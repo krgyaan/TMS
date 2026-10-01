@@ -1,4 +1,3 @@
-import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { useEmdCashFlow } from "@/hooks/api/useTenderExecutivePerformance";
 import { ColumnHeader } from "./emd-helpers";
@@ -14,9 +13,8 @@ export function EmdBacklogTable(props: { view: "user" | "team" | "all"; userId?:
     if (!data) return null;
 
     return (
-        <Card className="border-0 ring-1 ring-border/50 shadow-sm">
-            <CardContent className="p-0">
-                <Table className="w-full table-fixed">
+        <div className="overflow-x-auto">
+            <Table className="w-full table-fixed">
                     <TableHeader className="bg-muted/30">
                         <TableRow>
                             <TableHead />
@@ -65,14 +63,16 @@ export function EmdBacklogTable(props: { view: "user" | "team" | "all"; userId?:
                             {/* Received for Current Paid */}
                             <MetricCell data={data.receivedForDuring} strong />
 
-                            {props.view === "team" && props.teamId === 1 && data.otherThanTms && <OtherThanTmsBox entries={data.otherThanTms} />}
+                            {/* The cell must render whenever the header does, even with no entries, or the
+                                row would be one cell short and every later value would shift left
+                                under the wrong column. OtherThanTmsBox renders a placeholder. */}
+                            {props.view === "team" && props.teamId === 1 && <OtherThanTmsBox entries={data.otherThanTms ?? []} />}
 
                             {/* Closing */}
                             <MetricCell data={data.pendingAtEnd} />
                         </TableRow>
                     </TableBody>
                 </Table>
-            </CardContent>
-        </Card>
+        </div>
     );
 }

@@ -3,9 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 /* UI Components */
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -160,6 +159,9 @@ function resolveInitialScope(
     if (access.selfOnly) return access.userId ? { view: "user", userId: access.userId } : restored;
     return access.teamId ? { view: "team", teamId: access.teamId } : restored;
 }
+
+/* Team labels used by the Team dropdown and the scope note. */
+const TEAM_LABELS: Record<number, string> = { 1: "AC Team", 2: "DC Team" };
 
 const KPI_LABELS: Record<TenderKpiKey, string> = {
     ALLOCATED: "Allocated",
@@ -350,6 +352,21 @@ export default function TenderExecutivePerformance() {
         });
     }, [allUsers, unrestricted, teamLocked, authTeamName]);
 
+    /** Describes whose data is on screen, using the applied scope (what actually loaded). */
+    const scopeNote = useMemo(() => {
+        if (appliedScope.view === "all") return "You are viewing data for all teams (AC and DC).";
+        if (appliedScope.view === "team") {
+            const team = (appliedScope as { view: "team"; teamId: number }).teamId;
+            return `You are viewing data for the ${TEAM_LABELS[team] ?? "selected team"}.`;
+        }
+        if (appliedScope.view === "user") {
+            const id = (appliedScope as { view: "user"; userId: number }).userId;
+            const member = users.find(u => u.id === id)?.name;
+            return member ? `You are viewing data for ${member}.` : "You are viewing data for the selected team member.";
+        }
+        return "Select a team or team member to view their data.";
+    }, [appliedScope, users]);
+
     const { data: outcomes } = usePerformanceOutcomes(userQuery);
     const { data: stageMatrix } = useStageMatrix(userQuery);
 
@@ -530,8 +547,14 @@ export default function TenderExecutivePerformance() {
                     </div>
                 </div>
 
-                <Card className="shadow-sm">
-                    <CardContent className="p-6">
+                {/* ===== SINGLE CONTAINING CARD =====
+                    Every section below is a full-width slice of this one box. Boundaries between
+                    sections are drawn by divide-y (a thin 1px line), not by gaps, so there is no
+                    vertical whitespace between them. */}
+                <Card className="shadow-sm border-0 ring-1 ring-border/50 overflow-hidden">
+                    <CardContent className="p-0">
+                        {/* FILTER BAR */}
+                        <div className="p-6 border-b border-border/60">
                         <div className="flex flex-wrap items-end gap-4">
                             {/* TEAM SELECT */}
                             <div className="min-w-[200px] flex-1 space-y-2">
@@ -611,26 +634,33 @@ export default function TenderExecutivePerformance() {
                             </div>
                         </div>
                         {dateError && <p className="mt-2 text-sm text-destructive">{dateError}</p>}
-                    </CardContent>
-                </Card>
 
-                {/* ===== STAGE BACKLOG ===== */}
-                {/* {sharedQuery && <StageBacklogTable {...sharedQuery} />} */}
-                {sharedQuery && <StageBacklogV4Table {...sharedQuery} />}
+                        {/* SCOPE NOTE - spells out whose data the grid is showing, so the
+                            effect of the Team / Team Member dropdowns is never ambiguous. */}
+                        <p className="mt-3 flex items-start gap-1.5 text-xs text-muted-foreground">
+                            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                            <span>{scopeNote}</span>
+                        </p>
+                        </div>
 
-                {/* ===== EMD BACKLOG ===== */}
-                {sharedQuery && <EmdBacklogTable {...sharedQuery} />}
+                        {/* divide-y draws the thin line above every section except the first,
+                            so the final section has no trailing border - the card's own border
+                            closes the box. */}
+                        <div className="divide-y divide-border/60">
+                        {/* ===== STAGE BACKLOG ===== */}
+                        {sharedQuery && <StageBacklogV4Table {...sharedQuery} />}
 
-                {appliedScope.view === "user" && (
-                    <>
+                        {/* ===== EMD BACKLOG ===== */}
+                        {sharedQuery && <EmdBacklogTable {...sharedQuery} />}
+
+                        {appliedScope.view === "user" && (
+                            <>
                         {/* ===== KPI CARDS ===== */}
                         <div className="space-y-6 hidden">
                             <div>
                                 <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase">Pre-Bid</h3>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{PRE_BID_KPIS.map(renderKpiCard)}</div>
                             </div>
-
-                            <Separator />
 
                             <div>
                                 <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase">Post-Bid</h3>
@@ -639,20 +669,19 @@ export default function TenderExecutivePerformance() {
                         </div>
 
                         {/* ===== TENDER LIST TABLE ===== */}
-                        <Card className="shadow-sm border-0 ring-1 ring-border/50">
-                            <CardHeader className="flex flex-row items-center justify-between pb-4">
+                        <div>
+                            <div className="flex flex-row items-center justify-between p-6 pb-4">
                                 <div>
-                                    <CardTitle className="text-lg flex items-center gap-2">
+                                    <h3 className="text-lg font-semibold flex items-center gap-2">
                                         {[...PRE_BID_KPIS, ...POST_BID_KPIS].find(k => k.key === selectedMetric)?.label ?? "All"} Tenders
                                         <Badge variant="secondary">{tenders.length}</Badge>
-                                    </CardTitle>
+                                    </h3>
                                 </div>
                                 <div className="relative w-64 hidden sm:block">
                                     <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                                     <Input placeholder="Search tenders..." className="pl-8 h-9" />
                                 </div>
-                            </CardHeader>
-                            <CardContent className="p-0">
+                            </div>
                                 <Table>
                                     <TableHeader className="bg-muted/50">
                                         <TableRow>
@@ -687,22 +716,19 @@ export default function TenderExecutivePerformance() {
                                         ))}
                                     </TableBody>
                                 </Table>
-                            </CardContent>
-                        </Card>
+                        </div>
 
                         {/* ===== STAGE MATRIX / KANBAN METRICS ===== */}
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <div className="space-y-1">
-                                    <h2 className="text-xl font-bold flex items-center gap-2">
-                                        <Briefcase className="h-5 w-5 text-primary" />
-                                        Stage Efficiency Matrix
-                                    </h2>
-                                    <p className="text-sm text-muted-foreground">Detailed breakdown of tender counts per stage and status.</p>
-                                </div>
+                        <div>
+                            <div className="p-6 pb-4">
+                                <h2 className="text-xl font-bold flex items-center gap-2">
+                                    <Briefcase className="h-5 w-5 text-primary" />
+                                    Stage Efficiency Matrix
+                                </h2>
+                                <p className="text-sm text-muted-foreground">Detailed breakdown of tender counts per stage and status.</p>
                             </div>
 
-                            <Card className="shadow-sm border-0 ring-1 ring-border/50 overflow-hidden pt-0 mt-0">
+                            <div>
                                 <div className="overflow-x-auto">
                                     <Table className="min-w-[1000px] border-collapse">
                                         <TableHeader className="bg-muted/30">
@@ -818,10 +844,13 @@ export default function TenderExecutivePerformance() {
                                         </TableBody>
                                     </Table>
                                 </div>
-                            </Card>
+                            </div>
                         </div>
-                    </>
-                )}
+                            </>
+                        )}
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
         </div>
     );
