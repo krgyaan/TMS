@@ -66,7 +66,11 @@ const formatLabel = (label: string) => {
         .join(" ");
 };
 
-export type Scope = { view: "user"; userId: number } | { view: "team"; teamId: number } | { view: null };
+export type Scope =
+    | { view: "user"; userId: number }
+    | { view: "team"; teamId: number }
+    | { view: "all" }
+    | { view: null };
 
 const SCOPE_STORAGE_KEY = "tms:tender-executive-scope";
 
@@ -85,16 +89,23 @@ type InitialFilters = {
     toDate: string | null;
 };
 
-const FILTER_KEYS = ["userId", "teamId", "fromDate", "toDate"];
+const FILTER_KEYS = ["userId", "teamId", "view", "fromDate", "toDate"];
 
 function readFiltersFrom(source: URLSearchParams): InitialFilters {
     const userId = parsePositiveId(source.get("userId"));
     const teamId = parsePositiveId(source.get("teamId"));
+    const viewAll = source.get("view") === "all";
     const rawFrom = source.get("fromDate");
     const rawTo = source.get("toDate");
 
     return {
-        scope: userId ? { view: "user", userId } : teamId ? { view: "team", teamId } : { view: null },
+        scope: viewAll
+            ? { view: "all" }
+            : userId
+              ? { view: "user", userId }
+              : teamId
+                ? { view: "team", teamId }
+                : { view: null },
         fromDate: isDateString(rawFrom) ? rawFrom : null,
         toDate: isDateString(rawTo) ? rawTo : null,
     };
@@ -186,7 +197,14 @@ export default function TenderExecutivePerformance() {
 
         const userId = parsePositiveId(searchParams.get("userId"));
         const teamId = parsePositiveId(searchParams.get("teamId"));
-        const urlScope: Scope = userId ? { view: "user", userId } : teamId ? { view: "team", teamId } : { view: null };
+        const viewAll = searchParams.get("view") === "all";
+        const urlScope: Scope = viewAll
+            ? { view: "all" }
+            : userId
+              ? { view: "user", userId }
+              : teamId
+                ? { view: "team", teamId }
+                : { view: null };
         const rawFrom = searchParams.get("fromDate");
         const rawTo = searchParams.get("toDate");
         const urlFrom = isDateString(rawFrom) ? rawFrom : null;
@@ -204,6 +222,7 @@ export default function TenderExecutivePerformance() {
         const params = new URLSearchParams();
         if (appliedScope.view === "user") params.set("userId", String(appliedScope.userId));
         if (appliedScope.view === "team") params.set("teamId", String(appliedScope.teamId));
+        if (appliedScope.view === "all") params.set("view", "all");
         if (appliedFromDate) params.set("fromDate", appliedFromDate);
         if (appliedToDate) params.set("toDate", appliedToDate);
 
@@ -247,7 +266,9 @@ export default function TenderExecutivePerformance() {
             ? { ...baseRange, view: "user" as const, userId: (appliedScope as { view: "user"; userId: number }).userId }
             : baseRange && appliedScope.view === "team"
               ? { ...baseRange, view: "team" as const, teamId: (appliedScope as { view: "team"; teamId: number }).teamId }
-              : null;
+              : baseRange && appliedScope.view === "all"
+                ? { ...baseRange, view: "all" as const }
+                : null;
 
     const { data: users } = useUsersByRole(5);
 
@@ -438,12 +459,17 @@ export default function TenderExecutivePerformance() {
                             <div className="min-w-[200px] flex-1 space-y-2">
                                 <label className="text-sm font-medium">Team</label>
                                 <Combobox
-                                    value={draftScope.view === "team" ? String(draftScope.teamId) : ""}
+                                    value={draftScope.view === "team" ? String(draftScope.teamId) : draftScope.view === "all" ? "all" : ""}
                                     onChange={v => {
+                                        if (v === "all") {
+                                            setDraftScope({ view: "all" });
+                                            return;
+                                        }
                                         const teamId = parsePositiveId(v);
                                         setDraftScope(teamId ? { view: "team", teamId } : { view: null });
                                     }}
                                     options={[
+                                        { id: "all", name: "All Teams" },
                                         { id: "1", name: "AC Team" },
                                         { id: "2", name: "DC Team" },
                                     ]}
@@ -455,7 +481,7 @@ export default function TenderExecutivePerformance() {
                             <div className="min-w-[200px] flex-1 space-y-2">
                                 <label className="text-sm font-medium">Team Member</label>
                                 <Combobox
-                                    disabled={draftScope.view === "team"}
+                                    disabled={draftScope.view === "team" || draftScope.view === "all"}
                                     value={draftScope.view === "user" ? String(draftScope.userId) : ""}
                                     onChange={v => {
                                         const userId = parsePositiveId(v);

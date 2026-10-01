@@ -9,7 +9,7 @@ import { OtherThanTmsBox } from "./otherThanTmsBox";
    EMD TRACKING TABLE
 ================================ */
 
-export function EmdBacklogTable(props: { view: "user" | "team"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
+export function EmdBacklogTable(props: { view: "user" | "team" | "all"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
     const { data } = useEmdCashFlow(props);
     if (!data) return null;
 

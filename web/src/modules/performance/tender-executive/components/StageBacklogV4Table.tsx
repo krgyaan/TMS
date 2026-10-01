@@ -300,7 +300,7 @@ function CancelledTable({ stage }: { stage: StageBacklogStage }) {
    FINAL PAGE EXPORT
 =============================== */
 
-export function StageBacklogV4Table(props: { view: "user" | "team"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
+export function StageBacklogV4Table(props: { view: "user" | "team" | "all"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
     const { data } = useStageBacklogV2(props);
     if (!data) return null;
 

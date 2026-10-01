@@ -53,7 +53,10 @@ export const useStageBacklogV2 = (query: StageQuery) =>
 
             return tenderExecutivePerformanceService.getStageBacklogV2(query);
         },
-        enabled: !!query.fromDate && !!query.toDate && ((query.view === "user" && !!query.userId) || (query.view === "team" && !!query.teamId)),
+        enabled:
+            !!query.fromDate &&
+            !!query.toDate &&
+            ((query.view === "user" && !!query.userId) || (query.view === "team" && !!query.teamId) || query.view === "all"),
     });
 
 /* ===================== EMD CASH FLOW ===================== */
@@ -68,5 +71,8 @@ export const useEmdCashFlow = (query: StageQuery) =>
 
             return tenderExecutivePerformanceService.getEmdCashFlow(query);
         },
-        enabled: !!query.fromDate && !!query.toDate && ((query.view === "user" && !!query.userId) || (query.view === "team" && !!query.teamId)),
+        enabled:
+            !!query.fromDate &&
+            !!query.toDate &&
+            ((query.view === "user" && !!query.userId) || (query.view === "team" && !!query.teamId) || query.view === "all"),
     });
