@@ -35,9 +35,19 @@ import {
     type LucideIcon,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { EmdBacklogTable } from "./components/EmdBacklogTable";
 import { StageBacklogV4Table } from "./components/StageBacklogV4Table";
 import { ScoreDrilldownPopover } from "./components/ScoreDrilldownPopover";
+
+/* ================================
+   ACCESS SCOPE
+   Roles that may pick any team and any member on these screens.
+   Coordinator is listed here on purpose rather than by widening their entry in
+   the shared TEAM_SWITCH_ALLOWED_ROLES constant, so the change stays local to
+   this module. The backend enforces the same rules.
+   ================================ */
+const UNRESTRICTED_ROLES = new Set(["Super User", "Admin", "Coordinator"]);
 
 /* ================================
    HELPERS
@@ -132,6 +142,25 @@ function isSameScope(a: Scope, b: Scope) {
     return true;
 }
 
+/**
+ * Decide the scope a locked role should open with.
+ *
+ * Unrestricted roles (Super User / Admin / Coordinator) keep whatever the URL or
+ * localStorage held, since choosing their own scope is legitimate. Everyone else
+ * is pinned on first render so a bookmarked team or member cannot survive a role
+ * change: self-scope roles start on their own record, Team Leaders start on their
+ * own team. Returns the restored scope unchanged while auth is still loading, so
+ * the effect that follows auth arrival can do the pinning instead.
+ */
+function resolveInitialScope(
+    restored: Scope,
+    access: { unrestricted: boolean; selfOnly: boolean; teamId: number | null; userId: number | null }
+): Scope {
+    if (access.unrestricted) return restored;
+    if (access.selfOnly) return access.userId ? { view: "user", userId: access.userId } : restored;
+    return access.teamId ? { view: "team", teamId: access.teamId } : restored;
+}
+
 const KPI_LABELS: Record<TenderKpiKey, string> = {
     ALLOCATED: "Allocated",
     PENDING: "Pending",
@@ -157,13 +186,31 @@ const KPI_LABELS: Record<TenderKpiKey, string> = {
 
 export default function TenderExecutivePerformance() {
     const [searchParams, setSearchParams] = useSearchParams();
+    const { role, dataScope, teamId: authTeamId, teamName: authTeamName, user: authUser } = useAuth();
+
+    /* Whether this user may pick any team and any member. */
+    const unrestricted = UNRESTRICTED_ROLES.has(role ?? "");
+    /* Team Leader and self-scope roles keep the Team dropdown pinned to their own team. */
+    const teamLocked = !unrestricted;
+    /* Self-scope roles (Executive / Engineer / Field) are pinned to their own record. */
+    const selfOnly = dataScope === "self";
+    const authUserId = authUser?.id ?? null;
+
     const [initialFilters] = useState(() => readInitialFilters(searchParams.toString()));
 
-    const [draftScope, setDraftScope] = useState<Scope>(initialFilters.scope);
+    /* Pin locked roles before the first paint so the tables never issue a request
+       for a team or member the user is not allowed to see. */
+    const initialScope = useMemo(
+        () => resolveInitialScope(initialFilters.scope, { unrestricted, selfOnly, teamId: authTeamId, userId: authUserId }),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        []
+    );
+
+    const [draftScope, setDraftScope] = useState<Scope>(initialScope);
     const [draftFromDate, setDraftFromDate] = useState<string | null>(initialFilters.fromDate);
     const [draftToDate, setDraftToDate] = useState<string | null>(initialFilters.toDate);
 
-    const [appliedScope, setAppliedScope] = useState<Scope>(initialFilters.scope);
+    const [appliedScope, setAppliedScope] = useState<Scope>(initialScope);
     const [appliedFromDate, setAppliedFromDate] = useState<string | null>(initialFilters.fromDate);
     const [appliedToDate, setAppliedToDate] = useState<string | null>(initialFilters.toDate);
 
@@ -184,6 +231,24 @@ export default function TenderExecutivePerformance() {
         lastWrittenRef.current = cached;
         setSearchParams(new URLSearchParams(cached), { replace: true });
     }, [searchParams, setSearchParams]);
+
+    /**
+     * Overwrite any scope restored from the URL or localStorage that exceeds
+     * what this user may see, so a bookmarked team or member cannot survive a
+     * role change. Runs once per identity.
+     */
+    useEffect(() => {
+        /* Unrestricted roles legitimately pick their own scope, so a saved
+           preference must survive a reload. */
+        if (authUserId == null || unrestricted) return;
+
+        const forced: Scope = selfOnly
+            ? { view: "user", userId: authUserId }
+            : { view: "team", teamId: authTeamId ?? -1 };
+
+        setDraftScope(current => (isSameScope(current, forced) ? current : forced));
+        setAppliedScope(current => (isSameScope(current, forced) ? current : forced));
+    }, [authUserId, authTeamId, selfOnly, teamLocked, unrestricted]);
 
     useEffect(() => {
         const current = searchParams.toString();
@@ -270,7 +335,20 @@ export default function TenderExecutivePerformance() {
                 ? { ...baseRange, view: "all" as const }
                 : null;
 
-    const { data: users } = useUsersByRole(5);
+    const { data: allUsers } = useUsersByRole(5);
+
+    /* Team Leaders see only their own team's members. A member with no team, or a
+       session whose team name is missing, is not filtered out here — the backend
+       scope clamp still refuses the data, so hiding them would only mislead. */
+    const users = useMemo(() => {
+        if (!allUsers) return [];
+        if (unrestricted || !teamLocked) return allUsers;
+        if (!authTeamName) return allUsers;
+        return allUsers.filter(u => {
+            const memberTeam = (u.team as unknown as string | null) ?? null;
+            return !memberTeam || memberTeam === authTeamName;
+        });
+    }, [allUsers, unrestricted, teamLocked, authTeamName]);
 
     const { data: outcomes } = usePerformanceOutcomes(userQuery);
     const { data: stageMatrix } = useStageMatrix(userQuery);
@@ -459,7 +537,16 @@ export default function TenderExecutivePerformance() {
                             <div className="min-w-[200px] flex-1 space-y-2">
                                 <label className="text-sm font-medium">Team</label>
                                 <Combobox
-                                    value={draftScope.view === "team" ? String(draftScope.teamId) : draftScope.view === "all" ? "all" : ""}
+                                    disabled={teamLocked}
+                                    value={
+                                        teamLocked
+                                            ? String(draftScope.view === "team" ? draftScope.teamId : authTeamId ?? "")
+                                            : draftScope.view === "team"
+                                              ? String(draftScope.teamId)
+                                              : draftScope.view === "all"
+                                                ? "all"
+                                                : ""
+                                    }
                                     onChange={v => {
                                         if (v === "all") {
                                             setDraftScope({ view: "all" });
@@ -468,11 +555,15 @@ export default function TenderExecutivePerformance() {
                                         const teamId = parsePositiveId(v);
                                         setDraftScope(teamId ? { view: "team", teamId } : { view: null });
                                     }}
-                                    options={[
-                                        { id: "all", name: "All Teams" },
-                                        { id: "1", name: "AC Team" },
-                                        { id: "2", name: "DC Team" },
-                                    ]}
+                                    options={
+                                        teamLocked && authTeamId
+                                            ? [{ id: String(authTeamId), name: authTeamName ?? "Your Team" }]
+                                            : [
+                                                  { id: "all", name: "All Teams" },
+                                                  { id: "1", name: "AC Team" },
+                                                  { id: "2", name: "DC Team" },
+                                              ]
+                                    }
                                     placeholder="Select Team"
                                 />
                             </div>
@@ -481,7 +572,7 @@ export default function TenderExecutivePerformance() {
                             <div className="min-w-[200px] flex-1 space-y-2">
                                 <label className="text-sm font-medium">Team Member</label>
                                 <Combobox
-                                    disabled={draftScope.view === "team" || draftScope.view === "all"}
+                                    disabled={selfOnly || draftScope.view === "all"}
                                     value={draftScope.view === "user" ? String(draftScope.userId) : ""}
                                     onChange={v => {
                                         const userId = parsePositiveId(v);

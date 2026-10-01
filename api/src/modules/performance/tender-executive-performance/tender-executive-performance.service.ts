@@ -1603,15 +1603,15 @@ export class TenderExecutiveService {
 
         /**
          * Awaited at Start
-         * Tenders that had already bid by the period start and had no result on
-         * record as of that date.
+         * Tenders that had already bid by the period start with no terminal
+         * result recorded by that date.
          *
-         * The result test is point-in-time: a tender leaves the opening backlog
-         * only once a result had actually landed by ${fromTz}. Testing mere
-         * existence would strip tenders whose result arrived after the period
-         * began, which is why the exclusion is bounded by <= rather than open
-         * ended. tender_infos.status is deliberately not consulted — it is the
-         * current status and cannot answer a historical question.
+         * "under evaluation" is not treated as resolved: it means the result has
+         * arrived and is still being assessed, so such a tender is still
+         * awaiting an outcome and belongs in the backlog.
+         *
+         * tender_infos.status is deliberately not consulted — it is the current
+         * status and cannot answer a historical question.
          */
         const resultAwaitedOpening = await exec(`
         ${baseSelect}
@@ -1627,12 +1627,8 @@ export class TenderExecutiveService {
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND (
-                        (LOWER(TRIM(tr.status)) IN (${resolvedResultStatuses})
-                         AND COALESCE(tr.result_uploaded_at, tr.updated_at) <= ${fromTz})
-                     OR (LOWER(TRIM(tr.status)) = 'under evaluation'
-                         AND tr.created_at <= ${fromTz})
-                  )
+                  AND LOWER(TRIM(tr.status)) IN (${resolvedResultStatuses})
+                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) <= ${fromTz}
           )
     `);
 
@@ -1712,8 +1708,14 @@ export class TenderExecutiveService {
 
         /**
          * Awaited at End
-         * Tenders that had bid by the period end with no result recorded by that
-         * date. Mirrors Awaited at Start, bounded to ${toTz}.
+         * Tenders that had bid by the period end with no terminal result
+         * recorded by that date. Mirrors Awaited at Start, bounded to ${toTz}.
+         *
+         * "under evaluation" is deliberately not tested here: that state means
+         * the tender is still awaiting its result, so it belongs in the closing
+         * backlog rather than being excluded from it. Including such a test
+         * would drop those tenders out of the funnel without them appearing in
+         * any outcome column.
          */
         const resultAwaitedClosing = await exec(`
         ${baseSelect}
@@ -1729,12 +1731,8 @@ export class TenderExecutiveService {
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND (
-                        (LOWER(TRIM(tr.status)) IN (${resolvedResultStatuses})
-                         AND COALESCE(tr.result_uploaded_at, tr.updated_at) <= ${toTz})
-                     OR (LOWER(TRIM(tr.status)) = 'under evaluation'
-                         AND tr.created_at <= ${toTz})
-                  )
+                  AND LOWER(TRIM(tr.status)) IN (${resolvedResultStatuses})
+                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) <= ${toTz}
           )
     `);
 
@@ -1999,6 +1997,21 @@ export class TenderExecutiveService {
                 },
             },
         };
+    }
+
+    /**
+     * Effective team for a user, matching the COALESCE used by getUserAuthInfo
+     * and by the auth /me response. Scope checks must use this rather than the
+     * raw users.team, which differs for anyone who has primary_team_id set.
+     */
+    async resolveEffectiveTeamId(userId: number): Promise<number | null> {
+        const rows = await this.db
+            .select({ teamId: sql<number | null>`COALESCE(${users.primaryTeamId}, ${users.team})` })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1);
+
+        return rows[0]?.teamId ?? null;
     }
 
     private sumValue(rows: any[]) {
