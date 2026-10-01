@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { documentChecklistService } from '@/services/api/document-checklist.service';
 import { toast } from 'sonner';
+import { saveAs } from 'file-saver';
 import type { DocumentChecklistsDashboardCounts, PaginatedResult, TenderDocumentChecklistDashboardRow, CreateDocumentChecklistDto, UpdateDocumentChecklistDto } from '@/types/api.types';
 import { useTeamFilter } from '@/hooks/useTeamFilter';
 
@@ -9,6 +10,7 @@ export const documentChecklistKeys = {
     lists: () => [...documentChecklistKeys.all, 'list'] as const,
     detail: (id: number) => [...documentChecklistKeys.all, 'detail', id] as const,
     byTender: (tenderId: number) => [...documentChecklistKeys.all, 'byTender', tenderId] as const,
+    biddingRequirements: (tenderId: number) => [...documentChecklistKeys.all, 'biddingRequirements', tenderId] as const,
     list: (filters?: Record<string, unknown>) => [...documentChecklistKeys.lists(), { filters }] as const,
     dashboardCounts: () => [...documentChecklistKeys.all, 'dashboardCounts'] as const,
 };
@@ -61,16 +63,51 @@ export const useDocumentChecklistByTender = (tenderId: number) => {
 };
 
 /**
+ * Page-load, cache-only read of a tender's bidding-requirements analysis. Hits the
+ * `/cached` endpoint, which never runs VolksAI, so opening the page costs nothing and a
+ * completed analysis shows immediately. `null` = the tender has never been analysed.
+ */
+export const useCachedBiddingRequirements = (tenderId: number) => {
+    return useQuery({
+        queryKey: documentChecklistKeys.biddingRequirements(tenderId),
+        queryFn: () => documentChecklistService.getCachedRequirements(tenderId),
+        enabled: !!tenderId,
+        staleTime: Infinity,
+        refetchOnWindowFocus: false,
+        retry: false,
+    });
+};
+
+/**
  * On-demand AI analysis (VolksAI) of a tender's main + ATC documents for
  * suggested bidding requirements. A mutation, not a query: this is a slow,
  * costed LLM call that should run only when the user asks for it, never
- * automatically on mount or refetch.
+ * automatically on mount or refetch. `forceRefresh` = "Re-analyze" (bypass the cache).
+ * The result is written into the cached-read query so the page shows it from then on.
  */
 export const useSuggestedBiddingRequirements = () => {
+    const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: (tenderId: number) => documentChecklistService.getSuggestedRequirements(tenderId),
+        mutationFn: ({ tenderId, forceRefresh = false }: { tenderId: number; forceRefresh?: boolean }) =>
+            documentChecklistService.getSuggestedRequirements(tenderId, forceRefresh),
+        onSuccess: (data, { tenderId }) => {
+            queryClient.setQueryData(documentChecklistKeys.biddingRequirements(tenderId), data);
+        },
         onError: (error: any) => {
             toast.error(error?.response?.data?.message || 'Failed to analyze bidding requirements for this tender');
+        },
+    });
+};
+
+/** Downloads one annexure's .docx and hands it to the browser (file-saver, as the xlsx exports do). */
+export const useDownloadAnnexure = () => {
+    return useMutation({
+        mutationFn: async ({ tenderId, annexureIndex }: { tenderId: number; annexureIndex: number }) => {
+            const { blob, filename } = await documentChecklistService.downloadAnnexure(tenderId, annexureIndex);
+            saveAs(blob, filename);
+        },
+        onError: () => {
+            toast.error('Failed to download annexure');
         },
     });
 };

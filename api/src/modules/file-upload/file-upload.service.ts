@@ -367,6 +367,37 @@ export class FileUploadService implements OnModuleInit {
     }
 
     /**
+     * Save a server-generated file (not a multer upload) into a context's directory,
+     * using the same `{epochMs}_{sanitizedName}.ext` naming and `{context}/{fileName}`
+     * relative path as processAndSave, so it is served by GET /files/serve/:context/:fileName.
+     * No compression or type validation -- the caller produced the buffer itself.
+     */
+    async saveBuffer(buffer: Buffer, context: FileContext, originalName: string, mimeType: string): Promise<UploadedFile> {
+        const ext = path.extname(originalName).toLowerCase();
+        const baseName = path
+            .basename(originalName, ext)
+            .replace(/[^a-zA-Z0-9-_]/g, '_')
+            .substring(0, 50);
+        const fileName = `${Date.now()}_${baseName}${ext}`;
+
+        const relativePath = path.join(context, fileName).replace(/\\/g, '/');
+        const absolutePath = path.join(this.getBasePath(context), relativePath);
+
+        await fs.mkdir(path.dirname(absolutePath), { recursive: true });
+        await fs.writeFile(absolutePath, buffer);
+
+        return {
+            originalName,
+            fileName,
+            path: relativePath,
+            fullPath: absolutePath,
+            mimeType,
+            size: buffer.length,
+            sizeFormatted: formatBytes(buffer.length),
+        };
+    }
+
+    /**
      * Get absolute path for serving
      */
     getAbsolutePath(filePath: string): string {

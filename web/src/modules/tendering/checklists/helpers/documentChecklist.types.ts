@@ -95,10 +95,33 @@ export interface SuggestedBiddingRequirement {
     reasoning: string;
 }
 
+/**
+ * An annexure/form identified in the tender documents. Only the fields the UI shows are
+ * typed; the structured `blocks` stay server-side (the .docx is rendered by the API).
+ */
+export interface SuggestedAnnexure {
+    annexureName: string;
+    source: {
+        document: 'main' | 'atc';
+        page: number;
+        snippet: string;
+    };
+}
+
 export interface BiddingRequirementsAnalysisResult {
     jobId: string;
     requirements: SuggestedBiddingRequirement[];
+    /** Absent on payloads that predate annexure extraction; its array index is the download index. */
+    annexures?: SuggestedAnnexure[];
     llmUsage: Record<string, unknown> | null;
+}
+
+/**
+ * GET /document-checklists/tender/:tenderId/bidding-requirements/cached -- cache-only read;
+ * `analysis` is null when the tender has no current cached analysis. Never runs VolksAI.
+ */
+export interface CachedBiddingRequirementsResponse {
+    analysis: BiddingRequirementsAnalysisResult | null;
 }
 
 /**

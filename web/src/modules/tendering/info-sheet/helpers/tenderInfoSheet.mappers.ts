@@ -13,6 +13,21 @@ const toNumber = (val: string | number | null | undefined, defaultValue = 0): nu
     return isNaN(num) ? defaultValue : num;
 };
 
+// For numeric FORM fields: a null / missing / unparseable value means "not stated" and
+// stays undefined (the input renders empty) -- never 0. A stored 0 is kept as 0.
+export const toOptionalNumber = (val: string | number | null | undefined): number | undefined => {
+    if (val === null || val === undefined || (typeof val === 'string' && val.trim() === '')) return undefined;
+    const num = typeof val === 'number' ? val : parseFloat(String(val));
+    return isNaN(num) ? undefined : num;
+};
+
+// Seeds from the tender record (gstValues / tenderFees / emd). Those columns are NOT NULL
+// DEFAULT 0 in tender_infos, so 0 there means "never entered", not a real amount.
+export const toSeedAmount = (val: string | number | null | undefined): number | undefined => {
+    const num = toOptionalNumber(val);
+    return num !== undefined && num > 0 ? num : undefined;
+};
+
 // Helper to extract document names from objects or return strings as-is
 const extractDocumentNames = (val: (string | { id?: number; documentName: string } | { id?: string | number; value?: string | number;[key: string]: any })[] | null | undefined): string[] => {
     if (!val || !Array.isArray(val)) return [];
@@ -73,44 +88,44 @@ export const buildDefaultValues = (tender?: TenderInfoWithNames | null): TenderI
 
     processingFeeRequired: undefined,
     processingFeeModes: [],
-    processingFeeAmount: 0,
+    processingFeeAmount: undefined,
 
     tenderFeeRequired: undefined,
     tenderFeeModes: [],
-    tenderFeeAmount: tender?.tenderFees ? toNumber(tender.tenderFees) : 0,
+    tenderFeeAmount: toSeedAmount(tender?.tenderFees),
 
     emdRequired: undefined,
     emdModes: [],
-    emdAmount: tender?.emd ? toNumber(tender.emd) : 0,
+    emdAmount: toSeedAmount(tender?.emd),
 
-    tenderValue: tender?.gstValues ? toNumber(tender.gstValues) : 0,
+    tenderValue: toSeedAmount(tender?.gstValues),
     oemExperience: tender?.oemExperience ? tender.oemExperience as 'YES' | 'NO' : null,
 
-    bidValidityDays: 0,
+    bidValidityDays: undefined,
     commercialEvaluation: undefined,
     mafRequired: undefined,
     reverseAuctionApplicable: undefined,
 
-    paymentTermsSupply: 0,
-    paymentTermsInstallation: 0,
+    paymentTermsSupply: undefined,
+    paymentTermsInstallation: undefined,
 
-    deliveryTimeSupply: 0,
+    deliveryTimeSupply: undefined,
     deliveryTimeInstallationInclusive: false,
     deliveryTimeInstallation: undefined,
 
     pbgRequired: undefined,
     pbgForm: undefined,
-    pbgPercentage: 0,
-    pbgDurationMonths: 0,
+    pbgPercentage: undefined,
+    pbgDurationMonths: undefined,
 
     sdRequired: undefined,
     sdForm: undefined,
-    securityDepositPercentage: 0,
-    sdDurationMonths: 0,
+    securityDepositPercentage: undefined,
+    sdDurationMonths: undefined,
 
     ldRequired: undefined,
-    ldPercentagePerWeek: 0,
-    maxLdPercentage: 0,
+    ldPercentagePerWeek: undefined,
+    maxLdPercentage: undefined,
 
     physicalDocsRequired: undefined,
     physicalDocType: undefined,
@@ -119,25 +134,25 @@ export const buildDefaultValues = (tender?: TenderInfoWithNames | null): TenderI
     siteVisit: '',
     sampleSubmission: '',
 
-    techEligibilityAgeYears: 0,
+    techEligibilityAgeYears: undefined,
 
     workValueType: undefined,
-    orderValue1: 0,
-    orderValue2: 0,
-    orderValue3: 0,
+    orderValue1: undefined,
+    orderValue2: undefined,
+    orderValue3: undefined,
     customEligibilityCriteria: '',
 
     technicalWorkOrders: [],
     commercialDocuments: [],
 
     avgAnnualTurnoverCriteria: undefined,
-    avgAnnualTurnoverValue: 0,
+    avgAnnualTurnoverValue: undefined,
     workingCapitalCriteria: undefined,
-    workingCapitalValue: 0,
+    workingCapitalValue: undefined,
     solvencyCertificateCriteria: undefined,
-    solvencyCertificateValue: 0,
+    solvencyCertificateValue: undefined,
     netWorthCriteria: undefined,
-    netWorthValue: 0,
+    netWorthValue: undefined,
 
     courierAddress: '',
     courierName: '',
@@ -181,26 +196,26 @@ export const mapResponseToForm = (
 
         processingFeeRequired: (data.processingFeeRequired?.trim().toUpperCase() as 'YES' | 'NO') ?? undefined,
         processingFeeModes: data.processingFeeMode ?? [],
-        processingFeeAmount: toNumber(data.processingFeeAmount),
+        processingFeeAmount: toOptionalNumber(data.processingFeeAmount),
 
         tenderFeeRequired: (data.tenderFeeRequired?.trim().toUpperCase() as 'YES' | 'NO') ?? undefined,
         tenderFeeModes: data.tenderFeeMode ?? [],
-        tenderFeeAmount: toNumber(data.tenderFeeAmount),
+        tenderFeeAmount: toOptionalNumber(data.tenderFeeAmount),
 
         emdRequired: (data.emdRequired?.trim().toUpperCase() as 'YES' | 'NO' | 'EXEMPT') ?? undefined,
         emdModes: data.emdMode ?? [],
-        emdAmount: toNumber(data.emdAmount),
-        tenderValue: toNumber(data.tenderValue),
+        emdAmount: toOptionalNumber(data.emdAmount),
+        tenderValue: toOptionalNumber(data.tenderValue),
 
         bidValidityDays: data.bidValidityDays != null ? toNumber(data.bidValidityDays) : undefined,
         commercialEvaluation: (data.commercialEvaluation?.trim() ?? undefined) as TenderInfoSheetFormValues['commercialEvaluation'],
         mafRequired: (data.mafRequired?.trim() ?? undefined) as TenderInfoSheetFormValues['mafRequired'],
         reverseAuctionApplicable: (data.reverseAuctionApplicable?.trim().toUpperCase() as 'YES' | 'NO') ?? undefined,
 
-        paymentTermsSupply: toNumber(data.paymentTermsSupply),
-        paymentTermsInstallation: toNumber(data.paymentTermsInstallation),
+        paymentTermsSupply: toOptionalNumber(data.paymentTermsSupply),
+        paymentTermsInstallation: toOptionalNumber(data.paymentTermsInstallation),
 
-        deliveryTimeSupply: toNumber(data.deliveryTimeSupply),
+        deliveryTimeSupply: toOptionalNumber(data.deliveryTimeSupply),
         deliveryTimeInstallationInclusive: data.deliveryTimeInstallationInclusive ?? false,
         deliveryTimeInstallation: data.deliveryTimeInstallationDays != null ? toNumber(data.deliveryTimeInstallationDays) : undefined,
 
@@ -216,8 +231,8 @@ export const mapResponseToForm = (
                 return [data.pbgMode];
             }
         })(),
-        pbgPercentage: toNumber(data.pbgPercentage),
-        pbgDurationMonths: toNumber(data.pbgDurationMonths),
+        pbgPercentage: toOptionalNumber(data.pbgPercentage),
+        pbgDurationMonths: toOptionalNumber(data.pbgDurationMonths),
 
         sdRequired: data.sdRequired ?? undefined,
         sdForm: (() => {
@@ -231,12 +246,12 @@ export const mapResponseToForm = (
                 return [data.sdMode];
             }
         })(),
-        securityDepositPercentage: toNumber(data.sdPercentage),
-        sdDurationMonths: toNumber(data.sdDurationMonths),
+        securityDepositPercentage: toOptionalNumber(data.sdPercentage),
+        sdDurationMonths: toOptionalNumber(data.sdDurationMonths),
 
         ldRequired: data.ldRequired ?? undefined,
-        ldPercentagePerWeek: toNumber(data.ldPercentagePerWeek),
-        maxLdPercentage: toNumber(data.maxLdPercentage),
+        ldPercentagePerWeek: toOptionalNumber(data.ldPercentagePerWeek),
+        maxLdPercentage: toOptionalNumber(data.maxLdPercentage),
 
         physicalDocsRequired: data.physicalDocsRequired ?? undefined,
         physicalDocType: (data.physicalDocType?.trim() ?? undefined) as TenderInfoSheetFormValues['physicalDocType'],
@@ -249,26 +264,26 @@ export const mapResponseToForm = (
         siteVisit: data.siteVisit ?? '',
         sampleSubmission: data.sampleSubmission ?? '',
 
-        techEligibilityAgeYears: toNumber(data.techEligibilityAge),
+        techEligibilityAgeYears: toOptionalNumber(data.techEligibilityAge),
         oemExperience: data.oemExperience as 'YES' | 'NO' | null,
 
         workValueType: data.workValueType ?? undefined,
-        orderValue1: toNumber(data.orderValue1),
-        orderValue2: toNumber(data.orderValue2),
-        orderValue3: toNumber(data.orderValue3),
+        orderValue1: toOptionalNumber(data.orderValue1),
+        orderValue2: toOptionalNumber(data.orderValue2),
+        orderValue3: toOptionalNumber(data.orderValue3),
         customEligibilityCriteria: data.customEligibilityCriteria ?? '',
 
         technicalWorkOrders: extractDocumentNames(data.technicalWorkOrders),
         commercialDocuments: extractDocumentNames(data.commercialDocuments),
 
         avgAnnualTurnoverCriteria: (data.avgAnnualTurnoverType?.trim() ?? undefined) as TenderInfoSheetFormValues['avgAnnualTurnoverCriteria'],
-        avgAnnualTurnoverValue: toNumber(data.avgAnnualTurnoverValue),
+        avgAnnualTurnoverValue: toOptionalNumber(data.avgAnnualTurnoverValue),
         workingCapitalCriteria: (data.workingCapitalType?.trim() ?? undefined) as TenderInfoSheetFormValues['workingCapitalCriteria'],
-        workingCapitalValue: toNumber(data.workingCapitalValue),
+        workingCapitalValue: toOptionalNumber(data.workingCapitalValue),
         solvencyCertificateCriteria: (data.solvencyCertificateType?.trim() ?? undefined) as TenderInfoSheetFormValues['solvencyCertificateCriteria'],
-        solvencyCertificateValue: toNumber(data.solvencyCertificateValue),
+        solvencyCertificateValue: toOptionalNumber(data.solvencyCertificateValue),
         netWorthCriteria: (data.netWorthType?.trim() ?? undefined) as TenderInfoSheetFormValues['netWorthCriteria'],
-        netWorthValue: toNumber(data.netWorthValue),
+        netWorthValue: toOptionalNumber(data.netWorthValue),
 
         courierAddress: data.courierAddress ?? '',
         courierName: data.courierName ?? '',
@@ -330,6 +345,11 @@ const safeYesNoValue = (value: 'YES' | 'NO' | undefined | null | string): 'YES' 
 };
 
 // Helper to convert number to null if 0 or undefined
+// Numbers where 0 is a genuine value (e.g. 0% installation payment): only "not stated"
+// becomes null.
+const nullableNumber = (value: number | null | undefined): number | null =>
+    value === null || value === undefined || Number.isNaN(value) ? null : value;
+
 const safeNumber = (value: number | null | undefined): number | null => {
     if (value === null || value === undefined || value === 0) {
         return null;
@@ -522,8 +542,8 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
         mafRequired: values.mafRequired ?? null,
         reverseAuctionApplicable: safeYesNoValue(values.reverseAuctionApplicable),
 
-        paymentTermsSupply: safeNumber(values.paymentTermsSupply),
-        paymentTermsInstallation: safeNumber(values.paymentTermsInstallation),
+        paymentTermsSupply: nullableNumber(values.paymentTermsSupply),
+        paymentTermsInstallation: nullableNumber(values.paymentTermsInstallation),
 
         deliveryTimeSupply: safeNumber(values.deliveryTimeSupply),
         deliveryTimeInstallationInclusive:

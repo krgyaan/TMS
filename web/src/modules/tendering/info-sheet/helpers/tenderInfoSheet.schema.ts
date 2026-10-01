@@ -1,5 +1,14 @@
 import { z } from 'zod';
 
+// Numeric form fields: null / '' (a cleared NumberInput, or an API value that is null)
+// mean "not stated" and must stay undefined. z.coerce.number() on its own turns null and
+// '' into 0, so an unset field used to validate -- and save -- as 0.
+const optionalNumber = <T extends z.ZodTypeAny>(schema: T) =>
+    z.preprocess(
+        (v) => (v === null || (typeof v === 'string' && v.trim() === '') ? undefined : v),
+        schema,
+    );
+
 export const TenderInformationFormSchema = z.object({
     // TE Recommendation
     teRecommendation: z.enum(['YES', 'NO']),
@@ -10,32 +19,34 @@ export const TenderInformationFormSchema = z.object({
     // Processing Fee
     processingFeeRequired: z.enum(['YES', 'NO']).optional(),
     processingFeeModes: z.array(z.string()).optional(),
-    processingFeeAmount: z.coerce.number().nonnegative().optional(),
+    processingFeeAmount: optionalNumber(z.coerce.number().nonnegative().optional()),
 
     // Tender Fee
     tenderFeeRequired: z.enum(['YES', 'NO']).optional(),
     tenderFeeModes: z.array(z.string()).optional(),
-    tenderFeeAmount: z.coerce.number().nonnegative().optional(),
+    tenderFeeAmount: optionalNumber(z.coerce.number().nonnegative().optional()),
 
     // EMD
     emdRequired: z.enum(['YES', 'NO', 'EXEMPT']).optional(),
     emdModes: z.array(z.string()).optional(),
-    emdAmount: z.coerce.number().nonnegative().optional(),
+    emdAmount: optionalNumber(z.coerce.number().nonnegative().optional()),
 
     // Tender Value
-    tenderValue: z.coerce
-        .number()
-        .nonnegative()
-        .optional()
-        .refine((val) => val === undefined || val === null || val >= 0, {
-            message: 'Tender value must be positive',
-        }),
+    tenderValue: optionalNumber(
+        z.coerce
+            .number()
+            .nonnegative()
+            .optional()
+            .refine((val) => val === undefined || val === null || val >= 0, {
+                message: 'Tender value must be positive',
+            })
+    ),
 
     // OEM Experience
     oemExperience: z.enum(['YES', 'NO']).nullable().optional(),
 
     // Bid & Commercial
-    bidValidityDays: z.coerce.number().int().min(0).max(366).optional(),
+    bidValidityDays: optionalNumber(z.coerce.number().int().min(0).max(366).optional()),
     commercialEvaluation: z
         .enum([
             'ITEM_WISE_GST_INCLUSIVE',
@@ -50,8 +61,8 @@ export const TenderInformationFormSchema = z.object({
     reverseAuctionApplicable: z.enum(['YES', 'NO']).optional(),
 
     // Payment Terms
-    paymentTermsSupply: z.coerce.number().min(0).max(100).optional(),
-    paymentTermsInstallation: z.coerce.number().min(0).max(100).optional(),
+    paymentTermsSupply: optionalNumber(z.coerce.number().min(0).max(100).optional()),
+    paymentTermsInstallation: optionalNumber(z.coerce.number().min(0).max(100).optional()),
 
     // Delivery Time
     deliveryTimeSupply: z.preprocess(
@@ -79,19 +90,19 @@ export const TenderInformationFormSchema = z.object({
     // PBG
     pbgRequired: z.enum(['YES', 'NO']).optional(),
     pbgForm: z.array(z.string()).optional(),
-    pbgPercentage: z.coerce.number().min(0).max(100).optional(),
-    pbgDurationMonths: z.coerce.number().int().min(0).max(120).optional(),
+    pbgPercentage: optionalNumber(z.coerce.number().min(0).max(100).optional()),
+    pbgDurationMonths: optionalNumber(z.coerce.number().int().min(0).max(120).optional()),
 
     // Security Deposit
     sdRequired: z.enum(['YES', 'NO']).optional(),
     sdForm: z.array(z.string()).optional(),
-    securityDepositPercentage: z.coerce.number().min(0).max(100).optional(),
-    sdDurationMonths: z.coerce.number().int().min(0).max(120).optional(),
+    securityDepositPercentage: optionalNumber(z.coerce.number().min(0).max(100).optional()),
+    sdDurationMonths: optionalNumber(z.coerce.number().int().min(0).max(120).optional()),
 
     // LD
     ldRequired: z.enum(['YES', 'NO']).optional(),
-    ldPercentagePerWeek: z.coerce.number().min(0).max(5).optional(),
-    maxLdPercentage: z.coerce.number().min(0).max(100).optional(),
+    ldPercentagePerWeek: optionalNumber(z.coerce.number().min(0).max(5).optional()),
+    maxLdPercentage: optionalNumber(z.coerce.number().min(0).max(100).optional()),
 
     // Physical Docs
     physicalDocsRequired: z.enum(['YES', 'NO']).optional(),
@@ -110,17 +121,19 @@ export const TenderInformationFormSchema = z.object({
     sampleSubmission: z.string().max(2000).optional(),
 
     // Technical Eligibility
-    techEligibilityAgeYears: z.coerce
-        .number()
-        .int()
-        .nonnegative()
-        .optional(),
+    techEligibilityAgeYears: optionalNumber(
+        z.coerce
+            .number()
+            .int()
+            .nonnegative()
+            .optional()
+    ),
 
     // Work Value Type
     workValueType: z.enum(['WORKS_VALUES', 'CUSTOM']).optional(),
-    orderValue1: z.coerce.number().nonnegative().optional(),
-    orderValue2: z.coerce.number().nonnegative().optional(),
-    orderValue3: z.coerce.number().nonnegative().optional(),
+    orderValue1: optionalNumber(z.coerce.number().nonnegative().optional()),
+    orderValue2: optionalNumber(z.coerce.number().nonnegative().optional()),
+    orderValue3: optionalNumber(z.coerce.number().nonnegative().optional()),
     customEligibilityCriteria: z.string().max(1000).optional(),
 
     // Documents
@@ -131,19 +144,19 @@ export const TenderInformationFormSchema = z.object({
     avgAnnualTurnoverCriteria: z
         .enum(['NOT_APPLICABLE', 'POSITIVE', 'AMOUNT'])
         .optional(),
-    avgAnnualTurnoverValue: z.coerce.number().nonnegative().optional(),
+    avgAnnualTurnoverValue: optionalNumber(z.coerce.number().nonnegative().optional()),
     workingCapitalCriteria: z
         .enum(['NOT_APPLICABLE', 'POSITIVE', 'AMOUNT'])
         .optional(),
-    workingCapitalValue: z.coerce.number().nonnegative().optional(),
+    workingCapitalValue: optionalNumber(z.coerce.number().nonnegative().optional()),
     solvencyCertificateCriteria: z
         .enum(['NOT_APPLICABLE', 'POSITIVE', 'AMOUNT'])
         .optional(),
-    solvencyCertificateValue: z.coerce.number().nonnegative().optional(),
+    solvencyCertificateValue: optionalNumber(z.coerce.number().nonnegative().optional()),
     netWorthCriteria: z
         .enum(['NOT_APPLICABLE', 'POSITIVE', 'AMOUNT'])
         .optional(),
-    netWorthValue: z.coerce.number().nonnegative().optional(),
+    netWorthValue: optionalNumber(z.coerce.number().nonnegative().optional()),
 
     clients: z.array(
         z.object({

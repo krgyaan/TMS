@@ -15,27 +15,34 @@ CREATE TABLE IF NOT EXISTS "tender_result_details" (
 
 CREATE INDEX IF NOT EXISTS "tender_result_details_result_id_idx" ON "tender_result_details" ("tender_result_id");--> statement-breakpoint
 
--- Backfill existing data from tender_results into tender_result_details
-INSERT INTO "tender_result_details" (
-    "tender_result_id",
-    "result",
-    "l1_price",
-    "l2_price",
-    "our_price",
-    "qualified_parties_screenshot",
-    "final_result_screenshot",
-    "result_uploaded_at",
-    "result_reason"
-)
-SELECT
-    "id",
-    "result",
-    "l1_price",
-    "l2_price",
-    
-    "our_price",
-    "qualified_parties_screenshot",
-    "final_result_screenshot",
-    "result_uploaded_at",
-    "result_reason"
-FROM "tender_results";
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'tender_results' AND column_name = 'result'
+    ) THEN
+        EXECUTE '
+        INSERT INTO "tender_result_details" (
+            "tender_result_id",
+            "result",
+            "l1_price",
+            "l2_price",
+            "our_price",
+            "qualified_parties_screenshot",
+            "final_result_screenshot",
+            "result_uploaded_at",
+            "result_reason"
+        )
+        SELECT
+            "id",
+            "result",
+            "l1_price",
+            "l2_price",
+            "our_price",
+            "qualified_parties_screenshot",
+            "final_result_screenshot",
+            "result_uploaded_at",
+            "result_reason"
+        FROM "tender_results"';
+    END IF;
+END $$;

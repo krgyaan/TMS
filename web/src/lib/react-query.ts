@@ -21,7 +21,10 @@ export const queryClient = new QueryClient({
 /**
  * Converts camelCase/snake_case to Title Case
  */
-const formatFieldName = (field: string): string => {
+const formatFieldName = (field?: string): string => {
+    if (!field || typeof field !== 'string') {
+        return 'Field';
+    }
     // Handle nested fields like clients.0.clientName
     if (field.includes('.')) {
         const parts = field.split('.');
@@ -81,8 +84,9 @@ export const handleQueryError = (error: unknown): string => {
 
         // Handle formatted validation errors (from your ValidatedBody decorator)
         if (responseData.errors && Array.isArray(responseData.errors)) {
-            const errorMessages = responseData.errors.map((err) => {
-                const label = formatFieldName(err.field);
+            const errorMessages = responseData.errors.map((err: any) => {
+                const rawField = err.field ?? (Array.isArray(err.path) ? err.path.join('.') : '');
+                const label = formatFieldName(rawField);
 
                 // Create detailed message for type errors
                 if (err.code === 'invalid_type' && err.expected && err.received) {

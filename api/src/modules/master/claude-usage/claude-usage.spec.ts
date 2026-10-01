@@ -381,5 +381,61 @@ describe('ClaudeUsageService & Health Controller RBAC Security', () => {
             loggerSpy.mockRestore();
         });
     });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 7. TENDER BREAKDOWN JOINING TENDER NAME & NO
+    // ─────────────────────────────────────────────────────────────────────────
+    describe('getTendersBreakdown', () => {
+        it('should return tenderName and tenderNo when available from tender_infos join', async () => {
+            (mockDb.execute as jest.Mock).mockResolvedValueOnce({
+                rows: [
+                    {
+                        id: 1,
+                        tender_id: 3633,
+                        tender_name: 'GAIL Noida SMF',
+                        tender_no: 'GEM/2026/B/7899053',
+                        job_id: 'job_1',
+                        call_type: 'main_extraction',
+                        model: 'claude-haiku-4-5-20251001',
+                        input_tokens: 1000,
+                        output_tokens: 200,
+                        total_tokens: 1200,
+                        estimated_cost_usd: '0.0025',
+                        duration_ms: 1500,
+                        created_at: new Date().toISOString(),
+                    },
+                    {
+                        id: 2,
+                        tender_id: 9999,
+                        tender_name: null,
+                        tender_no: null,
+                        job_id: null,
+                        call_type: 'main_extraction',
+                        model: 'claude-haiku-4-5-20251001',
+                        input_tokens: 500,
+                        output_tokens: 100,
+                        total_tokens: 600,
+                        estimated_cost_usd: '0.0010',
+                        duration_ms: 1000,
+                        created_at: new Date().toISOString(),
+                    },
+                ],
+            });
+
+            const result = await claudeUsageService.getTendersBreakdown('cost');
+            expect(result).toHaveLength(2);
+
+            const tender3633 = result.find((t) => t.tenderId === 3633);
+            expect(tender3633).toBeDefined();
+            expect(tender3633?.tenderName).toBe('GAIL Noida SMF');
+            expect(tender3633?.tenderNo).toBe('GEM/2026/B/7899053');
+
+            const tender9999 = result.find((t) => t.tenderId === 9999);
+            expect(tender9999).toBeDefined();
+            expect(tender9999?.tenderName).toBeNull();
+            expect(tender9999?.tenderNo).toBeNull();
+        });
+    });
 });
+
 

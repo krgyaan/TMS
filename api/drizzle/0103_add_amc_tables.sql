@@ -1,4 +1,8 @@
-CREATE TYPE "public"."amc_bill_type" AS ENUM('constant', 'variable');--> statement-breakpoint
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'amc_bill_type') THEN
+        CREATE TYPE "public"."amc_bill_type" AS ENUM('constant', 'variable');
+    END IF;
+END $$;--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "amc" (
 	"id" bigserial PRIMARY KEY NOT NULL,
 	"team_name" varchar(255) NOT NULL,

@@ -283,3 +283,300 @@ def test_atc_anchor_found_returns_real_page():
     pages = [{"page": 1, "text": "Cover"}, {"page": 4, "text": "Reverse Auction shall be applicable"}]
     page, snippet = _find_atc_anchor_citation("reverse_auction", pages)
     assert page == 4 and "Reverse Auction" in snippet
+
+
+# ── FIX J: Key-to-label alias map for citation lookup ────────────────────────
+
+def test_fix_j_alias_map_resolves_mismatched_layer1_labels():
+    """
+    Layer 1 stores snapshots under its own labels ('Bid Validity Period',
+    'PBG Duration (Months)', 'ePBG Percentage', 'Commercial Evaluation Type'),
+    which previously missed derived-name lookup and became no_source_record.
+    """
+    obj_validity = _format_field_object(
+        tms_key="bidValidityDays",
+        dto_value=90,
+        source_field_name="bid_validity_days_display",
+        field_statuses={"bid_validity_days_display": "OK"},
+        field_sources={"bid_validity_days_display": "main_tender"},
+        dual_sources={
+            "Bid Validity Period": {
+                "main_tender": {"value": 90, "page": 1, "snippet": "Bid Validity Period: 90 (Days)"},
+                "atc": None,
+            }
+        },
+    )
+    s_val = obj_validity["sources"]
+    assert s_val["located"] is True
+    assert s_val["main_tender"]["page"] == 1
+    assert s_val["unlocated"] is None
+
+    obj_pbg_dur = _format_field_object(
+        tms_key="pbgDurationMonths",
+        dto_value=30,
+        source_field_name="pbg_duration_display",
+        field_statuses={"pbg_duration_display": "OK"},
+        field_sources={"pbg_duration_display": "main_tender"},
+        dual_sources={
+            "PBG Duration (Months)": {
+                "main_tender": {"value": 30, "page": 3, "snippet": "PBG Duration (Months): 30"},
+                "atc": None,
+            }
+        },
+    )
+    s_dur = obj_pbg_dur["sources"]
+    assert s_dur["located"] is True
+    assert s_dur["main_tender"]["page"] == 3
+    assert s_dur["unlocated"] is None
+
+    obj_pbg_pct = _format_field_object(
+        tms_key="pbgPercentage",
+        dto_value=5.0,
+        source_field_name="pbg_percentage_display",
+        field_statuses={"pbg_percentage_display": "OK"},
+        field_sources={"pbg_percentage_display": "main_tender"},
+        dual_sources={
+            "ePBG Percentage": {
+                "main_tender": {"value": 5.0, "page": 2, "snippet": "ePBG Percentage: 5.00%"},
+                "atc": None,
+            }
+        },
+    )
+    s_pct = obj_pbg_pct["sources"]
+    assert s_pct["located"] is True
+    assert s_pct["main_tender"]["page"] == 2
+    assert s_pct["unlocated"] is None
+
+
+def test_fix_j_kochi_fixture_resolves_all_aliased_fields_to_located():
+    """
+    Real Kochi (GEM/2026/B/8024876) Layer-1 snapshot data:
+    - Bid Validity Period: 30 on page 1
+    - PBG Duration (Months): 33 on page 3
+    - PBG Percentage: 5.0 on page 2
+    - Commercial Evaluation Type: 'Total value wise evaluation' on page 2
+    Confirm all resolve to 'located' with their genuine pages rather than 'no_source_record'.
+    """
+    kochi_dual_sources = {
+        "Bid Validity Period": {
+            "main_tender": {"value": 30, "page": 1, "snippet": "Bid Offer Validity (From End Date) 30 (Days)"},
+            "atc": None,
+        },
+        "PBG Duration (Months)": {
+            "main_tender": {"value": 33, "page": 3, "snippet": "Duration of ePBG required (Months). 33"},
+            "atc": None,
+        },
+        "PBG Percentage": {
+            "main_tender": {"value": 5.0, "page": 2, "snippet": "ePBG Percentage(%) 5.00"},
+            "atc": None,
+        },
+        "Commercial Evaluation Type": {
+            "main_tender": {"value": "Total value wise evaluation", "page": 2, "snippet": "Evaluation Method Total value wise evaluation"},
+            "atc": None,
+        },
+    }
+
+    # 1. bidValidityDays
+    f1 = _format_field_object(
+        tms_key="bidValidityDays",
+        dto_value=30,
+        source_field_name="bid_validity_days_display",
+        field_statuses={"bid_validity_days_display": "OK"},
+        field_sources={"bid_validity_days_display": "main_tender"},
+        dual_sources=kochi_dual_sources,
+    )
+    assert f1["sources"]["located"] is True
+    assert f1["sources"]["main_tender"]["page"] == 1
+    assert f1["sources"]["unlocated"] is None
+
+    # 2. pbgDurationMonths
+    f2 = _format_field_object(
+        tms_key="pbgDurationMonths",
+        dto_value=33,
+        source_field_name="pbg_duration_display",
+        field_statuses={"pbg_duration_display": "OK"},
+        field_sources={"pbg_duration_display": "main_tender"},
+        dual_sources=kochi_dual_sources,
+    )
+    assert f2["sources"]["located"] is True
+    assert f2["sources"]["main_tender"]["page"] == 3
+    assert f2["sources"]["unlocated"] is None
+
+    # 3. pbgPercentage
+    f3 = _format_field_object(
+        tms_key="pbgPercentage",
+        dto_value=5.0,
+        source_field_name="pbg_percentage_display",
+        field_statuses={"pbg_percentage_display": "OK"},
+        field_sources={"pbg_percentage_display": "main_tender"},
+        dual_sources=kochi_dual_sources,
+    )
+    assert f3["sources"]["located"] is True
+    assert f3["sources"]["main_tender"]["page"] == 2
+    assert f3["sources"]["unlocated"] is None
+
+    # 4. commercialEvaluation
+    f4 = _format_field_object(
+        tms_key="commercialEvaluation",
+        dto_value="OVERALL_GST_INCLUSIVE",
+        source_field_name="commercial_evaluation_display",
+        field_statuses={"commercial_evaluation_display": "OK"},
+        field_sources={"commercial_evaluation_display": "main_tender"},
+        dual_sources=kochi_dual_sources,
+    )
+    assert f4["sources"]["located"] is True
+    assert f4["sources"]["main_tender"]["page"] == 2
+    assert f4["sources"]["unlocated"] is None
+
+
+def test_fix_j_morena_fixture_resolves_all_aliased_fields_to_located():
+    """
+    Real Morena (GEM/2025/B/7021103) Layer-1 snapshot data:
+    - Bid Validity Period: 90 on page 1
+    - PBG Duration (Months): 30 on page 3
+    - PBG Percentage: 5.0 on page 3
+    - Commercial Evaluation Type: 'Total value wise evaluation' on page 2
+    Confirm all resolve to 'located' with their genuine pages rather than 'no_source_record'.
+    """
+    morena_dual_sources = {
+        "Bid Validity Period": {
+            "main_tender": {"value": 90, "page": 1, "snippet": "Bid Offer Validity (From End Date) 90 (Days)"},
+            "atc": None,
+        },
+        "PBG Duration (Months)": {
+            "main_tender": {"value": 30, "page": 3, "snippet": "Duration of ePBG required (Months). 30"},
+            "atc": None,
+        },
+        "PBG Percentage": {
+            "main_tender": {"value": 5.0, "page": 3, "snippet": "ePBG Percentage(%) 5.00"},
+            "atc": None,
+        },
+        "Commercial Evaluation Type": {
+            "main_tender": {"value": "Total value wise evaluation", "page": 2, "snippet": "Evaluation Method Total value wise evaluation"},
+            "atc": None,
+        },
+    }
+
+    # 1. bidValidityDays
+    f1 = _format_field_object(
+        tms_key="bidValidityDays",
+        dto_value=90,
+        source_field_name="bid_validity_days_display",
+        field_statuses={"bid_validity_days_display": "OK"},
+        field_sources={"bid_validity_days_display": "main_tender"},
+        dual_sources=morena_dual_sources,
+    )
+    assert f1["sources"]["located"] is True
+    assert f1["sources"]["main_tender"]["page"] == 1
+    assert f1["sources"]["unlocated"] is None
+
+    # 2. pbgDurationMonths
+    f2 = _format_field_object(
+        tms_key="pbgDurationMonths",
+        dto_value=30,
+        source_field_name="pbg_duration_display",
+        field_statuses={"pbg_duration_display": "OK"},
+        field_sources={"pbg_duration_display": "main_tender"},
+        dual_sources=morena_dual_sources,
+    )
+    assert f2["sources"]["located"] is True
+    assert f2["sources"]["main_tender"]["page"] == 3
+    assert f2["sources"]["unlocated"] is None
+
+    # 3. pbgPercentage
+    f3 = _format_field_object(
+        tms_key="pbgPercentage",
+        dto_value=5.0,
+        source_field_name="pbg_percentage_display",
+        field_statuses={"pbg_percentage_display": "OK"},
+        field_sources={"pbg_percentage_display": "main_tender"},
+        dual_sources=morena_dual_sources,
+    )
+    assert f3["sources"]["located"] is True
+    assert f3["sources"]["main_tender"]["page"] == 3
+    assert f3["sources"]["unlocated"] is None
+
+    # 4. commercialEvaluation
+    f4 = _format_field_object(
+        tms_key="commercialEvaluation",
+        dto_value="OVERALL_GST_INCLUSIVE",
+        source_field_name="commercial_evaluation_display",
+        field_statuses={"commercial_evaluation_display": "OK"},
+        field_sources={"commercial_evaluation_display": "main_tender"},
+        dual_sources=morena_dual_sources,
+    )
+    assert f4["sources"]["located"] is True
+    assert f4["sources"]["main_tender"]["page"] == 2
+    assert f4["sources"]["unlocated"] is None
+
+
+
+# ── FIX K: bool snapshot vs YES/NO final value in _values_match ──────────────
+
+from app.routers.extract import _values_match  # noqa: E402
+
+
+def _emd_required_object(snapshot_value, final_value, page=None):
+    return _format_field_object(
+        tms_key="emdRequired",
+        dto_value=final_value,
+        source_field_name="emd_required_display",
+        field_statuses={"emd_required_display": "OK"},
+        field_sources={"emd_required_display": "regex"},
+        dual_sources={
+            "EMD Required": {
+                "main_tender": {"value": snapshot_value, "page": page, "snippet": "EMD Required"},
+                "atc": None,
+            }
+        },
+    )
+
+
+def test_fix_k_values_match_compares_bool_meaning_not_spelling():
+    for truthy in ("YES", "yes", "Yes", "true", "TRUE", " yes "):
+        assert _values_match(True, truthy) and _values_match(truthy, True)
+    for falsy in ("NO", "no", "false", "False"):
+        assert _values_match(False, falsy) and _values_match(falsy, False)
+    # opposite meanings and non yes/no strings never match a bool
+    assert not _values_match(False, "YES")
+    assert not _values_match(True, "NO")
+    assert not _values_match(False, "Not Applicable")
+    assert not _values_match(True, "EXEMPT")
+    assert not _values_match(True, "")
+    assert _values_match(True, True) and not _values_match(True, False)
+
+
+def test_fix_k_morena_emd_required_false_vs_no_is_not_value_changed():
+    """Real Morena shape: Layer-1 snapshot False (page not recorded), final 'NO' -> same meaning."""
+    s = _emd_required_object(False, "NO")["sources"]
+    assert (s["unlocated"] or {}).get("unlocated_reason") != UNLOCATED_VALUE_CHANGED
+    assert s["unlocated"] is None
+    assert s["main_tender"] is not None                     # snapshot kept, not dropped
+    assert s["main_tender"]["unlocated_reason"] == UNLOCATED_NO_PAGE  # honest: page never captured
+
+
+def test_fix_k_bool_snapshot_with_page_is_located():
+    s = _emd_required_object(False, "NO", page=2)["sources"]
+    assert s["located"] is True
+    assert s["main_tender"]["page"] == 2
+
+
+def test_fix_k_kochi_emd_required_true_vs_yes_is_not_value_changed():
+    """Real Kochi shape (re-checked on current code): snapshot True, final 'YES' -> same meaning."""
+    s = _emd_required_object(True, "YES")["sources"]
+    assert s["unlocated"] is None
+    assert s["main_tender"] is not None
+
+
+def test_fix_k_guard_genuine_disagreement_is_still_value_changed():
+    """Layer 1 said False but the final value is 'YES' (Layer 1 was wrong): must NOT be hidden."""
+    s = _emd_required_object(False, "YES", page=2)["sources"]
+    assert s["located"] is False
+    assert s["main_tender"] is None and s["atc"] is None     # stale snapshot not shown
+    assert s["unlocated"]["unlocated_reason"] == UNLOCATED_VALUE_CHANGED
+    assert s["unlocated"]["value"] == "YES"
+
+
+def test_fix_k_guard_true_snapshot_vs_no_is_still_value_changed():
+    s = _emd_required_object(True, "NO")["sources"]
+    assert s["unlocated"]["unlocated_reason"] == UNLOCATED_VALUE_CHANGED

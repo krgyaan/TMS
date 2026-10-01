@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 
+from app.services.gem_field_aliases import MAIN_FIELD_ALIASES
 from app.services.pdf_parent_ingest import build_document_identity_check, ingest_parent_tender_pdf
 from app.services.tms_field_mapper import map_to_tms_dto
 from app.services.tender_mapper import (
@@ -125,6 +126,270 @@ TMS_TO_SOURCE_KEY_MAP: Dict[str, str] = {
     "courierAddress": "courier_address_display",
 }
 
+# Explicit alias map from TMS display keys and DTO field names to Layer-1 snapshot labels,
+# reusing MAIN_FIELD_ALIASES to cover GeM document conventions and specific document variations.
+TMS_KEY_TO_LAYER1_LABELS: Dict[str, List[str]] = {
+    # Bid validity
+    "bidValidityDays": MAIN_FIELD_ALIASES.get("bid_validity", []) + [
+        "Bid Validity Period", "Bid Validity (Days)", "Bid Validity Days", "Bid Validity", "Validity of Offer"
+    ],
+    "bid_validity_days_display": MAIN_FIELD_ALIASES.get("bid_validity", []) + [
+        "Bid Validity Period", "Bid Validity (Days)", "Bid Validity Days", "Bid Validity", "Validity of Offer"
+    ],
+
+    # PBG
+    "pbgDurationMonths": MAIN_FIELD_ALIASES.get("pbg_duration", []) + [
+        "PBG Duration (Months)", "Duration of ePBG required", "Duration of ePBG", "pbg_duration_months"
+    ],
+    "pbg_duration_display": MAIN_FIELD_ALIASES.get("pbg_duration", []) + [
+        "PBG Duration (Months)", "Duration of ePBG required", "Duration of ePBG", "pbg_duration_months"
+    ],
+    "pbgPercentage": MAIN_FIELD_ALIASES.get("pbg_percentage", []) + [
+        "PBG Percentage", "ePBG Percentage", "ePBG Detail", "Performance Bank Guarantee", "PBG %"
+    ],
+    "pbg_percentage_display": MAIN_FIELD_ALIASES.get("pbg_percentage", []) + [
+        "PBG Percentage", "ePBG Percentage", "ePBG Detail", "Performance Bank Guarantee", "PBG %"
+    ],
+    "pbgMode": MAIN_FIELD_ALIASES.get("pbg_mode", []),
+    "pbg_mode_display": MAIN_FIELD_ALIASES.get("pbg_mode", []),
+    "pbgRequired": MAIN_FIELD_ALIASES.get("pbg_required", []) + [
+        "PBG Required", "ePBG Detail", "Performance Bank Guarantee"
+    ],
+    "pbg_required_display": MAIN_FIELD_ALIASES.get("pbg_required", []) + [
+        "PBG Required", "ePBG Detail", "Performance Bank Guarantee"
+    ],
+
+    # Security Deposit
+    "sdPercentage": MAIN_FIELD_ALIASES.get("sd_percentage", []) + [
+        "Security Deposit %", "Security Deposit Percentage", "SD Percentage"
+    ],
+    "sd_percentage_display": MAIN_FIELD_ALIASES.get("sd_percentage", []) + [
+        "Security Deposit %", "Security Deposit Percentage", "SD Percentage"
+    ],
+    "sdDurationMonths": MAIN_FIELD_ALIASES.get("sd_duration", []) + [
+        "Security Deposit Duration", "SD Duration (Months)"
+    ],
+    "sd_duration_display": MAIN_FIELD_ALIASES.get("sd_duration", []) + [
+        "Security Deposit Duration", "SD Duration (Months)"
+    ],
+    "sdMode": MAIN_FIELD_ALIASES.get("sd_mode", []),
+    "sd_mode_display": MAIN_FIELD_ALIASES.get("sd_mode", []),
+    "sdRequired": MAIN_FIELD_ALIASES.get("sd_required", []) + [
+        "SD Required", "Security Deposit Required", "Contract Performance Security"
+    ],
+    "sd_required_display": MAIN_FIELD_ALIASES.get("sd_required", []) + [
+        "SD Required", "Security Deposit Required", "Contract Performance Security"
+    ],
+
+    # Payment Terms
+    "paymentTermsSupply": MAIN_FIELD_ALIASES.get("payment_terms_supply", []) + [
+        "Payment Terms Supply (%)", "Payment Terms Supply", "payment_terms_supply_percent"
+    ],
+    "payment_terms_supply_display": MAIN_FIELD_ALIASES.get("payment_terms_supply", []) + [
+        "Payment Terms Supply (%)", "Payment Terms Supply", "payment_terms_supply_percent"
+    ],
+    "paymentTermsInstallation": MAIN_FIELD_ALIASES.get("payment_terms_installation", []) + [
+        "Payment Terms Installation (%)", "Payment Terms Installation", "payment_terms_installation_percent"
+    ],
+    "payment_terms_installation_display": MAIN_FIELD_ALIASES.get("payment_terms_installation", []) + [
+        "Payment Terms Installation (%)", "Payment Terms Installation", "payment_terms_installation_percent"
+    ],
+
+    # Delivery Time
+    "deliveryTimeSupply": MAIN_FIELD_ALIASES.get("delivery_time_supply", []) + [
+        "Delivery Time Supply (Days)", "Delivery Time Supply", "Delivery Period (In Days)", "Delivery Schedules", "Delivery Period", "Delivery Days"
+    ],
+    "delivery_time_supply_display": MAIN_FIELD_ALIASES.get("delivery_time_supply", []) + [
+        "Delivery Time Supply (Days)", "Delivery Time Supply", "Delivery Period (In Days)", "Delivery Schedules", "Delivery Period", "Delivery Days"
+    ],
+    "deliveryTimeInstallationDays": MAIN_FIELD_ALIASES.get("delivery_time_installation", []) + [
+        "Delivery Time Installation (Days)", "Delivery Time Installation"
+    ],
+    "delivery_time_installation_display": MAIN_FIELD_ALIASES.get("delivery_time_installation", []) + [
+        "Delivery Time Installation (Days)", "Delivery Time Installation"
+    ],
+    "deliveryTimeInstallationInclusive": [
+        "Installation Inclusive", "installation_inclusive", "installation_inclusive_display"
+    ],
+    "installation_inclusive_display": [
+        "Installation Inclusive", "installation_inclusive", "installation_inclusive_display"
+    ],
+
+    # Commercial Evaluation & Terms
+    "commercialEvaluation": [
+        "Commercial Evaluation Type", "Commercial Evaluation", "evaluation_method", "commercial_evaluation", "commercial_evaluation_display"
+    ],
+    "commercial_evaluation_display": [
+        "Commercial Evaluation Type", "Commercial Evaluation", "evaluation_method", "commercial_evaluation", "commercial_evaluation_display"
+    ],
+    "reverseAuctionApplicable": [
+        "Reverse Auction Applicable", "Reverse Auction", "reverse_auction_enabled", "reverse_auction", "reverse_auction_applicable", "reverse_auction_applicable_display"
+    ],
+    "reverse_auction_applicable_display": [
+        "Reverse Auction Applicable", "Reverse Auction", "reverse_auction_enabled", "reverse_auction", "reverse_auction_applicable", "reverse_auction_applicable_display"
+    ],
+    "mafRequired": MAIN_FIELD_ALIASES.get("maf_required", []) + [
+        "MAF Required", "Manufacturer Authorization Form", "OEM Authorization Certificate"
+    ],
+    "maf_required_display": MAIN_FIELD_ALIASES.get("maf_required", []) + [
+        "MAF Required", "Manufacturer Authorization Form", "OEM Authorization Certificate"
+    ],
+
+    # Liquidated Damages / PRS
+    "ldPercentagePerWeek": MAIN_FIELD_ALIASES.get("ld_percentage_per_week", []) + [
+        "LD Percentage Per Week", "Price Reduction Schedule", "PRS", "Price Reduction Schedule (PRS)", "prs_ld", "prs_rate", "Price Reduction Schedule (PRS) for Delayed Delivery"
+    ],
+    "ld_percentage_display": MAIN_FIELD_ALIASES.get("ld_percentage_per_week", []) + [
+        "LD Percentage Per Week", "Price Reduction Schedule", "PRS", "Price Reduction Schedule (PRS)", "prs_ld", "prs_rate", "Price Reduction Schedule (PRS) for Delayed Delivery"
+    ],
+    "maxLdPercentage": MAIN_FIELD_ALIASES.get("max_ld_percentage", []) + [
+        "Max LD Percentage", "prs_max"
+    ],
+    "max_ld_percentage_display": MAIN_FIELD_ALIASES.get("max_ld_percentage", []) + [
+        "Max LD Percentage", "prs_max"
+    ],
+
+    # EMD & Fees
+    "emdAmount": MAIN_FIELD_ALIASES.get("emd_amount", []) + [
+        "EMD Amount", "Earnest Money Deposit", "EMD Detail", "EMD", "Bid Security Amount", "(E) BID SECURITY"
+    ],
+    "emd_amount_display": MAIN_FIELD_ALIASES.get("emd_amount", []) + [
+        "EMD Amount", "Earnest Money Deposit", "EMD Detail", "EMD", "Bid Security Amount", "(E) BID SECURITY"
+    ],
+    "emdRequired": [
+        "EMD Required", "EMD Detail", "Earnest Money Deposit", "(E) BID SECURITY", "emd_required", "emd_required_display"
+    ] + MAIN_FIELD_ALIASES.get("emd_amount", []),
+    "emd_required_display": [
+        "EMD Required", "EMD Detail", "Earnest Money Deposit", "(E) BID SECURITY", "emd_required", "emd_required_display"
+    ] + MAIN_FIELD_ALIASES.get("emd_amount", []),
+    "emdModes": MAIN_FIELD_ALIASES.get("emd_mode", []) + [
+        "EMD Mode", "EMD Modes", "emd_mode", "emd_modes"
+    ],
+    "emd_mode_display": MAIN_FIELD_ALIASES.get("emd_mode", []) + [
+        "EMD Mode", "EMD Modes", "emd_mode", "emd_modes"
+    ],
+    "tenderValue": [
+        "Estimated Tender Value", "Tender Value", "tender_value", "tender_value_display"
+    ],
+    "tender_value_display": [
+        "Estimated Tender Value", "Tender Value", "tender_value", "tender_value_display"
+    ],
+    "tenderFeeAmount": [
+        "Tender Fee", "Tender Fee Amount", "Cost of Tender Document", "tender_fee_amount", "tender_fee_amount_display"
+    ],
+    "tender_fee_amount_display": [
+        "Tender Fee", "Tender Fee Amount", "Cost of Tender Document", "tender_fee_amount", "tender_fee_amount_display"
+    ],
+    "tenderFeeModes": [
+        "Tender Fee Mode", "Tender Fee Modes", "tender_fee_mode", "tender_fee_mode_display"
+    ],
+    "tender_fee_mode_display": [
+        "Tender Fee Mode", "Tender Fee Modes", "tender_fee_mode", "tender_fee_mode_display"
+    ],
+    "processingFeeAmount": [
+        "Processing Fee Amount", "Processing Fee", "processing_fee_amount", "processing_fee_amount_display"
+    ],
+    "processing_fee_amount_display": [
+        "Processing Fee Amount", "Processing Fee", "processing_fee_amount", "processing_fee_amount_display"
+    ],
+    "processingFeeModes": [
+        "Processing Fee Mode", "Processing Fee Modes", "processing_fee_mode", "processing_fee_mode_display"
+    ],
+    "processing_fee_mode_display": [
+        "Processing Fee Mode", "Processing Fee Modes", "processing_fee_mode", "processing_fee_mode_display"
+    ],
+
+    # Physical Docs
+    "physicalDocsRequired": [
+        "Physical Docs Required", "Address for Submission of Physical Documents", "physical_docs_required", "physical_docs_required_display"
+    ],
+    "physical_docs_required_display": [
+        "Physical Docs Required", "Address for Submission of Physical Documents", "physical_docs_required", "physical_docs_required_display"
+    ],
+    "physicalDocsDeadline": [
+        "Physical Docs Deadline", "physical_docs_deadline", "physical_docs_deadline_display"
+    ],
+    "physical_docs_deadline_display": [
+        "Physical Docs Deadline", "physical_docs_deadline", "physical_docs_deadline_display"
+    ],
+
+    # Pre-Bid, Site Visit, Sample
+    "preBidMeeting": MAIN_FIELD_ALIASES.get("pre_bid_meeting", []) + [
+        "Pre-Bid Meeting Details", "Pre-Bid Date and Time", "Pre-Bid Venue", "Pre-Bid Meeting Date", "Pre-Bid Meeting", "(F) DATE, TIME & VENUE OF PRE-BID MEETING"
+    ],
+    "pre_bid_meeting_display": MAIN_FIELD_ALIASES.get("pre_bid_meeting", []) + [
+        "Pre-Bid Meeting Details", "Pre-Bid Date and Time", "Pre-Bid Venue", "Pre-Bid Meeting Date", "Pre-Bid Meeting", "(F) DATE, TIME & VENUE OF PRE-BID MEETING"
+    ],
+    "siteVisit": MAIN_FIELD_ALIASES.get("site_visit", []) + [
+        "Site Visit", "Site Inspection", "Site Survey", "Mandatory Site Visit", "Site Visit Required"
+    ],
+    "site_visit_display": MAIN_FIELD_ALIASES.get("site_visit", []) + [
+        "Site Visit", "Site Inspection", "Site Survey", "Mandatory Site Visit", "Site Visit Required"
+    ],
+    "siteVisitRequired": MAIN_FIELD_ALIASES.get("site_visit", []) + [
+        "Site Visit Required", "Site Visit", "Site Inspection"
+    ],
+    "sampleSubmission": MAIN_FIELD_ALIASES.get("sample_submission", []) + [
+        "Sample Submission", "Sample Testing", "Sample Required"
+    ],
+    "sample_submission_display": MAIN_FIELD_ALIASES.get("sample_submission", []) + [
+        "Sample Submission", "Sample Testing", "Sample Required"
+    ],
+    "sampleSubmissionRequired": MAIN_FIELD_ALIASES.get("sample_submission", []) + [
+        "Sample Submission", "Sample Testing", "Sample Required"
+    ],
+
+    # MII & Preferences
+    "miiPreference": MAIN_FIELD_ALIASES.get("mii_purchase_preference", []) + [
+        "MII Purchase Preference", "MII Purchase Preference / एमआईआई खरीद वरीयता", "Make In India Preference"
+    ],
+    "mii_preference_display": MAIN_FIELD_ALIASES.get("mii_purchase_preference", []) + [
+        "MII Purchase Preference", "MII Purchase Preference / एमआईआई खरीद वरीयता", "Make In India Preference"
+    ],
+    "miiRequired": MAIN_FIELD_ALIASES.get("mii_purchase_preference", []) + [
+        "MII Purchase Preference", "Make In India Preference"
+    ],
+
+    # Seller & Work Orders Documents
+    "requiredDocuments": [
+        "Required Documents", "required_documents", "doc_1_display"
+    ],
+    "doc_1_display": [
+        "Required Documents", "required_documents", "doc_1_display"
+    ],
+
+    # Financial & Technical BEC
+    "techEligibilityAge": MAIN_FIELD_ALIASES.get("eligibility_criterion_years", []) + [
+        "Eligibility Criterion (Years)", "Eligibility Criterion", "Years of Past Experience Required", "Experience Required", "years_of_past_experience", "experience_years_display", "eligibility_criterion_years_display"
+    ],
+    "experience_years_display": MAIN_FIELD_ALIASES.get("eligibility_criterion_years", []) + [
+        "Eligibility Criterion (Years)", "Eligibility Criterion", "Years of Past Experience Required", "Experience Required", "years_of_past_experience", "experience_years_display", "eligibility_criterion_years_display"
+    ],
+    "eligibility_criterion_years_display": MAIN_FIELD_ALIASES.get("eligibility_criterion_years", []) + [
+        "Eligibility Criterion (Years)", "Eligibility Criterion", "Years of Past Experience Required", "Experience Required", "years_of_past_experience", "experience_years_display", "eligibility_criterion_years_display"
+    ],
+    "customEligibilityCriteria": MAIN_FIELD_ALIASES.get("custom_eligibility_criteria", []) + [
+        "Custom Eligibility Criteria", "custom_eligibility_criteria"
+    ],
+    "custom_eligibility_criteria_display": MAIN_FIELD_ALIASES.get("custom_eligibility_criteria", []) + [
+        "Custom Eligibility Criteria", "custom_eligibility_criteria"
+    ],
+
+    # Contacts & Courier
+    "clients": MAIN_FIELD_ALIASES.get("client_name_1", []) + [
+        "Client Contacts", "Client Contact Person", "Nodal Officer", "client_name_1", "client_contacts", "client_contact_person"
+    ],
+    "client_name_1_display": MAIN_FIELD_ALIASES.get("client_name_1", []) + [
+        "Client Contacts", "Client Contact Person", "Nodal Officer", "client_name_1", "client_contacts", "client_contact_person"
+    ],
+    "courierAddress": MAIN_FIELD_ALIASES.get("courier_address", []) + [
+        "Courier Address", "Courier Information", "full_courier_address_with_pincode", "courier_address"
+    ],
+    "courier_address_display": MAIN_FIELD_ALIASES.get("courier_address", []) + [
+        "Courier Address", "Courier Information", "full_courier_address_with_pincode", "courier_address"
+    ],
+}
+
 
 def _normalize_extracted_value_for_key(tms_key: str, raw_val: Any) -> Any:
     """Normalizes raw string extraction to typed value matching TMS DTO schema."""
@@ -229,11 +494,33 @@ def _normalize_for_compare(val: Any) -> Any:
     return val
 
 
+_BOOL_TRUE_STRINGS = frozenset({"yes", "true"})
+_BOOL_FALSE_STRINGS = frozenset({"no", "false"})
+
+
+def _bool_meaning(value: Any) -> Optional[bool]:
+    """True/False for a bool or a YES/NO/true/false string (any case); None if neither."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        token = value.strip().casefold()
+        if token in _BOOL_TRUE_STRINGS:
+            return True
+        if token in _BOOL_FALSE_STRINGS:
+            return False
+    return None
+
+
 def _values_match(a: Any, b: Any) -> bool:
     if a is None or b is None:
         return a is None and b is None
     if isinstance(a, bool) or isinstance(b, bool):
-        return a is b if (isinstance(a, bool) and isinstance(b, bool)) else str(a).casefold() == str(b).casefold()
+        # A Layer-1 snapshot often stores a yes/no field as a Python bool while the DTO
+        # value is 'YES'/'NO' (e.g. Morena emdRequired: False vs 'NO'). Compare meanings:
+        # True == 'YES'/'true', False == 'NO'/'false'. A string that is not a yes/no token
+        # never matches a bool, and opposite meanings (False vs 'YES') stay a mismatch.
+        meaning_a, meaning_b = _bool_meaning(a), _bool_meaning(b)
+        return meaning_a is not None and meaning_b is not None and meaning_a == meaning_b
     if isinstance(a, (int, float)) and isinstance(b, (int, float)):
         return abs(float(a) - float(b)) <= 1e-4 * max(1.0, abs(float(a)), abs(float(b)))
     if isinstance(a, list) and isinstance(b, list):
@@ -289,6 +576,11 @@ def _resolve_dual_source_for_tms_key(
             base_name.replace("_percent", ""),
             base_name.replace("_percent", "").replace("_", " ").lower(),
         ])
+
+    for k in (tms_key, source_field_name):
+        if k and k in TMS_KEY_TO_LAYER1_LABELS:
+            for alias in TMS_KEY_TO_LAYER1_LABELS[k]:
+                candidates.extend([alias, alias.lower()])
 
     dual_entry = None
     for cand in candidates:

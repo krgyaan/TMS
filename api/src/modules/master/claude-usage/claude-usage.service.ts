@@ -85,6 +85,8 @@ export interface TenderCallDetail {
 
 export interface TenderBreakdownItem {
     tenderId: number;
+    tenderName?: string | null;
+    tenderNo?: string | null;
     totalTokens: number;
     estimatedCostUsd: number;
     estimatedCostInr: number;
@@ -590,11 +592,13 @@ export class ClaudeUsageService {
     async getTendersBreakdown(sortBy: 'cost' | 'tokens' | 'recent' = 'cost'): Promise<TenderBreakdownItem[]> {
         const currencyMeta = this.getCurrencyMeta();
         try {
-            // First fetch all calls ordered by tender
+            // First fetch all calls ordered by tender with tender info joined
             const res = await this.db.execute(sql`
                 SELECT 
                     c.id,
                     c.tender_id,
+                    t.tender_name,
+                    t.tender_no,
                     c.job_id,
                     c.call_type,
                     c.model,
@@ -605,6 +609,7 @@ export class ClaudeUsageService {
                     c.duration_ms,
                     c.created_at
                 FROM claude_token_usage c
+                LEFT JOIN tender_infos t ON t.id = c.tender_id
                 WHERE c.tender_id IS NOT NULL
                 ORDER BY c.created_at DESC
             `);
@@ -613,6 +618,8 @@ export class ClaudeUsageService {
 
             for (const row of (res.rows as Array<Record<string, unknown>>) || []) {
                 const tId = Number(row.tender_id);
+                const tenderName = row.tender_name ? String(row.tender_name).trim() : null;
+                const tenderNo = row.tender_no ? String(row.tender_no).trim() : null;
                 const estimatedCostUsd = Number(parseFloat(String(row.estimated_cost_usd || 0)).toFixed(4));
                 const callDetail: TenderCallDetail = {
                     id: Number(row.id),
@@ -631,6 +638,8 @@ export class ClaudeUsageService {
                 if (!grouped.has(tId)) {
                     grouped.set(tId, {
                         tenderId: tId,
+                        tenderName: tenderName || null,
+                        tenderNo: tenderNo || null,
                         totalTokens: 0,
                         estimatedCostUsd: 0,
                         estimatedCostInr: 0,
@@ -641,6 +650,12 @@ export class ClaudeUsageService {
                 }
 
                 const item = grouped.get(tId)!;
+                if (!item.tenderName && tenderName) {
+                    item.tenderName = tenderName;
+                }
+                if (!item.tenderNo && tenderNo) {
+                    item.tenderNo = tenderNo;
+                }
                 item.totalTokens += callDetail.totalTokens;
                 item.estimatedCostUsd = Number((item.estimatedCostUsd + callDetail.estimatedCostUsd).toFixed(4));
                 item.estimatedCostInr = this.toInr(item.estimatedCostUsd, currencyMeta.usdToInrRate);

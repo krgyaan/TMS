@@ -133,6 +133,8 @@ export interface TenderCallDetail {
 
 export interface TenderBreakdownItem {
     tenderId: number
+    tenderName?: string | null
+    tenderNo?: string | null
     totalTokens: number
     estimatedCostUsd: number
     estimatedCostInr: number

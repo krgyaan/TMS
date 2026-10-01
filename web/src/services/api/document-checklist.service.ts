@@ -1,4 +1,5 @@
 import { BaseApiService } from './base.service';
+import axiosInstance from '@/lib/axios';
 import type {
     DocumentChecklistsDashboardCounts,
     TenderDocumentChecklist,
@@ -6,8 +7,20 @@ import type {
     CreateDocumentChecklistDto,
     UpdateDocumentChecklistDto,
     BiddingRequirementsAnalysisResult,
+    CachedBiddingRequirementsResponse,
 } from '@/modules/tendering/checklists/helpers/documentChecklist.types';
 import type { PaginatedResult } from '@/types/api.types';
+
+/**
+ * Per-request timeout for the bidding-requirements analysis only (the global axios
+ * timeout stays 30s). The call runs one full-document Sonnet pass and routinely takes
+ * 80-100s+; at 30s the browser gave up while the API kept going, and the user's retry
+ * started a second paid analysis. It must outlast the API's own wait for VolksAI
+ * (BIDDING_REQUIREMENTS_MIN_TIMEOUT_MS = 240s, which covers VolksAI's 180s Claude timeout
+ * plus PDF text extraction), so: 240s + 30s headroom. Node's default server
+ * requestTimeout (300s) is above this.
+ */
+export const BIDDING_REQUIREMENTS_REQUEST_TIMEOUT_MS = 270_000;
 
 export type DocumentChecklistListParams = {
     tab?: 'pending' | 'submitted' | 'tender-dnb';
@@ -71,8 +84,35 @@ class DocumentChecklistService extends BaseApiService {
      * AI-suggested bidding requirements for this tender (VolksAI analysis of the
      * tender's main + ATC documents, bridged through the API). Read-only.
      */
-    async getSuggestedRequirements(tenderId: number): Promise<BiddingRequirementsAnalysisResult> {
-        return this.get<BiddingRequirementsAnalysisResult>(`/tender/${tenderId}/bidding-requirements`);
+    async getSuggestedRequirements(tenderId: number, forceRefresh = false): Promise<BiddingRequirementsAnalysisResult> {
+        // forceRefresh=true bypasses the API cache and runs a new (paid) analysis.
+        const query = forceRefresh ? '?forceRefresh=true' : '';
+        return this.get<BiddingRequirementsAnalysisResult>(`/tender/${tenderId}/bidding-requirements${query}`, {
+            timeout: BIDDING_REQUIREMENTS_REQUEST_TIMEOUT_MS,
+        });
+    }
+
+    /**
+     * Cache-only read (never runs VolksAI): the tender's current cached analysis, or null
+     * if it has never been analysed. Fast, so it uses the normal request timeout.
+     */
+    async getCachedRequirements(tenderId: number): Promise<BiddingRequirementsAnalysisResult | null> {
+        const res = await this.get<CachedBiddingRequirementsResponse>(`/tender/${tenderId}/bidding-requirements/cached`);
+        return res?.analysis ?? null;
+    }
+
+    /**
+     * Downloads ONE annexure (by its index in the cached analysis's `annexures[]`) as a .docx.
+     * Returns the blob plus the server-chosen filename for the caller to save.
+     */
+    async downloadAnnexure(tenderId: number, annexureIndex: number): Promise<{ blob: Blob; filename: string }> {
+        const response = await axiosInstance.get<Blob>(
+            `${this.basePath}/tender/${tenderId}/annexures/${annexureIndex}/download`,
+            { responseType: 'blob' },
+        );
+        const disposition = String(response.headers?.['content-disposition'] ?? '');
+        const filename = /filename="?([^";]+)"?/i.exec(disposition)?.[1] ?? `tender${tenderId}_annexure-${annexureIndex + 1}.docx`;
+        return { blob: response.data, filename };
     }
 
     async create(data: CreateDocumentChecklistDto): Promise<TenderDocumentChecklist> {

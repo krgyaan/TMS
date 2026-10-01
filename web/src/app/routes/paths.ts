@@ -20,6 +20,7 @@ export const paths = {
     // ==================== SYSTEM ====================
     system: {
         health: "/system-health",
+        tenderCosts: "/system-health/tender-costs",
     },
 
 
