@@ -9,6 +9,7 @@ import { RolesGuard } from '@/modules/auth/guards/roles.guard';
 import { RoleName } from '@/common/constants/roles.constant';
 import { ROLES_KEY } from '@/modules/auth/decorators/roles.decorator';
 import { DRIZZLE } from '@/db/database.module';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 describe('ClaudeUsageService & Health Controller RBAC Security', () => {
     let controller: HealthController;
@@ -434,6 +435,103 @@ describe('ClaudeUsageService & Health Controller RBAC Security', () => {
             expect(tender9999).toBeDefined();
             expect(tender9999?.tenderName).toBeNull();
             expect(tender9999?.tenderNo).toBeNull();
+        });
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 8. TENDER BREAKDOWN: JOIN, NULL FALLBACK, SORT WITH JOIN PRESENT
+    // ─────────────────────────────────────────────────────────────────────────
+    describe('getTendersBreakdown tender_infos join', () => {
+        const usageRow = (over: Record<string, unknown>) => ({
+            id: 1,
+            tender_id: 42,
+            tender_name: null,
+            tender_no: null,
+            job_id: 'job',
+            call_type: 'main_extraction',
+            model: 'claude-haiku-4-5-20251001',
+            input_tokens: 100,
+            output_tokens: 10,
+            total_tokens: 110,
+            estimated_cost_usd: '0.0010',
+            duration_ms: 500,
+            created_at: '2026-10-01T10:00:00.000Z',
+            ...over,
+        });
+
+        // Renders the drizzle sql`` object passed to db.execute to its SQL text.
+        const executedSql = (): string => new PgDialect().sqlToQuery(mockDb.execute.mock.calls[0][0]).sql;
+
+        it('TEST 1: queries claude_token_usage LEFT JOIN tender_infos and returns tenderName/tenderNo on the grouped item', async () => {
+            mockDb.execute.mockResolvedValueOnce({
+                rows: [
+                    usageRow({ id: 1, tender_name: 'GAIL Noida SMF', tender_no: 'GEM/2026/B/7899053', total_tokens: 1200 }),
+                    usageRow({ id: 2, tender_name: 'GAIL Noida SMF', tender_no: 'GEM/2026/B/7899053', total_tokens: 300 }),
+                ],
+            });
+
+            const result = await claudeUsageService.getTendersBreakdown('cost');
+
+            expect(executedSql()).toMatch(/FROM\s+claude_token_usage\s+c\s+LEFT JOIN\s+tender_infos\s+t\s+ON\s+t\.id\s*=\s*c\.tender_id/i);
+            expect(executedSql()).toMatch(/t\.tender_name/);
+            expect(executedSql()).toMatch(/t\.tender_no/);
+            expect(result).toHaveLength(1);
+            expect(result[0]).toEqual(
+                expect.objectContaining({
+                    tenderId: 42,
+                    tenderName: 'GAIL Noida SMF',
+                    tenderNo: 'GEM/2026/B/7899053',
+                    totalTokens: 1500,
+                    totalCalls: 2,
+                }),
+            );
+        });
+
+        it('TEST 2: a usage row with no matching tender_infos row is kept with tenderName/tenderNo null', async () => {
+            mockDb.execute.mockResolvedValueOnce({
+                rows: [usageRow({ id: 7, tender_id: 999, tender_name: null, tender_no: null })],
+            });
+
+            const result = await claudeUsageService.getTendersBreakdown('cost');
+
+            // LEFT (not INNER) join: unmatched usage rows must not be dropped by the query.
+            expect(executedSql()).not.toMatch(/\bINNER JOIN\b/i);
+            expect(executedSql()).toMatch(/\bLEFT JOIN\s+tender_infos\b/i);
+            expect(result).toHaveLength(1);
+            expect(result[0].tenderId).toBe(999);
+            expect(result[0].tenderName).toBeNull();
+            expect(result[0].tenderNo).toBeNull();
+            expect(result[0].totalCalls).toBe(1);
+        });
+
+        describe('TEST 3: sorting with the join present', () => {
+            // Three tenders whose cost, token and recency orders all differ:
+            //   cost:   A (0.05) > B (0.03) > C (0.01)
+            //   tokens: C (9000) > A (5000) > B (1000)
+            //   recent: B (Oct 3) > C (Oct 2) > A (Oct 1)
+            const rows = () => [
+                usageRow({ id: 1, tender_id: 1, tender_name: 'A', tender_no: 'A-1', estimated_cost_usd: '0.05', total_tokens: 5000, created_at: '2026-10-01T00:00:00.000Z' }),
+                usageRow({ id: 2, tender_id: 2, tender_name: 'B', tender_no: null, estimated_cost_usd: '0.03', total_tokens: 1000, created_at: '2026-10-03T00:00:00.000Z' }),
+                usageRow({ id: 3, tender_id: 3, tender_name: null, tender_no: null, estimated_cost_usd: '0.01', total_tokens: 9000, created_at: '2026-10-02T00:00:00.000Z' }),
+            ];
+
+            it.each([
+                ['cost', [1, 2, 3]],
+                ['tokens', [3, 1, 2]],
+                ['recent', [2, 3, 1]],
+            ] as const)('sortBy=%s orders tenders %j and keeps joined names', async (sortBy, expectedIds) => {
+                mockDb.execute.mockResolvedValueOnce({ rows: rows() });
+
+                const result = await claudeUsageService.getTendersBreakdown(sortBy);
+
+                expect(executedSql()).toMatch(/LEFT JOIN\s+tender_infos/i);
+                expect(result.map((r) => r.tenderId)).toEqual(expectedIds);
+                const byId = Object.fromEntries(result.map((r) => [r.tenderId, r]));
+                expect(byId[1].tenderName).toBe('A');
+                expect(byId[1].tenderNo).toBe('A-1');
+                expect(byId[2].tenderName).toBe('B');
+                expect(byId[3].tenderName).toBeNull();
+            });
         });
     });
 });

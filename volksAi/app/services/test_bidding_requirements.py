@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.services.pdf_parent_ingest import build_page_tagged_text
-from app.services.bidding_requirements_resolver import analyze_bidding_requirements
+from app.services.bidding_requirements_resolver import analyze_bidding_requirements, fill_missing_requirement_snippets
 
 client = TestClient(app)
 
@@ -184,6 +184,71 @@ def test_analyze_bidding_requirements_forces_null_match_for_oem_even_if_model_er
         )
 
     assert result["requirements"][0]["matchedLibraryId"] is None
+
+
+# Requirement snippets: the model sometimes omits them; they are filled from the cited
+# page's own text with no extra Claude call.
+_GAIL_PAGES = (
+    "[Main Page 4]: Bid Security. Bidders shall submit Declaration for Bid Security as per "
+    "Form F-2A in lieu of EMD. Late bids will not be considered.\n\n"
+    "[ATC Page 44]: Payment terms apply. EMD / Bid Security instrument shall be furnished in "
+    "the form of Bank Guarantee or FDR.\n\n"
+    "[ATC Page 45]: Weather conditions at site are humid."
+)
+
+
+def _req(name, document, page, **source_extra):
+    return {
+        "documentName": name, "category": "standard", "required": True,
+        "source": {"document": document, "page": page, **source_extra},
+        "matchedLibraryId": None, "confidence": "high", "reasoning": "r",
+    }
+
+
+def test_analyze_bidding_requirements_fills_missing_snippets_from_cited_page():
+    """Real-world shape: Claude returned {document, page} with no snippet (65/65 cached
+    requirements on tenders 3633/3635). The line on the cited page is used instead."""
+    mock_requirements = [
+        _req("Declaration for Bid Security (Form F-2A)", "main", 4),                 # missing
+        _req("EMD / Bid Security Instrument", "atc", 44, snippet="   "),             # blank
+        _req("Type Test Report", "main", 4, snippet="  Type test report needed  "),   # model-provided
+    ]
+    with patch("anthropic.Anthropic") as MockAnthropic:
+        MockAnthropic.return_value.messages.create.return_value = _mock_anthropic_response(mock_requirements)
+        result = analyze_bidding_requirements(_GAIL_PAGES, library_documents=[], api_key="sk-ant-test-key")
+
+    assert MockAnthropic.return_value.messages.create.call_count == 1  # no second Claude call
+    snippets = [r["source"]["snippet"] for r in result["requirements"]]
+    assert snippets[0] == "Bidders shall submit Declaration for Bid Security as per Form F-2A in lieu of EMD."
+    assert snippets[1] == "EMD / Bid Security instrument shall be furnished in the form of Bank Guarantee or FDR."
+    assert snippets[2] == "Type test report needed"
+
+
+def test_fill_missing_snippets_leaves_empty_rather_than_quoting_unrelated_text():
+    reqs = [
+        _req("MSE Udyam Registration", "atc", 45),           # cited page has nothing matching
+        _req("Power of Attorney", "atc", 99),                 # cited page does not exist
+        {"documentName": "No source", "category": "other"},   # no source at all: left untouched
+    ]
+    counts = fill_missing_requirement_snippets(reqs, _GAIL_PAGES)
+    assert reqs[0]["source"]["snippet"] == ""
+    assert reqs[1]["source"]["snippet"] == ""
+    assert "source" not in reqs[2]
+    assert counts == {"model": 0, "filled": 0, "missing": 2}
+
+
+def test_fill_missing_snippets_trims_long_lines():
+    long_line = "Bidders shall submit the Integrity Pact " + "duly signed and stamped " * 20
+    reqs = [_req("Integrity Pact", "main", 1)]
+    fill_missing_requirement_snippets(reqs, f"[Main Page 1]: {long_line}")
+    snippet = reqs[0]["source"]["snippet"]
+    assert snippet.startswith("Bidders shall submit the Integrity Pact") and snippet.endswith("…")
+    assert len(snippet) <= 200
+
+
+def test_prompt_requires_a_snippet_for_every_requirement():
+    from app.services.bidding_requirements_resolver import SYSTEM_PROMPT
+    assert "snippet is required for every requirement" in SYSTEM_PROMPT
 
 
 # ─────────────────────────────────────────────────────────────────────────────

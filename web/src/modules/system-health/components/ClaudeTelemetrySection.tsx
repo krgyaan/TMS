@@ -152,7 +152,6 @@ export function ClaudeTelemetrySection() {
                         size="sm"
                         onClick={() => {
                             refetch();
-                            refetchTenders();
                         }}
                         disabled={isFetching}
                     >

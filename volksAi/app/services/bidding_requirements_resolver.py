@@ -23,6 +23,7 @@ pricing constants from llm_field_resolver.py for cost accounting.
 """
 import logging
 import os
+import re
 from typing import Any, Dict, List, Optional
 
 from app.services.annexure_resolver import _build_annexures_tool_schema, validate_annexures
@@ -162,8 +163,9 @@ SYSTEM_PROMPT = (
     "paperwork (PAN, GST, MSME, incorporation); 'company' only when you found a strong "
     "match in the supplied library; 'other' for anything that doesn't fit those.\n"
     "  - source: cite exactly which page label ('[Main Page N]' or '[ATC Page N]') the "
-    "supporting text appeared under, and quote or closely paraphrase that text as the "
-    "snippet. Never cite a page you did not see the requirement on.\n"
+    "supporting text appeared under, and quote that text as the snippet (verbatim, at most "
+    "about 20 words). The snippet is required for every requirement -- never omit it or "
+    "leave it empty. Never cite a page you did not see the requirement on.\n"
     "  - matchedLibraryId: for non-OEM items only, try to match against the supplied "
     "company library list by meaning (not just exact string), and return that entry's "
     "id. Return null if no entry is a good match. ALWAYS return null for category='oem' "
@@ -198,6 +200,82 @@ SYSTEM_PROMPT = (
     "If a blank's exact label is not stated, describe what it is for rather than guessing "
     "wording. Do not merge or split annexures. Return an empty annexures list if there are none."
 )
+
+
+_PAGE_SPLIT_RE = re.compile(r"\[(Main|ATC) Page (\d+)\]:")
+_WORD_RE = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
+# Words too generic to tie a page line to a specific requirement name.
+_STOPWORDS = {
+    "the", "and", "for", "with", "from", "of", "to", "in", "on", "by", "or", "an", "a",
+    "certificate", "document", "documents", "copy", "copies", "details", "proof", "if",
+    "applicable", "any", "all", "etc", "as", "per", "under", "required",
+}
+SNIPPET_MAX_CHARS = 200
+
+
+def _split_pages(page_tagged_text: str) -> Dict[tuple, str]:
+    """{('main', 3): '<page text>', ...} from build_page_tagged_text() output."""
+    pages: Dict[tuple, str] = {}
+    matches = list(_PAGE_SPLIT_RE.finditer(page_tagged_text or ""))
+    for i, m in enumerate(matches):
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(page_tagged_text)
+        pages[(m.group(1).lower(), int(m.group(2)))] = page_tagged_text[m.end():end].strip()
+    return pages
+
+
+def _snippet_from_page(document_name: str, page_text: str) -> str:
+    """
+    The sentence/line on the cited page sharing the most significant words with the
+    requirement's name, trimmed to SNIPPET_MAX_CHARS. '' when no line shares enough words
+    (one for a 1-2 word name, otherwise two) -- a wrong quote is worse than none.
+    """
+    terms = {
+        w for w in _WORD_RE.findall(document_name.lower())
+        if w not in _STOPWORDS and (len(w) > 2 or any(c.isdigit() for c in w))
+    }
+    if not terms:
+        return ""
+    needed = 1 if len(terms) <= 2 else 2
+    best, best_score = "", 0
+    for piece in re.split(r"(?<=[.;:!?])\s+|\n+", page_text):
+        piece = " ".join(piece.split())
+        score = len(terms & set(_WORD_RE.findall(piece.lower())))
+        if score > best_score:
+            best, best_score = piece, score
+    if best_score < needed:
+        return ""
+    return best if len(best) <= SNIPPET_MAX_CHARS else best[: SNIPPET_MAX_CHARS - 1].rstrip() + "…"
+
+
+def fill_missing_requirement_snippets(requirements: List[Any], page_tagged_text: str) -> Dict[str, int]:
+    """
+    Ensures every requirement's source carries a string snippet. A model-provided snippet
+    is kept (stripped); a missing/blank one is filled from the cited page's text when that
+    page exists and a matching line is found, otherwise set to ''. Mutates in place and
+    returns counts {model, filled, missing}.
+    """
+    pages = _split_pages(page_tagged_text)
+    counts = {"model": 0, "filled": 0, "missing": 0}
+    for r in requirements:
+        if not isinstance(r, dict) or not isinstance(r.get("source"), dict):
+            continue
+        source = r["source"]
+        snippet = source.get("snippet")
+        if isinstance(snippet, str) and snippet.strip():
+            source["snippet"] = snippet.strip()
+            counts["model"] += 1
+            continue
+        page_text = pages.get((str(source.get("document", "")).lower(), source.get("page")))
+        filled = _snippet_from_page(str(r.get("documentName") or ""), page_text) if page_text else ""
+        source["snippet"] = filled
+        counts["filled" if filled else "missing"] += 1
+    if counts["filled"] or counts["missing"]:
+        logger.warning(
+            "[LLM_BIDDING_REQUIREMENTS][Role 3] Requirement snippets: %d from model, %d filled "
+            "from cited page, %d still missing",
+            counts["model"], counts["filled"], counts["missing"],
+        )
+    return counts
 
 
 def analyze_bidding_requirements(
@@ -322,6 +400,11 @@ def analyze_bidding_requirements(
     for r in requirements:
         if isinstance(r, dict) and r.get("category") == "oem":
             r["matchedLibraryId"] = None
+
+    # The model sometimes omits source.snippet for requirements (the tool schema's
+    # "required" is not enforced). Fill it from the cited page's own text -- deterministic,
+    # no extra Claude call -- so every requirement's citation shows supporting text.
+    fill_missing_requirement_snippets(requirements, page_tagged_text)
 
     # Citation guard for annexures (same discipline as the OEM null-match guard below the
     # requirements): missing/malformed/non-existent page citations or no valid blocks ->

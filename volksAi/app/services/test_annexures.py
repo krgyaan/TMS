@@ -9,6 +9,7 @@ text below reproduces real GAIL phrasing (Format F-2A Declaration for Bid Securi
 and an Annexure-I Guaranteed Technical Particulars table, both from real GAIL ATC
 documents in the gold-standard set).
 """
+import io
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -17,7 +18,7 @@ from docx import Document
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.services.annexure_docx_builder import BLANK, build_annexure_docx
+from app.services.annexure_docx_builder import BLANK, build_annexure_docx, requires_bidder_letterhead
 from app.services.annexure_resolver import (
     SYSTEM_PROMPT,
     TOOL_NAME,
@@ -285,3 +286,81 @@ def test_non_list_model_output_yields_nothing():
     assert validate_annexures({"annexureName": "x"}, TENDER_TEXT) == ([], [])
 
 
+
+
+# ── Bidder letterhead: applied only when the form itself asks for it ────────────
+
+def _form(name, *texts):
+    return {"annexureName": name, "blocks": [{"type": "heading", "text": name}] + [{"type": "paragraph", "text": t} for t in texts]}
+
+
+# Real phrasing from tender 3633 (GAIL) plus common variants.
+@pytest.mark.parametrize("annexure", [
+    _form("Form-IA to Section II: Undertaking on Letterhead (Land Border Country Declaration)", "We certify that ..."),
+    _form("Form-I-B to Section II", "UNDERTAKING ON LETTERHEAD (Applicable in case of Transfer of Technology cases only)"),
+    _form("Format F-2A", "To be submitted on the letter head of the Bidder."),
+    _form("Covering Letter", "Printed on bidder's letter-head with seal."),
+    _form("Annexure-V", "On company letterhead"),
+])
+def test_requires_bidder_letterhead_when_form_asks_for_it(annexure):
+    assert requires_bidder_letterhead(annexure) is True
+
+
+@pytest.mark.parametrize("annexure", [
+    _form("Appendix-A1 to Section-II: Format of Agreement", "ON INDIAN STAMP PAPER OF REQUISITE VALUE DULY NOTARIZED."),
+    _form("Appendix-A3: Proforma of Bank Guarantee", "(ON NON-JUDICIAL STAMP PAPER OF APPROPRIATE VALUE)"),
+    _form("Appendix-A2: Guarantee by the Foreign Based Supporting Company/Guarantor", "THIS DEED OF GUARANTEE ..."),
+    _form("Manufacturer's Authorization Form", "To be issued on the manufacturer's letterhead."),
+    _form("Bank Guarantee", "On bank letterhead"),
+    _form("Turnover Certificate", "On letterhead of the Chartered Accountant"),
+    _form("OEM Undertaking", "on the letterhead of the OEM"),
+    # Real wording, tender 3629 ATC p.47 (Annexure-IA).
+    _form("Annexure-IA: Third Party Deposit Confirmation Letter",
+          "a confirmation letter in original on letter head from the issuing bank to GAIL"),
+    _form("Dealer Certificate", "on letterhead issued by the manufacturer"),
+    _form("Plain declaration", "We declare that ..."),
+])
+def test_no_bidder_letterhead_for_stamp_paper_third_party_or_unmarked_forms(annexure):
+    assert requires_bidder_letterhead(annexure) is False
+
+
+def test_letterhead_detected_in_table_and_blank_field_text():
+    annexure = {"annexureName": "Form X", "blocks": [
+        {"type": "table", "headers": ["Note"], "rows": [["Submit on our letterhead"]]},
+    ]}
+    assert requires_bidder_letterhead(annexure) is True
+    annexure = {"annexureName": "Form Y", "blocks": [{"type": "blank_field", "label": "Signature (on letter head)"}]}
+    assert requires_bidder_letterhead(annexure) is True
+
+
+def _header_footer_pictures(doc):
+    sec = doc.sections[0]
+    return (len(sec.header._element.xpath(".//pic:pic")), len(sec.footer._element.xpath(".//pic:pic")))
+
+
+def test_build_annexure_docx_letterhead_flag(tmp_path):
+    plain = Document(str(build_annexure_docx(F2A_ANNEXURE, tmp_path / "plain.docx")))
+    lh = Document(str(build_annexure_docx(F2A_ANNEXURE, tmp_path / "lh.docx", letterhead=True)))
+    assert _header_footer_pictures(plain) == (0, 0)
+    assert _header_footer_pictures(lh) == (1, 1)
+    # Same body either way: the letterhead only adds the bands and A4 margins; blanks stay blank.
+    assert [p.text for p in lh.paragraphs] == [p.text for p in plain.paragraphs]
+    assert lh.sections[0].top_margin.pt == 128.0
+    # Both are A4 (python-docx defaults to US Letter, 612 x 792 pt).
+    for d in (plain, lh):
+        assert (round(d.sections[0].page_width.pt), round(d.sections[0].page_height.pt)) == (595, 842)
+
+
+def test_generate_endpoint_applies_letterhead_only_when_required_without_claude():
+    letterhead_form = _form("Form-IA: Undertaking on Letterhead", "We M/s______ (Name of Bidder) certify ...")
+    stamp_form = _form("Appendix-A1: Agreement", "ON INDIAN STAMP PAPER OF REQUISITE VALUE")
+    with patch("anthropic.Anthropic") as MockAnthropic:
+        r1 = client.post("/generate-annexure-docx", json=letterhead_form)
+        r2 = client.post("/generate-annexure-docx", json=stamp_form)
+    MockAnthropic.assert_not_called()
+    assert r1.status_code == 200 and r2.status_code == 200
+    d1, d2 = Document(io.BytesIO(r1.content)), Document(io.BytesIO(r2.content))
+    assert _header_footer_pictures(d1) == (1, 1)
+    assert _header_footer_pictures(d2) == (0, 0)
+    # Blanks are left for the bidder to fill in by hand.
+    assert any("M/s______" in p.text for p in d1.paragraphs)

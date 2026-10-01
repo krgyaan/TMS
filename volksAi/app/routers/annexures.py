@@ -16,7 +16,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from app.services.annexure_resolver import _sanitize_block
-from app.services.annexure_docx_builder import build_annexure_docx
+from app.services.annexure_docx_builder import build_annexure_docx, requires_bidder_letterhead
 
 router = APIRouter(tags=["Annexures"])
 logger = logging.getLogger(__name__)
@@ -54,14 +54,16 @@ async def generate_annexure_docx_endpoint(payload: GenerateAnnexureDocxRequest) 
         )
 
     filename = f"{_slugify(payload.annexureName)}.docx"
+    annexure = {"annexureName": payload.annexureName, "blocks": blocks}
+    # Only forms whose own text asks for the bidder's letterhead get it (deterministic, no Claude).
+    letterhead = requires_bidder_letterhead(annexure)
     with tempfile.TemporaryDirectory(prefix="volksai_annexure_docx_") as temp_dir:
-        out_path = build_annexure_docx(
-            {"annexureName": payload.annexureName, "blocks": blocks}, Path(temp_dir) / filename
-        )
+        out_path = build_annexure_docx(annexure, Path(temp_dir) / filename, letterhead=letterhead)
         content = out_path.read_bytes()
 
     logger.info(
-        "[ANNEXURE_DOCX] Generated '%s' (%d block(s), %d bytes)", filename, len(blocks), len(content),
+        "[ANNEXURE_DOCX] Generated '%s' (%d block(s), %d bytes, letterhead=%s)",
+        filename, len(blocks), len(content), letterhead,
     )
     return Response(
         content=content,

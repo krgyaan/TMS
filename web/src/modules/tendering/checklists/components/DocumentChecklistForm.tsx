@@ -13,7 +13,7 @@ import { ArrowLeft, Save, AlertCircle, Plus, Trash2, FileText, Sparkles, Check, 
 import { CompactFileUploader } from '@/components/file-upload';
 import { paths } from '@/app/routes/paths';
 import { MultiSelectField } from '@/components/form/MultiSelectField';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import {
     useCreateDocumentChecklist,
     useUpdateDocumentChecklist,
@@ -92,7 +92,6 @@ export default function DocumentChecklistForm({
     const suggestions = suggestionPanel.analysis;
     const annexureRows = buildAnnexureRows(suggestions);
     const downloadAnnexure = useDownloadAnnexure();
-    const [addedSuggestions, setAddedSuggestions] = useState<Set<string>>(new Set());
 
     const form = useForm<FormValues>({
         resolver: zodResolver(DocumentChecklistFormSchema),
@@ -126,19 +125,13 @@ export default function DocumentChecklistForm({
         [fields],
     );
 
-    const handleAddSuggestion = (requirement: SuggestedBiddingRequirement) => {
-        const key = requirement.documentName.trim().toLowerCase();
-        if (existingExtraDocNames.has(key)) {
-            setAddedSuggestions((prev) => new Set(prev).add(key));
-            return;
-        }
-        append({ name: requirement.documentName, path: '' });
-        setAddedSuggestions((prev) => new Set(prev).add(key));
-    };
+    // "Added" reflects the current Additional Documents list, so removing the row re-enables Add.
+    const isSuggestionAdded = (requirement: SuggestedBiddingRequirement) =>
+        existingExtraDocNames.has(requirement.documentName.trim().toLowerCase());
 
-    const isSuggestionAdded = (requirement: SuggestedBiddingRequirement) => {
-        const key = requirement.documentName.trim().toLowerCase();
-        return addedSuggestions.has(key) || existingExtraDocNames.has(key);
+    const handleAddSuggestion = (requirement: SuggestedBiddingRequirement) => {
+        if (isSuggestionAdded(requirement)) return;
+        append({ name: requirement.documentName, path: '' });
     };
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
