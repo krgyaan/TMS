@@ -1601,10 +1601,21 @@ export class TenderExecutiveService {
        RESULT AWAITED
     ===================================================== */
 
+        /**
+         * Awaited at Start
+         * Tenders that had already bid by the period start and had no result on
+         * record as of that date.
+         *
+         * The result test is point-in-time: a tender leaves the opening backlog
+         * only once a result had actually landed by ${fromTz}. Testing mere
+         * existence would strip tenders whose result arrived after the period
+         * began, which is why the exclusion is bounded by <= rather than open
+         * ended. tender_infos.status is deliberately not consulted — it is the
+         * current status and cannot answer a historical question.
+         */
         const resultAwaitedOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
@@ -1617,17 +1628,23 @@ export class TenderExecutiveService {
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
                   AND (
-                        LOWER(TRIM(tr.status)) IN (${resolvedResultStatuses})
+                        (LOWER(TRIM(tr.status)) IN (${resolvedResultStatuses})
+                         AND COALESCE(tr.result_uploaded_at, tr.updated_at) <= ${fromTz})
                      OR (LOWER(TRIM(tr.status)) = 'under evaluation'
-                         AND tr.created_at >= ${fromTz})
+                         AND tr.created_at <= ${fromTz})
                   )
           )
     `);
 
+        /**
+         * Bid During
+         * Tenders that entered this stage during the period, i.e. the bid was
+         * raised between the boundaries. submission_datetime is coalesced to
+         * created_at because a few Bid Submitted rows carry a null value.
+         */
         const resultAwaitedDuringTotal = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
@@ -1663,27 +1680,27 @@ export class TenderExecutiveService {
           )
     `);
 
+        /**
+         * Result Received
+         * Tenders whose outcome landed during the period. Disqualified is
+         * excluded here because it has its own column and including it would
+         * count the same tender twice against the row.
+         */
         const resultAwaitedDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND (
-                        (LOWER(TRIM(tr.status)) IN (${receivedResultStatuses})
-                          AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN ${fromTz} AND ${toTz})
-                     OR (LOWER(TRIM(tr.status)) = 'disqualified'
-                          AND tr.created_at BETWEEN ${fromTz} AND ${toTz})
-                  )
+                  AND LOWER(TRIM(tr.status)) IN (${receivedResultStatuses})
+                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN ${fromTz} AND ${toTz}
           )
     `);
 
         const disqualifiedDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
@@ -1693,10 +1710,14 @@ export class TenderExecutiveService {
           )
     `);
 
+        /**
+         * Awaited at End
+         * Tenders that had bid by the period end with no result recorded by that
+         * date. Mirrors Awaited at Start, bounded to ${toTz}.
+         */
         const resultAwaitedClosing = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
@@ -1709,9 +1730,10 @@ export class TenderExecutiveService {
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
                   AND (
-                        LOWER(TRIM(tr.status)) IN (${resolvedResultStatuses})
+                        (LOWER(TRIM(tr.status)) IN (${resolvedResultStatuses})
+                         AND COALESCE(tr.result_uploaded_at, tr.updated_at) <= ${toTz})
                      OR (LOWER(TRIM(tr.status)) = 'under evaluation'
-                         AND tr.created_at >= ${toTz})
+                         AND tr.created_at <= ${toTz})
                   )
           )
     `);
