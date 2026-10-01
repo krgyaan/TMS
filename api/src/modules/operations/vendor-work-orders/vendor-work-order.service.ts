@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, eq, like, desc, sql, inArray, isNull, ne } from "drizzle-orm";
+import { and, eq, like, desc, sql, inArray, isNull, isNotNull, ne } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { rename, readFile } from "node:fs/promises";
@@ -415,15 +415,19 @@ export class VendorWorkOrderService {
         if (status === "pending") {
             conditions.push(isNull(vendorWorkOrders.woApproved));
         } else if (status === "approved") {
-            conditions.push(sql`${vendorWorkOrders.woApproved} = true AND ${paymentDoneTotal} < ${effectiveAmount}`);
+            // approved but not yet closed: payment progress no longer separates
+            // these two tabs, `closed_at` does (see closeVendorWorkOrder).
+            conditions.push(sql`${vendorWorkOrders.woApproved} = true AND ${vendorWorkOrders.closedAt} IS NULL`);
         } else if (status === "rejected") {
             conditions.push(eq(vendorWorkOrders.woApproved, false));
         } else if (status === "new") {
             conditions.push(sql`${vendorWorkOrders.woApproved} IS NOT FALSE`);
         } else if (status === "closed") {
-            conditions.push(sql`${vendorWorkOrders.woApproved} = true AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} >= ${effectiveAmount}`);
+            conditions.push(isNotNull(vendorWorkOrders.closedAt));
         } else if (status === "invoice-pending") {
-            conditions.push(sql`${vendorWorkOrders.woApproved} = true AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`);
+            conditions.push(
+                sql`${vendorWorkOrders.woApproved} = true AND ${vendorWorkOrders.closedAt} IS NULL AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`
+            );
         }
 
         const rows = await this.db
@@ -451,6 +455,7 @@ export class VendorWorkOrderService {
                 amountAfterTds: vendorWorkOrders.amountAfterTds,
                 woApproved: vendorWorkOrders.woApproved,
                 woApprovalRemark: vendorWorkOrders.woApprovalRemark,
+                closedAt: vendorWorkOrders.closedAt,
                 totalAmount: sql<number>`COALESCE((SELECT SUM(CAST(taxable_amount AS numeric)) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
                 totalGstAmt: sql<number>`COALESCE((SELECT SUM(CAST(gst_amount AS numeric)) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
                 grandTotal: sql<number>`COALESCE((SELECT SUM(CAST(total_amount AS numeric)) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
@@ -492,11 +497,13 @@ export class VendorWorkOrderService {
 
         const [pending, approved, newCount, rejected, closedCount, invoicePendingCount] = await Promise.all([
             buildCount(isNull(vendorWorkOrders.woApproved)),
-            buildCount(sql`${vendorWorkOrders.woApproved} = true AND ${paymentDoneTotal} < ${effectiveAmount}`),
+            buildCount(sql`${vendorWorkOrders.woApproved} = true AND ${vendorWorkOrders.closedAt} IS NULL`),
             buildCount(sql`${vendorWorkOrders.woApproved} IS NOT FALSE`),
             buildCount(eq(vendorWorkOrders.woApproved, false)),
-            buildCount(sql`${vendorWorkOrders.woApproved} = true AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} >= ${effectiveAmount}`),
-            buildCount(sql`${vendorWorkOrders.woApproved} = true AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`),
+            buildCount(isNotNull(vendorWorkOrders.closedAt)),
+            buildCount(
+                sql`${vendorWorkOrders.woApproved} = true AND ${vendorWorkOrders.closedAt} IS NULL AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`
+            ),
         ]);
 
         return { pending, approved, rejected, new: newCount, closed: closedCount, invoicePending: invoicePendingCount };
@@ -660,6 +667,7 @@ export class VendorWorkOrderService {
                 amountAfterTds: vendorWorkOrders.amountAfterTds,
                 woApproved: vendorWorkOrders.woApproved,
                 woApprovalRemark: vendorWorkOrders.woApprovalRemark,
+                closedAt: vendorWorkOrders.closedAt,
                 generatedPdfVersions: vendorWorkOrders.generatedPdfVersions,
             })
             .from(vendorWorkOrders)
@@ -785,7 +793,8 @@ export class VendorWorkOrderService {
         const [updated] = await this.db
             .update(vendorWorkOrders)
             .set({
-                updatedAt: sql`now()`,
+                closedAt: new Date(),
+                updatedAt: new Date(),
             })
             .where(eq(vendorWorkOrders.id, id))
             .returning();

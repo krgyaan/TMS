@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, desc, eq, inArray, isNull, like, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, like, ne, sql } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, rename } from "node:fs/promises";
 import { join } from "node:path";
@@ -74,6 +74,7 @@ export class PurchaseOrderService {
                     totalPiCount: sql<number>`COALESCE((SELECT COUNT(*) FROM project_purchase_invoices WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                     poApproved: purchaseOrders.poApproved,
                     poApprovalRemark: purchaseOrders.poApprovalRemark,
+                    closedAt: purchaseOrders.closedAt,
                 })
                 .from(purchaseOrders)
                 .leftJoin(users, eq(users.id, purchaseOrders.poRaisedBy))
@@ -149,15 +150,19 @@ export class PurchaseOrderService {
         if (status === "pending") {
             conditions.push(isNull(purchaseOrders.poApproved));
         } else if (status === "approved") {
-            conditions.push(sql`${purchaseOrders.poApproved} = true AND ${paymentDoneTotal} < ${effectiveAmount}`);
+            // approved but not yet closed: payment progress is no longer what
+            // separates these two tabs, `closed_at` is (see closePurchaseOrder).
+            conditions.push(sql`${purchaseOrders.poApproved} = true AND ${purchaseOrders.closedAt} IS NULL`);
         } else if (status === "rejected") {
             conditions.push(eq(purchaseOrders.poApproved, false));
         } else if (status === "new") {
             conditions.push(sql`${purchaseOrders.poApproved} IS NOT FALSE`);
         } else if (status === "closed") {
-            conditions.push(sql`${purchaseOrders.poApproved} = true AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} >= ${effectiveAmount}`);
+            conditions.push(isNotNull(purchaseOrders.closedAt));
         } else if (status === "invoice-pending") {
-            conditions.push(sql`${purchaseOrders.poApproved} = true AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`);
+            conditions.push(
+                sql`${purchaseOrders.poApproved} = true AND ${purchaseOrders.closedAt} IS NULL AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`
+            );
         }
 
         const purchaseOrdersData = await this.db
@@ -186,6 +191,7 @@ export class PurchaseOrderService {
                     amountAfterTds: purchaseOrders.amountAfterTds,
                     poApproved: purchaseOrders.poApproved,
                     poApprovalRemark: purchaseOrders.poApprovalRemark,
+                    closedAt: purchaseOrders.closedAt,
                     totalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                     totalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                     grandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
@@ -227,11 +233,13 @@ export class PurchaseOrderService {
 
         const [pending, approved, newCount, rejected, closedCount, invoicePendingCount] = await Promise.all([
             buildCount(isNull(purchaseOrders.poApproved)),
-            buildCount(sql`${purchaseOrders.poApproved} = true AND ${paymentDoneTotal} < ${effectiveAmount}`),
+            buildCount(sql`${purchaseOrders.poApproved} = true AND ${purchaseOrders.closedAt} IS NULL`),
             buildCount(sql`${purchaseOrders.poApproved} IS NOT FALSE`),
             buildCount(eq(purchaseOrders.poApproved, false)),
-            buildCount(sql`${purchaseOrders.poApproved} = true AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} >= ${effectiveAmount}`),
-            buildCount(sql`${purchaseOrders.poApproved} = true AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`),
+            buildCount(isNotNull(purchaseOrders.closedAt)),
+            buildCount(
+                sql`${purchaseOrders.poApproved} = true AND ${purchaseOrders.closedAt} IS NULL AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`
+            ),
         ]);
 
         return { pending, approved, rejected, new: newCount, closed: closedCount, invoicePending: invoicePendingCount };
@@ -701,6 +709,41 @@ export class PurchaseOrderService {
             this.logger.info(`TDS rejected for PO #${id}: ${remark || 'no remark'}`);
             return updated;
         }
+    }
+
+    /**
+     * Closure is an explicit, permissioned decision rather than a derived state:
+     * `closed_at` is what the "Closed" tab and the approval counts read, so a PO
+     * that is merely fully paid stays in "Approved" until someone closes it.
+     */
+    async closePurchaseOrder(id: number) {
+        const po = await this.db
+            .select()
+            .from(purchaseOrders)
+            .where(eq(purchaseOrders.id, id))
+            .then(rows => rows[0]);
+
+        if (!po) throw new NotFoundException("Purchase Order not found");
+        if (po.poApproved !== true) {
+            throw new BadRequestException("Only approved Purchase Orders can be closed");
+        }
+
+        const closureStatus = await this.checkClosure(id);
+        if (!closureStatus.canClose) {
+            throw new BadRequestException("Purchase Order cannot be closed until all payment requests and purchase invoices are cleared.");
+        }
+
+        const [updated] = await this.db
+            .update(purchaseOrders)
+            .set({
+                closedAt: new Date(),
+                updatedAt: new Date(),
+            })
+            .where(eq(purchaseOrders.id, id))
+            .returning();
+
+        this.logger.info(`Purchase Order closed #${id}`);
+        return updated ?? po;
     }
 
     async getPurchaseOrder(id: number) {
