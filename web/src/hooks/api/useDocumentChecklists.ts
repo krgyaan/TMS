@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { documentChecklistService } from '@/services/api/document-checklist.service';
 import { toast } from 'sonner';
+import { saveAs } from 'file-saver';
 import type { DocumentChecklistsDashboardCounts, PaginatedResult, TenderDocumentChecklistDashboardRow, CreateDocumentChecklistDto, UpdateDocumentChecklistDto } from '@/types/api.types';
 import { useTeamFilter } from '@/hooks/useTeamFilter';
 
@@ -94,6 +95,19 @@ export const useSuggestedBiddingRequirements = () => {
         },
         onError: (error: any) => {
             toast.error(error?.response?.data?.message || 'Failed to analyze bidding requirements for this tender');
+        },
+    });
+};
+
+/** Downloads one annexure's .docx and hands it to the browser (file-saver, as the xlsx exports do). */
+export const useDownloadAnnexure = () => {
+    return useMutation({
+        mutationFn: async ({ tenderId, annexureIndex }: { tenderId: number; annexureIndex: number }) => {
+            const { blob, filename } = await documentChecklistService.downloadAnnexure(tenderId, annexureIndex);
+            saveAs(blob, filename);
+        },
+        onError: () => {
+            toast.error('Failed to download annexure');
         },
     });
 };

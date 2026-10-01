@@ -1,4 +1,5 @@
 import { BaseApiService } from './base.service';
+import axiosInstance from '@/lib/axios';
 import type {
     DocumentChecklistsDashboardCounts,
     TenderDocumentChecklist,
@@ -98,6 +99,20 @@ class DocumentChecklistService extends BaseApiService {
     async getCachedRequirements(tenderId: number): Promise<BiddingRequirementsAnalysisResult | null> {
         const res = await this.get<CachedBiddingRequirementsResponse>(`/tender/${tenderId}/bidding-requirements/cached`);
         return res?.analysis ?? null;
+    }
+
+    /**
+     * Downloads ONE annexure (by its index in the cached analysis's `annexures[]`) as a .docx.
+     * Returns the blob plus the server-chosen filename for the caller to save.
+     */
+    async downloadAnnexure(tenderId: number, annexureIndex: number): Promise<{ blob: Blob; filename: string }> {
+        const response = await axiosInstance.get<Blob>(
+            `${this.basePath}/tender/${tenderId}/annexures/${annexureIndex}/download`,
+            { responseType: 'blob' },
+        );
+        const disposition = String(response.headers?.['content-disposition'] ?? '');
+        const filename = /filename="?([^";]+)"?/i.exec(disposition)?.[1] ?? `tender${tenderId}_annexure-${annexureIndex + 1}.docx`;
+        return { blob: response.data, filename };
     }
 
     async create(data: CreateDocumentChecklistDto): Promise<TenderDocumentChecklist> {

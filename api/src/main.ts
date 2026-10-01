@@ -62,6 +62,8 @@ async function bootstrap() {
         credentials: true,
         methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allowedHeaders: ["Content-Type", "Authorization"],
+        // Lets the web app read the server-chosen filename on file downloads.
+        exposedHeaders: ["Content-Disposition"],
     });
 
     // Graceful shutdown
