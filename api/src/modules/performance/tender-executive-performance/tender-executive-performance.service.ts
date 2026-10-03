@@ -229,7 +229,7 @@ export class TenderExecutiveService {
      * Produces normalized stage-level performance
      */
     async getStagePerformance(query: PerformanceQueryDto): Promise<StagePerformance[]> {
-        const { userId, fromDate, toDate } = query;
+        const { userId } = query;
 
         const activeStages = getExecutiveStages();
 
@@ -237,10 +237,13 @@ export class TenderExecutiveService {
        STEP 1: Fetch tenders
     ===================================================== */
 
+        /* All of the member's live tenders, not only those CREATED inside the window.
+           Filtering on createdAt dropped tenders that started earlier but progressed during the
+           period, so the matrix disagreed with the stage tables rendered above it. */
         const tenders = await this.db
             .select()
             .from(tenderInfos)
-            .where(and(eq(tenderInfos.teamMember, userId), eq(tenderInfos.deleteStatus, 0), between(tenderInfos.createdAt, fromDate, toDate)));
+            .where(and(eq(tenderInfos.teamMember, userId), eq(tenderInfos.deleteStatus, 0)));
 
         if (tenders.length === 0) return [];
 
@@ -252,10 +255,13 @@ export class TenderExecutiveService {
 
         const timerNames = activeStages.filter(s => s.type === "timer" && s.timerName).map(s => s.timerName!);
 
+        /* A stage belongs to whoever it is ASSIGNED to. Matching on createdByUserId here
+           meant a member saw no timers at all for stages created by anyone else, which left
+           every row stuck at "Pending" with empty Done / On Time / Late / Overdue. */
         const timers = await this.db
             .select()
             .from(timerTrackers)
-            .where(and(eq(timerTrackers.createdByUserId, userId), inArray(timerTrackers.entityId, tenderIds), inArray(timerTrackers.stage, timerNames)));
+            .where(and(eq(timerTrackers.assignedUserId, userId), inArray(timerTrackers.entityId, tenderIds), inArray(timerTrackers.stage, timerNames)));
 
         const timerMap = new Map<string, (typeof timers)[number]>();
         for (const t of timers) {
@@ -296,7 +302,11 @@ export class TenderExecutiveService {
 
                 const hasBid = ["RESULT_AWAITED", "WON", "LOST", "DISQUALIFIED"].includes(bucket);
 
-                const applicable = stage.stageKey === "tq" ? hasTq : stage.stageKey === "result" ? hasBid : stage.isApplicable(tender);
+                /* tq / result / ra are existence-based, so their applicability comes from the
+                   rows actually fetched above. The config's isApplicable for these stages reads
+                   columns that do not exist on tender_infos (currentStatusCode,
+                   reverseAuctionId), which would have made them permanently Not Applicable. */
+                const applicable = stage.stageKey === "tq" ? hasTq : stage.stageKey === "result" ? hasBid : stage.stageKey === "ra" ? raMap.has(tender.id) : stage.isApplicable(tender);
 
                 let completed = false;
                 let onTime: boolean | null = null;
@@ -310,19 +320,20 @@ export class TenderExecutiveService {
                     if (timerRow) {
                         startTime = timerRow.startedAt;
                         endTime = timerRow.endedAt ?? null;
-                        const deadline = stage.resolveDeadline(tender);
+                        /* The timer row carries the authoritative deadline (already extended by
+                           any granted extensions); fall back to the tender due date only when the
+                           timer has none. */
+                        const deadline = timerRow.deadlineAt ?? stage.resolveDeadline(tender);
                         const now = new Date();
 
                         if (timerRow.status === "completed" && endTime) {
                             completed = true;
-                            onTime = deadline ? endTime <= deadline : null;
+                            onTime = deadline ? new Date(endTime) <= new Date(deadline) : null;
                         } else {
+                            /* running / paused / not_started / overdue are all still incomplete.
+                               Split Pending vs Overdue purely on the deadline. */
                             completed = false;
-                            if (deadline) {
-                                // not completed, check SLA
-                                onTime = now <= deadline ? null : false;
-                                // null = still pending, false = overdue
-                            }
+                            onTime = deadline && now > new Date(deadline) ? false : null;
                         }
                     }
                 }
