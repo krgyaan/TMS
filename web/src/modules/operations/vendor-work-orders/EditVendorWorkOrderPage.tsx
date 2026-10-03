@@ -2,6 +2,7 @@ import { paths } from "@/app/routes/paths";
 import { DateInput } from "@/components/form/DateInput";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
+import { AsyncSelectField } from "@/components/form/AsyncSelectField";
 import { MultiSelectField } from "@/components/form/MultiSelectField";
 import { FileUploader } from "@/components/file-upload";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +14,8 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
-import { useCreatePoParty, useSellerOptions, useShipToOptions } from "@/hooks/api/usePurchaseOrders";
+import { useCreatePoParty } from "@/hooks/api/usePurchaseOrders";
+import { useSellerSelectOptions, useShipToSelectOptions } from "@/hooks/useSelectOptions";
 import { useSellerContactPerson } from "@/hooks/useSellerContactPerson";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import { useAuth } from "@/contexts/AuthContext";
@@ -164,8 +166,6 @@ export default function EditVendorWorkOrderPage() {
   const { teamId } = useAuth();
 
   const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
-  const { data: sellerRows = [] } = useSellerOptions();
-  const { data: shipToRows = [] } = useShipToOptions();
   const createPartyMutation = useCreatePoParty();
 
   const [showPreview, setShowPreview] = useState(false);
@@ -196,6 +196,22 @@ export default function EditVendorWorkOrderPage() {
   const selectedSellerId = form.watch("sellerId");
   const selectedPartyId = form.watch("partyId");
 
+  // Server-searched pickers. Each owns its query (debounced inside), and pins
+  // the current id so the row behind it is always in the response no matter
+  // what is typed - otherwise the auto-fill effect below loses its row.
+  const {
+      options: sellerOptions,
+      rows: sellerRows,
+      onSearch: onSellerSearch,
+      isLoading: isSellerLoading,
+  } = useSellerSelectOptions(selectedSellerId);
+  const {
+      options: partyOptions,
+      rows: shipToRows,
+      onSearch: onShipToSearch,
+      isLoading: isShipToLoading,
+  } = useShipToSelectOptions(selectedPartyId);
+
   const { data: teamMembers = [] } = useGetTeamMembers(0);
   const selectedUserId = form.watch("selectedUserId");
   const activeTeamMembers = useMemo(
@@ -205,19 +221,9 @@ export default function EditVendorWorkOrderPage() {
 
   const { sellerPersons } = useSellerContactPerson(form, { autoSelectFirstOnLoad: false });
 
-  const sellerOptions = useMemo(
-    () => sellerRows.map((p) => ({ id: String(p.id), name: p.alias ? `${p.name} (${p.alias})` : p.name })),
-    [sellerRows]
-  );
-
   const sellerPersonOptions = useMemo(
     () => sellerPersons.map((p) => ({ id: String(p.id), name: p.name || "Unnamed person" })),
     [sellerPersons]
-  );
-
-  const partyOptions = useMemo(
-    () => shipToRows.map((p) => ({ id: String(p.id), name: p.alias ? `${p.name} (${p.alias})` : p.name })),
-    [shipToRows]
   );
 
   useEffect(() => {
@@ -428,15 +434,15 @@ export default function EditVendorWorkOrderPage() {
                   isLoading={createPartyMutation.isPending}
                 />
                 <p className="text-sm text-muted-foreground mb-4">Select or enter vendor details</p>
-                <div className="mb-6 max-w-md">
-                  <SelectField
+                  <AsyncSelectField
                     control={form.control}
                     name="sellerId"
                     label="Select Existing Vendor"
                     options={sellerOptions}
                     placeholder="Choose a vendor..."
+                    onSearch={onSellerSearch}
+                    isLoading={isSellerLoading}
                   />
-                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FieldWrapper control={form.control} name="sellerName" label={<>Vendor Name <span className="text-destructive">*</span></>}>
                       {(field) => <Input {...field} placeholder="Enter vendor name" />}
@@ -512,15 +518,15 @@ export default function EditVendorWorkOrderPage() {
                    isLoading={createPartyMutation.isPending}
                  />
                  <p className="text-sm text-muted-foreground mb-4">Delivery destination information</p>
-                <div className="mb-6 max-w-md">
-                  <SelectField
+                  <AsyncSelectField
                     control={form.control}
                     name="partyId"
                     label="Select Destination"
                     options={partyOptions}
                     placeholder="Choose shipping destination..."
+                    onSearch={onShipToSearch}
+                    isLoading={isShipToLoading}
                   />
-                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FieldWrapper control={form.control} name="shipToName" label={<>Ship To Name <span className="text-destructive">*</span></>}>
                       {(field) => <Input {...field} placeholder="Enter recipient name" />}

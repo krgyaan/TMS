@@ -1,13 +1,13 @@
 import type { CreatePartyDTO, CreatePurchaseOrderDTO, SetTdsDTO, UpdatePurchaseOrderDTO } from "@/modules/operations/purchase-orders/helpers/purchaseOrder.types";
 import { purchaseOrderApi } from "@/services/api/purchase-order.api";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const purchaseOrderKeys = {
     all: ["purchase-orders"] as const,
     poParties: () => [...purchaseOrderKeys.all, "po-parties"] as const,
-    sellerOptions: () => [...purchaseOrderKeys.poParties(), "sellers"] as const,
+    sellerOptions: (q?: string, ids?: number[]) => [...purchaseOrderKeys.poParties(), "sellers", { q, ids }] as const,
     sellerPersons: (orgId: number) => [...purchaseOrderKeys.poParties(), "seller-persons", orgId] as const,
-    shipToOptions: () => [...purchaseOrderKeys.poParties(), "ship-to"] as const,
+    shipToOptions: (q?: string, ids?: number[]) => [...purchaseOrderKeys.poParties(), "ship-to", { q, ids }] as const,
     purchaseOrder: (id: number) => [...purchaseOrderKeys.all, "purchase-order", id] as const,
     projectPurchaseOrders: (projectId: number) => [...purchaseOrderKeys.all, "project", projectId] as const,
     projectInventory: (projectId: number) => [...purchaseOrderKeys.all, "project-inventory", projectId] as const,
@@ -37,11 +37,18 @@ export const usePoParties = () => {
     });
 };
 
-export const useSellerOptions = () => {
+// Rows the seller / ship-to pickers ask for per page. Baked into the hook so
+// there is exactly one limit in play and the cache key stays unambiguous.
+export const PICKER_OPTION_LIMIT = 20;
+
+export const useSellerOptions = (q?: string, ids?: number[]) => {
     return useQuery({
-        queryKey: purchaseOrderKeys.sellerOptions(),
-        queryFn: () => purchaseOrderApi.getSellerOptions(),
-        staleTime: 5 * 60 * 1000,
+        queryKey: purchaseOrderKeys.sellerOptions(q, ids),
+        queryFn: () => purchaseOrderApi.getSellerOptions(q, ids, PICKER_OPTION_LIMIT),
+        // Hold the previous page on screen while the next one loads so the menu
+        // never flashes "No results" between keystrokes.
+        placeholderData: keepPreviousData,
+        staleTime: 30 * 1000,
     });
 };
 
@@ -54,11 +61,12 @@ export const useSellerPersons = (orgId: number | undefined) => {
     });
 };
 
-export const useShipToOptions = () => {
+export const useShipToOptions = (q?: string, ids?: number[]) => {
     return useQuery({
-        queryKey: purchaseOrderKeys.shipToOptions(),
-        queryFn: () => purchaseOrderApi.getShipToOptions(),
-        staleTime: 5 * 60 * 1000,
+        queryKey: purchaseOrderKeys.shipToOptions(q, ids),
+        queryFn: () => purchaseOrderApi.getShipToOptions(q, ids, PICKER_OPTION_LIMIT),
+        placeholderData: keepPreviousData,
+        staleTime: 30 * 1000,
     });
 };
 

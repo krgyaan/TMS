@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, asc, desc, eq, inArray, isNotNull, isNull, like, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, like, ne, or, sql, type SQL } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, rename } from "node:fs/promises";
 import { join } from "node:path";
@@ -1544,21 +1544,61 @@ export class PurchaseOrderService {
     // Organization-level only: `vendors` is 1:N per org, so joining it here and
     // keeping the first row picked an arbitrary contact person with no ORDER BY
     // to stabilise it. Persons come from listSellerPersons once a seller is chosen.
-    async listSellerOptions() {
+    //
+    // The dropdown never needs the whole table, so this pages itself: it returns
+    // `limit` rows matching `q` plus any row in `ids`. Passing the ids of rows
+    // the form already has selected keeps the current selection in the response
+    // even when it does not match the query - without that the picker would lose
+    // its own label the moment the user types.
+    async listSellerOptions(q?: string, ids?: number[], limit = 20) {
+        const pattern = q?.trim() ? `%${q.trim()}%` : undefined;
+        // Mirrors the columns vendor-master already searches, so a GSTIN typed
+        // into the picker behaves like a GSTIN typed into the vendor list.
+        const matches = pattern
+            ? sql`(
+                ${vendorOrganizations.name} ILIKE ${pattern} OR
+                ${vendorOrganizations.alias} ILIKE ${pattern} OR
+                ${vendorOrganizations.pan} ILIKE ${pattern} OR
+                ${vendorOrganizations.msme} ILIKE ${pattern} OR
+                ${vendorOrganizations.address} ILIKE ${pattern} OR
+                exists (
+                    select 1 from ${vendorGsts}
+                    where ${vendorGsts.orgId} = ${vendorOrganizations.id}
+                      and ${vendorGsts.gstNo} ILIKE ${pattern}
+                )
+            )`
+            : undefined;
+        const selected = ids?.length ? inArray(vendorOrganizations.id, ids) : undefined;
+        const either = matches && selected ? or(matches, selected) : (matches ?? selected);
+
+        const conditions: SQL<unknown>[] = [eq(vendorOrganizations.status, true)];
+        if (either) conditions.push(either);
+
         return this.db
             .select({
                 id: vendorOrganizations.id,
                 name: vendorOrganizations.name,
                 alias: vendorOrganizations.alias,
-                gstNo: vendorGsts.gstNo,
+                // vendor_gsts is 1:N (one org holds 43 rows), so a join fans 482
+                // orgs out to 1251 rows and duplicate ids reach the picker. A
+                // correlated subquery keeps exactly one row per org instead.
+                // NOTE: `${vendorOrganizations}.id` (table + "." + column) is
+                // deliberate. Drizzle renders `${vendorOrganizations.id}` inside a
+                // select-list sql chunk as a bare `"id"`, which the inner FROM
+                // resolves to g.id - so every row returned the same first GST.
+                gstNo: sql<string | null>`(
+                    SELECT g.gst_no FROM ${vendorGsts} g
+                    WHERE g.org_id = ${vendorOrganizations}.id
+                    ORDER BY g.id LIMIT 1
+                )`,
                 msme: vendorOrganizations.msme,
                 pan: vendorOrganizations.pan,
                 address: vendorOrganizations.address,
             })
             .from(vendorOrganizations)
-            .leftJoin(vendorGsts, eq(vendorGsts.orgId, vendorOrganizations.id))
-            .where(eq(vendorOrganizations.status, true))
-            .orderBy(asc(vendorOrganizations.name));
+            .where(and(...conditions))
+            .orderBy(asc(vendorOrganizations.name), asc(vendorOrganizations.id))
+            .limit(limit + (ids?.length ?? 0));
     }
 
     // Contact persons for one seller org. Ordered so the same person is always
@@ -1578,8 +1618,26 @@ export class PurchaseOrderService {
 
     // Ship-to picker reads project_parties only - vendor_organizations never
     // contributes here, so ids from the two tables cannot cross-wire.
-    async listShipToOptions() {
-        const rows = await this.db
+    // Paged the same way listSellerOptions is: `q` rows plus whatever `ids`
+    // the form already holds, so the client never downloads all 129 rows.
+    async listShipToOptions(q?: string, ids?: number[], limit = 20) {
+        const pattern = q?.trim() ? `%${q.trim()}%` : undefined;
+        const matches = pattern
+            ? sql`(
+                ${projectParties.name} ILIKE ${pattern} OR
+                ${projectParties.alias} ILIKE ${pattern} OR
+                ${projectParties.gstNo} ILIKE ${pattern} OR
+                ${projectParties.pan} ILIKE ${pattern} OR
+                ${projectParties.address} ILIKE ${pattern}
+            )`
+            : undefined;
+        const selected = ids?.length ? inArray(projectParties.id, ids) : undefined;
+        const either = matches && selected ? or(matches, selected) : (matches ?? selected);
+
+        const conditions: SQL<unknown>[] = [eq(projectParties.type, "ship_to"), eq(projectParties.isActive, true)];
+        if (either) conditions.push(either);
+
+        return this.db
             .select({
                 id: projectParties.id,
                 name: projectParties.name,
@@ -1589,10 +1647,9 @@ export class PurchaseOrderService {
                 pan: projectParties.pan,
             })
             .from(projectParties)
-            .where(and(eq(projectParties.type, "ship_to"), eq(projectParties.isActive, true)))
-            .orderBy(asc(projectParties.name));
-
-        return rows;
+            .where(and(...conditions))
+            .orderBy(asc(projectParties.name), asc(projectParties.id))
+            .limit(limit + (ids?.length ?? 0));
     }
 
     async activateParty(id: number, source?: string) {
