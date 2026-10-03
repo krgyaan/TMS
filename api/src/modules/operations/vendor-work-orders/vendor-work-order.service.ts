@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, eq, like, desc, sql, inArray, isNull, isNotNull, ne } from "drizzle-orm";
+import { and, eq, like, desc, asc, sql, inArray, isNull, isNotNull, ne } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { rename, readFile } from "node:fs/promises";
@@ -113,6 +113,9 @@ export class VendorWorkOrderService {
                     contactPersonName: body.contactPersonName,
                     contactPersonPhone: body.contactPersonPhone,
                     contactPersonEmail: body.contactPersonEmail,
+                    vendorContactPersonName: body.vendorContactPersonName,
+                    vendorContactPersonPhone: body.vendorContactPersonPhone,
+                    vendorContactPersonEmail: body.vendorContactPersonEmail,
 
                     shipToName: body.shipToName,
                     shippingAddress: body.shippingAddress,
@@ -230,6 +233,9 @@ export class VendorWorkOrderService {
                     contactPersonName: body.contactPersonName,
                     contactPersonPhone: body.contactPersonPhone,
                     contactPersonEmail: body.contactPersonEmail,
+                    vendorContactPersonName: body.vendorContactPersonName,
+                    vendorContactPersonPhone: body.vendorContactPersonPhone,
+                    vendorContactPersonEmail: body.vendorContactPersonEmail,
                     shipToName: body.shipToName,
                     shippingAddress: body.shippingAddress,
                     shipToGst: body.shipToGst,
@@ -1132,7 +1138,9 @@ export class VendorWorkOrderService {
             .leftJoin(vendorGsts, eq(vendorGsts.orgId, vendorOrganizations.id))
             .leftJoin(vendors, eq(vendors.orgId, vendorOrganizations.id))
             .where(eq(vendorOrganizations.status, true))
-            .orderBy(desc(vendorOrganizations.createdAt));
+            // vendors.id keeps the 1:N fan-out stable: without it the "first"
+            // person per org in the merge below was whatever Postgres returned.
+            .orderBy(desc(vendorOrganizations.createdAt), asc(vendors.id));
 
         type OrgRow = (typeof orgRows)[number] & { type: string; source: string };
         const orgMap = new Map<number, OrgRow>();
@@ -1278,9 +1286,6 @@ export class VendorWorkOrderService {
                 .returning();
             if (!rows[0]) throw new NotFoundException(`Vendor organization with ID ${id} not found`);
 
-            await this.syncPersonForOrg(id, body);
-            await this.syncGstForOrg(id, body);
-
             return { ...rows[0], type: "seller", source: "vendor_org", isActive: rows[0].status };
         }
 
@@ -1411,9 +1416,6 @@ export class VendorWorkOrderService {
                     updatedAt: new Date(),
                 })
                 .where(eq(vendorOrganizations.id, orgId));
-
-            await this.syncPersonForOrg(orgId, body);
-            await this.syncGstForOrg(orgId, body);
         } else {
             // Sellers live only in vendor master; without an org id there is
             // nothing to write to rather than recreating a party row.
@@ -1448,70 +1450,6 @@ export class VendorWorkOrderService {
         }
     }
 
-    private async syncPersonForOrg(orgId: number, body: any) {
-        const [person] = await this.db
-            .select()
-            .from(vendors)
-            .where(eq(vendors.orgId, orgId))
-            .limit(1);
-
-        const name = body.contactPersonName ?? body.contact_person ?? null;
-        const email = body.contactPersonEmail ?? body.sellerEmail ?? null;
-        const mobile = body.contactPersonPhone ?? body.mobile_number ?? null;
-
-        if (person) {
-            await this.db
-                .update(vendors)
-                .set({
-                    name,
-                    email,
-                    mobile,
-                    updatedAt: new Date(),
-                })
-                .where(eq(vendors.id, person.id));
-        } else {
-            await this.db.insert(vendors).values({
-                orgId,
-                name,
-                email,
-                mobile,
-                address: null,
-            });
-        }
-    }
-
-    private async syncGstForOrg(orgId: number, body: any) {
-        const [gst] = await this.db
-            .select()
-            .from(vendorGsts)
-            .where(eq(vendorGsts.orgId, orgId))
-            .limit(1);
-
-        const hasGstNo = body.sellerGstNo !== undefined || body.gstNo !== undefined;
-        const hasGstState = body.gstState !== undefined;
-        const gstNo = body.sellerGstNo ?? body.gstNo;
-        const gstState = body.gstState;
-
-        if (gst) {
-            if (hasGstNo || hasGstState) {
-                await this.db
-                    .update(vendorGsts)
-                    .set({
-                        ...(hasGstNo ? { gstNo } : {}),
-                        ...(hasGstState ? { gstState } : {}),
-                        updatedAt: new Date(),
-                    })
-                    .where(eq(vendorGsts.id, gst.id));
-            }
-        } else {
-            await this.db.insert(vendorGsts).values({
-                orgId,
-                gstState: hasGstState ? gstState : null,
-                gstNo: hasGstNo ? gstNo : null,
-            });
-        }
-    }
-
     private computeWOHash(wo: any, products: any[]): string {
         const fields = {
             woDate: wo.woDate,
@@ -1530,6 +1468,9 @@ export class VendorWorkOrderService {
             contactPersonName: wo.contactPersonName,
             contactPersonPhone: wo.contactPersonPhone,
             contactPersonEmail: wo.contactPersonEmail,
+            vendorContactPersonName: wo.vendorContactPersonName,
+            vendorContactPersonPhone: wo.vendorContactPersonPhone,
+            vendorContactPersonEmail: wo.vendorContactPersonEmail,
             termsAndConditions: wo.termsAndConditions,
             team: wo.team,
             certRecipient: wo.certRecipient,
@@ -1599,6 +1540,9 @@ export class VendorWorkOrderService {
             oe_name: wo.contactPersonName || "",
             oe_number: wo.contactPersonPhone || "",
             oe_email: wo.contactPersonEmail || "",
+            vendor_contact_name: wo.vendorContactPersonName || "",
+            vendor_contact_phone: wo.vendorContactPersonPhone || "",
+            vendor_contact_email: wo.vendorContactPersonEmail || "",
             seller_name: wo.sellerName || "",
             seller_address: wo.sellerAddress || "",
             seller_pan: wo.sellerPanNo || "",

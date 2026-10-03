@@ -62,6 +62,11 @@ export class PurchaseOrderController {
         return this.service.listSellerOptions();
     }
 
+    @Get("parties/sellers/:orgId/persons")
+    listSellerPersons(@Param("orgId", ParseIntPipe) orgId: number) {
+        return this.service.listSellerPersons(orgId);
+    }
+
     @Get("parties/ship-to")
     listShipToOptions() {
         return this.service.listShipToOptions();
