@@ -6,6 +6,7 @@ import type {
     PurchaseOrderRow,
     SetTdsDTO,
     SellerOption,
+    SellerPersonOption,
     ShipToOption,
 } from '@/modules/operations/purchase-orders/helpers/purchaseOrder.types';
 import axiosInstance from '@/lib/axios';
@@ -29,6 +30,10 @@ class PurchaseOrderApiService extends BaseApiService {
 
     async getSellerOptions(): Promise<SellerOption[]> {
         return this.get('/parties/sellers');
+    }
+
+    async getSellerPersons(orgId: number): Promise<SellerPersonOption[]> {
+        return this.get(`/parties/sellers/${orgId}/persons`);
     }
 
     async getShipToOptions(): Promise<ShipToOption[]> {

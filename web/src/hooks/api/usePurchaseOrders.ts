@@ -6,6 +6,7 @@ export const purchaseOrderKeys = {
     all: ["purchase-orders"] as const,
     poParties: () => [...purchaseOrderKeys.all, "po-parties"] as const,
     sellerOptions: () => [...purchaseOrderKeys.poParties(), "sellers"] as const,
+    sellerPersons: (orgId: number) => [...purchaseOrderKeys.poParties(), "seller-persons", orgId] as const,
     shipToOptions: () => [...purchaseOrderKeys.poParties(), "ship-to"] as const,
     purchaseOrder: (id: number) => [...purchaseOrderKeys.all, "purchase-order", id] as const,
     projectPurchaseOrders: (projectId: number) => [...purchaseOrderKeys.all, "project", projectId] as const,
@@ -40,6 +41,15 @@ export const useSellerOptions = () => {
     return useQuery({
         queryKey: purchaseOrderKeys.sellerOptions(),
         queryFn: () => purchaseOrderApi.getSellerOptions(),
+        staleTime: 5 * 60 * 1000,
+    });
+};
+
+export const useSellerPersons = (orgId: number | undefined) => {
+    return useQuery({
+        queryKey: purchaseOrderKeys.sellerPersons(orgId!),
+        queryFn: () => purchaseOrderApi.getSellerPersons(orgId!),
+        enabled: !!orgId,
         staleTime: 5 * 60 * 1000,
     });
 };
