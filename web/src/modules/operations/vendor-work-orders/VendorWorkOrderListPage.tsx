@@ -15,6 +15,7 @@ import { paths } from "@/app/routes/paths";
 import { formatDate, formatDateTime } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
+import { useAuth } from "@/contexts/AuthContext";
 import type { VendorWorkOrderRow } from "./helpers/vwoForm.types";
 import { SetVwoApprovalDialog } from "./components/SetVwoApprovalDialog";
 import { OrderProgressCell } from "@/components/OrderProgressCell";
@@ -43,6 +44,10 @@ const VendorWorkOrderListPage: React.FC<VendorWorkOrderListPageProps> = ({
     const isApprovalEnabled = showApprovalAction ?? false;
     const location = useLocation();
     const isAccountsSection = location.pathname.includes("/accounts/");
+    const vwoModule = isAccountsSection ? "accounts.vendor-work-orders" : "ops.vendor-work-orders";
+    const { canApprove, canClose } = useAuth();
+    const approvalAllowed = isApprovalEnabled && canApprove(vwoModule);
+    const closureAllowed = isAccountsSection && canClose("accounts.vendor-work-orders");
 
     const workOrders = propWorkOrders ?? [];
 
@@ -74,7 +79,7 @@ const VendorWorkOrderListPage: React.FC<VendorWorkOrderListPageProps> = ({
             },
         ];
 
-        if (isApprovalEnabled) {
+        if (approvalAllowed) {
             actions.unshift({
                 label: "VWO Approval",
                 icon: <CheckCircle className="h-4 w-4" />,
@@ -82,7 +87,7 @@ const VendorWorkOrderListPage: React.FC<VendorWorkOrderListPageProps> = ({
             });
         }
 
-        if (isAccountsSection) {
+        if (closureAllowed) {
             actions.push({
                 label: "Closure",
                 icon: <Lock className="h-4 w-4" />,
@@ -92,7 +97,7 @@ const VendorWorkOrderListPage: React.FC<VendorWorkOrderListPageProps> = ({
         }
 
         return actions;
-    }, [navigate, isApprovalEnabled, isAccountsSection]);
+    }, [navigate, approvalAllowed, closureAllowed]);
 
     const woColumns = useMemo<ColDef<VendorWorkOrderRow>[]>(() => [
         {

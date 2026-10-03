@@ -236,7 +236,14 @@ export class ClientDirectoryService {
     async syncAll(): Promise<{ synced: number }> {
         const allContacts: { name: string; email: string | null; phone: string | null; org: string | null }[] = [];
 
-        const sources = [
+        const sources: {
+            name: SQL<string>;
+            email: SQL<string | null>;
+            phone: SQL<string | null>;
+            org: SQL<string | null>;
+            table: SQL;
+            filter?: SQL;
+        }[] = [
             { name: sql<string>`client_name`, email: sql<string | null>`client_email`, phone: sql<string | null>`client_mobile`, org: sql<string | null>`NULL`, table: sql`tender_clients` },
             { name: sql<string>`name`, email: sql<string | null>`email`, phone: sql<string | null>`phone`, org: sql<string | null>`NULL`, table: sql`physical_docs_persons` },
             { name: sql<string>`name`, email: sql<string | null>`email`, phone: sql<string | null>`phone`, org: sql<string | null>`organization`, table: sql`follow_up_persons` },
@@ -245,14 +252,22 @@ export class ClientDirectoryService {
             { name: sql<string>`contact_person_name`, email: sql<string | null>`contact_person_email`, phone: sql<string | null>`contact_person_phone`, org: sql<string | null>`seller_name`, table: sql`purchase_orders` },
             { name: sql<string>`contact_person_name`, email: sql<string | null>`contact_person_email`, phone: sql<string | null>`contact_person_phone`, org: sql<string | null>`seller_name`, table: sql`vendor_work_orders` },
             { name: sql<string>`person_name`, email: sql<string | null>`email`, phone: sql<string | null>`phone`, org: sql<string | null>`org_name`, table: sql`loan_bank_contacts` },
-            { name: sql<string>`name`, email: sql<string | null>`email`, phone: sql<string | null>`NULL`, org: sql<string | null>`NULL`, table: sql`project_parties` },
+            // project_parties only holds ship-to rows now; sellers live in vendor master.
+            {
+                name: sql<string>`name`,
+                email: sql<string | null>`email`,
+                phone: sql<string | null>`NULL`,
+                org: sql<string | null>`NULL`,
+                table: sql`project_parties`,
+                filter: sql`type = 'ship_to'`,
+            },
         ];
 
         for (const src of sources) {
             const rows = await this.db
                 .select({ name: src.name, email: src.email, phone: src.phone, org: src.org })
                 .from(src.table)
-                .where(sql`${src.name} IS NOT NULL AND ${src.name} != ''`);
+                .where(and(sql`${src.name} IS NOT NULL AND ${src.name} != ''`, src.filter ?? sql`TRUE`));
 
             for (const row of rows) {
                 if (row.name) {

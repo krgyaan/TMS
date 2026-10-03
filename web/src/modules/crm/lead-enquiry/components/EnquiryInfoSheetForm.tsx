@@ -33,7 +33,7 @@ import { useDnbStatusOptions } from '@/hooks/useSelectOptions';
 import type { TenderInfoSheetFormValues, TenderInfoSheetResponse, SaveTenderInfoSheetDto } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
 import { TenderView } from '@/modules/tendering/tenders/components/TenderView';
 import { TenderInformationFormSchema } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.schema';
-import { mapResponseToForm, mapFormToPayload } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.mappers';
+import { mapResponseToForm, mapFormToPayload, toSeedAmount } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.mappers';
 
 interface EnquiryInfoSheetFormProps {
     tenderId: number;
@@ -59,68 +59,68 @@ const buildEnquiryDefaults = (tender?: TenderInfoWithNames | null): TenderInfoSh
 
         processingFeeRequired: undefined,
         processingFeeModes: [] as string[],
-        processingFeeAmount: 0,
+        processingFeeAmount: undefined,
 
         tenderFeeRequired: undefined,
         tenderFeeModes: [] as string[],
-        tenderFeeAmount: tender?.tenderFees ? Number(tender.tenderFees) : 0,
+        tenderFeeAmount: toSeedAmount(tender?.tenderFees),
 
         emdRequired: undefined,
         emdModes: [] as string[],
-        emdAmount: tender?.emd ? Number(tender.emd) : 0,
+        emdAmount: toSeedAmount(tender?.emd),
 
-        tenderValue: tender?.gstValues ? Number(tender.gstValues) : 0,
+        tenderValue: toSeedAmount(tender?.gstValues),
         oemExperience: null as 'YES' | 'NO' | null,
 
-        bidValidityDays: 0,
+        bidValidityDays: undefined,
         commercialEvaluation: undefined,
         mafRequired: undefined,
         reverseAuctionApplicable: undefined,
 
-        paymentTermsSupply: 0,
-        paymentTermsInstallation: 0,
+        paymentTermsSupply: undefined,
+        paymentTermsInstallation: undefined,
 
-        deliveryTimeSupply: 0,
+        deliveryTimeSupply: undefined,
         deliveryTimeInstallationInclusive: false,
         deliveryTimeInstallation: undefined,
 
         pbgRequired: undefined,
         pbgForm: undefined as string[] | undefined,
-        pbgPercentage: 0,
-        pbgDurationMonths: 0,
+        pbgPercentage: undefined,
+        pbgDurationMonths: undefined,
 
         sdRequired: undefined,
         sdForm: undefined as string[] | undefined,
-        securityDepositPercentage: 0,
-        sdDurationMonths: 0,
+        securityDepositPercentage: undefined,
+        sdDurationMonths: undefined,
 
         ldRequired: undefined,
-        ldPercentagePerWeek: 0,
-        maxLdPercentage: 0,
+        ldPercentagePerWeek: undefined,
+        maxLdPercentage: undefined,
 
         physicalDocsRequired: 'NO' as 'YES' | 'NO',
         physicalDocType: undefined,
         physicalDocsDeadline: '',
 
-        techEligibilityAgeYears: 0,
+        techEligibilityAgeYears: undefined,
 
         workValueType: undefined,
-        orderValue1: 0,
-        orderValue2: 0,
-        orderValue3: 0,
+        orderValue1: undefined,
+        orderValue2: undefined,
+        orderValue3: undefined,
         customEligibilityCriteria: '',
 
         technicalWorkOrders: [] as string[],
         commercialDocuments: [] as string[],
 
         avgAnnualTurnoverCriteria: undefined,
-        avgAnnualTurnoverValue: 0,
+        avgAnnualTurnoverValue: undefined,
         workingCapitalCriteria: undefined,
-        workingCapitalValue: 0,
+        workingCapitalValue: undefined,
         solvencyCertificateCriteria: undefined,
-        solvencyCertificateValue: 0,
+        solvencyCertificateValue: undefined,
         netWorthCriteria: undefined,
-        netWorthValue: 0,
+        netWorthValue: undefined,
 
         courierAddress: '',
         courierName: '',

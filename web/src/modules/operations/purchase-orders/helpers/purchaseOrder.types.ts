@@ -11,7 +11,6 @@ export interface CreatePurchaseOrderDTO {
     piAttachments?: string;
     category?: string;
     poDate: string;
-    sellerId?: number;
     sellerOrganizationId?: number;
     shipToPartyId?: number;
     sellerName: string;
@@ -62,6 +61,28 @@ export interface CreatePartyDTO {
     mobile_number?: string;
 }
 
+export interface SellerOption {
+    id: number;
+    name: string;
+    alias?: string | null;
+    gstNo?: string | null;
+    msme?: string | null;
+    pan?: string | null;
+    address?: string | null;
+    email?: string | null;
+    mobile?: string | null;
+    contactPerson?: string | null;
+}
+
+export interface ShipToOption {
+    id: number;
+    name: string;
+    alias?: string | null;
+    address?: string | null;
+    gstNo?: string | null;
+    pan?: string | null;
+}
+
 export interface PurchaseOrderRow {
     id: number;
     projectId: number;
@@ -109,7 +130,6 @@ export interface UpdatePurchaseOrderDTO {
     piAttachments?: string;
     category?: string;
     poDate: string;
-    sellerId?: number;
     sellerOrganizationId?: number;
     shipToPartyId?: number;
     sellerName: string;

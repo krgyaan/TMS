@@ -24,7 +24,10 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 
 from app.services.pdf_text_extractor import extract_pdf_text_hybrid
 from app.services.pdf_parent_ingest import build_page_tagged_text
-from app.services.bidding_requirements_resolver import analyze_bidding_requirements
+from app.services.bidding_requirements_resolver import (
+    TENDER_KNOWLEDGE_SCHEMA_VERSION,
+    analyze_bidding_requirements,
+)
 
 router = APIRouter(tags=["Bidding Requirements"])
 logger = logging.getLogger(__name__)
@@ -46,8 +49,9 @@ async def analyze_bidding_requirements_endpoint(
     VolksAI has no database of its own, so this is always supplied by the
     caller, never queried here.
 
-    Response shape:
+    Response shape (schemaVersion 1):
     {
+      "schemaVersion": 1,
       "job_id": str,
       "requirements": [
         {
@@ -60,6 +64,16 @@ async def analyze_bidding_requirements_endpoint(
           "reasoning": str
         }, ...
       ],
+      "annexures": [
+        {
+          "annexureName": str,
+          "source": { "document": "main" | "atc", "page": int, "snippet": str },
+          "blocks": [ { "type": "heading" | "paragraph" | "blank_field" | "table" | "signature_line", ... } ],
+          "droppedBlocks": int
+        }, ...
+      ],
+      "rejectedAnnexures": [ { "annexureName": str | null, "reason": str }, ... ],
+      "truncated": bool,
       "llm_usage": { "input_tokens": int, "output_tokens": int, ... } | null
     }
     """
@@ -120,8 +134,19 @@ async def analyze_bidding_requirements_endpoint(
                 filename, job_id, len(requirements),
             )
             return {
+                # Version of this response shape (see TENDER_KNOWLEDGE_SCHEMA_VERSION); lets
+                # consumers detect cached results from an older, smaller shape.
+                "schemaVersion": TENDER_KNOWLEDGE_SCHEMA_VERSION,
                 "job_id": job_id,
                 "requirements": requirements,
+                # Identified from the same Sonnet read. Only identified here -- a .docx for
+                # one annexure is generated on demand via POST /generate-annexure-docx.
+                "annexures": result.get("annexures", []),
+                "rejectedAnnexures": [
+                    {"annexureName": r.get("annexureName"), "reason": r.get("reason")}
+                    for r in result.get("rejectedAnnexures", [])
+                ],
+                "truncated": bool(result.get("truncated", False)),
                 "llm_usage": result.get("usage"),
             }
 

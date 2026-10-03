@@ -74,7 +74,9 @@ def test_emd_mode_extracted_from_emd_section():
 
     assert infosheet.get("emd_required_display") == "Yes"
     mode_str = infosheet.get("emd_mode_display")
-    assert "BT" in mode_str
+    # Banker's Cheque is a cheque-type instrument -> DD (tms_field_mapper's own convention);
+    # the text names no electronic transfer, so BT / BANK_TRANSFER must NOT appear (Fix I).
+    assert "BT" not in mode_str
     assert "DD" in mode_str
     assert "BG" in mode_str
     assert "SB" not in mode_str
@@ -83,7 +85,7 @@ def test_emd_mode_extracted_from_emd_section():
 
     dto = map_to_tms_dto(infosheet)
     assert dto.get("emdModes") is not None
-    assert set(dto.get("emdModes")) == {"BANK_TRANSFER", "DD", "BG"}
+    assert set(dto.get("emdModes")) == {"DD", "BG"}
 
 
 def test_emd_mode_does_not_sweep_all_5_instruments_from_boilerplate():

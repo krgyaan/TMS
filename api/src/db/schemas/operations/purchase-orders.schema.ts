@@ -42,6 +42,7 @@ export const purchaseOrders = pgTable(
         amountAfterTds: numeric("amount_after_tds", { precision: 14, scale: 2 }),
         poApproved: boolean("po_approved"),
         poApprovalRemark: text("po_approval_remark"),
+        closedAt: timestamp("closed_at", { withTimezone: true }),
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
         generatedPdfVersions: jsonb("generated_pdf_versions").notNull().default({}),
         updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

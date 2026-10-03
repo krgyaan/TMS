@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
-import { useCreatePoParty, usePoParties } from "@/hooks/api/usePurchaseOrders";
+import { useCreatePoParty, useSellerOptions, useShipToOptions } from "@/hooks/api/usePurchaseOrders";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import { useAuth } from "@/contexts/AuthContext";
 import { useVendorWorkOrderDetails, useUpdateVendorWorkOrder } from "@/hooks/api/useVendorWorkOrders";
@@ -35,7 +35,6 @@ const defaultFormValues: VendorWorkOrderFormValues = {
   woDate: formatDateForInput(new Date()),
   category: "",
   sellerId: "",
-  sellerSource: "",
   sellerName: "",
   sellerEmail: "",
   sellerAddress: "",
@@ -106,8 +105,7 @@ function mapVwoDataToFormValues(data: any): VendorWorkOrderFormValues {
     return {
       woDate: formatDateForInput(data.woDate) || formatDateForInput(new Date()),
       category: data.category || "",
-      sellerId: data.sellerOrganizationId ? String(data.sellerOrganizationId) : (data.sellerId ? String(data.sellerId) : ""),
-      sellerSource: data.sellerOrganizationId ? "vendor_org" : "",
+      sellerId: data.sellerOrganizationId ? String(data.sellerOrganizationId) : "",
       sellerName: data.sellerName || "",
       sellerEmail: data.sellerEmail || "",
       sellerAddress: data.sellerAddress || "",
@@ -157,10 +155,9 @@ export default function EditVendorWorkOrderPage() {
   const { teamId } = useAuth();
 
   const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
-  const { data: partiesData } = usePoParties();
+  const { data: sellerRows = [] } = useSellerOptions();
+  const { data: shipToRows = [] } = useShipToOptions();
   const createPartyMutation = useCreatePoParty();
-
-  const parties = partiesData || [];
 
   const [showPreview, setShowPreview] = useState(false);
   const [isAddPartyOpen, setIsAddPartyOpen] = useState(false);
@@ -197,23 +194,20 @@ export default function EditVendorWorkOrderPage() {
     [teamMembers]
   );
 
-  const sellerOptions = useMemo(() => [
-    ...(parties || [])
-      .filter((p: any) => !p.type || p.type === "seller")
-      .map((p: any) => ({ id: String(p.id), name: p.alias ? `${p.name} (${p.alias})` : p.name })),
-  ], [parties]);
+  const sellerOptions = useMemo(
+    () => sellerRows.map((p) => ({ id: String(p.id), name: p.alias ? `${p.name} (${p.alias})` : p.name })),
+    [sellerRows]
+  );
 
-  const partyOptions = useMemo(() => [
-    ...(parties || [])
-      .filter((p: any) => p.type === "ship_to")
-      .map((p: any) => ({ id: String(p.id), name: p.alias ? `${p.name} (${p.alias})` : p.name })),
-  ], [parties]);
+  const partyOptions = useMemo(
+    () => shipToRows.map((p) => ({ id: String(p.id), name: p.alias ? `${p.name} (${p.alias})` : p.name })),
+    [shipToRows]
+  );
 
   useEffect(() => {
     if (!selectedSellerId || selectedSellerId === "__create_new__") return;
-    const party = parties.find((p: any) => String(p.id) === selectedSellerId);
+    const party = sellerRows.find((p) => String(p.id) === selectedSellerId);
     if (!party) return;
-    form.setValue("sellerSource", party.source === "vendor_org" ? "vendor_org" : "party");
     form.setValue("sellerName", party.name || "");
     form.setValue("sellerEmail", party.email || "");
     form.setValue("sellerAddress", party.address || "");
@@ -222,18 +216,18 @@ export default function EditVendorWorkOrderPage() {
     form.setValue("sellerMsmeNo", party.msme || "");
     form.setValue("contactPersonName", party.contactPerson || "");
     form.setValue("contactPersonEmail", party.email || "");
-    form.setValue("contactPersonPhone", party.mobileNumber || party.mobile || "");
-  }, [selectedSellerId, parties, form]);
+    form.setValue("contactPersonPhone", party.mobile || "");
+  }, [selectedSellerId, sellerRows, form]);
 
   useEffect(() => {
     if (!selectedPartyId || selectedPartyId === "__create_new__") return;
-    const party = parties.find((p: any) => String(p.id) === selectedPartyId);
+    const party = shipToRows.find((p) => String(p.id) === selectedPartyId);
     if (!party) return;
     form.setValue("shipToName", party.name || "");
     form.setValue("shippingAddress", party.address || "");
     form.setValue("shipToGst", party.gstNo || "");
     form.setValue("shipToPan", party.pan || "");
-  }, [selectedPartyId, parties, form]);
+  }, [selectedPartyId, shipToRows, form]);
 
   useEffect(() => {
     if (!selectedUserId) return;

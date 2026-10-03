@@ -5,8 +5,9 @@
 --   3. Add category column to teams
 --   4. Set default category on existing teams
 
+ALTER TABLE users DROP COLUMN IF EXISTS designation_id;
 ALTER TABLE user_profiles DROP COLUMN IF EXISTS designation_id;
-DROP TABLE IF EXISTS designations;
+DROP TABLE IF EXISTS designations CASCADE;
 ALTER TABLE teams ADD COLUMN IF NOT EXISTS category VARCHAR(20);
 UPDATE teams SET category = CASE id
     WHEN 1 THEN 'primary'

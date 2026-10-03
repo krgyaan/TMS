@@ -6,7 +6,7 @@ import { DocumentChecklistsService } from '@/modules/tendering/checklists/docume
 import type { CreateDocumentChecklistDto, UpdateDocumentChecklistDto } from '@/modules/tendering/checklists/dto/document-checklist.dto';
 import { getFrontendTimersBatch } from '@/modules/timers/timer-helper';
 import { TimersService } from '@/modules/timers/timers.service';
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, UsePipes, ValidationPipe } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, StreamableFile, UsePipes, ValidationPipe } from '@nestjs/common';
 
 @Controller('document-checklists')
 @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
@@ -82,6 +82,29 @@ export class DocumentChecklistsController {
      * Caches result in tender_extractions.fields under 'biddingRequirementsAnalysis'.
      * Pass forceRefresh=true to bypass cache and re-analyze.
      */
+    /**
+     * Downloads ONE annexure (by its index in the cached bidding-requirements analysis) as
+     * a .docx, rendered on demand by VolksAI's deterministic /generate-annexure-docx from the
+     * stored blocks -- no tender re-read, no Claude call. 404 if no current analysis exists.
+     */
+    @Get('tender/:tenderId/annexures/:annexureIndex/download')
+    downloadAnnexure(
+        @Param('tenderId', ParseIntPipe) tenderId: number,
+        @Param('annexureIndex', ParseIntPipe) annexureIndex: number,
+    ): Promise<StreamableFile> {
+        return this.biddingRequirementsService.downloadAnnexureDocx(tenderId, annexureIndex);
+    }
+
+    /**
+     * Cache-only read of the bidding-requirements analysis: `{ analysis }`, where analysis is
+     * null when no current cached result exists. Never calls VolksAI -- used on page load so
+     * an earlier analysis is visible without starting a new (paid) one.
+     */
+    @Get('tender/:tenderId/bidding-requirements/cached')
+    async getCachedBiddingRequirements(@Param('tenderId', ParseIntPipe) tenderId: number) {
+        return { analysis: await this.biddingRequirementsService.getCachedAnalysis(tenderId) };
+    }
+
     @Get('tender/:tenderId/bidding-requirements')
     analyzeBiddingRequirements(
         @Param('tenderId', ParseIntPipe) tenderId: number,

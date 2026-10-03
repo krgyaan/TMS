@@ -31,3 +31,5 @@ export const CanUpdate = (module: string) => RequirePermissions({ module, action
 export const CanDelete = (module: string) => RequirePermissions({ module, action: "delete" });
 
 export const CanApprove = (module: string) => RequirePermissions({ module, action: "approve" });
+
+export const CanClose = (module: string) => RequirePermissions({ module, action: "close" });

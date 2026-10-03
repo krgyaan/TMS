@@ -14,6 +14,13 @@ import type { BaseFilters } from "@/modules/tendering/types/shared.types";
 
 export type VendorOrganizationListFilters = BaseFilters & { search?: string };
 
+// Email is optional on vendors; an explicit blank must not be stored as "" and an
+// omitted field must not be rewritten (so PATCH leaves the column untouched).
+const normalizeEmail = (email: string | null | undefined): string | null | undefined => {
+    if (email === undefined) return undefined;
+    return email?.trim() || null;
+};
+
 @Injectable()
 export class VendorMasterService {
     constructor(
@@ -626,6 +633,7 @@ export class VendorMasterService {
             organizationId: vendors.orgId,
             name: vendors.name,
             email: vendors.email,
+            mobile: vendors.mobile,
             address: vendors.address,
             createdAt: vendors.createdAt,
             updatedAt: vendors.updatedAt,
@@ -698,7 +706,7 @@ export class VendorMasterService {
         const trimmedData = {
             ...data,
             name: data.name?.trim(),
-            email: data.email?.trim(),
+            email: normalizeEmail(data.email),
             mobile: data.mobile?.trim(),
             address: data.address?.trim(),
         };
@@ -724,7 +732,7 @@ export class VendorMasterService {
         const trimmedData = {
             ...data,
             name: data.name?.trim(),
-            email: data.email?.trim(),
+            email: normalizeEmail(data.email),
             mobile: data.mobile?.trim(),
             address: data.address?.trim(),
         };

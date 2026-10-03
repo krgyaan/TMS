@@ -9,15 +9,15 @@ const optionalString = z
         return trimmed.length > 0 ? trimmed : null;
     });
 
-// Helper for optional numbers
-const optionalNumber = (schema: z.ZodNumber = z.coerce.number()) =>
-    z
-        .union([schema, z.undefined(), z.null(), z.literal('')])
-        .transform((v) => {
-            if (v === null || v === undefined || v === '') return null;
-            const num = typeof v === 'number' ? v : Number(v);
-            return Number.isNaN(num) ? null : num;
-        });
+// Helper for optional numbers: null / undefined / '' mean "not stated" and are stored as
+// NULL; only real values are validated. The empty cases must be handled BEFORE `schema`
+// runs -- a z.union([schema, z.null(), ...]) tries `schema` first, and z.coerce.number()
+// turns null and '' into 0, so every unset field used to be saved as 0.
+export const optionalNumber = (schema: z.ZodNumber = z.coerce.number()) =>
+    z.preprocess(
+        (v) => (v === null || v === undefined || (typeof v === 'string' && v.trim() === '') ? null : v),
+        z.union([z.null(), schema]),
+    );
 
 // Helper for optional arrays
 const optionalStringArray = z

@@ -12,7 +12,8 @@ import { FileUploader } from "@/components/file-upload";
 import { AlertCircle, CheckCircle2, Loader2, Plus, Save, Trash2, Edit } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { CanUpdate } from "@/components/PermissionGuard";
+import { CanUpdate, CanDelete } from "@/components/PermissionGuard";
+import { useAuth } from "@/contexts/AuthContext";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -23,7 +24,6 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AdminOnly } from "@/components/RoleGuard";
 
 const STATUS_CONFIG: Record<string, { label: string; variant: "secondary" | "default" | "outline" | "success" | "destructive" }> = {
     pending: { label: "Pending", variant: "outline" },
@@ -117,6 +117,11 @@ const PoClosurePage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    // `canClose` below is the derived "everything settled" state, so the
+    // permission check needs its own name to avoid shadowing it.
+    const { canClose: hasClosePermission, canCreate } = useAuth();
+    const [closingPo, setClosingPo] = useState(false);
+
     const [paymentRows, setPaymentRows] = useState<PaymentRow[]>([]);
     const [invoiceRows, setInvoiceRows] = useState<InvoiceRow[]>([]);
     const [savingPayments, setSavingPayments] = useState(false);
@@ -160,6 +165,20 @@ const PoClosurePage: React.FC = () => {
         setPo(res);
     };
 
+    const handleClosePo = async () => {
+        setClosingPo(true);
+        setSaveMsg(null);
+        try {
+            await purchaseOrderApi.close(id);
+            setSaveMsg({ type: "success", text: "Purchase Order closed successfully." });
+            await fetchData();
+        } catch (err) {
+            console.error(err);
+            setSaveMsg({ type: "error", text: "Failed to close Purchase Order." });
+        } finally {
+            setClosingPo(false);
+        }
+    };
     useEffect(() => {
         const load = async () => {
             try {
@@ -428,10 +447,12 @@ const PoClosurePage: React.FC = () => {
                             </div>
                         )}
                         <div className="flex justify-end mt-4">
-                            <Button onClick={savePayments} disabled={savingPayments || paymentRows.length === 0}>
-                                {savingPayments ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                                Bulk Save Payments
-                            </Button>
+                            {canCreate("accounts.payment-requests") && (
+                                <Button onClick={savePayments} disabled={savingPayments || paymentRows.length === 0}>
+                                    {savingPayments ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                                    Bulk Save Payments
+                                </Button>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
@@ -539,10 +560,12 @@ const PoClosurePage: React.FC = () => {
                             </div>
                         )}
                         <div className="flex justify-end mt-4">
-                            <Button onClick={saveInvoices} disabled={savingInvoices || invoiceRows.length === 0}>
-                                {savingInvoices ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                                Bulk Save Invoices
-                            </Button>
+                            {canCreate("accounts.purchase-invoices") && (
+                                <Button onClick={saveInvoices} disabled={savingInvoices || invoiceRows.length === 0}>
+                                    {savingInvoices ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                                    Bulk Save Invoices
+                                </Button>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
@@ -596,7 +619,7 @@ const PoClosurePage: React.FC = () => {
                                                                 <Edit className="h-4 w-4" />
                                                             </Button>
                                                         </CanUpdate>
-                                                        <AdminOnly>
+                                                        <CanDelete module="accounts.payment-requests">
                                                             <Button
                                                                 type="button"
                                                                 variant="ghost"
@@ -607,7 +630,7 @@ const PoClosurePage: React.FC = () => {
                                                             >
                                                                 <Trash2 className="h-4 w-4" />
                                                             </Button>
-                                                        </AdminOnly>
+                                                        </CanDelete>
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
@@ -668,7 +691,7 @@ const PoClosurePage: React.FC = () => {
                                                                 <Edit className="h-4 w-4" />
                                                             </Button>
                                                         </CanUpdate>
-                                                        <AdminOnly>
+                                                        <CanDelete module="accounts.purchase-invoices">
                                                             <Button
                                                                 type="button"
                                                                 variant="ghost"
@@ -679,7 +702,7 @@ const PoClosurePage: React.FC = () => {
                                                             >
                                                                 <Trash2 className="h-4 w-4" />
                                                             </Button>
-                                                        </AdminOnly>
+                                                        </CanDelete>
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
@@ -693,9 +716,17 @@ const PoClosurePage: React.FC = () => {
             </Card>
 
             <CardFooter className="flex gap-3">
-                {canClose && (
-                    <Button className="bg-green-600 hover:bg-green-700">
-                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                {canClose && hasClosePermission("accounts.purchase-orders") && (
+                    <Button
+                        className="bg-green-600 hover:bg-green-700"
+                        onClick={handleClosePo}
+                        disabled={closingPo}
+                    >
+                        {closingPo ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                            <CheckCircle2 className="h-4 w-4 mr-2" />
+                        )}
                         Close PO
                     </Button>
                 )}

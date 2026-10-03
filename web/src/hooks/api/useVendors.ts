@@ -54,7 +54,7 @@ export const useCreateVendor = () => {
             queryClient.invalidateQueries({ queryKey: vendorsKey.lists() });
 
             queryClient.invalidateQueries({
-                queryKey: ["vendors", "organization", variables.organizationId],
+                queryKey: ["vendors", "organization", variables.orgId],
             });
 
             toast.success("Vendor created successfully");

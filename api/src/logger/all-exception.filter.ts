@@ -64,10 +64,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
       }
     } else if (exception instanceof ZodError) {
       status = HttpStatus.BAD_REQUEST;
+      const formattedErrors = exception.issues.map((issue) => ({
+        field: issue.path.join('.'),
+        message: issue.message,
+        code: issue.code,
+        path: issue.path,
+        expected: (issue as any).expected,
+        received: (issue as any).received,
+      }));
       errorResponse = {
         statusCode: status,
         message: "Validation failed",
-        errors: exception.issues,
+        errors: formattedErrors,
         issues: exception.issues,
       };
     } else {
