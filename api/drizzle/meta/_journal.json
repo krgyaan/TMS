@@ -547,6 +547,13 @@
       "when": 1790000000000,
       "tag": "0145_add_msme_type_to_vendor_organizations",
       "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1790100000000,
+      "tag": "0146_create_bidding_requirements_jobs",
+      "breakpoints": true
     }
   ]
 }

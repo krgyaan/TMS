@@ -41,7 +41,7 @@ ATC_SOURCED_LABELS = {
 
 MAIN_SOURCED_LABELS = {
     "PBG Required", "PBG Percentage", "PBG Duration", "PBG Duration (Months)",
-    "Eligibility Criterion (Years)", "Bid Validity (Days)", "Bid Validity Period",
+    "Bid Validity (Days)", "Bid Validity Period",
     "Tender Name / Title", "Reference ID / NIT No", "Estimated Tender Value",
     "Organisation", "Authority Agency"
 }
@@ -945,6 +945,9 @@ def ingest_parent_tender_pdf(
                         finally:
                             executor.shutdown(wait=False, cancel_futures=True)
                         
+                        if getattr(resolver, "llm_status", "ok") == "llm_unavailable" or llm_resolved.get("_llm_status") == "llm_unavailable":
+                            infosheet_data["_llm_status"] = "llm_unavailable"
+
                         field_statuses = cast(Dict[str, str], infosheet_data.get("_info_sheet_statuses", {}))
                         missing_fields = cast(List[str], infosheet_data.get("missing_fields", []))
                         status_summary = cast(Dict[str, int], infosheet_data.get("status_summary", {}))
@@ -1111,6 +1114,9 @@ def ingest_parent_tender_pdf(
                             ambig_decisions = {}
                         finally:
                             ambig_executor.shutdown(wait=False, cancel_futures=True)
+
+                        if getattr(resolver, "llm_status", "ok") == "llm_unavailable" or ambig_decisions.get("_llm_status"):
+                            infosheet_data["_llm_status"] = "llm_unavailable"
 
                         field_statuses = cast(Dict[str, str], infosheet_data.get("_info_sheet_statuses", {}))
 

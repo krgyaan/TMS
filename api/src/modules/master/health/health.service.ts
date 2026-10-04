@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger, OnApplicationBootstrap } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { sql } from "drizzle-orm";
 import type { DbInstance } from "@/db";
 import { DRIZZLE } from "@/db/database.module";
@@ -44,6 +45,7 @@ export class HealthService implements OnApplicationBootstrap {
         @Inject("VIDEO_PROCESSING_QUEUE") private readonly videoProcessingQueue: Queue,
         @Inject("GENERIC_QUEUE") private readonly genericQueue: Queue,
         private readonly claudeUsageService: ClaudeUsageService,
+        private readonly configService: ConfigService,
     ) {}
 
     async onApplicationBootstrap(): Promise<void> {
@@ -97,7 +99,7 @@ export class HealthService implements OnApplicationBootstrap {
     }
 
     async getHealth(): Promise<HealthResult> {
-        const [api, database, redis, queues, workers, email, claude] = await Promise.all([
+        const [api, database, redis, queues, workers, email, claude, volksAi] = await Promise.all([
             Promise.resolve(this.checkApi()),
             this.checkDatabase(),
             this.checkRedis(),
@@ -105,14 +107,46 @@ export class HealthService implements OnApplicationBootstrap {
             this.checkWorkers(),
             this.checkEmail(),
             this.checkClaude(),
+            this.checkVolksAi(),
         ]);
 
-        const results = { api, database, redis, queues, workers, email, claude };
-        const statuses = [api.status, database.status, redis.status, queues.status, workers.status, email.status, claude.status];
+        const volksAiHealth: HealthResult = {
+            status: volksAi.status === "healthy" ? "ok" : "down",
+            data: volksAi,
+        };
+
+        const results = { api, database, redis, queues, workers, email, claude, volksAi: volksAiHealth };
+        const statuses = [api.status, database.status, redis.status, queues.status, workers.status, email.status, claude.status, volksAiHealth.status];
 
         const status: "ok" | "degraded" | "down" = statuses.includes("down") ? "down" : statuses.includes("degraded") ? "degraded" : "ok";
 
         return { status, data: results };
+    }
+
+    /**
+     * Verifies connectivity to VOLKS_AI_SERVICE_URL and returns only status and latency.
+     */
+    async checkVolksAi(): Promise<{ status: "healthy" | "unhealthy"; latencyMs?: number }> {
+        const serviceUrl =
+            this.configService.get<string>('volksAi.serviceUrl') ||
+            this.configService.get<string>('volksAi.VOLKS_AI_SERVICE_URL') ||
+            'http://localhost:8001';
+        const endpoint = `${serviceUrl.replace(/\/+$/, '')}/health`;
+        const startTime = Date.now();
+
+        try {
+            const res = await fetch(endpoint, {
+                method: 'GET',
+                signal: AbortSignal.timeout(5000),
+            });
+            const latencyMs = Date.now() - startTime;
+            if (res.ok) {
+                return { status: 'healthy', latencyMs };
+            }
+            return { status: 'unhealthy', latencyMs };
+        } catch {
+            return { status: 'unhealthy' };
+        }
     }
 
     private async checkClaude(): Promise<HealthResult> {

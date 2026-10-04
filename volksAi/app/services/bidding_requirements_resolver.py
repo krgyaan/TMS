@@ -170,10 +170,7 @@ SYSTEM_PROMPT = (
     "  - source: cite exactly which page label ('[Main Page N]' or '[ATC Page N]') the "
     "supporting text appeared under, and quote that text as the snippet (verbatim, at most "
     "about 20 words). The snippet is required for every requirement -- never omit it or "
-    "leave it empty. Never cite a page you did not see the requirement on.\n"
-    "  - matchedLibraryId: for non-OEM items only, try to match against the supplied "
-    "company library list by meaning (not just exact string), and return that entry's "
-    "id. Return null if no entry is a good match. ALWAYS return null for category='oem' "
+    "  - matchedLibraryId: try to match against the supplied library list (which includes standard statutory documents with 'std:' IDs and company library documents) by meaning, and return that entry's exact id. If a requirement matches a standard document in the list (e.g. PAN & GST, MSME, Cancelled Cheque, Incorporation/Registration, Board Resolution/POA, Electrical License), you MUST set matchedLibraryId to its 'std:' ID. Return null if no entry is a good match. ALWAYS return null for category='oem' "
     "-- there is no OEM certificate library yet, do not force a match.\n"
     "  - confidence: your confidence that this is a genuine, tender-specific requirement "
     "(not generic legal boilerplate).\n\n"
@@ -311,14 +308,22 @@ def analyze_bidding_requirements(
         "%d library doc(s) supplied", resolved_model, len(library_documents),
     )
 
-    response = client.messages.create(
-        model=resolved_model,
-        max_tokens=ROLE_3_MAX_TOKENS,
-        system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
-        messages=[{"role": "user", "content": user_prompt}],
-        tools=[tool_spec],
-        tool_choice={"type": "tool", "name": "report_bidding_requirements"},
-    )
+    try:
+        response = client.messages.create(
+            model=resolved_model,
+            max_tokens=ROLE_3_MAX_TOKENS,
+            system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content": user_prompt}],
+            tools=[tool_spec],
+            tool_choice={"type": "tool", "name": "report_bidding_requirements"},
+        )
+    except Exception as exc:
+        status_code = getattr(exc, "status_code", None)
+        logger.error(
+            "[LLM_BIDDING_REQUIREMENTS][Role 3] Claude bidding requirements failed: class=%s, status=%s, detail=%s",
+            type(exc).__name__, status_code, exc
+        )
+        raise
 
     usage: Optional[Dict[str, Any]] = None
     if hasattr(response, "usage") and response.usage:
@@ -334,6 +339,7 @@ def analyze_bidding_requirements(
             + (cache_read / 1_000_000 * SONNET_5_CACHE_READ_PER_M)
         )
         usage = {
+            "model": getattr(response, "model", resolved_model),
             "input_tokens": in_tok,
             "output_tokens": out_tok,
             "cache_creation_tokens": cache_create,

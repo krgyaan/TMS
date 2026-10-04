@@ -1,3 +1,4 @@
+import { useRef, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { documentChecklistService } from '@/services/api/document-checklist.service';
 import { toast } from 'sonner';
@@ -87,14 +88,41 @@ export const useCachedBiddingRequirements = (tenderId: number) => {
  */
 export const useSuggestedBiddingRequirements = () => {
     const queryClient = useQueryClient();
+    const abortControllerRef = useRef<AbortController | null>(null);
+
+    useEffect(() => {
+        return () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        };
+    }, []);
+
     return useMutation({
-        mutationFn: ({ tenderId, forceRefresh = false }: { tenderId: number; forceRefresh?: boolean }) =>
-            documentChecklistService.getSuggestedRequirements(tenderId, forceRefresh),
+        mutationFn: ({ tenderId, forceRefresh = false }: { tenderId: number; forceRefresh?: boolean }) => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+            const controller = new AbortController();
+            abortControllerRef.current = controller;
+            return documentChecklistService.getSuggestedRequirements(tenderId, forceRefresh, {
+                signal: controller.signal,
+                pollIntervalMs: 2000,
+                maxWaitMs: 300_000,
+            });
+        },
+        retry: false,
         onSuccess: (data, { tenderId }) => {
             queryClient.setQueryData(documentChecklistKeys.biddingRequirements(tenderId), data);
         },
         onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Failed to analyze bidding requirements for this tender');
+            if (error?.name === 'AbortError') return;
+            const data = error?.response?.data;
+            let message = data?.message || error?.message || 'Failed to analyze bidding requirements for this tender';
+            if (message === 'Internal server error' && data?.code) {
+                message = `Analysis failed: ${data.code}`;
+            }
+            toast.error(message);
         },
     });
 };

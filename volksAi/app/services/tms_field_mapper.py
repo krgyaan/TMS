@@ -50,6 +50,10 @@ PAYMENT_INSTRUMENT_FULL_MAPPING: Dict[str, str] = {
     "INSURANCE SURETY BOND": "SB",
     "SURETY BONDS": "SB",
     "INSURANCE BOND": "SB",
+    # LC
+    "LC": "LC",
+    "LETTER OF CREDIT": "LC",
+    "LETTER_OF_CREDIT": "LC",
 }
 
 # 2. EMD Mode (Options: BG, DD, BANK_TRANSFER, FDR, SB, PORTAL)
@@ -732,6 +736,7 @@ def map_to_tms_dto(raw_infosheet_data: Dict[str, Any]) -> Dict[str, Any]:
         # LD (Liquidated Damages)
         "ldPercentagePerWeek": _parse_percentage_float(raw.get("ld_percentage_display")),
         "maxLdPercentage": _parse_percentage_float(raw.get("max_ld_percentage_display")),
+        "ldType": raw.get("ld_type_display"),
 
         # Physical Documents
         "physicalDocsRequired": _map_yes_no(raw.get("physical_docs_required_display")),
@@ -796,6 +801,10 @@ def map_to_tms_dto(raw_infosheet_data: Dict[str, Any]) -> Dict[str, Any]:
         # Contacts & Address
         "clients": _extract_clients(raw),
         "courierAddress": None if _is_empty(raw.get("courier_address_display")) else str(raw.get("courier_address_display")).strip(),
+
+        # GeM Schedule & Dates (Phase 1B)
+        "gemBidEndDate": None if _is_empty(raw.get("gem_bid_end_date_display") or raw.get("bid_due_date_time")) else str(raw.get("gem_bid_end_date_display") or raw.get("bid_due_date_time")).strip(),
+        "gemBidOpeningDate": None if _is_empty(raw.get("gem_bid_opening_date_display") or raw.get("bid_opening_date_time")) else str(raw.get("gem_bid_opening_date_display") or raw.get("bid_opening_date_time")).strip(),
     }
 
     return dto

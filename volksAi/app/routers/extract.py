@@ -388,6 +388,18 @@ TMS_KEY_TO_LAYER1_LABELS: Dict[str, List[str]] = {
     "courier_address_display": MAIN_FIELD_ALIASES.get("courier_address", []) + [
         "Courier Address", "Courier Information", "full_courier_address_with_pincode", "courier_address"
     ],
+    "gemBidEndDate": [
+        "Bid End Date/Time", "bid_end_datetime", "Bid End Date", "Bid Submission Deadline", "Due Date & Time", "bid_due_date_time", "gem_bid_end_date_display"
+    ],
+    "gem_bid_end_date_display": [
+        "Bid End Date/Time", "bid_end_datetime", "Bid End Date", "Bid Submission Deadline", "Due Date & Time", "bid_due_date_time", "gem_bid_end_date_display"
+    ],
+    "gemBidOpeningDate": [
+        "Bid Opening Date/Time", "bid_opening_datetime", "Bid Opening Date & Time", "bid_opening_date_time", "gem_bid_opening_date_display"
+    ],
+    "gem_bid_opening_date_display": [
+        "Bid Opening Date/Time", "bid_opening_datetime", "Bid Opening Date & Time", "bid_opening_date_time", "gem_bid_opening_date_display"
+    ],
 }
 
 
@@ -892,6 +904,7 @@ async def extract_tender(
                 "missing_fields": missing_fields,
                 "processing_time_ms": processing_time_ms,
                 "llm_usage": infosheet_data.get("_llm_usage"),
+                "llm_status": infosheet_data.get("_llm_status", "ok"),
                 "self_classified_atc": is_self_classified_atc,
                 "has_atc": has_atc,
                 "ambiguous_field_conflicts": ambiguous_field_conflicts,

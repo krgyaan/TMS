@@ -1126,6 +1126,8 @@ class LLMFieldResolver:
 
         import anthropic
         self.client = anthropic.Anthropic(api_key=self.api_key, timeout=self.timeout)
+        self.llm_status: str = "ok"
+        self.last_error: Optional[Dict[str, Any]] = None
 
         # Token and cost tracking (Multi-metric tracking)
         self.total_input_tokens: int = 0
@@ -1443,7 +1445,14 @@ class LLMFieldResolver:
                     break  # Successful attempt, exit attempt loop
 
                 except Exception as exc:
-                    logger.error("[LLM_FALLBACK][Role 1] Claude extraction failed for category '%s': %s", cat, exc)
+                    status_code = getattr(exc, "status_code", None)
+                    logger.error(
+                        "[LLM_FALLBACK][Role 1] Claude extraction failed for category '%s': class=%s, status=%s, detail=%s",
+                        cat, type(exc).__name__, status_code, exc
+                    )
+                    self.llm_status = "llm_unavailable"
+                    self.last_error = {"class": type(exc).__name__, "status": status_code, "detail": str(exc)}
+                    results["_llm_status"] = "llm_unavailable"
                     break
 
         logger.info("[LLM_FALLBACK][Role 1] Successfully resolved %d/%d fields via Claude", len(results), len(known_missing))
@@ -1572,8 +1581,14 @@ class LLMFieldResolver:
             return results
 
         except Exception as exc:
-            logger.error("[LLM_AMBIGUITY][Role 2] Claude ambiguity resolution failed: %s", exc)
-            return {}
+            status_code = getattr(exc, "status_code", None)
+            logger.error(
+                "[LLM_AMBIGUITY][Role 2] Claude ambiguity resolution failed: class=%s, status=%s, detail=%s",
+                type(exc).__name__, status_code, exc
+            )
+            self.llm_status = "llm_unavailable"
+            self.last_error = {"class": type(exc).__name__, "status": status_code, "detail": str(exc)}
+            return {"_llm_status": {"action": "error", "reasoning": "llm_unavailable"}}
 
     # Backward compatibility alias
     def resolve(

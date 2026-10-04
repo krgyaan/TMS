@@ -22,6 +22,18 @@ export class HealthController {
     }
 
     /**
+     * Protected health check endpoint verifying VOLKS_AI_SERVICE_URL reachability.
+     * Accessible strictly by Admin and Super User roles.
+     * Returns only status and latency.
+     */
+    @Get("volksai")
+    @UseGuards(RolesGuard)
+    @Roles(RoleName.ADMIN, RoleName.SUPER_USER)
+    async getVolksAiHealth() {
+        return this.healthService.checkVolksAi();
+    }
+
+    /**
      * Protected telemetry endpoint returning detailed Claude API usage,
      * Tokens Per Minute (TPM), per-user billing metrics, and Admin API reconciliation.
      * Accessible strictly by Admin and Super User roles.

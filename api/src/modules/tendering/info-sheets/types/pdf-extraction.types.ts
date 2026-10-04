@@ -53,6 +53,7 @@ export interface PdfExtractionJobResult {
     missing_fields: string[];
     processing_time_ms: number;
     llm_usage?: Record<string, any>;
+    llm_status?: string;
     self_classified_atc?: boolean;
     has_atc?: boolean;
     ambiguous_field_conflicts?: Record<string, any>;

@@ -88,7 +88,14 @@ before(async () => {
         if ((req.url ?? '').endsWith('/bidding-requirements/cached')) {
             res.end(JSON.stringify(cachedPayload));
         } else {
-            res.end(JSON.stringify({ ...CACHED, jobId: 'breq_new_run' }));
+            res.end(JSON.stringify({
+                jobId: 1,
+                tenderId: 1175,
+                status: 'done',
+                documentHash: 'hash_test',
+                analysis: { ...CACHED, jobId: 'breq_new_run' },
+                error: null,
+            }));
         }
     });
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));

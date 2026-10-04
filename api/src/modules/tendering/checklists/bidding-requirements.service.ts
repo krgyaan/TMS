@@ -7,9 +7,27 @@ import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service'
 import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { tenderExtractions } from '@db/schemas/tendering/tender-extractions.schema';
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, Optional, StreamableFile } from '@nestjs/common';
+import {
+    biddingRequirementsJobs,
+    type BiddingRequirementsJob,
+} from '@db/schemas/tendering/bidding-requirements-jobs.schema';
+import {
+    BadGatewayException,
+    BadRequestException,
+    ConflictException,
+    GatewayTimeoutException,
+    HttpException,
+    HttpStatus,
+    Inject,
+    Injectable,
+    NotFoundException,
+    Optional,
+    ServiceUnavailableException,
+    StreamableFile,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { eq, sql } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
+import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
@@ -78,6 +96,15 @@ const lockKey = (tenderId: number) => `bidding-requirements:lock:${tenderId}`;
 const RELEASE_LOCK_LUA =
     "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
 
+import {
+    STANDARD_CHECKLIST_DOCUMENTS,
+    type StandardChecklistDocument,
+} from './standard-documents.constant';
+export { STANDARD_CHECKLIST_DOCUMENTS, type StandardChecklistDocument };
+
+export const JOB_HEARTBEAT_TIMEOUT_MS = 60_000; // 60 seconds without heartbeat = dead job
+export const MAX_JOB_DURATION_MS = BIDDING_REQUIREMENTS_MIN_TIMEOUT_MS + 60000; // 300,000ms = 5 minutes absolute cap
+
 export interface BiddingRequirementsAnalysisResult {
     jobId: string;
     requirements: SuggestedBiddingRequirement[];
@@ -86,6 +113,24 @@ export interface BiddingRequirementsAnalysisResult {
     annexures: SuggestedAnnexure[];
     rejectedAnnexures: { annexureName: string | null; reason: string }[];
     truncated: boolean;
+}
+
+export type BiddingRequirementsErrorCode =
+    | 'VOLKSAI_UNREACHABLE'
+    | 'LLM_UNAVAILABLE'
+    | 'ANALYSIS_TIMEOUT'
+    | 'ANALYSIS_FAILED';
+
+export interface BiddingRequirementsJobStatusResponse {
+    jobId: number | null;
+    tenderId: number;
+    status: 'idle' | 'pending' | 'running' | 'done' | 'failed';
+    documentHash: string | null;
+    analysis: BiddingRequirementsAnalysisResult | null;
+    error: {
+        code: string;
+        message: string;
+    } | null;
 }
 
 interface VolksAiBiddingRequirementsResponse {
@@ -104,16 +149,17 @@ const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingm
  * Bridges document-checklist auto-suggestion to VolksAI's `/analyze-bidding-requirements`
  * endpoint: resolves the tender's main + ATC PDFs (reusing the same resolution logic as
  * PDF field extraction), builds the company document library from `finance_documents`,
- * and forwards both as multipart form data -- mirroring the existing
- * PdfExtractionProcessor -> VolksAI `/extract` integration pattern.
+ * and forwards both as multipart form data.
+ *
+ * Implements asynchronous background execution with database job tracking,
+ * idempotency on (tender, document_hash), and typed HttpException subclasses.
  */
 @Injectable()
 export class BiddingRequirementsService {
     private readonly logger;
+
     /**
-     * In-process de-duplication: tenderId -> the analysis currently running for it. A second
-     * request for the same tender (double-click, two tabs) awaits this promise and gets the
-     * same result instead of dispatching its own VolksAI call.
+     * In-process de-duplication: tenderId -> the analysis currently running for it.
      */
     private readonly inFlight = new Map<number, Promise<BiddingRequirementsAnalysisResult>>();
 
@@ -131,6 +177,368 @@ export class BiddingRequirementsService {
         this.logger = this.appLogger.withContext(BiddingRequirementsService.name);
     }
 
+    /**
+     * Determines whether an in-flight job is stuck/dead:
+     * - Dead if last heartbeat is older than JOB_HEARTBEAT_TIMEOUT_MS (60s)
+     * - Stuck if total duration exceeds MAX_JOB_DURATION_MS (5m)
+     */
+    public isJobStuck(job: BiddingRequirementsJob): boolean {
+        if (job.status !== 'running' && job.status !== 'pending') return false;
+        const now = Date.now();
+
+        // 1. Check heartbeat freshness (60s threshold)
+        const lastHeartbeat = job.heartbeatAt || job.startedAt || job.updatedAt || job.createdAt;
+        if (lastHeartbeat) {
+            const lastHeartbeatTime =
+                lastHeartbeat instanceof Date ? lastHeartbeat.getTime() : new Date(lastHeartbeat).getTime();
+            if (!isNaN(lastHeartbeatTime) && now - lastHeartbeatTime > JOB_HEARTBEAT_TIMEOUT_MS) {
+                return true;
+            }
+        }
+
+        // 2. Absolute duration guard (5m)
+        const started = job.startedAt || job.createdAt;
+        if (started) {
+            const startTime = started instanceof Date ? started.getTime() : new Date(started).getTime();
+            if (!isNaN(startTime) && now - startTime > MAX_JOB_DURATION_MS) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Marks a stuck job as failed so that subsequent requests or retries can execute freshly.
+     */
+    public async markJobAsStuckFailed(jobId: number): Promise<BiddingRequirementsJob> {
+        this.logger.warn(
+            `[BiddingRequirementsJob] Marking stuck job ${jobId} as failed (heartbeat older than ${JOB_HEARTBEAT_TIMEOUT_MS / 1000}s or exceeded max duration)`,
+        );
+        const [updated] = await this.db
+            .update(biddingRequirementsJobs)
+            .set({
+                status: 'failed',
+                errorCode: 'ANALYSIS_TIMEOUT',
+                errorMessage: 'Analysis job heartbeat stalled (>60s) or server restarted while job was in-flight',
+                updatedAt: new Date(),
+            })
+            .where(eq(biddingRequirementsJobs.id, jobId))
+            .returning();
+        return updated;
+    }
+
+    /**
+     * Computes a SHA-256 hash across the main tender PDF, any ATC PDFs,
+     * the extraction schema version, and the master checklist document IDs.
+     * This ensures any change in document files, schema, or master prompt automatically
+     * invalidates cached job rows and generates fresh analyses.
+     */
+    public async computeDocumentHash(mainPath: string, atcPaths: string[] = []): Promise<string> {
+        const hash = crypto.createHash('sha256');
+        hash.update(`schema_v${BIDDING_REQUIREMENTS_SCHEMA_VERSION}:prompt_v2:`);
+        for (const doc of STANDARD_CHECKLIST_DOCUMENTS) {
+            hash.update(`${doc.id}:${doc.document_name};`);
+        }
+        if (fs.existsSync(mainPath)) {
+            const mainBuffer = await fs.promises.readFile(mainPath);
+            hash.update(mainBuffer);
+        } else {
+            hash.update(mainPath);
+        }
+        for (const atcPath of atcPaths) {
+            try {
+                const resolvedAtc = this.resolvePdfPath(atcPath);
+                if (fs.existsSync(resolvedAtc)) {
+                    const atcBuffer = await fs.promises.readFile(resolvedAtc);
+                    hash.update(atcBuffer);
+                } else {
+                    hash.update(atcPath);
+                }
+            } catch {
+                hash.update(atcPath);
+            }
+        }
+        return hash.digest('hex');
+    }
+
+    /**
+     * Starts an asynchronous bidding requirements analysis job or returns an existing one.
+     * Idempotency guarantee:
+     *   - If a completed job exists for (tenderId, documentHash) and !forceRefresh, returns the saved result immediately.
+     *   - If a job is currently 'running' or 'pending' and not stuck, returns the active job immediately (no duplicate call).
+     *   - If stuck or failed, allows immediate restart/retry.
+     *   - If forceRefresh or new, starts background analysis and returns status 'pending' immediately.
+     */
+    async startOrGetAnalysis(
+        tenderId: number,
+        forceRefresh = false,
+        userId?: number,
+    ): Promise<BiddingRequirementsJobStatusResponse> {
+        const tender = await this.tenderInfosService.validateExists(tenderId);
+        const resolvedDocs = this.tenderInfoSheetsService.resolveTenderDocuments(tender.documents);
+        const mainPath = this.resolvePdfPath(resolvedDocs.mainTenderPath);
+        if (!fs.existsSync(mainPath)) {
+            throw new BadRequestException(
+                `Tender main document not found at '${resolvedDocs.mainTenderPath}' (resolved to '${mainPath}')`,
+            );
+        }
+
+        const documentHash = await this.computeDocumentHash(mainPath, resolvedDocs.atcPaths);
+
+        // Check if an existing job exists for this (tender, documentHash)
+        let [existingJob] = await this.db
+            .select()
+            .from(biddingRequirementsJobs)
+            .where(
+                and(
+                    eq(biddingRequirementsJobs.tenderId, tenderId),
+                    eq(biddingRequirementsJobs.documentHash, documentHash),
+                ),
+            );
+
+        if (existingJob && this.isJobStuck(existingJob)) {
+            existingJob = await this.markJobAsStuckFailed(existingJob.id);
+        }
+
+        // 1. Idempotency: If job is already 'done' and not forceRefresh, return saved result immediately with no LLM call
+        if (existingJob?.status === 'done' && existingJob.result && !forceRefresh) {
+            this.logger.log(
+                `[BiddingRequirementsJob] Returning existing completed job ${existingJob.id} for tender ${tenderId} (hash: ${documentHash.slice(0, 12)})`,
+            );
+            return this.mapJobToResponse(existingJob);
+        }
+
+        // 2. Idempotency: If job is already running or pending and not stuck, return existing job (no duplicate LLM call)
+        if (existingJob?.status === 'running' || existingJob?.status === 'pending') {
+            this.logger.log(
+                `[BiddingRequirementsJob] Joining in-flight job ${existingJob.id} (${existingJob.status}) for tender ${tenderId}`,
+            );
+            return this.mapJobToResponse(existingJob);
+        }
+
+        // 3. Create or reset the unique row on (tender, documentHash)
+        let job: BiddingRequirementsJob;
+        const now = new Date();
+        if (existingJob) {
+            const [updated] = await this.db
+                .update(biddingRequirementsJobs)
+                .set({
+                    status: 'pending',
+                    errorCode: null,
+                    errorMessage: null,
+                    result: null,
+                    startedAt: now,
+                    heartbeatAt: now,
+                    userId: userId || existingJob.userId,
+                    updatedAt: now,
+                })
+                .where(eq(biddingRequirementsJobs.id, existingJob.id))
+                .returning();
+            job = updated;
+        } else {
+            const [inserted] = await this.db
+                .insert(biddingRequirementsJobs)
+                .values({
+                    tenderId,
+                    documentHash,
+                    status: 'pending',
+                    startedAt: now,
+                    heartbeatAt: now,
+                    userId,
+                    createdAt: now,
+                    updatedAt: now,
+                })
+                .onConflictDoUpdate({
+                    target: [biddingRequirementsJobs.tenderId, biddingRequirementsJobs.documentHash],
+                    set: {
+                        status: 'pending',
+                        errorCode: null,
+                        errorMessage: null,
+                        result: null,
+                        startedAt: now,
+                        heartbeatAt: now,
+                        updatedAt: now,
+                    },
+                })
+                .returning();
+            job = inserted;
+        }
+
+        // Fire and forget in the background (no proxy or client timeout)
+        this.executeJobInBackground(job.id, tenderId, tender, resolvedDocs, mainPath, userId).catch(
+            (err) => {
+                this.logger.error(
+                    `[BiddingRequirementsJob] Unhandled background failure for job ${job.id}: ${(err as Error).message}`,
+                );
+            },
+        );
+
+        return this.mapJobToResponse(job);
+    }
+
+    /**
+     * Executes the VolksAI dispatch in the background and updates the job row.
+     * Maintains heartbeat timestamps while processing to detect hung workers.
+     */
+    private async executeJobInBackground(
+        jobId: number,
+        tenderId: number,
+        tender: Awaited<ReturnType<TenderInfosService['validateExists']>>,
+        resolvedDocs: ReturnType<TenderInfoSheetsService['resolveTenderDocuments']>,
+        mainPath: string,
+        userId?: number,
+    ): Promise<void> {
+        const now = new Date();
+        await this.db
+            .update(biddingRequirementsJobs)
+            .set({ status: 'running', startedAt: now, heartbeatAt: now, updatedAt: now })
+            .where(eq(biddingRequirementsJobs.id, jobId));
+
+        // Periodic heartbeat update while dispatch is running
+        const heartbeatTimer = setInterval(async () => {
+            try {
+                await this.db
+                    .update(biddingRequirementsJobs)
+                    .set({ heartbeatAt: new Date() })
+                    .where(eq(biddingRequirementsJobs.id, jobId));
+            } catch (hbErr) {
+                this.logger.debug(
+                    `[BiddingRequirementsJob] Heartbeat update failed for job ${jobId}: ${(hbErr as Error).message}`,
+                );
+            }
+        }, 15000);
+
+        const startTime = Date.now();
+        try {
+            const analysisResult = await this.dispatchAnalysis(
+                tenderId,
+                tender,
+                resolvedDocs,
+                mainPath,
+                userId,
+            );
+            const durationMs = Date.now() - startTime;
+
+            await this.db
+                .update(biddingRequirementsJobs)
+                .set({
+                    status: 'done',
+                    result: analysisResult,
+                    processingTimeMs: durationMs,
+                    heartbeatAt: new Date(),
+                    errorCode: null,
+                    errorMessage: null,
+                    updatedAt: new Date(),
+                })
+                .where(eq(biddingRequirementsJobs.id, jobId));
+
+            // Also persist into tender_extractions for backward compatibility with cached reads
+            await this.cacheIntoTenderExtractions(tenderId, analysisResult, durationMs, userId);
+
+            this.logger.log(
+                `[BiddingRequirementsJob] Job ${jobId} completed successfully for tender ${tenderId} in ${durationMs}ms`,
+            );
+        } catch (err: unknown) {
+            const durationMs = Date.now() - startTime;
+            let code = 'ANALYSIS_FAILED';
+            let message = 'Bidding requirements analysis failed';
+
+            if (err instanceof HttpException) {
+                const response = err.getResponse() as any;
+                if (typeof response === 'object' && response !== null) {
+                    code = response.code || 'ANALYSIS_FAILED';
+                    message = response.message || err.message;
+                } else if (typeof response === 'string') {
+                    message = response;
+                }
+            } else if (err instanceof Error) {
+                message = err.message;
+            }
+
+            this.logger.error(
+                `[BiddingRequirementsJob] Job ${jobId} failed for tender ${tenderId} [${code}]: ${message}`,
+                err instanceof Error ? err.stack : undefined,
+            );
+
+            await this.db
+                .update(biddingRequirementsJobs)
+                .set({
+                    status: 'failed',
+                    errorCode: code,
+                    errorMessage: message,
+                    processingTimeMs: durationMs,
+                    heartbeatAt: new Date(),
+                    updatedAt: new Date(),
+                })
+                .where(eq(biddingRequirementsJobs.id, jobId));
+        } finally {
+            clearInterval(heartbeatTimer);
+        }
+    }
+
+    /**
+     * Pollable status endpoint for bidding requirements analysis job.
+     */
+    async getJobStatus(tenderId: number): Promise<BiddingRequirementsJobStatusResponse> {
+        await this.tenderInfosService.validateExists(tenderId);
+
+        let [latestJob] = await this.db
+            .select()
+            .from(biddingRequirementsJobs)
+            .where(eq(biddingRequirementsJobs.tenderId, tenderId))
+            .orderBy(desc(biddingRequirementsJobs.updatedAt))
+            .limit(1);
+
+        if (latestJob) {
+            if (this.isJobStuck(latestJob)) {
+                latestJob = await this.markJobAsStuckFailed(latestJob.id);
+            }
+            return this.mapJobToResponse(latestJob);
+        }
+
+        // Backward compatibility: check tender_extractions cache
+        const cachedAnalysis = await this.getCachedAnalysis(tenderId);
+        if (cachedAnalysis) {
+            return {
+                jobId: null,
+                tenderId,
+                status: 'done',
+                documentHash: null,
+                analysis: cachedAnalysis,
+                error: null,
+            };
+        }
+
+        return {
+            jobId: null,
+            tenderId,
+            status: 'idle',
+            documentHash: null,
+            analysis: null,
+            error: null,
+        };
+    }
+
+    private mapJobToResponse(job: BiddingRequirementsJob): BiddingRequirementsJobStatusResponse {
+        return {
+            jobId: job.id,
+            tenderId: job.tenderId,
+            status: job.status as 'pending' | 'running' | 'done' | 'failed',
+            documentHash: job.documentHash,
+            analysis: (job.result as BiddingRequirementsAnalysisResult) || null,
+            error: job.errorCode
+                ? {
+                      code: job.errorCode,
+                      message: job.errorMessage || 'Analysis failed',
+                  }
+                : null,
+        };
+    }
+
+    /**
+     * Synchronous analysis method (preserved for backward compatibility and unit tests).
+     */
     async analyzeForTender(
         tenderId: number,
         forceRefresh = false,
@@ -138,7 +546,6 @@ export class BiddingRequirementsService {
     ): Promise<BiddingRequirementsAnalysisResult> {
         const tender = await this.tenderInfosService.validateExists(tenderId);
 
-        // STEP 2: Check cache in tender_extractions.fields before calling VolksAI
         const [existingExtraction] = await this.db
             .select()
             .from(tenderExtractions)
@@ -149,22 +556,32 @@ export class BiddingRequirementsService {
         if (!forceRefresh && cachedAnalysis) {
             this.logger.log(
                 `Returning cached bidding-requirements analysis for tender ${tenderId} ` +
-                `(${cachedAnalysis.requirements.length} requirement(s), ${cachedAnalysis.annexures.length} annexure(s), ` +
-                `schemaVersion ${cachedAnalysis.schemaVersion})`,
+                    `(${cachedAnalysis.requirements.length} requirement(s), ${cachedAnalysis.annexures.length} annexure(s), ` +
+                    `schemaVersion ${cachedAnalysis.schemaVersion})`,
             );
             return cachedAnalysis;
         }
 
-        // In-process: join an analysis already running for this tender. No await between this
-        // check and the set below, so two concurrent requests can never both miss it.
         const running = this.inFlight.get(tenderId);
         if (running) {
             this.logger.log(`Joining in-flight bidding-requirements analysis for tender ${tenderId} (no second VolksAI dispatch)`);
             return running;
         }
-        const run = this.runWithTenderLock(tenderId, () =>
-            this.dispatchAnalysis(tenderId, tender, existingExtraction, forceRefresh, userId),
-        );
+
+        const resolvedDocs = this.tenderInfoSheetsService.resolveTenderDocuments(tender.documents);
+        const mainPath = this.resolvePdfPath(resolvedDocs.mainTenderPath);
+        if (!fs.existsSync(mainPath)) {
+            throw new BadRequestException(
+                `Tender main document not found at '${resolvedDocs.mainTenderPath}' (resolved to '${mainPath}')`,
+            );
+        }
+
+        const run = this.runWithTenderLock(tenderId, async () => {
+            const res = await this.dispatchAnalysis(tenderId, tender, resolvedDocs, mainPath, userId);
+            await this.cacheIntoTenderExtractions(tenderId, res, 0, userId);
+            return res;
+        });
+
         this.inFlight.set(tenderId, run);
         try {
             return await run;
@@ -174,10 +591,7 @@ export class BiddingRequirementsService {
     }
 
     /**
-     * Cross-process guard (only when Redis is connected): acquires the tender's lock and runs
-     * `dispatch`; if another API process already holds it, waits for it to finish and returns
-     * the analysis that process cached, instead of dispatching a second paid VolksAI call.
-     * Without Redis this is a pass-through (the in-process map still de-duplicates).
+     * Cross-process guard (only when Redis is connected): acquires the tender's lock.
      */
     private async runWithTenderLock(
         tenderId: number,
@@ -221,22 +635,17 @@ export class BiddingRequirementsService {
         );
     }
 
+    /**
+     * Dispatches the multipart/form-data request to VolksAI's /analyze-bidding-requirements.
+     * Throws typed NestJS HttpException subclasses with structured codes and user-safe messages.
+     */
     private async dispatchAnalysis(
         tenderId: number,
         tender: Awaited<ReturnType<TenderInfosService['validateExists']>>,
-        existingExtraction: typeof tenderExtractions.$inferSelect | undefined,
-        forceRefresh: boolean,
+        resolvedDocs: ReturnType<TenderInfoSheetsService['resolveTenderDocuments']>,
+        mainPath: string,
         userId: number | undefined,
     ): Promise<BiddingRequirementsAnalysisResult> {
-        const resolvedDocs = this.tenderInfoSheetsService.resolveTenderDocuments(tender.documents);
-
-        const mainPath = this.resolvePdfPath(resolvedDocs.mainTenderPath);
-        if (!fs.existsSync(mainPath)) {
-            throw new BadRequestException(
-                `Tender main document not found at '${resolvedDocs.mainTenderPath}' (resolved to '${mainPath}')`,
-            );
-        }
-
         const libraryDocuments = await this.buildLibraryDocuments();
 
         const fileBuffer = await fs.promises.readFile(mainPath);
@@ -257,13 +666,7 @@ export class BiddingRequirementsService {
 
         formData.append('library_documents', JSON.stringify(libraryDocuments));
 
-        const serviceUrl =
-            this.configService.get<string>('volksAi.serviceUrl') ||
-            this.configService.get<string>('volksAi.VOLKS_AI_SERVICE_URL') ||
-            'http://localhost:8001';
-        // VOLKS_AI_TIMEOUT_MS is shared with /extract (120s default); this call must outlast
-        // VolksAI's own Claude timeout (ANTHROPIC_ROLE3_TIMEOUT_S, 180s) plus PDF text/OCR time,
-        // so it never waits less than BIDDING_REQUIREMENTS_MIN_TIMEOUT_MS.
+        const serviceUrl = this.getServiceUrl();
         const timeoutMs = Math.max(
             this.configService.get<number>('volksAi.timeoutMs') ||
                 this.configService.get<number>('volksAi.VOLKS_AI_TIMEOUT_MS') ||
@@ -271,10 +674,10 @@ export class BiddingRequirementsService {
             BIDDING_REQUIREMENTS_MIN_TIMEOUT_MS,
         );
 
-        const endpoint = `${serviceUrl.replace(/\/+$/, '')}/analyze-bidding-requirements`;
+        const endpoint = `${serviceUrl}/analyze-bidding-requirements`;
         this.logger.log(
             `Dispatching bidding-requirements analysis for tender ${tenderId} to ${endpoint} ` +
-            `(${resolvedDocs.atcPaths.length} ATC file(s), ${libraryDocuments.length} library doc(s), forceRefresh: ${forceRefresh})`,
+            `(${resolvedDocs.atcPaths.length} ATC file(s), ${libraryDocuments.length} library doc(s))`,
         );
 
         const startTime = Date.now();
@@ -288,11 +691,24 @@ export class BiddingRequirementsService {
         } catch (err: unknown) {
             const error = err as Error;
             if (error.name === 'TimeoutError' || error.name === 'AbortError') {
-                throw new Error(
+                this.logger.error(
                     `Bidding requirements analysis timed out after ${timeoutMs}ms for tender ${tenderId} (URL: ${endpoint})`,
                 );
+                throw new GatewayTimeoutException({
+                    statusCode: HttpStatus.GATEWAY_TIMEOUT,
+                    code: 'ANALYSIS_TIMEOUT',
+                    message: `Bidding requirements analysis timed out after ${Math.round(timeoutMs / 1000)}s for tender ${tenderId}. The document may be too large.`,
+                });
             }
-            throw new Error(`Failed to connect to VolksAI service at ${endpoint}: ${error.message}`);
+            this.logger.error(
+                `Failed to connect to VolksAI service at ${endpoint} for tender ${tenderId}: ${error.message}`,
+                error.stack,
+            );
+            throw new BadGatewayException({
+                statusCode: HttpStatus.BAD_GATEWAY,
+                code: 'VOLKSAI_UNREACHABLE',
+                message: `VolksAI service is unreachable at ${endpoint}: ${error.message}. Please verify the service is running.`,
+            });
         }
 
         const durationMs = Date.now() - startTime;
@@ -302,7 +718,33 @@ export class BiddingRequirementsService {
             this.logger.error(
                 `Bidding requirements analysis failed for tender ${tenderId}: HTTP ${response.status} - ${responseText}`,
             );
-            throw new Error(`Bidding requirements analysis failed with HTTP ${response.status} (${response.statusText}): ${responseText}`);
+
+            if (
+                response.status === HttpStatus.SERVICE_UNAVAILABLE ||
+                responseText.includes('ANTHROPIC_API_KEY') ||
+                responseText.includes('Claude') ||
+                responseText.includes('credit_balance_too_low')
+            ) {
+                throw new ServiceUnavailableException({
+                    statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+                    code: 'LLM_UNAVAILABLE',
+                    message: `Claude AI service is unavailable: ${responseText.slice(0, 200)}`,
+                });
+            }
+
+            if (response.status === HttpStatus.GATEWAY_TIMEOUT || response.status === HttpStatus.REQUEST_TIMEOUT) {
+                throw new GatewayTimeoutException({
+                    statusCode: HttpStatus.GATEWAY_TIMEOUT,
+                    code: 'ANALYSIS_TIMEOUT',
+                    message: `Bidding requirements analysis timed out in VolksAI: ${responseText.slice(0, 200)}`,
+                });
+            }
+
+            throw new BadGatewayException({
+                statusCode: HttpStatus.BAD_GATEWAY,
+                code: 'ANALYSIS_FAILED',
+                message: `Bidding requirements analysis failed with HTTP ${response.status}: ${responseText.slice(0, 200)}`,
+            });
         }
 
         const result = (await response.json()) as VolksAiBiddingRequirementsResponse;
@@ -311,8 +753,6 @@ export class BiddingRequirementsService {
             `Bidding requirements analysis complete for tender ${tenderId}: ${result.requirements?.length ?? 0} requirement(s) identified in ${durationMs}ms`,
         );
 
-        // A VolksAI build older than this code returns no schemaVersion; it is stored as 0 so
-        // the next read treats it as stale instead of caching old-shape data as current.
         const schemaVersion = Number(result.schemaVersion) || 0;
         if (schemaVersion < BIDDING_REQUIREMENTS_SCHEMA_VERSION) {
             this.logger.warn(
@@ -331,7 +771,7 @@ export class BiddingRequirementsService {
             truncated: Boolean(result.truncated),
         };
 
-        // STEP 1: Wire token usage tracking into claude_token_usage
+        // Wire token usage tracking into claude_token_usage
         if (result.llm_usage) {
             try {
                 const usage = result.llm_usage as Record<string, any>;
@@ -343,7 +783,8 @@ export class BiddingRequirementsService {
                     Number(usage.total_tokens || 0) ||
                     inputTokens + outputTokens + cacheCreationTokens + cacheReadTokens;
                 const estimatedCostUsd = Number(usage.estimated_cost_usd || 0);
-                const model = (usage.model as string) || 'claude-sonnet-4-5-20250929';
+                // Do NOT change model names: store response.model; if absent store "unknown"
+                const model = (usage.model as string) || (usage.role3_model as string) || 'unknown';
 
                 await this.claudeUsageService.recordUsage({
                     userId,
@@ -376,8 +817,24 @@ export class BiddingRequirementsService {
             }
         }
 
-        // STEP 2: Write result into tender_extractions.fields under 'biddingRequirementsAnalysis'
+        return analysisResult;
+    }
+
+    /**
+     * Persists analysis result into tender_extractions.fields.biddingRequirementsAnalysis.
+     */
+    private async cacheIntoTenderExtractions(
+        tenderId: number,
+        analysisResult: BiddingRequirementsAnalysisResult,
+        durationMs: number,
+        userId?: number,
+    ): Promise<void> {
         try {
+            const [existingExtraction] = await this.db
+                .select()
+                .from(tenderExtractions)
+                .where(eq(tenderExtractions.tenderId, tenderId));
+
             const existingFields =
                 existingExtraction?.fields && typeof existingExtraction.fields === 'object'
                     ? (existingExtraction.fields as Record<string, any>)
@@ -416,14 +873,11 @@ export class BiddingRequirementsService {
                 `Failed to cache bidding requirements into tender_extractions for tender ${tenderId}: ${(dbErr as Error).message}`,
             );
         }
-
-        return analysisResult;
     }
 
     /**
-     * Read-only: the current cached analysis for this tender, or null when there is none
-     * (or it is older than BIDDING_REQUIREMENTS_SCHEMA_VERSION). Never calls VolksAI, so the
-     * checklist page can show an earlier result on load without starting a paid analysis.
+     * Read-only: the current cached analysis for this tender, or null when absent or older than
+     * BIDDING_REQUIREMENTS_SCHEMA_VERSION.
      */
     async getCachedAnalysis(tenderId: number): Promise<BiddingRequirementsAnalysisResult | null> {
         await this.tenderInfosService.validateExists(tenderId);
@@ -435,11 +889,7 @@ export class BiddingRequirementsService {
     }
 
     /**
-     * Streams ONE cached annexure as a .docx. Reads the cached
-     * tender_extractions.fields.biddingRequirementsAnalysis.annexures[annexureIndex] and asks
-     * VolksAI's deterministic /generate-annexure-docx to render its stored blocks -- the
-     * tender is not re-read and no Claude call is made. A missing/stale cache is a 404 (run
-     * the analysis first) rather than an implicit, costly re-extraction from a GET download.
+     * Streams ONE cached annexure as a .docx.
      */
     async downloadAnnexureDocx(tenderId: number, annexureIndex: number): Promise<StreamableFile> {
         await this.tenderInfosService.validateExists(tenderId);
@@ -472,11 +922,21 @@ export class BiddingRequirementsService {
                 signal: AbortSignal.timeout(30000),
             });
         } catch (err: unknown) {
-            throw new Error(`Failed to connect to VolksAI service at ${endpoint}: ${(err as Error).message}`);
+            this.logger.error(`Failed to connect to VolksAI service at ${endpoint}: ${(err as Error).message}`);
+            throw new BadGatewayException({
+                statusCode: HttpStatus.BAD_GATEWAY,
+                code: 'VOLKSAI_UNREACHABLE',
+                message: `Failed to connect to VolksAI service at ${endpoint}: ${(err as Error).message}`,
+            });
         }
         if (!response.ok) {
             const responseText = await response.text();
-            throw new Error(`Annexure .docx generation failed with HTTP ${response.status}: ${responseText}`);
+            this.logger.error(`Annexure .docx generation failed with HTTP ${response.status}: ${responseText}`);
+            throw new BadGatewayException({
+                statusCode: HttpStatus.BAD_GATEWAY,
+                code: 'ANALYSIS_FAILED',
+                message: `Annexure .docx generation failed with HTTP ${response.status}: ${responseText.slice(0, 200)}`,
+            });
         }
 
         const buffer = Buffer.from(await response.arrayBuffer());
@@ -494,11 +954,6 @@ export class BiddingRequirementsService {
         });
     }
 
-    /**
-     * The cached analysis, or null when absent or older than
-     * BIDDING_REQUIREMENTS_SCHEMA_VERSION (so callers re-extract instead of serving an
-     * old-shape entry, e.g. one cached before annexures existed).
-     */
     private readCurrentCache(fields: unknown, tenderId: number): BiddingRequirementsAnalysisResult | null {
         const cached =
             fields && typeof fields === 'object'
@@ -540,13 +995,16 @@ export class BiddingRequirementsService {
         return path.resolve(pdfPath);
     }
 
-    /**
-     * Pages through the entire finance_documents table (mirrors useFinanceDocumentsAll on
-     * the web side) and maps each row into VolksAI's libraryDocuments shape. VolksAI holds
-     * no database of its own -- this list is always built here and passed in.
-     */
     private async buildLibraryDocuments(): Promise<{ id: string; document_name: string; document_type: string | null }[]> {
-        const docs: { id: string; document_name: string; document_type: string | null }[] = [];
+        // Master standard checklist documents (with unique 'std:' IDs)
+        const docs: { id: string; document_name: string; document_type: string | null }[] = [
+            ...STANDARD_CHECKLIST_DOCUMENTS.map((doc) => ({
+                id: doc.id,
+                document_name: doc.document_name,
+                document_type: doc.document_type,
+            })),
+        ];
+
         const limit = 100;
         let page = 1;
         let totalPages = 1;
