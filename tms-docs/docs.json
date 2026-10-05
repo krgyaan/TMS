@@ -34,5 +34,16 @@
   },
   "fonts": {
     "family": "Geist"
+  },
+  "contextual": {
+    "options": [
+      "download-pdf",
+      "chatgpt",
+      "claude"
+    ],
+    "display": "header"
+  },
+  "search": {
+    "prompt": "Ask"
   }
 }
