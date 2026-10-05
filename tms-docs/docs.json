@@ -7,7 +7,7 @@
     "light": "#07C983",
     "dark": "#15803D"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "/web/dist/ve_favicon.png",
   "navigation": {
     "pages": [
       {
@@ -20,7 +20,7 @@
     ]
   },
   "logo": {
-    "light": "/web/public/ve_logo.png",
-    "dark": "/web/public/ve_logo.png"
+    "light": "/web/dist/ve_logo.png",
+    "dark": "/web/dist/ve_logo.png"
   }
 }
