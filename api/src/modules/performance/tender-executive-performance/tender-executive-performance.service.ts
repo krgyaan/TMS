@@ -376,19 +376,18 @@ export class TenderExecutiveService {
                 if (stage.stageKey === "tender_info_sheet") {
                     const deadlineAt = timerDeadline(timerRow, stage, tender);
                     const startedAt = timerRow?.startedAt ? new Date(timerRow.startedAt) : null;
-                    const createdAt = tender.createdAt ? new Date(tender.createdAt) : null;
+                    const endedAt = timerRow?.endedAt ? new Date(timerRow.endedAt) : null;
 
-                    applicable = createdAt !== null && deadlineAt !== null && createdAt >= periodStart && createdAt <= periodEnd;
+                    const closedInPeriod = endedAt !== null && endedAt >= periodStart && endedAt <= periodEnd;
+                    const openAtEnd = (endedAt === null || endedAt > periodEnd) && startedAt !== null && startedAt <= periodEnd && (startedAt >= periodStart || (deadlineAt !== null && deadlineAt >= periodStart));
 
-                    if (deadlineAt !== null && createdAt !== null && createdAt >= periodStart && createdAt <= periodEnd) {
-                        const endedAt = timerRow?.endedAt ? new Date(timerRow.endedAt) : null;
-                        const closedAtEnd = timerRow?.status === "completed" && endedAt !== null && endedAt <= periodEnd;
-                        const doneAtEnd = closedAtEnd && endedAt !== null ? endedAt : null;
+                    applicable = deadlineAt !== null && (closedInPeriod || openAtEnd);
 
-                        completed = doneAtEnd !== null;
+                    if (applicable && deadlineAt !== null) {
+                        completed = closedInPeriod;
                         startTime = startedAt;
-                        endTime = doneAtEnd;
-                        onTime = doneAtEnd !== null ? doneAtEnd <= deadlineAt : periodEnd > deadlineAt ? false : null;
+                        endTime = closedInPeriod ? endedAt : null;
+                        onTime = closedInPeriod ? endedAt <= deadlineAt : periodEnd > deadlineAt ? false : null;
                     }
                 } else if (stage.stageKey === "tq" || stage.stageKey === "ra" || stage.stageKey === "result") {
                     const source = (stage.stageKey === "tq" ? tqMap.get(tender.id) : stage.stageKey === "ra" ? raMap.get(tender.id) : resultMap.get(tender.id)) as { createdAt?: Date | string | null } | undefined;
