@@ -7,7 +7,10 @@
     "light": "#FF8A3D",
     "dark": "#D94F00"
   },
-  "favicon": "/web/dist/ve_favicon.png",
+  "favicon": {
+    "light": "/tms-docs/images/logo.svg",
+    "dark": "/tms-docs/images/logo.svg"
+  },
   "navigation": {
     "pages": [
       {
@@ -20,13 +23,16 @@
     ]
   },
   "logo": {
-    "light": "/web/dist/ve_logo.png",
-    "dark": "/web/dist/ve_logo.png"
+    "light": "/tms-docs/images/dark-ve-logo.png",
+    "dark": "/tms-docs/images/ve_logo.png"
   },
   "icons": {
     "library": "fontawesome"
   },
   "background": {
     "decoration": "grid"
+  },
+  "fonts": {
+    "family": "Geist"
   }
 }
