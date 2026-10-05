@@ -39,7 +39,7 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
     const poActions: ActionItem<PurchaseOrderRow>[] = useMemo(() => [
         {
             label: "Raise Payment",
-            visible: (row) => row.poApproved === true
+            visible: (row) => row.poApproved !== false
                 && Number(row.totalPaymentRequested || 0) < Number(row.amountAfterTds ?? row.grandTotal),
             onClick: (row) => navigate(paths.operations.raiseProjectPaymentRequestForm(projectId!, row.id)),
         },

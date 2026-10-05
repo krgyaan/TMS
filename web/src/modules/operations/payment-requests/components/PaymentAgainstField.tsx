@@ -4,6 +4,7 @@ import { useProjectVendorWorkOrders } from "@/hooks/api/useVendorWorkOrders";
 import { formatINR } from "@/hooks/useINRFormatter";
 import type { PurchaseOrderRow } from "@/modules/operations/purchase-orders/helpers/purchaseOrder.types";
 import type { VendorWorkOrderRow } from "@/modules/operations/vendor-work-orders/helpers/vwoForm.types";
+import { AlertTriangle } from "lucide-react";
 import React from "react";
 import type { Control } from "react-hook-form";
 import { useFormContext } from "react-hook-form";
@@ -42,19 +43,19 @@ export const PaymentAgainstField: React.FC<PaymentAgainstFieldProps> = ({ contro
     }, [preSelectedPoId, preSelectedVwoId, setValue]);
 
     const poOptions = (poData?.purchaseOrders || [])
-        .filter((po: any) => po.poApproved === true)
+        .filter((po: any) => po.poApproved !== false)
         .filter((po: any) => !preSelectedPoId || String(po.id) === String(preSelectedPoId))
         .map((po: any) => ({
             id: String(po.id),
-            name: `${po.poNumber} - ${po.sellerName}`,
+            name: `${po.poNumber} - ${po.sellerName}${po.poApproved === true ? "" : " — Approval Pending"}`,
         }));
 
     const vwoOptions = (vwoData || [])
-        .filter((vwo: any) => vwo.woApproved === true)
+        .filter((vwo: any) => vwo.woApproved !== false)
         .filter((vwo: any) => !preSelectedVwoId || String(vwo.id) === String(preSelectedVwoId))
         .map((vwo: any) => ({
             id: String(vwo.id),
-            name: `${vwo.woNumber} - ${vwo.sellerName}`,
+            name: `${vwo.woNumber} - ${vwo.sellerName}${vwo.woApproved === true ? "" : " — Approval Pending"}`,
         }));
 
     const isPreSelected = !!preSelectedPoId || !!preSelectedVwoId;
@@ -162,6 +163,17 @@ export const PaymentAgainstField: React.FC<PaymentAgainstFieldProps> = ({ contro
                     <VwoDetailsCard vwo={selectedVwo} requestAmount={amount} />
                 )}
             </div>
+            {((paymentAgainst === "po" && selectedPo && selectedPo.poApproved !== true) ||
+                (paymentAgainst === "vwo" && selectedVwo && selectedVwo.woApproved !== true)) && (
+                <div className="col-span-1 md:col-span-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                    <p>
+                        This {paymentAgainst === "vwo" ? "Work Order" : "PO"} is not yet approved. The payment
+                        request will stay in <span className="font-semibold">PO Approval Pending</span> and only
+                        move forward once the {paymentAgainst === "vwo" ? "Work Order" : "PO"} is approved.
+                    </p>
+                </div>
+            )}
         </div>
     );
 };
