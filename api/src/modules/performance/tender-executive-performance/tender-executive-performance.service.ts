@@ -143,6 +143,28 @@ function mapStatusToKpi(statusCode: number): TenderKpiBucket {
     return "ALLOCATED";
 }
 
+/* ================================================================
+   PERIOD BOUNDARIES
+
+   The query schemas coerce a bare `YYYY-MM-DD` into a Date at UTC
+   midnight, and several methods also appended an explicit `Z` when
+   building their own boundaries. Either way every comparison ran
+   05:30 off against real India-local dates.
+
+   Asia/Calcutta observes no DST, so a fixed +05:30 offset is exact and
+   avoids a zone lookup. `getStageBacklogV2` already used
+   `AT TIME ZONE 'Asia/Calcutta'` for the same reason.
+   ================================================================ */
+const APP_OFFSET = "+05:30";
+
+/** Local-midnight-to-local-end-of-day bounds for a `YYYY-MM-DD` pair. */
+function istDayBounds(fromDate: string, toDate: string): { start: Date; end: Date } {
+    return {
+        start: new Date(`${fromDate}T00:00:00${APP_OFFSET}`),
+        end: new Date(`${toDate}T23:59:59.999${APP_OFFSET}`),
+    };
+}
+
 function classifyStage(row?: StagePerformance): StageState {
     if (!row || !row.applicable) {
         return "NOT_APPLICABLE";
@@ -185,6 +207,47 @@ function resolveEmdFinancialState(instrumentType: string, action: number | null)
     }
 }
 const TERMINAL_KPI: TenderKpiBucket[] = ["WON", "LOST", "DISQUALIFIED", "MISSED", "REJECTED"];
+
+/* `statuses.tender_category` values that mark a tender as already resolved. The backlog
+   bid queries exclude exactly these two, since a won or lost tender belongs to no
+   outcome column. */
+function isResolvedTender(tenderCategory?: string | null) {
+    return tenderCategory === "won" || tenderCategory === "lost";
+}
+
+/**
+ * The deadline that grades a stage.
+ *
+ * A timer row carries the authoritative deadline, already extended by any granted
+ * extension, so it wins over the tender's due date. Falls back to the stage's own
+ * resolution when the timer has none.
+ */
+function timerDeadline(timerRow: { deadlineAt?: Date | string | null } | undefined, stage: (typeof STAGE_CONFIG)[number], tender: TenderInfo): Date | null {
+    const deadline = timerRow?.deadlineAt ?? stage.resolveDeadline(tender);
+    return deadline ? new Date(deadline) : null;
+}
+
+/** The three point-in-time flags for a timer-driven stage's source table. */
+type StageArtifactFlags = { exists: boolean; inPeriod: boolean; byEnd: boolean };
+
+/**
+ * Everything the stage loop needs about one tender, beyond the tender row itself.
+ *
+ * Mostly stage artifact flags keyed by stageKey, plus the approval facts the bid
+ * guard reads. It is a loose record because the flags come back from a raw query
+ * under generated keys; `artifactOf` is the typed way in.
+ */
+type TenderFacts = Record<string, StageArtifactFlags | boolean | string | null | undefined>;
+
+function artifactOf(facts: TenderFacts | undefined, stageKey: string): StageArtifactFlags | undefined {
+    const value = facts?.[stageKey];
+    return value && typeof value === "object" ? value : undefined;
+}
+
+/** Narrow a loose raw-query value to the string it may be, for the category comparisons. */
+function factString(value: unknown): string | null {
+    return typeof value === "string" ? value : null;
+}
 
 type StageState = "DONE" | "PENDING" | "OVERDUE" | "NOT_APPLICABLE";
 
@@ -229,21 +292,58 @@ export class TenderExecutiveService {
      * Produces normalized stage-level performance
      */
     async getStagePerformance(query: PerformanceQueryDto): Promise<StagePerformance[]> {
-        const { userId } = query;
+        const { userId, fromDate, toDate } = query;
 
         const activeStages = getExecutiveStages();
+
+        /* =====================================================
+       STEP 0: Period bounds (point-in-time)
+
+       The matrix is a snapshot measured AS OF the end of the selected
+       period, so stage states below are judged against `period.end`, not
+       against now.
+
+       Population is every tender assigned on or before the period end,
+       NOT only those assigned during it. A two-sided
+       `created_at BETWEEN period.start AND period.end` window excluded
+       carry-in work: tenders 4572 (assigned 03 Sep) and 4639 (10 Sep)
+       both hold a completed `bid_submission` timer, yet the matrix
+       reported Done 0 for Bid Submission while the backlog table below it
+       correctly reported 2. Each stage now decides relevance for itself
+       (see STEP 3), which is the same opening-plus-inflow basis the
+       backlog tables use.
+
+       One stage is the exception: `tender_info_sheet` is scoped to the
+       tenders BORN inside the window (created_at within [start, end]),
+       which is the cohort its own timer measures. Tender 4551 (born 01
+       Sep) therefore drops to Not Applicable in a 13-19 Sep window even
+       though its sheet was submitted on the 17th. That is deliberate — it
+       keeps the matrix column reading one cohort by one rule. Note it no
+       longer ties back to the backlog's Tender Assignment row, which still
+       counts carry-in tenders. See its branch in STEP 4.
+     ===================================================== */
+        const period = istDayBounds(fromDate.toISOString().slice(0, 10), toDate.toISOString().slice(0, 10));
+        const periodEnd = period.end;
+        const periodStart = period.start;
+
+        /* True when the row exists and was created on or before the period end. A row with no
+           created_at is treated as existing, since older data may predate the column. */
+        const existedByPeriod = (row?: { createdAt?: Date | string | null } | null) => {
+            if (!row) return false;
+            if (!row.createdAt) return true;
+            return new Date(row.createdAt) <= periodEnd;
+        };
 
         /* =====================================================
        STEP 1: Fetch tenders
     ===================================================== */
 
-        /* All of the member's live tenders, not only those CREATED inside the window.
-           Filtering on createdAt dropped tenders that started earlier but progressed during the
-           period, so the matrix disagreed with the stage tables rendered above it. */
+        /* Tenders assigned on or before the period end. The lower bound is deliberately
+           absent: stages are allowed to reach back into carry-in work. */
         const tenders = await this.db
             .select()
             .from(tenderInfos)
-            .where(and(eq(tenderInfos.teamMember, userId), eq(tenderInfos.deleteStatus, 0)));
+            .where(and(eq(tenderInfos.teamMember, userId), eq(tenderInfos.deleteStatus, 0), lte(tenderInfos.createdAt, period.end)));
 
         if (tenders.length === 0) return [];
 
@@ -255,18 +355,145 @@ export class TenderExecutiveService {
 
         const timerNames = activeStages.filter(s => s.type === "timer" && s.timerName).map(s => s.timerName!);
 
-        /* A stage belongs to whoever it is ASSIGNED to. Matching on createdByUserId here
-           meant a member saw no timers at all for stages created by anyone else, which left
-           every row stuck at "Pending" with empty Done / On Time / Late / Overdue. */
+        /* Timers are matched on (entityId, stage) alone, never on the assignee.
+           `unique_active_timer(entity_type, entity_id, stage)` guarantees exactly one
+           timer per tender per stage, so an assignee filter could never disambiguate
+           anything — it could only drop rows. It did exactly that: tender 4551's
+           info-sheet timer (id 19284) carries assigned_user_id = 8 while the tender
+           belongs to team_member 41, so the row vanished and the tender could not be
+           graded in EITHER report, because user 8's population excludes tender 4551
+           and user 41's population excluded its own timer. The same happened to 4685's
+           RFQ timer (assigned to user 15). */
         const timers = await this.db
             .select()
             .from(timerTrackers)
-            .where(and(eq(timerTrackers.assignedUserId, userId), inArray(timerTrackers.entityId, tenderIds), inArray(timerTrackers.stage, timerNames)));
+            .where(and(inArray(timerTrackers.entityId, tenderIds), inArray(timerTrackers.stage, timerNames)));
 
         const timerMap = new Map<string, (typeof timers)[number]>();
         for (const t of timers) {
             timerMap.set(`${t.entityId}:${t.stage}`, t);
         }
+
+        /* =====================================================
+       STEP 2b: Stage artifacts (domain)
+
+       For every stage EXCEPT `tender_info_sheet`: COUNTS come from the
+       domain tables, TIMING comes from the timers.
+
+       Timing from the timers was previously the only option and proved to
+       be the weaker record — tender 4685's info-sheet timer was backfilled
+       with started_at/ended_at of 24 Sep while the sheet itself was created
+       on 18 Sep, and the RFQ timers show 0 completions inside the window
+       against 6 `rfqs` rows. Counting from the domain tables reproduced the
+       backlog for those stages:
+
+         bid submission done 2 / missed 1 / pending 15
+
+       `tender_info_sheet` is now deliberately switched over to the timer
+       as the sole authority for both membership and grade. That stage's
+       timer is written in the same insert as tender_infos.created_at, so
+       its started_at/ended_at/deadline_at are a complete and consistent
+       record of the stage. The RFQ caveat above does not apply to it and is
+       unchanged for every other stage.
+
+       Every comparison is emitted as a boolean so the application layer
+       never has to interpret a timestamp string. The date columns are not
+       homogeneous, so each one gets the boundary flavour it needs:
+         - `timestamptz` columns  -> fromTz / toTz
+         - `tender_infos.tl_approval_timestamp` is UTC wall clock -> fromUtc / toUtc
+         - `tender_information.created_at` is local wall clock  -> fromLocal / toLocal
+     ===================================================== */
+
+        const APP_ZONE = `'Asia/Calcutta'`;
+        const fromDay = fromDate.toISOString().slice(0, 10);
+        const toDay = toDate.toISOString().slice(0, 10);
+        const fromTz = `((DATE '${fromDay}' + TIME '00:00:00') AT TIME ZONE ${APP_ZONE})`;
+        const toTz = `((DATE '${toDay}' + TIME '23:59:59.999') AT TIME ZONE ${APP_ZONE})`;
+        const toUtc = `(timezone('UTC', (DATE '${toDay}' + TIME '23:59:59.999') AT TIME ZONE ${APP_ZONE}))`;
+        const fromLocal = `(DATE '${fromDay}' + TIME '00:00:00')`;
+        const toLocal = `(DATE '${toDay}' + TIME '23:59:59.999')`;
+
+        /** `exists` / `done during` / `done by end` flags for one stage's source table. */
+        const artifactFlags = (key: string, table: string, alias: string, columnExpr: string, from: string, to: string, extra = "") => `
+            EXISTS (SELECT 1 FROM ${table} ${alias} WHERE ${alias}.tender_id = ti.id ${extra}) AS "${key}Exists",
+            EXISTS (SELECT 1 FROM ${table} ${alias} WHERE ${alias}.tender_id = ti.id ${extra} AND ${columnExpr} BETWEEN ${from} AND ${to}) AS "${key}In",
+            EXISTS (SELECT 1 FROM ${table} ${alias} WHERE ${alias}.tender_id = ti.id ${extra} AND ${columnExpr} <= ${to}) AS "${key}ByEnd"`;
+
+        /** Raw row shape returned by the stage-artifact query. The `*Exists`/`*In`/`*ByEnd` triples are generated per stage, so they are indexed by key. */
+        type ArtifactRow = Record<string, string | number | boolean | null> & { id: number };
+
+        const artifactRows = (await this.db.execute(sql.raw(`
+            SELECT
+                ti.id,
+                st.tender_category AS "tenderCategory",
+                (ti.tl_status = 1) AS "tlApproved",
+                (ti.tl_approval_timestamp IS NULL OR ti.tl_approval_timestamp <= ${toUtc}) AS "approvedByEnd",
+                ${artifactFlags("info", "tender_information", "ti_n", "ti_n.created_at", fromLocal, toLocal)},
+                ${artifactFlags("rfq", "rfqs", "ti_r", "ti_r.created_at", fromTz, toTz)},
+                ${artifactFlags("emd", "payment_requests", "ti_e", "ti_e.created_at", fromLocal, toLocal, "AND ti_e.purpose = 'EMD'")},
+                ${artifactFlags("phys", "physical_docs", "ti_p", "ti_p.created_at", fromTz, toTz)},
+                ${artifactFlags("chk", "tender_document_checklists", "ti_c", "ti_c.created_at", fromTz, toTz)},
+                ${artifactFlags("cost", "tender_costing_sheets", "ti_s", "ti_s.created_at", fromTz, toTz)},
+                ${artifactFlags("bid", "bid_submissions", "ti_b", "COALESCE(ti_b.submission_datetime, ti_b.created_at)", fromTz, toTz, "AND ti_b.status = 'Bid Submitted'")},
+                EXISTS (SELECT 1 FROM bid_submissions ti_m WHERE ti_m.tender_id = ti.id AND ti_m.status = 'Tender Missed' AND ti_m.created_at < ${fromTz}) AS "missedBeforeStart",
+                EXISTS (SELECT 1 FROM bid_submissions ti_m WHERE ti_m.tender_id = ti.id AND ti_m.status = 'Tender Missed' AND ti_m.created_at BETWEEN ${fromTz} AND ${toTz}) AS "missedInPeriod"
+            FROM tender_infos ti
+            LEFT JOIN statuses st ON st.id = ti.status
+            WHERE ti.id IN (${tenderIds.join(",")})
+        `))).rows as ArtifactRow[];
+
+        /** Per tender: stage artifact flags plus the approval facts the bid guard needs. */
+        const artifactMap = new Map<number, TenderFacts>();
+
+        const ARTIFACT_STAGE: Record<string, string> = {
+            tender_info_sheet: "info",
+            rfq_sent: "rfq",
+            emd_requested: "emd",
+            physical_docs: "phys",
+            document_checklist: "chk",
+            costing_sheets: "cost",
+            bid_submission: "bid",
+        };
+
+        for (const row of artifactRows) {
+            const facts: TenderFacts = {
+                tenderCategory: factString(row.tenderCategory),
+                tlApproved: Boolean(row.tlApproved),
+                approvedByEnd: Boolean(row.approvedByEnd),
+                missedBeforeStart: Boolean(row.missedBeforeStart),
+                missedInPeriod: Boolean(row.missedInPeriod),
+            };
+
+            for (const [stageKey, key] of Object.entries(ARTIFACT_STAGE)) {
+                facts[stageKey] = { exists: Boolean(row[`${key}Exists`]), inPeriod: Boolean(row[`${key}In`]), byEnd: Boolean(row[`${key}ByEnd`]) };
+            }
+
+            artifactMap.set(Number(row.id), facts);
+        }
+
+        /* =====================================================
+       STEP 2c: "Still in play" guard
+
+       A stage is relevant to a tender only while the work can still move.
+       These guards mirror the backlog queries (getStageBacklogV2) so both
+       tables measure the same population:
+
+         - info sheet: has a sheet at some point, or is still freshly
+           allocated (status 1). This reproduces pending = 6 exactly; a
+           plain non-terminal-status test returns 0 and is wrong.
+         - bid submission: approved, and not already won or lost.
+         - everything else: has reached the stage, or the tender is still
+           in a non-terminal state.
+       ===================================================== */
+
+        const guardFor = (stageKey: string, tender: TenderInfo, facts: TenderFacts, artifact: StageArtifactFlags | undefined, isTerminal: boolean) => {
+            if (stageKey === "bid_submission") return Boolean(facts.tlApproved) && Boolean(facts.approvedByEnd) && !isResolvedTender(factString(facts.tenderCategory));
+
+            if (stageKey === "tender_info_sheet") return Boolean(artifact?.exists) || Number(tender.status) === 1;
+
+            if (!artifact) return true;
+            return artifact.exists || !isTerminal;
+        };
 
         /* =====================================================
        STEP 3: Fetch existence-based data (BULK)
@@ -296,64 +523,143 @@ export class TenderExecutiveService {
         const output: StagePerformance[] = [];
 
         for (const tender of tenders) {
+            const bucket = mapStatusToKpi(Number(tender.status));
+            const hasBid = ["RESULT_AWAITED", "WON", "LOST", "DISQUALIFIED"].includes(bucket);
+            const isTerminal = TERMINAL_KPI.includes(bucket);
+            const facts = artifactMap.get(tender.id);
+
             for (const stage of activeStages) {
-                const hasTq = tqMap.has(tender.id);
-                const bucket = mapStatusToKpi(Number(tender.status));
-
-                const hasBid = ["RESULT_AWAITED", "WON", "LOST", "DISQUALIFIED"].includes(bucket);
-
-                /* tq / result / ra are existence-based, so their applicability comes from the
-                   rows actually fetched above. The config's isApplicable for these stages reads
-                   columns that do not exist on tender_infos (currentStatusCode,
-                   reverseAuctionId), which would have made them permanently Not Applicable. */
-                const applicable = stage.stageKey === "tq" ? hasTq : stage.stageKey === "result" ? hasBid : stage.stageKey === "ra" ? raMap.has(tender.id) : stage.isApplicable(tender);
-
+                let applicable = false;
                 let completed = false;
                 let onTime: boolean | null = null;
                 let startTime: Date | null = null;
                 let endTime: Date | null = null;
 
-                /* ---------- TIMER-BASED STAGES ---------- */
-                if (applicable && stage.type === "timer" && stage.timerName) {
-                    const timerRow = timerMap.get(`${tender.id}:${stage.timerName}`);
+                /* The timer row. For tender_info_sheet it is the sole authority for membership AND
+                   grade (see its branch below). For every other stage it is the authority
+                   for TIMING only: it is read before the stage is judged because a recorded
+                   timer is itself evidence that the stage applied, but it does not decide
+                   the counts — `isApplicable` reads nullable columns (rfq_to, emd) and the
+                   timers are a lossy record (see STEP 2b). */
+                const timerRow = stage.type === "timer" && stage.timerName ? timerMap.get(`${tender.id}:${stage.timerName}`) : undefined;
 
-                    if (timerRow) {
-                        startTime = timerRow.startedAt;
-                        endTime = timerRow.endedAt ?? null;
-                        /* The timer row carries the authoritative deadline (already extended by
-                           any granted extensions); fall back to the tender due date only when the
-                           timer has none. */
-                        const deadline = timerRow.deadlineAt ?? stage.resolveDeadline(tender);
-                        const now = new Date();
+                /* ---------- TENDER INFO SHEET ----------
+                   Graded entirely off the `tender_info_sheet` timer, snapshot as of
+                   the period end:
 
-                        if (timerRow.status === "completed" && endTime) {
-                            completed = true;
-                            onTime = deadline ? new Date(endTime) <= new Date(deadline) : null;
-                        } else {
-                            /* running / paused / not_started / overdue are all still incomplete.
-                               Split Pending vs Overdue purely on the deadline. */
-                            completed = false;
-                            onTime = deadline && now > new Date(deadline) ? false : null;
-                        }
+                     completed & ended_at <= deadline_at  -> Done + On Time
+                     completed & ended_at >  deadline_at  -> Done + Late
+                     still open at period end,
+                       deadline_at >= periodEnd          -> Pending
+                       deadline_at <  periodEnd          -> Overdue
+
+                   Membership is "the tender was born inside the window".
+                   tender_infos.created_at and timer.started_at are the same instant
+                   by construction (they land 0.3 ms apart, written in the same
+                   insert), so either one scopes the cohort. The tender's own
+                   created_at is used because it is the domain record of when the
+                   tender entered the report and is immune to the one known
+                   divergence: tender 4685's info-sheet timer was backfilled to
+                   started/ended 24 Sep against a sheet created 18 Sep. Reading
+                   the timer here means 4685 still reads as open at the period end
+                   and lands in Pending rather than being dropped to N/A.
+
+                   "Still open" is judged as of periodEnd, never as of today: a
+                   timer completed on 21 Sep was running on 19 Sep, and grading
+                   that as Done would let a later period's work inflate this one. */
+                if (stage.stageKey === "tender_info_sheet") {
+                    const deadlineAt = timerDeadline(timerRow, stage, tender);
+                    const startedAt = timerRow?.startedAt ? new Date(timerRow.startedAt) : null;
+                    const createdAt = tender.createdAt ? new Date(tender.createdAt) : null;
+
+                    applicable = createdAt !== null && deadlineAt !== null && createdAt >= periodStart && createdAt <= periodEnd;
+
+                    if (deadlineAt !== null && createdAt !== null && createdAt >= periodStart && createdAt <= periodEnd) {
+                        const endedAt = timerRow?.endedAt ? new Date(timerRow.endedAt) : null;
+                        /* Only a timer that had actually closed by the period end counts as done. */
+                        const closedAtEnd = timerRow?.status === "completed" && endedAt !== null && endedAt <= periodEnd;
+                        const doneAtEnd = closedAtEnd && endedAt !== null ? endedAt : null;
+
+                        completed = doneAtEnd !== null;
+                        startTime = startedAt;
+                        endTime = doneAtEnd;
+                        onTime = doneAtEnd !== null ? doneAtEnd <= deadlineAt : periodEnd > deadlineAt ? false : null;
                     }
-                }
+                } else if (stage.stageKey === "tq" || stage.stageKey === "ra" || stage.stageKey === "result") {
+                    /* ---------- EXISTENCE-BASED STAGES (tq / ra / result) ----------
+                       These have no domain "artifact" table of their own, so they keep
+                       working off the row simply existing. Their applicability comes from
+                       the rows fetched in STEP 3; the config's isApplicable for them reads
+                       columns that do not exist on tender_infos (currentStatusCode,
+                       reverseAuctionId), which would have made them permanently NA. */
+                    const source = (stage.stageKey === "tq" ? tqMap.get(tender.id) : stage.stageKey === "ra" ? raMap.get(tender.id) : resultMap.get(tender.id)) as { createdAt?: Date | string | null } | undefined;
 
-                /* ---------- EXISTENCE-BASED STAGES ---------- */
-                if (applicable && stage.type === "existence") {
-                    if (stage.stageKey === "result") {
-                        const result = resultMap.get(tender.id);
-                        completed = Boolean(result?.status);
-                    }
+                    const createdAt = source?.createdAt ? new Date(source.createdAt) : null;
+                    /* Raised after the period end had not happened yet as far as this report
+                       goes; raised before it was history and belongs to no column. */
+                    const createdInPeriod = createdAt !== null && createdAt >= periodStart && createdAt <= periodEnd;
 
-                    if (stage.stageKey === "ra") {
-                        completed = raMap.has(tender.id);
-                    }
+                    applicable = stage.stageKey === "result" ? hasBid : existedByPeriod(source);
+                    completed = applicable && Boolean(source) && createdInPeriod;
 
-                    if (stage.stageKey === "tq") {
-                        completed = tqMap.has(tender.id);
-                    }
+                    /* Work finished before the window opened is neither Done nor Pending. */
+                    if (applicable && createdAt !== null && createdAt < periodStart) applicable = false;
 
+                    startTime = createdAt;
+                    endTime = completed ? createdAt : null;
                     onTime = null;
+                } else {
+                    /* ---------- DOMAIN-DRIVEN STAGES ---------- */
+                    const artifact = artifactOf(facts, stage.stageKey);
+
+                    /* A tender missed before the window opened is history: the backlog
+                       excludes misses before the period start from bidOpening, and the
+                       matrix has no "did not submit" bucket, so such a tender is
+                       Not Applicable. A miss inside the window is an adverse
+                       resolution — it is reported as Overdue rather than
+                       inflating the Pending count. */
+                    const missedInPeriod = stage.stageKey === "bid_submission" && Boolean(facts?.missedInPeriod);
+                    const missedBeforeStart = stage.stageKey === "bid_submission" && Boolean(facts?.missedBeforeStart);
+
+                    /* A stage completed before the window opened is history: it appears in
+                       neither Done nor Pending, so it drops out of the population entirely
+                       and lands in Not Applicable. */
+                    const domainDoneBeforeStart = Boolean(artifact?.byEnd) && !artifact?.inPeriod;
+                    const timerDoneBeforeStart = Boolean(timerRow?.endedAt) && timerRow?.status === "completed" && new Date(timerRow.endedAt!) < periodStart;
+                    const doneBeforeStart = domainDoneBeforeStart || timerDoneBeforeStart || missedBeforeStart;
+
+                    /* Done is an activity fact: the artifact was created inside the window.
+                       It is evaluated first and overrides the gates below, because a tender
+                       that DID reach the stage inside the window must not be demoted to
+                       Not Applicable by a gate that reads a nullable column (rfq_to, emd)
+                       or by a guard that excludes a tender resolved after it completed. */
+                    completed = Boolean(artifact?.inPeriod);
+
+                    const gatePassed = !doneBeforeStart &&
+                        (stage.isApplicable(tender) || Boolean(timerRow) || Boolean(artifact?.exists)) &&
+                        guardFor(stage.stageKey, tender, facts ?? {}, artifact, isTerminal);
+
+                    applicable = completed || gatePassed;
+
+                    startTime = timerRow?.startedAt ?? null;
+                    endTime = completed ? (timerRow?.endedAt ?? null) : null;
+
+                    if (completed) {
+                        /* Timing comes from the timer, compared on its own terms rather than
+                           against the period window, so a timer that closed slightly after
+                           period end still grades correctly. */
+                        const endedAt = timerRow?.endedAt ? new Date(timerRow.endedAt) : null;
+                        const deadlineAt = timerDeadline(timerRow, stage, tender);
+
+                        if (endedAt && deadlineAt) onTime = endedAt <= deadlineAt;
+                        else onTime = null;
+                    } else if (applicable) {
+                        /* Still open at the period end. Overdue is measured against the
+                           deadline as it stood at period end, NOT against today. */
+                        const deadlineAt = timerDeadline(timerRow, stage, tender);
+
+                        onTime = missedInPeriod || (deadlineAt && periodEnd > deadlineAt) ? false : null;
+                    }
                 }
 
                 output.push({
@@ -365,8 +671,8 @@ export class TenderExecutiveService {
                     completed,
                     onTime,
                     startTime,
-                    endTime,
-                    deadline: stage.resolveDeadline(tender),
+                    endTime: completed ? endTime : null,
+                    deadline: timerDeadline(timerRow, stage, tender),
                 });
             }
         }
@@ -445,10 +751,21 @@ export class TenderExecutiveService {
     async getOutcomes(query: PerformanceQueryDto) {
         const { userId, fromDate, toDate } = query;
 
+        /* created_at is timestamptz, so IST day bounds apply — the same bounds the stage
+           matrix and the All Tenders list use. */
+        const period = istDayBounds(fromDate.toISOString().slice(0, 10), toDate.toISOString().slice(0, 10));
+
         const tenders = await this.db
             .select()
             .from(tenderInfos)
-            .where(and(eq(tenderInfos.teamMember, userId), eq(tenderInfos.deleteStatus, 0), between(tenderInfos.createdAt, fromDate, toDate)));
+            .where(
+                and(
+                    eq(tenderInfos.teamMember, userId),
+                    eq(tenderInfos.deleteStatus, 0),
+                    gte(tenderInfos.createdAt, period.start),
+                    lte(tenderInfos.createdAt, period.end)
+                )
+            );
 
         const counters = {
             allocated: 0,
@@ -572,6 +889,10 @@ export class TenderExecutiveService {
     async getStageMatrix(query: PerformanceQueryDto) {
         const stages = await this.getStagePerformance(query);
 
+        /* The matrix is a snapshot as of the period end, so overdue days are measured from
+           there too. Using Date.now() would inflate them for any closed period. */
+        const periodEnd = istDayBounds(query.fromDate.toISOString().slice(0, 10), query.toDate.toISOString().slice(0, 10)).end;
+
         const stageTenderIds = Array.from(new Set(stages.map(s => s.tenderId)));
         const tenderDetails = new Map<number, { value: number; status: string | null }>();
 
@@ -655,7 +976,7 @@ export class TenderExecutiveService {
                 completedAt: stage.endTime ?? null,
                 daysOverdue:
                     !stage.completed && stage.onTime === false && stage.deadline
-                        ? Math.max(0, Math.ceil((Date.now() - new Date(stage.deadline).getTime()) / (1000 * 60 * 60 * 24)))
+                        ? Math.max(0, Math.ceil((periodEnd.getTime() - new Date(stage.deadline).getTime()) / (1000 * 60 * 60 * 24)))
                         : null,
                 meta: {},
             };
@@ -774,8 +1095,9 @@ export class TenderExecutiveService {
     async getTenderList(query: TenderListQuery) {
         const { userId, fromDate, toDate, kpi } = query;
 
-        const from = new Date(`${fromDate}T00:00:00.000Z`);
-        const to = new Date(`${toDate}T23:59:59.999Z`);
+        /* Same IST bounds as the stage matrix, so this table and the matrix
+           always describe the same set of tenders. */
+        const { start: from, end: to } = istDayBounds(fromDate, toDate);
 
         /* ----------------------------------------
        Step 1: Fetch tenders
@@ -1578,18 +1900,7 @@ export class TenderExecutiveService {
           AND ti.updated_at <= ${toTz}
     `);
 
-        /**
-         * Pending at End
-         * Approved tenders with no bid raised and none missed by the end of the
-         * period. A null tl_approval_timestamp is treated as carry-in, since the
-         * real approval time is not recoverable from any other column.
-         *
-         * Won and lost are excluded because those tenders are already resolved
-         * and belong to no outcome column. The dnb category is handled by the
-         * Tender Missed test in the guard below rather than by a category check,
-         * so a tender missed during the period is excluded here and counted in
-         * Did Not Bid, while one missed after the period is still open.
-         */
+       
         const bidTotal = await exec(`
         ${baseSelect}
         JOIN statuses st ON st.id = ti.status
@@ -2090,6 +2401,10 @@ export class TenderExecutiveService {
     }
 
     async getEmdBalance(query: EmdBalanceQueryDto) {
+        /* Left on UTC bounds deliberately: these are compared in JS against EMD date columns
+           that are a mix of `date`, `timestamp` and `timestamptz`, so a single IST bound would
+           shift them unpredictably. Needs the same per-column-type treatment as
+           getStageBacklogV2. */
         const from = new Date(`${query.fromDate}T00:00:00.000Z`);
         const to = new Date(`${query.toDate}T23:59:59.999Z`);
 
