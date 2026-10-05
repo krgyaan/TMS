@@ -202,8 +202,8 @@ export class PurchaseOrderController {
     @Post(":id/close")
     @HttpCode(HttpStatus.OK)
     @RequireAnyPermission(...eitherModule(...PURCHASE_ORDER_MODULES, "close"))
-    closePurchaseOrder(@Param("id", ParseIntPipe) id: number) {
-        return this.service.closePurchaseOrder(id);
+    closePurchaseOrder(@Param("id", ParseIntPipe) id: number, @Body() body: { closureNote?: string }, @CurrentUser() user: ValidatedUser) {
+        return this.service.closePurchaseOrder(id, body?.closureNote, user?.id);
     }
 
     @Put(":id")

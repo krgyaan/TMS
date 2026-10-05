@@ -112,8 +112,8 @@ export class VendorWorkOrderController {
     @Post(":id/close")
     @HttpCode(HttpStatus.OK)
     @RequireAnyPermission(...eitherModule(...WORK_ORDER_MODULES, "close"))
-    closeVendorWorkOrder(@Param("id", ParseIntPipe) id: number) {
-        return this.service.closeVendorWorkOrder(id);
+    closeVendorWorkOrder(@Param("id", ParseIntPipe) id: number, @Body() body: { closureNote?: string }, @CurrentUser() user: ValidatedUser) {
+        return this.service.closeVendorWorkOrder(id, body?.closureNote, user?.id);
     }
 
     @Post(":id/bulk-payment-requests")
