@@ -21,6 +21,9 @@ export const createVendorWorkOrderSchema = z.object({
     contactPersonName: z.string().optional().default(""),
     contactPersonPhone: z.string().optional().default(""),
     contactPersonEmail: z.string().optional().default(""),
+    vendorContactPersonName: z.string().optional().default(""),
+    vendorContactPersonPhone: z.string().optional().default(""),
+    vendorContactPersonEmail: z.string().optional().default(""),
     certRecipients: z.array(z.number()).optional(),
 
     shipToName: z.string().min(1, "Ship to name is required"),

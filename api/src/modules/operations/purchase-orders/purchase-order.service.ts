@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, asc, desc, eq, inArray, isNotNull, isNull, like, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, like, ne, or, sql, type SQL } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, rename } from "node:fs/promises";
 import { join } from "node:path";
@@ -364,22 +364,19 @@ export class PurchaseOrderService {
             }
         }
 
-        await this.clientDirectorySyncService.syncToClientDirectory(
-            [
-                {
-                    name: body.contactPersonName,
-                    email: body.contactPersonEmail,
-                    phone: body.contactPersonPhone,
-                    org: body.sellerName,
-                },
-                {
-                    name: body.sellerName,
-                    email: body.sellerEmail,
-                    phone: null,
-                    org: null,
-                },
-            ].filter(c => c.name)
-        );
+        // Client directory holds external parties, so the vendor's person goes in -
+        // not our own contact, which is an internal employee.
+        await this.clientDirectorySyncService.syncToClientDirectory([{
+            name: body.vendorContactPersonName,
+            email: body.vendorContactPersonEmail,
+            phone: body.vendorContactPersonPhone,
+            org: body.sellerName,
+        }, {
+            name: body.sellerName,
+            email: body.sellerEmail,
+            phone: null,
+            org: null,
+        }].filter((c) => c.name));
 
         this.logger.info(`Purchase Order created: ${poNumber}`);
 
@@ -444,6 +441,9 @@ export class PurchaseOrderService {
             contactPersonName: po.contactPersonName,
             contactPersonPhone: po.contactPersonPhone,
             contactPersonEmail: po.contactPersonEmail,
+            vendorContactPersonName: po.vendorContactPersonName,
+            vendorContactPersonPhone: po.vendorContactPersonPhone,
+            vendorContactPersonEmail: po.vendorContactPersonEmail,
             quotationNo: po.quotationNo,
             quotationDate: po.quotationDate,
             termsAndConditions: po.termsAndConditions,
@@ -514,6 +514,9 @@ export class PurchaseOrderService {
             oe_name: po.contactPersonName || "",
             oe_number: po.contactPersonPhone || "",
             oe_email: po.contactPersonEmail || "",
+            vendor_contact_name: po.vendorContactPersonName || "",
+            vendor_contact_phone: po.vendorContactPersonPhone || "",
+            vendor_contact_email: po.vendorContactPersonEmail || "",
             seller_name: po.sellerName || "",
             seller_address: po.sellerAddress || "",
             seller_pan: po.sellerPanNo || "",
@@ -1019,6 +1022,9 @@ export class PurchaseOrderService {
                     contactPersonName: body.contactPersonName,
                     contactPersonPhone: body.contactPersonPhone,
                     contactPersonEmail: body.contactPersonEmail,
+                    vendorContactPersonName: body.vendorContactPersonName,
+                    vendorContactPersonPhone: body.vendorContactPersonPhone,
+                    vendorContactPersonEmail: body.vendorContactPersonEmail,
 
                     shipToName: body.shipToName,
                     shippingAddress: body.shippingAddress,
@@ -1090,16 +1096,12 @@ export class PurchaseOrderService {
             this.logger.error(`Failed to generate PO PDF after update: ${err.message}`);
         });
 
-        await this.clientDirectorySyncService.syncToClientDirectory(
-            [
-                {
-                    name: body.contactPersonName,
-                    email: body.contactPersonEmail,
-                    phone: body.contactPersonPhone,
-                    org: body.sellerName,
-                },
-            ].filter(c => c.name)
-        );
+        await this.clientDirectorySyncService.syncToClientDirectory([{
+            name: body.vendorContactPersonName,
+            email: body.vendorContactPersonEmail,
+            phone: body.vendorContactPersonPhone,
+            org: body.sellerName,
+        }].filter((c) => c.name));
 
         this.logger.info(`Purchase Order updated: ${updatedPO.poNumber}`);
 
@@ -1114,6 +1116,10 @@ export class PurchaseOrderService {
         return updatedPO;
     }
 
+    // Vendor master is edited through the Vendor Master module only. PO creation
+    // used to write the contact person back into `vendors` (see the removed
+    // syncPersonForOrg), which let a Quick-Filled internal employee permanently
+    // rename the vendor's contact person.
     private async syncPartyFromPO(body: any) {
         if (body.sellerOrganizationId) {
             const orgId = body.sellerOrganizationId;
@@ -1128,9 +1134,6 @@ export class PurchaseOrderService {
                     updatedAt: new Date(),
                 })
                 .where(eq(vendorOrganizations.id, orgId));
-
-            await this.syncPersonForOrg(orgId, body);
-            await this.syncGstForOrg(orgId, body);
         }
         if (body.shipToPartyId) {
             await this.db
@@ -1146,61 +1149,6 @@ export class PurchaseOrderService {
         }
     }
 
-    private async syncPersonForOrg(orgId: number, body: any) {
-        const [person] = await this.db.select().from(vendors).where(eq(vendors.orgId, orgId)).limit(1);
-
-        const name = body.contactPersonName ?? body.contact_person ?? null;
-        const email = body.contactPersonEmail ?? body.sellerEmail ?? null;
-        const mobile = body.contactPersonPhone ?? body.mobile_number ?? null;
-
-        if (person) {
-            await this.db
-                .update(vendors)
-                .set({
-                    name,
-                    email,
-                    mobile,
-                    updatedAt: new Date(),
-                })
-                .where(eq(vendors.id, person.id));
-        } else {
-            await this.db.insert(vendors).values({
-                orgId,
-                name,
-                email,
-                mobile,
-                address: null,
-            });
-        }
-    }
-
-    private async syncGstForOrg(orgId: number, body: any) {
-        const [gst] = await this.db.select().from(vendorGsts).where(eq(vendorGsts.orgId, orgId)).limit(1);
-
-        const hasGstNo = body.sellerGstNo !== undefined || body.gstNo !== undefined;
-        const hasGstState = body.gstState !== undefined;
-        const gstNo = body.sellerGstNo ?? body.gstNo;
-        const gstState = body.gstState;
-
-        if (gst) {
-            if (hasGstNo || hasGstState) {
-                await this.db
-                    .update(vendorGsts)
-                    .set({
-                        ...(hasGstNo ? { gstNo } : {}),
-                        ...(hasGstState ? { gstState } : {}),
-                        updatedAt: new Date(),
-                    })
-                    .where(eq(vendorGsts.id, gst.id));
-            }
-        } else {
-            await this.db.insert(vendorGsts).values({
-                orgId,
-                gstState: hasGstState ? gstState : null,
-                gstNo: hasGstNo ? gstNo : null,
-            });
-        }
-    }
 
     private async resolveCertRecipientEmails(po: any): Promise<string> {
         const ids: number[] = Array.isArray(po.certRecipients) && po.certRecipients.length > 0 ? po.certRecipients : po.certRecipient ? [po.certRecipient] : [];
@@ -1626,46 +1574,103 @@ export class PurchaseOrderService {
 
     // Seller picker reads vendor_organizations only - project_parties never
     // contributes here (it is ship-to only since migration 0146).
-    async listSellerOptions() {
-        const orgRows = await this.db
+    // Organization-level only: `vendors` is 1:N per org, so joining it here and
+    // keeping the first row picked an arbitrary contact person with no ORDER BY
+    // to stabilise it. Persons come from listSellerPersons once a seller is chosen.
+    //
+    // The dropdown never needs the whole table, so this pages itself: it returns
+    // `limit` rows matching `q` plus any row in `ids`. Passing the ids of rows
+    // the form already has selected keeps the current selection in the response
+    // even when it does not match the query - without that the picker would lose
+    // its own label the moment the user types.
+    async listSellerOptions(q?: string, ids?: number[], limit = 20) {
+        const pattern = q?.trim() ? `%${q.trim()}%` : undefined;
+        // Mirrors the columns vendor-master already searches, so a GSTIN typed
+        // into the picker behaves like a GSTIN typed into the vendor list.
+        const matches = pattern
+            ? sql`(
+                ${vendorOrganizations.name} ILIKE ${pattern} OR
+                ${vendorOrganizations.alias} ILIKE ${pattern} OR
+                ${vendorOrganizations.pan} ILIKE ${pattern} OR
+                ${vendorOrganizations.msme} ILIKE ${pattern} OR
+                ${vendorOrganizations.address} ILIKE ${pattern} OR
+                exists (
+                    select 1 from ${vendorGsts}
+                    where ${vendorGsts.orgId} = ${vendorOrganizations.id}
+                      and ${vendorGsts.gstNo} ILIKE ${pattern}
+                )
+            )`
+            : undefined;
+        const selected = ids?.length ? inArray(vendorOrganizations.id, ids) : undefined;
+        const either = matches && selected ? or(matches, selected) : (matches ?? selected);
+
+        const conditions: SQL<unknown>[] = [eq(vendorOrganizations.status, true)];
+        if (either) conditions.push(either);
+
+        return this.db
             .select({
                 id: vendorOrganizations.id,
                 name: vendorOrganizations.name,
                 alias: vendorOrganizations.alias,
-                gstNo: vendorGsts.gstNo,
+                // vendor_gsts is 1:N (one org holds 43 rows), so a join fans 482
+                // orgs out to 1251 rows and duplicate ids reach the picker. A
+                // correlated subquery keeps exactly one row per org instead.
+                // NOTE: `${vendorOrganizations}.id` (table + "." + column) is
+                // deliberate. Drizzle renders `${vendorOrganizations.id}` inside a
+                // select-list sql chunk as a bare `"id"`, which the inner FROM
+                // resolves to g.id - so every row returned the same first GST.
+                gstNo: sql<string | null>`(
+                    SELECT g.gst_no FROM ${vendorGsts} g
+                    WHERE g.org_id = ${vendorOrganizations}.id
+                    ORDER BY g.id LIMIT 1
+                )`,
                 msme: vendorOrganizations.msme,
                 pan: vendorOrganizations.pan,
                 address: vendorOrganizations.address,
-                email: vendors.email,
-                mobile: vendors.mobile,
-                contactPerson: vendors.name,
             })
             .from(vendorOrganizations)
-            .leftJoin(vendorGsts, eq(vendorGsts.orgId, vendorOrganizations.id))
-            .leftJoin(vendors, eq(vendors.orgId, vendorOrganizations.id))
-            .where(eq(vendorOrganizations.status, true))
-            .orderBy(asc(vendorOrganizations.name));
+            .where(and(...conditions))
+            .orderBy(asc(vendorOrganizations.name), asc(vendorOrganizations.id))
+            .limit(limit + (ids?.length ?? 0));
+    }
 
-        const merged = new Map<number, (typeof orgRows)[number]>();
-        for (const row of orgRows) {
-            const existing = merged.get(row.id);
-            if (!existing) {
-                merged.set(row.id, row);
-                continue;
-            }
-            if (!existing.gstNo && row.gstNo) existing.gstNo = row.gstNo;
-            if (!existing.email && row.email) existing.email = row.email;
-            if (!existing.mobile && row.mobile) existing.mobile = row.mobile;
-            if (!existing.contactPerson && row.contactPerson) existing.contactPerson = row.contactPerson;
-        }
-
-        return [...merged.values()];
+    // Contact persons for one seller org. Ordered so the same person is always
+    // first; the form auto-selects that row.
+    async listSellerPersons(orgId: number) {
+        return this.db
+            .select({
+                id: vendors.id,
+                name: vendors.name,
+                email: vendors.email,
+                mobile: vendors.mobile,
+            })
+            .from(vendors)
+            .where(eq(vendors.orgId, orgId))
+            .orderBy(asc(vendors.id));
     }
 
     // Ship-to picker reads project_parties only - vendor_organizations never
     // contributes here, so ids from the two tables cannot cross-wire.
-    async listShipToOptions() {
-        const rows = await this.db
+    // Paged the same way listSellerOptions is: `q` rows plus whatever `ids`
+    // the form already holds, so the client never downloads all 129 rows.
+    async listShipToOptions(q?: string, ids?: number[], limit = 20) {
+        const pattern = q?.trim() ? `%${q.trim()}%` : undefined;
+        const matches = pattern
+            ? sql`(
+                ${projectParties.name} ILIKE ${pattern} OR
+                ${projectParties.alias} ILIKE ${pattern} OR
+                ${projectParties.gstNo} ILIKE ${pattern} OR
+                ${projectParties.pan} ILIKE ${pattern} OR
+                ${projectParties.address} ILIKE ${pattern}
+            )`
+            : undefined;
+        const selected = ids?.length ? inArray(projectParties.id, ids) : undefined;
+        const either = matches && selected ? or(matches, selected) : (matches ?? selected);
+
+        const conditions: SQL<unknown>[] = [eq(projectParties.type, "ship_to"), eq(projectParties.isActive, true)];
+        if (either) conditions.push(either);
+
+        return this.db
             .select({
                 id: projectParties.id,
                 name: projectParties.name,
@@ -1675,10 +1680,9 @@ export class PurchaseOrderService {
                 pan: projectParties.pan,
             })
             .from(projectParties)
-            .where(and(eq(projectParties.type, "ship_to"), eq(projectParties.isActive, true)))
-            .orderBy(asc(projectParties.name));
-
-        return rows;
+            .where(and(...conditions))
+            .orderBy(asc(projectParties.name), asc(projectParties.id))
+            .limit(limit + (ids?.length ?? 0));
     }
 
     async activateParty(id: number, source?: string) {
@@ -1728,9 +1732,6 @@ export class PurchaseOrderService {
                 .where(eq(vendorOrganizations.id, id))
                 .returning();
             if (!rows[0]) throw new NotFoundException(`Vendor organization with ID ${id} not found`);
-
-            await this.syncPersonForOrg(id, body);
-            await this.syncGstForOrg(id, body);
 
             return { ...rows[0], type: "seller", source: "vendor_org", isActive: rows[0].status };
         }

@@ -3,6 +3,7 @@ import { DateInput } from "@/components/form/DateInput";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { NumberInput } from "@/components/form/NumberInput";
 import { SelectField } from "@/components/form/SelectField";
+import { AsyncSelectField } from "@/components/form/AsyncSelectField";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +15,8 @@ import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, Table
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
-import { useSellerOptions, useShipToOptions, useCreatePoParty, useProjectInventory } from "@/hooks/api/usePurchaseOrders";
+import { useCreatePoParty, useProjectInventory } from "@/hooks/api/usePurchaseOrders";
+import { useSellerSelectOptions, useShipToSelectOptions } from "@/hooks/useSelectOptions";
 import { useCreateSaleInvoice, useWoBillingData } from "@/hooks/api/useSaleInvoices";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertCircle, ArrowLeft, Building2, Copy, Eye, FileText, ListChecks, Mail, MapPin, Trash2, Truck, UserPlus } from "lucide-react";
@@ -91,8 +93,6 @@ export default function CreateSaleInvoicePage() {
     const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
     const { data: woBillingData, isLoading: isWoDataLoading } = useWoBillingData(projectId);
     const { data: inventoryData } = useProjectInventory(projectId);
-    const { data: sellerRows = [] } = useSellerOptions();
-    const { data: shipToRows = [] } = useShipToOptions();
     const createPartyMutation = useCreatePoParty();
     const createSIMutation = useCreateSaleInvoice();
 
@@ -176,18 +176,24 @@ export default function CreateSaleInvoicePage() {
 
     const itemRow = (index: number) => items[index] ?? {};
 
-    const sellerOptions = useMemo(
-        () => sellerRows.map((p) => ({ id: String(p.id), name: p.alias ? `${p.name} (${p.alias})` : p.name })),
-        [sellerRows]
-    );
-
-    const partyOptions = useMemo(
-        () => shipToRows.map((p) => ({ id: String(p.id), name: p.alias ? `${p.name} (${p.alias})` : p.name })),
-        [shipToRows]
-    );
-
     const selectedSellerId = form.watch("sellerId");
     const selectedPartyId = form.watch("partyId");
+
+    // Server-searched pickers. Each owns its query (debounced inside), and pins
+    // the current id so the row behind it is always in the response no matter
+    // what is typed - otherwise the auto-fill effect below loses its row.
+    const {
+        options: sellerOptions,
+        rows: sellerRows,
+        onSearch: onSellerSearch,
+        isLoading: isSellerLoading,
+    } = useSellerSelectOptions(selectedSellerId);
+    const {
+        options: partyOptions,
+        rows: shipToRows,
+        onSearch: onShipToSearch,
+        isLoading: isShipToLoading,
+    } = useShipToSelectOptions(selectedPartyId);
 
     useEffect(() => {
         if (!selectedSellerId) return;
@@ -547,72 +553,74 @@ export default function CreateSaleInvoicePage() {
                                     isLoading={createPartyMutation.isPending}
                                 />
                                 <p className="text-sm text-muted-foreground mb-4">Select or enter the billing party details</p>
-                                <div className="mb-6">
-                                    <SelectField
-                                        control={form.control}
-                                        name="sellerId"
-                                        label="Select Billing Party"
-                                        options={sellerOptions}
-                                        placeholder="Choose a billing party..."
-                                    />
-                                </div>
-                                {selectedSellerId && selectedSellerId !== "" && (
-                                    <div className="space-y-4">
-                                        <FieldWrapper control={form.control} name="billingCustomerName" label={<><Building2 className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Customer Name <span className="text-destructive">*</span></>}>
-                                            {(field) => <Input {...field} placeholder="Enter customer name" />}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                                  <AsyncSelectField
+                                    control={form.control}
+                                    name="sellerId"
+                                    label="Select Billing Party"
+                                    options={sellerOptions}
+                                    placeholder="Choose a billing party..."
+                                    onSearch={onSellerSearch}
+                                    isLoading={isSellerLoading}
+                                  />
+                                  {selectedSellerId && selectedSellerId !== "" && (
+                                    <>
+                                    <FieldWrapper control={form.control} name="billingCustomerName" label={<><Building2 className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Customer Name <span className="text-destructive">*</span></>}>
+                                        {(field) => <Input {...field} placeholder="Enter customer name" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="billingAddress" label={<><MapPin className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Address <span className="text-destructive">*</span></>}>
+                                        {(field) => <Textarea {...field} placeholder="Enter billing address" rows={3} />}
+                                    </FieldWrapper>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <FieldWrapper control={form.control} name="billingGst" label="GST Number">
+                                            {(field) => (
+                                                <Input
+                                                    {...field}
+                                                    placeholder="e.g. 27ABCDE1234F1Z5"
+                                                    className="font-mono"
+                                                    maxLength={15}
+                                                    onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                                />
+                                            )}
                                         </FieldWrapper>
-                                        <FieldWrapper control={form.control} name="billingAddress" label={<><MapPin className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Address <span className="text-destructive">*</span></>}>
-                                            {(field) => <Textarea {...field} placeholder="Enter billing address" rows={3} />}
+                                        <FieldWrapper control={form.control} name="billingEmail" label={<><Mail className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Email</>}>
+                                            {(field) => <Input {...field} type="email" placeholder="billing@example.com" />}
                                         </FieldWrapper>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                            <FieldWrapper control={form.control} name="billingGst" label="GST Number">
-                                                {(field) => (
-                                                    <Input
-                                                        {...field}
-                                                        placeholder="e.g. 27ABCDE1234F1Z5"
-                                                        className="font-mono"
-                                                        maxLength={15}
-                                                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                                                    />
-                                                )}
-                                            </FieldWrapper>
-                                            <FieldWrapper control={form.control} name="billingEmail" label={<><Mail className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Email</>}>
-                                                {(field) => <Input {...field} type="email" placeholder="billing@example.com" />}
-                                            </FieldWrapper>
-                                            <FieldWrapper control={form.control} name="billingPanNo" label="PAN Number">
-                                                {(field) => (
-                                                    <Input
-                                                        {...field}
-                                                        placeholder="e.g. ABCDE1234F"
-                                                        className="font-mono"
-                                                        maxLength={10}
-                                                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                                                    />
-                                                )}
-                                            </FieldWrapper>
-                                            <FieldWrapper control={form.control} name="billingMsmeNo" label="MSME Number">
-                                                {(field) => (
-                                                    <Input
-                                                        {...field}
-                                                        placeholder="e.g. UDYAM-XX-00-0000000"
-                                                        className="font-mono"
-                                                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                                                    />
-                                                )}
-                                            </FieldWrapper>
-                                            <FieldWrapper control={form.control} name="billingCinNo" label={<><Building2 className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />CIN Number</>}>
-                                                {(field) => (
-                                                    <Input
-                                                        {...field}
-                                                        placeholder="e.g. U74999KA2020PTC123456"
-                                                        className="font-mono"
-                                                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                                                    />
-                                                )}
-                                            </FieldWrapper>
-                                        </div>
+                                        <FieldWrapper control={form.control} name="billingPanNo" label="PAN Number">
+                                            {(field) => (
+                                                <Input
+                                                    {...field}
+                                                    placeholder="e.g. ABCDE1234F"
+                                                    className="font-mono"
+                                                    maxLength={10}
+                                                    onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="billingMsmeNo" label="MSME Number">
+                                            {(field) => (
+                                                <Input
+                                                    {...field}
+                                                    placeholder="e.g. UDYAM-XX-00-0000000"
+                                                    className="font-mono"
+                                                    onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="billingCinNo" label={<><Building2 className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />CIN Number</>}>
+                                            {(field) => (
+                                                <Input
+                                                    {...field}
+                                                    placeholder="e.g. U74999KA2020PTC123456"
+                                                    className="font-mono"
+                                                    onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                                />
+                                            )}
+                                        </FieldWrapper>
                                     </div>
-                                )}
+                                    </>
+                                  )}
+                                </div>
                             </div>
 
                             <div className="border rounded-lg border-sidebar-primary-foreground border-dashed p-4 w-full md:w-1/2">
@@ -635,49 +643,51 @@ export default function CreateSaleInvoicePage() {
                                     isLoading={createPartyMutation.isPending}
                                 />
                                 <p className="text-sm text-muted-foreground mb-4">Delivery destination information</p>
-                                <div className="mb-6">
-                                    <SelectField
-                                        control={form.control}
-                                        name="partyId"
-                                        label="Select Shipping Destination"
-                                        options={partyOptions}
-                                        placeholder="Choose shipping destination..."
-                                    />
-                                </div>
-                                {selectedPartyId && selectedPartyId !== "" && (
-                                    <div className="space-y-4">
-                                        <FieldWrapper control={form.control} name="shippingCustomerName" label={<><Building2 className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Customer Name <span className="text-destructive">*</span></>}>
-                                            {(field) => <Input {...field} placeholder="Enter customer name" />}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                                  <AsyncSelectField
+                                    control={form.control}
+                                    name="partyId"
+                                    label="Select Shipping Destination"
+                                    options={partyOptions}
+                                    placeholder="Choose shipping destination..."
+                                    onSearch={onShipToSearch}
+                                    isLoading={isShipToLoading}
+                                  />
+                                  {selectedPartyId && selectedPartyId !== "" && (
+                                    <>
+                                    <FieldWrapper control={form.control} name="shippingCustomerName" label={<><Building2 className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Customer Name <span className="text-destructive">*</span></>}>
+                                        {(field) => <Input {...field} placeholder="Enter customer name" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="shippingAddress" label={<><MapPin className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Address <span className="text-destructive">*</span></>}>
+                                        {(field) => <Textarea {...field} placeholder="Enter shipping address" rows={3} />}
+                                    </FieldWrapper>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <FieldWrapper control={form.control} name="shippingGst" label="GST Number">
+                                            {(field) => (
+                                                <Input
+                                                    {...field}
+                                                    placeholder="e.g. 27ABCDE1234F1Z5"
+                                                    className="font-mono"
+                                                    maxLength={15}
+                                                    onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                                />
+                                            )}
                                         </FieldWrapper>
-                                        <FieldWrapper control={form.control} name="shippingAddress" label={<><MapPin className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Address <span className="text-destructive">*</span></>}>
-                                            {(field) => <Textarea {...field} placeholder="Enter shipping address" rows={3} />}
+                                        <FieldWrapper control={form.control} name="shippingPanNo" label="PAN Number">
+                                            {(field) => (
+                                                <Input
+                                                    {...field}
+                                                    placeholder="e.g. ABCDE1234F"
+                                                    className="font-mono"
+                                                    maxLength={10}
+                                                    onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                                />
+                                            )}
                                         </FieldWrapper>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                            <FieldWrapper control={form.control} name="shippingGst" label="GST Number">
-                                                {(field) => (
-                                                    <Input
-                                                        {...field}
-                                                        placeholder="e.g. 27ABCDE1234F1Z5"
-                                                        className="font-mono"
-                                                        maxLength={15}
-                                                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                                                    />
-                                                )}
-                                            </FieldWrapper>
-                                            <FieldWrapper control={form.control} name="shippingPanNo" label="PAN Number">
-                                                {(field) => (
-                                                    <Input
-                                                        {...field}
-                                                        placeholder="e.g. ABCDE1234F"
-                                                        className="font-mono"
-                                                        maxLength={10}
-                                                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                                                    />
-                                                )}
-                                            </FieldWrapper>
-                                        </div>
                                     </div>
-                                )}
+                                    </>
+                                  )}
+                                </div>
                             </div>
                         </div>
 

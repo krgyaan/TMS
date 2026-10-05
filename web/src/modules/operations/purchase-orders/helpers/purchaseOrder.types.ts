@@ -23,6 +23,9 @@ export interface CreatePurchaseOrderDTO {
     contactPersonName?: string;
     contactPersonPhone?: string;
     contactPersonEmail?: string;
+    vendorContactPersonName?: string;
+    vendorContactPersonPhone?: string;
+    vendorContactPersonEmail?: string;
     certRecipients?: number[];
     shipToName: string;
     shippingAddress: string;
@@ -69,9 +72,13 @@ export interface SellerOption {
     msme?: string | null;
     pan?: string | null;
     address?: string | null;
+}
+
+export interface SellerPersonOption {
+    id: number;
+    name?: string | null;
     email?: string | null;
     mobile?: string | null;
-    contactPerson?: string | null;
 }
 
 export interface ShipToOption {
@@ -142,6 +149,9 @@ export interface UpdatePurchaseOrderDTO {
     contactPersonName?: string;
     contactPersonPhone?: string;
     contactPersonEmail?: string;
+    vendorContactPersonName?: string;
+    vendorContactPersonPhone?: string;
+    vendorContactPersonEmail?: string;
     certRecipients?: number[];
     shipToName: string;
     shippingAddress: string;

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "maple",
+  "name": "Tender Management System",
+  "colors": {
+    "primary": "#FF6900",
+    "light": "#FF8A3D",
+    "dark": "#D94F00"
+  },
+  "favicon": {
+    "light": "/tms-docs/images/logo.svg",
+    "dark": "/tms-docs/images/logo.svg"
+  },
+  "navigation": {
+    "pages": [
+      {
+        "group": "Getting Started",
+        "pages": [
+          "index",
+          "quickstart"
+        ]
+      }
+    ]
+  },
+  "logo": {
+    "light": "/tms-docs/images/dark-ve-logo.png",
+    "dark": "/tms-docs/images/ve_logo.png"
+  },
+  "icons": {
+    "library": "fontawesome"
+  },
+  "background": {
+    "decoration": "grid"
+  },
+  "fonts": {
+    "family": "Geist"
+  },
+  "contextual": {
+    "options": [
+      "download-pdf",
+      "chatgpt",
+      "claude"
+    ],
+    "display": "header"
+  },
+  "search": {
+    "prompt": "Ask"
+  }
+}

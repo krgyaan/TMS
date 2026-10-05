@@ -579,6 +579,13 @@
     {
       "idx": 106,
       "version": "7",
+      "when": 1794001000000,
+      "tag": "0150_split_vendor_and_our_contact_person",
+      "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
       "when": 1795000000000,
       "tag": "0150_po_vwo_closure_note_closed_by",
       "breakpoints": true

@@ -174,6 +174,14 @@ export function VWOFormPreview({
                 <td colSpan={2} className="p-4 w-1/2 align-top">
                   <strong>Vendor Details:</strong><br />
                   {formValues.sellerName || "—"}<br />
+                  {formValues.vendorContactPersonName ? (
+                    <>
+                      Contact Person: {formValues.vendorContactPersonName}
+                      {formValues.vendorContactPersonPhone ? ` | ${formValues.vendorContactPersonPhone}` : ""}
+                      {formValues.vendorContactPersonEmail ? ` | ${formValues.vendorContactPersonEmail}` : ""}
+                      <br />
+                    </>
+                  ) : null}
                   {formValues.sellerAddress || "—"}<br />
                   PAN No.: {formValues.sellerPanNo || "—"}<br />
                   GST No.: {formValues.sellerGstNo || "—"}<br />

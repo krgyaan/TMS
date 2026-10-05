@@ -236,13 +236,25 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
                                     <TableCell className="text-sm font-medium text-muted-foreground">CIN</TableCell>
                                     <TableCell className="text-sm">{data.sellerCinNo || '—'}</TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">Contact Person</TableCell>
-                                    <TableCell className="text-sm">{data.contactPersonName || '—'}</TableCell>
+                                    <TableCell className="text-sm">{data.vendorContactPersonName || '—'}</TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">Contact Phone</TableCell>
-                                    <TableCell className="text-sm">{data.contactPersonPhone || '—'}</TableCell>
+                                    <TableCell className="text-sm">{data.vendorContactPersonPhone || '—'}</TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">Contact Email</TableCell>
-                                    <TableCell className="text-sm">{data.contactPersonEmail || '—'}</TableCell>
+                                    <TableCell className="text-sm">{data.vendorContactPersonEmail || '—'}</TableCell>
+                                </TableRow>
+
+                                <SectionHeader title="Our Contact Person" />
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Name</TableCell>
+                                    <TableCell className="text-sm">{data.contactPersonName || '—'}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Phone</TableCell>
+                                    <TableCell className="text-sm">{data.contactPersonPhone || '—'}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Email</TableCell>
+                                    <TableCell className="text-sm" colSpan={3}>{data.contactPersonEmail || '—'}</TableCell>
                                 </TableRow>
 
                                 <SectionHeader title="Ship-to Information" />
