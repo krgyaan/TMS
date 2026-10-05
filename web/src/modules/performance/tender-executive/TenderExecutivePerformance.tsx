@@ -756,108 +756,106 @@ export default function TenderExecutivePerformance() {
                             </div>
 
                             <div>
-                                <div className="overflow-x-auto">
-                                    <Table className="min-w-[1000px] border-collapse">
-                                        <TableHeader className="bg-muted/30">
-                                            <TableRow className="hover:bg-muted/30 border-b border-border/60">
-                                                <TableHead className="w-[150px] font-bold text-foreground bg-muted/30 sticky left-0 z-10 border-r">Metric / Stage</TableHead>
-                                                {STAGES.map((stage, i) => (
-                                                    <TableHead key={i} className="text-center text-xs uppercase font-semibold text-muted-foreground w-[90px]">
-                                                        <div className="flex items-center justify-center gap-1">
-                                                            {formatLabel(stage)}
-                                                            {/* <Tooltip>
-                                                        <TooltipTrigger>
-                                                            <Info className="h-3 w-3 text-muted-foreground" />
-                                                        </TooltipTrigger>
-                                                        <TooltipContent>
-                                                            <p className="text-xs max-w-xs">{STAGE_HELP_TEXT[stage] ?? "No description available"}</p>
-                                                        </TooltipContent>
-                                                    </Tooltip> */}
-                                                        </div>
-                                                    </TableHead>
-                                                ))}
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {STAGE_MATRIX.map((row, i) => {
-                                                const rowType = STAGE_ROW_TYPE_MAP[row.key];
-                                                return (
-                                                    <TableRow
-                                                        key={i}
+                                <Table className="w-full table-fixed border-collapse">
+                                    <TableHeader className="bg-muted/30">
+                                        <TableRow className="hover:bg-muted/30 border-b border-border/60">
+                                            <TableHead className="w-[120px] px-2 font-bold text-foreground bg-muted/30 sticky left-0 z-10 border-r">Metric / Stage</TableHead>
+                                            {STAGES.map((stage, i) => (
+                                                <TableHead key={i} className="px-1 text-center text-xs uppercase font-semibold text-muted-foreground break-words">
+                                                    <div className="flex items-center justify-center gap-1 break-words text-center leading-tight">
+                                                        {formatLabel(stage)}
+                                                        {/* <Tooltip>
+                                                    <TooltipTrigger>
+                                                        <Info className="h-3 w-3 text-muted-foreground" />
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <p className="text-xs max-w-xs">{STAGE_HELP_TEXT[stage] ?? "No description available"}</p>
+                                                    </TooltipContent>
+                                                </Tooltip> */}
+                                                    </div>
+                                                </TableHead>
+                                            ))}
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {STAGE_MATRIX.map((row, i) => {
+                                            const rowType = STAGE_ROW_TYPE_MAP[row.key];
+                                            return (
+                                                <TableRow
+                                                    key={i}
+                                                    className={`
+                                        ${row.label === "Approved" ? "bg-primary/5" : ""} 
+                                        hover:bg-muted/20
+                                    `}
+                                                >
+                                                    <TableCell
                                                         className={`
-                                            ${row.label === "Approved" ? "bg-primary/5" : ""} 
-                                            hover:bg-muted/20
+                                            font-semibold sticky left-0 z-10 border-r bg-background
+                                            ${rowType === "info" ? "text-primary" : ""}
+                                            ${rowType === "success" ? "text-emerald-600" : ""}
+                                            ${rowType === "warning" ? "text-amber-600" : ""}
+                                            ${rowType === "destructive" ? "text-destructive" : ""}
                                         `}
                                                     >
-                                                        <TableCell
-                                                            className={`
-                                                font-semibold sticky left-0 z-10 border-r bg-background
-                                                ${rowType === "info" ? "text-primary" : ""}
-                                                ${rowType === "success" ? "text-emerald-600" : ""}
-                                                ${rowType === "warning" ? "text-amber-600" : ""}
-                                                ${rowType === "destructive" ? "text-destructive" : ""}
-                                            `}
-                                                        >
-                                                            <div className="flex items-center gap-2">
-                                                                {row.label}
-                                                                <Tooltip>
-                                                                    <TooltipTrigger>
-                                                                        <Info className="h-3 w-3 text-muted-foreground" />
-                                                                    </TooltipTrigger>
-                                                                    <TooltipContent>
-                                                                        <p className="text-xs">{ROW_HELP_TEXT[row.key] ?? ""}</p>
-                                                                    </TooltipContent>
-                                                                </Tooltip>
-                                                            </div>
+                                                        <div className="flex items-center gap-2">
+                                                            {row.label}
+                                                            <Tooltip>
+                                                                <TooltipTrigger>
+                                                                    <Info className="h-3 w-3 text-muted-foreground" />
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>
+                                                                    <p className="text-xs">{ROW_HELP_TEXT[row.key] ?? ""}</p>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        </div>
+                                                    </TableCell>
+                                                    {row.data.map((val, j) => (
+                                                        <TableCell key={j} className="text-center p-1.5">
+                                                            {val !== null ? (
+                                                                (() => {
+                                                                    const drilldown = row.drilldown[j] ?? [];
+                                                                    const tenders = drilldown.map(item => ({
+                                                                        tenderId: item.tenderId,
+                                                                        tenderNo: item.tenderNo ?? `Tender #${item.tenderId}`,
+                                                                        tenderName: item.tenderName ?? "Tender name unavailable",
+                                                                        value: item.value ?? 0,
+                                                                        date: item.completedAt ?? item.deadline ?? null,
+                                                                        status: item.status ?? null,
+                                                                    }));
+
+                                                                    return (
+                                                                        <ScoreDrilldownPopover
+                                                                            title={`${row.label} · ${formatLabel(STAGES[j])}`}
+                                                                            tenders={tenders}
+                                                                            trigger={
+                                                                                <div
+                                                                                    className={`
+                                                                                    mx-auto flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-sm font-bold
+                                                                                    ${rowType === "success" ? "bg-emerald-100/70 text-emerald-700" : ""}
+                                                                                    ${rowType === "completed" ? "bg-green-100/70 text-green-700" : ""}
+                                                                                    ${rowType === "warning" ? "bg-amber-100/70 text-amber-700" : ""}
+                                                                                    ${rowType === "info" ? "bg-sky-100/70 text-sky-700" : ""}
+                                                                                    ${rowType === "destructive" ? "bg-destructive/10 text-destructive" : ""}
+                                                                                    ${rowType === "default" ? "bg-muted text-muted-foreground" : ""}
+                                                                                `}
+                                                                                >
+                                                                                    {val}
+                                                                                </div>
+                                                                            }
+                                                                        />
+                                                                    );
+                                                                })()
+                                                            ) : (
+                                                                <span className="text-muted-foreground/20 text-xl">·</span>
+                                                            )}
                                                         </TableCell>
-                                                        {row.data.map((val, j) => (
-                                                            <TableCell key={j} className="text-center p-2">
-                                                                {val !== null ? (
-                                                                    (() => {
-                                                                        const drilldown = row.drilldown[j] ?? [];
-                                                                        const tenders = drilldown.map(item => ({
-                                                                            tenderId: item.tenderId,
-                                                                            tenderNo: item.tenderNo ?? `Tender #${item.tenderId}`,
-                                                                            tenderName: item.tenderName ?? "Tender name unavailable",
-                                                                            value: item.value ?? 0,
-                                                                            date: item.completedAt ?? item.deadline ?? null,
-                                                                            status: item.status ?? null,
-                                                                        }));
+                                                    ))}
+                                                </TableRow>
+                                            );
+                                        })}
 
-                                                                        return (
-                                                                            <ScoreDrilldownPopover
-                                                                                title={`${row.label} · ${formatLabel(STAGES[j])}`}
-                                                                                tenders={tenders}
-                                                                                trigger={
-                                                                                    <div
-                                                                                        className={`
-                                                                                        mx-auto flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-sm font-bold
-                                                                                        ${rowType === "success" ? "bg-emerald-100/70 text-emerald-700" : ""}
-                                                                                        ${rowType === "completed" ? "bg-green-100/70 text-green-700" : ""}
-                                                                                        ${rowType === "warning" ? "bg-amber-100/70 text-amber-700" : ""}
-                                                                                        ${rowType === "info" ? "bg-sky-100/70 text-sky-700" : ""}
-                                                                                        ${rowType === "destructive" ? "bg-destructive/10 text-destructive" : ""}
-                                                                                        ${rowType === "default" ? "bg-muted text-muted-foreground" : ""}
-                                                                                    `}
-                                                                                    >
-                                                                                        {val}
-                                                                                    </div>
-                                                                                }
-                                                                            />
-                                                                        );
-                                                                    })()
-                                                                ) : (
-                                                                    <span className="text-muted-foreground/20 text-xl">·</span>
-                                                                )}
-                                                            </TableCell>
-                                                        ))}
-                                                    </TableRow>
-                                                );
-                                            })}
-
-                                        </TableBody>
+                                    </TableBody>
                                     </Table>
-                                </div>
                             </div>
                         </div>
                             </>
