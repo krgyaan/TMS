@@ -3,7 +3,6 @@ import { and, eq, inArray, between, lte, desc, sql, gte } from "drizzle-orm";
 import { PerformanceQueryDto } from "./zod/performance-query.dto";
 import { StagePerformance } from "./zod/stage-performance.type";
 import { TenderInfo, tenderInfos } from "@db/schemas/tendering/tenders.schema";
-// import { timer } from "@db/schemas/workflow/timer.schema";
 import { timerTrackers } from "@db/schemas/workflow/timer.schema";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
@@ -49,7 +48,6 @@ function resolvePeriod(type: "MONTH" | "QUARTER" | "FY", year: number, month?: n
         return { from, to, label: `Q${quarter} ${year}` };
     }
 
-    // FY (Apr–Mar)
     const from = new Date(Date.UTC(year, 3, 1));
     const to = new Date(Date.UTC(year + 1, 2, 31, 23, 59, 59));
     return { from, to, label: `FY ${year}-${year + 1}` };
@@ -90,15 +88,12 @@ interface StageDrilldownItem {
     tenderNo?: string;
     tenderName?: string;
 
-    // Common
     stageKey: string;
 
-    // Timing
     deadline?: Date | null;
     completedAt?: Date | null;
     daysOverdue?: number | null;
 
-    // Stage-specific (optional)
     meta?: Record<string, any>;
 
     value?: number;
@@ -118,46 +113,25 @@ function getWeekNumber(date: Date): number {
 }
 
 function mapStatusToKpi(statusCode: number): TenderKpiBucket {
-    // WON
     if ([25, 26, 27, 28].includes(statusCode)) return "WON";
 
-    // LOST
     if ([18, 21, 22, 24].includes(statusCode)) return "LOST";
 
-    // DISQUALIFIED
     if ([33, 38, 39, 41].includes(statusCode)) return "DISQUALIFIED";
 
-    // MISSED (subset of DNB)
     if ([8, 16, 36].includes(statusCode)) return "MISSED";
 
-    // REJECTED (Other DNB)
     if ([9, 10, 11, 12, 13, 14, 15, 31, 32, 34, 35].includes(statusCode)) return "REJECTED";
 
-    // BID DONE, RESULT NOT YET
     if ([17, 19, 20, 23, 37, 40].includes(statusCode)) return "RESULT_AWAITED";
 
-    // PRE-BID PENDING
     if ([1, 2, 3, 4, 5, 6, 7, 29, 30].includes(statusCode)) return "PENDING";
 
-    // Fallback
     return "ALLOCATED";
 }
 
-/* ================================================================
-   PERIOD BOUNDARIES
-
-   The query schemas coerce a bare `YYYY-MM-DD` into a Date at UTC
-   midnight, and several methods also appended an explicit `Z` when
-   building their own boundaries. Either way every comparison ran
-   05:30 off against real India-local dates.
-
-   Asia/Calcutta observes no DST, so a fixed +05:30 offset is exact and
-   avoids a zone lookup. `getStageBacklogV2` already used
-   `AT TIME ZONE 'Asia/Calcutta'` for the same reason.
-   ================================================================ */
 const APP_OFFSET = "+05:30";
 
-/** Local-midnight-to-local-end-of-day bounds for a `YYYY-MM-DD` pair. */
 function istDayBounds(fromDate: string, toDate: string): { start: Date; end: Date } {
     return {
         start: new Date(`${fromDate}T00:00:00${APP_OFFSET}`),
@@ -208,35 +182,17 @@ function resolveEmdFinancialState(instrumentType: string, action: number | null)
 }
 const TERMINAL_KPI: TenderKpiBucket[] = ["WON", "LOST", "DISQUALIFIED", "MISSED", "REJECTED"];
 
-/* `statuses.tender_category` values that mark a tender as already resolved. The backlog
-   bid queries exclude exactly these two, since a won or lost tender belongs to no
-   outcome column. */
 function isResolvedTender(tenderCategory?: string | null) {
     return tenderCategory === "won" || tenderCategory === "lost";
 }
 
-/**
- * The deadline that grades a stage.
- *
- * A timer row carries the authoritative deadline, already extended by any granted
- * extension, so it wins over the tender's due date. Falls back to the stage's own
- * resolution when the timer has none.
- */
 function timerDeadline(timerRow: { deadlineAt?: Date | string | null } | undefined, stage: (typeof STAGE_CONFIG)[number], tender: TenderInfo): Date | null {
     const deadline = timerRow?.deadlineAt ?? stage.resolveDeadline(tender);
     return deadline ? new Date(deadline) : null;
 }
 
-/** The three point-in-time flags for a timer-driven stage's source table. */
 type StageArtifactFlags = { exists: boolean; inPeriod: boolean; byEnd: boolean };
 
-/**
- * Everything the stage loop needs about one tender, beyond the tender row itself.
- *
- * Mostly stage artifact flags keyed by stageKey, plus the approval facts the bid
- * guard reads. It is a loose record because the flags come back from a raw query
- * under generated keys; `artifactOf` is the typed way in.
- */
 type TenderFacts = Record<string, StageArtifactFlags | boolean | string | null | undefined>;
 
 function artifactOf(facts: TenderFacts | undefined, stageKey: string): StageArtifactFlags | undefined {
@@ -244,7 +200,6 @@ function artifactOf(facts: TenderFacts | undefined, stageKey: string): StageArti
     return value && typeof value === "object" ? value : undefined;
 }
 
-/** Narrow a loose raw-query value to the string it may be, for the category comparisons. */
 function factString(value: unknown): string | null {
     return typeof value === "string" ? value : null;
 }
@@ -263,18 +218,8 @@ export class TenderExecutiveService {
         private readonly db: DbInstance
     ) {}
 
-    /**
-     * STEP 1:
-     * - Validate user
-     * - Resolve date range
-     * - Count tenders
-     */
     async getContext(query: PerformanceQueryDto) {
         const { userId, fromDate, toDate } = query;
-
-        // TODO:
-        // 1. Fetch user (users table)
-        // 2. Count tenders assigned to user in date range
 
         return {
             user: {
@@ -287,59 +232,21 @@ export class TenderExecutiveService {
         };
     }
 
-    /**
-     * CORE ENGINE
-     * Produces normalized stage-level performance
-     */
     async getStagePerformance(query: PerformanceQueryDto): Promise<StagePerformance[]> {
         const { userId, fromDate, toDate } = query;
 
         const activeStages = getExecutiveStages();
 
-        /* =====================================================
-       STEP 0: Period bounds (point-in-time)
-
-       The matrix is a snapshot measured AS OF the end of the selected
-       period, so stage states below are judged against `period.end`, not
-       against now.
-
-       Population is every tender assigned on or before the period end,
-       NOT only those assigned during it. A two-sided
-       `created_at BETWEEN period.start AND period.end` window excluded
-       carry-in work: tenders 4572 (assigned 03 Sep) and 4639 (10 Sep)
-       both hold a completed `bid_submission` timer, yet the matrix
-       reported Done 0 for Bid Submission while the backlog table below it
-       correctly reported 2. Each stage now decides relevance for itself
-       (see STEP 3), which is the same opening-plus-inflow basis the
-       backlog tables use.
-
-       One stage is the exception: `tender_info_sheet` is scoped to the
-       tenders BORN inside the window (created_at within [start, end]),
-       which is the cohort its own timer measures. Tender 4551 (born 01
-       Sep) therefore drops to Not Applicable in a 13-19 Sep window even
-       though its sheet was submitted on the 17th. That is deliberate — it
-       keeps the matrix column reading one cohort by one rule. Note it no
-       longer ties back to the backlog's Tender Assignment row, which still
-       counts carry-in tenders. See its branch in STEP 4.
-     ===================================================== */
         const period = istDayBounds(fromDate.toISOString().slice(0, 10), toDate.toISOString().slice(0, 10));
         const periodEnd = period.end;
         const periodStart = period.start;
 
-        /* True when the row exists and was created on or before the period end. A row with no
-           created_at is treated as existing, since older data may predate the column. */
         const existedByPeriod = (row?: { createdAt?: Date | string | null } | null) => {
             if (!row) return false;
             if (!row.createdAt) return true;
             return new Date(row.createdAt) <= periodEnd;
         };
 
-        /* =====================================================
-       STEP 1: Fetch tenders
-    ===================================================== */
-
-        /* Tenders assigned on or before the period end. The lower bound is deliberately
-           absent: stages are allowed to reach back into carry-in work. */
         const tenders = await this.db
             .select()
             .from(tenderInfos)
@@ -349,21 +256,8 @@ export class TenderExecutiveService {
 
         const tenderIds = tenders.map(t => t.id);
 
-        /* =====================================================
-       STEP 2: Fetch timers
-    ===================================================== */
-
         const timerNames = activeStages.filter(s => s.type === "timer" && s.timerName).map(s => s.timerName!);
 
-        /* Timers are matched on (entityId, stage) alone, never on the assignee.
-           `unique_active_timer(entity_type, entity_id, stage)` guarantees exactly one
-           timer per tender per stage, so an assignee filter could never disambiguate
-           anything — it could only drop rows. It did exactly that: tender 4551's
-           info-sheet timer (id 19284) carries assigned_user_id = 8 while the tender
-           belongs to team_member 41, so the row vanished and the tender could not be
-           graded in EITHER report, because user 8's population excludes tender 4551
-           and user 41's population excluded its own timer. The same happened to 4685's
-           RFQ timer (assigned to user 15). */
         const timers = await this.db
             .select()
             .from(timerTrackers)
@@ -374,36 +268,6 @@ export class TenderExecutiveService {
             timerMap.set(`${t.entityId}:${t.stage}`, t);
         }
 
-        /* =====================================================
-       STEP 2b: Stage artifacts (domain)
-
-       For every stage EXCEPT `tender_info_sheet`: COUNTS come from the
-       domain tables, TIMING comes from the timers.
-
-       Timing from the timers was previously the only option and proved to
-       be the weaker record — tender 4685's info-sheet timer was backfilled
-       with started_at/ended_at of 24 Sep while the sheet itself was created
-       on 18 Sep, and the RFQ timers show 0 completions inside the window
-       against 6 `rfqs` rows. Counting from the domain tables reproduced the
-       backlog for those stages:
-
-         bid submission done 2 / missed 1 / pending 15
-
-       `tender_info_sheet` is now deliberately switched over to the timer
-       as the sole authority for both membership and grade. That stage's
-       timer is written in the same insert as tender_infos.created_at, so
-       its started_at/ended_at/deadline_at are a complete and consistent
-       record of the stage. The RFQ caveat above does not apply to it and is
-       unchanged for every other stage.
-
-       Every comparison is emitted as a boolean so the application layer
-       never has to interpret a timestamp string. The date columns are not
-       homogeneous, so each one gets the boundary flavour it needs:
-         - `timestamptz` columns  -> fromTz / toTz
-         - `tender_infos.tl_approval_timestamp` is UTC wall clock -> fromUtc / toUtc
-         - `tender_information.created_at` is local wall clock  -> fromLocal / toLocal
-     ===================================================== */
-
         const APP_ZONE = `'Asia/Calcutta'`;
         const fromDay = fromDate.toISOString().slice(0, 10);
         const toDay = toDate.toISOString().slice(0, 10);
@@ -413,13 +277,11 @@ export class TenderExecutiveService {
         const fromLocal = `(DATE '${fromDay}' + TIME '00:00:00')`;
         const toLocal = `(DATE '${toDay}' + TIME '23:59:59.999')`;
 
-        /** `exists` / `done during` / `done by end` flags for one stage's source table. */
         const artifactFlags = (key: string, table: string, alias: string, columnExpr: string, from: string, to: string, extra = "") => `
             EXISTS (SELECT 1 FROM ${table} ${alias} WHERE ${alias}.tender_id = ti.id ${extra}) AS "${key}Exists",
             EXISTS (SELECT 1 FROM ${table} ${alias} WHERE ${alias}.tender_id = ti.id ${extra} AND ${columnExpr} BETWEEN ${from} AND ${to}) AS "${key}In",
             EXISTS (SELECT 1 FROM ${table} ${alias} WHERE ${alias}.tender_id = ti.id ${extra} AND ${columnExpr} <= ${to}) AS "${key}ByEnd"`;
 
-        /** Raw row shape returned by the stage-artifact query. The `*Exists`/`*In`/`*ByEnd` triples are generated per stage, so they are indexed by key. */
         type ArtifactRow = Record<string, string | number | boolean | null> & { id: number };
 
         const artifactRows = (await this.db.execute(sql.raw(`
@@ -442,7 +304,6 @@ export class TenderExecutiveService {
             WHERE ti.id IN (${tenderIds.join(",")})
         `))).rows as ArtifactRow[];
 
-        /** Per tender: stage artifact flags plus the approval facts the bid guard needs. */
         const artifactMap = new Map<number, TenderFacts>();
 
         const ARTIFACT_STAGE: Record<string, string> = {
@@ -471,21 +332,6 @@ export class TenderExecutiveService {
             artifactMap.set(Number(row.id), facts);
         }
 
-        /* =====================================================
-       STEP 2c: "Still in play" guard
-
-       A stage is relevant to a tender only while the work can still move.
-       These guards mirror the backlog queries (getStageBacklogV2) so both
-       tables measure the same population:
-
-         - info sheet: has a sheet at some point, or is still freshly
-           allocated (status 1). This reproduces pending = 6 exactly; a
-           plain non-terminal-status test returns 0 and is wrong.
-         - bid submission: approved, and not already won or lost.
-         - everything else: has reached the stage, or the tender is still
-           in a non-terminal state.
-       ===================================================== */
-
         const guardFor = (stageKey: string, tender: TenderInfo, facts: TenderFacts, artifact: StageArtifactFlags | undefined, isTerminal: boolean) => {
             if (stageKey === "bid_submission") return Boolean(facts.tlApproved) && Boolean(facts.approvedByEnd) && !isResolvedTender(factString(facts.tenderCategory));
 
@@ -495,30 +341,20 @@ export class TenderExecutiveService {
             return artifact.exists || !isTerminal;
         };
 
-        /* =====================================================
-       STEP 3: Fetch existence-based data (BULK)
-    ===================================================== */
-
         const resultsRows = await this.db.select().from(tenderResults).where(inArray(tenderResults.tenderId, tenderIds));
 
         const resultMap = new Map<number, (typeof resultsRows)[number]>();
         resultsRows.forEach(r => resultMap.set(Number(r.tenderId), r));
 
-        // TQ
         const tqs = await this.db.select().from(tenderQueries).where(inArray(tenderQueries.tenderId, tenderIds));
 
         const tqMap = new Map<number, (typeof tqs)[number]>();
         tqs.forEach(tq => tqMap.set(Number(tq.tenderId), tq));
 
-        // RA
         const raResults = await this.db.select().from(reverseAuctions).where(inArray(reverseAuctions.tenderId, tenderIds));
 
         const raMap = new Map<number, (typeof raResults)[number]>();
         raResults.forEach(ra => raMap.set(Number(ra.tenderId), ra));
-
-        /* =====================================================
-       STEP 4: Normalize stage performance
-    ===================================================== */
 
         const output: StagePerformance[] = [];
 
@@ -535,38 +371,8 @@ export class TenderExecutiveService {
                 let startTime: Date | null = null;
                 let endTime: Date | null = null;
 
-                /* The timer row. For tender_info_sheet it is the sole authority for membership AND
-                   grade (see its branch below). For every other stage it is the authority
-                   for TIMING only: it is read before the stage is judged because a recorded
-                   timer is itself evidence that the stage applied, but it does not decide
-                   the counts — `isApplicable` reads nullable columns (rfq_to, emd) and the
-                   timers are a lossy record (see STEP 2b). */
                 const timerRow = stage.type === "timer" && stage.timerName ? timerMap.get(`${tender.id}:${stage.timerName}`) : undefined;
 
-                /* ---------- TENDER INFO SHEET ----------
-                   Graded entirely off the `tender_info_sheet` timer, snapshot as of
-                   the period end:
-
-                     completed & ended_at <= deadline_at  -> Done + On Time
-                     completed & ended_at >  deadline_at  -> Done + Late
-                     still open at period end,
-                       deadline_at >= periodEnd          -> Pending
-                       deadline_at <  periodEnd          -> Overdue
-
-                   Membership is "the tender was born inside the window".
-                   tender_infos.created_at and timer.started_at are the same instant
-                   by construction (they land 0.3 ms apart, written in the same
-                   insert), so either one scopes the cohort. The tender's own
-                   created_at is used because it is the domain record of when the
-                   tender entered the report and is immune to the one known
-                   divergence: tender 4685's info-sheet timer was backfilled to
-                   started/ended 24 Sep against a sheet created 18 Sep. Reading
-                   the timer here means 4685 still reads as open at the period end
-                   and lands in Pending rather than being dropped to N/A.
-
-                   "Still open" is judged as of periodEnd, never as of today: a
-                   timer completed on 21 Sep was running on 19 Sep, and grading
-                   that as Done would let a later period's work inflate this one. */
                 if (stage.stageKey === "tender_info_sheet") {
                     const deadlineAt = timerDeadline(timerRow, stage, tender);
                     const startedAt = timerRow?.startedAt ? new Date(timerRow.startedAt) : null;
@@ -576,7 +382,6 @@ export class TenderExecutiveService {
 
                     if (deadlineAt !== null && createdAt !== null && createdAt >= periodStart && createdAt <= periodEnd) {
                         const endedAt = timerRow?.endedAt ? new Date(timerRow.endedAt) : null;
-                        /* Only a timer that had actually closed by the period end counts as done. */
                         const closedAtEnd = timerRow?.status === "completed" && endedAt !== null && endedAt <= periodEnd;
                         const doneAtEnd = closedAtEnd && endedAt !== null ? endedAt : null;
 
@@ -586,53 +391,29 @@ export class TenderExecutiveService {
                         onTime = doneAtEnd !== null ? doneAtEnd <= deadlineAt : periodEnd > deadlineAt ? false : null;
                     }
                 } else if (stage.stageKey === "tq" || stage.stageKey === "ra" || stage.stageKey === "result") {
-                    /* ---------- EXISTENCE-BASED STAGES (tq / ra / result) ----------
-                       These have no domain "artifact" table of their own, so they keep
-                       working off the row simply existing. Their applicability comes from
-                       the rows fetched in STEP 3; the config's isApplicable for them reads
-                       columns that do not exist on tender_infos (currentStatusCode,
-                       reverseAuctionId), which would have made them permanently NA. */
                     const source = (stage.stageKey === "tq" ? tqMap.get(tender.id) : stage.stageKey === "ra" ? raMap.get(tender.id) : resultMap.get(tender.id)) as { createdAt?: Date | string | null } | undefined;
 
                     const createdAt = source?.createdAt ? new Date(source.createdAt) : null;
-                    /* Raised after the period end had not happened yet as far as this report
-                       goes; raised before it was history and belongs to no column. */
                     const createdInPeriod = createdAt !== null && createdAt >= periodStart && createdAt <= periodEnd;
 
                     applicable = stage.stageKey === "result" ? hasBid : existedByPeriod(source);
                     completed = applicable && Boolean(source) && createdInPeriod;
 
-                    /* Work finished before the window opened is neither Done nor Pending. */
                     if (applicable && createdAt !== null && createdAt < periodStart) applicable = false;
 
                     startTime = createdAt;
                     endTime = completed ? createdAt : null;
                     onTime = null;
                 } else {
-                    /* ---------- DOMAIN-DRIVEN STAGES ---------- */
                     const artifact = artifactOf(facts, stage.stageKey);
 
-                    /* A tender missed before the window opened is history: the backlog
-                       excludes misses before the period start from bidOpening, and the
-                       matrix has no "did not submit" bucket, so such a tender is
-                       Not Applicable. A miss inside the window is an adverse
-                       resolution — it is reported as Overdue rather than
-                       inflating the Pending count. */
                     const missedInPeriod = stage.stageKey === "bid_submission" && Boolean(facts?.missedInPeriod);
                     const missedBeforeStart = stage.stageKey === "bid_submission" && Boolean(facts?.missedBeforeStart);
 
-                    /* A stage completed before the window opened is history: it appears in
-                       neither Done nor Pending, so it drops out of the population entirely
-                       and lands in Not Applicable. */
                     const domainDoneBeforeStart = Boolean(artifact?.byEnd) && !artifact?.inPeriod;
                     const timerDoneBeforeStart = Boolean(timerRow?.endedAt) && timerRow?.status === "completed" && new Date(timerRow.endedAt!) < periodStart;
                     const doneBeforeStart = domainDoneBeforeStart || timerDoneBeforeStart || missedBeforeStart;
 
-                    /* Done is an activity fact: the artifact was created inside the window.
-                       It is evaluated first and overrides the gates below, because a tender
-                       that DID reach the stage inside the window must not be demoted to
-                       Not Applicable by a gate that reads a nullable column (rfq_to, emd)
-                       or by a guard that excludes a tender resolved after it completed. */
                     completed = Boolean(artifact?.inPeriod);
 
                     const gatePassed = !doneBeforeStart &&
@@ -645,17 +426,12 @@ export class TenderExecutiveService {
                     endTime = completed ? (timerRow?.endedAt ?? null) : null;
 
                     if (completed) {
-                        /* Timing comes from the timer, compared on its own terms rather than
-                           against the period window, so a timer that closed slightly after
-                           period end still grades correctly. */
                         const endedAt = timerRow?.endedAt ? new Date(timerRow.endedAt) : null;
                         const deadlineAt = timerDeadline(timerRow, stage, tender);
 
                         if (endedAt && deadlineAt) onTime = endedAt <= deadlineAt;
                         else onTime = null;
                     } else if (applicable) {
-                        /* Still open at the period end. Overdue is measured against the
-                           deadline as it stood at period end, NOT against today. */
                         const deadlineAt = timerDeadline(timerRow, stage, tender);
 
                         onTime = missedInPeriod || (deadlineAt && periodEnd > deadlineAt) ? false : null;
@@ -680,16 +456,9 @@ export class TenderExecutiveService {
         return output;
     }
 
-    /**
-     * Aggregated metrics
-     * Derived from getStagePerformance()
-     */
     async getSummary(query: PerformanceQueryDto) {
         const stagePerformances = await this.getStagePerformance(query);
 
-        // -------------------------------
-        // Tender count (unique tenders)
-        // -------------------------------
         const tenderSet = new Set<number>();
         for (const stage of stagePerformances) {
             tenderSet.add(stage.tenderId);
@@ -701,9 +470,6 @@ export class TenderExecutiveService {
         let onTimeStages = 0;
         let lateStages = 0;
 
-        // -------------------------------
-        // Aggregate stage metrics
-        // -------------------------------
         for (const stage of stagePerformances) {
             if (!stage.applicable) {
                 continue;
@@ -726,9 +492,6 @@ export class TenderExecutiveService {
             }
         }
 
-        // -------------------------------
-        // Rates (safe division)
-        // -------------------------------
         const completionRate = applicableStages > 0 ? Math.round((completedStages / applicableStages) * 100) : 0;
 
         const onTimeRate = completedStages > 0 ? Math.round((onTimeStages / completedStages) * 100) : 0;
@@ -751,8 +514,6 @@ export class TenderExecutiveService {
     async getOutcomes(query: PerformanceQueryDto) {
         const { userId, fromDate, toDate } = query;
 
-        /* created_at is timestamptz, so IST day bounds apply — the same bounds the stage
-           matrix and the All Tenders list use. */
         const period = istDayBounds(fromDate.toISOString().slice(0, 10), toDate.toISOString().slice(0, 10));
 
         const tenders = await this.db
@@ -770,21 +531,17 @@ export class TenderExecutiveService {
         const counters = {
             allocated: 0,
 
-            // PRE-BID
             pending: 0,
             approved: 0,
             rejected: 0,
 
-            // POST-BID
             bid: 0,
             missed: 0,
 
-            // BID OUTCOMES
             resultAwaited: 0,
             won: 0,
             lost: 0,
 
-            // CROSS-CUTTING
             disqualified: 0,
         };
 
@@ -816,15 +573,9 @@ export class TenderExecutiveService {
                 statusBucket: bucket,
             };
 
-            // ----------------------------------
-            // ALLOCATED (all tenders)
-            // ----------------------------------
             counters.allocated++;
             tendersByKpi.ALLOCATED.push(meta);
 
-            // ----------------------------------
-            // PRE-BID PHASE
-            // ----------------------------------
             if (bucket === "PENDING" || bucket === "ALLOCATED") {
                 counters.pending++;
                 tendersByKpi.PENDING.push(meta);
@@ -837,13 +588,8 @@ export class TenderExecutiveService {
                 continue;
             }
 
-            // If we reach here, tender was APPROVED
             counters.approved++;
             tendersByKpi.APPROVED.push(meta);
-
-            // ----------------------------------
-            // POST-BID PHASE (only approved)
-            // ----------------------------------
 
             if (bucket === "MISSED") {
                 counters.missed++;
@@ -851,13 +597,9 @@ export class TenderExecutiveService {
                 continue;
             }
 
-            // If we reach here, bid was submitted
             counters.bid++;
             tendersByKpi.BID.push(meta);
 
-            // ----------------------------------
-            // BID OUTCOMES
-            // ----------------------------------
             if (bucket === "RESULT_AWAITED") {
                 counters.resultAwaited++;
                 tendersByKpi.RESULT_AWAITED.push(meta);
@@ -889,8 +631,6 @@ export class TenderExecutiveService {
     async getStageMatrix(query: PerformanceQueryDto) {
         const stages = await this.getStagePerformance(query);
 
-        /* The matrix is a snapshot as of the period end, so overdue days are measured from
-           there too. Using Date.now() would inflate them for any closed period. */
         const periodEnd = istDayBounds(query.fromDate.toISOString().slice(0, 10), query.toDate.toISOString().slice(0, 10)).end;
 
         const stageTenderIds = Array.from(new Set(stages.map(s => s.tenderId)));
@@ -912,14 +652,8 @@ export class TenderExecutiveService {
             }
         }
 
-        // ----------------------------------------
-        // Resolve unique stages (column order)
-        // ----------------------------------------
         const stageKeys = Array.from(new Set(stages.map(s => s.stageKey)));
 
-        // ----------------------------------------
-        // Initialize counters
-        // ----------------------------------------
         const counters = new Map<
             string,
             {
@@ -959,9 +693,6 @@ export class TenderExecutiveService {
             });
         }
 
-        // ----------------------------------------
-        // Populate counters
-        // ----------------------------------------
         for (const stage of stages) {
             const counter = counters.get(stage.stageKey)!;
 
@@ -1029,7 +760,6 @@ export class TenderExecutiveService {
                 continue;
             }
 
-            // Completed
             counter.done++;
             counter.drilldown.done.push(tenderMeta);
 
@@ -1044,9 +774,6 @@ export class TenderExecutiveService {
             }
         }
 
-        // ----------------------------------------
-        // Build rows (UI order)
-        // ----------------------------------------
         const rows = [
             {
                 key: "done",
@@ -1095,13 +822,7 @@ export class TenderExecutiveService {
     async getTenderList(query: TenderListQuery) {
         const { userId, fromDate, toDate, kpi } = query;
 
-        /* Same IST bounds as the stage matrix, so this table and the matrix
-           always describe the same set of tenders. */
         const { start: from, end: to } = istDayBounds(fromDate, toDate);
-
-        /* ----------------------------------------
-       Step 1: Fetch tenders
-    ---------------------------------------- */
 
         const tenders = await this.db
             .select({
@@ -1117,10 +838,6 @@ export class TenderExecutiveService {
             .where(and(eq(tenderInfos.teamMember, userId), eq(tenderInfos.deleteStatus, 0), between(tenderInfos.createdAt, from, to)));
 
         if (tenders.length === 0) return [];
-
-        /* ----------------------------------------
-       Step 2: Normalize + filter by KPI bucket
-    ---------------------------------------- */
 
         return tenders
             .map(t => {
@@ -1145,12 +862,10 @@ export class TenderExecutiveService {
     async getTrends(query: PerformanceQueryDto & { bucket?: "week" | "month" }) {
         const { userId, fromDate, toDate, bucket = "week" } = query;
 
-        // 1️⃣ Fetch all stage performance ONCE
         const stageData = await this.getStagePerformance(query);
 
         if (stageData.length === 0) return [];
 
-        // 2️⃣ Group stages by tenderId
         const stagesByTender = new Map<number, StagePerformance[]>();
         for (const s of stageData) {
             if (!stagesByTender.has(s.tenderId)) {
@@ -1159,7 +874,6 @@ export class TenderExecutiveService {
             stagesByTender.get(s.tenderId)!.push(s);
         }
 
-        // 3️⃣ Fetch tender createdAt for bucketing
         const tenders = await this.db
             .select({
                 id: tenderInfos.id,
@@ -1168,7 +882,6 @@ export class TenderExecutiveService {
             .from(tenderInfos)
             .where(and(eq(tenderInfos.teamMember, userId), eq(tenderInfos.deleteStatus, 0), between(tenderInfos.createdAt, new Date(fromDate), new Date(toDate))));
 
-        // 4️⃣ Group tenders by time bucket
         const buckets = new Map<
             string,
             {
@@ -1203,7 +916,6 @@ export class TenderExecutiveService {
             }
         }
 
-        // 5️⃣ Normalize to chart data
         return Array.from(buckets.entries()).map(([label, stats]) => ({
             label,
             completion: stats.applicable > 0 ? Math.round((stats.completed / stats.applicable) * 100) : 0,
@@ -1215,7 +927,7 @@ export class TenderExecutiveService {
         const summary = await this.getSummary(query);
         const outcomes = await this.getOutcomes(query);
 
-        const velocityScore = summary.completionRate; // proxy for now
+        const velocityScore = summary.completionRate;
         const accuracyScore = summary.onTimeRate;
 
         const outcomeScore = outcomes.resultAwaited > 0 ? Math.round((outcomes.won / outcomes.resultAwaited) * 100) : 0;
@@ -1230,18 +942,10 @@ export class TenderExecutiveService {
         };
     }
 
-    //LOGIC FOR STAGE BACKLOG (STAGE-WISE OPEN TENDERS)
-    // =======================================================
-    // STAGE BACKLOG (STATUS-DRIVEN, CUMULATIVE)
-    // =======================================================
-
     async getStageBacklog(query: StageBacklogQueryDto) {
         const from = new Date(`${query.fromDate}T00:00:00.000Z`);
         const to = new Date(`${query.toDate}T23:59:59.999Z`);
 
-        // --------------------------------------------------
-        // 1️⃣ Fetch tender universe (till `to`)
-        // --------------------------------------------------
         const conditions = [eq(tenderInfos.deleteStatus, 0), between(tenderInfos.createdAt, new Date("2000-01-01"), to)];
 
         if (query.view === "user" && query.userId) {
@@ -1259,9 +963,6 @@ export class TenderExecutiveService {
 
         if (!tenders.length) return [];
 
-        // --------------------------------------------------
-        // 2️⃣ Stage Matrix (CURRENT truth)
-        // --------------------------------------------------
         const stageMatrix =
             query.view === "user" && query.userId
                 ? await this.getStagePerformance({
@@ -1278,9 +979,6 @@ export class TenderExecutiveService {
             stageMatrixMap.set(`${row.tenderId}:${row.stageKey}`, row);
         }
 
-        // --------------------------------------------------
-        // 3️⃣ Aggregate per stage
-        // --------------------------------------------------
         return STAGE_BACKLOG_CONFIG.map(stage => {
             const metrics = {
                 opening: { count: 0, value: 0, drilldown: [] as any[] },
@@ -1293,7 +991,6 @@ export class TenderExecutiveService {
             for (const tender of tenders) {
                 const bucket = mapStatusToKpi(Number(tender.status));
 
-                // 🔴 TERMINAL TENDERS ARE NEVER PART OF BACKLOG
                 if (TERMINAL_KPI.includes(bucket)) {
                     continue;
                 }
@@ -1310,7 +1007,7 @@ export class TenderExecutiveService {
                     tenderNo: tender.tenderNo ?? null,
                     tenderName: tender.tenderName ?? null,
                     value,
-                    status: bucket, // ✅ normalized KPI status
+                    status: bucket,
                     deadline: matrixRow?.deadline ?? null,
                     daysOverdue:
                         matrixRow && !matrixRow.completed && matrixRow.onTime === false && matrixRow.deadline
@@ -1318,9 +1015,6 @@ export class TenderExecutiveService {
                             : null,
                 };
 
-                // ===============================
-                // OPENING — OLD TENDERS ONLY
-                // ===============================
                 if (isOldTender) {
                     const applicable = stage.isApplicable?.(tender) ?? true;
 
@@ -1334,9 +1028,6 @@ export class TenderExecutiveService {
                     continue;
                 }
 
-                // ===============================
-                // CURRENT TENDERS — STAGE MATRIX TRUTH
-                // ===============================
                 if (!isOldTender) {
                     const state = classifyStage(matrixRow);
 
@@ -1344,7 +1035,6 @@ export class TenderExecutiveService {
                         continue;
                     }
 
-                    // CURRENT = applicable stages only
                     metrics.current.count++;
                     metrics.current.value += value;
                     metrics.current.drilldown.push(meta);
@@ -1385,21 +1075,15 @@ export class TenderExecutiveService {
         const activeStages = getExecutiveStages();
         const tenderIds = tenders.map(t => t.id);
 
-        // -----------------------------
-        // Timers (USER + TEAM MODE)
-        // -----------------------------
         let timerMap = new Map<string, any>();
 
         const timerNames = activeStages.filter(s => s.type === "timer" && s.timerName).map(s => s.timerName!);
 
         const timerConditions = [inArray(timerTrackers.entityId, tenderIds), inArray(timerTrackers.stage, timerNames)];
 
-        // User view → only that user's timers
         if (mode === "user" && userId) {
             timerConditions.push(eq(timerTrackers.createdByUserId, userId));
         }
-
-        // Team view → ALL timers (no user filter)
 
         const timers = await this.db
             .select()
@@ -1410,9 +1094,6 @@ export class TenderExecutiveService {
             timerMap.set(`${t.entityId}:${t.stage}`, t);
         });
 
-        // -----------------------------
-        // Existence data (shared)
-        // -----------------------------
         const [resultsRows, tqs, raResults] = await Promise.all([
             this.db.select().from(tenderResults).where(inArray(tenderResults.tenderId, tenderIds)),
             this.db.select().from(tenderQueries).where(inArray(tenderQueries.tenderId, tenderIds)),
@@ -1423,9 +1104,6 @@ export class TenderExecutiveService {
         const tqMap = new Map(tqs.map(tq => [Number(tq.tenderId), tq]));
         const raMap = new Map(raResults.map(ra => [Number(ra.tenderId), ra]));
 
-        // -----------------------------
-        // Normalize stages
-        // -----------------------------
         const output: StagePerformance[] = [];
 
         for (const tender of tenders) {
@@ -1440,7 +1118,6 @@ export class TenderExecutiveService {
                 let startTime: Date | null = null;
                 let endTime: Date | null = null;
 
-                // TIMER STAGES → only user mode
                 if (applicable && mode === "user" && stage.type === "timer" && stage.timerName) {
                     const timer = timerMap.get(`${tender.id}:${stage.timerName}`);
                     if (timer) {
@@ -1458,7 +1135,6 @@ export class TenderExecutiveService {
                     }
                 }
 
-                // EXISTENCE STAGES → both modes
                 if (applicable && stage.type === "existence") {
                     if (stage.stageKey === "result") {
                         completed = Boolean(resultMap.get(tender.id)?.status);
@@ -1491,16 +1167,10 @@ export class TenderExecutiveService {
     }
 
     async getStagePerformanceForTeamAggregated(teamId: number, fromDate: Date, toDate: Date): Promise<StagePerformance[]> {
-        // --------------------------------------------------
-        // 1️⃣ Fetch users in the team
-        // --------------------------------------------------
         const teamUsers = await this.db.select({ id: users.id }).from(users).where(eq(users.team, teamId));
 
         if (!teamUsers.length) return [];
 
-        // --------------------------------------------------
-        // 2️⃣ Aggregate stage performance per user
-        // --------------------------------------------------
         const aggregated: StagePerformance[] = [];
 
         for (const user of teamUsers) {
@@ -1538,30 +1208,14 @@ export class TenderExecutiveService {
     }
 
     async getStageBacklogV2(query: { view: "user" | "team" | "all"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
-        /* =====================================================
-       DATE BOUNDARIES
-       The date columns in this schema are stored inconsistently, so a
-       single pair of literals cannot be reused everywhere:
-         - `timestamptz` columns (tender_infos.created_at/updated_at,
-           bid_submissions.*, tender_results.*) hold real instants.
-         - tender_infos.tl_approval_timestamp is `timestamp without time
-           zone` and holds UTC wall clock.
-         - tender_information.created_at is `timestamp without time zone`
-           and holds local wall clock.
-       Appending `Z` made every comparison resolve in UTC, which shifted
-       the `timestamptz` and approval windows by +05:30.
-     ===================================================== */
         const APP_ZONE = `'Asia/Calcutta'`;
 
-        /** Boundary for `timestamptz` columns: the real instant of local midnight. */
         const fromTz = `(('${query.fromDate}'::date + TIME '00:00:00') AT TIME ZONE ${APP_ZONE})`;
         const toTz = `(('${query.toDate}'::date + TIME '23:59:59.999') AT TIME ZONE ${APP_ZONE})`;
 
-        /** Boundary for tender_infos.tl_approval_timestamp, which stores UTC wall clock. */
         const fromUtc = `(timezone('UTC', ('${query.fromDate}'::date + TIME '00:00:00') AT TIME ZONE ${APP_ZONE}))`;
         const toUtc = `(timezone('UTC', ('${query.toDate}'::date + TIME '23:59:59.999') AT TIME ZONE ${APP_ZONE}))`;
 
-        /** Boundary for tender_information.created_at, which stores local wall clock. */
         const fromLocal = `(('${query.fromDate}'::date + TIME '00:00:00'))`;
         const toLocal = `(('${query.toDate}'::date + TIME '23:59:59.999'))`;
 
@@ -1578,10 +1232,6 @@ export class TenderExecutiveService {
 
         const exec = async (sqlText: string) => (await this.db.execute(sql.raw(sqlText))).rows as any[];
 
-        /**
-         * 🔥 BASE SELECT WITH VALUE SWITCH
-         * Switch to final_price only AFTER Bid Submitted
-         */
         const baseSelect = `
         SELECT
             ti.*,
@@ -1642,17 +1292,6 @@ export class TenderExecutiveService {
         const resolvedResultStatuses =
             "'won','lost','disqualified','cancelled','lost - h1 elimination'";
         const receivedResultStatuses = "'won','lost','cancelled','lost - h1 elimination'";
-        /* =====================================================
-       ASSIGNED
-    ===================================================== */
-        /**
-         * Pending at Start
-         * Point-in-time: assigned before the period start with no info sheet
-         * as of the period start.
-         * Carry-over whose sheet landed during the period still counts as pending
-         * at the start. Legacy rows with no info sheet at all and a progressed
-         * status are excluded.
-         */
         const assignedOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
@@ -1672,24 +1311,12 @@ export class TenderExecutiveService {
             OR ti.status = 1
         )
         `);
-        /**
-         * Allocated During Period
-         * All tenders assigned during selected period
-         */
         const assignedDuringTotal = await exec(`
             ${baseSelect}
             WHERE ${baseWhere()}
             AND ti.created_at BETWEEN ${fromTz} AND ${toTz}
             `);
 
-        /**
-         * Info Filled During
-         * Info sheet saved during the period (any assignment date) — this is the
-         * shared source for both the Assignment and Approval "Info Filled" columns.
-         * Also counts tenders assigned during the period that progressed past
-         * Read Tender with no info sheet recorded, since reaching a later status
-         * implies the information was captured.
-         */
         const assignedDuringCompleted = await exec(`
             ${baseSelect}
             WHERE ${baseWhere()}
@@ -1712,13 +1339,6 @@ export class TenderExecutiveService {
             )
             `);
 
-        /**
-         * Pending at End
-         * Point-in-time: assigned on or before end of period with no info sheet
-         * by end. Includes carry-over backlog from pending-at-start and tenders
-         * that progressed after the period. Legacy rows with no info sheet at
-         * all and a progressed status are excluded.
-         */
         const assignedClosingPending = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
@@ -1739,21 +1359,8 @@ export class TenderExecutiveService {
         )
         `);
 
-        /**
-         * Closing Total (pending backlog)
-         */
         const assignedTotal = assignedClosingPending;
-        /* =====================================================
-       APPROVED
-    ===================================================== */
 
-        /**
-         * Pending at Start
-         * Info sheet filled before the period and still awaiting approval
-         * (tl_status 0 = pending, 3 = incomplete bounce — neither decided).
-         * Point-in-time: a tender decided after the period start was pending
-         * at the period start.
-         */
         const approvedOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
@@ -1810,34 +1417,6 @@ export class TenderExecutiveService {
           )
     `);
 
-        /* =====================================================
-       BID
-    ===================================================== */
-
-        /**
-         * Pending at Start
-         * Tenders already approved before the period (tl_status = 1) that had no
-         * bid raised and none missed as of the period start, excluding the dnb,
-         * won and lost categories.
-         *
-         * The bid test is point-in-time, not "has no bid row at all": a tender
-         * that bids during the period was still opening backlog on the first day,
-         * so it belongs here as well as in Bid Submitted. submission_datetime is
-         * coalesced to created_at because a few Bid Submitted rows carry a null
-         * submission_datetime and would otherwise read as never-bid.
-         *
-         * Won and lost are excluded because those tenders are already resolved
-         * and belong to no outcome column. The dnb category needs no category
-         * check of its own: the Tender Missed test in the guard above already
-         * drops those missed before the period, while one missed during the
-         * period is still opening backlog here and resolves into Did Not Bid.
-         *
-         * The approval bound keeps this column disjoint from Approved During: a
-         * tender approved inside the window belongs to Approved During only, so
-         * it can never be counted on both sides of the inflow. A null
-         * tl_approval_timestamp is treated as carry-in, since the real approval
-         * time is not recoverable from any other column.
-         */
         const bidOpening = await exec(`
         ${baseSelect}
         JOIN statuses st ON st.id = ti.status
@@ -1900,7 +1479,6 @@ export class TenderExecutiveService {
           AND ti.updated_at <= ${toTz}
     `);
 
-       
         const bidTotal = await exec(`
         ${baseSelect}
         JOIN statuses st ON st.id = ti.status
@@ -1919,22 +1497,6 @@ export class TenderExecutiveService {
           )
     `);
 
-        /* =====================================================
-       RESULT AWAITED
-    ===================================================== */
-
-        /**
-         * Awaited at Start
-         * Tenders that had already bid by the period start with no terminal
-         * result recorded by that date.
-         *
-         * "under evaluation" is not treated as resolved: it means the result has
-         * arrived and is still being assessed, so such a tender is still
-         * awaiting an outcome and belongs in the backlog.
-         *
-         * tender_infos.status is deliberately not consulted — it is the current
-         * status and cannot answer a historical question.
-         */
         const resultAwaitedOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
@@ -1954,12 +1516,6 @@ export class TenderExecutiveService {
           )
     `);
 
-        /**
-         * Bid During
-         * Tenders that entered this stage during the period, i.e. the bid was
-         * raised between the boundaries. submission_datetime is coalesced to
-         * created_at because a few Bid Submitted rows carry a null value.
-         */
         const resultAwaitedDuringTotal = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
@@ -1998,12 +1554,6 @@ export class TenderExecutiveService {
           )
     `);
 
-        /**
-         * Result Received
-         * Tenders whose outcome landed during the period. Disqualified is
-         * excluded here because it has its own column and including it would
-         * count the same tender twice against the row.
-         */
         const resultAwaitedDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
@@ -2028,17 +1578,6 @@ export class TenderExecutiveService {
           )
     `);
 
-        /**
-         * Awaited at End
-         * Tenders that had bid by the period end with no terminal result
-         * recorded by that date. Mirrors Awaited at Start, bounded to ${toTz}.
-         *
-         * "under evaluation" is deliberately not tested here: that state means
-         * the tender is still awaiting its result, so it belongs in the closing
-         * backlog rather than being excluded from it. Including such a test
-         * would drop those tenders out of the funnel without them appearing in
-         * any outcome column.
-         */
         const resultAwaitedClosing = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
@@ -2098,10 +1637,6 @@ export class TenderExecutiveService {
           AND ti.updated_at BETWEEN ${fromTz} AND ${toTz}
     `);
 
-        /* =====================================================
-        FINAL RESPONSE
-    ===================================================== */
-
         const wonTotalSet = new Map();
         [...wonOpening, ...wonDuringCompleted].forEach(t => {
             wonTotalSet.set(t.id, t);
@@ -2149,9 +1684,6 @@ export class TenderExecutiveService {
                             value: this.sumValue(assignedDuringCompleted),
                             drilldown: this.mapDrilldown(assignedDuringCompleted, "infoFilled"),
                         },
-
-                        // statusChanged is intentionally no longer reported for this
-                        // stage: it duplicated the assignment cohort and was never rendered.
 
                         pending: {
                             count: assignedClosingPending.length,
@@ -2228,26 +1760,23 @@ export class TenderExecutiveService {
                     },
 
                     total: {
-                        count: resultAwaitedClosing.length, // 🔥 closing pending
+                        count: resultAwaitedClosing.length,
                         value: this.sumValue(resultAwaitedClosing),
                         drilldown: this.mapDrilldown(resultAwaitedClosing, "resultEval"),
                     },
 
                     during: {
                         total: {
-                            // 🔥 bids that entered result stage during period
                             count: resultAwaitedDuringTotal.length,
                             value: this.sumValue(resultAwaitedDuringTotal),
                             drilldown: this.mapDrilldown(resultAwaitedDuringTotal, "bidSubmitted"),
                         },
                         disqualified: {
-                            // 🔥 bids that entered result stage during period
                             count: disqualifiedDuringCompleted.length,
                             value: this.sumValue(disqualifiedDuringCompleted),
                             drilldown: this.mapDrilldown(disqualifiedDuringCompleted, "resultUploaded"),
                         },
                         received: {
-                            // 🔥 result received during period
                             count: resultAwaitedDuringCompleted.length,
                             value: this.sumValue(resultAwaitedDuringCompleted),
                             drilldown: this.mapDrilldown(resultAwaitedDuringCompleted, "resultUploaded"),
@@ -2321,11 +1850,6 @@ export class TenderExecutiveService {
         };
     }
 
-    /**
-     * Effective team for a user, matching the COALESCE used by getUserAuthInfo
-     * and by the auth /me response. Scope checks must use this rather than the
-     * raw users.team, which differs for anyone who has primary_team_id set.
-     */
     async resolveEffectiveTeamId(userId: number): Promise<number | null> {
         const rows = await this.db
             .select({ teamId: sql<number | null>`COALESCE(${users.primaryTeamId}, ${users.team})` })
@@ -2339,9 +1863,6 @@ export class TenderExecutiveService {
     private sumValue(rows: any[]) {
         return rows.reduce((sum, r) => sum + Number(r.effective_value ?? r.gst_values ?? 0), 0);
     }
-    // =======================================================
-    // EMD BALANCE SHEET VIEW
-    // =======================================================
 
     private async resolveTenderIdsForView(view: "user" | "team" | "all", userId?: number, teamId?: number): Promise<number[]> {
         const conditions = [eq(tenderInfos.deleteStatus, 0)];
@@ -2394,17 +1915,12 @@ export class TenderExecutiveService {
                     eq(paymentRequests.purpose, "EMD"),
                     lte(paymentRequests.createdAt, to),
 
-                    // ✅ IMPORTANT: Only real EMD instruments
                     inArray(paymentInstruments.instrumentType, ["DD", "FDR", "Bank Transfer", "Portal Payment", "BG"])
                 )
             );
     }
 
     async getEmdBalance(query: EmdBalanceQueryDto) {
-        /* Left on UTC bounds deliberately: these are compared in JS against EMD date columns
-           that are a mix of `date`, `timestamp` and `timestamptz`, so a single IST bound would
-           shift them unpredictably. Needs the same per-column-type treatment as
-           getStageBacklogV2. */
         const from = new Date(`${query.fromDate}T00:00:00.000Z`);
         const to = new Date(`${query.toDate}T23:59:59.999Z`);
 
@@ -2439,7 +1955,6 @@ export class TenderExecutiveService {
     private isTenderWon(statusCode: number | null): boolean {
         if (statusCode === null || statusCode === undefined) return false;
 
-        // WON status codes from your KPI mapping
         return [25, 26, 27, 28].includes(Number(statusCode));
     }
 
@@ -2463,47 +1978,29 @@ export class TenderExecutiveService {
                 daysLocked: state === "LOCKED" ? Math.ceil((to.getTime() - r.createdAt.getTime()) / 86400000) : null,
             };
 
-            // ===============================
-            // OPENING BALANCE
-            // ===============================
             if (r.createdAt < from && state === "LOCKED") {
                 this.add(result.opening, meta);
             }
 
-            // ===============================
-            // REQUESTED (during period)
-            // ===============================
             if (r.createdAt >= from && r.createdAt <= to) {
                 this.add(result.requested, meta);
             }
 
-            // ===============================
-            // RETURNED (during period)
-            // ===============================
             if (state === "RETURNED" && r.statusUpdatedAt && r.statusUpdatedAt >= from && r.statusUpdatedAt <= to) {
                 this.add(result.returned, meta);
             }
 
-            // ===============================
-            // SETTLED / ADJUSTED (during period)
-            // ===============================
             if (state === "SETTLED" && r.statusUpdatedAt && r.statusUpdatedAt >= from && r.statusUpdatedAt <= to) {
                 this.add(result.settled, meta);
             }
 
-            // ===============================
-            // CLOSING BALANCE
-            // ===============================
             if (state === "LOCKED") {
                 this.add(result.closing, meta);
 
-                // ===============================
-                // OVERDUE (FINAL DEFINITION)
-                // ===============================
                 if (
-                    r.resultDeclaredAt && // result declared
-                    !weWonTender && // NOT won
-                    new Date(r.resultDeclaredAt.getTime() + EMD_OVERDUE_GRACE_DAYS * 86400000) < to // grace expired
+                    r.resultDeclaredAt &&
+                    !weWonTender &&
+                    new Date(r.resultDeclaredAt.getTime() + EMD_OVERDUE_GRACE_DAYS * 86400000) < to
                 ) {
                     this.add(result.overdue, meta);
                 }
@@ -2522,10 +2019,6 @@ export class TenderExecutiveService {
     async getEmdCashFlow(query: { view: "user" | "team" | "all"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
         const from = `${query.fromDate}T00:00:00.000Z`;
         const to = `${query.toDate}T23:59:59.999Z`;
-
-        /* ============================
-       BASE WHERE
-    ============================ */
 
         const baseWhere = () => {
             let w = `pr.purpose = 'EMD'`;
@@ -2604,10 +2097,6 @@ export class TenderExecutiveService {
             AND pi.status NOT ILIKE '%pending%'
         )`;
 
-        /* =====================================================
-   A. OPENING
-===================================================== */
-
         const opening = await exec(`${emdCte}
         SELECT
             instrument_id AS "instrumentId",
@@ -2631,10 +2120,6 @@ export class TenderExecutiveService {
         AND (NOT has_return OR returned_at >= '${from}')
         `);
 
-        /* =====================================================
-   B. PAID DURING PERIOD (ALL)
-===================================================== */
-
         const paidDuring = await exec(`${emdCte}
         SELECT
             instrument_id AS "instrumentId",
@@ -2656,10 +2141,6 @@ export class TenderExecutiveService {
         FROM emd
         WHERE paid_at BETWEEN '${from}' AND '${to}'
         `);
-
-        /* =====================================================
-   C. RECEIVED FOR PRIOR PAID
-===================================================== */
 
         const receivedForPrior = await exec(`${emdCte}
         SELECT
@@ -2685,10 +2166,6 @@ export class TenderExecutiveService {
         AND returned_at BETWEEN '${from}' AND '${to}'
         `);
 
-        /* =====================================================
-   D. RECEIVED FOR DURING PAID
-===================================================== */
-
         const receivedForDuring = await exec(`${emdCte}
         SELECT
             instrument_id AS "instrumentId",
@@ -2712,11 +2189,6 @@ export class TenderExecutiveService {
         AND has_return
         AND returned_at BETWEEN '${from}' AND '${to}'
         `);
-
-        /* =====================================================
-   E. CLOSING
-   Pending at end of period
-===================================================== */
 
         const closing = await exec(`${emdCte}
         SELECT
@@ -2762,10 +2234,6 @@ export class TenderExecutiveService {
 
             otherThanTms = rows;
         }
-
-        /* =====================================================
-       FINAL RESPONSE (dashboard-ready)
-    ===================================================== */
 
         return {
             from: new Date(from),
