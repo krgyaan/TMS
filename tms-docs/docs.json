@@ -3,9 +3,9 @@
   "theme": "maple",
   "name": "Tender Management System",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#FF6900",
+    "light": "#FF8A3D",
+    "dark": "#D94F00"
   },
   "favicon": "/web/dist/ve_favicon.png",
   "navigation": {
@@ -22,5 +22,11 @@
   "logo": {
     "light": "/web/dist/ve_logo.png",
     "dark": "/web/dist/ve_logo.png"
+  },
+  "icons": {
+    "library": "fontawesome"
+  },
+  "background": {
+    "decoration": "grid"
   }
 }
