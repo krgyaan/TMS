@@ -6,9 +6,19 @@ import type {
     PurchaseOrderRow,
     SetTdsDTO,
     SellerOption,
+    SellerPersonOption,
     ShipToOption,
 } from '@/modules/operations/purchase-orders/helpers/purchaseOrder.types';
 import axiosInstance from '@/lib/axios';
+
+const buildPickerQuery = (q?: string, ids?: number[], limit?: number): string => {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (ids?.length) params.set('ids', ids.join(','));
+    if (limit) params.set('limit', String(limit));
+    const qs = params.toString();
+    return qs ? `?${qs}` : '';
+};
 
 class PurchaseOrderApiService extends BaseApiService {
     constructor() {
@@ -27,12 +37,20 @@ class PurchaseOrderApiService extends BaseApiService {
         return this.get('/parties');
     }
 
-    async getSellerOptions(): Promise<SellerOption[]> {
-        return this.get('/parties/sellers');
+    // Both pickers are server-paged: `q` narrows, `ids` guarantees the rows a
+    // form has already selected stay in the response (otherwise the combobox
+    // loses its own label once the query stops matching it), `limit` caps the
+    // first page so mounting a form never downloads the whole table.
+    async getSellerOptions(q?: string, ids?: number[], limit?: number): Promise<SellerOption[]> {
+        return this.get(`/parties/sellers${buildPickerQuery(q, ids, limit)}`);
     }
 
-    async getShipToOptions(): Promise<ShipToOption[]> {
-        return this.get('/parties/ship-to');
+    async getSellerPersons(orgId: number): Promise<SellerPersonOption[]> {
+        return this.get(`/parties/sellers/${orgId}/persons`);
+    }
+
+    async getShipToOptions(q?: string, ids?: number[], limit?: number): Promise<ShipToOption[]> {
+        return this.get(`/parties/ship-to${buildPickerQuery(q, ids, limit)}`);
     }
 
     async getNextPONumber(projectName: string): Promise<string> {

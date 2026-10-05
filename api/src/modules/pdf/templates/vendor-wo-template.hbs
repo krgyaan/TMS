@@ -43,6 +43,15 @@
             <td colspan="2" style="width: 50%; vertical-align: top; border: 1px solid #000; padding: 8px;">
                 <strong>Vendor Details:</strong><br>
                 {{seller_name}}<br>
+                {{#if vendor_contact_name}}
+                Contact Person: {{vendor_contact_name}}<br>
+                {{/if}}
+                {{#if vendor_contact_phone}}
+                Contact No.: {{vendor_contact_phone}}<br>
+                {{/if}}
+                {{#if vendor_contact_email}}
+                Contact Email: {{vendor_contact_email}}<br>
+                {{/if}}
                 {{seller_address}}<br>
                 PAN No.: {{seller_pan}}<br>
                 GST No.: {{seller_gst}}<br>

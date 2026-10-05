@@ -62,6 +62,9 @@ export interface CreateVendorWorkOrderDTO {
     contactPersonName?: string;
     contactPersonPhone?: string;
     contactPersonEmail?: string;
+    vendorContactPersonName?: string;
+    vendorContactPersonPhone?: string;
+    vendorContactPersonEmail?: string;
     certRecipients?: number[];
     shipToName: string;
     shippingAddress: string;
@@ -97,6 +100,9 @@ export interface UpdateVendorWorkOrderDTO {
     contactPersonName?: string;
     contactPersonPhone?: string;
     contactPersonEmail?: string;
+    vendorContactPersonName?: string;
+    vendorContactPersonPhone?: string;
+    vendorContactPersonEmail?: string;
     certRecipients?: number[];
     shipToName: string;
     shippingAddress: string;
