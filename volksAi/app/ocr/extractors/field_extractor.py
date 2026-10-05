@@ -807,7 +807,7 @@ class FieldExtractor:
 
     def extract_fields(self, pages: List[PageResult], doc_source: str = "main_tender") -> List[ExtractedFieldSchema]:
         extracted = []
-        scan_pages = pages[:50] if len(pages) > 50 else pages
+        scan_pages = pages
         print(f"\n[FIELD_EXTRACTOR_DEBUG] Starting field extraction on {len(scan_pages)}/{len(pages)} page(s) (doc_source: '{doc_source}').", flush=True)
         
         for field_name, rule in self.rules.items():

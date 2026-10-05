@@ -370,8 +370,10 @@ def ingest_parent_tender_pdf(
     logger.info(f"[INGEST_PIPELINE][Job {job_id}] Step 1 complete: Extracted {len(all_pages)} text pages")
 
     # 2. Extract clickable hyperlinks and document mentions
-    logger.info(f"[INGEST_PIPELINE][Job {job_id}] Step 2: Extracting hyperlinks & ATC document mentions...")
-    links, mentions = extract_links_and_mentions(str(pdf_path))
+    # If explicit ATC files were uploaded, external child downloads are unnecessary and bypassed.
+    download_external = not bool(explicit_atc_paths)
+    logger.info(f"[INGEST_PIPELINE][Job {job_id}] Step 2: Extracting hyperlinks & ATC document mentions (download_external={download_external})...")
+    links, mentions = extract_links_and_mentions(str(pdf_path), download_external=download_external)
     logger.info(f"[INGEST_PIPELINE][Job {job_id}] Step 2 complete: Found {len(links)} links, {len(mentions)} mentions")
 
     # 3. Deterministic Field Extraction
@@ -549,11 +551,12 @@ def ingest_parent_tender_pdf(
                     p = Path(l["local_path"])
                     if p not in valid_child_pdfs and p != pdf_path and p != atc_path:
                         valid_child_pdfs.append(p)
-            c_dir = job_dir / "extracted_children"
-            if c_dir.exists():
-                for p in c_dir.glob("*.pdf"):
-                    if p not in valid_child_pdfs and p != pdf_path and p != atc_path and p.stat().st_size > 0:
-                        valid_child_pdfs.append(p)
+            if not explicit_atc_paths:
+                c_dir = job_dir / "extracted_children"
+                if c_dir.exists():
+                    for p in c_dir.glob("*.pdf"):
+                        if p not in valid_child_pdfs and p != pdf_path and p != atc_path and p.stat().st_size > 0:
+                            valid_child_pdfs.append(p)
 
             # Explicit uploads beyond the first ATC file (multiple ATC docs): merge
             # their text the same way so the content actually participates in

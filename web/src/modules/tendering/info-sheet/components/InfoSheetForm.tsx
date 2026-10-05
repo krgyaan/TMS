@@ -1476,15 +1476,23 @@ export function TenderInformationForm({
                                                     label="Physical Docs Submission Deadline"
                                                 >
                                                     {(field) => (
-                                                        <DateTimeInput
-                                                            value={
-                                                                typeof field.value === 'string'
-                                                                    ? field.value
-                                                                    : null
-                                                            }
-                                                            onChange={field.onChange}
-                                                            className="bg-background"
-                                                        />
+                                                        <div className="space-y-1">
+                                                            <DateTimeInput
+                                                                value={
+                                                                    typeof field.value === 'string'
+                                                                        ? field.value
+                                                                        : null
+                                                                }
+                                                                onChange={field.onChange}
+                                                                className="bg-background"
+                                                            />
+                                                            <p className="text-xs text-muted-foreground flex items-center gap-1.5 pt-0.5">
+                                                                <span className="inline-block px-1.5 py-0.5 rounded text-[11px] bg-amber-500/15 text-amber-500 font-medium">
+                                                                    Derived rule
+                                                                </span>
+                                                                <span>Within 7 days of bid due date</span>
+                                                            </p>
+                                                        </div>
                                                     )}
                                                 </FieldWrapper>
                                                 {getIncompleteFieldComment('physicalDocsDeadline') && (

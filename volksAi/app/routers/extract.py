@@ -74,9 +74,11 @@ TMS_TO_SOURCE_KEY_MAP: Dict[str, str] = {
     # LD (Liquidated Damages)
     "ldPercentagePerWeek": "ld_percentage_display",
     "maxLdPercentage": "max_ld_percentage_display",
+    "ldType": "ld_type_display",
 
     # Physical Documents
     "physicalDocsRequired": "physical_docs_required_display",
+    "physicalDocType": "physical_doc_type_display",
     "physicalDocsDeadline": "physical_docs_deadline_display",
 
     # Before-Bidding Requirements
@@ -123,6 +125,8 @@ TMS_TO_SOURCE_KEY_MAP: Dict[str, str] = {
 
     # Contacts & Address
     "clients": "client_name_1_display",
+    "grievanceContact": "grievance_contact_display",
+    "grievanceEmail": "grievance_email_display",
     "courierAddress": "courier_address_display",
 }
 
@@ -248,6 +252,12 @@ TMS_KEY_TO_LAYER1_LABELS: Dict[str, List[str]] = {
     "max_ld_percentage_display": MAIN_FIELD_ALIASES.get("max_ld_percentage", []) + [
         "Max LD Percentage", "prs_max"
     ],
+    "ldType": [
+        "LD Type", "ld_type", "ld_type_display"
+    ],
+    "ld_type_display": [
+        "LD Type", "ld_type", "ld_type_display"
+    ],
 
     # EMD & Fees
     "emdAmount": MAIN_FIELD_ALIASES.get("emd_amount", []) + [
@@ -311,6 +321,12 @@ TMS_KEY_TO_LAYER1_LABELS: Dict[str, List[str]] = {
     ],
     "physical_docs_deadline_display": [
         "Physical Docs Deadline", "physical_docs_deadline", "physical_docs_deadline_display"
+    ],
+    "physicalDocType": [
+        "Physical Doc Type", "physical_doc_type", "physical_doc_type_display"
+    ],
+    "physical_doc_type_display": [
+        "Physical Doc Type", "physical_doc_type", "physical_doc_type_display"
     ],
 
     # Pre-Bid, Site Visit, Sample
@@ -387,6 +403,18 @@ TMS_KEY_TO_LAYER1_LABELS: Dict[str, List[str]] = {
     ],
     "courier_address_display": MAIN_FIELD_ALIASES.get("courier_address", []) + [
         "Courier Address", "Courier Information", "full_courier_address_with_pincode", "courier_address"
+    ],
+    "grievanceContact": [
+        "Grievance Contact", "grievance_contact", "grievance_contact_display"
+    ],
+    "grievance_contact_display": [
+        "Grievance Contact", "grievance_contact", "grievance_contact_display"
+    ],
+    "grievanceEmail": [
+        "Grievance Email", "grievance_email", "grievance_email_display"
+    ],
+    "grievance_email_display": [
+        "Grievance Email", "grievance_email", "grievance_email_display"
     ],
     "gemBidEndDate": [
         "Bid End Date/Time", "bid_end_datetime", "Bid End Date", "Bid Submission Deadline", "Due Date & Time", "bid_due_date_time", "gem_bid_end_date_display"
@@ -674,6 +702,7 @@ def _format_field_object(
     dual_sources: Optional[Dict[str, Any]] = None,
     is_self_classified_atc: bool = False,
     has_atc: bool = False,
+    raw_display_value: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """
     Transforms an extracted TMS DTO field into a structured object containing:
@@ -700,13 +729,21 @@ def _format_field_object(
     # 1. Determine confidence & clean value using exact status constants & DTO value
     if dto_value is None:
         if (
+            tms_key in ("paymentTermsSupply", "paymentTermsInstallation")
+            and raw_display_value
+            and str(raw_display_value).strip() not in ("", "NA", "Not Found", "None", "⚠️ MISSING", "Not Applicable")
+        ):
+            confidence = "high"
+            clean_value = str(raw_display_value).strip()
+        elif (
             status_val == FIELD_STATUS_NOT_APPLICABLE
             or (source_field_name and "not applicable" in str(field_statuses.get(source_field_name, "")).lower())
         ):
             confidence = "not_applicable"
+            clean_value = None
         else:
             confidence = "missing"
-        clean_value = None
+            clean_value = None
     elif isinstance(dto_value, list) and len(dto_value) == 0:
         confidence = "missing"
         clean_value = []
@@ -885,6 +922,7 @@ async def extract_tender(
                     dual_sources=dual_sources,
                     is_self_classified_atc=is_self_classified_atc,
                     has_atc=has_atc,
+                    raw_display_value=infosheet_data.get(source_key),
                 )
                 fields[tms_key] = field_obj
 

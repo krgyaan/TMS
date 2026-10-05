@@ -7,10 +7,13 @@ Reference: TMS TenderInfoSheetPayloadSchema (info-sheet.dto.ts)
 
 import logging
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List, Optional
 
 logger = logging.getLogger(__name__)
+
+# Indian Standard Time (UTC+05:30) for GeM tender deadlines
+IST = timezone(timedelta(hours=5, minutes=30))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -299,15 +302,25 @@ def _parse_percentage_float(val: Any) -> Optional[float]:
 
 
 def _parse_percentage_int(val: Any) -> Optional[int]:
-    """Strips %, parses integer clamped between 0 and 100."""
+    """
+    Parses integer clamped between 0 and 100 from pure percentage string (e.g. '80%', '100%').
+    Returns None if val is empty, None, or structured milestone text (e.g. containing multiple
+    stages, '/', 'portion', 'completion', 'milestone', or non-simple percentage phrases).
+    """
     if _is_empty(val):
         return None
-    s = str(val).replace("%", "").strip()
-    m = re.search(r"\d+", s)
+    s = str(val).strip()
+    # Reject structured milestone text, multiple percentages, or non-simple splits
+    if "/" in s or ";" in s or s.count("%") > 1 or any(
+        kw in s.lower() for kw in ["portion", "completion", "milestone", "receipt", "commissioning", "buyback", "handover"]
+    ):
+        return None
+    # Must match a simple percentage e.g. "80%", "80 %", "80"
+    m = re.fullmatch(r"^\s*(\d+(?:\.\d+)?)\s*%?\s*$", s)
     if not m:
         return None
     try:
-        v = int(m.group(0))
+        v = int(float(m.group(1)))
         return max(0, min(100, v))
     except (ValueError, TypeError):
         return None
@@ -562,7 +575,9 @@ def _parse_physical_docs_deadline(deadline_str: Any, raw: Dict[str, Any]) -> Opt
             ):
                 try:
                     dt = datetime.strptime(base_str, fmt)
-                    absolute_dt = dt + timedelta(days=offset_days)
+                    # Bid end date on GeM is in Indian Standard Time (IST, UTC+05:30)
+                    dt_ist = dt.replace(tzinfo=IST)
+                    absolute_dt = dt_ist + timedelta(days=offset_days)
                     return absolute_dt.isoformat()
                 except ValueError:
                     continue
@@ -581,13 +596,15 @@ def _parse_physical_docs_deadline(deadline_str: Any, raw: Dict[str, Any]) -> Opt
     ):
         try:
             dt = datetime.strptime(s, fmt)
-            return dt.isoformat()
+            return dt.replace(tzinfo=IST).isoformat()
         except ValueError:
             continue
 
     # Try ISO direct parse
     try:
         dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=IST)
         return dt.isoformat()
     except Exception:
         return None
@@ -740,6 +757,7 @@ def map_to_tms_dto(raw_infosheet_data: Dict[str, Any]) -> Dict[str, Any]:
 
         # Physical Documents
         "physicalDocsRequired": _map_yes_no(raw.get("physical_docs_required_display")),
+        "physicalDocType": normalize_enum_value(raw.get("physical_doc_type_display"), PHYSICAL_DOC_TYPE_MAPPING, "physicalDocType") if _map_yes_no(raw.get("physical_docs_required_display")) == "YES" else None,
         "physicalDocsDeadline": _parse_physical_docs_deadline(raw.get("physical_docs_deadline_display"), raw),
 
         # Before-Bidding Requirements
@@ -800,6 +818,8 @@ def map_to_tms_dto(raw_infosheet_data: Dict[str, Any]) -> Dict[str, Any]:
 
         # Contacts & Address
         "clients": _extract_clients(raw),
+        "grievanceContact": None if _is_empty(raw.get("grievance_contact_display")) else str(raw.get("grievance_contact_display")).strip(),
+        "grievanceEmail": _validate_email(raw.get("grievance_email_display")),
         "courierAddress": None if _is_empty(raw.get("courier_address_display")) else str(raw.get("courier_address_display")).strip(),
 
         # GeM Schedule & Dates (Phase 1B)

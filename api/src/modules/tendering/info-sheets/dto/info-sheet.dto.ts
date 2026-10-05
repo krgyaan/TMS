@@ -113,6 +113,7 @@ export const TenderInfoSheetPayloadSchema = z
 
         // LD
         ldRequired: z.enum(['YES', 'NO']).optional().nullable(),
+        ldType: optionalString,
         ldPercentagePerWeek: optionalNumber(z.coerce.number().min(0).max(5)),
         maxLdPercentage: optionalNumber(z.coerce.number().min(0).max(100)),
 
@@ -188,6 +189,8 @@ export const TenderInfoSheetPayloadSchema = z
 
         // Client & Address
         clients: z.array(ClientSchema),
+        grievanceContact: optionalString,
+        grievanceEmail: optionalString,
         courierAddress: optionalString,
         courierName: optionalString,
         courierPhone: optionalString,
@@ -200,6 +203,9 @@ export const TenderInfoSheetPayloadSchema = z
         clientDetailsPresent: z.enum(['YES', 'NO']).optional().nullable(),
         customerInContact: z.enum(['YES', 'NO']).optional().nullable(),
         courierDetailsPresent: z.enum(['YES', 'NO']).optional().nullable(),
+
+        // LLM & Processing Status
+        llm_status: optionalString,
 
         // Final Remark
         teFinalRemark: optionalString,
