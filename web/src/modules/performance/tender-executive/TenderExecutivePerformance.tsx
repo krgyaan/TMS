@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 /* UI Components */
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,7 +10,6 @@ import { usePerformanceOutcomes, useStageMatrix } from "@/hooks/api/useTenderExe
 import type { TenderKpiKey } from "./helpers/tender-executive.types";
 
 /* Icons */
-import { paths } from "@/app/routes/paths";
 import { Combobox } from "@/components/form/SelectField";
 import { useUsersByRole } from "@/hooks/api/useUsers";
 import {
@@ -21,41 +19,23 @@ import {
     CheckCircle2,
     Clock,
     Download,
-    Eye,
     FileText,
     Filter,
     Info,
-    Search,
     Trophy,
     X,
     XCircle,
     type LucideIcon,
 } from "lucide-react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { EmdBacklogTable } from "./components/EmdBacklogTable";
 import { StageBacklogV4Table } from "./components/StageBacklogV4Table";
 import { ScoreDrilldownPopover } from "./components/ScoreDrilldownPopover";
 
-/* ================================
-   ACCESS SCOPE
-   Roles that may pick any team and any member on these screens.
-   Coordinator is listed here on purpose rather than by widening their entry in
-   the shared TEAM_SWITCH_ALLOWED_ROLES constant, so the change stays local to
-   this module. The backend enforces the same rules.
-   ================================ */
+
 const UNRESTRICTED_ROLES = new Set(["Super User", "Admin", "Coordinator"]);
 
-/* ================================
-   HELPERS
-================================ */
-const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-IN", {
-        style: "currency",
-        currency: "INR",
-        maximumFractionDigits: 0,
-    }).format(amount);
-};
 
 const STAGE_ROW_TYPE_MAP: Record<string, string> = {
     done: "default",
@@ -161,19 +141,6 @@ function resolveInitialScope(
 /* Team labels used by the Team dropdown and the scope note. */
 const TEAM_LABELS: Record<number, string> = { 1: "AC Team", 2: "DC Team" };
 
-const KPI_LABELS: Record<TenderKpiKey, string> = {
-    ALLOCATED: "Allocated",
-    PENDING: "Pending",
-    APPROVED: "Approved",
-    REJECTED: "Rejected",
-    BID: "Bid",
-    MISSED: "Missed",
-    DISQUALIFIED: "Disqualified",
-    RESULT_AWAITED: "Result Awaited",
-    LOST: "Lost",
-    WON: "Won",
-};
-
 // const TEAM_OPTIONS = [
 //     { label: "All Teams", value: "all" },
 //     { label: "AC Team", value: 1 }, // ← actual team ID
@@ -214,9 +181,8 @@ export default function TenderExecutivePerformance() {
     const [appliedFromDate, setAppliedFromDate] = useState<string | null>(initialFilters.fromDate);
     const [appliedToDate, setAppliedToDate] = useState<string | null>(initialFilters.toDate);
 
-    const [selectedMetric, setSelectedMetric] = useState<TenderKpiKey | null>(null);
-    const navigate = useNavigate();
-    const lastWrittenRef = useRef<string>(searchParams.toString());
+const [selectedMetric, setSelectedMetric] = useState<TenderKpiKey | null>(null);
+      const lastWrittenRef = useRef<string>(searchParams.toString());
     const restoredRef = useRef(false);
     const hydratedRef = useRef(false);
 
@@ -476,29 +442,6 @@ export default function TenderExecutivePerformance() {
         ];
     }, [outcomes]);
 
-    const tenders = useMemo(() => {
-        const tendersByKpi = outcomes?.tendersByKpi;
-
-        if (!tendersByKpi) return [];
-
-        // ALL view → deduplicated
-        if (!selectedMetric) {
-            const map = new Map<number, (typeof tendersByKpi)[TenderKpiKey][number]>();
-
-            Object.values(tendersByKpi).forEach(list => {
-                list.forEach(tender => {
-                    if (!map.has(tender.id)) {
-                        map.set(tender.id, tender);
-                    }
-                });
-            });
-
-            return Array.from(map.values());
-        }
-
-        return tendersByKpi[selectedMetric] ?? [];
-    }, [outcomes, selectedMetric]);
-
     const renderKpiCard = (kpi: KpiItem) => {
         const isSelected = selectedMetric === kpi.key;
 
@@ -693,57 +636,7 @@ export default function TenderExecutivePerformance() {
                             </div>
                         </div>
 
-                        {/* ===== TENDER LIST TABLE ===== */}
-                        <div>
-                            <div className="flex flex-row items-center justify-between p-6 pb-4">
-                                <div>
-                                    <h3 className="text-lg font-semibold flex items-center gap-2">
-                                        {[...PRE_BID_KPIS, ...POST_BID_KPIS].find(k => k.key === selectedMetric)?.label ?? "All"} Tenders
-                                        <Badge variant="secondary">{tenders.length}</Badge>
-                                    </h3>
-                                </div>
-                                <div className="relative w-64 hidden sm:block">
-                                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                    <Input placeholder="Search tenders..." className="pl-8 h-9" />
-                                </div>
-                            </div>
-                                <Table>
-                                    <TableHeader className="bg-muted/50">
-                                        <TableRow>
-                                            <TableHead>Tender No</TableHead>
-                                            <TableHead>Organization</TableHead>
-                                            <TableHead>Tender Name</TableHead>
-                                            <TableHead className="text-right">Value</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            <TableHead className="text-right">Action</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {tenders.map(tender => (
-                                            <TableRow key={tender.id}>
-                                                <TableCell className="font-medium text-muted-foreground">{tender.tenderNo}</TableCell>
-                                                <TableCell>{tender.organizationName}</TableCell>
-                                                <TableCell className="max-w-[300px] truncate" title={tender.tenderName ?? undefined}>
-                                                    {tender.tenderName}
-                                                </TableCell>
-                                                <TableCell className="text-right font-medium">{formatCurrency(tender.value)}</TableCell>
-                                                <TableCell>
-                                                    <Badge variant={tender.statusBucket === "WON" ? "default" : tender.statusBucket === "LOST" ? "destructive" : "secondary"}>
-                                                        {KPI_LABELS[tender.statusBucket]}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => navigate(paths.tendering.tenderView(tender.id))}>
-                                                        <Eye className="h-4 w-4 text-muted-foreground" />
-                                                    </Button>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                        </div>
-
-                        {/* ===== STAGE MATRIX / KANBAN METRICS ===== */}
+{/* ===== STAGE MATRIX / KANBAN METRICS ===== */}
                         <div>
                             <div className="p-6 pb-4">
                                 <h2 className="text-xl font-bold flex items-center gap-2">
