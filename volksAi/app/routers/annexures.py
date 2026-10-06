@@ -9,7 +9,7 @@ import logging
 import re
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import Response
@@ -34,6 +34,7 @@ class GenerateAnnexureDocxRequest(BaseModel):
     /analyze-bidding-requirements response) -- no tender text, no LLM input."""
     annexureName: str = ""
     blocks: List[Dict[str, Any]] = Field(default_factory=list)
+    context: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
 
 @router.post("/generate-annexure-docx")
@@ -58,7 +59,12 @@ async def generate_annexure_docx_endpoint(payload: GenerateAnnexureDocxRequest) 
     # Only forms whose own text asks for the bidder's letterhead get it (deterministic, no Claude).
     letterhead = requires_bidder_letterhead(annexure)
     with tempfile.TemporaryDirectory(prefix="volksai_annexure_docx_") as temp_dir:
-        out_path = build_annexure_docx(annexure, Path(temp_dir) / filename, letterhead=letterhead)
+        out_path = build_annexure_docx(
+            annexure,
+            Path(temp_dir) / filename,
+            letterhead=letterhead,
+            context=payload.context,
+        )
         content = out_path.read_bytes()
 
     logger.info(

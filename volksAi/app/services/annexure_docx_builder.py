@@ -15,7 +15,7 @@ Block types (the same five the Role 4 tool schema allows):
 """
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -130,27 +130,155 @@ def requires_bidder_letterhead(annexure: Dict[str, Any]) -> bool:
     return False
 
 
+def _normalize_label(label: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", (label or "").lower()).strip()
+
+
+def _resolve_field_value(label: str, context: Dict[str, Any]) -> Optional[str]:
+    norm = _normalize_label(label)
+    if not norm:
+        return None
+
+    # Tender number / Bid number
+    if any(k in norm for k in (
+        "tender no", "tender number", "bid no", "bid number", "nit no", "nit number",
+        "gem bid", "rfp no", "tender ref", "reference no", "enquiry no"
+    )):
+        val = context.get("tender_no") or context.get("tenderNo")
+        if val:
+            return str(val)
+
+    # Tender / Work name
+    if any(k in norm for k in (
+        "name of work", "work name", "tender name", "project name", "title of work"
+    )):
+        val = context.get("tender_name") or context.get("tenderName")
+        if val:
+            return str(val)
+
+    # Bidder / Company name
+    if any(k in norm for k in (
+        "name of bidder", "bidder name", "company name", "name of company",
+        "firm name", "name of firm", "vendor name", "agency name"
+    )):
+        return str(context.get("company_name") or context.get("companyName") or "Volks Energie Private Limited")
+
+    # Registered Address
+    if any(k in norm for k in ("address", "office address", "registered office")):
+        return str(
+            context.get("company_address") or context.get("companyAddress")
+            or "B-1/D8, 2nd floor, Mohan Cooperative Industrial Estate, New Delhi – 110044"
+        )
+
+    # Place / Station
+    if norm in ("place", "station", "location"):
+        return str(context.get("place") or "New Delhi")
+
+    # Date
+    if norm in ("date", "dated"):
+        val = context.get("date")
+        if val:
+            return str(val)
+
+    # Designation
+    if any(k in norm for k in ("designation", "capacity")):
+        return str(context.get("designation") or "Authorized Signatory")
+
+    # PAN
+    if "pan" in norm:
+        return str(context.get("pan") or "AADCV9396C")
+
+    # CIN
+    if "cin" in norm:
+        return str(context.get("cin") or "U40100DL2011PTC228907")
+
+    # GSTIN
+    if "gst" in norm:
+        return str(context.get("gstin") or context.get("gst") or "07AADCV9396C1Z9")
+
+    # Email
+    if "email" in norm or "e mail" in norm:
+        return str(context.get("email") or "contact@volksenergie.in")
+
+    # Phone / Mobile
+    if any(k in norm for k in ("phone", "mobile", "contact no", "telephone")):
+        return str(context.get("phone") or "+91 9650393636")
+
+    # MSME / Udyam
+    if any(k in norm for k in ("msme", "udyam")):
+        return str(context.get("msme") or "UDYAM-DL-090000465")
+
+    # Signatory Name (e.g. "Name of Authorized Signatory", "Name of Signatory")
+    if any(k in norm for k in ("signatory", "authorized representative")):
+        val = context.get("signatory_name") or context.get("signatoryName")
+        if val:
+            return str(val)
+
+    if norm == "name" and (context.get("signatory_name") or context.get("signatoryName")):
+        return str(context.get("signatory_name") or context.get("signatoryName"))
+
+    return None
+
+
+def _fill_paragraph_text(text: str, context: Dict[str, Any]) -> str:
+    company_name = str(context.get("company_name") or context.get("companyName") or "Volks Energie Private Limited")
+    tender_no = context.get("tender_no") or context.get("tenderNo")
+    date_val = context.get("date")
+
+    # Replace M/s ______ (Name of Bidder) or M/s _______
+    text = re.sub(
+        r"M/s[._\s]*_{2,}\s*(?:\((?:Name of Bidder|Bidder)\))?",
+        f"M/s {company_name}",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(
+        r"\(Name of Bidder\)\s*_{2,}",
+        f"{company_name}",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    if tender_no:
+        text = re.sub(
+            r"((?:offer/?\s*bid\s+no|bid\s+no|tender\s+no|nit\s+no|rfp\s+no)[.:\s]*)_{2,}",
+            rf"\g<1>{tender_no}",
+            text,
+            flags=re.IGNORECASE,
+        )
+
+    if date_val:
+        text = re.sub(
+            r"(dated[.:\s]*)_{2,}",
+            rf"\g<1>{date_val}",
+            text,
+            flags=re.IGNORECASE,
+        )
+
+    return text
+
+
 def build_annexure_docx(
-    annexure: Dict[str, Any], output_path: Union[str, Path], letterhead: bool = False,
+    annexure: Dict[str, Any],
+    output_path: Union[str, Path],
+    letterhead: bool = False,
+    context: Optional[Dict[str, Any]] = None,
 ) -> Path:
     """
     Renders one annexure's blocks to a .docx at output_path and returns that path.
     With letterhead=True the Volks letterhead (apply_letterhead) is applied first, so the
     body flows between its header and footer bands; the default output is unchanged.
 
+    If letterhead=True and context is provided, known blanks (Tender No, Company Name,
+    Place, Date, Designation) and inline bidder placeholders are auto-filled deterministically
+    without calling Claude. Forms not requiring bidder letterhead remain plain with original blanks.
+
     - heading        -> Word "Heading 1" paragraph
     - paragraph      -> normal paragraph
-    - blank_field    -> "Label: ______________________________"
+    - blank_field    -> "Label: ______________________________" (or auto-filled value)
     - table          -> real Word table (Table Grid), bold header row
     - signature_line -> right-aligned "______________________________" line with the
                         label on the line below it
-
-    annexureName is stored as the document's core title property rather than added
-    to the body, because the blocks normally already include the annexure's own
-    heading and repeating it would duplicate it.
-
-    Unknown block types and non-dict blocks are skipped (the resolver's validation
-    has already filtered them; this is a last line of defense, not the primary guard).
     """
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -172,11 +300,20 @@ def build_annexure_docx(
         if btype == "heading":
             doc.add_heading(_clean(block.get("text")), level=1)
         elif btype == "paragraph":
-            doc.add_paragraph(_clean(block.get("text")))
+            raw_text = _clean(block.get("text"))
+            if letterhead and context:
+                raw_text = _fill_paragraph_text(raw_text, context)
+            doc.add_paragraph(raw_text)
         elif btype == "blank_field":
             label = _clean(block.get("label"))
             sep = " " if label.endswith(":") else ": "
-            doc.add_paragraph(f"{label}{sep}{BLANK}" if label else BLANK)
+            value = None
+            if letterhead and context:
+                value = _resolve_field_value(label, context)
+            if value:
+                doc.add_paragraph(f"{label}{sep}{value}")
+            else:
+                doc.add_paragraph(f"{label}{sep}{BLANK}" if label else BLANK)
         elif btype == "table":
             _add_table(doc, block.get("headers"), block.get("rows"))
         elif btype == "signature_line":
@@ -187,6 +324,10 @@ def build_annexure_docx(
             if label:
                 run.add_break()
                 p.add_run(label)
+            if letterhead and context:
+                comp_name = context.get("company_name") or context.get("companyName") or "Volks Energie Private Limited"
+                run.add_break()
+                p.add_run(f"(For {comp_name})")
 
     doc.save(str(output_path))
     return output_path
