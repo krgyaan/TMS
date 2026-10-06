@@ -1,5 +1,9 @@
 import { StageConfig } from "./stage-config.type";
 
+type StageGateFields = { rfqRequired?: string | null; emdRequired?: string | null; physicalDocsRequired?: string | null };
+
+const isAffirmative = (value: unknown) => typeof value === "string" && value.trim().toLowerCase() === "yes";
+
 //OLD  KEYS : SINCE GYAN FUCKED THE ENTIRE THING UP WITH MIGRATIONS AND USING AI FOR LITERALLY EVERYTHING
 export const STAGE_CONFIG: StageConfig[] = [
     {
@@ -22,7 +26,7 @@ export const STAGE_CONFIG: StageConfig[] = [
         stageKey: "rfq_sent",
         timerName: "rfq_sent",
         type: "timer",
-        isApplicable: tender => Boolean(tender.rfqTo),
+        isApplicable: (tender: StageGateFields) => isAffirmative(tender.rfqRequired),
         resolveDeadline: tender => tender.dueDate,
         tlStage: false,
     },
@@ -30,7 +34,7 @@ export const STAGE_CONFIG: StageConfig[] = [
         stageKey: "emd_requested",
         timerName: "emd_requested",
         type: "timer",
-        isApplicable: tender => Number(tender.emd) > 0,
+        isApplicable: (tender: StageGateFields) => isAffirmative(tender.emdRequired),
         resolveDeadline: tender => tender.dueDate,
         tlStage: false,
     },
@@ -38,7 +42,7 @@ export const STAGE_CONFIG: StageConfig[] = [
         stageKey: "physical_docs",
         timerName: "physical_docs",
         type: "timer",
-        isApplicable: () => true,
+        isApplicable: (tender: StageGateFields) => tender.physicalDocsRequired === "YES",
         resolveDeadline: tender => tender.dueDate,
         tlStage: false,
     },
