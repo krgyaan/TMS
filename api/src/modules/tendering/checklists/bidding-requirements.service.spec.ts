@@ -10,7 +10,12 @@ import {
     BIDDING_REQUIREMENTS_SCHEMA_VERSION,
     BiddingRequirementsService,
 } from './bidding-requirements.service';
-import { StreamableFile } from '@nestjs/common';
+import {
+    BadGatewayException,
+    GatewayTimeoutException,
+    ServiceUnavailableException,
+    StreamableFile,
+} from '@nestjs/common';
 import { tenderExtractions } from '@db/schemas/tendering/tender-extractions.schema';
 import { AppLogger } from '@/logger/app-logger.service';
 import { FileUploadService } from '@/modules/file-upload/file-upload.service';
@@ -369,6 +374,7 @@ describe('BiddingRequirementsService', () => {
                 job_id: 'breq_fresh_789',
                 requirements: [],
                 llm_usage: {
+                    model: 'claude-sonnet-5',
                     input_tokens: 3000,
                     output_tokens: 400,
                     cache_creation_tokens: 1000,
@@ -396,7 +402,7 @@ describe('BiddingRequirementsService', () => {
                     stages: {
                         bidding_requirements: {
                             call_type: 'bidding_requirements',
-                            model: 'claude-sonnet-4-5-20250929',
+                            model: 'claude-sonnet-5',
                             input_tokens: 3000,
                             output_tokens: 400,
                             cache_creation_tokens: 1000,
@@ -408,6 +414,45 @@ describe('BiddingRequirementsService', () => {
                     },
                 },
             });
+        });
+
+        it('should fallback to unknown when model is absent from llm_usage', async () => {
+            mockDb.select.mockReturnValueOnce({
+                from: jest.fn().mockReturnValueOnce({
+                    where: jest.fn().mockResolvedValueOnce([]),
+                }),
+            });
+
+            const volksAiResponse = {
+                job_id: 'breq_fresh_no_model',
+                requirements: [],
+                llm_usage: {
+                    input_tokens: 100,
+                    output_tokens: 50,
+                    total_tokens: 150,
+                    estimated_cost_usd: 0.001,
+                },
+            };
+
+            jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                json: jest.fn().mockResolvedValueOnce(volksAiResponse),
+            } as any);
+
+            await service.analyzeForTender(1175, false, 99);
+
+            expect(mockClaudeUsageService.recordUsage).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    usage: {
+                        stages: {
+                            bidding_requirements: expect.objectContaining({
+                                model: 'unknown',
+                            }),
+                        },
+                    },
+                }),
+            );
         });
     });
 
@@ -743,4 +788,382 @@ describe('BiddingRequirementsService', () => {
             });
         });
     });
+
+    describe('startOrGetAnalysis - Job Lifecycle & Idempotency', () => {
+        beforeEach(() => {
+            mockDb.execute = jest.fn().mockResolvedValue([]);
+        });
+
+        it('returns saved result immediately without LLM call when job is done and !forceRefresh', async () => {
+            const savedResult = {
+                jobId: 'breq_saved_123',
+                requirements: [{ documentName: 'PAN', category: 'standard', required: true }],
+                annexures: [],
+                schemaVersion: 1,
+            };
+            mockDb.select.mockReturnValueOnce({
+                from: jest.fn().mockReturnValueOnce({
+                    where: jest.fn().mockResolvedValueOnce([
+                        {
+                            id: 42,
+                            tenderId: 1175,
+                            documentHash: 'hash123',
+                            status: 'done',
+                            result: savedResult,
+                        },
+                    ]),
+                }),
+            });
+            const fetchSpy = jest.spyOn(global, 'fetch');
+
+            const res = await service.startOrGetAnalysis(1175, false);
+
+            expect(res.jobId).toBe(42);
+            expect(res.status).toBe('done');
+            expect(res.analysis).toEqual(savedResult);
+            expect(fetchSpy).not.toHaveBeenCalled();
+        });
+
+        it('joins in-flight job without starting duplicate job when status is running or pending', async () => {
+            mockDb.select.mockReturnValueOnce({
+                from: jest.fn().mockReturnValueOnce({
+                    where: jest.fn().mockResolvedValueOnce([
+                        {
+                            id: 43,
+                            tenderId: 1175,
+                            documentHash: 'hash123',
+                            status: 'running',
+                            startedAt: new Date(),
+                            heartbeatAt: new Date(),
+                            result: null,
+                        },
+                    ]),
+                }),
+            });
+            const fetchSpy = jest.spyOn(global, 'fetch');
+
+            const res = await service.startOrGetAnalysis(1175, false);
+
+            expect(res.jobId).toBe(43);
+            expect(res.status).toBe('running');
+            expect(fetchSpy).not.toHaveBeenCalled();
+        });
+
+        it('double-click makes one LLM call (concurrent calls join the same in-flight job)', async () => {
+            let activeJob: any = null;
+            mockDb.select.mockImplementation(() => ({
+                from: jest.fn().mockReturnValue({
+                    where: jest.fn().mockImplementation(() => {
+                        return Promise.resolve(activeJob ? [activeJob] : []);
+                    }),
+                }),
+            }));
+
+            mockDb.insert.mockImplementation(() => ({
+                values: jest.fn().mockReturnValue({
+                    onConflictDoUpdate: jest.fn().mockReturnValue({
+                        returning: jest.fn().mockImplementation(() => {
+                            activeJob = {
+                                id: 99,
+                                tenderId: 1175,
+                                documentHash: 'hash_test',
+                                status: 'pending',
+                                startedAt: new Date(),
+                                heartbeatAt: new Date(),
+                                result: null,
+                            };
+                            return Promise.resolve([activeJob]);
+                        }),
+                    }),
+                }),
+            }));
+
+            const executeSpy = jest.spyOn(service as any, 'executeJobInBackground').mockResolvedValue(undefined);
+
+            const [call1, call2] = await Promise.all([
+                service.startOrGetAnalysis(1175, false),
+                service.startOrGetAnalysis(1175, false),
+            ]);
+
+            expect(call1.jobId).toBe(99);
+            expect(call2.jobId).toBe(99);
+            expect(executeSpy).toHaveBeenCalledTimes(1);
+        });
+
+        it('failed job can be retried by restarting analysis', async () => {
+            const failedJob = {
+                id: 44,
+                tenderId: 1175,
+                documentHash: 'hash123',
+                status: 'failed',
+                errorCode: 'ANALYSIS_FAILED',
+                errorMessage: 'Previous attempt failed',
+                result: null,
+                startedAt: new Date(Date.now() - 60000),
+                heartbeatAt: new Date(Date.now() - 60000),
+            };
+
+            mockDb.select.mockReturnValueOnce({
+                from: jest.fn().mockReturnValueOnce({
+                    where: jest.fn().mockResolvedValueOnce([failedJob]),
+                }),
+            });
+
+            const resetJob = {
+                ...failedJob,
+                status: 'pending',
+                errorCode: null,
+                errorMessage: null,
+            };
+
+            mockDb.update = jest.fn().mockReturnValue({
+                set: jest.fn().mockReturnValue({
+                    where: jest.fn().mockReturnValue({
+                        returning: jest.fn().mockResolvedValue([resetJob]),
+                    }),
+                }),
+            });
+
+            const executeSpy = jest.spyOn(service as any, 'executeJobInBackground').mockResolvedValue(undefined);
+
+            const res = await service.startOrGetAnalysis(1175, false);
+
+            expect(res.jobId).toBe(44);
+            expect(res.status).toBe('pending');
+            expect(executeSpy).toHaveBeenCalledWith(
+                44,
+                1175,
+                expect.any(Object),
+                expect.any(Object),
+                expect.any(String),
+                undefined,
+            );
+        });
+
+        describe('Heartbeat & Dead Job Detection (60s threshold)', () => {
+            it('treats a running job with heartbeat younger than 60s as alive', () => {
+                const freshJob: any = {
+                    id: 46,
+                    status: 'running',
+                    startedAt: new Date(Date.now() - 45_000),
+                    heartbeatAt: new Date(Date.now() - 45_000), // 45s ago: alive
+                };
+                expect(service.isJobStuck(freshJob)).toBe(false);
+            });
+
+            it('treats a running job with heartbeat older than 60s as dead', () => {
+                const deadJob: any = {
+                    id: 47,
+                    status: 'running',
+                    startedAt: new Date(Date.now() - 65_000),
+                    heartbeatAt: new Date(Date.now() - 65_000), // 65s ago: dead
+                };
+                expect(service.isJobStuck(deadJob)).toBe(true);
+            });
+
+            it('getJobStatus marks dead running job as failed when API restarts while job was running', async () => {
+                // Simulated state: node process restarted 70s ago while job was running; heartbeat was never updated again
+                const crashedJob = {
+                    id: 48,
+                    tenderId: 1175,
+                    documentHash: 'hash789',
+                    status: 'running',
+                    startedAt: new Date(Date.now() - 70_000),
+                    heartbeatAt: new Date(Date.now() - 70_000),
+                    result: null,
+                    errorCode: null,
+                    errorMessage: null,
+                };
+
+                const failedJob = {
+                    ...crashedJob,
+                    status: 'failed',
+                    errorCode: 'ANALYSIS_TIMEOUT',
+                    errorMessage: 'Analysis job heartbeat stalled (>60s) or server restarted while job was in-flight',
+                };
+
+                mockDb.select.mockReturnValueOnce({
+                    from: jest.fn().mockReturnValueOnce({
+                        where: jest.fn().mockReturnValueOnce({
+                            orderBy: jest.fn().mockReturnValueOnce({
+                                limit: jest.fn().mockResolvedValueOnce([crashedJob]),
+                            }),
+                        }),
+                    }),
+                });
+
+                mockDb.update = jest.fn().mockReturnValueOnce({
+                    set: jest.fn().mockReturnValueOnce({
+                        where: jest.fn().mockReturnValueOnce({
+                            returning: jest.fn().mockResolvedValueOnce([failedJob]),
+                        }),
+                    }),
+                });
+
+                const res = await service.getJobStatus(1175);
+
+                expect(res.jobId).toBe(48);
+                expect(res.status).toBe('failed');
+                expect(res.error?.code).toBe('ANALYSIS_TIMEOUT');
+                expect(res.error?.message).toContain('heartbeat stalled (>60s)');
+            });
+        });
+
+        it('stuck job from API restart or timeout (>60s heartbeat) is marked failed and may be retried', async () => {
+            const stuckJob = {
+                id: 45,
+                tenderId: 1175,
+                documentHash: 'hash123',
+                status: 'running',
+                result: null,
+                startedAt: new Date(Date.now() - 65_000), // 65s > 60s threshold
+                heartbeatAt: new Date(Date.now() - 65_000),
+            };
+
+            mockDb.select.mockReturnValueOnce({
+                from: jest.fn().mockReturnValueOnce({
+                    where: jest.fn().mockResolvedValueOnce([stuckJob]),
+                }),
+            });
+
+            const markedFailedJob = {
+                ...stuckJob,
+                status: 'failed',
+                errorCode: 'ANALYSIS_TIMEOUT',
+                errorMessage: 'Analysis job heartbeat stalled (>60s) or server restarted while job was in-flight',
+            };
+
+            const retriedJob = {
+                ...stuckJob,
+                status: 'pending',
+                startedAt: new Date(),
+                heartbeatAt: new Date(),
+            };
+
+            mockDb.update = jest.fn()
+                .mockReturnValueOnce({
+                    set: jest.fn().mockReturnValueOnce({
+                        where: jest.fn().mockReturnValueOnce({
+                            returning: jest.fn().mockResolvedValueOnce([markedFailedJob]),
+                        }),
+                    }),
+                })
+                .mockReturnValueOnce({
+                    set: jest.fn().mockReturnValueOnce({
+                        where: jest.fn().mockReturnValueOnce({
+                            returning: jest.fn().mockResolvedValueOnce([retriedJob]),
+                        }),
+                    }),
+                });
+
+            const executeSpy = jest.spyOn(service as any, 'executeJobInBackground').mockResolvedValue(undefined);
+
+            const res = await service.startOrGetAnalysis(1175, false);
+
+            expect(res.jobId).toBe(45);
+            expect(res.status).toBe('pending');
+            expect(executeSpy).toHaveBeenCalledWith(
+                45,
+                1175,
+                expect.any(Object),
+                expect.any(Object),
+                expect.any(String),
+                undefined,
+            );
+        });
+    });
+
+    describe('HttpException mapping & code reporting', () => {
+        it('throws BadGatewayException with code VOLKSAI_UNREACHABLE when fetch throws network error', async () => {
+            mockDb.select.mockReturnValueOnce({
+                from: jest.fn().mockReturnValueOnce({
+                    where: jest.fn().mockResolvedValueOnce([]),
+                }),
+            });
+            jest.spyOn(global, 'fetch').mockRejectedValueOnce(new TypeError('fetch failed'));
+
+            await expect(service.analyzeForTender(1175, true)).rejects.toThrow(BadGatewayException);
+            try {
+                mockDb.select.mockReturnValueOnce({
+                    from: jest.fn().mockReturnValueOnce({
+                        where: jest.fn().mockResolvedValueOnce([]),
+                    }),
+                });
+                jest.spyOn(global, 'fetch').mockRejectedValueOnce(new TypeError('fetch failed'));
+                await service.analyzeForTender(1175, true);
+            } catch (err: any) {
+                expect(err.getResponse()).toMatchObject({
+                    code: 'VOLKSAI_UNREACHABLE',
+                });
+            }
+        });
+
+        it('throws GatewayTimeoutException with code ANALYSIS_TIMEOUT when request aborts due to timeout', async () => {
+            mockDb.select.mockReturnValueOnce({
+                from: jest.fn().mockReturnValueOnce({
+                    where: jest.fn().mockResolvedValueOnce([]),
+                }),
+            });
+            const timeoutError = new Error('The operation was aborted due to timeout');
+            timeoutError.name = 'TimeoutError';
+            jest.spyOn(global, 'fetch').mockRejectedValueOnce(timeoutError);
+
+            try {
+                await service.analyzeForTender(1175, true);
+                fail('Expected GatewayTimeoutException');
+            } catch (err: any) {
+                expect(err).toBeInstanceOf(GatewayTimeoutException);
+                expect(err.getResponse()).toMatchObject({
+                    code: 'ANALYSIS_TIMEOUT',
+                });
+            }
+        });
+
+        it('throws ServiceUnavailableException with code LLM_UNAVAILABLE when VolksAI reports Claude issue', async () => {
+            mockDb.select.mockReturnValueOnce({
+                from: jest.fn().mockReturnValueOnce({
+                    where: jest.fn().mockResolvedValueOnce([]),
+                }),
+            });
+            jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+                ok: false,
+                status: 503,
+                text: jest.fn().mockResolvedValueOnce('ANTHROPIC_API_KEY credit_balance_too_low'),
+            } as any);
+
+            try {
+                await service.analyzeForTender(1175, true);
+                fail('Expected ServiceUnavailableException');
+            } catch (err: any) {
+                expect(err).toBeInstanceOf(ServiceUnavailableException);
+                expect(err.getResponse()).toMatchObject({
+                    code: 'LLM_UNAVAILABLE',
+                });
+            }
+        });
+
+        it('throws BadGatewayException with code ANALYSIS_FAILED on generic upstream failure', async () => {
+            mockDb.select.mockReturnValueOnce({
+                from: jest.fn().mockReturnValueOnce({
+                    where: jest.fn().mockResolvedValueOnce([]),
+                }),
+            });
+            jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+                ok: false,
+                status: 500,
+                text: jest.fn().mockResolvedValueOnce('Internal error inside VolksAI pipeline'),
+            } as any);
+
+            try {
+                await service.analyzeForTender(1175, true);
+                fail('Expected BadGatewayException');
+            } catch (err: any) {
+                expect(err).toBeInstanceOf(BadGatewayException);
+                expect(err.getResponse()).toMatchObject({
+                    code: 'ANALYSIS_FAILED',
+                });
+            }
+        });
+    });
 });
+

@@ -70,4 +70,20 @@ describe('TenderInfoSheetPayloadSchema numeric fields', () => {
         expect(fieldSchema('paymentTermsSupply').parse(100)).toBe(100);
         expect(fieldSchema('paymentTermsInstallation').parse(0)).toBe(0);
     });
+
+    it('ldType, grievanceContact, grievanceEmail, and llm_status pass payload validation', () => {
+        const parsed = TenderInfoSheetPayloadSchema.parse({
+            teRecommendation: 'YES',
+            ldType: 'PRS',
+            grievanceContact: 'Shri Shari Kumar, GM (P&C)',
+            grievanceEmail: 'sharikumar@gail.co.in',
+            llm_status: 'ok',
+            clients: [{ clientName: 'Allan Tomy', clientEmail: 'allan.tomy@gail.co.in' }],
+        });
+        expect(parsed.ldType).toBe('PRS');
+        expect(parsed.grievanceContact).toBe('Shri Shari Kumar, GM (P&C)');
+        expect(parsed.grievanceEmail).toBe('sharikumar@gail.co.in');
+        expect(parsed.llm_status).toBe('ok');
+    });
 });
+

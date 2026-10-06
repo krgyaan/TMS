@@ -118,7 +118,7 @@ def _download_with_retry(
                 continue
     raise RuntimeError(f"ATC download failed after {max_retries} attempts") from last_exc
 
-def extract_links_and_mentions(pdf_path: str) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+def extract_links_and_mentions(pdf_path: str, download_external: bool = True) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """
     Hardened layer-based link extractor for tender PDFs.
     Layer 1: Standard machine-readable page links via page.get_links()
@@ -453,7 +453,7 @@ def extract_links_and_mentions(pdf_path: str) -> Tuple[List[Dict[str, Any]], Lis
                                 and filename.lower().endswith(".pdf")
                                 and not is_policy
                             )
-                            should_download = (not is_offline) and (is_atc_anchor or is_schedule_doc or (is_tender_doc_url(uri) and not is_excluded_non_atc and not is_policy))
+                            should_download = download_external and (not is_offline) and (is_atc_anchor or is_schedule_doc or (is_tender_doc_url(uri) and not is_excluded_non_atc and not is_policy))
                             if should_download:
                                 try:
                                     logger.info(

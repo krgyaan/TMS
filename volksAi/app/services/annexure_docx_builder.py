@@ -44,6 +44,9 @@ FOOTER_DISTANCE_PT = 32.0
 FOOTER_GAP_PT = 21.72
 BOTTOM_MARGIN_PT = 65.0  # 32.0 + 11.28 + 21.72
 
+A4_WIDTH_PT = 595.3
+A4_HEIGHT_PT = 841.9
+
 LEFT_MARGIN_PT = 36.0
 RIGHT_MARGIN_PT = 36.0
 HEADER_DISTANCE_PT = 0.0
@@ -88,9 +91,52 @@ def _add_table(doc, headers: List[Any], rows: List[Any]) -> None:
             cells[i].text = v
 
 
-def build_annexure_docx(annexure: Dict[str, Any], output_path: Union[str, Path]) -> Path:
+# "letterhead" / "letter head" / "letter-head"
+_LETTERHEAD = re.compile(r"letter\s*-?\s*head", re.IGNORECASE)
+# Parties whose letterhead a form may name instead of the bidder's ("on the bank's
+# letterhead", "on letterhead of the OEM") -- those forms must NOT get our letterhead.
+_THIRD_PARTY = (
+    r"bank(?:er)?|manufacturer|oem|principal|supporting\s+company|guarantor|chartered\s+accountant"
+    r"|c\.?\s*a\.?|auditor|company\s+secretary|vendor|supplier|sub-?\s*contractor|issuing\s+authority"
+)
+_THIRD_PARTY_BEFORE = re.compile(rf"\b(?:{_THIRD_PARTY})(?:'s|s'|’s)?\s+$", re.IGNORECASE)
+_THIRD_PARTY_AFTER = re.compile(
+    rf"^\s+(?:issued\s+)?(?:of|from|by)\s+(?:the\s+|their\s+|its\s+)?(?:issuing\s+)?(?:{_THIRD_PARTY})\b", re.IGNORECASE,
+)
+
+
+def requires_bidder_letterhead(annexure: Dict[str, Any]) -> bool:
+    """
+    True when the annexure's own text says it is to be given on (the bidder's) letterhead,
+    e.g. "UNDERTAKING ON LETTERHEAD", "on the letterhead of the bidder", "on company
+    letterhead". Deterministic text check over the stored name and blocks -- no Claude call.
+
+    A letterhead mention qualified by another party ("on bank's letterhead", "letterhead
+    of the OEM") does not count, and forms with no letterhead mention (stamp-paper
+    agreements, bank guarantees) stay plain.
+    """
+    parts = [str(annexure.get("annexureName") or "")]
+    for block in annexure.get("blocks") or []:
+        if isinstance(block, dict):
+            parts += [str(block.get(k) or "") for k in ("text", "label")]
+            for row in [block.get("headers") or []] + list(block.get("rows") or []):
+                if isinstance(row, list):
+                    parts += [str(c) for c in row]
+    for text in parts:
+        for m in _LETTERHEAD.finditer(text):
+            before, after = text[max(0, m.start() - 40):m.start()], text[m.end():m.end() + 50]
+            if not (_THIRD_PARTY_BEFORE.search(before) or _THIRD_PARTY_AFTER.search(after)):
+                return True
+    return False
+
+
+def build_annexure_docx(
+    annexure: Dict[str, Any], output_path: Union[str, Path], letterhead: bool = False,
+) -> Path:
     """
     Renders one annexure's blocks to a .docx at output_path and returns that path.
+    With letterhead=True the Volks letterhead (apply_letterhead) is applied first, so the
+    body flows between its header and footer bands; the default output is unchanged.
 
     - heading        -> Word "Heading 1" paragraph
     - paragraph      -> normal paragraph
@@ -111,6 +157,12 @@ def build_annexure_docx(annexure: Dict[str, Any], output_path: Union[str, Path])
 
     doc = Document()
     doc.core_properties.title = _clean(annexure.get("annexureName"))[:255]
+    # Indian tender forms are A4; python-docx's default template is US Letter.
+    for section in doc.sections:
+        section.page_width = Pt(A4_WIDTH_PT)
+        section.page_height = Pt(A4_HEIGHT_PT)
+    if letterhead:
+        apply_letterhead(doc)
 
     for block in annexure.get("blocks") or []:
         if not isinstance(block, dict):
@@ -170,8 +222,8 @@ def apply_letterhead(
 
     for section in document.sections:
         # Standard A4 paper dimensions
-        section.page_width = Pt(595.3)
-        section.page_height = Pt(841.9)
+        section.page_width = Pt(A4_WIDTH_PT)
+        section.page_height = Pt(A4_HEIGHT_PT)
 
         # Content area margins
         section.left_margin = Pt(LEFT_MARGIN_PT)

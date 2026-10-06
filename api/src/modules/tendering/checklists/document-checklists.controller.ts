@@ -105,14 +105,42 @@ export class DocumentChecklistsController {
         return { analysis: await this.biddingRequirementsService.getCachedAnalysis(tenderId) };
     }
 
-    @Get('tender/:tenderId/bidding-requirements')
-    analyzeBiddingRequirements(
+    /**
+     * Starts an asynchronous AI analysis job for bidding requirements (POST).
+     * Returns immediately with job status without waiting for the slow LLM call.
+     * Idempotent on (tender, document_hash).
+     */
+    @Post('tender/:tenderId/bidding-requirements')
+    startBiddingRequirementsAnalysis(
         @Param('tenderId', ParseIntPipe) tenderId: number,
-        @Query('forceRefresh') forceRefresh?: string,
+        @Body() body?: { forceRefresh?: boolean },
+        @Query('forceRefresh') forceRefreshQuery?: string,
         @CurrentUser() user?: ValidatedUser,
     ) {
-        const isForceRefresh = forceRefresh === 'true' || forceRefresh === '1';
-        return this.biddingRequirementsService.analyzeForTender(tenderId, isForceRefresh, user?.id);
+        const isForceRefresh =
+            body?.forceRefresh === true ||
+            forceRefreshQuery === 'true' ||
+            forceRefreshQuery === '1';
+        return this.biddingRequirementsService.startOrGetAnalysis(tenderId, isForceRefresh, user?.id);
+    }
+
+    /**
+     * Pollable status endpoint for bidding requirements analysis job.
+     * Returns { jobId, tenderId, status: 'pending'|'running'|'done'|'failed', analysis, error }.
+     */
+    @Get('tender/:tenderId/bidding-requirements/status')
+    getBiddingRequirementsStatus(@Param('tenderId', ParseIntPipe) tenderId: number) {
+        return this.biddingRequirementsService.getJobStatus(tenderId);
+    }
+
+    /**
+     * Alias for status check (or backward-compatible read).
+     */
+    @Get('tender/:tenderId/bidding-requirements')
+    analyzeBiddingRequirementsStatus(
+        @Param('tenderId', ParseIntPipe) tenderId: number,
+    ) {
+        return this.biddingRequirementsService.getJobStatus(tenderId);
     }
 
     @Post()

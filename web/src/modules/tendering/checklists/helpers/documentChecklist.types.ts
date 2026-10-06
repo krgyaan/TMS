@@ -124,6 +124,18 @@ export interface CachedBiddingRequirementsResponse {
     analysis: BiddingRequirementsAnalysisResult | null;
 }
 
+export interface BiddingRequirementsJobStatusResponse {
+    jobId: number | null;
+    tenderId: number;
+    status: 'idle' | 'pending' | 'running' | 'done' | 'failed';
+    documentHash: string | null;
+    analysis: BiddingRequirementsAnalysisResult | null;
+    error: {
+        code: string;
+        message: string;
+    } | null;
+}
+
 /**
  * Standard document options for checklist
  */

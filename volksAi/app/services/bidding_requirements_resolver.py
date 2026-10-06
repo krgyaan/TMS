@@ -23,9 +23,15 @@ pricing constants from llm_field_resolver.py for cost accounting.
 """
 import logging
 import os
+import re
 from typing import Any, Dict, List, Optional
 
-from app.services.annexure_resolver import _build_annexures_tool_schema, validate_annexures
+from app.services.annexure_resolver import (
+    _build_annexures_tool_schema,
+    snippet_from_page,
+    split_page_tagged_text,
+    validate_annexures,
+)
 from app.services.llm_field_resolver import (
     SONNET_5_INPUT_PRICE_PER_M,
     SONNET_5_OUTPUT_PRICE_PER_M,
@@ -162,11 +168,9 @@ SYSTEM_PROMPT = (
     "paperwork (PAN, GST, MSME, incorporation); 'company' only when you found a strong "
     "match in the supplied library; 'other' for anything that doesn't fit those.\n"
     "  - source: cite exactly which page label ('[Main Page N]' or '[ATC Page N]') the "
-    "supporting text appeared under, and quote or closely paraphrase that text as the "
-    "snippet. Never cite a page you did not see the requirement on.\n"
-    "  - matchedLibraryId: for non-OEM items only, try to match against the supplied "
-    "company library list by meaning (not just exact string), and return that entry's "
-    "id. Return null if no entry is a good match. ALWAYS return null for category='oem' "
+    "supporting text appeared under, and quote that text as the snippet (verbatim, at most "
+    "about 20 words). The snippet is required for every requirement -- never omit it or "
+    "  - matchedLibraryId: try to match against the supplied library list (which includes standard statutory documents with 'std:' IDs and company library documents) by meaning, and return that entry's exact id. If a requirement matches a standard document in the list (e.g. PAN & GST, MSME, Cancelled Cheque, Incorporation/Registration, Board Resolution/POA, Electrical License), you MUST set matchedLibraryId to its 'std:' ID. Return null if no entry is a good match. ALWAYS return null for category='oem' "
     "-- there is no OEM certificate library yet, do not force a match.\n"
     "  - confidence: your confidence that this is a genuine, tender-specific requirement "
     "(not generic legal boilerplate).\n\n"
@@ -198,6 +202,37 @@ SYSTEM_PROMPT = (
     "If a blank's exact label is not stated, describe what it is for rather than guessing "
     "wording. Do not merge or split annexures. Return an empty annexures list if there are none."
 )
+
+
+def fill_missing_requirement_snippets(requirements: List[Any], page_tagged_text: str) -> Dict[str, int]:
+    """
+    Ensures every requirement's source carries a string snippet. A model-provided snippet
+    is kept (stripped); a missing/blank one is filled from the cited page's text when that
+    page exists and a matching line is found, otherwise set to ''. Mutates in place and
+    returns counts {model, filled, missing}.
+    """
+    pages = split_page_tagged_text(page_tagged_text)
+    counts = {"model": 0, "filled": 0, "missing": 0}
+    for r in requirements:
+        if not isinstance(r, dict) or not isinstance(r.get("source"), dict):
+            continue
+        source = r["source"]
+        snippet = source.get("snippet")
+        if isinstance(snippet, str) and snippet.strip():
+            source["snippet"] = snippet.strip()
+            counts["model"] += 1
+            continue
+        page_text = pages.get((str(source.get("document", "")).lower(), source.get("page")))
+        filled = snippet_from_page(str(r.get("documentName") or ""), page_text) if page_text else ""
+        source["snippet"] = filled
+        counts["filled" if filled else "missing"] += 1
+    if counts["filled"] or counts["missing"]:
+        logger.warning(
+            "[LLM_BIDDING_REQUIREMENTS][Role 3] Requirement snippets: %d from model, %d filled "
+            "from cited page, %d still missing",
+            counts["model"], counts["filled"], counts["missing"],
+        )
+    return counts
 
 
 def analyze_bidding_requirements(
@@ -273,14 +308,22 @@ def analyze_bidding_requirements(
         "%d library doc(s) supplied", resolved_model, len(library_documents),
     )
 
-    response = client.messages.create(
-        model=resolved_model,
-        max_tokens=ROLE_3_MAX_TOKENS,
-        system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
-        messages=[{"role": "user", "content": user_prompt}],
-        tools=[tool_spec],
-        tool_choice={"type": "tool", "name": "report_bidding_requirements"},
-    )
+    try:
+        response = client.messages.create(
+            model=resolved_model,
+            max_tokens=ROLE_3_MAX_TOKENS,
+            system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content": user_prompt}],
+            tools=[tool_spec],
+            tool_choice={"type": "tool", "name": "report_bidding_requirements"},
+        )
+    except Exception as exc:
+        status_code = getattr(exc, "status_code", None)
+        logger.error(
+            "[LLM_BIDDING_REQUIREMENTS][Role 3] Claude bidding requirements failed: class=%s, status=%s, detail=%s",
+            type(exc).__name__, status_code, exc
+        )
+        raise
 
     usage: Optional[Dict[str, Any]] = None
     if hasattr(response, "usage") and response.usage:
@@ -296,6 +339,7 @@ def analyze_bidding_requirements(
             + (cache_read / 1_000_000 * SONNET_5_CACHE_READ_PER_M)
         )
         usage = {
+            "model": getattr(response, "model", resolved_model),
             "input_tokens": in_tok,
             "output_tokens": out_tok,
             "cache_creation_tokens": cache_create,
@@ -322,6 +366,11 @@ def analyze_bidding_requirements(
     for r in requirements:
         if isinstance(r, dict) and r.get("category") == "oem":
             r["matchedLibraryId"] = None
+
+    # The model sometimes omits source.snippet for requirements (the tool schema's
+    # "required" is not enforced). Fill it from the cited page's own text -- deterministic,
+    # no extra Claude call -- so every requirement's citation shows supporting text.
+    fill_missing_requirement_snippets(requirements, page_tagged_text)
 
     # Citation guard for annexures (same discipline as the OEM null-match guard below the
     # requirements): missing/malformed/non-existent page citations or no valid blocks ->

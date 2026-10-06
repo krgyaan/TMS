@@ -54,9 +54,9 @@ def test_gem_kochi_two_emails_no_names_no_phones_no_duplication():
     info = build_infosheet_data([], page_texts=[{"page": 1, "text": GEM_KOCHI_CONTACT_BLOCK}])
     c = _contacts(info)
 
-    assert {c["client_email_1_display"], c["client_email_2_display"]} == {
-        "allan.tomy@gail.co.in", "sharikumar@gail.co.in",
-    }
+    assert c["client_email_1_display"] == "allan.tomy@gail.co.in"
+    assert c["client_email_2_display"] in NULLS
+    assert info.get("grievance_email_display") == "sharikumar@gail.co.in"
     for key in ("client_name_1_display", "client_name_2_display",
                 "client_phone_1_display", "client_phone_2_display"):
         assert c[key] in NULLS, f"{key} = {c[key]!r} (nothing in the source text supports it)"
@@ -170,6 +170,7 @@ def test_role1_cannot_invent_contact_or_duplicate_buyer_into_hod_slot(tmp_path, 
     for key in ("client_name_1_display", "client_phone_1_display",
                 "client_name_2_display", "client_phone_2_display"):
         assert result[key] in NULLS, f"{key} = {result[key]!r}"
-    assert {result["client_email_1_display"], result["client_email_2_display"]} == {
-        "allan.tomy@gail.co.in", "sharikumar@gail.co.in",
-    }
+    assert result["client_email_1_display"] == "allan.tomy@gail.co.in"
+    assert result["client_email_2_display"] in NULLS
+    assert result.get("grievance_email_display") == "sharikumar@gail.co.in"
+

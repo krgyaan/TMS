@@ -26,6 +26,7 @@ export * from './tender-costing-details.relations';
 
 // Tender Checklists
 export * from './tender-document-checklists.schema';
+export * from './bidding-requirements-jobs.schema';
 
 // Tender Status History
 export * from './tender-status-history.schema';

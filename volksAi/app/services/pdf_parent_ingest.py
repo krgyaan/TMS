@@ -41,7 +41,7 @@ ATC_SOURCED_LABELS = {
 
 MAIN_SOURCED_LABELS = {
     "PBG Required", "PBG Percentage", "PBG Duration", "PBG Duration (Months)",
-    "Eligibility Criterion (Years)", "Bid Validity (Days)", "Bid Validity Period",
+    "Bid Validity (Days)", "Bid Validity Period",
     "Tender Name / Title", "Reference ID / NIT No", "Estimated Tender Value",
     "Organisation", "Authority Agency"
 }
@@ -370,8 +370,10 @@ def ingest_parent_tender_pdf(
     logger.info(f"[INGEST_PIPELINE][Job {job_id}] Step 1 complete: Extracted {len(all_pages)} text pages")
 
     # 2. Extract clickable hyperlinks and document mentions
-    logger.info(f"[INGEST_PIPELINE][Job {job_id}] Step 2: Extracting hyperlinks & ATC document mentions...")
-    links, mentions = extract_links_and_mentions(str(pdf_path))
+    # If explicit ATC files were uploaded, external child downloads are unnecessary and bypassed.
+    download_external = not bool(explicit_atc_paths)
+    logger.info(f"[INGEST_PIPELINE][Job {job_id}] Step 2: Extracting hyperlinks & ATC document mentions (download_external={download_external})...")
+    links, mentions = extract_links_and_mentions(str(pdf_path), download_external=download_external)
     logger.info(f"[INGEST_PIPELINE][Job {job_id}] Step 2 complete: Found {len(links)} links, {len(mentions)} mentions")
 
     # 3. Deterministic Field Extraction
@@ -549,11 +551,12 @@ def ingest_parent_tender_pdf(
                     p = Path(l["local_path"])
                     if p not in valid_child_pdfs and p != pdf_path and p != atc_path:
                         valid_child_pdfs.append(p)
-            c_dir = job_dir / "extracted_children"
-            if c_dir.exists():
-                for p in c_dir.glob("*.pdf"):
-                    if p not in valid_child_pdfs and p != pdf_path and p != atc_path and p.stat().st_size > 0:
-                        valid_child_pdfs.append(p)
+            if not explicit_atc_paths:
+                c_dir = job_dir / "extracted_children"
+                if c_dir.exists():
+                    for p in c_dir.glob("*.pdf"):
+                        if p not in valid_child_pdfs and p != pdf_path and p != atc_path and p.stat().st_size > 0:
+                            valid_child_pdfs.append(p)
 
             # Explicit uploads beyond the first ATC file (multiple ATC docs): merge
             # their text the same way so the content actually participates in
@@ -945,6 +948,9 @@ def ingest_parent_tender_pdf(
                         finally:
                             executor.shutdown(wait=False, cancel_futures=True)
                         
+                        if getattr(resolver, "llm_status", "ok") == "llm_unavailable" or llm_resolved.get("_llm_status") == "llm_unavailable":
+                            infosheet_data["_llm_status"] = "llm_unavailable"
+
                         field_statuses = cast(Dict[str, str], infosheet_data.get("_info_sheet_statuses", {}))
                         missing_fields = cast(List[str], infosheet_data.get("missing_fields", []))
                         status_summary = cast(Dict[str, int], infosheet_data.get("status_summary", {}))
@@ -1111,6 +1117,9 @@ def ingest_parent_tender_pdf(
                             ambig_decisions = {}
                         finally:
                             ambig_executor.shutdown(wait=False, cancel_futures=True)
+
+                        if getattr(resolver, "llm_status", "ok") == "llm_unavailable" or ambig_decisions.get("_llm_status"):
+                            infosheet_data["_llm_status"] = "llm_unavailable"
 
                         field_statuses = cast(Dict[str, str], infosheet_data.get("_info_sheet_statuses", {}))
 

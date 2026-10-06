@@ -1,14 +1,11 @@
 // Run with: npm run test:unit
 //
-// Fix 1 -- the bidding-requirements analysis gets its own long timeout; every other
-// request keeps the global 30s axios default. At 30s the browser gave up on a request
-// that genuinely takes 80-100s+, while the API kept running it, so the user's retry
-// started a second paid analysis.
+// Phase 1C -- Async Job Polling & Timeout Prevention
 //
-// Uses the REAL documentChecklistService and axiosInstance against a local HTTP server
-// (no mocked axios). To keep the suite fast, the "slow" delay and the instance default
-// are scaled down together: the per-request override is independent of the default's
-// value, so "override outlasts a delay the default cannot" is the property under test.
+// In Phase 1C, the analyze endpoint is changed from a long-lived GET to an asynchronous
+// POST that returns immediately with a job row (pending/running/done/failed).
+// The frontend polls the status endpoint until done or failed.
+// Because each HTTP request completes in <1s, no proxy or browser timeouts occur.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -30,17 +27,69 @@ const { documentChecklistService, BIDDING_REQUIREMENTS_REQUEST_TIMEOUT_MS } = aw
     '../src/services/api/document-checklist.service.ts'
 );
 
-const DELAY_MS = 600; // stands in for the real ~90s analysis
 let server: http.Server;
 let requestedPaths: string[] = [];
+let statusPollCount = 0;
+
+const COMPLETED_ANALYSIS = {
+    jobId: 'breq_job_done',
+    requirements: [
+        {
+            documentName: 'PAN & GST',
+            category: 'standard',
+            required: true,
+            source: { document: 'atc', page: 2, snippet: 'PAN and GST required' },
+            matchedLibraryId: 'std:pan_gst',
+            confidence: 'high',
+            reasoning: 'Standard statutory document',
+        },
+    ],
+    llmUsage: null,
+    schemaVersion: 1,
+    annexures: [],
+    rejectedAnnexures: [],
+    truncated: false,
+};
 
 before(async () => {
     server = http.createServer((req, res) => {
         requestedPaths.push(req.url ?? '');
-        setTimeout(() => {
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ jobId: 'breq_slow', requirements: [], llmUsage: null, schemaVersion: 1, annexures: [] }));
-        }, DELAY_MS);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+
+        if ((req.url ?? '').includes('/bidding-requirements/status')) {
+            statusPollCount++;
+            if (statusPollCount < 2) {
+                // First poll: still running
+                res.end(JSON.stringify({
+                    jobId: 101,
+                    tenderId: 1175,
+                    status: 'running',
+                    documentHash: 'hash101',
+                    analysis: null,
+                    error: null,
+                }));
+            } else {
+                // Second poll: completed
+                res.end(JSON.stringify({
+                    jobId: 101,
+                    tenderId: 1175,
+                    status: 'done',
+                    documentHash: 'hash101',
+                    analysis: COMPLETED_ANALYSIS,
+                    error: null,
+                }));
+            }
+        } else {
+            // POST /tender/1175/bidding-requirements returns pending immediately
+            res.end(JSON.stringify({
+                jobId: 101,
+                tenderId: 1175,
+                status: 'pending',
+                documentHash: 'hash101',
+                analysis: null,
+                error: null,
+            }));
+        }
     });
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
     axiosInstance.defaults.baseURL = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/v1`;
@@ -48,46 +97,47 @@ before(async () => {
 
 after(() => server.close());
 
-test('the global axios timeout is still 30s (not raised for every request)', () => {
+test('the global axios timeout is 30s (not raised globally for standard requests)', () => {
     assert.equal(axiosInstance.defaults.timeout, 30000);
 });
 
-test('the bidding-requirements override is at least 180s and outlasts the API wait for VolksAI (240s)', () => {
-    assert.ok(BIDDING_REQUIREMENTS_REQUEST_TIMEOUT_MS >= 180_000);
-    assert.ok(BIDDING_REQUIREMENTS_REQUEST_TIMEOUT_MS > 240_000);
+test('startSuggestedRequirements returns immediately with pending job status via POST', async () => {
+    requestedPaths = [];
+    const status = await documentChecklistService.startSuggestedRequirements(1175);
+    assert.equal(status.jobId, 101);
+    assert.equal(status.status, 'pending');
+    assert.ok(requestedPaths.some((p) => p.includes('/tender/1175/bidding-requirements')));
 });
 
-test('getSuggestedRequirements sends its own timeout on the request config', async () => {
-    const original = axiosInstance.get;
-    let seenConfig: any;
-    (axiosInstance as any).get = async (url: string, config?: any) => {
-        seenConfig = config;
-        return { data: { jobId: 'x', requirements: [] } };
-    };
-    try {
-        await documentChecklistService.getSuggestedRequirements(1175);
-    } finally {
-        (axiosInstance as any).get = original;
-    }
-    assert.equal(seenConfig?.timeout, BIDDING_REQUIREMENTS_REQUEST_TIMEOUT_MS);
+test('getSuggestedRequirements polls until job status is done without long HTTP request', async () => {
+    statusPollCount = 0;
+    requestedPaths = [];
+
+    const result = await documentChecklistService.getSuggestedRequirements(1175, false, {
+        pollIntervalMs: 50,
+        maxWaitMs: 5000,
+    });
+
+    assert.equal(result.jobId, 'breq_job_done');
+    assert.equal(result.requirements.length, 1);
+    assert.equal(result.requirements[0].documentName, 'PAN & GST');
+
+    // Verified that polling occurred
+    assert.ok(statusPollCount >= 2);
+    assert.ok(requestedPaths.some((p) => p.includes('/bidding-requirements/status')));
 });
 
-test('a slow analysis response does not abort, while other calls still use the default timeout', async () => {
-    const originalDefault = axiosInstance.defaults.timeout;
-    axiosInstance.defaults.timeout = DELAY_MS / 3; // default now shorter than the response delay
-    try {
-        requestedPaths = [];
-        // Real service call through the real axios instance: must succeed despite the delay.
-        const result = await documentChecklistService.getSuggestedRequirements(1175);
-        assert.equal(result.jobId, 'breq_slow');
+test('getSuggestedRequirements aborts polling immediately when AbortSignal is triggered', async () => {
+    const controller = new AbortController();
+    // Trigger abort shortly after starting
+    setTimeout(() => controller.abort(), 20);
 
-        // Any other request on the same instance still gets the (short) default and aborts.
-        await assert.rejects(
-            axiosInstance.get('/document-checklists/dashboard'),
-            (err: any) => err?.code === 'ECONNABORTED',
-        );
-        assert.ok(requestedPaths.includes('/api/v1/document-checklists/tender/1175/bidding-requirements'));
-    } finally {
-        axiosInstance.defaults.timeout = originalDefault;
-    }
+    await assert.rejects(
+        documentChecklistService.getSuggestedRequirements(1175, false, {
+            signal: controller.signal,
+            pollIntervalMs: 200,
+            maxWaitMs: 5000,
+        }),
+        (err: any) => err?.name === 'AbortError',
+    );
 });

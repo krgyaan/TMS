@@ -108,7 +108,7 @@ def test_map_to_tms_dto_clean_full_value():
 
     # 5. Physical Docs & Deadline offset
     assert dto["physicalDocsRequired"] == "YES"
-    assert dto["physicalDocsDeadline"] == "2026-08-17T14:00:00"
+    assert dto["physicalDocsDeadline"] == "2026-08-17T14:00:00+05:30"
 
     # 6. BEC Financial
     assert dto["orderValue1"] == 3200000.0

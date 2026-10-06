@@ -35,8 +35,24 @@ def verify_anthropic_api_key():
     key = os.getenv("ANTHROPIC_API_KEY", "").strip()
     placeholder_vals = ["your_claude_api_key_here", "your_anthropic_api_key_here", "your_key_here", "placeholder", "xxx"]
     if not key or any(p in key.lower() for p in placeholder_vals):
-        raise RuntimeError("FATAL: ANTHROPIC_API_KEY is not configured or is a placeholder. Claude is required for tender field resolution.")
-    logger.info("[STARTUP] Anthropic API key validated successfully. Claude Sonnet 5 is active.")
+        logger.error("[STARTUP] FATAL: ANTHROPIC_API_KEY is not configured or is a placeholder.")
+        return
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=key, timeout=5.0)
+        test_model = os.getenv("ANTHROPIC_ROLE1_MODEL", "claude-haiku-4-5-20251001")
+        client.messages.create(
+            model=test_model,
+            max_tokens=1,
+            messages=[{"role": "user", "content": "ping"}],
+        )
+        logger.info("[STARTUP] Anthropic API connection verified successfully. Claude is active.")
+    except Exception as exc:
+        status_code = getattr(exc, "status_code", None)
+        logger.error(
+            "[STARTUP] Anthropic API startup check failed: status_code=%s, error_type=%s, detail=%s",
+            status_code, type(exc).__name__, exc
+        )
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

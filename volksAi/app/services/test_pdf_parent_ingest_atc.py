@@ -28,6 +28,8 @@ def _isolate_llm_fallback(monkeypatch):
     # runs, and disabling it keeps this test free of any Anthropic API dependency.
     # Using monkeypatch ensures LLM_FALLBACK_ENABLED is restored after each test.
     monkeypatch.setenv("LLM_FALLBACK_ENABLED", "false")
+    yield
+    monkeypatch.undo()
 
 MAIN_PDF_TEXT = (
     "NIT No: TEST/2026/001\n"

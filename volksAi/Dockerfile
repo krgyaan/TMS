@@ -31,6 +31,8 @@ RUN python -c "from paddleocr import PaddleOCR; PaddleOCR(use_angle_cls=True, la
 
 # Copy application source code into the image
 COPY app/ ./app
+# Letterhead bands applied to annexures that must be on the bidder's letterhead
+COPY assets/header_band.png assets/footer_band.png ./assets/
 
 # Exposure Note:
 # Inside the container namespace, Uvicorn listens on 0.0.0.0 to receive traffic forwarded

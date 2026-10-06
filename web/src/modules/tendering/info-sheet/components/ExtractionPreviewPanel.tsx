@@ -53,6 +53,8 @@ const FIELD_METADATA: Record<string, FieldMeta> = {
     processingFeeModes: { label: 'Processing Fee Modes', category: 'basic' },
 
     // Evaluation & Terms
+    gemBidEndDate: { label: 'GeM Bid End Date & Time', category: 'terms' },
+    gemBidOpeningDate: { label: 'GeM Bid Opening Date & Time', category: 'terms' },
     bidValidityDays: { label: 'Bid Validity (Days)', category: 'terms' },
     commercialEvaluation: { label: 'Commercial Evaluation Method', category: 'terms' },
     reverseAuctionApplicable: { label: 'Reverse Auction Applicable', category: 'terms' },

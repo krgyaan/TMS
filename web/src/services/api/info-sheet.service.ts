@@ -28,6 +28,7 @@ class InfoSheetsService extends BaseApiService {
         message?: string;
         fields?: Record<string, import('@/modules/tendering/info-sheet/helpers/tenderInfoSheet.autoExtract').ExtractedField>;
         missing_fields?: string[];
+        llm_status?: string;
         self_classified_atc?: boolean;
         has_atc?: boolean;
         ambiguous_field_conflicts?: Record<string, any>;
@@ -44,6 +45,7 @@ class InfoSheetsService extends BaseApiService {
         extraction_version: string;
         processing_time_ms: number;
         updatedAt: string;
+        llm_status?: string;
         self_classified_atc?: boolean;
         has_atc?: boolean;
         ambiguous_field_conflicts?: Record<string, any>;
@@ -62,6 +64,7 @@ class InfoSheetsService extends BaseApiService {
             missing_fields?: string[];
             extraction_version?: string;
             processing_time_ms?: number;
+            llm_status?: string;
             self_classified_atc?: boolean;
             has_atc?: boolean;
             ambiguous_field_conflicts?: Record<string, any>;
@@ -79,6 +82,7 @@ class InfoSheetsService extends BaseApiService {
         missing_fields?: string[];
         extraction_version?: string;
         processing_time_ms?: number;
+        llm_status?: string;
         self_classified_atc?: boolean;
         has_atc?: boolean;
         ambiguous_field_conflicts?: Record<string, any>;

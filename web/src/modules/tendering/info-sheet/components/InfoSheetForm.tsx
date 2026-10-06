@@ -80,6 +80,7 @@ export function TenderInformationForm({
         missing_fields?: string[];
         processing_time_ms?: number;
         documentIdentityCheck?: DocumentIdentityCheck | null;
+        llm_status?: string;
     } | null>(null);
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -169,6 +170,7 @@ export function TenderInformationForm({
                     missing_fields: res.missing_fields,
                     processing_time_ms: res.processing_time_ms,
                     documentIdentityCheck: res.documentIdentityCheck,
+                    llm_status: res.llm_status,
                 });
                 const populateResult = populateFormFromExtraction(form, res.fields as any);
                 const indicators = extractFieldIndicators(res.fields as any, res.missing_fields);
@@ -216,6 +218,7 @@ export function TenderInformationForm({
                             missing_fields: statusRes.missing_fields,
                             processing_time_ms: statusRes.processing_time_ms,
                             documentIdentityCheck: statusRes.documentIdentityCheck,
+                            llm_status: statusRes.llm_status,
                         });
 
                         const populateResult = populateFormFromExtraction(form, statusRes.fields as any);
@@ -454,6 +457,26 @@ export function TenderInformationForm({
                             ) : (
                                 'Linked tender details'
                             )}
+                            {Boolean(extractionData?.fields?.gemBidEndDate?.value) && (
+                                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                                    <span
+                                        className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
+                                        title={
+                                            extractionData?.fields?.gemBidEndDate?.sources?.main_tender?.page
+                                                ? `Extracted from Main Tender (Page ${extractionData.fields.gemBidEndDate.sources.main_tender.page})`
+                                                : 'Extracted from GeM Tender Document'
+                                        }
+                                    >
+                                        <Sparkles className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                                        GeM Bid End Date: {String(extractionData.fields.gemBidEndDate.value)}
+                                    </span>
+                                    {Boolean(extractionData?.fields?.gemBidOpeningDate?.value) && (
+                                        <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                            Opening: {String(extractionData.fields.gemBidOpeningDate.value)}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
                         </CardDescription>
                     </div>
                     <CardAction className="flex items-center gap-2">
@@ -513,6 +536,25 @@ export function TenderInformationForm({
             </CardHeader>
 
             <CardContent>
+                {extractionData?.llm_status === 'llm_unavailable' && (
+                    <Alert
+                        role="alert"
+                        data-testid="ai-extraction-unavailable"
+                        className="mb-6 border-amber-500 bg-amber-50 dark:bg-amber-950/60"
+                    >
+                        <AlertCircle className="h-4 w-4 text-amber-600" />
+                        <AlertDescription className="text-amber-800 dark:text-amber-200">
+                            <div className="space-y-1.5">
+                                <p className="font-semibold">
+                                    AI extraction unavailable
+                                </p>
+                                <p className="text-sm">
+                                    The AI service could not be reached or encountered an error. Document parsing completed using rule-based pattern matching only. Some complex fields may require manual review.
+                                </p>
+                            </div>
+                        </AlertDescription>
+                    </Alert>
+                )}
                 {identityMismatch && (
                     <Alert
                         role="alert"
@@ -1434,15 +1476,23 @@ export function TenderInformationForm({
                                                     label="Physical Docs Submission Deadline"
                                                 >
                                                     {(field) => (
-                                                        <DateTimeInput
-                                                            value={
-                                                                typeof field.value === 'string'
-                                                                    ? field.value
-                                                                    : null
-                                                            }
-                                                            onChange={field.onChange}
-                                                            className="bg-background"
-                                                        />
+                                                        <div className="space-y-1">
+                                                            <DateTimeInput
+                                                                value={
+                                                                    typeof field.value === 'string'
+                                                                        ? field.value
+                                                                        : null
+                                                                }
+                                                                onChange={field.onChange}
+                                                                className="bg-background"
+                                                            />
+                                                            <p className="text-xs text-muted-foreground flex items-center gap-1.5 pt-0.5">
+                                                                <span className="inline-block px-1.5 py-0.5 rounded text-[11px] bg-amber-500/15 text-amber-500 font-medium">
+                                                                    Derived rule
+                                                                </span>
+                                                                <span>Within 7 days of bid due date</span>
+                                                            </p>
+                                                        </div>
                                                     )}
                                                 </FieldWrapper>
                                                 {getIncompleteFieldComment('physicalDocsDeadline') && (

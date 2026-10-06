@@ -3,6 +3,13 @@ from app.services.tender_mapper import build_infosheet_data
 from app.services.tms_field_mapper import map_to_tms_dto
 
 
+@pytest.fixture(autouse=True)
+def _ensure_llm_fallback_enabled(monkeypatch):
+    monkeypatch.setenv("LLM_FALLBACK_ENABLED", "true")
+    yield
+    monkeypatch.undo()
+
+
 def test_delivery_time_pure_supply_not_inherited_from_supply():
     """
     Case 1: Pure-supply tender with supply delivery time specified.

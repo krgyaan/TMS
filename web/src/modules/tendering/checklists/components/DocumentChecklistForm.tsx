@@ -13,7 +13,7 @@ import { ArrowLeft, Save, AlertCircle, Plus, Trash2, FileText, Sparkles, Check, 
 import { CompactFileUploader } from '@/components/file-upload';
 import { paths } from '@/app/routes/paths';
 import { MultiSelectField } from '@/components/form/MultiSelectField';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
     useCreateDocumentChecklist,
     useUpdateDocumentChecklist,
@@ -31,6 +31,10 @@ import { formatDateTime } from '@/hooks/useFormatedDate';
 import { DocumentChecklistFormSchema } from '../helpers/documentChecklist.schema';
 import { resolveSuggestionPanel } from '../helpers/suggestionPanel';
 import { buildAnnexureRows } from '../helpers/annexureRows';
+import {
+    STANDARD_DOCUMENT_OPTIONS,
+    computeAutoPreselectedDocuments,
+} from '../helpers/preselectDocuments';
 
 const CATEGORY_BADGE_VARIANT: Record<SuggestedBiddingRequirement['category'], 'default' | 'secondary' | 'outline'> = {
     oem: 'default',
@@ -60,17 +64,6 @@ interface DocumentChecklistFormProps {
     existingData?: TenderDocumentChecklist;
 }
 
-// Standard document options
-const standardDocumentOptions = [
-    { value: 'PAN & GST', label: 'PAN & GST' },
-    { value: 'MSME', label: 'MSME' },
-    { value: 'Cancelled Cheque', label: 'Cancelled Cheque' },
-    { value: 'Incorporation/Registration', label: 'Incorporation/Registration' },
-    { value: 'Board Resolution/POA', label: 'Board Resolution/POA' },
-    { value: 'Electrical License', label: 'Electrical License' },
-    { value: 'Mandate form', label: 'Mandate form' },
-];
-
 export default function DocumentChecklistForm({
     tenderId,
     tenderDetails,
@@ -92,7 +85,6 @@ export default function DocumentChecklistForm({
     const suggestions = suggestionPanel.analysis;
     const annexureRows = buildAnnexureRows(suggestions);
     const downloadAnnexure = useDownloadAnnexure();
-    const [addedSuggestions, setAddedSuggestions] = useState<Set<string>>(new Set());
 
     const form = useForm<FormValues>({
         resolver: zodResolver(DocumentChecklistFormSchema),
@@ -126,19 +118,67 @@ export default function DocumentChecklistForm({
         [fields],
     );
 
-    const handleAddSuggestion = (requirement: SuggestedBiddingRequirement) => {
-        const key = requirement.documentName.trim().toLowerCase();
-        if (existingExtraDocNames.has(key)) {
-            setAddedSuggestions((prev) => new Set(prev).add(key));
-            return;
+    const hasPreselectedRef = useRef(false);
+
+    // Auto-preselect matched standard documents on page load (from cached analysis)
+    useEffect(() => {
+        if (!suggestions?.requirements || suggestions.requirements.length === 0) return;
+        if (hasPreselectedRef.current) return;
+
+        const currentSelected = form.getValues('selectedDocuments') || [];
+        const { updated, selectedDocuments } = computeAutoPreselectedDocuments({
+            currentSelected,
+            requirements: suggestions.requirements,
+            mode,
+            existingSelectedDocuments: existingData?.selectedDocuments,
+        });
+
+        if (updated) {
+            form.setValue('selectedDocuments', selectedDocuments, { shouldDirty: true });
         }
+        hasPreselectedRef.current = true;
+    }, [suggestions, form, mode, existingData]);
+
+    // When a fresh re-analysis succeeds, merge new standard matches ONLY IF it's a new or empty checklist
+    useEffect(() => {
+        if (!suggestMutation.data?.requirements || suggestMutation.data.requirements.length === 0) return;
+
+        const currentSelected = form.getValues('selectedDocuments') || [];
+        const { updated, selectedDocuments } = computeAutoPreselectedDocuments({
+            currentSelected,
+            requirements: suggestMutation.data.requirements,
+            mode,
+            existingSelectedDocuments: existingData?.selectedDocuments,
+        });
+
+        if (updated) {
+            form.setValue('selectedDocuments', selectedDocuments, { shouldDirty: true });
+        }
+    }, [suggestMutation.data, form, mode, existingData]);
+
+    // "Added" reflects the current Additional Documents list, so removing the row re-enables Add.
+    const isSuggestionAdded = (requirement: SuggestedBiddingRequirement) =>
+        existingExtraDocNames.has(requirement.documentName.trim().toLowerCase());
+
+    const handleAddSuggestion = (requirement: SuggestedBiddingRequirement) => {
+        if (isSuggestionAdded(requirement)) return;
         append({ name: requirement.documentName, path: '' });
-        setAddedSuggestions((prev) => new Set(prev).add(key));
     };
 
-    const isSuggestionAdded = (requirement: SuggestedBiddingRequirement) => {
-        const key = requirement.documentName.trim().toLowerCase();
-        return addedSuggestions.has(key) || existingExtraDocNames.has(key);
+    const isAnnexureAdded = (name: string) =>
+        existingExtraDocNames.has(name.trim().toLowerCase());
+
+    const handleAddAnnexure = (name: string) => {
+        if (isAnnexureAdded(name)) return;
+        append({ name, path: '' });
+    };
+
+    const handleAddAllAnnexures = () => {
+        for (const row of annexureRows) {
+            if (!isAnnexureAdded(row.name)) {
+                append({ name: row.name, path: '' });
+            }
+        }
     };
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
@@ -278,6 +318,22 @@ export default function DocumentChecklistForm({
                                 </Alert>
                             )}
 
+                            {suggestMutation.isError && (
+                                <Alert variant="destructive">
+                                    <AlertCircle className="h-4 w-4" />
+                                    <AlertDescription>
+                                        {(() => {
+                                            const data = (suggestMutation.error as any)?.response?.data;
+                                            let message = data?.message || (suggestMutation.error as any)?.message || 'Failed to analyze bidding requirements for this tender';
+                                            if (message === 'Internal server error' && data?.code) {
+                                                message = `Analysis failed: ${data.code}`;
+                                            }
+                                            return message;
+                                        })()}
+                                    </AlertDescription>
+                                </Alert>
+                            )}
+
                             {suggestionPanel.checkingCache && (
                                 <p className="text-sm text-muted-foreground">Checking for a saved analysis…</p>
                             )}
@@ -347,34 +403,64 @@ export default function DocumentChecklistForm({
                         {/* Annexures & Forms identified in the tender documents (hidden when none) */}
                         {annexureRows.length > 0 && (
                             <div className="space-y-4">
-                                <h4 className="font-semibold text-base text-primary border-b pb-2">
-                                    Annexures &amp; Forms
-                                </h4>
+                                <div className="flex items-center justify-between border-b pb-2">
+                                    <h4 className="font-semibold text-base text-primary">
+                                        Annexures &amp; Forms ({annexureRows.length})
+                                    </h4>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleAddAllAnnexures}
+                                    >
+                                        <Plus className="mr-1 h-4 w-4" />
+                                        Add All Forms to Additional Documents
+                                    </Button>
+                                </div>
                                 <div className="border rounded-lg divide-y">
                                     {annexureRows.map((row) => {
                                         const downloading =
                                             downloadAnnexure.isPending && downloadAnnexure.variables?.annexureIndex === row.index;
+                                        const added = isAnnexureAdded(row.name);
                                         return (
                                             <div key={`${row.name}-${row.index}`} className="p-3 flex items-start justify-between gap-3">
                                                 <div className="min-w-0">
                                                     <span className="font-medium text-sm">{row.name}</span>
                                                     <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{row.citation}</p>
                                                 </div>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => downloadAnnexure.mutate({ tenderId, annexureIndex: row.index })}
-                                                    disabled={downloading}
-                                                    className="shrink-0"
-                                                >
-                                                    {downloading ? (
-                                                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                                                    ) : (
-                                                        <Download className="mr-1 h-4 w-4" />
-                                                    )}
-                                                    Download
-                                                </Button>
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <Button
+                                                        type="button"
+                                                        variant={added ? 'secondary' : 'outline'}
+                                                        size="sm"
+                                                        onClick={() => handleAddAnnexure(row.name)}
+                                                        disabled={added}
+                                                    >
+                                                        {added ? (
+                                                            <>
+                                                                <Check className="mr-1 h-4 w-4" /> Added
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Plus className="mr-1 h-4 w-4" /> Add
+                                                            </>
+                                                        )}
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => downloadAnnexure.mutate({ tenderId, annexureIndex: row.index })}
+                                                        disabled={downloading}
+                                                    >
+                                                        {downloading ? (
+                                                            <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                                                        ) : (
+                                                            <Download className="mr-1 h-4 w-4" />
+                                                        )}
+                                                        Download
+                                                    </Button>
+                                                </div>
                                             </div>
                                         );
                                     })}
@@ -391,7 +477,7 @@ export default function DocumentChecklistForm({
                                 control={form.control}
                                 name="selectedDocuments"
                                 label="Select Required Documents"
-                                options={standardDocumentOptions}
+                                options={STANDARD_DOCUMENT_OPTIONS}
                                 placeholder="Select standard documents"
                             />
                         </div>

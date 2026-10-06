@@ -1,7 +1,7 @@
 from pathlib import Path
 from PIL import Image, ImageEnhance, ImageFilter
 from app.ocr.ocr_engine import OcrEngine
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from app.models.models import TextBlock
 
 def preprocess_image_for_ocr(img_path: Path) -> Path:
@@ -130,7 +130,7 @@ def build_text_blocks_from_words(words: list) -> list[dict]:
         })
     return blocks
 
-def extract_pdf_text_hybrid(pdf_path: str, pages_dir: Path, max_pages: int = 50) -> List[Dict[str, Any]]:
+def extract_pdf_text_hybrid(pdf_path: str, pages_dir: Path, max_pages: Optional[int] = None) -> List[Dict[str, Any]]:
     """
     Hybrid PDF extraction.
     Determines if a page is a text-based digital PDF or a scanned image page.
@@ -141,7 +141,7 @@ def extract_pdf_text_hybrid(pdf_path: str, pages_dir: Path, max_pages: int = 50)
     ocr_engine = None
     results = []
     
-    total_pages = min(len(doc), max_pages)
+    total_pages = min(len(doc), max_pages) if max_pages is not None else len(doc)
     for page_num in range(total_pages):
         page = doc.load_page(page_num)
         native_text = page.get_text()

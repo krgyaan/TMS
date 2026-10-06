@@ -8,6 +8,7 @@ import type {
     UpdateDocumentChecklistDto,
     BiddingRequirementsAnalysisResult,
     CachedBiddingRequirementsResponse,
+    BiddingRequirementsJobStatusResponse,
 } from '@/modules/tendering/checklists/helpers/documentChecklist.types';
 import type { PaginatedResult } from '@/types/api.types';
 
@@ -81,15 +82,118 @@ class DocumentChecklistService extends BaseApiService {
     }
 
     /**
-     * AI-suggested bidding requirements for this tender (VolksAI analysis of the
-     * tender's main + ATC documents, bridged through the API). Read-only.
+     * Starts an asynchronous AI analysis job for bidding requirements (POST).
+     * Returns immediately with job status without waiting for the slow LLM call.
      */
-    async getSuggestedRequirements(tenderId: number, forceRefresh = false): Promise<BiddingRequirementsAnalysisResult> {
-        // forceRefresh=true bypasses the API cache and runs a new (paid) analysis.
-        const query = forceRefresh ? '?forceRefresh=true' : '';
-        return this.get<BiddingRequirementsAnalysisResult>(`/tender/${tenderId}/bidding-requirements${query}`, {
-            timeout: BIDDING_REQUIREMENTS_REQUEST_TIMEOUT_MS,
-        });
+    async startSuggestedRequirements(
+        tenderId: number,
+        forceRefresh = false,
+    ): Promise<BiddingRequirementsJobStatusResponse> {
+        return this.post<BiddingRequirementsJobStatusResponse>(
+            `/tender/${tenderId}/bidding-requirements${forceRefresh ? '?forceRefresh=true' : ''}`,
+            { forceRefresh },
+        );
+    }
+
+    /**
+     * Polls the status of an ongoing or completed bidding requirements job.
+     */
+    async getSuggestedRequirementsStatus(
+        tenderId: number,
+    ): Promise<BiddingRequirementsJobStatusResponse> {
+        return this.get<BiddingRequirementsJobStatusResponse>(
+            `/tender/${tenderId}/bidding-requirements/status`,
+        );
+    }
+
+    /**
+     * AI-suggested bidding requirements for this tender.
+     * Uses POST to initiate an async job (idempotent per tender + document hash)
+     * and polls the status endpoint until done or failed.
+     * Prevents long-lived HTTP requests and proxy/client timeouts.
+     * Supports cancellation signal on page unmount and configurable max wait.
+     */
+    async getSuggestedRequirements(
+        tenderId: number,
+        forceRefresh = false,
+        options?: {
+            signal?: AbortSignal;
+            pollIntervalMs?: number;
+            maxWaitMs?: number;
+        },
+    ): Promise<BiddingRequirementsAnalysisResult> {
+        const signal = options?.signal;
+        const pollIntervalMs = options?.pollIntervalMs ?? 2000;
+        const maxWaitMs = options?.maxWaitMs ?? 300_000;
+
+        if (signal?.aborted) {
+            throw new DOMException('Bidding requirements request aborted', 'AbortError');
+        }
+
+        // 1. Start or join existing job via POST (returns immediately)
+        const initialStatus = await this.startSuggestedRequirements(tenderId, forceRefresh);
+
+        if (initialStatus.status === 'done' && initialStatus.analysis) {
+            return initialStatus.analysis;
+        }
+
+        if (initialStatus.status === 'failed') {
+            const err: any = new Error(initialStatus.error?.message || 'Bidding requirements analysis failed');
+            err.response = { data: initialStatus.error };
+            throw err;
+        }
+
+        // 2. Poll status endpoint until done, failed, timed out, or unmounted
+        const startTime = Date.now();
+        while (Date.now() - startTime < maxWaitMs) {
+            if (signal?.aborted) {
+                throw new DOMException('Bidding requirements polling aborted on page unmount', 'AbortError');
+            }
+
+            // Await pollIntervalMs with cancellation listener
+            await new Promise<void>((resolve, reject) => {
+                const timer = setTimeout(() => {
+                    if (signal) signal.removeEventListener('abort', onAbort);
+                    resolve();
+                }, pollIntervalMs);
+
+                const onAbort = () => {
+                    clearTimeout(timer);
+                    reject(new DOMException('Bidding requirements polling aborted on page unmount', 'AbortError'));
+                };
+
+                if (signal) {
+                    signal.addEventListener('abort', onAbort, { once: true });
+                }
+            });
+
+            if (signal?.aborted) {
+                throw new DOMException('Bidding requirements polling aborted on page unmount', 'AbortError');
+            }
+
+            const currentStatus = await this.getSuggestedRequirementsStatus(tenderId);
+
+            if (currentStatus.status === 'done' && currentStatus.analysis) {
+                return currentStatus.analysis;
+            }
+
+            if (currentStatus.status === 'failed') {
+                const err: any = new Error(currentStatus.error?.message || 'Bidding requirements analysis failed');
+                err.response = { data: currentStatus.error };
+                throw err;
+            }
+        }
+
+        const timeoutErr: any = new Error(
+            'Bidding requirements analysis timed out while waiting for background job to finish',
+        );
+        timeoutErr.response = {
+            data: {
+                code: 'ANALYSIS_TIMEOUT',
+                message: 'Bidding requirements analysis timed out. The document may be too large.',
+            },
+        };
+        throw timeoutErr;
     }
 
     /**
