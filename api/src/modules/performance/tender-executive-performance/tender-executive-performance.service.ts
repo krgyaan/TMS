@@ -3,7 +3,6 @@ import { and, eq, inArray, between, lte, desc, sql, gte } from "drizzle-orm";
 import { PerformanceQueryDto } from "./zod/performance-query.dto";
 import { StagePerformance } from "./zod/stage-performance.type";
 import { TenderInfo, tenderInfos } from "@db/schemas/tendering/tenders.schema";
-// import { timer } from "@db/schemas/workflow/timer.schema";
 import { timerTrackers } from "@db/schemas/workflow/timer.schema";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
@@ -49,7 +48,6 @@ function resolvePeriod(type: "MONTH" | "QUARTER" | "FY", year: number, month?: n
         return { from, to, label: `Q${quarter} ${year}` };
     }
 
-    // FY (Apr–Mar)
     const from = new Date(Date.UTC(year, 3, 1));
     const to = new Date(Date.UTC(year + 1, 2, 31, 23, 59, 59));
     return { from, to, label: `FY ${year}-${year + 1}` };
@@ -90,15 +88,12 @@ interface StageDrilldownItem {
     tenderNo?: string;
     tenderName?: string;
 
-    // Common
     stageKey: string;
 
-    // Timing
     deadline?: Date | null;
     completedAt?: Date | null;
     daysOverdue?: number | null;
 
-    // Stage-specific (optional)
     meta?: Record<string, any>;
 
     value?: number;
@@ -118,29 +113,30 @@ function getWeekNumber(date: Date): number {
 }
 
 function mapStatusToKpi(statusCode: number): TenderKpiBucket {
-    // WON
     if ([25, 26, 27, 28].includes(statusCode)) return "WON";
 
-    // LOST
     if ([18, 21, 22, 24].includes(statusCode)) return "LOST";
 
-    // DISQUALIFIED
     if ([33, 38, 39, 41].includes(statusCode)) return "DISQUALIFIED";
 
-    // MISSED (subset of DNB)
     if ([8, 16, 36].includes(statusCode)) return "MISSED";
 
-    // REJECTED (Other DNB)
     if ([9, 10, 11, 12, 13, 14, 15, 31, 32, 34, 35].includes(statusCode)) return "REJECTED";
 
-    // BID DONE, RESULT NOT YET
     if ([17, 19, 20, 23, 37, 40].includes(statusCode)) return "RESULT_AWAITED";
 
-    // PRE-BID PENDING
     if ([1, 2, 3, 4, 5, 6, 7, 29, 30].includes(statusCode)) return "PENDING";
 
-    // Fallback
     return "ALLOCATED";
+}
+
+const APP_OFFSET = "+05:30";
+
+function istDayBounds(fromDate: string, toDate: string): { start: Date; end: Date } {
+    return {
+        start: new Date(`${fromDate}T00:00:00${APP_OFFSET}`),
+        end: new Date(`${toDate}T23:59:59.999${APP_OFFSET}`),
+    };
 }
 
 function classifyStage(row?: StagePerformance): StageState {
@@ -186,7 +182,26 @@ function resolveEmdFinancialState(instrumentType: string, action: number | null)
 }
 const TERMINAL_KPI: TenderKpiBucket[] = ["WON", "LOST", "DISQUALIFIED", "MISSED", "REJECTED"];
 
+const GATED_STAGES = new Set(["rfq_sent", "emd_requested", "physical_docs"]);
+
+const MATRIX_STAGE_EXCLUSIONS = new Set(["tq", "ra", "result"]);
+
+function timerDeadline(timerRow: { deadlineAt?: Date | string | null } | undefined, stage: (typeof STAGE_CONFIG)[number], tender: TenderInfo): Date | null {
+    const deadline = timerRow?.deadlineAt ?? stage.resolveDeadline(tender);
+    return deadline ? new Date(deadline) : null;
+}
+
+type StageArtifactFlags = { exists: boolean; inPeriod: boolean; byEnd: boolean };
+
+type TenderFacts = Record<string, StageArtifactFlags | boolean | string | null | undefined>;
+
+function factString(value: unknown): string | null {
+    return typeof value === "string" ? value : null;
+}
+
 type StageState = "DONE" | "PENDING" | "OVERDUE" | "NOT_APPLICABLE";
+
+type DrilldownDateMode = "assigned" | "infoFilled" | "approved" | "bidSubmitted" | "resultEval" | "resultUploaded" | "tenderUpdated";
 
 @Injectable()
 export class TenderExecutiveService {
@@ -198,18 +213,8 @@ export class TenderExecutiveService {
         private readonly db: DbInstance
     ) {}
 
-    /**
-     * STEP 1:
-     * - Validate user
-     * - Resolve date range
-     * - Count tenders
-     */
     async getContext(query: PerformanceQueryDto) {
         const { userId, fromDate, toDate } = query;
-
-        // TODO:
-        // 1. Fetch user (users table)
-        // 2. Count tenders assigned to user in date range
 
         return {
             user: {
@@ -222,124 +227,207 @@ export class TenderExecutiveService {
         };
     }
 
-    /**
-     * CORE ENGINE
-     * Produces normalized stage-level performance
-     */
     async getStagePerformance(query: PerformanceQueryDto): Promise<StagePerformance[]> {
         const { userId, fromDate, toDate } = query;
 
         const activeStages = getExecutiveStages();
 
-        /* =====================================================
-       STEP 1: Fetch tenders
-    ===================================================== */
+        const period = istDayBounds(fromDate.toISOString().slice(0, 10), toDate.toISOString().slice(0, 10));
+        const periodEnd = period.end;
+        const periodStart = period.start;
 
-        const tenders = await this.db
-            .select()
-            .from(tenderInfos)
-            .where(and(eq(tenderInfos.teamMember, userId), eq(tenderInfos.deleteStatus, 0), between(tenderInfos.createdAt, fromDate, toDate)));
+        const existedByPeriod = (row?: { createdAt?: Date | string | null } | null) => {
+            if (!row) return false;
+            if (!row.createdAt) return true;
+            return new Date(row.createdAt) <= periodEnd;
+        };
+
+        const APP_ZONE = `'Asia/Calcutta'`;
+        const fromDay = fromDate.toISOString().slice(0, 10);
+        const toDay = toDate.toISOString().slice(0, 10);
+        const fromTz = `((DATE '${fromDay}' + TIME '00:00:00') AT TIME ZONE ${APP_ZONE})`;
+        const toTz = `((DATE '${toDay}' + TIME '23:59:59.999') AT TIME ZONE ${APP_ZONE})`;
+        const toUtc = `(timezone('UTC', (DATE '${toDay}' + TIME '23:59:59.999') AT TIME ZONE ${APP_ZONE}))`;
+        const fromLocal = `(DATE '${fromDay}' + TIME '00:00:00')`;
+        const toLocal = `(DATE '${toDay}' + TIME '23:59:59.999')`;
+
+        const tenders = (await this.db.execute(sql.raw(`
+            SELECT DISTINCT ti.*
+            FROM tender_infos ti
+            WHERE ti.team_member = ${userId}
+              AND ti.delete_status = 0
+              AND ti.created_at <= ${toTz}
+              AND (
+                    ti.created_at BETWEEN ${fromTz} AND ${toTz}
+                 OR EXISTS (SELECT 1 FROM tender_information x WHERE x.tender_id = ti.id AND x.created_at BETWEEN ${fromLocal} AND ${toLocal})
+                 OR EXISTS (SELECT 1 FROM rfqs r WHERE r.tender_id = ti.id AND r.created_at BETWEEN ${fromTz} AND ${toTz})
+                 OR EXISTS (SELECT 1 FROM payment_requests p WHERE p.tender_id = ti.id AND p.purpose = 'EMD' AND p.created_at BETWEEN ${fromLocal} AND ${toLocal})
+                 OR EXISTS (SELECT 1 FROM physical_docs d WHERE d.tender_id = ti.id AND d.created_at BETWEEN ${fromTz} AND ${toTz})
+                 OR EXISTS (SELECT 1 FROM tender_document_checklists c WHERE c.tender_id = ti.id AND c.created_at BETWEEN ${fromTz} AND ${toTz})
+                 OR EXISTS (SELECT 1 FROM tender_costing_sheets s WHERE s.tender_id = ti.id AND s.created_at BETWEEN ${fromTz} AND ${toTz})
+                 OR EXISTS (SELECT 1 FROM bid_submissions b WHERE b.tender_id = ti.id AND b.status = 'Bid Submitted' AND COALESCE(b.submission_datetime, b.created_at) BETWEEN ${fromTz} AND ${toTz})
+                 OR EXISTS (SELECT 1 FROM timers t WHERE t.entity_id = ti.id AND t.entity_type = 'TENDER' AND t.stage IN ('tender_info_sheet','rfq_sent','emd_requested','physical_docs','document_checklist','costing_sheets','bid_submission') AND t.ended_at BETWEEN ${fromTz} AND ${toTz})
+                 OR NOT EXISTS (SELECT 1 FROM tender_information x WHERE x.tender_id = ti.id AND x.created_at <= ${toLocal})
+              )
+        `))).rows as TenderInfo[];
 
         if (tenders.length === 0) return [];
 
         const tenderIds = tenders.map(t => t.id);
-
-        /* =====================================================
-       STEP 2: Fetch timers
-    ===================================================== */
 
         const timerNames = activeStages.filter(s => s.type === "timer" && s.timerName).map(s => s.timerName!);
 
         const timers = await this.db
             .select()
             .from(timerTrackers)
-            .where(and(eq(timerTrackers.createdByUserId, userId), inArray(timerTrackers.entityId, tenderIds), inArray(timerTrackers.stage, timerNames)));
+            .where(and(inArray(timerTrackers.entityId, tenderIds), inArray(timerTrackers.stage, timerNames)));
 
         const timerMap = new Map<string, (typeof timers)[number]>();
         for (const t of timers) {
             timerMap.set(`${t.entityId}:${t.stage}`, t);
         }
 
-        /* =====================================================
-       STEP 3: Fetch existence-based data (BULK)
-    ===================================================== */
+        const artifactFlags = (key: string, table: string, alias: string, columnExpr: string, from: string, to: string, extra = "") => `
+            EXISTS (SELECT 1 FROM ${table} ${alias} WHERE ${alias}.tender_id = ti.id ${extra}) AS "${key}Exists",
+            EXISTS (SELECT 1 FROM ${table} ${alias} WHERE ${alias}.tender_id = ti.id ${extra} AND ${columnExpr} BETWEEN ${from} AND ${to}) AS "${key}In",
+            EXISTS (SELECT 1 FROM ${table} ${alias} WHERE ${alias}.tender_id = ti.id ${extra} AND ${columnExpr} <= ${to}) AS "${key}ByEnd"`;
+
+        type ArtifactRow = Record<string, string | number | boolean | null> & { id: number };
+
+        const artifactRows = (await this.db.execute(sql.raw(`
+            SELECT
+                ti.id,
+                st.tender_category AS "tenderCategory",
+                (ti.tl_status = 1) AS "tlApproved",
+                (ti.tl_approval_timestamp IS NULL OR ti.tl_approval_timestamp <= ${toUtc}) AS "approvedByEnd",
+                ti.rfq_required AS "rfqRequired",
+                (SELECT tn.emd_required FROM tender_information tn WHERE tn.tender_id = ti.id ORDER BY tn.created_at NULLS LAST LIMIT 1) AS "emdRequired",
+                (SELECT tn.physical_docs_required FROM tender_information tn WHERE tn.tender_id = ti.id ORDER BY tn.created_at NULLS LAST LIMIT 1) AS "physicalDocsRequired",
+                (EXISTS (SELECT 1 FROM tender_information x WHERE x.tender_id = ti.id AND x.created_at BETWEEN ${fromLocal} AND ${toLocal})
+                 OR EXISTS (SELECT 1 FROM rfqs r WHERE r.tender_id = ti.id AND r.created_at BETWEEN ${fromTz} AND ${toTz})
+                 OR EXISTS (SELECT 1 FROM payment_requests p WHERE p.tender_id = ti.id AND p.purpose = 'EMD' AND p.created_at BETWEEN ${fromLocal} AND ${toLocal})
+                 OR EXISTS (SELECT 1 FROM physical_docs d WHERE d.tender_id = ti.id AND d.created_at BETWEEN ${fromTz} AND ${toTz})
+                 OR EXISTS (SELECT 1 FROM tender_document_checklists c WHERE c.tender_id = ti.id AND c.created_at BETWEEN ${fromTz} AND ${toTz})
+                 OR EXISTS (SELECT 1 FROM tender_costing_sheets s WHERE s.tender_id = ti.id AND s.created_at BETWEEN ${fromTz} AND ${toTz})
+                 OR EXISTS (SELECT 1 FROM bid_submissions b WHERE b.tender_id = ti.id AND b.status = 'Bid Submitted' AND COALESCE(b.submission_datetime, b.created_at) BETWEEN ${fromTz} AND ${toTz})
+                 OR EXISTS (SELECT 1 FROM timers t WHERE t.entity_id = ti.id AND t.entity_type = 'TENDER' AND t.stage IN ('tender_info_sheet','rfq_sent','emd_requested','physical_docs','document_checklist','costing_sheets','bid_submission') AND t.ended_at BETWEEN ${fromTz} AND ${toTz})
+                ) AS "activeInPeriod",
+                ${artifactFlags("info", "tender_information", "ti_n", "ti_n.created_at", fromLocal, toLocal)},
+                ${artifactFlags("rfq", "rfqs", "ti_r", "ti_r.created_at", fromTz, toTz)},
+                ${artifactFlags("emd", "payment_requests", "ti_e", "ti_e.created_at", fromLocal, toLocal, "AND ti_e.purpose = 'EMD'")},
+                ${artifactFlags("phys", "physical_docs", "ti_p", "ti_p.created_at", fromTz, toTz)},
+                ${artifactFlags("chk", "tender_document_checklists", "ti_c", "ti_c.created_at", fromTz, toTz)},
+                ${artifactFlags("cost", "tender_costing_sheets", "ti_s", "ti_s.created_at", fromTz, toTz)},
+                ${artifactFlags("bid", "bid_submissions", "ti_b", "COALESCE(ti_b.submission_datetime, ti_b.created_at)", fromTz, toTz, "AND ti_b.status = 'Bid Submitted'")},
+                EXISTS (SELECT 1 FROM bid_submissions ti_m WHERE ti_m.tender_id = ti.id AND ti_m.status = 'Tender Missed' AND ti_m.created_at < ${fromTz}) AS "missedBeforeStart",
+                EXISTS (SELECT 1 FROM bid_submissions ti_m WHERE ti_m.tender_id = ti.id AND ti_m.status = 'Tender Missed' AND ti_m.created_at BETWEEN ${fromTz} AND ${toTz}) AS "missedInPeriod"
+            FROM tender_infos ti
+            LEFT JOIN statuses st ON st.id = ti.status
+            WHERE ti.id IN (${tenderIds.join(",")})
+        `))).rows as ArtifactRow[];
+
+        const artifactMap = new Map<number, TenderFacts>();
+
+        const ARTIFACT_STAGE: Record<string, string> = {
+            tender_info_sheet: "info",
+            rfq_sent: "rfq",
+            emd_requested: "emd",
+            physical_docs: "phys",
+            document_checklist: "chk",
+            costing_sheets: "cost",
+            bid_submission: "bid",
+        };
+
+        for (const row of artifactRows) {
+            const facts: TenderFacts = {
+                tenderCategory: factString(row.tenderCategory),
+                tlApproved: Boolean(row.tlApproved),
+                approvedByEnd: Boolean(row.approvedByEnd),
+                missedBeforeStart: Boolean(row.missedBeforeStart),
+                missedInPeriod: Boolean(row.missedInPeriod),
+                rfqRequired: factString(row.rfqRequired),
+                emdRequired: factString(row.emdRequired),
+                physicalDocsRequired: factString(row.physicalDocsRequired),
+                activeInPeriod: Boolean(row.activeInPeriod),
+            };
+
+            for (const [stageKey, key] of Object.entries(ARTIFACT_STAGE)) {
+                facts[stageKey] = { exists: Boolean(row[`${key}Exists`]), inPeriod: Boolean(row[`${key}In`]), byEnd: Boolean(row[`${key}ByEnd`]) };
+            }
+
+            artifactMap.set(Number(row.id), facts);
+        }
 
         const resultsRows = await this.db.select().from(tenderResults).where(inArray(tenderResults.tenderId, tenderIds));
 
         const resultMap = new Map<number, (typeof resultsRows)[number]>();
         resultsRows.forEach(r => resultMap.set(Number(r.tenderId), r));
 
-        // TQ
         const tqs = await this.db.select().from(tenderQueries).where(inArray(tenderQueries.tenderId, tenderIds));
 
         const tqMap = new Map<number, (typeof tqs)[number]>();
         tqs.forEach(tq => tqMap.set(Number(tq.tenderId), tq));
 
-        // RA
         const raResults = await this.db.select().from(reverseAuctions).where(inArray(reverseAuctions.tenderId, tenderIds));
 
         const raMap = new Map<number, (typeof raResults)[number]>();
         raResults.forEach(ra => raMap.set(Number(ra.tenderId), ra));
 
-        /* =====================================================
-       STEP 4: Normalize stage performance
-    ===================================================== */
-
         const output: StagePerformance[] = [];
 
         for (const tender of tenders) {
+            const bucket = mapStatusToKpi(Number(tender.status));
+            const hasBid = ["RESULT_AWAITED", "WON", "LOST", "DISQUALIFIED"].includes(bucket);
+            const facts = artifactMap.get(tender.id);
+
             for (const stage of activeStages) {
-                const hasTq = tqMap.has(tender.id);
-                const bucket = mapStatusToKpi(Number(tender.status));
-
-                const hasBid = ["RESULT_AWAITED", "WON", "LOST", "DISQUALIFIED"].includes(bucket);
-
-                const applicable = stage.stageKey === "tq" ? hasTq : stage.stageKey === "result" ? hasBid : stage.isApplicable(tender);
-
+                let applicable = false;
+                let hidden = false;
                 let completed = false;
                 let onTime: boolean | null = null;
                 let startTime: Date | null = null;
                 let endTime: Date | null = null;
 
-                /* ---------- TIMER-BASED STAGES ---------- */
-                if (applicable && stage.type === "timer" && stage.timerName) {
-                    const timerRow = timerMap.get(`${tender.id}:${stage.timerName}`);
+                const timerRow = stage.type === "timer" && stage.timerName ? timerMap.get(`${tender.id}:${stage.timerName}`) : undefined;
 
-                    if (timerRow) {
-                        startTime = timerRow.startedAt;
-                        endTime = timerRow.endedAt ?? null;
-                        const deadline = stage.resolveDeadline(tender);
-                        const now = new Date();
+                const tenderForGate = { ...tender, rfqRequired: facts?.rfqRequired ?? null, emdRequired: facts?.emdRequired ?? null, physicalDocsRequired: facts?.physicalDocsRequired ?? null };
 
-                        if (timerRow.status === "completed" && endTime) {
-                            completed = true;
-                            onTime = deadline ? endTime <= deadline : null;
-                        } else {
-                            completed = false;
-                            if (deadline) {
-                                // not completed, check SLA
-                                onTime = now <= deadline ? null : false;
-                                // null = still pending, false = overdue
-                            }
-                        }
+                if (stage.type === "timer") {
+                    const deadlineAt = timerDeadline(timerRow, stage, tender);
+                    const startedAt = timerRow?.startedAt ? new Date(timerRow.startedAt) : null;
+                    const endedAt = timerRow?.endedAt ? new Date(timerRow.endedAt) : null;
+
+                    const closedInPeriod = endedAt !== null && endedAt >= periodStart && endedAt <= periodEnd;
+                    const openAtEnd = (endedAt === null || endedAt > periodEnd) && startedAt !== null && startedAt <= periodEnd && (startedAt >= periodStart || (deadlineAt !== null && deadlineAt >= periodStart));
+                    const inWindow = deadlineAt !== null && (closedInPeriod || openAtEnd);
+
+                    const gated = GATED_STAGES.has(stage.stageKey);
+                    const sheetInPeriod = Boolean((facts?.tender_info_sheet as StageArtifactFlags | undefined)?.inPeriod);
+                    const flagOk = !gated || (stage.isApplicable ? stage.isApplicable(tenderForGate) : false);
+                    const na = gated && sheetInPeriod && !flagOk;
+
+                    applicable = !na && inWindow;
+                    hidden = gated && !na && !inWindow;
+
+                    if (applicable && deadlineAt !== null) {
+                        completed = closedInPeriod;
+                        startTime = startedAt;
+                        endTime = closedInPeriod ? endedAt : null;
+                        onTime = closedInPeriod ? endedAt <= deadlineAt : periodEnd > deadlineAt ? false : null;
                     }
-                }
+                } else if (stage.stageKey === "tq" || stage.stageKey === "ra" || stage.stageKey === "result") {
+                    const source = (stage.stageKey === "tq" ? tqMap.get(tender.id) : stage.stageKey === "ra" ? raMap.get(tender.id) : resultMap.get(tender.id)) as { createdAt?: Date | string | null } | undefined;
 
-                /* ---------- EXISTENCE-BASED STAGES ---------- */
-                if (applicable && stage.type === "existence") {
-                    if (stage.stageKey === "result") {
-                        const result = resultMap.get(tender.id);
-                        completed = Boolean(result?.status);
-                    }
+                    const createdAt = source?.createdAt ? new Date(source.createdAt) : null;
+                    const createdInPeriod = createdAt !== null && createdAt >= periodStart && createdAt <= periodEnd;
 
-                    if (stage.stageKey === "ra") {
-                        completed = raMap.has(tender.id);
-                    }
+                    applicable = stage.stageKey === "result" ? hasBid : existedByPeriod(source);
+                    completed = applicable && Boolean(source) && createdInPeriod;
 
-                    if (stage.stageKey === "tq") {
-                        completed = tqMap.has(tender.id);
-                    }
+                    if (applicable && createdAt !== null && createdAt < periodStart) applicable = false;
 
+                    startTime = createdAt;
+                    endTime = completed ? createdAt : null;
                     onTime = null;
                 }
 
@@ -349,11 +437,12 @@ export class TenderExecutiveService {
                     tenderName: tender.tenderName ?? null,
                     stageKey: stage.stageKey,
                     applicable,
+                    hidden,
                     completed,
                     onTime,
                     startTime,
-                    endTime,
-                    deadline: stage.resolveDeadline(tender),
+                    endTime: completed ? endTime : null,
+                    deadline: timerDeadline(timerRow, stage, tender),
                 });
             }
         }
@@ -361,16 +450,9 @@ export class TenderExecutiveService {
         return output;
     }
 
-    /**
-     * Aggregated metrics
-     * Derived from getStagePerformance()
-     */
     async getSummary(query: PerformanceQueryDto) {
         const stagePerformances = await this.getStagePerformance(query);
 
-        // -------------------------------
-        // Tender count (unique tenders)
-        // -------------------------------
         const tenderSet = new Set<number>();
         for (const stage of stagePerformances) {
             tenderSet.add(stage.tenderId);
@@ -382,9 +464,6 @@ export class TenderExecutiveService {
         let onTimeStages = 0;
         let lateStages = 0;
 
-        // -------------------------------
-        // Aggregate stage metrics
-        // -------------------------------
         for (const stage of stagePerformances) {
             if (!stage.applicable) {
                 continue;
@@ -407,9 +486,6 @@ export class TenderExecutiveService {
             }
         }
 
-        // -------------------------------
-        // Rates (safe division)
-        // -------------------------------
         const completionRate = applicableStages > 0 ? Math.round((completedStages / applicableStages) * 100) : 0;
 
         const onTimeRate = completedStages > 0 ? Math.round((onTimeStages / completedStages) * 100) : 0;
@@ -432,29 +508,34 @@ export class TenderExecutiveService {
     async getOutcomes(query: PerformanceQueryDto) {
         const { userId, fromDate, toDate } = query;
 
+        const period = istDayBounds(fromDate.toISOString().slice(0, 10), toDate.toISOString().slice(0, 10));
+
         const tenders = await this.db
             .select()
             .from(tenderInfos)
-            .where(and(eq(tenderInfos.teamMember, userId), eq(tenderInfos.deleteStatus, 0), between(tenderInfos.createdAt, fromDate, toDate)));
+            .where(
+                and(
+                    eq(tenderInfos.teamMember, userId),
+                    eq(tenderInfos.deleteStatus, 0),
+                    gte(tenderInfos.createdAt, period.start),
+                    lte(tenderInfos.createdAt, period.end)
+                )
+            );
 
         const counters = {
             allocated: 0,
 
-            // PRE-BID
             pending: 0,
             approved: 0,
             rejected: 0,
 
-            // POST-BID
             bid: 0,
             missed: 0,
 
-            // BID OUTCOMES
             resultAwaited: 0,
             won: 0,
             lost: 0,
 
-            // CROSS-CUTTING
             disqualified: 0,
         };
 
@@ -486,15 +567,9 @@ export class TenderExecutiveService {
                 statusBucket: bucket,
             };
 
-            // ----------------------------------
-            // ALLOCATED (all tenders)
-            // ----------------------------------
             counters.allocated++;
             tendersByKpi.ALLOCATED.push(meta);
 
-            // ----------------------------------
-            // PRE-BID PHASE
-            // ----------------------------------
             if (bucket === "PENDING" || bucket === "ALLOCATED") {
                 counters.pending++;
                 tendersByKpi.PENDING.push(meta);
@@ -507,13 +582,8 @@ export class TenderExecutiveService {
                 continue;
             }
 
-            // If we reach here, tender was APPROVED
             counters.approved++;
             tendersByKpi.APPROVED.push(meta);
-
-            // ----------------------------------
-            // POST-BID PHASE (only approved)
-            // ----------------------------------
 
             if (bucket === "MISSED") {
                 counters.missed++;
@@ -521,13 +591,9 @@ export class TenderExecutiveService {
                 continue;
             }
 
-            // If we reach here, bid was submitted
             counters.bid++;
             tendersByKpi.BID.push(meta);
 
-            // ----------------------------------
-            // BID OUTCOMES
-            // ----------------------------------
             if (bucket === "RESULT_AWAITED") {
                 counters.resultAwaited++;
                 tendersByKpi.RESULT_AWAITED.push(meta);
@@ -557,7 +623,9 @@ export class TenderExecutiveService {
     }
 
     async getStageMatrix(query: PerformanceQueryDto) {
-        const stages = await this.getStagePerformance(query);
+        const stages = (await this.getStagePerformance(query)).filter(s => !MATRIX_STAGE_EXCLUSIONS.has(s.stageKey));
+
+        const periodEnd = istDayBounds(query.fromDate.toISOString().slice(0, 10), query.toDate.toISOString().slice(0, 10)).end;
 
         const stageTenderIds = Array.from(new Set(stages.map(s => s.tenderId)));
         const tenderDetails = new Map<number, { value: number; status: string | null }>();
@@ -578,14 +646,8 @@ export class TenderExecutiveService {
             }
         }
 
-        // ----------------------------------------
-        // Resolve unique stages (column order)
-        // ----------------------------------------
         const stageKeys = Array.from(new Set(stages.map(s => s.stageKey)));
 
-        // ----------------------------------------
-        // Initialize counters
-        // ----------------------------------------
         const counters = new Map<
             string,
             {
@@ -625,9 +687,6 @@ export class TenderExecutiveService {
             });
         }
 
-        // ----------------------------------------
-        // Populate counters
-        // ----------------------------------------
         for (const stage of stages) {
             const counter = counters.get(stage.stageKey)!;
 
@@ -642,7 +701,7 @@ export class TenderExecutiveService {
                 completedAt: stage.endTime ?? null,
                 daysOverdue:
                     !stage.completed && stage.onTime === false && stage.deadline
-                        ? Math.max(0, Math.ceil((Date.now() - new Date(stage.deadline).getTime()) / (1000 * 60 * 60 * 24)))
+                        ? Math.max(0, Math.ceil((periodEnd.getTime() - new Date(stage.deadline).getTime()) / (1000 * 60 * 60 * 24)))
                         : null,
                 meta: {},
             };
@@ -679,10 +738,12 @@ export class TenderExecutiveService {
             }
 
             if (!stage.applicable) {
-                counter.notApplicable++;
-                counter.drilldown.notApplicable.push(tenderMeta);
-                continue;
-            }
+                    if (!stage.hidden) {
+                        counter.notApplicable++;
+                        counter.drilldown.notApplicable.push(tenderMeta);
+                    }
+                    continue;
+                }
 
             if (!stage.completed) {
                 if (stage.onTime === false) {
@@ -695,7 +756,6 @@ export class TenderExecutiveService {
                 continue;
             }
 
-            // Completed
             counter.done++;
             counter.drilldown.done.push(tenderMeta);
 
@@ -710,9 +770,6 @@ export class TenderExecutiveService {
             }
         }
 
-        // ----------------------------------------
-        // Build rows (UI order)
-        // ----------------------------------------
         const rows = [
             {
                 key: "done",
@@ -747,8 +804,8 @@ export class TenderExecutiveService {
             {
                 key: "notApplicable",
                 label: "Not Applicable",
-                data: stageKeys.map(k => counters.get(k)!.notApplicable),
-                drilldown: stageKeys.map(k => counters.get(k)!.drilldown.notApplicable),
+                data: stageKeys.map(k => (GATED_STAGES.has(k) ? counters.get(k)!.notApplicable : 0)),
+                drilldown: stageKeys.map(k => (GATED_STAGES.has(k) ? counters.get(k)!.drilldown.notApplicable : [])),
             },
         ];
 
@@ -761,12 +818,7 @@ export class TenderExecutiveService {
     async getTenderList(query: TenderListQuery) {
         const { userId, fromDate, toDate, kpi } = query;
 
-        const from = new Date(`${fromDate}T00:00:00.000Z`);
-        const to = new Date(`${toDate}T23:59:59.999Z`);
-
-        /* ----------------------------------------
-       Step 1: Fetch tenders
-    ---------------------------------------- */
+        const { start: from, end: to } = istDayBounds(fromDate, toDate);
 
         const tenders = await this.db
             .select({
@@ -782,10 +834,6 @@ export class TenderExecutiveService {
             .where(and(eq(tenderInfos.teamMember, userId), eq(tenderInfos.deleteStatus, 0), between(tenderInfos.createdAt, from, to)));
 
         if (tenders.length === 0) return [];
-
-        /* ----------------------------------------
-       Step 2: Normalize + filter by KPI bucket
-    ---------------------------------------- */
 
         return tenders
             .map(t => {
@@ -810,12 +858,10 @@ export class TenderExecutiveService {
     async getTrends(query: PerformanceQueryDto & { bucket?: "week" | "month" }) {
         const { userId, fromDate, toDate, bucket = "week" } = query;
 
-        // 1️⃣ Fetch all stage performance ONCE
         const stageData = await this.getStagePerformance(query);
 
         if (stageData.length === 0) return [];
 
-        // 2️⃣ Group stages by tenderId
         const stagesByTender = new Map<number, StagePerformance[]>();
         for (const s of stageData) {
             if (!stagesByTender.has(s.tenderId)) {
@@ -824,7 +870,6 @@ export class TenderExecutiveService {
             stagesByTender.get(s.tenderId)!.push(s);
         }
 
-        // 3️⃣ Fetch tender createdAt for bucketing
         const tenders = await this.db
             .select({
                 id: tenderInfos.id,
@@ -833,7 +878,6 @@ export class TenderExecutiveService {
             .from(tenderInfos)
             .where(and(eq(tenderInfos.teamMember, userId), eq(tenderInfos.deleteStatus, 0), between(tenderInfos.createdAt, new Date(fromDate), new Date(toDate))));
 
-        // 4️⃣ Group tenders by time bucket
         const buckets = new Map<
             string,
             {
@@ -868,7 +912,6 @@ export class TenderExecutiveService {
             }
         }
 
-        // 5️⃣ Normalize to chart data
         return Array.from(buckets.entries()).map(([label, stats]) => ({
             label,
             completion: stats.applicable > 0 ? Math.round((stats.completed / stats.applicable) * 100) : 0,
@@ -880,7 +923,7 @@ export class TenderExecutiveService {
         const summary = await this.getSummary(query);
         const outcomes = await this.getOutcomes(query);
 
-        const velocityScore = summary.completionRate; // proxy for now
+        const velocityScore = summary.completionRate;
         const accuracyScore = summary.onTimeRate;
 
         const outcomeScore = outcomes.resultAwaited > 0 ? Math.round((outcomes.won / outcomes.resultAwaited) * 100) : 0;
@@ -895,18 +938,10 @@ export class TenderExecutiveService {
         };
     }
 
-    //LOGIC FOR STAGE BACKLOG (STAGE-WISE OPEN TENDERS)
-    // =======================================================
-    // STAGE BACKLOG (STATUS-DRIVEN, CUMULATIVE)
-    // =======================================================
-
     async getStageBacklog(query: StageBacklogQueryDto) {
         const from = new Date(`${query.fromDate}T00:00:00.000Z`);
         const to = new Date(`${query.toDate}T23:59:59.999Z`);
 
-        // --------------------------------------------------
-        // 1️⃣ Fetch tender universe (till `to`)
-        // --------------------------------------------------
         const conditions = [eq(tenderInfos.deleteStatus, 0), between(tenderInfos.createdAt, new Date("2000-01-01"), to)];
 
         if (query.view === "user" && query.userId) {
@@ -924,9 +959,6 @@ export class TenderExecutiveService {
 
         if (!tenders.length) return [];
 
-        // --------------------------------------------------
-        // 2️⃣ Stage Matrix (CURRENT truth)
-        // --------------------------------------------------
         const stageMatrix =
             query.view === "user" && query.userId
                 ? await this.getStagePerformance({
@@ -943,9 +975,6 @@ export class TenderExecutiveService {
             stageMatrixMap.set(`${row.tenderId}:${row.stageKey}`, row);
         }
 
-        // --------------------------------------------------
-        // 3️⃣ Aggregate per stage
-        // --------------------------------------------------
         return STAGE_BACKLOG_CONFIG.map(stage => {
             const metrics = {
                 opening: { count: 0, value: 0, drilldown: [] as any[] },
@@ -958,7 +987,6 @@ export class TenderExecutiveService {
             for (const tender of tenders) {
                 const bucket = mapStatusToKpi(Number(tender.status));
 
-                // 🔴 TERMINAL TENDERS ARE NEVER PART OF BACKLOG
                 if (TERMINAL_KPI.includes(bucket)) {
                     continue;
                 }
@@ -975,7 +1003,7 @@ export class TenderExecutiveService {
                     tenderNo: tender.tenderNo ?? null,
                     tenderName: tender.tenderName ?? null,
                     value,
-                    status: bucket, // ✅ normalized KPI status
+                    status: bucket,
                     deadline: matrixRow?.deadline ?? null,
                     daysOverdue:
                         matrixRow && !matrixRow.completed && matrixRow.onTime === false && matrixRow.deadline
@@ -983,9 +1011,6 @@ export class TenderExecutiveService {
                             : null,
                 };
 
-                // ===============================
-                // OPENING — OLD TENDERS ONLY
-                // ===============================
                 if (isOldTender) {
                     const applicable = stage.isApplicable?.(tender) ?? true;
 
@@ -999,9 +1024,6 @@ export class TenderExecutiveService {
                     continue;
                 }
 
-                // ===============================
-                // CURRENT TENDERS — STAGE MATRIX TRUTH
-                // ===============================
                 if (!isOldTender) {
                     const state = classifyStage(matrixRow);
 
@@ -1009,7 +1031,6 @@ export class TenderExecutiveService {
                         continue;
                     }
 
-                    // CURRENT = applicable stages only
                     metrics.current.count++;
                     metrics.current.value += value;
                     metrics.current.drilldown.push(meta);
@@ -1050,21 +1071,15 @@ export class TenderExecutiveService {
         const activeStages = getExecutiveStages();
         const tenderIds = tenders.map(t => t.id);
 
-        // -----------------------------
-        // Timers (USER + TEAM MODE)
-        // -----------------------------
         let timerMap = new Map<string, any>();
 
         const timerNames = activeStages.filter(s => s.type === "timer" && s.timerName).map(s => s.timerName!);
 
         const timerConditions = [inArray(timerTrackers.entityId, tenderIds), inArray(timerTrackers.stage, timerNames)];
 
-        // User view → only that user's timers
         if (mode === "user" && userId) {
             timerConditions.push(eq(timerTrackers.createdByUserId, userId));
         }
-
-        // Team view → ALL timers (no user filter)
 
         const timers = await this.db
             .select()
@@ -1075,9 +1090,6 @@ export class TenderExecutiveService {
             timerMap.set(`${t.entityId}:${t.stage}`, t);
         });
 
-        // -----------------------------
-        // Existence data (shared)
-        // -----------------------------
         const [resultsRows, tqs, raResults] = await Promise.all([
             this.db.select().from(tenderResults).where(inArray(tenderResults.tenderId, tenderIds)),
             this.db.select().from(tenderQueries).where(inArray(tenderQueries.tenderId, tenderIds)),
@@ -1088,9 +1100,6 @@ export class TenderExecutiveService {
         const tqMap = new Map(tqs.map(tq => [Number(tq.tenderId), tq]));
         const raMap = new Map(raResults.map(ra => [Number(ra.tenderId), ra]));
 
-        // -----------------------------
-        // Normalize stages
-        // -----------------------------
         const output: StagePerformance[] = [];
 
         for (const tender of tenders) {
@@ -1105,7 +1114,6 @@ export class TenderExecutiveService {
                 let startTime: Date | null = null;
                 let endTime: Date | null = null;
 
-                // TIMER STAGES → only user mode
                 if (applicable && mode === "user" && stage.type === "timer" && stage.timerName) {
                     const timer = timerMap.get(`${tender.id}:${stage.timerName}`);
                     if (timer) {
@@ -1123,7 +1131,6 @@ export class TenderExecutiveService {
                     }
                 }
 
-                // EXISTENCE STAGES → both modes
                 if (applicable && stage.type === "existence") {
                     if (stage.stageKey === "result") {
                         completed = Boolean(resultMap.get(tender.id)?.status);
@@ -1156,16 +1163,10 @@ export class TenderExecutiveService {
     }
 
     async getStagePerformanceForTeamAggregated(teamId: number, fromDate: Date, toDate: Date): Promise<StagePerformance[]> {
-        // --------------------------------------------------
-        // 1️⃣ Fetch users in the team
-        // --------------------------------------------------
         const teamUsers = await this.db.select({ id: users.id }).from(users).where(eq(users.team, teamId));
 
         if (!teamUsers.length) return [];
 
-        // --------------------------------------------------
-        // 2️⃣ Aggregate stage performance per user
-        // --------------------------------------------------
         const aggregated: StagePerformance[] = [];
 
         for (const user of teamUsers) {
@@ -1181,9 +1182,38 @@ export class TenderExecutiveService {
         return aggregated;
     }
 
+    private mapDrilldown(rows: any[], dateMode: DrilldownDateMode = "assigned") {
+        const pick: Record<DrilldownDateMode, (t: any) => unknown> = {
+            assigned: t => t.created_at,
+            infoFilled: t => t.info_filled_at,
+            approved: t => t.tl_approval_timestamp ?? t.info_filled_at,
+            bidSubmitted: t => t.bid_submitted_at ?? t.missed_at,
+            resultEval: t => t.result_created_at ?? t.bid_submitted_at,
+            resultUploaded: t => t.result_resolved_at,
+            tenderUpdated: t => t.updated_at,
+        };
+
+        return rows.map(t => ({
+            tenderId: t.id,
+            tenderNo: t.tender_no ?? t.tenderNo,
+            tenderName: t.tender_name ?? t.tenderName,
+            value: Number(t.effective_value ?? t.gst_values ?? 0),
+            status: t.status_name ?? null,
+            date: (pick[dateMode](t) as string | undefined) ?? null,
+        }));
+    }
+
     async getStageBacklogV2(query: { view: "user" | "team" | "all"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
-        const from = `${query.fromDate}T00:00:00.000Z`;
-        const to = `${query.toDate}T23:59:59.999Z`;
+        const APP_ZONE = `'Asia/Calcutta'`;
+
+        const fromTz = `(('${query.fromDate}'::date + TIME '00:00:00') AT TIME ZONE ${APP_ZONE})`;
+        const toTz = `(('${query.toDate}'::date + TIME '23:59:59.999') AT TIME ZONE ${APP_ZONE})`;
+
+        const fromUtc = `(timezone('UTC', ('${query.fromDate}'::date + TIME '00:00:00') AT TIME ZONE ${APP_ZONE}))`;
+        const toUtc = `(timezone('UTC', ('${query.toDate}'::date + TIME '23:59:59.999') AT TIME ZONE ${APP_ZONE}))`;
+
+        const fromLocal = `(('${query.fromDate}'::date + TIME '00:00:00'))`;
+        const toLocal = `(('${query.toDate}'::date + TIME '23:59:59.999'))`;
 
         const baseWhere = () => {
             let w = `ti.delete_status = 0`;
@@ -1198,10 +1228,6 @@ export class TenderExecutiveService {
 
         const exec = async (sqlText: string) => (await this.db.execute(sql.raw(sqlText))).rows as any[];
 
-        /**
-         * 🔥 BASE SELECT WITH VALUE SWITCH
-         * Switch to final_price only AFTER Bid Submitted
-         */
         const baseSelect = `
         SELECT
             ti.*,
@@ -1215,6 +1241,32 @@ export class TenderExecutiveService {
                 THEN COALESCE(tcd.final_price, ti.gst_values)
                 ELSE ti.gst_values
             END AS effective_value,
+            (
+                SELECT MIN(tin.created_at)
+                FROM tender_information tin
+                WHERE tin.tender_id = ti.id
+            ) AS info_filled_at,
+            (
+                SELECT MIN(bs.submission_datetime)
+                FROM bid_submissions bs
+                WHERE bs.tender_id = ti.id
+            ) AS bid_submitted_at,
+            (
+                SELECT MIN(bs.created_at)
+                FROM bid_submissions bs
+                WHERE bs.tender_id = ti.id
+                  AND bs.status = 'Tender Missed'
+            ) AS missed_at,
+            (
+                SELECT MIN(tr.created_at)
+                FROM tender_results tr
+                WHERE tr.tender_id = ti.id
+            ) AS result_created_at,
+            (
+                SELECT COALESCE(MAX(tr.result_uploaded_at), MAX(tr.updated_at))
+                FROM tender_results tr
+                WHERE tr.tender_id = ti.id
+            ) AS result_resolved_at,
             sst.name AS status_name
         FROM tender_infos ti
         LEFT JOIN LATERAL (
@@ -1236,25 +1288,15 @@ export class TenderExecutiveService {
         const resolvedResultStatuses =
             "'won','lost','disqualified','cancelled','lost - h1 elimination'";
         const receivedResultStatuses = "'won','lost','cancelled','lost - h1 elimination'";
-        /* =====================================================
-       ASSIGNED
-    ===================================================== */
-        /**
-         * Pending at Start
-         * Point-in-time: assigned before ${from} with no info sheet as of ${from}.
-         * Carry-over whose sheet landed during the period still counts as pending
-         * at the start. Legacy rows with no info sheet at all and a progressed
-         * status are excluded.
-         */
         const assignedOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-        AND ti.created_at < '${from}'
+        AND ti.created_at < ${fromTz}
         AND NOT EXISTS (
             SELECT 1
             FROM tender_information tin
             WHERE tin.tender_id = ti.id
-            AND tin.created_at < '${from}'
+            AND tin.created_at < ${fromLocal}
         )
         AND (
             EXISTS (
@@ -1265,24 +1307,12 @@ export class TenderExecutiveService {
             OR ti.status = 1
         )
         `);
-        /**
-         * Allocated During Period
-         * All tenders assigned during selected period
-         */
         const assignedDuringTotal = await exec(`
             ${baseSelect}
             WHERE ${baseWhere()}
-            AND ti.created_at BETWEEN '${from}' AND '${to}'
+            AND ti.created_at BETWEEN ${fromTz} AND ${toTz}
             `);
 
-        /**
-         * Info Filled During
-         * Info sheet saved during the period (any assignment date) — this is the
-         * shared source for both the Assignment and Approval "Info Filled" columns.
-         * Also counts tenders assigned during the period that progressed past
-         * Read Tender with no info sheet recorded, since reaching a later status
-         * implies the information was captured.
-         */
         const assignedDuringCompleted = await exec(`
             ${baseSelect}
             WHERE ${baseWhere()}
@@ -1291,10 +1321,10 @@ export class TenderExecutiveService {
                     SELECT 1
                     FROM tender_information tin
                     WHERE tin.tender_id = ti.id
-                    AND tin.created_at BETWEEN '${from}' AND '${to}'
+                    AND tin.created_at BETWEEN ${fromLocal} AND ${toLocal}
                 )
                 OR (
-                    ti.created_at BETWEEN '${from}' AND '${to}'
+                    ti.created_at BETWEEN ${fromTz} AND ${toTz}
                     AND NOT EXISTS (
                         SELECT 1
                         FROM tender_information tin
@@ -1305,38 +1335,28 @@ export class TenderExecutiveService {
             )
             `);
 
-        /**
-         * Pending at End
-         * Assigned on or before end of period and still no info sheet by end
-         * (includes carry-over backlog from pending-at-start).
-         */
         const assignedClosingPending = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-        AND ti.created_at <= '${to}'
-        AND ti.status = 1
+        AND ti.created_at <= ${toTz}
         AND NOT EXISTS (
             SELECT 1
             FROM tender_information tin
             WHERE tin.tender_id = ti.id
-            AND tin.created_at <= '${to}'
+            AND tin.created_at <= ${toLocal}
+        )
+        AND (
+            EXISTS (
+                SELECT 1
+                FROM tender_information tin
+                WHERE tin.tender_id = ti.id
+            )
+            OR ti.status = 1
         )
         `);
 
-        /**
-         * Closing Total (pending backlog)
-         */
         const assignedTotal = assignedClosingPending;
-        /* =====================================================
-       APPROVED
-    ===================================================== */
 
-        /**
-         * Pending at Start
-         * Info sheet filled before the period and still awaiting approval
-         * (tl_status 0 = pending, 3 = incomplete bounce — neither decided).
-         * Point-in-time: a tender decided after ${from} was pending at ${from}.
-         */
         const approvedOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
@@ -1344,13 +1364,13 @@ export class TenderExecutiveService {
               SELECT 1
               FROM tender_information tin
               WHERE tin.tender_id = ti.id
-                AND tin.created_at < '${from}'
+                AND tin.created_at < ${fromLocal}
           )
           AND (
               ti.tl_status IN (0,3)
               OR (
                   ti.tl_status IN (1,2)
-                  AND ti.tl_approval_timestamp >= '${from}'
+                  AND ti.tl_approval_timestamp >= ${fromUtc}
               )
           )
     `);
@@ -1358,7 +1378,7 @@ export class TenderExecutiveService {
         const approvedDuringAccepted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-        AND ti.tl_approval_timestamp BETWEEN '${from}' AND '${to}'
+        AND ti.tl_approval_timestamp BETWEEN ${fromUtc} AND ${toUtc}
         AND EXISTS (
             SELECT 1
             FROM tender_information tin
@@ -1370,7 +1390,7 @@ export class TenderExecutiveService {
         const approvedDuringRejected = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-        AND ti.tl_approval_timestamp BETWEEN '${from}' AND '${to}'
+        AND ti.tl_approval_timestamp BETWEEN ${fromUtc} AND ${toUtc}
         AND EXISTS (
             SELECT 1
             FROM tender_information tin
@@ -1383,38 +1403,40 @@ export class TenderExecutiveService {
         ${baseSelect}
         JOIN tender_information tin ON tin.tender_id = ti.id
         WHERE ${baseWhere()}
-          AND tin.created_at <= '${to}'
+          AND tin.created_at <= ${toLocal}
           AND (
               ti.tl_status IN (0,3)
               OR (
                   ti.tl_status IN (1,2)
-                  AND ti.tl_approval_timestamp > '${to}'
+                  AND ti.tl_approval_timestamp > ${toUtc}
               )
           )
     `);
-
-        /* =====================================================
-       BID
-    ===================================================== */
 
         const bidOpening = await exec(`
         ${baseSelect}
         JOIN statuses st ON st.id = ti.status
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
-          AND ti.tl_approval_timestamp < '${from}'
-          AND st.tender_category <> 'dnb'
+          AND (ti.tl_approval_timestamp IS NULL OR ti.tl_approval_timestamp < ${fromUtc})
           AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
+                  AND (
+                        (bs.status = 'Bid Submitted'
+                         AND COALESCE(bs.submission_datetime, bs.created_at) < ${fromTz})
+                     OR (bs.status = 'Tender Missed'
+                         AND bs.created_at < ${fromTz})
+                  )
           )
+          AND st.tender_category NOT IN ('won', 'lost')
     `);
 
         const bidDuringTotal = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.tl_approval_timestamp BETWEEN '${from}' AND '${to}'
+          AND ti.tl_approval_timestamp BETWEEN ${fromUtc} AND ${toUtc}
           AND EXISTS (
                 SELECT 1
                 FROM tender_information tin
@@ -1432,7 +1454,7 @@ export class TenderExecutiveService {
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND bs.status = 'Bid Submitted'
-                  AND bs.submission_datetime BETWEEN '${from}' AND '${to}'
+                  AND COALESCE(bs.submission_datetime, bs.created_at) BETWEEN ${fromTz} AND ${toTz}
           )
     `);
 
@@ -1440,25 +1462,17 @@ export class TenderExecutiveService {
         ${baseSelect}
         JOIN statuses st ON st.id = ti.status
         WHERE ${baseWhere()}
-          AND ti.tl_status IN (1, 2)
+          AND ti.tl_status = 1
           AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND bs.status = 'Bid Submitted'
-                  AND bs.submission_datetime <= '${to}'
+                  AND COALESCE(bs.submission_datetime, bs.created_at) <= ${toTz}
           )
-          AND (
-                st.tender_category = 'dnb'
-             OR EXISTS (
-                    SELECT 1
-                    FROM bid_submissions bs
-                    WHERE bs.tender_id = ti.id
-                      AND bs.status = 'Tender Missed'
-                )
-          )
-          AND ti.updated_at >= '${from}'
-          AND ti.updated_at <= '${to}'
+          AND st.tender_category = 'dnb'
+          AND ti.updated_at >= ${fromTz}
+          AND ti.updated_at <= ${toTz}
     `);
 
         const bidTotal = await exec(`
@@ -1466,57 +1480,47 @@ export class TenderExecutiveService {
         JOIN statuses st ON st.id = ti.status
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
-          AND ti.tl_approval_timestamp >= '${from}'
-          AND ti.tl_approval_timestamp <= '${to}'
-          AND st.tender_category <> 'dnb'
+          AND (ti.tl_approval_timestamp IS NULL OR ti.tl_approval_timestamp <= ${toUtc})
+          AND st.tender_category NOT IN ('won', 'lost')
           AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND (
-                        (bs.status = 'Bid Submitted' AND bs.submission_datetime <= '${to}')
-                     OR (bs.status = 'Tender Missed'    AND bs.created_at <= '${to}')
+                        (bs.status = 'Bid Submitted' AND COALESCE(bs.submission_datetime, bs.created_at) <= ${toTz})
+                     OR (bs.status = 'Tender Missed'    AND bs.created_at <= ${toTz})
                   )
           )
     `);
 
-        /* =====================================================
-       RESULT AWAITED
-    ===================================================== */
-
         const resultAwaitedOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND bs.status = 'Bid Submitted'
-                  AND bs.submission_datetime < '${from}'
+                  AND COALESCE(bs.submission_datetime, bs.created_at) < ${fromTz}
           )
           AND NOT EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND (
-                        LOWER(TRIM(tr.status)) IN (${resolvedResultStatuses})
-                     OR (LOWER(TRIM(tr.status)) = 'under evaluation'
-                         AND tr.created_at >= '${from}')
-                  )
+                  AND LOWER(TRIM(tr.status)) IN (${resolvedResultStatuses})
+                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) <= ${fromTz}
           )
     `);
 
         const resultAwaitedDuringTotal = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND bs.status = 'Bid Submitted'
-                  AND bs.submission_datetime BETWEEN '${from}' AND '${to}'
+                  AND COALESCE(bs.submission_datetime, bs.created_at) BETWEEN ${fromTz} AND ${toTz}
           )
     `);
 
@@ -1529,7 +1533,7 @@ export class TenderExecutiveService {
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
                   AND LOWER(TRIM(tr.status)) = 'won'
-                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN '${from}' AND '${to}'
+                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN ${fromTz} AND ${toTz}
           )
     `);
 
@@ -1542,60 +1546,50 @@ export class TenderExecutiveService {
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
                   AND LOWER(TRIM(tr.status)) IN ('lost', 'lost - h1 elimination')
-                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN '${from}' AND '${to}'
+                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN ${fromTz} AND ${toTz}
           )
     `);
 
         const resultAwaitedDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND (
-                        (LOWER(TRIM(tr.status)) IN (${receivedResultStatuses})
-                          AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN '${from}' AND '${to}')
-                     OR (LOWER(TRIM(tr.status)) = 'disqualified'
-                          AND tr.created_at BETWEEN '${from}' AND '${to}')
-                  )
+                  AND LOWER(TRIM(tr.status)) IN (${receivedResultStatuses})
+                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN ${fromTz} AND ${toTz}
           )
     `);
 
         const disqualifiedDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
                   AND LOWER(TRIM(tr.status)) = 'disqualified'
-                  AND tr.created_at BETWEEN '${from}' AND '${to}'
+                  AND tr.created_at BETWEEN ${fromTz} AND ${toTz}
           )
     `);
 
         const resultAwaitedClosing = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND bs.status = 'Bid Submitted'
-                  AND bs.submission_datetime <= '${to}'
+                  AND COALESCE(bs.submission_datetime, bs.created_at) <= ${toTz}
           )
           AND NOT EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND (
-                        LOWER(TRIM(tr.status)) IN (${resolvedResultStatuses})
-                     OR (LOWER(TRIM(tr.status)) = 'under evaluation'
-                         AND tr.created_at >= '${to}')
-                  )
+                  AND LOWER(TRIM(tr.status)) IN (${resolvedResultStatuses})
+                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) <= ${toTz}
           )
     `);
 
@@ -1608,7 +1602,7 @@ export class TenderExecutiveService {
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
                   AND LOWER(TRIM(tr.status)) = 'won'
-                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) < '${from}'
+                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) < ${fromTz}
           )
     `);
 
@@ -1621,7 +1615,7 @@ export class TenderExecutiveService {
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
                   AND LOWER(TRIM(tr.status)) IN ('lost', 'lost - h1 elimination')
-                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) < '${from}'
+                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) < ${fromTz}
           )
     `);
 
@@ -1629,19 +1623,15 @@ export class TenderExecutiveService {
         ${baseSelect}
         WHERE ${baseWhere()}
           AND ti.status = 18
-          AND ti.updated_at < '${from}'
+          AND ti.updated_at < ${fromTz}
     `);
 
         const cancelledDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
           AND ti.status = 18
-          AND ti.updated_at BETWEEN '${from}' AND '${to}'
+          AND ti.updated_at BETWEEN ${fromTz} AND ${toTz}
     `);
-
-        /* =====================================================
-        FINAL RESPONSE
-    ===================================================== */
 
         const wonTotalSet = new Map();
         [...wonOpening, ...wonDuringCompleted].forEach(t => {
@@ -1662,8 +1652,8 @@ export class TenderExecutiveService {
         const cancelledTotal = Array.from(cancelledTotalSet.values());
 
         return {
-            from: new Date(from),
-            to: new Date(to),
+            from: new Date(`${query.fromDate}T00:00:00+05:30`),
+            to: new Date(`${query.toDate}T23:59:59.999+05:30`),
             stages: {
                 assigned: {
                     opening: {
@@ -1688,11 +1678,8 @@ export class TenderExecutiveService {
                         completed: {
                             count: assignedDuringCompleted.length,
                             value: this.sumValue(assignedDuringCompleted),
-                            drilldown: this.mapDrilldown(assignedDuringCompleted),
+                            drilldown: this.mapDrilldown(assignedDuringCompleted, "infoFilled"),
                         },
-
-                        // statusChanged is intentionally no longer reported for this
-                        // stage: it duplicated the assignment cohort and was never rendered.
 
                         pending: {
                             count: assignedClosingPending.length,
@@ -1706,28 +1693,28 @@ export class TenderExecutiveService {
                     opening: {
                         count: approvedOpening.length,
                         value: this.sumValue(approvedOpening),
-                        drilldown: this.mapDrilldown(approvedOpening),
+                        drilldown: this.mapDrilldown(approvedOpening, "infoFilled"),
                     },
                     total: {
                         count: approvedTotal.length,
                         value: this.sumValue(approvedTotal),
-                        drilldown: this.mapDrilldown(approvedTotal),
+                        drilldown: this.mapDrilldown(approvedTotal, "infoFilled"),
                     },
                     during: {
                         total: {
                             count: assignedDuringCompleted.length,
                             value: this.sumValue(assignedDuringCompleted),
-                            drilldown: this.mapDrilldown(assignedDuringCompleted),
+                            drilldown: this.mapDrilldown(assignedDuringCompleted, "infoFilled"),
                         },
                         completed: {
                             count: approvedDuringAccepted.length,
                             value: this.sumValue(approvedDuringAccepted),
-                            drilldown: this.mapDrilldown(approvedDuringAccepted),
+                            drilldown: this.mapDrilldown(approvedDuringAccepted, "approved"),
                         },
                         rejected: {
                             count: approvedDuringRejected.length,
                             value: this.sumValue(approvedDuringRejected),
-                            drilldown: this.mapDrilldown(approvedDuringRejected),
+                            drilldown: this.mapDrilldown(approvedDuringRejected, "approved"),
                         },
                     },
                 },
@@ -1736,28 +1723,28 @@ export class TenderExecutiveService {
                     opening: {
                         count: bidOpening.length,
                         value: this.sumValue(bidOpening),
-                        drilldown: this.mapDrilldown(bidOpening),
+                        drilldown: this.mapDrilldown(bidOpening, "bidSubmitted"),
                     },
                     total: {
                         count: bidTotal.length,
                         value: this.sumValue(bidTotal),
-                        drilldown: this.mapDrilldown(bidTotal),
+                        drilldown: this.mapDrilldown(bidTotal, "bidSubmitted"),
                     },
                     during: {
                         total: {
                             count: bidDuringTotal.length,
                             value: this.sumValue(bidDuringTotal),
-                            drilldown: this.mapDrilldown(bidDuringTotal),
+                            drilldown: this.mapDrilldown(bidDuringTotal, "approved"),
                         },
                         completed: {
                             count: bidDuringCompleted.length,
                             value: this.sumValue(bidDuringCompleted),
-                            drilldown: this.mapDrilldown(bidDuringCompleted),
+                            drilldown: this.mapDrilldown(bidDuringCompleted, "bidSubmitted"),
                         },
                         pending: {
                             count: dnbDuringCompleted.length,
                             value: this.sumValue(dnbDuringCompleted),
-                            drilldown: this.mapDrilldown(dnbDuringCompleted),
+                            drilldown: this.mapDrilldown(dnbDuringCompleted, "tenderUpdated"),
                         },
                     },
                 },
@@ -1765,33 +1752,30 @@ export class TenderExecutiveService {
                     opening: {
                         count: resultAwaitedOpening.length,
                         value: this.sumValue(resultAwaitedOpening),
-                        drilldown: this.mapDrilldown(resultAwaitedOpening),
+                        drilldown: this.mapDrilldown(resultAwaitedOpening, "resultEval"),
                     },
 
                     total: {
-                        count: resultAwaitedClosing.length, // 🔥 closing pending
+                        count: resultAwaitedClosing.length,
                         value: this.sumValue(resultAwaitedClosing),
-                        drilldown: this.mapDrilldown(resultAwaitedClosing),
+                        drilldown: this.mapDrilldown(resultAwaitedClosing, "resultEval"),
                     },
 
                     during: {
                         total: {
-                            // 🔥 bids that entered result stage during period
                             count: resultAwaitedDuringTotal.length,
                             value: this.sumValue(resultAwaitedDuringTotal),
-                            drilldown: this.mapDrilldown(resultAwaitedDuringTotal),
+                            drilldown: this.mapDrilldown(resultAwaitedDuringTotal, "bidSubmitted"),
                         },
                         disqualified: {
-                            // 🔥 bids that entered result stage during period
                             count: disqualifiedDuringCompleted.length,
                             value: this.sumValue(disqualifiedDuringCompleted),
-                            drilldown: this.mapDrilldown(disqualifiedDuringCompleted),
+                            drilldown: this.mapDrilldown(disqualifiedDuringCompleted, "resultUploaded"),
                         },
                         received: {
-                            // 🔥 result received during period
                             count: resultAwaitedDuringCompleted.length,
                             value: this.sumValue(resultAwaitedDuringCompleted),
-                            drilldown: this.mapDrilldown(resultAwaitedDuringCompleted),
+                            drilldown: this.mapDrilldown(resultAwaitedDuringCompleted, "resultUploaded"),
                         },
                     },
                 },
@@ -1800,18 +1784,18 @@ export class TenderExecutiveService {
                     opening: {
                         count: wonOpening.length,
                         value: this.sumValue(wonOpening),
-                        drilldown: this.mapDrilldown(wonOpening),
+                        drilldown: this.mapDrilldown(wonOpening, "resultUploaded"),
                     },
                     total: {
                         count: wonTotal.length,
                         value: this.sumValue(wonTotal),
-                        drilldown: this.mapDrilldown(wonTotal),
+                        drilldown: this.mapDrilldown(wonTotal, "resultUploaded"),
                     },
                     during: {
                         completed: {
                             count: wonDuringCompleted.length,
                             value: this.sumValue(wonDuringCompleted),
-                            drilldown: this.mapDrilldown(wonDuringCompleted),
+                            drilldown: this.mapDrilldown(wonDuringCompleted, "resultUploaded"),
                         },
                         pending: { count: 0, value: 0, drilldown: [] },
                     },
@@ -1821,18 +1805,18 @@ export class TenderExecutiveService {
                     opening: {
                         count: lostOpening.length,
                         value: this.sumValue(lostOpening),
-                        drilldown: this.mapDrilldown(lostOpening),
+                        drilldown: this.mapDrilldown(lostOpening, "resultUploaded"),
                     },
                     total: {
                         count: lostTotal.length,
                         value: this.sumValue(lostTotal),
-                        drilldown: this.mapDrilldown(lostTotal),
+                        drilldown: this.mapDrilldown(lostTotal, "resultUploaded"),
                     },
                     during: {
                         completed: {
                             count: lostDuringCompleted.length,
                             value: this.sumValue(lostDuringCompleted),
-                            drilldown: this.mapDrilldown(lostDuringCompleted),
+                            drilldown: this.mapDrilldown(lostDuringCompleted, "resultUploaded"),
                         },
                         pending: { count: 0, value: 0, drilldown: [] },
                     },
@@ -1842,18 +1826,18 @@ export class TenderExecutiveService {
                     opening: {
                         count: cancelledOpening.length,
                         value: this.sumValue(cancelledOpening),
-                        drilldown: this.mapDrilldown(cancelledOpening),
+                        drilldown: this.mapDrilldown(cancelledOpening, "resultUploaded"),
                     },
                     total: {
                         count: cancelledTotal.length,
                         value: this.sumValue(cancelledTotal),
-                        drilldown: this.mapDrilldown(cancelledTotal),
+                        drilldown: this.mapDrilldown(cancelledTotal, "resultUploaded"),
                     },
                     during: {
                         completed: {
                             count: cancelledDuringCompleted.length,
                             value: this.sumValue(cancelledDuringCompleted),
-                            drilldown: this.mapDrilldown(cancelledDuringCompleted),
+                            drilldown: this.mapDrilldown(cancelledDuringCompleted, "resultUploaded"),
                         },
                         pending: { count: 0, value: 0, drilldown: [] },
                     },
@@ -1862,23 +1846,19 @@ export class TenderExecutiveService {
         };
     }
 
-    private mapDrilldown(rows: any[]) {
-        return rows.map(t => ({
-            tenderId: t.id,
-            tenderNo: t.tender_no ?? t.tenderNo,
-            tenderName: t.tender_name ?? t.tenderName,
-            value: Number(t.effective_value ?? t.gst_values ?? 0),
-            status: t.status_name ?? null,
-            date: t.updated_at ?? null,
-        }));
+    async resolveEffectiveTeamId(userId: number): Promise<number | null> {
+        const rows = await this.db
+            .select({ teamId: sql<number | null>`COALESCE(${users.primaryTeamId}, ${users.team})` })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1);
+
+        return rows[0]?.teamId ?? null;
     }
 
     private sumValue(rows: any[]) {
         return rows.reduce((sum, r) => sum + Number(r.effective_value ?? r.gst_values ?? 0), 0);
     }
-    // =======================================================
-    // EMD BALANCE SHEET VIEW
-    // =======================================================
 
     private async resolveTenderIdsForView(view: "user" | "team" | "all", userId?: number, teamId?: number): Promise<number[]> {
         const conditions = [eq(tenderInfos.deleteStatus, 0)];
@@ -1931,7 +1911,6 @@ export class TenderExecutiveService {
                     eq(paymentRequests.purpose, "EMD"),
                     lte(paymentRequests.createdAt, to),
 
-                    // ✅ IMPORTANT: Only real EMD instruments
                     inArray(paymentInstruments.instrumentType, ["DD", "FDR", "Bank Transfer", "Portal Payment", "BG"])
                 )
             );
@@ -1972,7 +1951,6 @@ export class TenderExecutiveService {
     private isTenderWon(statusCode: number | null): boolean {
         if (statusCode === null || statusCode === undefined) return false;
 
-        // WON status codes from your KPI mapping
         return [25, 26, 27, 28].includes(Number(statusCode));
     }
 
@@ -1996,47 +1974,29 @@ export class TenderExecutiveService {
                 daysLocked: state === "LOCKED" ? Math.ceil((to.getTime() - r.createdAt.getTime()) / 86400000) : null,
             };
 
-            // ===============================
-            // OPENING BALANCE
-            // ===============================
             if (r.createdAt < from && state === "LOCKED") {
                 this.add(result.opening, meta);
             }
 
-            // ===============================
-            // REQUESTED (during period)
-            // ===============================
             if (r.createdAt >= from && r.createdAt <= to) {
                 this.add(result.requested, meta);
             }
 
-            // ===============================
-            // RETURNED (during period)
-            // ===============================
             if (state === "RETURNED" && r.statusUpdatedAt && r.statusUpdatedAt >= from && r.statusUpdatedAt <= to) {
                 this.add(result.returned, meta);
             }
 
-            // ===============================
-            // SETTLED / ADJUSTED (during period)
-            // ===============================
             if (state === "SETTLED" && r.statusUpdatedAt && r.statusUpdatedAt >= from && r.statusUpdatedAt <= to) {
                 this.add(result.settled, meta);
             }
 
-            // ===============================
-            // CLOSING BALANCE
-            // ===============================
             if (state === "LOCKED") {
                 this.add(result.closing, meta);
 
-                // ===============================
-                // OVERDUE (FINAL DEFINITION)
-                // ===============================
                 if (
-                    r.resultDeclaredAt && // result declared
-                    !weWonTender && // NOT won
-                    new Date(r.resultDeclaredAt.getTime() + EMD_OVERDUE_GRACE_DAYS * 86400000) < to // grace expired
+                    r.resultDeclaredAt &&
+                    !weWonTender &&
+                    new Date(r.resultDeclaredAt.getTime() + EMD_OVERDUE_GRACE_DAYS * 86400000) < to
                 ) {
                     this.add(result.overdue, meta);
                 }
@@ -2055,10 +2015,6 @@ export class TenderExecutiveService {
     async getEmdCashFlow(query: { view: "user" | "team" | "all"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
         const from = `${query.fromDate}T00:00:00.000Z`;
         const to = `${query.toDate}T23:59:59.999Z`;
-
-        /* ============================
-       BASE WHERE
-    ============================ */
 
         const baseWhere = () => {
             let w = `pr.purpose = 'EMD'`;
@@ -2137,10 +2093,6 @@ export class TenderExecutiveService {
             AND pi.status NOT ILIKE '%pending%'
         )`;
 
-        /* =====================================================
-   A. OPENING
-===================================================== */
-
         const opening = await exec(`${emdCte}
         SELECT
             instrument_id AS "instrumentId",
@@ -2164,10 +2116,6 @@ export class TenderExecutiveService {
         AND (NOT has_return OR returned_at >= '${from}')
         `);
 
-        /* =====================================================
-   B. PAID DURING PERIOD (ALL)
-===================================================== */
-
         const paidDuring = await exec(`${emdCte}
         SELECT
             instrument_id AS "instrumentId",
@@ -2189,10 +2137,6 @@ export class TenderExecutiveService {
         FROM emd
         WHERE paid_at BETWEEN '${from}' AND '${to}'
         `);
-
-        /* =====================================================
-   C. RECEIVED FOR PRIOR PAID
-===================================================== */
 
         const receivedForPrior = await exec(`${emdCte}
         SELECT
@@ -2218,10 +2162,6 @@ export class TenderExecutiveService {
         AND returned_at BETWEEN '${from}' AND '${to}'
         `);
 
-        /* =====================================================
-   D. RECEIVED FOR DURING PAID
-===================================================== */
-
         const receivedForDuring = await exec(`${emdCte}
         SELECT
             instrument_id AS "instrumentId",
@@ -2245,11 +2185,6 @@ export class TenderExecutiveService {
         AND has_return
         AND returned_at BETWEEN '${from}' AND '${to}'
         `);
-
-        /* =====================================================
-   E. CLOSING
-   Pending at end of period
-===================================================== */
 
         const closing = await exec(`${emdCte}
         SELECT
@@ -2295,10 +2230,6 @@ export class TenderExecutiveService {
 
             otherThanTms = rows;
         }
-
-        /* =====================================================
-       FINAL RESPONSE (dashboard-ready)
-    ===================================================== */
 
         return {
             from: new Date(from),

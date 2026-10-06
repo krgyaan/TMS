@@ -8,6 +8,8 @@ export type StagePerformance = {
 
     applicable: boolean;
 
+    hidden?: boolean;
+
     completed: boolean;
     onTime: boolean | null;
 

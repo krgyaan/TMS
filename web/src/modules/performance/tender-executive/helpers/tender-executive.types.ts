@@ -8,7 +8,7 @@ export interface PerformanceQuery {
 }
 
 export interface StageQuery {
-    view: "user" | "team";
+    view: "user" | "team" | "all";
     userId?: number;
     teamId?: number;
     fromDate: string;

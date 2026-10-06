@@ -1,4 +1,3 @@
-import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useStageBacklogV2 } from "@/hooks/api/useTenderExecutivePerformance";
 import { MetricCell } from "./MetricCell";
@@ -11,44 +10,42 @@ import type { StageBacklogStage } from "../helpers/tender-executive.types";
 
 function AssignmentTable({ stage }: { stage: StageBacklogStage }) {
     return (
-        <Card className="border-0 ring-1 ring-border/50 shadow-sm">
-            <CardContent className="p-0">
-                <Table className="w-full table-fixed">
-                    <TableHeader className="bg-muted/30">
-                        <TableRow>
-                            <TableHead />
-                            <TableHead className="text-center">
-                                <ColumnHeader title="Pending at Start" description="Tenders assigned but pending at the start of the period" />
-                            </TableHead>
-                            <TableHead className="text-center">
-                                <ColumnHeader title="Assigned During" description="Tenders assigned during the period" />
-                            </TableHead>
-                            <TableHead className="text-center">
-                                <ColumnHeader title="Info Filled" description="Tender Info filled during the period" />
-                            </TableHead>
-                            {/* <TableHead className="text-center">
-                                <ColumnHeader title="Status Changed" description="Tenders with status changes during the period" />
-                            </TableHead> */}
-                            <TableHead className="text-center">
-                                <ColumnHeader title="Pending at End" description="Tender Info pending at the end of the period" />
-                            </TableHead>
-                        </TableRow>
-                    </TableHeader>
+        <div className="overflow-x-auto">
+            <Table className="w-full table-fixed">
+                <TableHeader className="bg-muted/30">
+                    <TableRow>
+                        <TableHead />
+                        <TableHead className="text-center">
+                            <ColumnHeader title="Pending at Start" description="Tenders assigned but pending at the start of the period" />
+                        </TableHead>
+                        <TableHead className="text-center">
+                            <ColumnHeader title="Assigned During" description="Tenders assigned during the period" />
+                        </TableHead>
+                        <TableHead className="text-center">
+                            <ColumnHeader title="Info Filled" description="Tender Info filled during the period" />
+                        </TableHead>
+                        {/* <TableHead className="text-center">
+                            <ColumnHeader title="Status Changed" description="Tenders with status changes during the period" />
+                        </TableHead> */}
+                        <TableHead className="text-center">
+                            <ColumnHeader title="Pending at End" description="Tender Info pending at the end of the period" />
+                        </TableHead>
+                    </TableRow>
+                </TableHeader>
 
-                    <TableBody>
-                        <TableRow className="hover:bg-muted/20">
-                            <TableCell className="font-semibold">Tender Assignment</TableCell>
+                <TableBody>
+                    <TableRow className="hover:bg-muted/20">
+                        <TableCell className="font-semibold">Tender Assignment</TableCell>
 
-                            <MetricCell data={stage.opening} />
-                            <MetricCell data={stage.during.total} />
-                            <MetricCell data={stage.during.completed} />
-                            {/* <MetricCell data={stage.during.statusChanged} /> */}
-                            <MetricCell data={stage.total} />
-                        </TableRow>
-                    </TableBody>
-                </Table>
-            </CardContent>
-        </Card>
+                        <MetricCell data={stage.opening} />
+                        <MetricCell data={stage.during.total} />
+                        <MetricCell data={stage.during.completed} />
+                        {/* <MetricCell data={stage.during.statusChanged} /> */}
+                        <MetricCell data={stage.total} />
+                    </TableRow>
+                </TableBody>
+            </Table>
+        </div>
     );
 }
 
@@ -58,44 +55,42 @@ function AssignmentTable({ stage }: { stage: StageBacklogStage }) {
 
 function ApprovalTable({ stage }: { stage: StageBacklogStage }) {
     return (
-        <Card className="border-0 ring-1 ring-border/50 shadow-sm">
-            <CardContent className="p-0">
-                <Table className="w-full table-fixed">
-                    <TableHeader className="bg-muted/30">
-                        <TableRow>
-                            <TableHead />
-                            <TableHead className="text-center">
-                                <ColumnHeader title="Pending at Start" description="Tender approval pending at the start of the period" />
-                            </TableHead>
-                            <TableHead className="text-center">
-                                <ColumnHeader title="Info Filled" description="Tender Info filled during the period" />
-                            </TableHead>
-                            <TableHead className="text-center">
-                                <ColumnHeader title="Approved" description="Tenders approved during the period" />
-                            </TableHead>
-                            <TableHead className="text-center">
-                                <ColumnHeader title="Rejected" description="Tenders rejected during the period" />
-                            </TableHead>
-                            <TableHead className="text-center">
-                                <ColumnHeader title="Pending at End" description="Tender approval pending at the end of the period" />
-                            </TableHead>
-                        </TableRow>
-                    </TableHeader>
+        <div className="overflow-x-auto">
+            <Table className="w-full table-fixed">
+                <TableHeader className="bg-muted/30">
+                    <TableRow>
+                        <TableHead />
+                        <TableHead className="text-center">
+                            <ColumnHeader title="Pending at Start" description="Tender approval pending at the start of the period" />
+                        </TableHead>
+                        <TableHead className="text-center">
+                            <ColumnHeader title="Info Filled" description="Tender Info filled during the period" />
+                        </TableHead>
+                        <TableHead className="text-center">
+                            <ColumnHeader title="Approved" description="Tenders approved during the period" />
+                        </TableHead>
+                        <TableHead className="text-center">
+                            <ColumnHeader title="Rejected" description="Tenders rejected during the period" />
+                        </TableHead>
+                        <TableHead className="text-center">
+                            <ColumnHeader title="Pending at End" description="Tender approval pending at the end of the period" />
+                        </TableHead>
+                    </TableRow>
+                </TableHeader>
 
-                    <TableBody>
-                        <TableRow className="hover:bg-muted/20">
-                            <TableCell className="font-semibold">Tender Approval</TableCell>
+                <TableBody>
+                    <TableRow className="hover:bg-muted/20">
+                        <TableCell className="font-semibold">Tender Approval</TableCell>
 
-                            <MetricCell data={stage.opening} />
-                            <MetricCell data={stage.during.total} />
-                            <MetricCell data={stage.during.completed} />
-                            <MetricCell data={stage.during.rejected} />
-                            <MetricCell data={stage.total} />
-                        </TableRow>
-                    </TableBody>
-                </Table>
-            </CardContent>
-        </Card>
+                        <MetricCell data={stage.opening} />
+                        <MetricCell data={stage.during.total} />
+                        <MetricCell data={stage.during.completed} />
+                        <MetricCell data={stage.during.rejected} />
+                        <MetricCell data={stage.total} />
+                    </TableRow>
+                </TableBody>
+            </Table>
+        </div>
     );
 }
 
@@ -105,44 +100,42 @@ function ApprovalTable({ stage }: { stage: StageBacklogStage }) {
 
 function BidTable({ stage }: { stage: StageBacklogStage }) {
     return (
-        <Card className="border-0 ring-1 ring-border/50 shadow-sm">
-            <CardContent className="p-0">
-                <Table className="w-full table-fixed">
-                    <TableHeader className="bg-muted/30">
-                        <TableRow>
-                            <TableHead />
-                            <TableHead className="text-center">
-                                <ColumnHeader title="Pending at Start" description="Approved but bid submission pending at the start of the period" />
-                            </TableHead>
-                            <TableHead className="text-center">
-                                <ColumnHeader title="Approved During" description="Tenders approved during the period" />
-                            </TableHead>
-                            <TableHead className="text-center">
-                                <ColumnHeader title="Bid Submitted" description="Tenders bid during the period (Final Price)" />
-                            </TableHead>
-                            <TableHead className="text-center">
-                                <ColumnHeader title="Did Not Bid" description="Tenders sent to DNB during the period (Final Price)" />
-                            </TableHead>
-                            <TableHead className="text-center">
-                                <ColumnHeader title="Pending at End" description="Approved but bidding pending at the end of the period" />
-                            </TableHead>
-                        </TableRow>
-                    </TableHeader>
+        <div className="overflow-x-auto">
+            <Table className="w-full table-fixed">
+                <TableHeader className="bg-muted/30">
+                    <TableRow>
+                        <TableHead />
+                        <TableHead className="text-center">
+                            <ColumnHeader title="Pending at Start" description="Approved but bid submission pending at the start of the period" />
+                        </TableHead>
+                        <TableHead className="text-center">
+                            <ColumnHeader title="Approved During" description="Tenders approved during the period" />
+                        </TableHead>
+                        <TableHead className="text-center">
+                            <ColumnHeader title="Bid Submitted" description="Tenders bid during the period (Final Price)" />
+                        </TableHead>
+                        <TableHead className="text-center">
+                            <ColumnHeader title="Did Not Bid" description="Tenders sent to DNB during the period (Final Price)" />
+                        </TableHead>
+                        <TableHead className="text-center">
+                            <ColumnHeader title="Pending at End" description="Approved but bidding pending at the end of the period" />
+                        </TableHead>
+                    </TableRow>
+                </TableHeader>
 
-                    <TableBody>
-                        <TableRow className="hover:bg-muted/20">
-                            <TableCell className="font-semibold">Tender Submission</TableCell>
+                <TableBody>
+                    <TableRow className="hover:bg-muted/20">
+                        <TableCell className="font-semibold">Tender Submission</TableCell>
 
-                            <MetricCell data={stage.opening} />
-                            <MetricCell data={stage.during.total} />
-                            <MetricCell data={stage.during.completed} />
-                            <MetricCell data={stage.during.pending} />
-                            <MetricCell data={stage.total} />
-                        </TableRow>
-                    </TableBody>
-                </Table>
-            </CardContent>
-        </Card>
+                        <MetricCell data={stage.opening} />
+                        <MetricCell data={stage.during.total} />
+                        <MetricCell data={stage.during.completed} />
+                        <MetricCell data={stage.during.pending} />
+                        <MetricCell data={stage.total} />
+                    </TableRow>
+                </TableBody>
+            </Table>
+        </div>
     );
 }
 
@@ -152,44 +145,42 @@ function BidTable({ stage }: { stage: StageBacklogStage }) {
 
 function ResultTable({ stage }: { stage: StageBacklogStage }) {
     return (
-        <Card className="border-0 ring-1 ring-border/50 shadow-sm">
-            <CardContent className="p-0">
-                <Table className="w-full table-fixed">
-                    <TableHeader className="bg-muted/30">
-                        <TableRow>
-                            <TableHead />
-                            <TableHead className="text-center">
-                                <ColumnHeader title="Awaited at Start" description="Tender Result awaited at the start of the period  (Final Price)" />
-                            </TableHead>
-                            <TableHead className="text-center">
-                                <ColumnHeader title="Bid During" description="Tenders Bid during the period (Final Price)" />
-                            </TableHead>
-                            <TableHead className="text-center">
-                                <ColumnHeader title="Result Received" description="Tender Results received during the period (Final Price)" />
-                            </TableHead>
-                            <TableHead className="text-center">
-                                <ColumnHeader title="Disqualified" description="Tenders disqualified during the period (Final Price)" />
-                            </TableHead>
-                            <TableHead className="text-center">
-                                <ColumnHeader title="Awaited at End" description="Tender Result awaited at the end of the period (Final Price)" />
-                            </TableHead>
-                        </TableRow>
-                    </TableHeader>
+        <div className="overflow-x-auto">
+            <Table className="w-full table-fixed">
+                <TableHeader className="bg-muted/30">
+                    <TableRow>
+                        <TableHead />
+                        <TableHead className="text-center">
+                            <ColumnHeader title="Awaited at Start" description="Tender Result awaited at the start of the period  (Final Price)" />
+                        </TableHead>
+                        <TableHead className="text-center">
+                            <ColumnHeader title="Bid During" description="Tenders Bid during the period (Final Price)" />
+                        </TableHead>
+                        <TableHead className="text-center">
+                            <ColumnHeader title="Result Received" description="Tender Results received during the period (Final Price)" />
+                        </TableHead>
+                        <TableHead className="text-center">
+                            <ColumnHeader title="Disqualified" description="Tenders disqualified during the period (Final Price)" />
+                        </TableHead>
+                        <TableHead className="text-center">
+                            <ColumnHeader title="Awaited at End" description="Tender Result awaited at the end of the period (Final Price)" />
+                        </TableHead>
+                    </TableRow>
+                </TableHeader>
 
-                    <TableBody>
-                        <TableRow className="hover:bg-muted/20">
-                            <TableCell className="font-semibold">Tender Results</TableCell>
+                <TableBody>
+                    <TableRow className="hover:bg-muted/20">
+                        <TableCell className="font-semibold">Tender Results</TableCell>
 
-                            <MetricCell data={stage.opening} />
-                            <MetricCell data={stage.during.total} />
-                            <MetricCell data={stage.during.received} />
-                            <MetricCell data={stage.during.disqualified} />
-                            <MetricCell data={stage.total} />
-                        </TableRow>
-                    </TableBody>
-                </Table>
-            </CardContent>
-        </Card>
+                        <MetricCell data={stage.opening} />
+                        <MetricCell data={stage.during.total} />
+                        <MetricCell data={stage.during.received} />
+                        <MetricCell data={stage.during.disqualified} />
+                        <MetricCell data={stage.total} />
+                    </TableRow>
+                </TableBody>
+            </Table>
+        </div>
     );
 }
 
@@ -199,31 +190,29 @@ function ResultTable({ stage }: { stage: StageBacklogStage }) {
 
 function WonTable({ stage }: { stage: StageBacklogStage }) {
     return (
-        <Card className="border-0 ring-1 ring-border/50 shadow-sm">
-            <CardContent className="p-0">
-                <Table className="w-full table-fixed">
-                    <TableHeader className="bg-muted/30">
-                        <TableRow>
-                            <TableHead />
-                            <TableHead className="text-center">
-                                <ColumnHeader title="Won Before Period" description="Tenders won before the start of the period (Final Price)" />
-                            </TableHead>
-                            <TableHead className="text-center">
-                                <ColumnHeader title="Won During Period" description="Tenders won for tenders bid during the period (Final Price)" />
-                            </TableHead>
-                        </TableRow>
-                    </TableHeader>
+        <div className="overflow-x-auto">
+            <Table className="w-full table-fixed">
+                <TableHeader className="bg-muted/30">
+                    <TableRow>
+                        <TableHead />
+                        <TableHead className="text-center">
+                            <ColumnHeader title="Won Before Period" description="Tenders won before the start of the period (Final Price)" />
+                        </TableHead>
+                        <TableHead className="text-center">
+                            <ColumnHeader title="Won During Period" description="Tenders won for tenders bid during the period (Final Price)" />
+                        </TableHead>
+                    </TableRow>
+                </TableHeader>
 
-                    <TableBody>
-                        <TableRow className="hover:bg-muted/20">
-                            <TableCell className="font-semibold">Tenders Won</TableCell>
-                            <MetricCell data={stage.opening} />
-                            <MetricCell data={stage.during.completed} />
-                        </TableRow>
-                    </TableBody>
-                </Table>
-            </CardContent>
-        </Card>
+                <TableBody>
+                    <TableRow className="hover:bg-muted/20">
+                        <TableCell className="font-semibold">Tenders Won</TableCell>
+                        <MetricCell data={stage.opening} />
+                        <MetricCell data={stage.during.completed} />
+                    </TableRow>
+                </TableBody>
+            </Table>
+        </div>
     );
 }
 /* ================================
@@ -232,34 +221,32 @@ function WonTable({ stage }: { stage: StageBacklogStage }) {
 
 function LostTable({ stage }: { stage: StageBacklogStage }) {
     return (
-        <Card className="border-0 ring-1 ring-border/50 shadow-sm">
-            <CardContent className="p-0">
-                <Table className="w-full table-fixed">
-                    <TableHeader className="bg-muted/30">
-                        <TableRow>
-                            <TableHead />
+        <div className="overflow-x-auto">
+            <Table className="w-full table-fixed">
+                <TableHeader className="bg-muted/30">
+                    <TableRow>
+                        <TableHead />
 
-                            <TableHead className="text-center">
-                                <ColumnHeader title="Lost Before Period" description="Tenders Lost for tender bids before the start of the period (Final Price)" />
-                            </TableHead>
+                        <TableHead className="text-center">
+                            <ColumnHeader title="Lost Before Period" description="Tenders Lost for tender bids before the start of the period (Final Price)" />
+                        </TableHead>
 
-                            <TableHead className="text-center">
-                                <ColumnHeader title="Lost During Period" description="Tenders Lost for tenders bid during the period (Final Price)" />
-                            </TableHead>
-                        </TableRow>
-                    </TableHeader>
+                        <TableHead className="text-center">
+                            <ColumnHeader title="Lost During Period" description="Tenders Lost for tenders bid during the period (Final Price)" />
+                        </TableHead>
+                    </TableRow>
+                </TableHeader>
 
-                    <TableBody>
-                        <TableRow className="hover:bg-muted/20">
-                            <TableCell className="font-semibold">Tenders Lost</TableCell>
+                <TableBody>
+                    <TableRow className="hover:bg-muted/20">
+                        <TableCell className="font-semibold">Tenders Lost</TableCell>
 
-                            <MetricCell data={stage.opening} />
-                            <MetricCell data={stage.during.completed} />
-                        </TableRow>
-                    </TableBody>
-                </Table>
-            </CardContent>
-        </Card>
+                        <MetricCell data={stage.opening} />
+                        <MetricCell data={stage.during.completed} />
+                    </TableRow>
+                </TableBody>
+            </Table>
+        </div>
     );
 }
 
@@ -269,30 +256,28 @@ function LostTable({ stage }: { stage: StageBacklogStage }) {
 
 function CancelledTable({ stage }: { stage: StageBacklogStage }) {
     return (
-        <Card className="border-0 ring-1 ring-border/50 shadow-sm">
-            <CardContent className="p-0">
-                <Table className="w-full table-fixed">
-                    <TableHeader className="bg-muted/30">
-                        <TableRow>
-                            <TableHead />
-                            <TableHead className="text-center">
-                                <ColumnHeader title="Cancelled Before Period" description="Tenders cancelled before the start of the period (Final Price)" />
-                            </TableHead>
-                            <TableHead className="text-center">
-                                <ColumnHeader title="Cancelled During Period" description="Tenders cancelled during the period (Final Price)" />
-                            </TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        <TableRow className="hover:bg-muted/20">
-                            <TableCell className="font-semibold">Tenders Cancelled</TableCell>
-                            <MetricCell data={stage.opening} />
-                            <MetricCell data={stage.during.completed} />
-                        </TableRow>
-                    </TableBody>
-                </Table>
-            </CardContent>
-        </Card>
+        <div className="overflow-x-auto">
+            <Table className="w-full table-fixed">
+                <TableHeader className="bg-muted/30">
+                    <TableRow>
+                        <TableHead />
+                        <TableHead className="text-center">
+                            <ColumnHeader title="Cancelled Before Period" description="Tenders cancelled before the start of the period (Final Price)" />
+                        </TableHead>
+                        <TableHead className="text-center">
+                            <ColumnHeader title="Cancelled During Period" description="Tenders cancelled during the period (Final Price)" />
+                        </TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    <TableRow className="hover:bg-muted/20">
+                        <TableCell className="font-semibold">Tenders Cancelled</TableCell>
+                        <MetricCell data={stage.opening} />
+                        <MetricCell data={stage.during.completed} />
+                    </TableRow>
+                </TableBody>
+            </Table>
+        </div>
     );
 }
 
@@ -300,14 +285,14 @@ function CancelledTable({ stage }: { stage: StageBacklogStage }) {
    FINAL PAGE EXPORT
 =============================== */
 
-export function StageBacklogV4Table(props: { view: "user" | "team"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
+export function StageBacklogV4Table(props: { view: "user" | "team" | "all"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
     const { data } = useStageBacklogV2(props);
     if (!data) return null;
 
     const { stages } = data;
 
     return (
-        <div className="space-y-6">
+        <div className="divide-y divide-border/60">
             <AssignmentTable stage={stages.assigned} />
             <ApprovalTable stage={stages.approved} />
             <BidTable stage={stages.bid} />
