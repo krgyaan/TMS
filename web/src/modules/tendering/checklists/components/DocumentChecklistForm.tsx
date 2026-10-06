@@ -31,6 +31,10 @@ import { formatDateTime } from '@/hooks/useFormatedDate';
 import { DocumentChecklistFormSchema } from '../helpers/documentChecklist.schema';
 import { resolveSuggestionPanel } from '../helpers/suggestionPanel';
 import { buildAnnexureRows } from '../helpers/annexureRows';
+import {
+    STANDARD_DOCUMENT_OPTIONS,
+    computeAutoPreselectedDocuments,
+} from '../helpers/preselectDocuments';
 
 const CATEGORY_BADGE_VARIANT: Record<SuggestedBiddingRequirement['category'], 'default' | 'secondary' | 'outline'> = {
     oem: 'default',
@@ -59,12 +63,6 @@ interface DocumentChecklistFormProps {
     mode: 'create' | 'edit';
     existingData?: TenderDocumentChecklist;
 }
-
-import {
-    STANDARD_DOCUMENT_OPTIONS,
-    resolveStandardDocValue,
-    computeAutoPreselectedDocuments,
-} from '../helpers/preselectDocuments';
 
 export default function DocumentChecklistForm({
     tenderId,

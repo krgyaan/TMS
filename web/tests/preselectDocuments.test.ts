@@ -2,12 +2,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import {
+import { register } from 'node:module';
+
+register('./helpers/vite-env-loader.mjs', import.meta.url);
+
+const {
     computeAutoPreselectedDocuments,
     resolveStandardDocValue,
     STANDARD_CHECKLIST_DOCUMENTS,
     STANDARD_DOCUMENT_OPTIONS,
-} from '../src/modules/tendering/checklists/helpers/preselectDocuments.ts';
+} = await import('../src/modules/tendering/checklists/helpers/preselectDocuments.ts');
 import type { SuggestedBiddingRequirement } from '../src/modules/tendering/checklists/helpers/documentChecklist.types.ts';
 
 const SAMPLE_REQUIREMENTS: SuggestedBiddingRequirement[] = [

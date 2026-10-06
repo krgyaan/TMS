@@ -2,8 +2,8 @@ import {
     STANDARD_CHECKLIST_DOCUMENTS,
     STANDARD_DOCUMENT_OPTIONS,
     STANDARD_DOC_ID_TO_NAME,
-} from './standardDocuments.constant.ts';
-import type { SuggestedBiddingRequirement } from './documentChecklist.types.ts';
+} from './standardDocuments.constant';
+import type { SuggestedBiddingRequirement } from './documentChecklist.types';
 
 export {
     STANDARD_CHECKLIST_DOCUMENTS,
