@@ -53,6 +53,9 @@ export interface OrderViewData {
     contactPersonName?: string;
     contactPersonPhone?: string;
     contactPersonEmail?: string;
+    vendorContactPersonName?: string;
+    vendorContactPersonPhone?: string;
+    vendorContactPersonEmail?: string;
     shipToName: string;
     shippingAddress: string;
     shipToGst?: string;

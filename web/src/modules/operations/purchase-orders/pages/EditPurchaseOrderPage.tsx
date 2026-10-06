@@ -2,6 +2,7 @@ import { paths } from "@/app/routes/paths";
 import { DateInput } from "@/components/form/DateInput";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
+import { AsyncSelectField } from "@/components/form/AsyncSelectField";
 import { MultiSelectField } from "@/components/form/MultiSelectField";
 import { FileUploader } from "@/components/file-upload";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +13,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { usePurchaseOrderDetails, useUpdatePurchaseOrder, useCreatePoParty, useSellerOptions, useShipToOptions } from "@/hooks/api/usePurchaseOrders";
+import { usePurchaseOrderDetails, useUpdatePurchaseOrder, useCreatePoParty } from "@/hooks/api/usePurchaseOrders";
+import { useSellerSelectOptions, useShipToSelectOptions } from "@/hooks/useSelectOptions";
+import { useSellerContactPerson } from "@/hooks/useSellerContactPerson";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -44,6 +47,10 @@ const defaultFormValues: PurchaseOrderFormValues = {
     contactPersonName: "",
     contactPersonPhone: "",
     contactPersonEmail: "",
+    vendorPersonId: "",
+    vendorContactPersonName: "",
+    vendorContactPersonPhone: "",
+    vendorContactPersonEmail: "",
     partyId: "",
     selectedUserId: "",
     selectedCertRecipients: [],
@@ -114,8 +121,6 @@ export default function EditPurchaseOrderPage() {
     const { data: poData, isLoading: isPOLoading, isError: isPOError, error: poError } = usePurchaseOrderDetails(purchaseOrderId);
     const projectId = Number(projectIdParam) || poData?.projectId;
 
-    const { data: sellerRows = [] } = useSellerOptions();
-    const { data: shipToRows = [] } = useShipToOptions();
     const updatePOMutation = useUpdatePurchaseOrder();
     const createPartyMutation = useCreatePoParty();
 
@@ -130,6 +135,22 @@ export default function EditPurchaseOrderPage() {
     const selectedSellerId = form.watch("sellerId");
     const selectedPartyId = form.watch("partyId");
 
+    // Server-searched pickers. Each owns its query (debounced inside), and pins
+    // the current id so the row behind it is always in the response no matter
+    // what is typed - otherwise the auto-fill effect below loses its row.
+    const {
+        options: sellerOptions,
+        rows: sellerRows,
+        onSearch: onSellerSearch,
+        isLoading: isSellerLoading,
+    } = useSellerSelectOptions(selectedSellerId);
+    const {
+        options: partyOptions,
+        rows: shipToRows,
+        onSearch: onShipToSearch,
+        isLoading: isShipToLoading,
+    } = useShipToSelectOptions(selectedPartyId);
+
     const { data: teamMembers = [] } = useGetTeamMembers(0); // all active team members across teams
     const selectedUserId = form.watch("selectedUserId");
     const activeTeamMembers = useMemo(
@@ -137,14 +158,11 @@ export default function EditPurchaseOrderPage() {
         [teamMembers]
     );
 
-    const sellerOptions = useMemo(
-        () => sellerRows.map((p) => ({ id: String(p.id), name: p.alias ? `${p.name} (${p.alias})` : p.name })),
-        [sellerRows]
-    );
+    const { sellerPersons } = useSellerContactPerson(form, { autoSelectFirstOnLoad: false });
 
-    const partyOptions = useMemo(
-        () => shipToRows.map((p) => ({ id: String(p.id), name: p.alias ? `${p.name} (${p.alias})` : p.name })),
-        [shipToRows]
+    const sellerPersonOptions = useMemo(
+        () => sellerPersons.map((p) => ({ id: String(p.id), name: p.name || "Unnamed person" })),
+        [sellerPersons]
     );
 
     useEffect(() => {
@@ -152,14 +170,14 @@ export default function EditPurchaseOrderPage() {
         const party = sellerRows.find((p) => String(p.id) === selectedSellerId);
         if (!party) return;
         form.setValue("sellerName", party.name || "");
-        form.setValue("sellerEmail", party.email || "");
-        form.setValue("sellerAddress", party.address || "");
+                form.setValue("sellerAddress", party.address || "");
         form.setValue("sellerGstNo", party.gstNo || "");
         form.setValue("sellerPanNo", party.pan || "");
         form.setValue("sellerMsmeNo", party.msme || "");
-        form.setValue("contactPersonName", party.contactPerson || "");
-        form.setValue("contactPersonEmail", party.email || "");
-        form.setValue("contactPersonPhone", party.mobile || "");
+        // Contact person is deliberately not written here: the seller effect used
+        // to fill the same fields as "Quick Fill from Team Member", and whichever
+        // ran last won. Vendor-side contact now lives in vendorContactPerson* and
+        // is handled by useSellerContactPerson.
     }, [selectedSellerId, sellerRows, form]);
 
     useEffect(() => {
@@ -199,6 +217,10 @@ export default function EditPurchaseOrderPage() {
             contactPersonName: poData.contactPersonName || "",
             contactPersonPhone: poData.contactPersonPhone || "",
             contactPersonEmail: poData.contactPersonEmail || "",
+            vendorPersonId: "",
+            vendorContactPersonName: poData.vendorContactPersonName || "",
+            vendorContactPersonPhone: poData.vendorContactPersonPhone || "",
+            vendorContactPersonEmail: poData.vendorContactPersonEmail || "",
             partyId: "",
             selectedUserId: "",
             selectedCertRecipients: poData.certRecipients?.map(String) ?? (poData.certRecipient ? [String(poData.certRecipient)] : []),
@@ -445,15 +467,15 @@ export default function EditPurchaseOrderPage() {
                                         onSubmit={handleAddNewParty}
                                         isLoading={createPartyMutation.isPending}
                                     />
-                                <div className="grid grid-cols-1 md:grid-cols-4 mb-6">
-                                    <SelectField
-                                        control={form.control}
-                                        name="sellerId"
-                                        label="Select Existing Seller"
-                                        options={sellerOptions}
-                                        placeholder="Choose a seller..."
-                                    />
-                                </div>
+                                  <AsyncSelectField
+                                    control={form.control}
+                                    name="sellerId"
+                                    label="Select Existing Seller"
+                                    options={sellerOptions}
+                                    placeholder="Choose a seller..."
+                                    onSearch={onSellerSearch}
+                                    isLoading={isSellerLoading}
+                                  />
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                                     <FieldWrapper control={form.control} name="sellerName" label={<>Seller Name <span className="text-destructive">*</span></>}>
                                         {(field) => <Input {...field} placeholder="Enter seller name" />}
@@ -529,15 +551,15 @@ export default function EditPurchaseOrderPage() {
                                             isLoading={createPartyMutation.isPending}
                                         />
                                 <p className="text-sm text-muted-foreground mb-4">Delivery destination information</p>
-                                <div className="mb-6 max-w-md">
-                                    <SelectField
-                                        control={form.control}
-                                        name="partyId"
-                                        label="Select Destination"
-                                        options={partyOptions}
-                                        placeholder="Choose shipping destination..."
-                                    />
-                                </div>
+                                  <AsyncSelectField
+                                    control={form.control}
+                                    name="partyId"
+                                    label="Select Destination"
+                                    options={partyOptions}
+                                    placeholder="Choose shipping destination..."
+                                    onSearch={onShipToSearch}
+                                    isLoading={isShipToLoading}
+                                  />
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <FieldWrapper control={form.control} name="shipToName" label={<>Ship To Name <span className="text-destructive">*</span></>}>
                                         {(field) => <Input {...field} placeholder="Enter recipient name" />}
@@ -571,23 +593,54 @@ export default function EditPurchaseOrderPage() {
                             </div>
                             </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 my-6">
-                            <SelectField
-                                control={form.control}
-                                name="selectedUserId"
-                                label={<><UserCheck className="h-3.5 w-3.5 inline mr-1" />Quick Fill from Team Member</>}
-                                options={activeTeamMembers.map((u: any) => ({ id: String(u.id), name: u.name }))}
-                                placeholder="Select a user to auto-fill contact details..."
-                            />
-                            <FieldWrapper control={form.control} name="contactPersonName" label="Contact Person Name">
-                                {(field) => <Input {...field} placeholder="Enter contact person name" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="contactPersonPhone" label={<><Phone className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Contact Person Phone</>}>
-                                {(field) => <Input {...field} placeholder="e.g. +91-9876543210" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="contactPersonEmail" label={<><Mail className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Contact Person Email</>}>
-                                {(field) => <Input {...field} type="email" placeholder="contact@example.com" />}
-                            </FieldWrapper>
+                        <div className="space-y-6 my-6">
+                            <div>
+                                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">
+                                    Vendor Contact Person
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                    <SelectField
+                                        control={form.control}
+                                        name="vendorPersonId"
+                                        label={<><Building2 className="h-3.5 w-3.5 inline mr-1" />Vendor Contact Person</>}
+                                        options={sellerPersonOptions}
+                                        placeholder={sellerPersons.length ? "Select vendor contact person..." : "No persons saved for this vendor"}
+                                    />
+                                    <FieldWrapper control={form.control} name="vendorContactPersonName" label="Vendor Contact Name">
+                                        {(field) => <Input {...field} placeholder="Enter vendor contact name" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="vendorContactPersonPhone" label={<><Phone className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Vendor Contact Phone</>}>
+                                        {(field) => <Input {...field} placeholder="e.g. +91-9876543210" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="vendorContactPersonEmail" label={<><Mail className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Vendor Contact Email</>}>
+                                        {(field) => <Input {...field} type="email" placeholder="contact@example.com" />}
+                                    </FieldWrapper>
+                                </div>
+                            </div>
+
+                            <div>
+                                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">
+                                    Our Contact Person (printed on the PO)
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                    <SelectField
+                                        control={form.control}
+                                        name="selectedUserId"
+                                        label={<><UserCheck className="h-3.5 w-3.5 inline mr-1" />Quick Fill from Team Member</>}
+                                        options={activeTeamMembers.map((u: any) => ({ id: String(u.id), name: u.name }))}
+                                        placeholder="Select a user to auto-fill contact details..."
+                                    />
+                                    <FieldWrapper control={form.control} name="contactPersonName" label="Our Contact Name">
+                                        {(field) => <Input {...field} placeholder="Enter contact person name" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="contactPersonPhone" label={<><Phone className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Our Contact Phone</>}>
+                                        {(field) => <Input {...field} placeholder="e.g. +91-9876543210" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="contactPersonEmail" label={<><Mail className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Our Contact Email</>}>
+                                        {(field) => <Input {...field} type="email" placeholder="contact@example.com" />}
+                                    </FieldWrapper>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 my-6">

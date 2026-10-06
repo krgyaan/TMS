@@ -9,9 +9,14 @@ export const purchaseOrders = pgTable(
         shipToGst: varchar("ship_to_gst", { length: 50 }),
         shipToPan: varchar("ship_to_pan", { length: 50 }),
         projectName: varchar("project_name", { length: 255 }),
+        // Our-side contact (the PO owner). Matches the `oe_*` PDF vars.
         contactPersonName: varchar("contact_person_name", { length: 255 }),
         contactPersonPhone: varchar("contact_person_phone", { length: 20 }),
         contactPersonEmail: varchar("contact_person_email", { length: 255 }),
+        // Vendor-side contact: a person belonging to the seller organization.
+        vendorContactPersonName: varchar("vendor_contact_person_name", { length: 255 }),
+        vendorContactPersonPhone: varchar("vendor_contact_person_phone", { length: 20 }),
+        vendorContactPersonEmail: varchar("vendor_contact_person_email", { length: 255 }),
         sellerOrganizationId: bigint("seller_organization_id", { mode: "number" }),
         sellerName: varchar("seller_name", { length: 255 }),
         sellerAddress: text("seller_address"),
@@ -43,6 +48,8 @@ export const purchaseOrders = pgTable(
         poApproved: boolean("po_approved"),
         poApprovalRemark: text("po_approval_remark"),
         closedAt: timestamp("closed_at", { withTimezone: true }),
+        closedBy: bigint("closed_by", { mode: "number" }),
+        closureNote: text("closure_note"),
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
         generatedPdfVersions: jsonb("generated_pdf_versions").notNull().default({}),
         updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

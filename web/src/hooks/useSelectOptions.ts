@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTeams } from './api/useTeams';
 import { useOrganizations } from './api/useOrganizations';
 import { useLocations } from './api/useLocations';
@@ -10,6 +10,22 @@ import { usePqrsAll } from './api/usePqrs';
 import { useFinanceDocumentsAll } from './api/useFinanceDocuments';
 import { useProjectsMaster } from './api/useProjects';
 import { useLoanParties } from './api/useLoanParties';
+import { useSellerOptions, useShipToOptions } from './api/usePurchaseOrders';
+import { useDebouncedSearch } from './useDebouncedSearch';
+
+const toSearchableIds = (selectedId?: string): number[] => {
+    if (!selectedId || selectedId === '__create_new__') return [];
+    const parsed = Number(selectedId);
+    return Number.isInteger(parsed) && parsed > 0 ? [parsed] : [];
+};
+
+/**
+ * Turn the current form value into the `ids` the server must always return.
+ * Without it a loaded page would drop its own selection the moment the query
+ * stopped matching it, and the trigger would lose its label.
+ */
+const useSelectedPartyId = (selectedId?: string) =>
+    useMemo(() => toSearchableIds(selectedId), [selectedId]);
 
 export function useTeamOptions(ids: Array<number> = []) {
     const { data: teams = [] } = useTeams();
@@ -148,6 +164,62 @@ export function useLoanPartyOptions() {
             })),
         [projects]
     );
+}
+
+/**
+ * Seller / ship-to pickers for PO, VWO and Sale Invoice.
+ *
+ * Unlike the master-data hooks above these are server-searched: the form never
+ * downloads all 482 sellers, it asks for one page matching the query. The
+ * returned `onSearch` goes straight into `AsyncSelectField`, which lifts its
+ * keystrokes here so this hook owns the debounce.
+ *
+ * `keywords` carries the fields the server filters on but the row does not
+ * display (gst, pan, address) so the client-side pass still keeps a row the
+ * server matched by something invisible in the panel.
+ */
+export function useSellerSelectOptions(selectedId?: string) {
+    const [query, setQuery] = useState('');
+    const debouncedQuery = useDebouncedSearch(query, 300);
+    const ids = useSelectedPartyId(selectedId);
+
+    const { data: rows = [], isLoading } = useSellerOptions(debouncedQuery, ids);
+
+    const options = useMemo(
+        () =>
+            rows.map((p) => ({
+                id: String(p.id),
+                name: p.alias ? `${p.name} (${p.alias})` : p.name,
+                keywords: [p.name, p.alias, p.gstNo, p.pan, p.msme, p.address]
+                    .filter(Boolean)
+                    .join(' '),
+            })),
+        [rows]
+    );
+
+    // `rows` feeds the pages' auto-fill effect: the effect must find the row
+    // backing the current id, which is always present because `ids` pins it.
+    return { options, rows, onSearch: setQuery, isLoading };
+}
+
+export function useShipToSelectOptions(selectedId?: string) {
+    const [query, setQuery] = useState('');
+    const debouncedQuery = useDebouncedSearch(query, 300);
+    const ids = useSelectedPartyId(selectedId);
+
+    const { data: rows = [], isLoading } = useShipToOptions(debouncedQuery, ids);
+
+    const options = useMemo(
+        () =>
+            rows.map((p) => ({
+                id: String(p.id),
+                name: p.alias ? `${p.name} (${p.alias})` : p.name,
+                keywords: [p.name, p.alias, p.gstNo, p.pan, p.address].filter(Boolean).join(' '),
+            })),
+        [rows]
+    );
+
+    return { options, rows, onSearch: setQuery, isLoading };
 }
 
 export function useAllSelectOptions() {

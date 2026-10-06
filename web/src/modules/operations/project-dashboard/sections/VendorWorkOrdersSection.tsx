@@ -39,7 +39,7 @@ export const VendorWorkOrdersSection: React.FC<VendorWorkOrdersSectionProps> = (
     const vwoActions: ActionItem<VendorWorkOrderRow>[] = useMemo(() => [
         {
             label: "Raise Payment",
-            visible: (row) => row.woApproved === true
+            visible: (row) => row.woApproved !== false
                 && Number(row.totalPaymentRequested || 0) < Number(row.amountAfterTds ?? row.grandTotal),
             onClick: (row) => navigate(paths.operations.raiseProjectPaymentRequestForm(projectId!, undefined, row.id)),
         },

@@ -25,6 +25,28 @@ const PAYMENT_REQUESTS = ["accounts.payment-requests", "ops.payment-requests"] a
 const PURCHASE_INVOICES = ["accounts.purchase-invoices", "ops.purchase-invoices"] as const;
 const PURCHASE_ORDER_MODULES = ["accounts.purchase-orders", "ops.purchase-orders"] as const;
 
+// `?ids=1,2,3` -> [1, 2, 3]. A picker's query string should never 400 the
+// dropdown, so junk entries are dropped instead of rejected.
+const parseIds = (raw?: string): number[] | undefined => {
+    if (!raw) return undefined;
+    const parsed = raw
+        .split(",")
+        .map(part => Number.parseInt(part.trim(), 10))
+        .filter(id => Number.isInteger(id) && id > 0);
+    return parsed.length ? parsed : undefined;
+};
+
+// A picker should be able to ask for more rows than the default page, but the
+// endpoint must never become a way to dump the whole table in one request.
+const OPTION_LIMIT_MAX = 200;
+
+const parseLimit = (raw?: string): number | undefined => {
+    if (!raw) return undefined;
+    const parsed = Number.parseInt(raw, 10);
+    if (!Number.isInteger(parsed) || parsed <= 0) return undefined;
+    return Math.min(parsed, OPTION_LIMIT_MAX);
+};
+
 @Controller("purchase-orders")
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class PurchaseOrderController {
@@ -57,14 +79,21 @@ export class PurchaseOrderController {
         return this.service.listParties(type);
     }
 
+    // Paged + searchable: no `q` and no `ids` still returns only the first
+    // `limit` rows, so mounting a form never pulls the whole vendor table.
     @Get("parties/sellers")
-    listSellerOptions() {
-        return this.service.listSellerOptions();
+    listSellerOptions(@Query("q") q?: string, @Query("ids") ids?: string, @Query("limit") limit?: string) {
+        return this.service.listSellerOptions(q, parseIds(ids), parseLimit(limit));
+    }
+
+    @Get("parties/sellers/:orgId/persons")
+    listSellerPersons(@Param("orgId", ParseIntPipe) orgId: number) {
+        return this.service.listSellerPersons(orgId);
     }
 
     @Get("parties/ship-to")
-    listShipToOptions() {
-        return this.service.listShipToOptions();
+    listShipToOptions(@Query("q") q?: string, @Query("ids") ids?: string, @Query("limit") limit?: string) {
+        return this.service.listShipToOptions(q, parseIds(ids), parseLimit(limit));
     }
 
     @Get("next-number")
@@ -202,8 +231,8 @@ export class PurchaseOrderController {
     @Post(":id/close")
     @HttpCode(HttpStatus.OK)
     @RequireAnyPermission(...eitherModule(...PURCHASE_ORDER_MODULES, "close"))
-    closePurchaseOrder(@Param("id", ParseIntPipe) id: number) {
-        return this.service.closePurchaseOrder(id);
+    closePurchaseOrder(@Param("id", ParseIntPipe) id: number, @Body() body: { closureNote?: string }, @CurrentUser() user: ValidatedUser) {
+        return this.service.closePurchaseOrder(id, body?.closureNote, user?.id);
     }
 
     @Put(":id")

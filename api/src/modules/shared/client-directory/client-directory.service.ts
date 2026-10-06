@@ -249,8 +249,11 @@ export class ClientDirectoryService {
             { name: sql<string>`name`, email: sql<string | null>`email`, phone: sql<string | null>`phone`, org: sql<string | null>`organization`, table: sql`follow_up_persons` },
             { name: sql<string>`name`, email: sql<string | null>`email`, phone: sql<string | null>`phone`, org: sql<string | null>`organization`, table: sql`wo_contacts` },
             { name: sql<string>`name`, email: sql<string | null>`email`, phone: sql<string | null>`mobile`, org: sql<string | null>`NULL`, table: sql`vendors` },
-            { name: sql<string>`contact_person_name`, email: sql<string | null>`contact_person_email`, phone: sql<string | null>`contact_person_phone`, org: sql<string | null>`seller_name`, table: sql`purchase_orders` },
-            { name: sql<string>`contact_person_name`, email: sql<string | null>`contact_person_email`, phone: sql<string | null>`contact_person_phone`, org: sql<string | null>`seller_name`, table: sql`vendor_work_orders` },
+            // vendor_contact_person_* is the vendor's person. contact_person_* on
+            // these two tables is our own employee and does not belong in a
+            // directory of external parties.
+            { name: sql<string>`vendor_contact_person_name`, email: sql<string | null>`vendor_contact_person_email`, phone: sql<string | null>`vendor_contact_person_phone`, org: sql<string | null>`seller_name`, table: sql`purchase_orders` },
+            { name: sql<string>`vendor_contact_person_name`, email: sql<string | null>`vendor_contact_person_email`, phone: sql<string | null>`vendor_contact_person_phone`, org: sql<string | null>`seller_name`, table: sql`vendor_work_orders` },
             { name: sql<string>`person_name`, email: sql<string | null>`email`, phone: sql<string | null>`phone`, org: sql<string | null>`org_name`, table: sql`loan_bank_contacts` },
             // project_parties only holds ship-to rows now; sellers live in vendor master.
             {

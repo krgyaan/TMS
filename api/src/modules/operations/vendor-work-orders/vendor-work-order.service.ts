@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, eq, like, desc, sql, inArray, isNull, isNotNull, ne } from "drizzle-orm";
+import { and, eq, like, desc, asc, sql, inArray, isNull, isNotNull, ne } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { rename, readFile } from "node:fs/promises";
@@ -26,6 +26,7 @@ import { users } from "@/db/schemas";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 import { OperationNotificationService } from "@/modules/operations/operation-notification.service";
+import { round2, CLOSURE_TOLERANCE } from "@/utils/money.util";
 
 @Injectable()
 export class VendorWorkOrderService {
@@ -36,7 +37,7 @@ export class VendorWorkOrderService {
         private readonly clientDirectorySyncService: ClientDirectorySyncService,
         private readonly insuranceService: InsurancePolicyService,
         private readonly notifications: OperationNotificationService,
-        private readonly cashFlowService: CashFlowService,
+        private readonly cashFlowService: CashFlowService
     ) {}
 
     async generateWONumber(projectName?: string) {
@@ -53,7 +54,7 @@ export class VendorWorkOrderService {
         const last = await this.db
             .select({
                 id: vendorWorkOrders.id,
-                woNumber: vendorWorkOrders.woNumber
+                woNumber: vendorWorkOrders.woNumber,
             })
             .from(vendorWorkOrders)
             .where(like(vendorWorkOrders.woNumber, `VE/%/${fy}/WO%`))
@@ -70,11 +71,7 @@ export class VendorWorkOrderService {
 
     async create(body: any, userId: number) {
         if (body.projectId) {
-            const [project] = await this.db
-                .select({ insuranceRequired: projects.insuranceRequired })
-                .from(projects)
-                .where(eq(projects.id, body.projectId))
-                .limit(1);
+            const [project] = await this.db.select({ insuranceRequired: projects.insuranceRequired }).from(projects).where(eq(projects.id, body.projectId)).limit(1);
             if (project?.insuranceRequired) {
                 const hasWC = await this.insuranceService.hasActiveWCInsurance(body.projectId);
                 if (!hasWC) {
@@ -87,11 +84,7 @@ export class VendorWorkOrderService {
 
         const woNumber = await this.generateWONumber(body.projectName);
 
-        const [woBasic] = await this.db
-            .select({ team: woBasicDetails.team })
-            .from(woBasicDetails)
-            .where(eq(woBasicDetails.tenderId, body.tenderId))
-            .limit(1);
+        const [woBasic] = await this.db.select({ team: woBasicDetails.team }).from(woBasicDetails).where(eq(woBasicDetails.tenderId, body.tenderId)).limit(1);
 
         const wo = (
             await this.db
@@ -113,6 +106,9 @@ export class VendorWorkOrderService {
                     contactPersonName: body.contactPersonName,
                     contactPersonPhone: body.contactPersonPhone,
                     contactPersonEmail: body.contactPersonEmail,
+                    vendorContactPersonName: body.vendorContactPersonName,
+                    vendorContactPersonPhone: body.vendorContactPersonPhone,
+                    vendorContactPersonEmail: body.vendorContactPersonEmail,
 
                     shipToName: body.shipToName,
                     shippingAddress: body.shippingAddress,
@@ -121,7 +117,9 @@ export class VendorWorkOrderService {
                     category: body.category,
 
                     termsAndConditions: body.termsAndConditions
-                        ? (typeof body.termsAndConditions === 'string' ? JSON.parse(body.termsAndConditions) : body.termsAndConditions)
+                        ? typeof body.termsAndConditions === "string"
+                            ? JSON.parse(body.termsAndConditions)
+                            : body.termsAndConditions
                         : [],
                     scopeOfWork: body.scopeOfWork,
                     accessoriesPackagingListAttachments: body.accessoriesPackagingListAttachments,
@@ -171,30 +169,34 @@ export class VendorWorkOrderService {
             return sum + taxable + gst;
         }, 0);
 
-        this.notifications.notifyVwoCreated({
-            woNumber,
-            sellerName: body.sellerName,
-            grandTotal: grandTotal.toFixed(2),
-            projectName: body.projectName,
-            createdBy: userId,
-        }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+        this.notifications
+            .notifyVwoCreated({
+                woNumber,
+                sellerName: body.sellerName,
+                grandTotal: grandTotal.toFixed(2),
+                projectName: body.projectName,
+                createdBy: userId,
+            })
+            .catch(err => this.logger.warn(`WhatsApp notification failed: ${err}`));
 
-        this.generatePdfForWO(wo, body.products).catch((err) => {
+        this.generatePdfForWO(wo, body.products).catch(err => {
             this.logger.error(`Failed to generate VWO PDF: ${err.message}`);
         });
 
         if (wo.projectId) {
-            await this.cashFlowService.create({
-                projectId: wo.projectId,
-                eventType: 'vwo_created',
-                amount: grandTotal.toString(),
-                direction: 'outflow',
-                referenceType: 'vendor_work_order',
-                referenceId: wo.id,
-                referenceNo: woNumber ?? `VWO #${wo.id}`,
-                remark: `VWO created: ${woNumber}`,
-                createdBy: userId,
-            }).catch((err) => this.logger.warn(`Cash flow creation failed for VWO #${wo.id}: ${err}`));
+            await this.cashFlowService
+                .create({
+                    projectId: wo.projectId,
+                    eventType: "vwo_created",
+                    amount: grandTotal.toString(),
+                    direction: "outflow",
+                    referenceType: "vendor_work_order",
+                    referenceId: wo.id,
+                    referenceNo: woNumber ?? `VWO #${wo.id}`,
+                    remark: `VWO created: ${woNumber}`,
+                    createdBy: userId,
+                })
+                .catch(err => this.logger.warn(`Cash flow creation failed for VWO #${wo.id}: ${err}`));
         }
 
         return this.getById(wo.id);
@@ -230,13 +232,18 @@ export class VendorWorkOrderService {
                     contactPersonName: body.contactPersonName,
                     contactPersonPhone: body.contactPersonPhone,
                     contactPersonEmail: body.contactPersonEmail,
+                    vendorContactPersonName: body.vendorContactPersonName,
+                    vendorContactPersonPhone: body.vendorContactPersonPhone,
+                    vendorContactPersonEmail: body.vendorContactPersonEmail,
                     shipToName: body.shipToName,
                     shippingAddress: body.shippingAddress,
                     shipToGst: body.shipToGst,
                     shipToPan: body.shipToPan,
                     category: body.category,
                     termsAndConditions: body.termsAndConditions
-                        ? (typeof body.termsAndConditions === 'string' ? JSON.parse(body.termsAndConditions) : body.termsAndConditions)
+                        ? typeof body.termsAndConditions === "string"
+                            ? JSON.parse(body.termsAndConditions)
+                            : body.termsAndConditions
                         : [],
                     scopeOfWork: body.scopeOfWork,
                     accessoriesPackagingListAttachments: body.accessoriesPackagingListAttachments,
@@ -256,23 +263,26 @@ export class VendorWorkOrderService {
                 .returning()
         )[0];
 
-        await this.clientDirectorySyncService.syncToClientDirectory([{
-            name: body.contactPersonName,
-            email: body.contactPersonEmail,
-            phone: body.contactPersonPhone,
-            org: body.sellerName,
-        }, {
-            name: body.sellerName,
-            email: body.sellerEmail,
-            phone: null,
-            org: null,
-        }].filter((c) => c.name));
+        await this.clientDirectorySyncService.syncToClientDirectory(
+            [
+                {
+                    name: body.contactPersonName,
+                    email: body.contactPersonEmail,
+                    phone: body.contactPersonPhone,
+                    org: body.sellerName,
+                },
+                {
+                    name: body.sellerName,
+                    email: body.sellerEmail,
+                    phone: null,
+                    org: null,
+                },
+            ].filter(c => c.name)
+        );
 
         await this.syncParty(body);
 
-        await this.db
-            .delete(vendorWorkOrderItems)
-            .where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
+        await this.db.delete(vendorWorkOrderItems).where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
 
         if (body.products && body.products.length > 0) {
             for (const product of body.products) {
@@ -298,13 +308,15 @@ export class VendorWorkOrderService {
 
         this.logger.info(`Vendor Work Order updated: ${existing.woNumber}`);
 
-        this.notifications.notifyVwoUpdated({
-            woNumber: existing.woNumber ?? `#${id}`,
-            sellerName: body.sellerName,
-            updatedBy: userId,
-        }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+        this.notifications
+            .notifyVwoUpdated({
+                woNumber: existing.woNumber ?? `#${id}`,
+                sellerName: body.sellerName,
+                updatedBy: userId,
+            })
+            .catch(err => this.logger.warn(`WhatsApp notification failed: ${err}`));
 
-        this.generatePdfForWO(updated, body.products).catch((err) => {
+        this.generatePdfForWO(updated, body.products).catch(err => {
             this.logger.error(`Failed to regenerate VWO PDF: ${err.message}`);
         });
 
@@ -319,10 +331,7 @@ export class VendorWorkOrderService {
             .then(rows => rows[0]);
         if (!wo) throw new NotFoundException("Vendor Work Order not found");
 
-        const items = await this.db
-            .select()
-            .from(vendorWorkOrderItems)
-            .where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
+        const items = await this.db.select().from(vendorWorkOrderItems).where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
 
         const rawTotal = items.reduce(
             (acc, item) => ({
@@ -339,7 +348,7 @@ export class VendorWorkOrderService {
             totalWithGst: rawTotal.grandTotal,
         };
 
-        const enrichedProducts = items.map((product) => {
+        const enrichedProducts = items.map(product => {
             const itemTotal = Number(product.rate) * Number(product.qty);
             const itemTotalGst = (itemTotal * Number(product.gstRate)) / 100;
             const itemTotalWithGst = itemTotal + itemTotalGst;
@@ -353,10 +362,7 @@ export class VendorWorkOrderService {
 
         let raisedByName: string | null = null;
         if (wo.woRaisedBy) {
-            const [raisedByUser] = await this.db
-                .select({ name: users.name })
-                .from(users)
-                .where(eq(users.id, wo.woRaisedBy));
+            const [raisedByUser] = await this.db.select({ name: users.name }).from(users).where(eq(users.id, wo.woRaisedBy));
             raisedByName = raisedByUser?.name ?? null;
         }
 
@@ -474,19 +480,12 @@ export class VendorWorkOrderService {
     }
 
     async getApprovalCounts(section?: string, user?: any) {
-        const teamCondition = section === "operations" && user && user.dataScope !== "all" && user.teamId
-            ? eq(vendorWorkOrders.team, user.teamId)
-            : undefined;
+        const teamCondition = section === "operations" && user && user.dataScope !== "all" && user.teamId ? eq(vendorWorkOrders.team, user.teamId) : undefined;
 
-        const baseQuery = () => this.db
-            .select({ id: vendorWorkOrders.id })
-            .from(vendorWorkOrders)
-            .leftJoin(users, eq(users.id, vendorWorkOrders.woRaisedBy));
+        const baseQuery = () => this.db.select({ id: vendorWorkOrders.id }).from(vendorWorkOrders).leftJoin(users, eq(users.id, vendorWorkOrders.woRaisedBy));
 
         const buildCount = async (condition: any) => {
-            const q = baseQuery().where(
-                teamCondition ? and(teamCondition, condition) : condition
-            );
+            const q = baseQuery().where(teamCondition ? and(teamCondition, condition) : condition);
             const rows = await q;
             return rows.length;
         };
@@ -522,10 +521,7 @@ export class VendorWorkOrderService {
                 throw new BadRequestException("TDS percentage is required when approving");
             }
 
-            const items = await this.db
-                .select()
-                .from(vendorWorkOrderItems)
-                .where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
+            const items = await this.db.select().from(vendorWorkOrderItems).where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
 
             const subtotal = items.reduce((acc, item) => acc + Number(item.taxableAmount), 0);
             const grandTotal = items.reduce((acc, item) => acc + Number(item.totalAmount), 0);
@@ -536,8 +532,8 @@ export class VendorWorkOrderService {
                 .update(vendorWorkOrders)
                 .set({
                     tdsPercentage: tdsPercentage.toString(),
-                    tdsAmount: tdsAmt.toString(),
-                    amountAfterTds: amountAfterTds.toString(),
+                    tdsAmount: round2(tdsAmt).toFixed(2),
+                    amountAfterTds: round2(amountAfterTds).toFixed(2),
                     woApproved: true,
                     woApprovalRemark: remark || null,
                     updatedAt: sql`now()`,
@@ -549,54 +545,68 @@ export class VendorWorkOrderService {
 
             // Bulk update po_approval_pending → pending and send WA notifications
             const pendingPrs = await this.db
-                .select({ id: paymentRequests.id, requestNo: paymentRequests.requestNo, amount: paymentRequests.amount, partyName: paymentRequests.partyName, portalLink: paymentRequests.portalLink, paymentAgainst: paymentRequests.paymentAgainst, requestedBy: paymentRequests.requestedBy })
+                .select({
+                    id: paymentRequests.id,
+                    requestNo: paymentRequests.requestNo,
+                    amount: paymentRequests.amount,
+                    partyName: paymentRequests.partyName,
+                    portalLink: paymentRequests.portalLink,
+                    paymentAgainst: paymentRequests.paymentAgainst,
+                    requestedBy: paymentRequests.requestedBy,
+                })
                 .from(paymentRequests)
-                .where(and(eq(paymentRequests.vendorWorkOrderId, id), eq(paymentRequests.status, 'po_approval_pending')));
+                .where(and(eq(paymentRequests.vendorWorkOrderId, id), eq(paymentRequests.status, "po_approval_pending")));
 
             if (pendingPrs.length > 0) {
                 await this.db
                     .update(paymentRequests)
-                    .set({ status: 'pending', tdsPercentage: tdsPercentage.toString(), updatedAt: new Date() })
-                    .where(and(eq(paymentRequests.vendorWorkOrderId, id), eq(paymentRequests.status, 'po_approval_pending')));
+                    .set({ status: "pending", tdsPercentage: tdsPercentage.toString(), updatedAt: new Date() })
+                    .where(and(eq(paymentRequests.vendorWorkOrderId, id), eq(paymentRequests.status, "po_approval_pending")));
 
                 for (const pr of pendingPrs) {
-                    this.notifications.notifyNewPaymentRequest({
-                        requestNo: pr.requestNo ?? '',
-                        amount: pr.amount ?? 0,
-                        partyName: pr.partyName ?? null,
-                        portalLink: pr.portalLink ?? null,
-                        requestedBy: pr.requestedBy ?? 0,
-                        category: pr.paymentAgainst ?? '',
-                    }).catch((err) => this.logger.warn(`WhatsApp notification failed for PR #${pr.id}: ${err}`));
+                    this.notifications
+                        .notifyNewPaymentRequest({
+                            requestNo: pr.requestNo ?? "",
+                            amount: pr.amount ?? 0,
+                            partyName: pr.partyName ?? null,
+                            portalLink: pr.portalLink ?? null,
+                            requestedBy: pr.requestedBy ?? 0,
+                            category: pr.paymentAgainst ?? "",
+                        })
+                        .catch(err => this.logger.warn(`WhatsApp notification failed for PR #${pr.id}: ${err}`));
                 }
 
                 this.logger.info(`Bulk updated ${pendingPrs.length} payment requests from po_approval_pending to pending for VWO #${id}`);
             }
 
             // Send VWO approved notification
-            this.notifications.notifyVwoApproved({
-                woNumber: wo.woNumber ?? `#${id}`,
-                sellerName: wo.sellerName,
-                grandTotal: grandTotal.toString(),
-                tdsPercentage: tdsPercentage.toString(),
-                amountAfterTds: amountAfterTds.toString(),
-                approvedBy: userId ?? 0,
-            }).catch((err) => this.logger.warn(`WhatsApp VWO approval notification failed: ${err}`));
+            this.notifications
+                .notifyVwoApproved({
+                    woNumber: wo.woNumber ?? `#${id}`,
+                    sellerName: wo.sellerName,
+                    grandTotal: round2(grandTotal).toFixed(2),
+                    tdsPercentage: tdsPercentage.toString(),
+                    amountAfterTds: round2(amountAfterTds).toFixed(2),
+                    approvedBy: userId ?? 0,
+                })
+                .catch(err => this.logger.warn(`WhatsApp VWO approval notification failed: ${err}`));
 
             if (wo.projectId) {
-                await this.cashFlowService.create({
-                    projectId: wo.projectId,
-                    eventType: 'vwo_approved',
-                    amount: amountAfterTds.toString(),
-                    direction: 'outflow',
-                    referenceType: 'vendor_work_order',
-                    referenceId: wo.id,
-                    referenceNo: wo.woNumber ?? `VWO #${wo.id}`,
-                    tdsPercentage: tdsPercentage.toString(),
-                    tdsAmount: tdsAmt.toString(),
-                    remark: `VWO approved with TDS @ ${tdsPercentage}%`,
-                    createdBy: userId ?? 0,
-                }).catch((err) => this.logger.warn(`Cash flow creation failed for VWO approval #${wo.id}: ${err}`));
+                await this.cashFlowService
+                    .create({
+                        projectId: wo.projectId,
+                        eventType: "vwo_approved",
+                        amount: round2(amountAfterTds).toFixed(2),
+                        direction: "outflow",
+                        referenceType: "vendor_work_order",
+                        referenceId: wo.id,
+                        referenceNo: wo.woNumber ?? `VWO #${wo.id}`,
+                        tdsPercentage: tdsPercentage.toString(),
+                        tdsAmount: round2(tdsAmt).toFixed(2),
+                        remark: `VWO approved with TDS @ ${tdsPercentage}%`,
+                        createdBy: userId ?? 0,
+                    })
+                    .catch(err => this.logger.warn(`Cash flow creation failed for VWO approval #${wo.id}: ${err}`));
             }
 
             return updated;
@@ -614,8 +624,8 @@ export class VendorWorkOrderService {
             // Bulk update po_approval_pending → rejected
             const rejectedCount = await this.db
                 .update(paymentRequests)
-                .set({ status: 'rejected', rejectionReason: remark || 'VWO Rejected', updatedAt: new Date() })
-                .where(and(eq(paymentRequests.vendorWorkOrderId, id), eq(paymentRequests.status, 'po_approval_pending')))
+                .set({ status: "rejected", rejectionReason: remark || "VWO Rejected", updatedAt: new Date() })
+                .where(and(eq(paymentRequests.vendorWorkOrderId, id), eq(paymentRequests.status, "po_approval_pending")))
                 .returning({ id: paymentRequests.id });
 
             if (rejectedCount.length > 0) {
@@ -623,21 +633,20 @@ export class VendorWorkOrderService {
             }
 
             // Compute grandTotal for notification
-            const rejectItems = await this.db
-                .select()
-                .from(vendorWorkOrderItems)
-                .where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
+            const rejectItems = await this.db.select().from(vendorWorkOrderItems).where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
             const rejectGrandTotal = rejectItems.reduce((acc, item) => acc + Number(item.totalAmount), 0);
 
-            this.notifications.notifyVwoRejected({
-                woNumber: wo.woNumber ?? `#${id}`,
-                sellerName: wo.sellerName,
-                grandTotal: rejectGrandTotal.toString(),
-                remark: remark || null,
-                rejectedBy: userId ?? 0,
-            }).catch((err) => this.logger.warn(`WhatsApp VWO rejection notification failed: ${err}`));
+            this.notifications
+                .notifyVwoRejected({
+                    woNumber: wo.woNumber ?? `#${id}`,
+                    sellerName: wo.sellerName,
+                    grandTotal: rejectGrandTotal.toString(),
+                    remark: remark || null,
+                    rejectedBy: userId ?? 0,
+                })
+                .catch(err => this.logger.warn(`WhatsApp VWO rejection notification failed: ${err}`));
 
-            this.logger.info(`VWO rejected #${id}: ${remark || 'no remark'}`);
+            this.logger.info(`VWO rejected #${id}: ${remark || "no remark"}`);
             return updated;
         }
     }
@@ -675,11 +684,8 @@ export class VendorWorkOrderService {
             .orderBy(desc(vendorWorkOrders.id));
 
         const enriched = await Promise.all(
-            rows.map(async (wo) => {
-                const items = await this.db
-                    .select()
-                    .from(vendorWorkOrderItems)
-                    .where(eq(vendorWorkOrderItems.vendorWorkOrderId, wo.id));
+            rows.map(async wo => {
+                const items = await this.db.select().from(vendorWorkOrderItems).where(eq(vendorWorkOrderItems.vendorWorkOrderId, wo.id));
 
                 const totals = items.reduce(
                     (acc, item) => ({
@@ -706,12 +712,7 @@ export class VendorWorkOrderService {
                     .from(paymentRequests)
                     .where(and(eq(paymentRequests.vendorWorkOrderId, wo.id), ne(paymentRequests.status, "rejected")));
 
-                const [raisedByUser] = wo.woRaisedBy
-                    ? await this.db
-                        .select({ name: users.name })
-                        .from(users)
-                        .where(eq(users.id, wo.woRaisedBy))
-                    : [];
+                const [raisedByUser] = wo.woRaisedBy ? await this.db.select({ name: users.name }).from(users).where(eq(users.id, wo.woRaisedBy)) : [];
 
                 return {
                     ...wo,
@@ -730,6 +731,9 @@ export class VendorWorkOrderService {
     }
 
     async checkClosure(id: number) {
+        const wo = (await this.db.select().from(vendorWorkOrders).where(eq(vendorWorkOrders.id, id)))[0];
+        if (!wo) throw new NotFoundException("Vendor Work Order not found");
+
         const paymentRequestsData = await this.db
             .select({
                 id: paymentRequests.id,
@@ -739,10 +743,7 @@ export class VendorWorkOrderService {
                 paymentAgainst: paymentRequests.paymentAgainst,
             })
             .from(paymentRequests)
-            .where(and(
-                eq(paymentRequests.vendorWorkOrderId, id),
-                ne(paymentRequests.status, "payment_done"),
-            ))
+            .where(and(eq(paymentRequests.vendorWorkOrderId, id), ne(paymentRequests.status, "payment_done")))
             .orderBy(desc(paymentRequests.createdAt));
 
         const purchaseInvoicesData = await this.db
@@ -757,21 +758,41 @@ export class VendorWorkOrderService {
             .where(eq(purchaseInvoices.vendorWorkOrderId, id))
             .orderBy(desc(purchaseInvoices.createdAt));
 
-        const advancePaid = paymentRequestsData.some(
-            (pr) => pr.paymentAgainst?.toLowerCase().includes("advance"),
-        );
+        const advancePaid = paymentRequestsData.some(pr => pr.paymentAgainst?.toLowerCase().includes("advance"));
 
-        const canClose = paymentRequestsData.length === 0 && purchaseInvoicesData.length === 0;
+        // Sums are computed in SQL (exact numeric) instead of JS floats so the
+        // API gate can never disagree with the closure page's rounded values.
+        const [totals] = await this.db
+            .select({
+                effectiveAmount: sql<string>`COALESCE(${vendorWorkOrders.amountAfterTds}::numeric, (SELECT COALESCE(SUM(${vendorWorkOrderItems.totalAmount}::numeric), 0) FROM ${vendorWorkOrderItems} WHERE ${vendorWorkOrderItems.vendorWorkOrderId} = ${vendorWorkOrders.id}))`,
+                paid: sql<string>`COALESCE((SELECT SUM(${paymentRequests.amount}::numeric) FROM ${paymentRequests} WHERE ${paymentRequests.vendorWorkOrderId} = ${vendorWorkOrders.id} AND ${paymentRequests.status} = 'payment_done'), 0)`,
+                invoiced: sql<string>`COALESCE((SELECT SUM(${purchaseInvoices.valuePreGst}::numeric + ${purchaseInvoices.gstAmount}::numeric) FROM ${purchaseInvoices} WHERE ${purchaseInvoices.vendorWorkOrderId} = ${vendorWorkOrders.id}), 0)`,
+            })
+            .from(vendorWorkOrders)
+            .where(eq(vendorWorkOrders.id, id));
+
+        const effectiveAmount = round2(totals.effectiveAmount);
+        const totalPaymentDone = round2(totals.paid);
+        const totalPiAmount = round2(totals.invoiced);
+        const remainingToPay = round2(effectiveAmount - totalPaymentDone);
+        const remainingInvoice = round2(effectiveAmount - totalPiAmount);
+
+        const canClose = paymentRequestsData.length === 0 && remainingToPay < CLOSURE_TOLERANCE && remainingInvoice < CLOSURE_TOLERANCE;
 
         return {
             canClose,
+            effectiveAmount,
+            totalPaymentDone,
+            totalPiAmount,
+            remainingToPay,
+            remainingInvoice,
             remainingPayments: paymentRequestsData,
             remainingInvoices: purchaseInvoicesData,
             advancePaid,
         };
     }
 
-    async closeVendorWorkOrder(id: number) {
+    async closeVendorWorkOrder(id: number, closureNote?: string, userId?: number) {
         const wo = await this.db
             .select()
             .from(vendorWorkOrders)
@@ -779,27 +800,35 @@ export class VendorWorkOrderService {
             .then(rows => rows[0]);
 
         if (!wo) throw new NotFoundException("Vendor Work Order not found");
+        if (wo.closedAt) {
+            throw new BadRequestException("Vendor Work Order is already closed");
+        }
         if (wo.woApproved !== true) {
             throw new BadRequestException("Only approved Vendor Work Orders can be closed");
         }
 
+        const note = closureNote?.trim();
+        if (!note) {
+            throw new BadRequestException("Closure note is required");
+        }
+
         const closureStatus = await this.checkClosure(id);
         if (!closureStatus.canClose) {
-            throw new BadRequestException(
-                "Vendor Work Order cannot be closed until all payment requests and purchase invoices are cleared.",
-            );
+            throw new BadRequestException(`Vendor Work Order cannot be closed until payments and invoices are settled (difference must be under ₹${CLOSURE_TOLERANCE}).`);
         }
 
         const [updated] = await this.db
             .update(vendorWorkOrders)
             .set({
                 closedAt: new Date(),
+                closedBy: userId ?? null,
+                closureNote: note,
                 updatedAt: new Date(),
             })
             .where(eq(vendorWorkOrders.id, id))
             .returning();
 
-        this.logger.info(`Vendor Work Order closed #${id}`);
+        this.logger.info(`Vendor Work Order closed #${id} by user #${userId ?? "unknown"}`);
         return updated ?? wo;
     }
 
@@ -820,8 +849,8 @@ export class VendorWorkOrderService {
             .from(vendorWorkOrderItems)
             .where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
 
-        const grandTotal = items.reduce((sum, item) => sum + Number(item.totalAmount), 0);
-        const totalGst = items.reduce((sum, item) => sum + Number(item.gstAmount), 0);
+        const grandTotal = round2(items.reduce((sum, item) => sum + Number(item.totalAmount), 0));
+        const totalGst = round2(items.reduce((sum, item) => sum + Number(item.gstAmount), 0));
 
         const paymentRequestsData = await this.db
             .select({
@@ -854,14 +883,11 @@ export class VendorWorkOrderService {
             .where(eq(purchaseInvoices.vendorWorkOrderId, id))
             .orderBy(desc(purchaseInvoices.createdAt));
 
-        const totalPaymentDone = paymentRequestsData
-            .filter((pr) => pr.status === "payment_done")
-            .reduce((sum, pr) => sum + Number(pr.amount || 0), 0);
+        const totalPaymentDone = round2(paymentRequestsData.filter(pr => pr.status === "payment_done").reduce((sum, pr) => sum + Number(pr.amount || 0), 0));
 
-        const totalPiAmount = purchaseInvoicesData.reduce(
-            (sum, inv) => sum + Number(inv.valuePreGst || 0) + Number(inv.gstAmount || 0),
-            0,
-        );
+        const totalPiAmount = round2(purchaseInvoicesData.reduce((sum, inv) => sum + Number(inv.valuePreGst || 0) + Number(inv.gstAmount || 0), 0));
+
+        const closedByName = wo.closedBy ? ((await this.db.select({ name: users.name }).from(users).where(eq(users.id, wo.closedBy)))[0]?.name ?? null) : null;
 
         return {
             id: wo.id,
@@ -876,6 +902,10 @@ export class VendorWorkOrderService {
             totalGst,
             totalPaymentDone,
             totalPiAmount,
+            closedAt: wo.closedAt,
+            closedBy: wo.closedBy,
+            closedByName,
+            closureNote: wo.closureNote,
             paymentRequests: paymentRequestsData,
             purchaseInvoices: purchaseInvoicesData,
         };
@@ -957,16 +987,21 @@ export class VendorWorkOrderService {
         return created;
     }
 
-    async updatePaymentRequest(vwoId: number, prId: number, data: Partial<{
-        partyName: string;
-        accountNumber: string;
-        ifsc: string;
-        amount: string | number;
-        paymentMode: string;
-        utrNumber: string;
-        status: string;
-        paymentAgainst: string;
-    }>, userId: number) {
+    async updatePaymentRequest(
+        vwoId: number,
+        prId: number,
+        data: Partial<{
+            partyName: string;
+            accountNumber: string;
+            ifsc: string;
+            amount: string | number;
+            paymentMode: string;
+            utrNumber: string;
+            status: string;
+            paymentAgainst: string;
+        }>,
+        userId: number
+    ) {
         const pr = await this.db
             .select()
             .from(paymentRequests)
@@ -1000,14 +1035,19 @@ export class VendorWorkOrderService {
         return { success: true };
     }
 
-    async updatePurchaseInvoice(vwoId: number, piId: number, data: Partial<{
-        category: string;
-        partyName: string;
-        valuePreGst: string | number;
-        gstAmount: string | number;
-        invoiceDate: string;
-        invoiceFile: string;
-    }>, userId: number) {
+    async updatePurchaseInvoice(
+        vwoId: number,
+        piId: number,
+        data: Partial<{
+            category: string;
+            partyName: string;
+            valuePreGst: string | number;
+            gstAmount: string | number;
+            invoiceDate: string;
+            invoiceFile: string;
+        }>,
+        userId: number
+    ) {
         const pi = await this.db
             .select()
             .from(purchaseInvoices)
@@ -1099,9 +1139,7 @@ export class VendorWorkOrderService {
     async listParties(type?: string) {
         const conditions = type ? [eq(projectParties.type, type)] : [];
 
-        const partyQuery = this.db
-            .select()
-            .from(projectParties);
+        const partyQuery = this.db.select().from(projectParties);
 
         if (conditions.length > 0) {
             partyQuery.where(and(...conditions));
@@ -1110,7 +1148,7 @@ export class VendorWorkOrderService {
         const partyRows = await partyQuery.orderBy(desc(projectParties.id));
 
         if (type && type !== "seller") {
-            return partyRows.map((p) => ({ ...p, source: "party" as const }));
+            return partyRows.map(p => ({ ...p, source: "party" as const }));
         }
 
         const orgRows = await this.db
@@ -1132,7 +1170,9 @@ export class VendorWorkOrderService {
             .leftJoin(vendorGsts, eq(vendorGsts.orgId, vendorOrganizations.id))
             .leftJoin(vendors, eq(vendors.orgId, vendorOrganizations.id))
             .where(eq(vendorOrganizations.status, true))
-            .orderBy(desc(vendorOrganizations.createdAt));
+            // vendors.id keeps the 1:N fan-out stable: without it the "first"
+            // person per org in the merge below was whatever Postgres returned.
+            .orderBy(desc(vendorOrganizations.createdAt), asc(vendors.id));
 
         type OrgRow = (typeof orgRows)[number] & { type: string; source: string };
         const orgMap = new Map<number, OrgRow>();
@@ -1155,9 +1195,7 @@ export class VendorWorkOrderService {
         const sellerOrgs = [...orgMap.values()];
         // Sellers exist only in vendor master now, so project_parties contributes
         // nothing here beyond ship-to addresses and other non-seller beneficiaries.
-        const otherParties = partyRows
-            .filter((p) => p.type !== "seller")
-            .map((p) => ({ ...p, source: "party" as const }));
+        const otherParties = partyRows.filter(p => p.type !== "seller").map(p => ({ ...p, source: "party" as const }));
 
         return [...sellerOrgs, ...otherParties];
     }
@@ -1216,20 +1254,12 @@ export class VendorWorkOrderService {
 
     async activateParty(id: number, source?: string) {
         if (source === "vendor_org") {
-            const rows = await this.db
-                .update(vendorOrganizations)
-                .set({ status: true, updatedAt: new Date() })
-                .where(eq(vendorOrganizations.id, id))
-                .returning();
+            const rows = await this.db.update(vendorOrganizations).set({ status: true, updatedAt: new Date() }).where(eq(vendorOrganizations.id, id)).returning();
             if (!rows[0]) throw new NotFoundException(`Vendor organization with ID ${id} not found`);
             return { ...rows[0], type: "seller", source: "vendor_org", isActive: true };
         }
 
-        const rows = await this.db
-            .update(projectParties)
-            .set({ isActive: true, updatedAt: new Date() })
-            .where(eq(projectParties.id, id))
-            .returning();
+        const rows = await this.db.update(projectParties).set({ isActive: true, updatedAt: new Date() }).where(eq(projectParties.id, id)).returning();
 
         if (!rows[0]) {
             throw new NotFoundException(`Party with ID ${id} not found`);
@@ -1239,20 +1269,12 @@ export class VendorWorkOrderService {
 
     async deactivateParty(id: number, source?: string) {
         if (source === "vendor_org") {
-            const rows = await this.db
-                .update(vendorOrganizations)
-                .set({ status: false, updatedAt: new Date() })
-                .where(eq(vendorOrganizations.id, id))
-                .returning();
+            const rows = await this.db.update(vendorOrganizations).set({ status: false, updatedAt: new Date() }).where(eq(vendorOrganizations.id, id)).returning();
             if (!rows[0]) throw new NotFoundException(`Vendor organization with ID ${id} not found`);
             return { ...rows[0], type: "seller", source: "vendor_org", isActive: false };
         }
 
-        const rows = await this.db
-            .update(projectParties)
-            .set({ isActive: false, updatedAt: new Date() })
-            .where(eq(projectParties.id, id))
-            .returning();
+        const rows = await this.db.update(projectParties).set({ isActive: false, updatedAt: new Date() }).where(eq(projectParties.id, id)).returning();
 
         if (!rows[0]) {
             throw new NotFoundException(`Party with ID ${id} not found`);
@@ -1278,17 +1300,10 @@ export class VendorWorkOrderService {
                 .returning();
             if (!rows[0]) throw new NotFoundException(`Vendor organization with ID ${id} not found`);
 
-            await this.syncPersonForOrg(id, body);
-            await this.syncGstForOrg(id, body);
-
             return { ...rows[0], type: "seller", source: "vendor_org", isActive: rows[0].status };
         }
 
-        const [existing] = await this.db
-            .select()
-            .from(projectParties)
-            .where(eq(projectParties.id, id))
-            .limit(1);
+        const [existing] = await this.db.select().from(projectParties).where(eq(projectParties.id, id)).limit(1);
 
         if (!existing) {
             throw new NotFoundException(`Party with ID ${id} not found`);
@@ -1339,9 +1354,7 @@ export class VendorWorkOrderService {
             }
 
             // No version specified → return latest
-            const sorted = Object.entries(versions).sort((a, b) =>
-                this.parseLabelDate(b[0]).getTime() - this.parseLabelDate(a[0]).getTime()
-            );
+            const sorted = Object.entries(versions).sort((a, b) => this.parseLabelDate(b[0]).getTime() - this.parseLabelDate(a[0]).getTime());
             if (sorted.length === 0) throw new NotFoundException("No PDF versions found for this Vendor Work Order");
             const [latestLabel, latestEntry] = sorted[0];
             return {
@@ -1386,10 +1399,7 @@ export class VendorWorkOrderService {
             if (!versions[version]) throw new NotFoundException(`PDF version "${version}" not found`);
             delete versions[version];
 
-            await this.db
-                .update(vendorWorkOrders)
-                .set({ generatedPdfVersions: versions })
-                .where(eq(vendorWorkOrders.id, id));
+            await this.db.update(vendorWorkOrders).set({ generatedPdfVersions: versions }).where(eq(vendorWorkOrders.id, id));
         } catch (error) {
             this.logger.error(`Failed to delete VWO PDF version: ${error instanceof Error ? error.message : String(error)}`);
             throw error;
@@ -1411,9 +1421,6 @@ export class VendorWorkOrderService {
                     updatedAt: new Date(),
                 })
                 .where(eq(vendorOrganizations.id, orgId));
-
-            await this.syncPersonForOrg(orgId, body);
-            await this.syncGstForOrg(orgId, body);
         } else {
             // Sellers live only in vendor master; without an org id there is
             // nothing to write to rather than recreating a party row.
@@ -1448,70 +1455,6 @@ export class VendorWorkOrderService {
         }
     }
 
-    private async syncPersonForOrg(orgId: number, body: any) {
-        const [person] = await this.db
-            .select()
-            .from(vendors)
-            .where(eq(vendors.orgId, orgId))
-            .limit(1);
-
-        const name = body.contactPersonName ?? body.contact_person ?? null;
-        const email = body.contactPersonEmail ?? body.sellerEmail ?? null;
-        const mobile = body.contactPersonPhone ?? body.mobile_number ?? null;
-
-        if (person) {
-            await this.db
-                .update(vendors)
-                .set({
-                    name,
-                    email,
-                    mobile,
-                    updatedAt: new Date(),
-                })
-                .where(eq(vendors.id, person.id));
-        } else {
-            await this.db.insert(vendors).values({
-                orgId,
-                name,
-                email,
-                mobile,
-                address: null,
-            });
-        }
-    }
-
-    private async syncGstForOrg(orgId: number, body: any) {
-        const [gst] = await this.db
-            .select()
-            .from(vendorGsts)
-            .where(eq(vendorGsts.orgId, orgId))
-            .limit(1);
-
-        const hasGstNo = body.sellerGstNo !== undefined || body.gstNo !== undefined;
-        const hasGstState = body.gstState !== undefined;
-        const gstNo = body.sellerGstNo ?? body.gstNo;
-        const gstState = body.gstState;
-
-        if (gst) {
-            if (hasGstNo || hasGstState) {
-                await this.db
-                    .update(vendorGsts)
-                    .set({
-                        ...(hasGstNo ? { gstNo } : {}),
-                        ...(hasGstState ? { gstState } : {}),
-                        updatedAt: new Date(),
-                    })
-                    .where(eq(vendorGsts.id, gst.id));
-            }
-        } else {
-            await this.db.insert(vendorGsts).values({
-                orgId,
-                gstState: hasGstState ? gstState : null,
-                gstNo: hasGstNo ? gstNo : null,
-            });
-        }
-    }
-
     private computeWOHash(wo: any, products: any[]): string {
         const fields = {
             woDate: wo.woDate,
@@ -1530,6 +1473,9 @@ export class VendorWorkOrderService {
             contactPersonName: wo.contactPersonName,
             contactPersonPhone: wo.contactPersonPhone,
             contactPersonEmail: wo.contactPersonEmail,
+            vendorContactPersonName: wo.vendorContactPersonName,
+            vendorContactPersonPhone: wo.vendorContactPersonPhone,
+            vendorContactPersonEmail: wo.vendorContactPersonEmail,
             termsAndConditions: wo.termsAndConditions,
             team: wo.team,
             certRecipient: wo.certRecipient,
@@ -1549,7 +1495,7 @@ export class VendorWorkOrderService {
         const contentHash = this.computeWOHash(wo, products);
 
         const versions = (wo.generatedPdfVersions ?? {}) as Record<string, { path: string; hash: string }>;
-        const existingVersion = Object.values(versions).find((v) => v.hash === contentHash);
+        const existingVersion = Object.values(versions).find(v => v.hash === contentHash);
         if (existingVersion) {
             this.logger.info(`VWO ${wo.id}: no changes detected, reusing existing PDF`);
             return;
@@ -1578,18 +1524,14 @@ export class VendorWorkOrderService {
         const grandTotal = totalAmount + totalGstAmt;
 
         // Determine signature image based on creator's team
-        const [creatorUser] = await this.db
-            .select({ team: users.team })
-            .from(users)
-            .where(eq(users.id, wo.woRaisedBy))
-            .limit(1);
+        const [creatorUser] = await this.db.select({ team: users.team }).from(users).where(eq(users.id, wo.woRaisedBy)).limit(1);
         const team = creatorUser?.team;
-        const isProd = process.env.NODE_ENV === 'production';
-        const rootDir = isProd ? 'dist' : 'src';
-        const assetsPath = join(process.cwd(), rootDir, 'modules', 'pdf', 'assets');
-        const signFile = team === 1 ? 'arju-boi.png' : 'sign-po.jpg';
+        const isProd = process.env.NODE_ENV === "production";
+        const rootDir = isProd ? "dist" : "src";
+        const assetsPath = join(process.cwd(), rootDir, "modules", "pdf", "assets");
+        const signFile = team === 1 ? "arju-boi.png" : "sign-po.jpg";
         const signBuffer = await readFile(join(assetsPath, signFile));
-        const img_sign_po_base64 = signBuffer.toString('base64');
+        const img_sign_po_base64 = signBuffer.toString("base64");
 
         const data = {
             img_sign_po_base64,
@@ -1599,6 +1541,9 @@ export class VendorWorkOrderService {
             oe_name: wo.contactPersonName || "",
             oe_number: wo.contactPersonPhone || "",
             oe_email: wo.contactPersonEmail || "",
+            vendor_contact_name: wo.vendorContactPersonName || "",
+            vendor_contact_phone: wo.vendorContactPersonPhone || "",
+            vendor_contact_email: wo.vendorContactPersonEmail || "",
             seller_name: wo.sellerName || "",
             seller_address: wo.sellerAddress || "",
             seller_pan: wo.sellerPanNo || "",
@@ -1618,21 +1563,23 @@ export class VendorWorkOrderService {
         };
 
         try {
-            const pdfPaths = await this.pdfGenerator.generatePdfs('vwo', data, wo.id, 'VWO');
+            const pdfPaths = await this.pdfGenerator.generatePdfs("vwo", data, wo.id, "VWO");
             if (pdfPaths.length > 0) {
                 // Rename PDF to use WO sequence number instead of timestamp (avoids Date.now() race)
-                const woSeq = wo.woNumber?.split('/').pop() || `WO${wo.id}`;
-                const rand = randomUUID().split('-')[0];
+                const woSeq = wo.woNumber?.split("/").pop() || `WO${wo.id}`;
+                const rand = randomUUID().split("-")[0];
                 const newFileName = `${woSeq}-${rand}.pdf`;
-                const storageDir = 'operations/vwo';
+                const storageDir = "operations/vwo";
 
-                const oldPath = join(process.cwd(), 'uploads', pdfPaths[0]);
-                const newPath = join(process.cwd(), 'uploads', storageDir, newFileName);
+                const oldPath = join(process.cwd(), "uploads", pdfPaths[0]);
+                const newPath = join(process.cwd(), "uploads", storageDir, newFileName);
 
                 for (let attempt = 0; attempt < 3; attempt++) {
-                    try { await rename(oldPath, newPath); break; }
-                    catch (e) {
-                        if ((e as NodeJS.ErrnoException).code !== 'ENOENT' || attempt === 2) throw e;
+                    try {
+                        await rename(oldPath, newPath);
+                        break;
+                    } catch (e) {
+                        if ((e as NodeJS.ErrnoException).code !== "ENOENT" || attempt === 2) throw e;
                         await new Promise(r => setTimeout(r, 200 * (attempt + 1)));
                     }
                 }
@@ -1658,8 +1605,28 @@ export class VendorWorkOrderService {
 
     private numberToWords(num: number): string {
         if (num === 0) return "Zero Only";
-        const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
-            "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+        const ones = [
+            "",
+            "One",
+            "Two",
+            "Three",
+            "Four",
+            "Five",
+            "Six",
+            "Seven",
+            "Eight",
+            "Nine",
+            "Ten",
+            "Eleven",
+            "Twelve",
+            "Thirteen",
+            "Fourteen",
+            "Fifteen",
+            "Sixteen",
+            "Seventeen",
+            "Eighteen",
+            "Nineteen",
+        ];
         const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
 
         const convert = (n: number): string => {
@@ -1691,21 +1658,19 @@ export class VendorWorkOrderService {
     }
 
     private async resolveCertRecipientEmails(wo: any): Promise<string> {
-        const ids: number[] = Array.isArray(wo.certRecipients) && wo.certRecipients.length > 0
-            ? wo.certRecipients
-            : wo.certRecipient ? [wo.certRecipient] : [];
+        const ids: number[] = Array.isArray(wo.certRecipients) && wo.certRecipients.length > 0 ? wo.certRecipients : wo.certRecipient ? [wo.certRecipient] : [];
         if (ids.length === 0) return "goyal@volksenergie.in";
-        const users_data = await this.db
-            .select({ email: users.email })
-            .from(users)
-            .where(inArray(users.id, ids));
-        return users_data.map(u => u.email).filter(Boolean).join(", ");
+        const users_data = await this.db.select({ email: users.email }).from(users).where(inArray(users.id, ids));
+        return users_data
+            .map(u => u.email)
+            .filter(Boolean)
+            .join(", ");
     }
 
     private sanitizeProjectName(name: string): string {
         return name
-            .replace(/[^a-zA-Z0-9\s-]/g, '')
+            .replace(/[^a-zA-Z0-9\s-]/g, "")
             .trim()
-            .replace(/[\s-]+/g, '_');
+            .replace(/[\s-]+/g, "_");
     }
 }
