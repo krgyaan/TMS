@@ -242,12 +242,11 @@ export class TenderExecutiveService {
             return new Date(row.createdAt) <= periodEnd;
         };
 
-        const APP_ZONE = `'Asia/Calcutta'`;
         const fromDay = fromDate.toISOString().slice(0, 10);
         const toDay = toDate.toISOString().slice(0, 10);
-        const fromTz = `((DATE '${fromDay}' + TIME '00:00:00') AT TIME ZONE ${APP_ZONE})`;
-        const toTz = `((DATE '${toDay}' + TIME '23:59:59.999') AT TIME ZONE ${APP_ZONE})`;
-        const toUtc = `(timezone('UTC', (DATE '${toDay}' + TIME '23:59:59.999') AT TIME ZONE ${APP_ZONE}))`;
+        const fromTz = `'${period.start.toISOString()}'`;
+        const toTz = `'${period.end.toISOString()}'`;
+        const toUtc = toTz;
         const fromLocal = `(DATE '${fromDay}' + TIME '00:00:00')`;
         const toLocal = `(DATE '${toDay}' + TIME '23:59:59.999')`;
 
@@ -1204,13 +1203,13 @@ export class TenderExecutiveService {
     }
 
     async getStageBacklogV2(query: { view: "user" | "team" | "all"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
-        const APP_ZONE = `'Asia/Calcutta'`;
+        const backlogPeriod = istDayBounds(query.fromDate.slice(0, 10), query.toDate.slice(0, 10));
 
-        const fromTz = `(('${query.fromDate}'::date + TIME '00:00:00') AT TIME ZONE ${APP_ZONE})`;
-        const toTz = `(('${query.toDate}'::date + TIME '23:59:59.999') AT TIME ZONE ${APP_ZONE})`;
+        const fromTz = `'${backlogPeriod.start.toISOString()}'`;
+        const toTz = `'${backlogPeriod.end.toISOString()}'`;
 
-        const fromUtc = `(timezone('UTC', ('${query.fromDate}'::date + TIME '00:00:00') AT TIME ZONE ${APP_ZONE}))`;
-        const toUtc = `(timezone('UTC', ('${query.toDate}'::date + TIME '23:59:59.999') AT TIME ZONE ${APP_ZONE}))`;
+        const fromUtc = `'${backlogPeriod.start.toISOString()}'`;
+        const toUtc = `'${backlogPeriod.end.toISOString()}'`;
 
         const fromLocal = `(('${query.fromDate}'::date + TIME '00:00:00'))`;
         const toLocal = `(('${query.toDate}'::date + TIME '23:59:59.999'))`;
