@@ -182,11 +182,9 @@ function resolveEmdFinancialState(instrumentType: string, action: number | null)
 }
 const TERMINAL_KPI: TenderKpiBucket[] = ["WON", "LOST", "DISQUALIFIED", "MISSED", "REJECTED"];
 
-function isResolvedTender(tenderCategory?: string | null) {
-    return tenderCategory === "won" || tenderCategory === "lost";
-}
-
 const GATED_STAGES = new Set(["rfq_sent", "emd_requested", "physical_docs"]);
+
+const MATRIX_STAGE_EXCLUSIONS = new Set(["tq", "ra", "result"]);
 
 function timerDeadline(timerRow: { deadlineAt?: Date | string | null } | undefined, stage: (typeof STAGE_CONFIG)[number], tender: TenderInfo): Date | null {
     const deadline = timerRow?.deadlineAt ?? stage.resolveDeadline(tender);
@@ -196,11 +194,6 @@ function timerDeadline(timerRow: { deadlineAt?: Date | string | null } | undefin
 type StageArtifactFlags = { exists: boolean; inPeriod: boolean; byEnd: boolean };
 
 type TenderFacts = Record<string, StageArtifactFlags | boolean | string | null | undefined>;
-
-function artifactOf(facts: TenderFacts | undefined, stageKey: string): StageArtifactFlags | undefined {
-    const value = facts?.[stageKey];
-    return value && typeof value === "object" ? value : undefined;
-}
 
 function factString(value: unknown): string | null {
     return typeof value === "string" ? value : null;
@@ -249,10 +242,33 @@ export class TenderExecutiveService {
             return new Date(row.createdAt) <= periodEnd;
         };
 
-        const tenders = await this.db
-            .select()
-            .from(tenderInfos)
-            .where(and(eq(tenderInfos.teamMember, userId), eq(tenderInfos.deleteStatus, 0), between(tenderInfos.createdAt, period.start, period.end)));
+        const APP_ZONE = `'Asia/Calcutta'`;
+        const fromDay = fromDate.toISOString().slice(0, 10);
+        const toDay = toDate.toISOString().slice(0, 10);
+        const fromTz = `((DATE '${fromDay}' + TIME '00:00:00') AT TIME ZONE ${APP_ZONE})`;
+        const toTz = `((DATE '${toDay}' + TIME '23:59:59.999') AT TIME ZONE ${APP_ZONE})`;
+        const toUtc = `(timezone('UTC', (DATE '${toDay}' + TIME '23:59:59.999') AT TIME ZONE ${APP_ZONE}))`;
+        const fromLocal = `(DATE '${fromDay}' + TIME '00:00:00')`;
+        const toLocal = `(DATE '${toDay}' + TIME '23:59:59.999')`;
+
+        const tenders = (await this.db.execute(sql.raw(`
+            SELECT ti.*
+            FROM tender_infos ti
+            WHERE ti.team_member = ${userId}
+              AND ti.delete_status = 0
+              AND ti.created_at <= ${toTz}
+              AND (
+                ti.created_at BETWEEN ${fromTz} AND ${toTz}
+                OR EXISTS (SELECT 1 FROM tender_information x WHERE x.tender_id = ti.id AND x.created_at BETWEEN ${fromLocal} AND ${toLocal})
+                OR EXISTS (SELECT 1 FROM rfqs r WHERE r.tender_id = ti.id AND r.created_at BETWEEN ${fromTz} AND ${toTz})
+                OR EXISTS (SELECT 1 FROM payment_requests p WHERE p.tender_id = ti.id AND p.purpose = 'EMD' AND p.created_at BETWEEN ${fromLocal} AND ${toLocal})
+                OR EXISTS (SELECT 1 FROM physical_docs d WHERE d.tender_id = ti.id AND d.created_at BETWEEN ${fromTz} AND ${toTz})
+                OR EXISTS (SELECT 1 FROM tender_document_checklists c WHERE c.tender_id = ti.id AND c.created_at BETWEEN ${fromTz} AND ${toTz})
+                OR EXISTS (SELECT 1 FROM tender_costing_sheets s WHERE s.tender_id = ti.id AND s.created_at BETWEEN ${fromTz} AND ${toTz})
+                OR EXISTS (SELECT 1 FROM bid_submissions b WHERE b.tender_id = ti.id AND b.status = 'Bid Submitted' AND COALESCE(b.submission_datetime, b.created_at) BETWEEN ${fromTz} AND ${toTz})
+                OR EXISTS (SELECT 1 FROM timers t WHERE t.entity_id = ti.id AND t.entity_type = 'TENDER' AND t.ended_at BETWEEN ${fromTz} AND ${toTz})
+              )
+        `))).rows as TenderInfo[];
 
         if (tenders.length === 0) return [];
 
@@ -269,15 +285,6 @@ export class TenderExecutiveService {
         for (const t of timers) {
             timerMap.set(`${t.entityId}:${t.stage}`, t);
         }
-
-        const APP_ZONE = `'Asia/Calcutta'`;
-        const fromDay = fromDate.toISOString().slice(0, 10);
-        const toDay = toDate.toISOString().slice(0, 10);
-        const fromTz = `((DATE '${fromDay}' + TIME '00:00:00') AT TIME ZONE ${APP_ZONE})`;
-        const toTz = `((DATE '${toDay}' + TIME '23:59:59.999') AT TIME ZONE ${APP_ZONE})`;
-        const toUtc = `(timezone('UTC', (DATE '${toDay}' + TIME '23:59:59.999') AT TIME ZONE ${APP_ZONE}))`;
-        const fromLocal = `(DATE '${fromDay}' + TIME '00:00:00')`;
-        const toLocal = `(DATE '${toDay}' + TIME '23:59:59.999')`;
 
         const artifactFlags = (key: string, table: string, alias: string, columnExpr: string, from: string, to: string, extra = "") => `
             EXISTS (SELECT 1 FROM ${table} ${alias} WHERE ${alias}.tender_id = ti.id ${extra}) AS "${key}Exists",
@@ -348,15 +355,6 @@ export class TenderExecutiveService {
             artifactMap.set(Number(row.id), facts);
         }
 
-        const guardFor = (stageKey: string, tender: TenderInfo, facts: TenderFacts, artifact: StageArtifactFlags | undefined, isTerminal: boolean) => {
-            if (stageKey === "bid_submission") return Boolean(facts.tlApproved) && Boolean(facts.approvedByEnd) && !isResolvedTender(factString(facts.tenderCategory));
-
-            if (stageKey === "tender_info_sheet") return Boolean(artifact?.exists) || Number(tender.status) === 1;
-
-            if (!artifact) return true;
-            return artifact.exists || !isTerminal;
-        };
-
         const resultsRows = await this.db.select().from(tenderResults).where(inArray(tenderResults.tenderId, tenderIds));
 
         const resultMap = new Map<number, (typeof resultsRows)[number]>();
@@ -377,7 +375,6 @@ export class TenderExecutiveService {
         for (const tender of tenders) {
             const bucket = mapStatusToKpi(Number(tender.status));
             const hasBid = ["RESULT_AWAITED", "WON", "LOST", "DISQUALIFIED"].includes(bucket);
-            const isTerminal = TERMINAL_KPI.includes(bucket);
             const facts = artifactMap.get(tender.id);
 
             for (const stage of activeStages) {
@@ -389,7 +386,9 @@ export class TenderExecutiveService {
 
                 const timerRow = stage.type === "timer" && stage.timerName ? timerMap.get(`${tender.id}:${stage.timerName}`) : undefined;
 
-                if (stage.stageKey === "tender_info_sheet") {
+                const tenderForGate = { ...tender, emdRequired: facts?.emdRequired ?? null, physicalDocsRequired: facts?.physicalDocsRequired ?? null };
+
+                if (stage.type === "timer") {
                     const deadlineAt = timerDeadline(timerRow, stage, tender);
                     const startedAt = timerRow?.startedAt ? new Date(timerRow.startedAt) : null;
                     const endedAt = timerRow?.endedAt ? new Date(timerRow.endedAt) : null;
@@ -397,7 +396,9 @@ export class TenderExecutiveService {
                     const closedInPeriod = endedAt !== null && endedAt >= periodStart && endedAt <= periodEnd;
                     const openAtEnd = (endedAt === null || endedAt > periodEnd) && startedAt !== null && startedAt <= periodEnd && (startedAt >= periodStart || (deadlineAt !== null && deadlineAt >= periodStart));
 
-                    applicable = deadlineAt !== null && (closedInPeriod || openAtEnd);
+                    const gateBlocked = GATED_STAGES.has(stage.stageKey) && facts?.activeInPeriod !== true && !(stage.isApplicable ? stage.isApplicable(tenderForGate) : false);
+
+                    applicable = !gateBlocked && deadlineAt !== null && (closedInPeriod || openAtEnd);
 
                     if (applicable && deadlineAt !== null) {
                         completed = closedInPeriod;
@@ -419,42 +420,6 @@ export class TenderExecutiveService {
                     startTime = createdAt;
                     endTime = completed ? createdAt : null;
                     onTime = null;
-                } else {
-                    const artifact = artifactOf(facts, stage.stageKey);
-
-                    const missedInPeriod = stage.stageKey === "bid_submission" && Boolean(facts?.missedInPeriod);
-                    const missedBeforeStart = stage.stageKey === "bid_submission" && Boolean(facts?.missedBeforeStart);
-
-                    const domainDoneBeforeStart = Boolean(artifact?.byEnd) && !artifact?.inPeriod;
-                    const timerDoneBeforeStart = Boolean(timerRow?.endedAt) && timerRow?.status === "completed" && new Date(timerRow.endedAt!) < periodStart;
-                    const doneBeforeStart = domainDoneBeforeStart || timerDoneBeforeStart || missedBeforeStart;
-
-                    const tenderForGate = GATED_STAGES.has(stage.stageKey)
-                        ? { ...tender, emdRequired: facts?.emdRequired ?? null, physicalDocsRequired: facts?.physicalDocsRequired ?? null }
-                        : tender;
-
-                    completed = Boolean(artifact?.inPeriod);
-
-                    const gatePassed = !doneBeforeStart &&
-                        (stage.isApplicable(tenderForGate) || Boolean(timerRow) || Boolean(artifact?.exists)) &&
-                        guardFor(stage.stageKey, tender, facts ?? {}, artifact, isTerminal);
-
-                    applicable = GATED_STAGES.has(stage.stageKey) ? Boolean(facts?.activeInPeriod) || (!doneBeforeStart && gatePassed && stage.isApplicable(tenderForGate)) : completed || gatePassed;
-
-                    startTime = timerRow?.startedAt ?? null;
-                    endTime = completed ? (timerRow?.endedAt ?? null) : null;
-
-                    if (completed) {
-                        const endedAt = timerRow?.endedAt ? new Date(timerRow.endedAt) : null;
-                        const deadlineAt = timerDeadline(timerRow, stage, tender);
-
-                        if (endedAt && deadlineAt) onTime = endedAt <= deadlineAt;
-                        else onTime = null;
-                    } else if (applicable) {
-                        const deadlineAt = timerDeadline(timerRow, stage, tender);
-
-                        onTime = missedInPeriod || (deadlineAt && periodEnd > deadlineAt) ? false : null;
-                    }
                 }
 
                 output.push({
@@ -648,7 +613,7 @@ export class TenderExecutiveService {
     }
 
     async getStageMatrix(query: PerformanceQueryDto) {
-        const stages = await this.getStagePerformance(query);
+        const stages = (await this.getStagePerformance(query)).filter(s => !MATRIX_STAGE_EXCLUSIONS.has(s.stageKey));
 
         const periodEnd = istDayBounds(query.fromDate.toISOString().slice(0, 10), query.toDate.toISOString().slice(0, 10)).end;
 
