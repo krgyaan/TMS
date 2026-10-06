@@ -892,7 +892,7 @@ export class BiddingRequirementsService {
      * Streams ONE cached annexure as a .docx.
      */
     async downloadAnnexureDocx(tenderId: number, annexureIndex: number): Promise<StreamableFile> {
-        await this.tenderInfosService.validateExists(tenderId);
+        const tender = await this.tenderInfosService.validateExists(tenderId);
 
         const [existingExtraction] = await this.db
             .select()
@@ -913,12 +913,37 @@ export class BiddingRequirementsService {
         }
 
         const endpoint = `${this.getServiceUrl()}/generate-annexure-docx`;
+        const extractionFields = (existingExtraction?.fields as Record<string, any>) || {};
+        const tenderNo = tender?.tenderNo || extractionFields.tender_number || extractionFields.gem_bid_number || '';
+        const todayStr = new Date()
+            .toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
+            .replace(/\//g, '-');
+
+        const context: Record<string, string> = {
+            tenderNo,
+            tenderName: tender?.tenderName || '',
+            companyName: 'Volks Energie Private Limited',
+            companyAddress: 'B-1/D8, 2nd floor, Mohan Cooperative Industrial Estate, New Delhi – 110044',
+            place: 'New Delhi',
+            date: todayStr,
+            cin: 'U40100DL2011PTC228907',
+            pan: 'AADCV9396C',
+            msme: 'UDYAM-DL-090000465',
+            email: 'contact@volksenergie.in',
+            phone: '+91 9650393636',
+            designation: 'Authorized Signatory',
+        };
+
         let response: Response;
         try {
             response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ annexureName: annexure.annexureName, blocks: annexure.blocks }),
+                body: JSON.stringify({
+                    annexureName: annexure.annexureName,
+                    blocks: annexure.blocks,
+                    context,
+                }),
                 signal: AbortSignal.timeout(30000),
             });
         } catch (err: unknown) {

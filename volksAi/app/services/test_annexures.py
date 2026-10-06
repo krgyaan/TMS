@@ -365,6 +365,70 @@ def test_generate_endpoint_applies_letterhead_only_when_required_without_claude(
     assert any("M/s______" in p.text for p in d1.paragraphs)
 
 
+def test_generate_endpoint_autofills_bidder_letterhead_docs_with_context_without_claude():
+    letterhead_form = {
+        "annexureName": "Form-IA: Undertaking on Letterhead (Land Border)",
+        "blocks": [
+            {"type": "heading", "text": "UNDERTAKING ON LETTERHEAD"},
+            {"type": "paragraph", "text": "We M/s______ (Name of Bidder) certify that we have submitted offer for tender no. ______."},
+            {"type": "blank_field", "label": "Tender No"},
+            {"type": "blank_field", "label": "Place"},
+            {"type": "blank_field", "label": "Date"},
+            {"type": "blank_field", "label": "Designation"},
+            {"type": "signature_line", "label": "Signature of Authorized Signatory"},
+        ],
+    }
+    context = {
+        "tenderNo": "GEM/2026/B/9899640",
+        "tenderName": "Supply of Power Transformers",
+        "companyName": "Volks Energie Private Limited",
+        "place": "New Delhi",
+        "date": "06-10-2026",
+        "designation": "Authorized Signatory",
+    }
+    with patch("anthropic.Anthropic") as MockAnthropic:
+        resp = client.post("/generate-annexure-docx", json={**letterhead_form, "context": context})
+    MockAnthropic.assert_not_called()
+    assert resp.status_code == 200
+    doc = Document(io.BytesIO(resp.content))
+    assert _header_footer_pictures(doc) == (1, 1)
+
+    paragraphs_text = [p.text for p in doc.paragraphs]
+    assert any("M/s Volks Energie Private Limited" in t for t in paragraphs_text)
+    assert any("GEM/2026/B/9899640" in t for t in paragraphs_text)
+    assert any("Tender No: GEM/2026/B/9899640" in t for t in paragraphs_text)
+    assert any("Place: New Delhi" in t for t in paragraphs_text)
+    assert any("Date: 06-10-2026" in t for t in paragraphs_text)
+    assert any("Designation: Authorized Signatory" in t for t in paragraphs_text)
+    assert any("(For Volks Energie Private Limited)" in t for t in paragraphs_text)
+
+
+def test_generate_endpoint_leaves_non_letterhead_docs_unfilled():
+    bg_form = {
+        "annexureName": "Appendix-A3: Proforma of Bank Guarantee",
+        "blocks": [
+            {"type": "heading", "text": "PROFORMA OF BANK GUARANTEE"},
+            {"type": "paragraph", "text": "On bank letterhead, to be issued by the issuing bank."},
+            {"type": "blank_field", "label": "Name of Bank"},
+            {"type": "blank_field", "label": "Signature of Bank Official"},
+        ],
+    }
+    context = {
+        "tenderNo": "GEM/2026/B/9899640",
+        "companyName": "Volks Energie Private Limited",
+    }
+    with patch("anthropic.Anthropic") as MockAnthropic:
+        resp = client.post("/generate-annexure-docx", json={**bg_form, "context": context})
+    MockAnthropic.assert_not_called()
+    assert resp.status_code == 200
+    doc = Document(io.BytesIO(resp.content))
+    assert _header_footer_pictures(doc) == (0, 0)
+    paragraphs_text = [p.text for p in doc.paragraphs]
+    assert any("Name of Bank: ______________________________" in t for t in paragraphs_text)
+    assert not any("Volks Energie Private Limited" in t for t in paragraphs_text)
+
+
+
 # ── Missing annexure snippet: filled from the cited page, not rejected ─────────
 # Real-world case: tender 3635's analysis found 6 GAIL forms but Claude omitted every
 # source.snippet, so all 6 were rejected and the checklist showed no annexures.

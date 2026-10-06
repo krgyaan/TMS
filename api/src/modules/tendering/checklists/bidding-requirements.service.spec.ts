@@ -547,10 +547,16 @@ describe('BiddingRequirementsService', () => {
                 expect.objectContaining({
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        annexureName: 'Bid Security Declaration',
-                        blocks: storedBlocks,
-                    }),
+                    body: expect.stringContaining('"annexureName":"Bid Security Declaration"'),
+                }),
+            );
+            const sentPayload = JSON.parse((fetchSpy.mock.calls[0][1] as any).body);
+            expect(sentPayload.annexureName).toBe('Bid Security Declaration');
+            expect(sentPayload.blocks).toEqual(storedBlocks);
+            expect(sentPayload.context).toEqual(
+                expect.objectContaining({
+                    companyName: 'Volks Energie Private Limited',
+                    tenderNo: 'TND-1175',
                 }),
             );
 
