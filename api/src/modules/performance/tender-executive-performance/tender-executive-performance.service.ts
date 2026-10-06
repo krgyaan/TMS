@@ -242,7 +242,7 @@ export class TenderExecutiveService {
             return new Date(row.createdAt) <= periodEnd;
         };
 
-        const APP_ZONE = `'Asia/Calcutta'`;
+        const APP_ZONE = `'Asia/Kolkata'`;
         const fromDay = fromDate.toISOString().slice(0, 10);
         const toDay = toDate.toISOString().slice(0, 10);
         const fromTz = `((DATE '${fromDay}' + TIME '00:00:00') AT TIME ZONE ${APP_ZONE})`;
@@ -1204,7 +1204,7 @@ export class TenderExecutiveService {
     }
 
     async getStageBacklogV2(query: { view: "user" | "team" | "all"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
-        const APP_ZONE = `'Asia/Calcutta'`;
+        const APP_ZONE = `'Asia/Kolkata'`;
 
         const fromTz = `(('${query.fromDate}'::date + TIME '00:00:00') AT TIME ZONE ${APP_ZONE})`;
         const toTz = `(('${query.toDate}'::date + TIME '23:59:59.999') AT TIME ZONE ${APP_ZONE})`;
