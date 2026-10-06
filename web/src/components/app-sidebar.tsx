@@ -115,8 +115,8 @@ const navMain: NavGroup[] = [
             { title: "Payment Requests", url: paths.accounts.paymentRequests, permission: "accounts.payment-requests" },
             { title: "Sale Invoices", url: paths.accounts.saleInvoices, permission: "accounts.sale-invoices" },
             { title: "Inventory", url: paths.accounts.inventory, permission: "accounts.inventory" },
-            { title: "Vendor Master", url: paths.accounts.vendorMaster, permission: "accounts.vendor-master" },
-            { title: "Parties & Beneficiaries", url: paths.accounts.parties, permission: "accounts.vendor-master" },
+            { title: "Vendor Master", url: paths.accounts.vendorMaster, permission: "master.vendors" },
+            { title: "Parties & Beneficiaries", url: paths.accounts.parties, permission: "master.vendors" },
         ],
     },
     {

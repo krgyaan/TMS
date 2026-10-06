@@ -20,7 +20,6 @@ export const vendorWorkOrderFormSchema = z.object({
     category: z.string(),
 
     sellerId: z.string(),
-    sellerSource: z.enum(["", "vendor_org", "party"]),
     sellerName: z.string().min(1, "Vendor name is required"),
     sellerEmail: z.string(),
     sellerAddress: z.string(),
@@ -28,9 +27,15 @@ export const vendorWorkOrderFormSchema = z.object({
     sellerPanNo: z.string(),
     sellerMsmeNo: z.string(),
     sellerCinNo: z.string(),
+    // Our-side contact, filled by "Quick Fill from Team Member".
     contactPersonName: z.string(),
     contactPersonPhone: z.string(),
     contactPersonEmail: z.string(),
+    // Vendor-side contact, filled by the seller's contact person picker.
+    vendorPersonId: z.string(),
+    vendorContactPersonName: z.string(),
+    vendorContactPersonPhone: z.string(),
+    vendorContactPersonEmail: z.string(),
 
     partyId: z.string(),
     selectedUserId: z.string(),

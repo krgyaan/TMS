@@ -5,8 +5,20 @@ import type {
     CreatePartyDTO,
     PurchaseOrderRow,
     SetTdsDTO,
+    SellerOption,
+    SellerPersonOption,
+    ShipToOption,
 } from '@/modules/operations/purchase-orders/helpers/purchaseOrder.types';
 import axiosInstance from '@/lib/axios';
+
+const buildPickerQuery = (q?: string, ids?: number[], limit?: number): string => {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (ids?.length) params.set('ids', ids.join(','));
+    if (limit) params.set('limit', String(limit));
+    const qs = params.toString();
+    return qs ? `?${qs}` : '';
+};
 
 class PurchaseOrderApiService extends BaseApiService {
     constructor() {
@@ -23,6 +35,22 @@ class PurchaseOrderApiService extends BaseApiService {
 
     async getPoParties(): Promise<any> {
         return this.get('/parties');
+    }
+
+    // Both pickers are server-paged: `q` narrows, `ids` guarantees the rows a
+    // form has already selected stay in the response (otherwise the combobox
+    // loses its own label once the query stops matching it), `limit` caps the
+    // first page so mounting a form never downloads the whole table.
+    async getSellerOptions(q?: string, ids?: number[], limit?: number): Promise<SellerOption[]> {
+        return this.get(`/parties/sellers${buildPickerQuery(q, ids, limit)}`);
+    }
+
+    async getSellerPersons(orgId: number): Promise<SellerPersonOption[]> {
+        return this.get(`/parties/sellers/${orgId}/persons`);
+    }
+
+    async getShipToOptions(q?: string, ids?: number[], limit?: number): Promise<ShipToOption[]> {
+        return this.get(`/parties/ship-to${buildPickerQuery(q, ids, limit)}`);
     }
 
     async getNextPONumber(projectName: string): Promise<string> {
@@ -123,6 +151,10 @@ class PurchaseOrderApiService extends BaseApiService {
 
     async getClosureStatus(id: number): Promise<any> {
         return this.get(`/${id}/closure-status`);
+    }
+
+    async close(id: number, closureNote: string): Promise<void> {
+        return this.post(`/${id}/close`, { closureNote });
     }
 }
 

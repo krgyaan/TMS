@@ -11,7 +11,6 @@ export interface CreatePurchaseOrderDTO {
     piAttachments?: string;
     category?: string;
     poDate: string;
-    sellerId?: number;
     sellerOrganizationId?: number;
     shipToPartyId?: number;
     sellerName: string;
@@ -24,6 +23,9 @@ export interface CreatePurchaseOrderDTO {
     contactPersonName?: string;
     contactPersonPhone?: string;
     contactPersonEmail?: string;
+    vendorContactPersonName?: string;
+    vendorContactPersonPhone?: string;
+    vendorContactPersonEmail?: string;
     certRecipients?: number[];
     shipToName: string;
     shippingAddress: string;
@@ -60,6 +62,32 @@ export interface CreatePartyDTO {
     type?: string;
     contact_person?: string;
     mobile_number?: string;
+}
+
+export interface SellerOption {
+    id: number;
+    name: string;
+    alias?: string | null;
+    gstNo?: string | null;
+    msme?: string | null;
+    pan?: string | null;
+    address?: string | null;
+}
+
+export interface SellerPersonOption {
+    id: number;
+    name?: string | null;
+    email?: string | null;
+    mobile?: string | null;
+}
+
+export interface ShipToOption {
+    id: number;
+    name: string;
+    alias?: string | null;
+    address?: string | null;
+    gstNo?: string | null;
+    pan?: string | null;
 }
 
 export interface PurchaseOrderRow {
@@ -109,7 +137,6 @@ export interface UpdatePurchaseOrderDTO {
     piAttachments?: string;
     category?: string;
     poDate: string;
-    sellerId?: number;
     sellerOrganizationId?: number;
     shipToPartyId?: number;
     sellerName: string;
@@ -122,6 +149,9 @@ export interface UpdatePurchaseOrderDTO {
     contactPersonName?: string;
     contactPersonPhone?: string;
     contactPersonEmail?: string;
+    vendorContactPersonName?: string;
+    vendorContactPersonPhone?: string;
+    vendorContactPersonEmail?: string;
     certRecipients?: number[];
     shipToName: string;
     shippingAddress: string;

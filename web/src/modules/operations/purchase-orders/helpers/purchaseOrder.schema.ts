@@ -20,7 +20,6 @@ export const purchaseOrderFormSchema = z.object({
     poDate: z.string().min(1, "PO date is required"),
 
     sellerId: z.string(),
-    sellerSource: z.enum(["", "vendor_org", "party"]),
     sellerName: z.string().min(1, "Seller name is required"),
     sellerEmail: z.string(),
     sellerAddress: z.string(),
@@ -28,12 +27,18 @@ export const purchaseOrderFormSchema = z.object({
     sellerPanNo: z.string(),
     sellerMsmeNo: z.string(),
     sellerCinNo: z.string(),
+    // Our-side contact, filled by "Quick Fill from Team Member".
     contactPersonName: z.string(),
     contactPersonPhone: z.string(),
     contactPersonEmail: z.string(),
+    // Vendor-side contact, filled by the seller's contact person picker.
+    vendorPersonId: z.string(),
+    vendorContactPersonName: z.string(),
+    vendorContactPersonPhone: z.string(),
+    vendorContactPersonEmail: z.string(),
 
     partyId: z.string(),
-    selectedUserId: z.string().min(1, "Team member is required"),
+    selectedUserId: z.string(),
     selectedCertRecipients: z.array(z.string()).min(1, "At least one certificate recipient is required"),
     shipToName: z.string().min(1, "Ship to name is required"),
     shippingAddress: z.string().min(1, "Shipping address is required"),

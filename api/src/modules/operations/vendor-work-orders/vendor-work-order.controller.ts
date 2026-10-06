@@ -1,13 +1,31 @@
-import { Controller, Get, Post, Put, Param, Body, Query, ParseIntPipe, HttpCode, HttpStatus, Delete, Res, NotFoundException, Patch } from "@nestjs/common";
+import { Controller, Get, Post, Put, Param, Body, Query, ParseIntPipe, HttpCode, HttpStatus, Delete, Res, NotFoundException, Patch, UseGuards } from "@nestjs/common";
 import { createReadStream, existsSync } from "fs";
 import { join } from "path";
 import type { Response } from "express";
 
 import { VendorWorkOrderService } from "./vendor-work-order.service";
 import { CurrentUser } from "@/modules/auth/decorators/current-user.decorator";
+import { RequireAnyPermission } from "@/modules/auth/decorators";
+import type { PermissionRequirement } from "@/modules/auth/guards/permission.guard";
+import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
+import { PermissionGuard } from "@/modules/auth/guards/permission.guard";
 import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
 
+// Same dual-module situation as PurchaseOrderController: this serves /operations
+// and /accounts (picked by the `section` query param), so a permission has to
+// accept either module string. PermissionGuard is a no-op without metadata, so
+// the remaining routes stay unguarded until they opt in.
+const eitherModule = (accounts: string, ops: string, action: string): PermissionRequirement[] => [
+    { module: accounts, action },
+    { module: ops, action },
+];
+
+const PAYMENT_REQUESTS = ["accounts.payment-requests", "ops.payment-requests"] as const;
+const PURCHASE_INVOICES = ["accounts.purchase-invoices", "ops.purchase-invoices"] as const;
+const WORK_ORDER_MODULES = ["accounts.vendor-work-orders", "ops.vendor-work-orders"] as const;
+
 @Controller("vendor-work-orders")
+@UseGuards(JwtAuthGuard, PermissionGuard)
 export class VendorWorkOrderController {
     constructor(private readonly service: VendorWorkOrderService) {}
 
@@ -69,6 +87,7 @@ export class VendorWorkOrderController {
 
     @Put(":id/approval")
     @HttpCode(HttpStatus.OK)
+    @RequireAnyPermission(...eitherModule(...WORK_ORDER_MODULES, "approve"))
     setApproval(@Param("id", ParseIntPipe) id: number, @Body() body: { approve: boolean; tdsPercentage?: number; remark?: string }, @CurrentUser() user: ValidatedUser) {
         return this.service.setVwoApproval(id, body, user?.id);
     }
@@ -79,53 +98,62 @@ export class VendorWorkOrderController {
     }
 
     @Get(":id/closure-status")
+    @RequireAnyPermission(...eitherModule(...WORK_ORDER_MODULES, "read"))
     getClosureStatus(@Param("id", ParseIntPipe) id: number) {
         return this.service.checkClosure(id);
     }
 
     @Get(":id/closure")
+    @RequireAnyPermission(...eitherModule(...WORK_ORDER_MODULES, "read"))
     getClosure(@Param("id", ParseIntPipe) id: number) {
         return this.service.getVendorWorkOrderClosure(id);
     }
 
     @Post(":id/close")
     @HttpCode(HttpStatus.OK)
-    closeVendorWorkOrder(@Param("id", ParseIntPipe) id: number) {
-        return this.service.closeVendorWorkOrder(id);
+    @RequireAnyPermission(...eitherModule(...WORK_ORDER_MODULES, "close"))
+    closeVendorWorkOrder(@Param("id", ParseIntPipe) id: number, @Body() body: { closureNote?: string }, @CurrentUser() user: ValidatedUser) {
+        return this.service.closeVendorWorkOrder(id, body?.closureNote, user?.id);
     }
 
     @Post(":id/bulk-payment-requests")
     @HttpCode(HttpStatus.CREATED)
+    @RequireAnyPermission(...eitherModule(...PAYMENT_REQUESTS, "create"))
     bulkCreatePaymentRequests(@Param("id", ParseIntPipe) id: number, @Body() body: { items: any[] }, @CurrentUser() user: ValidatedUser) {
         return this.service.bulkCreatePaymentRequests(id, body?.items ?? [], user.id);
     }
 
     @Post(":id/bulk-purchase-invoices")
     @HttpCode(HttpStatus.CREATED)
+    @RequireAnyPermission(...eitherModule(...PURCHASE_INVOICES, "create"))
     bulkCreatePurchaseInvoices(@Param("id", ParseIntPipe) id: number, @Body() body: { items: any[] }, @CurrentUser() user: ValidatedUser) {
         return this.service.bulkCreatePurchaseInvoices(id, body?.items ?? [], user.id);
     }
 
     @Put(":id/payment-requests/:prId")
     @HttpCode(HttpStatus.OK)
+    @RequireAnyPermission(...eitherModule(...PAYMENT_REQUESTS, "update"))
     updatePaymentRequest(@Param("id", ParseIntPipe) id: number, @Param("prId", ParseIntPipe) prId: number, @Body() body: any, @CurrentUser() user: ValidatedUser) {
         return this.service.updatePaymentRequest(id, prId, body, user.id);
     }
 
     @Delete(":id/payment-requests/:prId")
     @HttpCode(HttpStatus.OK)
+    @RequireAnyPermission(...eitherModule(...PAYMENT_REQUESTS, "delete"))
     deletePaymentRequest(@Param("id", ParseIntPipe) id: number, @Param("prId", ParseIntPipe) prId: number, @CurrentUser() user: ValidatedUser) {
         return this.service.deletePaymentRequest(id, prId, user.id);
     }
 
     @Put(":id/purchase-invoices/:piId")
     @HttpCode(HttpStatus.OK)
+    @RequireAnyPermission(...eitherModule(...PURCHASE_INVOICES, "update"))
     updatePurchaseInvoice(@Param("id", ParseIntPipe) id: number, @Param("piId", ParseIntPipe) piId: number, @Body() body: any, @CurrentUser() user: ValidatedUser) {
         return this.service.updatePurchaseInvoice(id, piId, body, user.id);
     }
 
     @Delete(":id/purchase-invoices/:piId")
     @HttpCode(HttpStatus.OK)
+    @RequireAnyPermission(...eitherModule(...PURCHASE_INVOICES, "delete"))
     deletePurchaseInvoice(@Param("id", ParseIntPipe) id: number, @Param("piId", ParseIntPipe) piId: number, @CurrentUser() user: ValidatedUser) {
         return this.service.deletePurchaseInvoice(id, piId, user.id);
     }

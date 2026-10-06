@@ -1,6 +1,7 @@
 import { paths } from "@/app/routes/paths";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import { OrderProgressCell } from "@/components/OrderProgressCell";
+import { useAuth } from "@/contexts/AuthContext";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,6 +44,10 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
 
     const isAccountsSection = location.pathname.includes("/accounts/");
     const isApprovalEnabled = showApprovalAction ?? isAccountsSection;
+    const poModule = isAccountsSection ? "accounts.purchase-orders" : "ops.purchase-orders";
+    const { canApprove, canClose } = useAuth();
+    const approvalAllowed = isApprovalEnabled && canApprove(poModule);
+    const closureAllowed = isAccountsSection && canClose("accounts.purchase-orders");
 
     const purchaseOrders = propPurchaseOrders ?? [];
 
@@ -74,7 +79,7 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
             },
         ];
 
-        if (isApprovalEnabled) {
+        if (approvalAllowed) {
             actions.unshift({
                 label: "PO Approval",
                 icon: <CheckCircle className="h-4 w-4" />,
@@ -82,7 +87,7 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
             });
         }
 
-        if (isAccountsSection) {
+        if (closureAllowed) {
             actions.push({
                 label: "Closure",
                 icon: <Lock className="h-4 w-4" />,
@@ -92,7 +97,7 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
         }
 
         return actions;
-    }, [navigate, isAccountsSection]);
+    }, [navigate, approvalAllowed, closureAllowed]);
 
     const poColumns = useMemo<ColDef<PurchaseOrderRow>[]>(() => [
         {

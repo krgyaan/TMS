@@ -8,6 +8,7 @@ import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { PaymentRequestDetailDialog } from "@/modules/operations/payment-requests/components/PaymentRequestDetailDialog";
 import { fileUploadService } from "@/services/api/file-upload.service";
+import { round2 } from "@/utils/money";
 import { AlertCircle, ArrowLeft, Calculator, ExternalLink, Eye, FileText } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -126,22 +127,22 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
     const [viewingPrId, setViewingPrId] = useState<number | null>(null);
 
     const totalPaymentRequested = useMemo(() =>
-        data?.paymentRequests?.filter(pr => pr.status !== 'rejected').reduce((s, pr) => s + Number(pr.amount), 0) ?? 0,
+        round2(data?.paymentRequests?.filter(pr => pr.status !== 'rejected').reduce((s, pr) => s + Number(pr.amount), 0) ?? 0),
         [data?.paymentRequests]
     );
     const totalMakerDone = useMemo(() =>
-        data?.paymentRequests?.filter(pr => pr.status === 'maker_done').reduce((s, pr) => s + Number(pr.amount), 0) ?? 0,
+        round2(data?.paymentRequests?.filter(pr => pr.status === 'maker_done').reduce((s, pr) => s + Number(pr.amount), 0) ?? 0),
         [data?.paymentRequests]
     );
     const totalPaymentDone = useMemo(() =>
-        data?.paymentRequests?.filter(pr => pr.status === 'payment_done').reduce((s, pr) => s + Number(pr.amount), 0) ?? 0,
+        round2(data?.paymentRequests?.filter(pr => pr.status === 'payment_done').reduce((s, pr) => s + Number(pr.amount), 0) ?? 0),
         [data?.paymentRequests]
     );
     const totalPiAmount = useMemo(() =>
-        data?.purchaseInvoices?.reduce((s, pi) => s + Number(pi.valuePreGst || 0) + Number(pi.gstAmount || 0), 0) ?? 0,
+        round2(data?.purchaseInvoices?.reduce((s, pi) => s + Number(pi.valuePreGst || 0) + Number(pi.gstAmount || 0), 0) ?? 0),
         [data?.purchaseInvoices]
     );
-    const amountAfterTds = Number(data?.amountAfterTds || data?.total?.totalWithGst || 0);
+    const amountAfterTds = round2(Number(data?.amountAfterTds || data?.total?.totalWithGst || 0));
 
     if (isLoading) {
         return (
@@ -235,13 +236,25 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
                                     <TableCell className="text-sm font-medium text-muted-foreground">CIN</TableCell>
                                     <TableCell className="text-sm">{data.sellerCinNo || '—'}</TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">Contact Person</TableCell>
-                                    <TableCell className="text-sm">{data.contactPersonName || '—'}</TableCell>
+                                    <TableCell className="text-sm">{data.vendorContactPersonName || '—'}</TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">Contact Phone</TableCell>
-                                    <TableCell className="text-sm">{data.contactPersonPhone || '—'}</TableCell>
+                                    <TableCell className="text-sm">{data.vendorContactPersonPhone || '—'}</TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">Contact Email</TableCell>
-                                    <TableCell className="text-sm">{data.contactPersonEmail || '—'}</TableCell>
+                                    <TableCell className="text-sm">{data.vendorContactPersonEmail || '—'}</TableCell>
+                                </TableRow>
+
+                                <SectionHeader title="Our Contact Person" />
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Name</TableCell>
+                                    <TableCell className="text-sm">{data.contactPersonName || '—'}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Phone</TableCell>
+                                    <TableCell className="text-sm">{data.contactPersonPhone || '—'}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Email</TableCell>
+                                    <TableCell className="text-sm" colSpan={3}>{data.contactPersonEmail || '—'}</TableCell>
                                 </TableRow>
 
                                 <SectionHeader title="Ship-to Information" />

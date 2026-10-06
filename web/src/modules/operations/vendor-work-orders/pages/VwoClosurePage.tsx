@@ -12,8 +12,10 @@ import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { FileUploader } from "@/components/file-upload";
 import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
-import { CanUpdate } from "@/components/PermissionGuard";
-import { AdminOnly } from "@/components/RoleGuard";
+import { CanUpdate, CanDelete } from "@/components/PermissionGuard";
+import { useAuth } from "@/contexts/AuthContext";
+import { round2, CLOSURE_TOLERANCE } from "@/utils/money";
+import { CloseClosureDialog } from "@/components/CloseClosureDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,6 +42,10 @@ interface VwoClosureData {
   totalGst: number;
   totalPaymentDone: number;
   totalPiAmount: number;
+  closedAt?: string | null;
+  closedBy?: number | null;
+  closedByName?: string | null;
+  closureNote?: string | null;
   paymentRequests: Array<{
     id: number;
     requestNo?: string;
@@ -169,12 +175,41 @@ const VwoClosurePage = () => {
     if (woId) load();
   }, [woId]);
 
-  const amountAfterTds = Number(wo?.amountAfterTds || wo?.grandTotal || 0);
-  const totalPaymentDone = Number(wo?.totalPaymentDone || 0);
-  const totalPiAmount = Number(wo?.totalPiAmount || 0);
-  const remainingToPay = amountAfterTds - totalPaymentDone;
-  const remainingInvoice = amountAfterTds - totalPiAmount;
-  const canClose = remainingToPay <= 0 && remainingInvoice <= 0;
+  const amountAfterTds = round2(Number(wo?.amountAfterTds || wo?.grandTotal || 0));
+  const totalPaymentDone = round2(Number(wo?.totalPaymentDone || 0));
+  const totalPiAmount = round2(Number(wo?.totalPiAmount || 0));
+  const remainingToPay = round2(amountAfterTds - totalPaymentDone);
+  const remainingInvoice = round2(amountAfterTds - totalPiAmount);
+  // A difference strictly below CLOSURE_TOLERANCE rupees is absorbed as
+  // round-off; anything at or above it keeps the VWO open.
+  const paySettled = remainingToPay < CLOSURE_TOLERANCE;
+  const invoiceSettled = remainingInvoice < CLOSURE_TOLERANCE;
+  const withinRoundOff = (r: number) => r > 0 && r < CLOSURE_TOLERANCE;
+  const canClose = paySettled && invoiceSettled && !wo?.closedAt;
+
+  // `canClose` above is the derived "everything settled" state, so the
+  // permission check needs its own name to avoid shadowing it.
+  const { canClose: hasClosePermission, canCreate } = useAuth();
+  const [closingWo, setClosingWo] = useState(false);
+  const [showCloseDialog, setShowCloseDialog] = useState(false);
+  const [closeError, setCloseError] = useState<string | null>(null);
+
+  const handleCloseWo = async (closureNote: string) => {
+    setClosingWo(true);
+    setCloseError(null);
+    try {
+      await vendorWorkOrderApi.close(woId, closureNote);
+      setShowCloseDialog(false);
+      setSaveMsg({ type: "success", text: "Vendor Work Order closed successfully." });
+      await fetchData();
+    } catch (err) {
+      console.error(err);
+      const apiMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setCloseError(typeof apiMessage === "string" ? apiMessage : "Failed to close Vendor Work Order.");
+    } finally {
+      setClosingWo(false);
+    }
+  };
 
   const updatePaymentRow = (index: number, field: keyof PaymentRow, value: string) => {
     setPaymentRows((rows) => rows.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
@@ -266,8 +301,10 @@ const VwoClosurePage = () => {
               </div>
               <div className="text-right">
                 <p className="text-lg font-semibold">{formatINR(totalPaymentDone)}</p>
-                {totalPaymentDone >= amountAfterTds ? (
+                {remainingToPay <= 0 ? (
                   <Badge variant="default" className="mt-1">Settled</Badge>
+                ) : paySettled ? (
+                  <Badge variant="secondary" className="mt-1">Within tolerance</Badge>
                 ) : (
                   <Badge variant="outline" className="mt-1">Pending</Badge>
                 )}
@@ -281,8 +318,10 @@ const VwoClosurePage = () => {
               </div>
               <div className="text-right">
                 <p className="text-lg font-semibold">{formatINR(totalPiAmount)}</p>
-                {totalPiAmount >= amountAfterTds ? (
+                {remainingInvoice <= 0 ? (
                   <Badge variant="default" className="mt-1">Settled</Badge>
+                ) : invoiceSettled ? (
+                  <Badge variant="secondary" className="mt-1">Within tolerance</Badge>
                 ) : (
                   <Badge variant="outline" className="mt-1">Pending</Badge>
                 )}
@@ -307,6 +346,11 @@ const VwoClosurePage = () => {
                   </span>
                   <span className="font-semibold">{formatINR(remainingInvoice)}</span>
                 </div>
+              )}
+              {(withinRoundOff(remainingToPay) || withinRoundOff(remainingInvoice)) && (
+                <p className="text-xs text-amber-600">
+                  Difference under ₹{CLOSURE_TOLERANCE} — will be absorbed as round-off on closure.
+                </p>
               )}
               {canClose && (
                 <div className="flex items-center justify-between text-green-600 pt-2">
@@ -424,10 +468,12 @@ const VwoClosurePage = () => {
               </div>
             )}
             <div className="flex justify-end mt-4">
-              <Button onClick={savePayments} disabled={savingPayments || paymentRows.length === 0}>
-                {savingPayments ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                Bulk Save Payments
-              </Button>
+              {canCreate("accounts.payment-requests") && (
+                <Button onClick={savePayments} disabled={savingPayments || paymentRows.length === 0}>
+                  {savingPayments ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                  Bulk Save Payments
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -535,10 +581,12 @@ const VwoClosurePage = () => {
               </div>
             )}
             <div className="flex justify-end mt-4">
-              <Button onClick={saveInvoices} disabled={savingInvoices || invoiceRows.length === 0}>
-                {savingInvoices ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                Bulk Save Invoices
-              </Button>
+              {canCreate("accounts.purchase-invoices") && (
+                <Button onClick={saveInvoices} disabled={savingInvoices || invoiceRows.length === 0}>
+                  {savingInvoices ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                  Bulk Save Invoices
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -592,7 +640,7 @@ const VwoClosurePage = () => {
                                 <Edit className="h-4 w-4" />
                               </Button>
                             </CanUpdate>
-                            <AdminOnly>
+                            <CanDelete module="accounts.payment-requests">
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -603,7 +651,7 @@ const VwoClosurePage = () => {
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
-                            </AdminOnly>
+                            </CanDelete>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -664,7 +712,7 @@ const VwoClosurePage = () => {
                                 <Edit className="h-4 w-4" />
                               </Button>
                             </CanUpdate>
-                            <AdminOnly>
+                            <CanDelete module="accounts.purchase-invoices">
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -675,7 +723,7 @@ const VwoClosurePage = () => {
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
-                            </AdminOnly>
+                            </CanDelete>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -689,26 +737,46 @@ const VwoClosurePage = () => {
       </Card>
 
       <CardFooter className="flex gap-3">
-        {canClose && (
-          <Button
-            className="bg-green-600 hover:bg-green-700"
-            onClick={async () => {
-              try {
-                setSaveMsg(null);
-                await vendorWorkOrderApi.close(woId);
-                setSaveMsg({ type: "success", text: "Vendor Work Order closed successfully." });
-                await fetchData();
-              } catch (err) {
-                console.error(err);
-                setSaveMsg({ type: "error", text: "Failed to close Vendor Work Order." });
-              }
-            }}
-          >
-            <CheckCircle2 className="h-4 w-4 mr-2" />
-            Close VWO
-          </Button>
+        {wo.closedAt ? (
+          <div className="flex flex-col gap-1 text-sm">
+            <span className="flex items-center gap-2 font-medium text-green-700">
+              <CheckCircle2 className="h-5 w-5" />
+              Closed on {formatDate(wo.closedAt)}
+              {wo.closedByName ? ` by ${wo.closedByName}` : ""}
+            </span>
+            {wo.closureNote && (
+              <span className="text-muted-foreground">Closure note: {wo.closureNote}</span>
+            )}
+          </div>
+        ) : (
+          canClose &&
+          hasClosePermission("accounts.vendor-work-orders") && (
+            <Button
+              className="bg-green-600 hover:bg-green-700"
+              onClick={() => {
+                setCloseError(null);
+                setShowCloseDialog(true);
+              }}
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              Close VWO
+            </Button>
+          )
         )}
       </CardFooter>
+
+      <CloseClosureDialog
+        open={showCloseDialog}
+        onClose={() => setShowCloseDialog(false)}
+        onConfirm={handleCloseWo}
+        pending={closingWo}
+        error={closeError}
+        title="Close Vendor Work Order"
+        referenceNo={wo.woNumber}
+        amountAfterTds={amountAfterTds}
+        totalPaymentDone={totalPaymentDone}
+        totalPiAmount={totalPiAmount}
+      />
 
       {/* Delete Payment Request Confirmation Dialog */}
       <AlertDialog open={!!deletePaymentRequest} onOpenChange={(open) => !open && setDeletePaymentRequest(null)}>

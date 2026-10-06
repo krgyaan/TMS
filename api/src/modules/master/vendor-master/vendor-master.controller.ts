@@ -1,5 +1,8 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus, UseGuards } from "@nestjs/common";
 import { z } from "zod";
+import { CanCreate, CanUpdate, CanDelete, CanRead } from "@/modules/auth/decorators";
+import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
+import { PermissionGuard } from "@/modules/auth/guards/permission.guard";
 import { VendorMasterService } from "@/modules/master/vendor-master/vendor-master.service";
 
 const VendorOrganizationFields = z.object({
@@ -14,7 +17,7 @@ const VendorOrganizationFields = z.object({
 
 // An MSME number is only meaningful once its type (M/S) is known, so reject the
 // number alone. Existing rows are unaffected: this applies to incoming payloads only.
-const requireMsmeType = (val: z.infer<typeof VendorOrganizationFields>, ctx: z.RefinementCtx) => {
+const requireMsmeType = (val: { msme?: string | null | undefined; msmeType?: "M" | "S" | null | undefined }, ctx: z.RefinementCtx) => {
     if (val.msme?.trim() && !val.msmeType) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
@@ -31,7 +34,7 @@ const UpdateVendorOrganizationSchema = VendorOrganizationFields.partial().superR
 const CreateVendorSchema = z.object({
     orgId: z.number().optional(),
     name: z.string().trim().min(1).max(255),
-    email: z.string().trim().email(),
+    email: z.union([z.literal(""), z.string().trim().email()]).optional(),
     mobile: z.string().trim().min(1).max(22),
     address: z.string().trim().optional(),
 });
@@ -67,6 +70,11 @@ const CreateVendorFileSchema = z.object({
 const UpdateVendorFileSchema = CreateVendorFileSchema.partial();
 
 @Controller()
+@UseGuards(JwtAuthGuard, PermissionGuard)
+// `read` is the class-wide floor so every read route is covered without
+// repeating itself; the mutating handlers below override it, because
+// PermissionGuard resolves handler metadata before class metadata.
+@CanRead("master.vendors")
 export class VendorMasterController {
     constructor(private readonly vendorMasterService: VendorMasterService) {}
 
@@ -116,6 +124,7 @@ export class VendorMasterController {
 
     @Post("vendor-organizations")
     @HttpCode(HttpStatus.CREATED)
+    @CanCreate("master.vendors")
     async createOrganization(@Body() body: unknown) {
         const parsed = CreateVendorOrganizationSchema.parse(body);
         return this.vendorMasterService.createOrganization(parsed);
@@ -123,17 +132,20 @@ export class VendorMasterController {
 
     @Post("vendor-organizations/with-relations")
     @HttpCode(HttpStatus.CREATED)
+    @CanCreate("master.vendors")
     async createOrganizationWithRelations(@Body() body: unknown) {
         return this.vendorMasterService.createOrganizationWithRelations(body as any);
     }
 
     @Patch("vendor-organizations/:id")
+    @CanUpdate("master.vendors")
     async updateOrganization(@Param("id", ParseIntPipe) id: number, @Body() body: unknown) {
         const parsed = UpdateVendorOrganizationSchema.parse(body);
         return this.vendorMasterService.updateOrganization(id, parsed);
     }
 
     @Patch("vendor-organizations/:id/with-relations")
+    @CanUpdate("master.vendors")
     async updateOrganizationWithRelations(@Param("id", ParseIntPipe) id: number, @Body() body: unknown) {
         return this.vendorMasterService.updateOrganizationWithRelations(id, body as any);
     }
@@ -161,12 +173,14 @@ export class VendorMasterController {
 
     @Post("vendors")
     @HttpCode(HttpStatus.CREATED)
+    @CanCreate("master.vendors")
     async createVendor(@Body() body: unknown) {
         const parsed = CreateVendorSchema.parse(body);
         return this.vendorMasterService.createVendor(parsed);
     }
 
     @Patch("vendors/:id")
+    @CanUpdate("master.vendors")
     async updateVendor(@Param("id", ParseIntPipe) id: number, @Body() body: unknown) {
         const parsed = UpdateVendorSchema.parse(body);
         return this.vendorMasterService.updateVendor(id, parsed);
@@ -174,6 +188,7 @@ export class VendorMasterController {
 
     @Delete("vendors/:id")
     @HttpCode(HttpStatus.NO_CONTENT)
+    @CanDelete("master.vendors")
     async deleteVendor(@Param("id", ParseIntPipe) id: number) {
         await this.vendorMasterService.deleteVendor(id);
     }
@@ -195,12 +210,14 @@ export class VendorMasterController {
 
     @Post("vendor-gsts")
     @HttpCode(HttpStatus.CREATED)
+    @CanCreate("master.vendors")
     async createGst(@Body() body: unknown) {
         const parsed = CreateVendorGstSchema.parse(body);
         return this.vendorMasterService.createGst(parsed);
     }
 
     @Patch("vendor-gsts/:id")
+    @CanUpdate("master.vendors")
     async updateGst(@Param("id", ParseIntPipe) id: number, @Body() body: unknown) {
         const parsed = UpdateVendorGstSchema.parse(body);
         return this.vendorMasterService.updateGst(id, parsed);
@@ -208,6 +225,7 @@ export class VendorMasterController {
 
     @Delete("vendor-gsts/:id")
     @HttpCode(HttpStatus.NO_CONTENT)
+    @CanDelete("master.vendors")
     async deleteGst(@Param("id", ParseIntPipe) id: number) {
         await this.vendorMasterService.deleteGst(id);
     }
@@ -229,12 +247,14 @@ export class VendorMasterController {
 
     @Post("vendor-accounts")
     @HttpCode(HttpStatus.CREATED)
+    @CanCreate("master.vendors")
     async createAccount(@Body() body: unknown) {
         const parsed = CreateVendorAccountSchema.parse(body);
         return this.vendorMasterService.createAccount(parsed);
     }
 
     @Patch("vendor-accounts/:id")
+    @CanUpdate("master.vendors")
     async updateAccount(@Param("id", ParseIntPipe) id: number, @Body() body: unknown) {
         const parsed = UpdateVendorAccountSchema.parse(body);
         return this.vendorMasterService.updateAccount(id, parsed);
@@ -242,6 +262,7 @@ export class VendorMasterController {
 
     @Delete("vendor-accounts/:id")
     @HttpCode(HttpStatus.NO_CONTENT)
+    @CanDelete("master.vendors")
     async deleteAccount(@Param("id", ParseIntPipe) id: number) {
         await this.vendorMasterService.deleteAccount(id);
     }
@@ -263,12 +284,14 @@ export class VendorMasterController {
 
     @Post("vendor-files")
     @HttpCode(HttpStatus.CREATED)
+    @CanCreate("master.vendors")
     async createVendorFile(@Body() body: unknown) {
         const parsed = CreateVendorFileSchema.parse(body);
         return this.vendorMasterService.createVendorFile(parsed);
     }
 
     @Patch("vendor-files/:id")
+    @CanUpdate("master.vendors")
     async updateVendorFile(@Param("id", ParseIntPipe) id: number, @Body() body: unknown) {
         const parsed = UpdateVendorFileSchema.parse(body);
         return this.vendorMasterService.updateVendorFile(id, parsed);
@@ -276,6 +299,7 @@ export class VendorMasterController {
 
     @Delete("vendor-files/:id")
     @HttpCode(HttpStatus.NO_CONTENT)
+    @CanDelete("master.vendors")
     async deleteVendorFile(@Param("id", ParseIntPipe) id: number) {
         await this.vendorMasterService.deleteVendorFile(id);
     }
