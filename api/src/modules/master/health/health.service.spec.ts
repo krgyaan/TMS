@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { HealthService } from './health.service';
 import { ClaudeUsageService } from '@/modules/master/claude-usage/claude-usage.service';
 import { DRIZZLE } from '@/db/database.module';
@@ -45,6 +46,7 @@ describe('HealthService Database Integrity & Startup Checks (Step 3)', () => {
                 { provide: 'VIDEO_PROCESSING_QUEUE', useValue: mockQueue },
                 { provide: 'GENERIC_QUEUE', useValue: mockQueue },
                 { provide: ClaudeUsageService, useValue: mockClaudeUsageService },
+                { provide: ConfigService, useValue: { get: jest.fn() } },
             ],
         }).compile();
 
