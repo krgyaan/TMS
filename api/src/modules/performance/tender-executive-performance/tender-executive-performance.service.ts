@@ -252,21 +252,22 @@ export class TenderExecutiveService {
         const toLocal = `(DATE '${toDay}' + TIME '23:59:59.999')`;
 
         const tenders = (await this.db.execute(sql.raw(`
-            SELECT ti.*
+            SELECT DISTINCT ti.*
             FROM tender_infos ti
             WHERE ti.team_member = ${userId}
               AND ti.delete_status = 0
               AND ti.created_at <= ${toTz}
               AND (
-                ti.created_at BETWEEN ${fromTz} AND ${toTz}
-                OR EXISTS (SELECT 1 FROM tender_information x WHERE x.tender_id = ti.id AND x.created_at BETWEEN ${fromLocal} AND ${toLocal})
-                OR EXISTS (SELECT 1 FROM rfqs r WHERE r.tender_id = ti.id AND r.created_at BETWEEN ${fromTz} AND ${toTz})
-                OR EXISTS (SELECT 1 FROM payment_requests p WHERE p.tender_id = ti.id AND p.purpose = 'EMD' AND p.created_at BETWEEN ${fromLocal} AND ${toLocal})
-                OR EXISTS (SELECT 1 FROM physical_docs d WHERE d.tender_id = ti.id AND d.created_at BETWEEN ${fromTz} AND ${toTz})
-                OR EXISTS (SELECT 1 FROM tender_document_checklists c WHERE c.tender_id = ti.id AND c.created_at BETWEEN ${fromTz} AND ${toTz})
-                OR EXISTS (SELECT 1 FROM tender_costing_sheets s WHERE s.tender_id = ti.id AND s.created_at BETWEEN ${fromTz} AND ${toTz})
-                OR EXISTS (SELECT 1 FROM bid_submissions b WHERE b.tender_id = ti.id AND b.status = 'Bid Submitted' AND COALESCE(b.submission_datetime, b.created_at) BETWEEN ${fromTz} AND ${toTz})
-                OR EXISTS (SELECT 1 FROM timers t WHERE t.entity_id = ti.id AND t.entity_type = 'TENDER' AND t.ended_at BETWEEN ${fromTz} AND ${toTz})
+                    ti.created_at BETWEEN ${fromTz} AND ${toTz}
+                 OR EXISTS (SELECT 1 FROM tender_information x WHERE x.tender_id = ti.id AND x.created_at BETWEEN ${fromLocal} AND ${toLocal})
+                 OR EXISTS (SELECT 1 FROM rfqs r WHERE r.tender_id = ti.id AND r.created_at BETWEEN ${fromTz} AND ${toTz})
+                 OR EXISTS (SELECT 1 FROM payment_requests p WHERE p.tender_id = ti.id AND p.purpose = 'EMD' AND p.created_at BETWEEN ${fromLocal} AND ${toLocal})
+                 OR EXISTS (SELECT 1 FROM physical_docs d WHERE d.tender_id = ti.id AND d.created_at BETWEEN ${fromTz} AND ${toTz})
+                 OR EXISTS (SELECT 1 FROM tender_document_checklists c WHERE c.tender_id = ti.id AND c.created_at BETWEEN ${fromTz} AND ${toTz})
+                 OR EXISTS (SELECT 1 FROM tender_costing_sheets s WHERE s.tender_id = ti.id AND s.created_at BETWEEN ${fromTz} AND ${toTz})
+                 OR EXISTS (SELECT 1 FROM bid_submissions b WHERE b.tender_id = ti.id AND b.status = 'Bid Submitted' AND COALESCE(b.submission_datetime, b.created_at) BETWEEN ${fromTz} AND ${toTz})
+                 OR EXISTS (SELECT 1 FROM timers t WHERE t.entity_id = ti.id AND t.entity_type = 'TENDER' AND t.stage IN ('tender_info_sheet','rfq_sent','emd_requested','physical_docs','document_checklist','costing_sheets','bid_submission') AND t.ended_at BETWEEN ${fromTz} AND ${toTz})
+                 OR NOT EXISTS (SELECT 1 FROM tender_information x WHERE x.tender_id = ti.id AND x.created_at <= ${toLocal})
               )
         `))).rows as TenderInfo[];
 
@@ -299,6 +300,7 @@ export class TenderExecutiveService {
                 st.tender_category AS "tenderCategory",
                 (ti.tl_status = 1) AS "tlApproved",
                 (ti.tl_approval_timestamp IS NULL OR ti.tl_approval_timestamp <= ${toUtc}) AS "approvedByEnd",
+                ti.rfq_required AS "rfqRequired",
                 (SELECT tn.emd_required FROM tender_information tn WHERE tn.tender_id = ti.id ORDER BY tn.created_at NULLS LAST LIMIT 1) AS "emdRequired",
                 (SELECT tn.physical_docs_required FROM tender_information tn WHERE tn.tender_id = ti.id ORDER BY tn.created_at NULLS LAST LIMIT 1) AS "physicalDocsRequired",
                 (EXISTS (SELECT 1 FROM tender_information x WHERE x.tender_id = ti.id AND x.created_at BETWEEN ${fromLocal} AND ${toLocal})
@@ -343,6 +345,7 @@ export class TenderExecutiveService {
                 approvedByEnd: Boolean(row.approvedByEnd),
                 missedBeforeStart: Boolean(row.missedBeforeStart),
                 missedInPeriod: Boolean(row.missedInPeriod),
+                rfqRequired: factString(row.rfqRequired),
                 emdRequired: factString(row.emdRequired),
                 physicalDocsRequired: factString(row.physicalDocsRequired),
                 activeInPeriod: Boolean(row.activeInPeriod),
@@ -379,6 +382,7 @@ export class TenderExecutiveService {
 
             for (const stage of activeStages) {
                 let applicable = false;
+                let hidden = false;
                 let completed = false;
                 let onTime: boolean | null = null;
                 let startTime: Date | null = null;
@@ -386,7 +390,7 @@ export class TenderExecutiveService {
 
                 const timerRow = stage.type === "timer" && stage.timerName ? timerMap.get(`${tender.id}:${stage.timerName}`) : undefined;
 
-                const tenderForGate = { ...tender, emdRequired: facts?.emdRequired ?? null, physicalDocsRequired: facts?.physicalDocsRequired ?? null };
+                const tenderForGate = { ...tender, rfqRequired: facts?.rfqRequired ?? null, emdRequired: facts?.emdRequired ?? null, physicalDocsRequired: facts?.physicalDocsRequired ?? null };
 
                 if (stage.type === "timer") {
                     const deadlineAt = timerDeadline(timerRow, stage, tender);
@@ -395,10 +399,15 @@ export class TenderExecutiveService {
 
                     const closedInPeriod = endedAt !== null && endedAt >= periodStart && endedAt <= periodEnd;
                     const openAtEnd = (endedAt === null || endedAt > periodEnd) && startedAt !== null && startedAt <= periodEnd && (startedAt >= periodStart || (deadlineAt !== null && deadlineAt >= periodStart));
+                    const inWindow = deadlineAt !== null && (closedInPeriod || openAtEnd);
 
-                    const gateBlocked = GATED_STAGES.has(stage.stageKey) && facts?.activeInPeriod !== true && !(stage.isApplicable ? stage.isApplicable(tenderForGate) : false);
+                    const gated = GATED_STAGES.has(stage.stageKey);
+                    const sheetInPeriod = Boolean((facts?.tender_info_sheet as StageArtifactFlags | undefined)?.inPeriod);
+                    const flagOk = !gated || (stage.isApplicable ? stage.isApplicable(tenderForGate) : false);
+                    const na = gated && sheetInPeriod && !flagOk;
 
-                    applicable = !gateBlocked && deadlineAt !== null && (closedInPeriod || openAtEnd);
+                    applicable = !na && inWindow;
+                    hidden = gated && !na && !inWindow;
 
                     if (applicable && deadlineAt !== null) {
                         completed = closedInPeriod;
@@ -428,6 +437,7 @@ export class TenderExecutiveService {
                     tenderName: tender.tenderName ?? null,
                     stageKey: stage.stageKey,
                     applicable,
+                    hidden,
                     completed,
                     onTime,
                     startTime,
@@ -728,10 +738,12 @@ export class TenderExecutiveService {
             }
 
             if (!stage.applicable) {
-                counter.notApplicable++;
-                counter.drilldown.notApplicable.push(tenderMeta);
-                continue;
-            }
+                    if (!stage.hidden) {
+                        counter.notApplicable++;
+                        counter.drilldown.notApplicable.push(tenderMeta);
+                    }
+                    continue;
+                }
 
             if (!stage.completed) {
                 if (stage.onTime === false) {
