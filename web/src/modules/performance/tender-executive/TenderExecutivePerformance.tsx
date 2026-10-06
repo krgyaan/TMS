@@ -6,9 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-import { ROW_HELP_TEXT } from "./helpers/stage-matrix-help";
 import { usePerformanceOutcomes, useStageMatrix } from "@/hooks/api/useTenderExecutivePerformance";
 import type { TenderKpiKey } from "./helpers/tender-executive.types";
 
@@ -759,19 +757,11 @@ export default function TenderExecutivePerformance() {
                                 <Table className="w-full table-fixed border-collapse">
                                     <TableHeader className="bg-muted/30">
                                         <TableRow className="hover:bg-muted/30 border-b border-border/60">
-                                            <TableHead className="w-[120px] px-2 font-bold text-foreground bg-muted/30 sticky left-0 z-10 border-r">Metric / Stage</TableHead>
+                                            <TableHead className="w-[120px] h-auto px-2 pt-3 pb-2 align-top font-bold text-foreground bg-muted/30 sticky left-0 z-10 border-r">Metric / Stage</TableHead>
                                             {STAGES.map((stage, i) => (
-                                                <TableHead key={i} className="px-1 text-center text-xs uppercase font-semibold text-muted-foreground break-words">
-                                                    <div className="flex items-center justify-center gap-1 break-words text-center leading-tight">
+                                                <TableHead key={i} className="h-auto px-1 pt-3 pb-2 text-center text-xs uppercase font-semibold text-muted-foreground whitespace-normal break-words align-top leading-tight">
+                                                    <div className="flex flex-wrap items-start justify-center gap-x-1 text-center leading-tight">
                                                         {formatLabel(stage)}
-                                                        {/* <Tooltip>
-                                                    <TooltipTrigger>
-                                                        <Info className="h-3 w-3 text-muted-foreground" />
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>
-                                                        <p className="text-xs max-w-xs">{STAGE_HELP_TEXT[stage] ?? "No description available"}</p>
-                                                    </TooltipContent>
-                                                </Tooltip> */}
                                                     </div>
                                                 </TableHead>
                                             ))}
@@ -790,23 +780,15 @@ export default function TenderExecutivePerformance() {
                                                 >
                                                     <TableCell
                                                         className={`
-                                            font-semibold sticky left-0 z-10 border-r bg-background
+                                            font-semibold sticky left-0 z-10 border-r bg-background whitespace-normal break-words
                                             ${rowType === "info" ? "text-primary" : ""}
                                             ${rowType === "success" ? "text-emerald-600" : ""}
                                             ${rowType === "warning" ? "text-amber-600" : ""}
                                             ${rowType === "destructive" ? "text-destructive" : ""}
                                         `}
                                                     >
-                                                        <div className="flex items-center gap-2">
-                                                            {row.label}
-                                                            <Tooltip>
-                                                                <TooltipTrigger>
-                                                                    <Info className="h-3 w-3 text-muted-foreground" />
-                                                                </TooltipTrigger>
-                                                                <TooltipContent>
-                                                                    <p className="text-xs">{ROW_HELP_TEXT[row.key] ?? ""}</p>
-                                                                </TooltipContent>
-                                                            </Tooltip>
+                                                        <div className="flex flex-wrap items-center justify-start gap-x-2 gap-y-1 text-left leading-tight">
+                                                            <span>{row.label}</span>
                                                         </div>
                                                     </TableCell>
                                                     {row.data.map((val, j) => (
