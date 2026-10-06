@@ -153,8 +153,8 @@ class PurchaseOrderApiService extends BaseApiService {
         return this.get(`/${id}/closure-status`);
     }
 
-    async close(id: number): Promise<void> {
-        return this.post(`/${id}/close`);
+    async close(id: number, closureNote: string): Promise<void> {
+        return this.post(`/${id}/close`, { closureNote });
     }
 }
 

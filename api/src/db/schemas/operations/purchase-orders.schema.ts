@@ -48,6 +48,8 @@ export const purchaseOrders = pgTable(
         poApproved: boolean("po_approved"),
         poApprovalRemark: text("po_approval_remark"),
         closedAt: timestamp("closed_at", { withTimezone: true }),
+        closedBy: bigint("closed_by", { mode: "number" }),
+        closureNote: text("closure_note"),
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
         generatedPdfVersions: jsonb("generated_pdf_versions").notNull().default({}),
         updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

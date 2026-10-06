@@ -23,6 +23,7 @@ import { woBasicDetails } from "@/db/schemas/operations/work-order.schema";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 import { OperationNotificationService } from "@/modules/operations/operation-notification.service";
+import { round2, CLOSURE_TOLERANCE } from "@/utils/money.util";
 
 @Injectable()
 export class PurchaseOrderService {
@@ -36,49 +37,49 @@ export class PurchaseOrderService {
         private readonly clientDirectorySyncService: ClientDirectorySyncService,
         private readonly insuranceService: InsurancePolicyService,
         private readonly notifications: OperationNotificationService,
-        private readonly cashFlowService: CashFlowService,
+        private readonly cashFlowService: CashFlowService
     ) {}
 
     async getPurchaseOrders(projectId: number) {
         const purchaseOrdersData = await this.db
-                .select({
-                    id: purchaseOrders.id,
-                    projectId: purchaseOrders.projectId,
-                    projectName: purchaseOrders.projectName,
-                    poNumber: purchaseOrders.poNumber,
-                    sellerName: purchaseOrders.sellerName,
-                    sellerEmail: purchaseOrders.sellerEmail,
-                    sellerAddress: purchaseOrders.sellerAddress,
-                    sellerGstNo: purchaseOrders.sellerGstNo,
-                    sellerPanNo: purchaseOrders.sellerPanNo,
-                    sellerMsmeNo: purchaseOrders.sellerMsmeNo,
-                    sellerCinNo: purchaseOrders.sellerCinNo,
-                    shipToName: purchaseOrders.shipToName,
-                    shippingAddress: purchaseOrders.shippingAddress,
-                    shipToGst: purchaseOrders.shipToGst,
-                    shipToPan: purchaseOrders.shipToPan,
-                    poDate: purchaseOrders.poDate,
-                    poRaisedBy: users.name,
-                    createdAt: purchaseOrders.createdAt,
-                    poPdfVersions: purchaseOrders.generatedPdfVersions,
-                    tdsPercentage: purchaseOrders.tdsPercentage,
-                    tdsAmount: purchaseOrders.tdsAmount,
-                    amountAfterTds: purchaseOrders.amountAfterTds,
-                    totalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
-                    totalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
-                    grandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
-                    totalPaymentRequested: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status != 'rejected'), 0)`,
-                    totalMakerDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'maker_done'), 0)`,
-                    totalPaymentDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'payment_done'), 0)`,
-                    totalPiAmount: sql<number>`COALESCE((SELECT SUM(value_pre_gst::numeric + gst_amount::numeric) FROM project_purchase_invoices WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
-                    totalPiCount: sql<number>`COALESCE((SELECT COUNT(*) FROM project_purchase_invoices WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
-                    poApproved: purchaseOrders.poApproved,
-                    poApprovalRemark: purchaseOrders.poApprovalRemark,
-                    closedAt: purchaseOrders.closedAt,
-                })
-                .from(purchaseOrders)
-                .leftJoin(users, eq(users.id, purchaseOrders.poRaisedBy))
-                .where(eq(purchaseOrders.projectId, projectId));
+            .select({
+                id: purchaseOrders.id,
+                projectId: purchaseOrders.projectId,
+                projectName: purchaseOrders.projectName,
+                poNumber: purchaseOrders.poNumber,
+                sellerName: purchaseOrders.sellerName,
+                sellerEmail: purchaseOrders.sellerEmail,
+                sellerAddress: purchaseOrders.sellerAddress,
+                sellerGstNo: purchaseOrders.sellerGstNo,
+                sellerPanNo: purchaseOrders.sellerPanNo,
+                sellerMsmeNo: purchaseOrders.sellerMsmeNo,
+                sellerCinNo: purchaseOrders.sellerCinNo,
+                shipToName: purchaseOrders.shipToName,
+                shippingAddress: purchaseOrders.shippingAddress,
+                shipToGst: purchaseOrders.shipToGst,
+                shipToPan: purchaseOrders.shipToPan,
+                poDate: purchaseOrders.poDate,
+                poRaisedBy: users.name,
+                createdAt: purchaseOrders.createdAt,
+                poPdfVersions: purchaseOrders.generatedPdfVersions,
+                tdsPercentage: purchaseOrders.tdsPercentage,
+                tdsAmount: purchaseOrders.tdsAmount,
+                amountAfterTds: purchaseOrders.amountAfterTds,
+                totalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                totalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                grandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                totalPaymentRequested: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status != 'rejected'), 0)`,
+                totalMakerDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'maker_done'), 0)`,
+                totalPaymentDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'payment_done'), 0)`,
+                totalPiAmount: sql<number>`COALESCE((SELECT SUM(value_pre_gst::numeric + gst_amount::numeric) FROM project_purchase_invoices WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                totalPiCount: sql<number>`COALESCE((SELECT COUNT(*) FROM project_purchase_invoices WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                poApproved: purchaseOrders.poApproved,
+                poApprovalRemark: purchaseOrders.poApprovalRemark,
+                closedAt: purchaseOrders.closedAt,
+            })
+            .from(purchaseOrders)
+            .leftJoin(users, eq(users.id, purchaseOrders.poRaisedBy))
+            .where(eq(purchaseOrders.projectId, projectId));
 
         return { purchaseOrders: purchaseOrdersData };
     }
@@ -112,13 +113,10 @@ export class PurchaseOrderService {
             })
             .from(purchaseOrderProducts)
             .innerJoin(purchaseOrders, eq(purchaseOrders.id, purchaseOrderProducts.purchaseOrderId))
-            .where(and(
-                eq(purchaseOrders.projectId, projectId),
-                eq(purchaseOrders.poApproved, true),
-            ))
+            .where(and(eq(purchaseOrders.projectId, projectId), eq(purchaseOrders.poApproved, true)))
             .orderBy(desc(purchaseOrders.createdAt), purchaseOrderProducts.id);
 
-        const inventory = items.map((item) => {
+        const inventory = items.map(item => {
             const qty = Number(item.qty);
             const invoicedQty = Number(item.invoicedQty || 0);
             const remainingQty = Math.min(qty, Math.max(0, qty - invoicedQty));
@@ -166,63 +164,56 @@ export class PurchaseOrderService {
         }
 
         const purchaseOrdersData = await this.db
-                .select({
-                    id: purchaseOrders.id,
-                    projectId: purchaseOrders.projectId,
-                    projectName: purchaseOrders.projectName,
-                    poNumber: purchaseOrders.poNumber,
-                    sellerName: purchaseOrders.sellerName,
-                    sellerEmail: purchaseOrders.sellerEmail,
-                    sellerAddress: purchaseOrders.sellerAddress,
-                    sellerGstNo: purchaseOrders.sellerGstNo,
-                    sellerPanNo: purchaseOrders.sellerPanNo,
-                    sellerMsmeNo: purchaseOrders.sellerMsmeNo,
-                    sellerCinNo: purchaseOrders.sellerCinNo,
-                    shipToName: purchaseOrders.shipToName,
-                    shippingAddress: purchaseOrders.shippingAddress,
-                    shipToGst: purchaseOrders.shipToGst,
-                    shipToPan: purchaseOrders.shipToPan,
-                    poDate: purchaseOrders.poDate,
-                    poRaisedBy: users.name,
-                    createdAt: purchaseOrders.createdAt,
-                    poPdfVersions: purchaseOrders.generatedPdfVersions,
-                    tdsPercentage: purchaseOrders.tdsPercentage,
-                    tdsAmount: purchaseOrders.tdsAmount,
-                    amountAfterTds: purchaseOrders.amountAfterTds,
-                    poApproved: purchaseOrders.poApproved,
-                    poApprovalRemark: purchaseOrders.poApprovalRemark,
-                    closedAt: purchaseOrders.closedAt,
-                    totalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
-                    totalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
-                    grandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
-                    totalPaymentRequested: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status != 'rejected'), 0)`,
-                    totalMakerDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'maker_done'), 0)`,
-                    totalPaymentDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'payment_done'), 0)`,
-                    totalPiAmount: sql<number>`COALESCE((SELECT SUM(value_pre_gst::numeric + gst_amount::numeric) FROM project_purchase_invoices WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
-                    totalPiCount: sql<number>`COALESCE((SELECT COUNT(*) FROM project_purchase_invoices WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
-                })
-                .from(purchaseOrders)
-                .leftJoin(users, eq(users.id, purchaseOrders.poRaisedBy))
-                .where(conditions.length > 0 ? and(...conditions) : undefined)
-                .orderBy(desc(purchaseOrders.createdAt));
+            .select({
+                id: purchaseOrders.id,
+                projectId: purchaseOrders.projectId,
+                projectName: purchaseOrders.projectName,
+                poNumber: purchaseOrders.poNumber,
+                sellerName: purchaseOrders.sellerName,
+                sellerEmail: purchaseOrders.sellerEmail,
+                sellerAddress: purchaseOrders.sellerAddress,
+                sellerGstNo: purchaseOrders.sellerGstNo,
+                sellerPanNo: purchaseOrders.sellerPanNo,
+                sellerMsmeNo: purchaseOrders.sellerMsmeNo,
+                sellerCinNo: purchaseOrders.sellerCinNo,
+                shipToName: purchaseOrders.shipToName,
+                shippingAddress: purchaseOrders.shippingAddress,
+                shipToGst: purchaseOrders.shipToGst,
+                shipToPan: purchaseOrders.shipToPan,
+                poDate: purchaseOrders.poDate,
+                poRaisedBy: users.name,
+                createdAt: purchaseOrders.createdAt,
+                poPdfVersions: purchaseOrders.generatedPdfVersions,
+                tdsPercentage: purchaseOrders.tdsPercentage,
+                tdsAmount: purchaseOrders.tdsAmount,
+                amountAfterTds: purchaseOrders.amountAfterTds,
+                poApproved: purchaseOrders.poApproved,
+                poApprovalRemark: purchaseOrders.poApprovalRemark,
+                closedAt: purchaseOrders.closedAt,
+                totalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                totalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                grandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                totalPaymentRequested: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status != 'rejected'), 0)`,
+                totalMakerDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'maker_done'), 0)`,
+                totalPaymentDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'payment_done'), 0)`,
+                totalPiAmount: sql<number>`COALESCE((SELECT SUM(value_pre_gst::numeric + gst_amount::numeric) FROM project_purchase_invoices WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                totalPiCount: sql<number>`COALESCE((SELECT COUNT(*) FROM project_purchase_invoices WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+            })
+            .from(purchaseOrders)
+            .leftJoin(users, eq(users.id, purchaseOrders.poRaisedBy))
+            .where(conditions.length > 0 ? and(...conditions) : undefined)
+            .orderBy(desc(purchaseOrders.createdAt));
 
         return { purchaseOrders: purchaseOrdersData };
     }
 
     async getApprovalCounts(section?: string, user?: any) {
-        const teamCondition = section === "operations" && user && user.dataScope !== "all" && user.teamId
-            ? eq(purchaseOrders.team, user.teamId)
-            : undefined;
+        const teamCondition = section === "operations" && user && user.dataScope !== "all" && user.teamId ? eq(purchaseOrders.team, user.teamId) : undefined;
 
-        const baseQuery = () => this.db
-            .select({ id: purchaseOrders.id })
-            .from(purchaseOrders)
-            .leftJoin(users, eq(users.id, purchaseOrders.poRaisedBy));
+        const baseQuery = () => this.db.select({ id: purchaseOrders.id }).from(purchaseOrders).leftJoin(users, eq(users.id, purchaseOrders.poRaisedBy));
 
         const buildCount = async (condition: any) => {
-            const q = baseQuery().where(
-                teamCondition ? and(teamCondition, condition) : condition
-            );
+            const q = baseQuery().where(teamCondition ? and(teamCondition, condition) : condition);
             const rows = await q;
             return rows.length;
         };
@@ -247,9 +238,9 @@ export class PurchaseOrderService {
 
     private sanitizeProjectName(name: string): string {
         return name
-            .replace(/[^a-zA-Z0-9\s-]/g, '')
+            .replace(/[^a-zA-Z0-9\s-]/g, "")
             .trim()
-            .replace(/[\s-]+/g, '_');
+            .replace(/[\s-]+/g, "_");
     }
 
     async generatePONumber(projectName?: string) {
@@ -266,7 +257,7 @@ export class PurchaseOrderService {
         const last = await this.db
             .select({
                 id: purchaseOrders.id,
-                poNumber: purchaseOrders.poNumber
+                poNumber: purchaseOrders.poNumber,
             })
             .from(purchaseOrders)
             .where(like(purchaseOrders.poNumber, `VE/%/${fy}/PO%`))
@@ -283,11 +274,7 @@ export class PurchaseOrderService {
 
     async createPurchaseOrder(body: any, userId: number) {
         if (body.projectId) {
-            const [project] = await this.db
-                .select({ insuranceRequired: projects.insuranceRequired })
-                .from(projects)
-                .where(eq(projects.id, body.projectId))
-                .limit(1);
+            const [project] = await this.db.select({ insuranceRequired: projects.insuranceRequired }).from(projects).where(eq(projects.id, body.projectId)).limit(1);
             if (project?.insuranceRequired) {
                 const hasWC = await this.insuranceService.hasActiveWCInsurance(body.projectId);
                 if (!hasWC) {
@@ -300,80 +287,80 @@ export class PurchaseOrderService {
 
         const poNumber = await this.generatePONumber(body.projectName);
 
-        const [woBasic] = await this.db
-            .select({ team: woBasicDetails.team })
-            .from(woBasicDetails)
-            .where(eq(woBasicDetails.tenderId, body.tenderId))
-            .limit(1);
+        const [woBasic] = await this.db.select({ team: woBasicDetails.team }).from(woBasicDetails).where(eq(woBasicDetails.tenderId, body.tenderId)).limit(1);
         this.logger.debug(`Work Order Basic Details: ${JSON.stringify(woBasic)}`);
         this.logger.info(`Creating Purchase Order: ${poNumber} for project: ${body.projectName}, tenderId: ${body.tenderId}, team: ${woBasic?.team}`);
 
         const po = (
             await this.db
-            .insert(purchaseOrders)
-            .values({
-                tenderId: body.tenderId,
-                poNumber,
-                poDate: body.poDate,
-                projectName: body.projectName,
+                .insert(purchaseOrders)
+                .values({
+                    tenderId: body.tenderId,
+                    poNumber,
+                    poDate: body.poDate,
+                    projectName: body.projectName,
 
-                sellerName: body.sellerName,
-                sellerOrganizationId: body.sellerOrganizationId || null,
-                sellerAddress: body.sellerAddress,
-                sellerEmail: body.sellerEmail,
-                sellerGstNo: body.sellerGstNo,
-                sellerPanNo: body.sellerPanNo,
-                sellerMsmeNo: body.sellerMsmeNo,
-                sellerCinNo: body.sellerCinNo,
-                contactPersonName: body.contactPersonName,
-                contactPersonPhone: body.contactPersonPhone,
-                contactPersonEmail: body.contactPersonEmail,
+                    sellerName: body.sellerName,
+                    sellerOrganizationId: body.sellerOrganizationId || null,
+                    sellerAddress: body.sellerAddress,
+                    sellerEmail: body.sellerEmail,
+                    sellerGstNo: body.sellerGstNo,
+                    sellerPanNo: body.sellerPanNo,
+                    sellerMsmeNo: body.sellerMsmeNo,
+                    sellerCinNo: body.sellerCinNo,
+                    contactPersonName: body.contactPersonName,
+                    contactPersonPhone: body.contactPersonPhone,
+                    contactPersonEmail: body.contactPersonEmail,
 
-                shipToName: body.shipToName,
-                shippingAddress: body.shippingAddress,
-                shipToGst: body.shipToGst,
-                shipToPan: body.shipToPan,
+                    shipToName: body.shipToName,
+                    shippingAddress: body.shippingAddress,
+                    shipToGst: body.shipToGst,
+                    shipToPan: body.shipToPan,
 
-                poType: body.poType || 'new',
-                piAttachments: body.piAttachments,
-                category: body.category,
-                quotationNo: body.quotationNo,
-                quotationDate: body.quotationDate,
-                termsAndConditions: body.termsAndConditions ? (typeof body.termsAndConditions === 'string' ? JSON.parse(body.termsAndConditions) : body.termsAndConditions) : [],
-                technicalSpecsAttachments: body.technicalSpecsAttachments,
-                accessoriesPackagingListAttachments: body.accessoriesPackagingListAttachments,
-                remarks: body.remarks,
-                certRecipient: body.certRecipient,
-                certRecipients: body.certRecipients ?? [],
-                poRaisedBy: userId,
-                team: woBasic?.team,
-                projectId: body.projectId,
-            })
-            .returning()
+                    poType: body.poType || "new",
+                    piAttachments: body.piAttachments,
+                    category: body.category,
+                    quotationNo: body.quotationNo,
+                    quotationDate: body.quotationDate,
+                    termsAndConditions: body.termsAndConditions
+                        ? typeof body.termsAndConditions === "string"
+                            ? JSON.parse(body.termsAndConditions)
+                            : body.termsAndConditions
+                        : [],
+                    technicalSpecsAttachments: body.technicalSpecsAttachments,
+                    accessoriesPackagingListAttachments: body.accessoriesPackagingListAttachments,
+                    remarks: body.remarks,
+                    certRecipient: body.certRecipient,
+                    certRecipients: body.certRecipients ?? [],
+                    poRaisedBy: userId,
+                    team: woBasic?.team,
+                    projectId: body.projectId,
+                })
+                .returning()
         )[0];
 
         await this.syncPartyFromPO(body);
 
         if (body.products && body.products.length > 0) {
             for (const product of body.products) {
-            const qty = Number(product.qty);
-            const rate = Number(product.rate);
-            const gstRate = Number(product.gstRate);
-            const taxableAmount = qty * rate;
-            const gstAmount = (taxableAmount * gstRate) / 100;
-            const totalAmount = taxableAmount + gstAmount;
+                const qty = Number(product.qty);
+                const rate = Number(product.rate);
+                const gstRate = Number(product.gstRate);
+                const taxableAmount = qty * rate;
+                const gstAmount = (taxableAmount * gstRate) / 100;
+                const totalAmount = taxableAmount + gstAmount;
 
-            await this.db.insert(purchaseOrderProducts).values({
-                purchaseOrderId: po.id,
-                description: product.description,
-                qty: product.qty,
-                unit: (product.unit || "").trim().toUpperCase() || "NOS",
-                rate: product.rate.toString(),
-                taxableAmount: taxableAmount.toString(),
-                gstRate: product.gstRate.toString(),
-                gstAmount: gstAmount.toString(),
-                totalAmount: totalAmount.toString(),
-            });
+                await this.db.insert(purchaseOrderProducts).values({
+                    purchaseOrderId: po.id,
+                    description: product.description,
+                    qty: product.qty,
+                    unit: (product.unit || "").trim().toUpperCase() || "NOS",
+                    rate: product.rate.toString(),
+                    taxableAmount: taxableAmount.toString(),
+                    gstRate: product.gstRate.toString(),
+                    gstAmount: gstAmount.toString(),
+                    totalAmount: totalAmount.toString(),
+                });
             }
         }
 
@@ -403,30 +390,34 @@ export class PurchaseOrderService {
             return sum + taxable + gst;
         }, 0);
 
-        this.notifications.notifyPoCreated({
-            poNumber,
-            sellerName: body.sellerName,
-            grandTotal: grandTotal.toFixed(2),
-            projectName: body.projectName,
-            createdBy: userId,
-        }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+        this.notifications
+            .notifyPoCreated({
+                poNumber,
+                sellerName: body.sellerName,
+                grandTotal: grandTotal.toFixed(2),
+                projectName: body.projectName,
+                createdBy: userId,
+            })
+            .catch(err => this.logger.warn(`WhatsApp notification failed: ${err}`));
 
-        this.generatePdfForPO(po, body.products).catch((err) => {
+        this.generatePdfForPO(po, body.products).catch(err => {
             this.logger.error(`Failed to generate PO PDF: ${err.message}`);
         });
 
         if (po.projectId) {
-            await this.cashFlowService.create({
-                projectId: po.projectId,
-                eventType: 'po_created',
-                amount: grandTotal.toString(),
-                direction: 'outflow',
-                referenceType: 'purchase_order',
-                referenceId: po.id,
-                referenceNo: poNumber ?? `PO #${po.id}`,
-                remark: `PO created: ${poNumber}`,
-                createdBy: userId,
-            }).catch((err) => this.logger.warn(`Cash flow creation failed for PO #${po.id}: ${err}`));
+            await this.cashFlowService
+                .create({
+                    projectId: po.projectId,
+                    eventType: "po_created",
+                    amount: grandTotal.toString(),
+                    direction: "outflow",
+                    referenceType: "purchase_order",
+                    referenceId: po.id,
+                    referenceNo: poNumber ?? `PO #${po.id}`,
+                    remark: `PO created: ${poNumber}`,
+                    createdBy: userId,
+                })
+                .catch(err => this.logger.warn(`Cash flow creation failed for PO #${po.id}: ${err}`));
         }
 
         return this.getPurchaseOrder(po.id);
@@ -475,7 +466,7 @@ export class PurchaseOrderService {
         const contentHash = this.computePOHash(po, products);
 
         const versions = (po.generatedPdfVersions ?? {}) as Record<string, { path: string; hash: string }>;
-        const existingVersion = Object.values(versions).find((v) => v.hash === contentHash);
+        const existingVersion = Object.values(versions).find(v => v.hash === contentHash);
         if (existingVersion) {
             this.logger.info(`PO ${po.id}: no changes detected, reusing existing PDF`);
             return;
@@ -507,12 +498,12 @@ export class PurchaseOrderService {
 
         const [creatorUser] = await this.db.select({ team: users.team }).from(users).where(eq(users.id, po.poRaisedBy)).limit(1);
         const team = creatorUser?.team;
-        const isProd = process.env.NODE_ENV === 'production';
-        const rootDir = isProd ? 'dist' : 'src';
-        const assetsPath = join(process.cwd(), rootDir, 'modules', 'pdf', 'assets');
-        const signFile = team === 1 ? 'arju-boi.png' : 'sign-po.jpg';
+        const isProd = process.env.NODE_ENV === "production";
+        const rootDir = isProd ? "dist" : "src";
+        const assetsPath = join(process.cwd(), rootDir, "modules", "pdf", "assets");
+        const signFile = team === 1 ? "arju-boi.png" : "sign-po.jpg";
         const signBuffer = await readFile(join(assetsPath, signFile));
-        const img_sign_po_base64 = signBuffer.toString('base64');
+        const img_sign_po_base64 = signBuffer.toString("base64");
         this.logger.info(`PO ${po.id}: generating PDF with signature for team ${team}, signature file: ${join(assetsPath, signFile)}`);
 
         const data = {
@@ -545,20 +536,22 @@ export class PurchaseOrderService {
         };
 
         try {
-            const pdfPaths = await this.pdfGenerator.generatePdfs('po', data, po.id, 'PO');
+            const pdfPaths = await this.pdfGenerator.generatePdfs("po", data, po.id, "PO");
             if (pdfPaths.length > 0) {
-                const poSeq = po.poNumber?.split('/').pop() || `PO${po.id}`;
-                const rand = randomUUID().split('-')[0];
+                const poSeq = po.poNumber?.split("/").pop() || `PO${po.id}`;
+                const rand = randomUUID().split("-")[0];
                 const newFileName = `${poSeq}-${rand}.pdf`;
-                const storageDir = 'operations/po';
+                const storageDir = "operations/po";
 
-                const oldPath = join(process.cwd(), 'uploads', pdfPaths[0]);
-                const newPath = join(process.cwd(), 'uploads', storageDir, newFileName);
+                const oldPath = join(process.cwd(), "uploads", pdfPaths[0]);
+                const newPath = join(process.cwd(), "uploads", storageDir, newFileName);
 
                 for (let attempt = 0; attempt < 3; attempt++) {
-                    try { await rename(oldPath, newPath); break; }
-                    catch (e) {
-                        if ((e as NodeJS.ErrnoException).code !== 'ENOENT' || attempt === 2) throw e;
+                    try {
+                        await rename(oldPath, newPath);
+                        break;
+                    } catch (e) {
+                        if ((e as NodeJS.ErrnoException).code !== "ENOENT" || attempt === 2) throw e;
                         await new Promise(r => setTimeout(r, 200 * (attempt + 1)));
                     }
                 }
@@ -595,10 +588,7 @@ export class PurchaseOrderService {
                 throw new BadRequestException("TDS percentage is required when approving");
             }
 
-            const products = await this.db
-                .select()
-                .from(purchaseOrderProducts)
-                .where(eq(purchaseOrderProducts.purchaseOrderId, id));
+            const products = await this.db.select().from(purchaseOrderProducts).where(eq(purchaseOrderProducts.purchaseOrderId, id));
 
             const { total: subtotal, totalWithGst: grandTotal } = this.getTotalProductValues(products);
             const tdsAmt = (subtotal * tdsPercentage) / 100;
@@ -608,8 +598,8 @@ export class PurchaseOrderService {
                 .update(purchaseOrders)
                 .set({
                     tdsPercentage: tdsPercentage.toString(),
-                    tdsAmount: tdsAmt.toString(),
-                    amountAfterTds: amountAfterTds.toString(),
+                    tdsAmount: round2(tdsAmt).toFixed(2),
+                    amountAfterTds: round2(amountAfterTds).toFixed(2),
                     poApproved: true,
                     poApprovalRemark: remark || null,
                     updatedAt: new Date(),
@@ -624,56 +614,70 @@ export class PurchaseOrderService {
 
             // Bulk update po_approval_pending → pending and send WA notifications
             const pendingPrs = await this.db
-                .select({ id: paymentRequests.id, requestNo: paymentRequests.requestNo, amount: paymentRequests.amount, partyName: paymentRequests.partyName, portalLink: paymentRequests.portalLink, paymentAgainst: paymentRequests.paymentAgainst, requestedBy: paymentRequests.requestedBy })
+                .select({
+                    id: paymentRequests.id,
+                    requestNo: paymentRequests.requestNo,
+                    amount: paymentRequests.amount,
+                    partyName: paymentRequests.partyName,
+                    portalLink: paymentRequests.portalLink,
+                    paymentAgainst: paymentRequests.paymentAgainst,
+                    requestedBy: paymentRequests.requestedBy,
+                })
                 .from(paymentRequests)
-                .where(and(eq(paymentRequests.purchaseOrderId, id), eq(paymentRequests.status, 'po_approval_pending')));
+                .where(and(eq(paymentRequests.purchaseOrderId, id), eq(paymentRequests.status, "po_approval_pending")));
 
             if (pendingPrs.length > 0) {
                 await this.db
                     .update(paymentRequests)
-                    .set({ status: 'pending', tdsPercentage: tdsPercentage.toString(), updatedAt: new Date() })
-                    .where(and(eq(paymentRequests.purchaseOrderId, id), eq(paymentRequests.status, 'po_approval_pending')));
+                    .set({ status: "pending", tdsPercentage: tdsPercentage.toString(), updatedAt: new Date() })
+                    .where(and(eq(paymentRequests.purchaseOrderId, id), eq(paymentRequests.status, "po_approval_pending")));
 
                 for (const pr of pendingPrs) {
-                    this.notifications.notifyNewPaymentRequest({
-                        requestNo: pr.requestNo ?? '',
-                        amount: pr.amount ?? 0,
-                        partyName: pr.partyName ?? null,
-                        portalLink: pr.portalLink ?? null,
-                        requestedBy: pr.requestedBy ?? 0,
-                        category: pr.paymentAgainst ?? '',
-                    }).catch((err) => this.logger.warn(`WhatsApp notification failed for PR #${pr.id}: ${err}`));
+                    this.notifications
+                        .notifyNewPaymentRequest({
+                            requestNo: pr.requestNo ?? "",
+                            amount: pr.amount ?? 0,
+                            partyName: pr.partyName ?? null,
+                            portalLink: pr.portalLink ?? null,
+                            requestedBy: pr.requestedBy ?? 0,
+                            category: pr.paymentAgainst ?? "",
+                        })
+                        .catch(err => this.logger.warn(`WhatsApp notification failed for PR #${pr.id}: ${err}`));
                 }
 
                 this.logger.info(`Bulk updated ${pendingPrs.length} payment requests from po_approval_pending to pending for PO #${id}`);
             }
 
             // Send PO approved notification
-            this.notifications.notifyPoApproved({
-                poNumber: po.poNumber ?? `#${id}`,
-                sellerName: po.sellerName,
-                grandTotal: grandTotal.toString(),
-                tdsPercentage: tdsPercentage.toString(),
-                amountAfterTds: amountAfterTds.toString(),
-                approvedBy: userId ?? 0,
-            }).catch((err) => this.logger.warn(`WhatsApp PO approval notification failed: ${err}`));
+            this.notifications
+                .notifyPoApproved({
+                    poNumber: po.poNumber ?? `#${id}`,
+                    sellerName: po.sellerName,
+                    grandTotal: round2(grandTotal).toFixed(2),
+                    tdsPercentage: tdsPercentage.toString(),
+                    amountAfterTds: round2(amountAfterTds).toFixed(2),
+                    approvedBy: userId ?? 0,
+                })
+                .catch(err => this.logger.warn(`WhatsApp PO approval notification failed: ${err}`));
 
             this.logger.info(`TDS approved for PO #${id}: ${tdsPercentage}%, TDS Amount: ${tdsAmt}, After TDS: ${amountAfterTds}`);
 
             if (po.projectId) {
-                await this.cashFlowService.create({
-                    projectId: po.projectId,
-                    eventType: 'po_approved',
-                    amount: amountAfterTds.toString(),
-                    direction: 'outflow',
-                    referenceType: 'purchase_order',
-                    referenceId: po.id,
-                    referenceNo: po.poNumber ?? `PO #${po.id}`,
-                    tdsPercentage: tdsPercentage.toString(),
-                    tdsAmount: tdsAmt.toString(),
-                    remark: `PO approved with TDS @ ${tdsPercentage}%`,
-                    createdBy: userId ?? 0,
-                }).catch((err) => this.logger.warn(`Cash flow creation failed for PO approval #${po.id}: ${err}`));
+                await this.cashFlowService
+                    .create({
+                        projectId: po.projectId,
+                        eventType: "po_approved",
+                        amount: round2(amountAfterTds).toFixed(2),
+                        direction: "outflow",
+                        referenceType: "purchase_order",
+                        referenceId: po.id,
+                        referenceNo: po.poNumber ?? `PO #${po.id}`,
+                        tdsPercentage: tdsPercentage.toString(),
+                        tdsAmount: round2(tdsAmt).toFixed(2),
+                        remark: `PO approved with TDS @ ${tdsPercentage}%`,
+                        createdBy: userId ?? 0,
+                    })
+                    .catch(err => this.logger.warn(`Cash flow creation failed for PO approval #${po.id}: ${err}`));
             }
 
             return updated;
@@ -691,8 +695,8 @@ export class PurchaseOrderService {
             // Bulk update po_approval_pending → rejected
             const rejectedCount = await this.db
                 .update(paymentRequests)
-                .set({ status: 'rejected', rejectionReason: remark || 'PO Rejected', updatedAt: new Date() })
-                .where(and(eq(paymentRequests.purchaseOrderId, id), eq(paymentRequests.status, 'po_approval_pending')))
+                .set({ status: "rejected", rejectionReason: remark || "PO Rejected", updatedAt: new Date() })
+                .where(and(eq(paymentRequests.purchaseOrderId, id), eq(paymentRequests.status, "po_approval_pending")))
                 .returning({ id: paymentRequests.id });
 
             if (rejectedCount.length > 0) {
@@ -700,21 +704,20 @@ export class PurchaseOrderService {
             }
 
             // Compute grandTotal for notification
-            const rejectProducts = await this.db
-                .select()
-                .from(purchaseOrderProducts)
-                .where(eq(purchaseOrderProducts.purchaseOrderId, id));
+            const rejectProducts = await this.db.select().from(purchaseOrderProducts).where(eq(purchaseOrderProducts.purchaseOrderId, id));
             const { totalWithGst: rejectGrandTotal } = this.getTotalProductValues(rejectProducts);
 
-            this.notifications.notifyPoRejected({
-                poNumber: po.poNumber ?? `#${id}`,
-                sellerName: po.sellerName,
-                grandTotal: rejectGrandTotal.toString(),
-                remark: remark || null,
-                rejectedBy: userId ?? 0,
-            }).catch((err) => this.logger.warn(`WhatsApp PO rejection notification failed: ${err}`));
+            this.notifications
+                .notifyPoRejected({
+                    poNumber: po.poNumber ?? `#${id}`,
+                    sellerName: po.sellerName,
+                    grandTotal: rejectGrandTotal.toString(),
+                    remark: remark || null,
+                    rejectedBy: userId ?? 0,
+                })
+                .catch(err => this.logger.warn(`WhatsApp PO rejection notification failed: ${err}`));
 
-            this.logger.info(`TDS rejected for PO #${id}: ${remark || 'no remark'}`);
+            this.logger.info(`TDS rejected for PO #${id}: ${remark || "no remark"}`);
             return updated;
         }
     }
@@ -724,7 +727,7 @@ export class PurchaseOrderService {
      * `closed_at` is what the "Closed" tab and the approval counts read, so a PO
      * that is merely fully paid stays in "Approved" until someone closes it.
      */
-    async closePurchaseOrder(id: number) {
+    async closePurchaseOrder(id: number, closureNote?: string, userId?: number) {
         const po = await this.db
             .select()
             .from(purchaseOrders)
@@ -732,25 +735,35 @@ export class PurchaseOrderService {
             .then(rows => rows[0]);
 
         if (!po) throw new NotFoundException("Purchase Order not found");
+        if (po.closedAt) {
+            throw new BadRequestException("Purchase Order is already closed");
+        }
         if (po.poApproved !== true) {
             throw new BadRequestException("Only approved Purchase Orders can be closed");
         }
 
+        const note = closureNote?.trim();
+        if (!note) {
+            throw new BadRequestException("Closure note is required");
+        }
+
         const closureStatus = await this.checkClosure(id);
         if (!closureStatus.canClose) {
-            throw new BadRequestException("Purchase Order cannot be closed until all payment requests and purchase invoices are cleared.");
+            throw new BadRequestException(`Purchase Order cannot be closed until payments and invoices are settled (difference must be under ₹${CLOSURE_TOLERANCE}).`);
         }
 
         const [updated] = await this.db
             .update(purchaseOrders)
             .set({
                 closedAt: new Date(),
+                closedBy: userId ?? null,
+                closureNote: note,
                 updatedAt: new Date(),
             })
             .where(eq(purchaseOrders.id, id))
             .returning();
 
-        this.logger.info(`Purchase Order closed #${id}`);
+        this.logger.info(`Purchase Order closed #${id} by user #${userId ?? "unknown"}`);
         return updated ?? po;
     }
 
@@ -761,9 +774,9 @@ export class PurchaseOrderService {
         const poProducts = await this.db.select().from(purchaseOrderProducts).where(eq(purchaseOrderProducts.purchaseOrderId, id));
         const total = this.getTotalProductValues(poProducts);
 
-        const enrichedProducts = poProducts.map((product)=>{
+        const enrichedProducts = poProducts.map(product => {
             const itemTotal = Number(product.rate) * Number(product.qty);
-            const itemTotalGst = itemTotal * Number(product.gstRate)/(100);
+            const itemTotalGst = (itemTotal * Number(product.gstRate)) / 100;
             const itemTotalWithGst = itemTotal + itemTotalGst;
 
             return {
@@ -771,15 +784,12 @@ export class PurchaseOrderService {
                 itemTotal,
                 itemTotalGst,
                 itemTotalWithGst,
-            }
-        })
+            };
+        });
 
         let raisedByName: string | null = null;
         if (po.poRaisedBy) {
-            const [raisedByUser] = await this.db
-                .select({ name: users.name })
-                .from(users)
-                .where(eq(users.id, po.poRaisedBy));
+            const [raisedByUser] = await this.db.select({ name: users.name }).from(users).where(eq(users.id, po.poRaisedBy));
             raisedByName = raisedByUser?.name ?? null;
         }
 
@@ -839,9 +849,7 @@ export class PurchaseOrderService {
                 };
             }
 
-            const sorted = Object.entries(versions).sort((a, b) =>
-                this.parseLabelDate(b[0]).getTime() - this.parseLabelDate(a[0]).getTime()
-            );
+            const sorted = Object.entries(versions).sort((a, b) => this.parseLabelDate(b[0]).getTime() - this.parseLabelDate(a[0]).getTime());
             if (sorted.length === 0) throw new NotFoundException("No PDF versions found for this Purchase Order");
             const [latestLabel, latestEntry] = sorted[0];
             return {
@@ -880,10 +888,7 @@ export class PurchaseOrderService {
 
             delete versions[version];
 
-            await this.db
-                .update(purchaseOrders)
-                .set({ generatedPdfVersions: versions })
-                .where(eq(purchaseOrders.id, id));
+            await this.db.update(purchaseOrders).set({ generatedPdfVersions: versions }).where(eq(purchaseOrders.id, id));
         } catch (error) {
             this.logger.error(`Failed to delete PDF version: ${error instanceof Error ? error.message : String(error)}`);
             throw error;
@@ -891,12 +896,11 @@ export class PurchaseOrderService {
     }
 
     private getTotalProductValues(products: any[]) {
-
         let total = 0;
         let totalGst = 0;
         let totalWithGst = 0;
 
-        for(let product of products){
+        for (const product of products) {
             const prodTotal = product.qty * product.rate;
             const prodGstAmount = (prodTotal * product.gstRate) / 100;
             const prodTotalWithGst = prodTotal + prodGstAmount;
@@ -939,12 +943,14 @@ export class PurchaseOrderService {
             });
 
             if (org.name) {
-                await this.clientDirectorySyncService.syncToClientDirectory([{
-                    name: org.name,
-                    email: body.email || null,
-                    phone: body.mobile_number || null,
-                    org: null,
-                }]);
+                await this.clientDirectorySyncService.syncToClientDirectory([
+                    {
+                        name: org.name,
+                        email: body.email || null,
+                        phone: body.mobile_number || null,
+                        org: null,
+                    },
+                ]);
             }
 
             this.logger.info(`Seller created as vendor org: ${org.name} (ID: ${org.id})`);
@@ -953,29 +959,31 @@ export class PurchaseOrderService {
 
         const party = (
             await this.db
-            .insert(projectParties)
-            .values({
-                name: body.name,
-                alias: body.alias || null,
-                email: body.email || null,
-                address: body.address || null,
-                gstNo: body.gstNo || null,
-                pan: body.pan || null,
-                msme: body.msme || null,
-                type,
-                contactPerson: body.contact_person || null,
-                mobileNumber: body.mobile_number || null,
-            })
-            .returning()
+                .insert(projectParties)
+                .values({
+                    name: body.name,
+                    alias: body.alias || null,
+                    email: body.email || null,
+                    address: body.address || null,
+                    gstNo: body.gstNo || null,
+                    pan: body.pan || null,
+                    msme: body.msme || null,
+                    type,
+                    contactPerson: body.contact_person || null,
+                    mobileNumber: body.mobile_number || null,
+                })
+                .returning()
         )[0];
 
         if (party.name) {
-            await this.clientDirectorySyncService.syncToClientDirectory([{
-                name: party.name,
-                email: party.email,
-                phone: party.mobileNumber || null,
-                org: null,
-            }]);
+            await this.clientDirectorySyncService.syncToClientDirectory([
+                {
+                    name: party.name,
+                    email: party.email,
+                    phone: party.mobileNumber || null,
+                    org: null,
+                },
+            ]);
         }
 
         this.logger.info(`Party created: ${party.name} (ID: ${party.id}, type: ${party.type})`);
@@ -983,9 +991,7 @@ export class PurchaseOrderService {
     }
 
     async updatePurchaseOrder(id: number, body: any, userId?: number) {
-        const existingPO = (
-            await this.db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id))
-        )[0];
+        const existingPO = (await this.db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id)))[0];
 
         if (!existingPO) {
             throw new NotFoundException("Purchase Order not found");
@@ -996,11 +1002,7 @@ export class PurchaseOrderService {
         // }
 
         const wasRejected = existingPO.poApproved === false;
-        const [woBasic] = await this.db
-            .select({ team: woBasicDetails.team })
-            .from(woBasicDetails)
-            .where(eq(woBasicDetails.tenderId, existingPO.tenderId))
-            .limit(1);
+        const [woBasic] = await this.db.select({ team: woBasicDetails.team }).from(woBasicDetails).where(eq(woBasicDetails.tenderId, existingPO.tenderId)).limit(1);
         this.logger.info(`Updating Purchase Order: ${body.poNumber} for project: ${body.projectName}, tenderId: ${body.tenderId}, team: ${woBasic?.team}`);
 
         const updatedPO = (
@@ -1029,12 +1031,16 @@ export class PurchaseOrderService {
                     shipToGst: body.shipToGst,
                     shipToPan: body.shipToPan,
 
-                    poType: body.poType || existingPO.poType || 'new',
+                    poType: body.poType || existingPO.poType || "new",
                     piAttachments: body.piAttachments,
                     category: body.category,
                     quotationNo: body.quotationNo,
                     quotationDate: body.quotationDate,
-                    termsAndConditions: body.termsAndConditions ? (typeof body.termsAndConditions === 'string' ? JSON.parse(body.termsAndConditions) : body.termsAndConditions) : [],
+                    termsAndConditions: body.termsAndConditions
+                        ? typeof body.termsAndConditions === "string"
+                            ? JSON.parse(body.termsAndConditions)
+                            : body.termsAndConditions
+                        : [],
                     technicalSpecsAttachments: body.technicalSpecsAttachments,
                     accessoriesPackagingListAttachments: body.accessoriesPackagingListAttachments,
                     remarks: body.remarks,
@@ -1060,9 +1066,7 @@ export class PurchaseOrderService {
 
         await this.syncPartyFromPO(body);
 
-        await this.db
-            .delete(purchaseOrderProducts)
-            .where(eq(purchaseOrderProducts.purchaseOrderId, id));
+        await this.db.delete(purchaseOrderProducts).where(eq(purchaseOrderProducts.purchaseOrderId, id));
 
         if (body.products && body.products.length > 0) {
             for (const product of body.products) {
@@ -1088,7 +1092,7 @@ export class PurchaseOrderService {
             }
         }
 
-        this.generatePdfForPO(updatedPO, body.products).catch((err) => {
+        this.generatePdfForPO(updatedPO, body.products).catch(err => {
             this.logger.error(`Failed to generate PO PDF after update: ${err.message}`);
         });
 
@@ -1101,11 +1105,13 @@ export class PurchaseOrderService {
 
         this.logger.info(`Purchase Order updated: ${updatedPO.poNumber}`);
 
-        this.notifications.notifyPoUpdated({
-            poNumber: updatedPO.poNumber ?? `#${id}`,
-            sellerName: body.sellerName,
-            updatedBy: userId ?? 0,
-        }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+        this.notifications
+            .notifyPoUpdated({
+                poNumber: updatedPO.poNumber ?? `#${id}`,
+                sellerName: body.sellerName,
+                updatedBy: userId ?? 0,
+            })
+            .catch(err => this.logger.warn(`WhatsApp notification failed: ${err}`));
 
         return updatedPO;
     }
@@ -1145,18 +1151,19 @@ export class PurchaseOrderService {
 
 
     private async resolveCertRecipientEmails(po: any): Promise<string> {
-        const ids: number[] = Array.isArray(po.certRecipients) && po.certRecipients.length > 0
-            ? po.certRecipients
-            : po.certRecipient ? [po.certRecipient] : [];
+        const ids: number[] = Array.isArray(po.certRecipients) && po.certRecipients.length > 0 ? po.certRecipients : po.certRecipient ? [po.certRecipient] : [];
         if (ids.length === 0) return "";
-        const users_data = await this.db
-            .select({ email: users.email })
-            .from(users)
-            .where(inArray(users.id, ids));
-        return users_data.map(u => u.email).filter(Boolean).join(", ");
+        const users_data = await this.db.select({ email: users.email }).from(users).where(inArray(users.id, ids));
+        return users_data
+            .map(u => u.email)
+            .filter(Boolean)
+            .join(", ");
     }
 
     async checkClosure(id: number) {
+        const po = (await this.db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id)))[0];
+        if (!po) throw new NotFoundException("Purchase Order not found");
+
         const paymentRequestsData = await this.db
             .select({
                 id: paymentRequests.id,
@@ -1166,10 +1173,7 @@ export class PurchaseOrderService {
                 paymentAgainst: paymentRequests.paymentAgainst,
             })
             .from(paymentRequests)
-            .where(and(
-                eq(paymentRequests.purchaseOrderId, id),
-                ne(paymentRequests.status, "payment_done"),
-            ))
+            .where(and(eq(paymentRequests.purchaseOrderId, id), ne(paymentRequests.status, "payment_done")))
             .orderBy(desc(paymentRequests.createdAt));
 
         const purchaseInvoicesData = await this.db
@@ -1184,14 +1188,34 @@ export class PurchaseOrderService {
             .where(eq(purchaseInvoices.purchaseOrderId, id))
             .orderBy(desc(purchaseInvoices.createdAt));
 
-        const advancePaid = paymentRequestsData.some(
-            (pr) => pr.paymentAgainst?.toLowerCase().includes("advance"),
-        );
+        const advancePaid = paymentRequestsData.some(pr => pr.paymentAgainst?.toLowerCase().includes("advance"));
 
-        const canClose = paymentRequestsData.length === 0 && purchaseInvoicesData.length === 0;
+        // Sums are computed in SQL (exact numeric) instead of JS floats so the
+        // API gate can never disagree with the closure page's rounded values.
+        const [totals] = await this.db
+            .select({
+                effectiveAmount: sql<string>`COALESCE(${purchaseOrders.amountAfterTds}::numeric, (SELECT COALESCE(SUM(${purchaseOrderProducts.totalAmount}::numeric), 0) FROM ${purchaseOrderProducts} WHERE ${purchaseOrderProducts.purchaseOrderId} = ${purchaseOrders.id}))`,
+                paid: sql<string>`COALESCE((SELECT SUM(${paymentRequests.amount}::numeric) FROM ${paymentRequests} WHERE ${paymentRequests.purchaseOrderId} = ${purchaseOrders.id} AND ${paymentRequests.status} = 'payment_done'), 0)`,
+                invoiced: sql<string>`COALESCE((SELECT SUM(${purchaseInvoices.valuePreGst}::numeric + ${purchaseInvoices.gstAmount}::numeric) FROM ${purchaseInvoices} WHERE ${purchaseInvoices.purchaseOrderId} = ${purchaseOrders.id}), 0)`,
+            })
+            .from(purchaseOrders)
+            .where(eq(purchaseOrders.id, id));
+
+        const effectiveAmount = round2(totals.effectiveAmount);
+        const totalPaymentDone = round2(totals.paid);
+        const totalPiAmount = round2(totals.invoiced);
+        const remainingToPay = round2(effectiveAmount - totalPaymentDone);
+        const remainingInvoice = round2(effectiveAmount - totalPiAmount);
+
+        const canClose = paymentRequestsData.length === 0 && remainingToPay < CLOSURE_TOLERANCE && remainingInvoice < CLOSURE_TOLERANCE;
 
         return {
             canClose,
+            effectiveAmount,
+            totalPaymentDone,
+            totalPiAmount,
+            remainingToPay,
+            remainingInvoice,
             remainingPayments: paymentRequestsData,
             remainingInvoices: purchaseInvoicesData,
             advancePaid,
@@ -1207,7 +1231,7 @@ export class PurchaseOrderService {
             .from(purchaseOrderProducts)
             .where(eq(purchaseOrderProducts.purchaseOrderId, id));
 
-        const { total: grandTotal, totalGst } = this.getTotalProductValues(poProducts);
+        const { totalWithGst, totalGst } = this.getTotalProductValues(poProducts);
 
         const paymentRequestsData = await this.db
             .select({
@@ -1240,14 +1264,11 @@ export class PurchaseOrderService {
             .where(eq(purchaseInvoices.purchaseOrderId, id))
             .orderBy(desc(purchaseInvoices.createdAt));
 
-        const totalPaymentDone = paymentRequestsData
-            .filter((pr) => pr.status === "payment_done")
-            .reduce((sum, pr) => sum + Number(pr.amount || 0), 0);
+        const totalPaymentDone = round2(paymentRequestsData.filter(pr => pr.status === "payment_done").reduce((sum, pr) => sum + Number(pr.amount || 0), 0));
 
-        const totalPiAmount = purchaseInvoicesData.reduce(
-            (sum, inv) => sum + Number(inv.valuePreGst || 0) + Number(inv.gstAmount || 0),
-            0,
-        );
+        const totalPiAmount = round2(purchaseInvoicesData.reduce((sum, inv) => sum + Number(inv.valuePreGst || 0) + Number(inv.gstAmount || 0), 0));
+
+        const closedByName = po.closedBy ? ((await this.db.select({ name: users.name }).from(users).where(eq(users.id, po.closedBy)))[0]?.name ?? null) : null;
 
         return {
             id: po.id,
@@ -1258,10 +1279,14 @@ export class PurchaseOrderService {
             poDate: po.poDate,
             poApproved: po.poApproved,
             amountAfterTds: po.amountAfterTds,
-            grandTotal,
-            totalGst,
+            grandTotal: round2(totalWithGst),
+            totalGst: round2(totalGst),
             totalPaymentDone,
             totalPiAmount,
+            closedAt: po.closedAt,
+            closedBy: po.closedBy,
+            closedByName,
+            closureNote: po.closureNote,
             paymentRequests: paymentRequestsData,
             purchaseInvoices: purchaseInvoicesData,
         };
@@ -1335,16 +1360,21 @@ export class PurchaseOrderService {
         return created;
     }
 
-    async updatePaymentRequest(poId: number, prId: number, data: Partial<{
-        partyName: string;
-        accountNumber: string;
-        ifsc: string;
-        amount: string | number;
-        paymentMode: string;
-        utrNumber: string;
-        status: string;
-        paymentAgainst: string;
-    }>, userId: number) {
+    async updatePaymentRequest(
+        poId: number,
+        prId: number,
+        data: Partial<{
+            partyName: string;
+            accountNumber: string;
+            ifsc: string;
+            amount: string | number;
+            paymentMode: string;
+            utrNumber: string;
+            status: string;
+            paymentAgainst: string;
+        }>,
+        userId: number
+    ) {
         const pr = await this.db
             .select()
             .from(paymentRequests)
@@ -1378,14 +1408,19 @@ export class PurchaseOrderService {
         return { success: true };
     }
 
-    async updatePurchaseInvoice(poId: number, piId: number, data: Partial<{
-        category: string;
-        partyName: string;
-        valuePreGst: string | number;
-        gstAmount: string | number;
-        invoiceDate: string;
-        invoiceFile: string;
-    }>, userId: number) {
+    async updatePurchaseInvoice(
+        poId: number,
+        piId: number,
+        data: Partial<{
+            category: string;
+            partyName: string;
+            valuePreGst: string | number;
+            gstAmount: string | number;
+            invoiceDate: string;
+            invoiceFile: string;
+        }>,
+        userId: number
+    ) {
         const pi = await this.db
             .select()
             .from(purchaseInvoices)
@@ -1487,7 +1522,7 @@ export class PurchaseOrderService {
             .orderBy(desc(projectParties.createdAt));
 
         if (type && type !== "seller") {
-            return partyRows.map((p) => ({ ...p, source: "party" as const }));
+            return partyRows.map(p => ({ ...p, source: "party" as const }));
         }
 
         const orgRows = await this.db
@@ -1532,9 +1567,7 @@ export class PurchaseOrderService {
         const sellerOrgs = [...orgMap.values()];
         // Sellers exist only in vendor master now, so project_parties contributes
         // nothing here beyond ship-to addresses and other non-seller beneficiaries.
-        const otherParties = partyRows
-            .filter((p) => p.type !== "seller")
-            .map((p) => ({ ...p, source: "party" as const }));
+        const otherParties = partyRows.filter(p => p.type !== "seller").map(p => ({ ...p, source: "party" as const }));
 
         return [...sellerOrgs, ...otherParties];
     }
@@ -1654,20 +1687,12 @@ export class PurchaseOrderService {
 
     async activateParty(id: number, source?: string) {
         if (source === "vendor_org") {
-            const rows = await this.db
-                .update(vendorOrganizations)
-                .set({ status: true, updatedAt: new Date() })
-                .where(eq(vendorOrganizations.id, id))
-                .returning();
+            const rows = await this.db.update(vendorOrganizations).set({ status: true, updatedAt: new Date() }).where(eq(vendorOrganizations.id, id)).returning();
             if (!rows[0]) throw new NotFoundException(`Vendor organization with ID ${id} not found`);
             return { ...rows[0], type: "seller", source: "vendor_org", isActive: true };
         }
 
-        const rows = await this.db
-            .update(projectParties)
-            .set({ isActive: true, updatedAt: new Date() })
-            .where(eq(projectParties.id, id))
-            .returning();
+        const rows = await this.db.update(projectParties).set({ isActive: true, updatedAt: new Date() }).where(eq(projectParties.id, id)).returning();
 
         if (!rows[0]) {
             throw new NotFoundException(`Party with ID ${id} not found`);
@@ -1677,20 +1702,12 @@ export class PurchaseOrderService {
 
     async deactivateParty(id: number, source?: string) {
         if (source === "vendor_org") {
-            const rows = await this.db
-                .update(vendorOrganizations)
-                .set({ status: false, updatedAt: new Date() })
-                .where(eq(vendorOrganizations.id, id))
-                .returning();
+            const rows = await this.db.update(vendorOrganizations).set({ status: false, updatedAt: new Date() }).where(eq(vendorOrganizations.id, id)).returning();
             if (!rows[0]) throw new NotFoundException(`Vendor organization with ID ${id} not found`);
             return { ...rows[0], type: "seller", source: "vendor_org", isActive: false };
         }
 
-        const rows = await this.db
-            .update(projectParties)
-            .set({ isActive: false, updatedAt: new Date() })
-            .where(eq(projectParties.id, id))
-            .returning();
+        const rows = await this.db.update(projectParties).set({ isActive: false, updatedAt: new Date() }).where(eq(projectParties.id, id)).returning();
 
         if (!rows[0]) {
             throw new NotFoundException(`Party with ID ${id} not found`);
@@ -1719,11 +1736,7 @@ export class PurchaseOrderService {
             return { ...rows[0], type: "seller", source: "vendor_org", isActive: rows[0].status };
         }
 
-        const [existing] = await this.db
-            .select()
-            .from(projectParties)
-            .where(eq(projectParties.id, id))
-            .limit(1);
+        const [existing] = await this.db.select().from(projectParties).where(eq(projectParties.id, id)).limit(1);
 
         if (!existing) {
             throw new NotFoundException(`Party with ID ${id} not found`);
@@ -1752,12 +1765,14 @@ export class PurchaseOrderService {
         }
 
         if (rows[0].name) {
-            await this.clientDirectorySyncService.syncToClientDirectory([{
-                name: rows[0].name,
-                email: rows[0].email,
-                phone: rows[0].mobileNumber || null,
-                org: null,
-            }]);
+            await this.clientDirectorySyncService.syncToClientDirectory([
+                {
+                    name: rows[0].name,
+                    email: rows[0].email,
+                    phone: rows[0].mobileNumber || null,
+                    org: null,
+                },
+            ]);
         }
 
         return { ...rows[0], source: "party" as const };

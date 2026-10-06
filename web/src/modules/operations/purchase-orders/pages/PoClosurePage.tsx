@@ -14,6 +14,8 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { CanUpdate, CanDelete } from "@/components/PermissionGuard";
 import { useAuth } from "@/contexts/AuthContext";
+import { round2, CLOSURE_TOLERANCE } from "@/utils/money";
+import { CloseClosureDialog } from "@/components/CloseClosureDialog";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -47,6 +49,10 @@ interface PoClosureData {
     totalGst: number;
     totalPaymentDone: number;
     totalPiAmount: number;
+    closedAt?: string | null;
+    closedBy?: number | null;
+    closedByName?: string | null;
+    closureNote?: string | null;
     paymentRequests: Array<{
         id: number;
         requestNo?: string;
@@ -121,6 +127,8 @@ const PoClosurePage: React.FC = () => {
     // permission check needs its own name to avoid shadowing it.
     const { canClose: hasClosePermission, canCreate } = useAuth();
     const [closingPo, setClosingPo] = useState(false);
+    const [showCloseDialog, setShowCloseDialog] = useState(false);
+    const [closeError, setCloseError] = useState<string | null>(null);
 
     const [paymentRows, setPaymentRows] = useState<PaymentRow[]>([]);
     const [invoiceRows, setInvoiceRows] = useState<InvoiceRow[]>([]);
@@ -165,16 +173,18 @@ const PoClosurePage: React.FC = () => {
         setPo(res);
     };
 
-    const handleClosePo = async () => {
+    const handleClosePo = async (closureNote: string) => {
         setClosingPo(true);
-        setSaveMsg(null);
+        setCloseError(null);
         try {
-            await purchaseOrderApi.close(id);
+            await purchaseOrderApi.close(id, closureNote);
+            setShowCloseDialog(false);
             setSaveMsg({ type: "success", text: "Purchase Order closed successfully." });
             await fetchData();
         } catch (err) {
             console.error(err);
-            setSaveMsg({ type: "error", text: "Failed to close Purchase Order." });
+            const apiMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+            setCloseError(typeof apiMessage === "string" ? apiMessage : "Failed to close Purchase Order.");
         } finally {
             setClosingPo(false);
         }
@@ -194,12 +204,17 @@ const PoClosurePage: React.FC = () => {
         if (id) load();
     }, [id]);
 
-    const amountAfterTds = Number(po?.amountAfterTds || po?.grandTotal || 0);
-    const totalPaymentDone = Number(po?.totalPaymentDone || 0);
-    const totalPiAmount = Number(po?.totalPiAmount || 0);
-    const remainingToPay = amountAfterTds - totalPaymentDone;
-    const remainingInvoice = amountAfterTds - totalPiAmount;
-    const canClose = remainingToPay <= 0 && remainingInvoice <= 0;
+    const amountAfterTds = round2(Number(po?.amountAfterTds || po?.grandTotal || 0));
+    const totalPaymentDone = round2(Number(po?.totalPaymentDone || 0));
+    const totalPiAmount = round2(Number(po?.totalPiAmount || 0));
+    const remainingToPay = round2(amountAfterTds - totalPaymentDone);
+    const remainingInvoice = round2(amountAfterTds - totalPiAmount);
+    // A difference strictly below CLOSURE_TOLERANCE rupees is absorbed as
+    // round-off; anything at or above it keeps the PO open.
+    const paySettled = remainingToPay < CLOSURE_TOLERANCE;
+    const invoiceSettled = remainingInvoice < CLOSURE_TOLERANCE;
+    const withinRoundOff = (r: number) => r > 0 && r < CLOSURE_TOLERANCE;
+    const canClose = paySettled && invoiceSettled && !po?.closedAt;
 
     const updatePaymentRow = (index: number, field: keyof PaymentRow, value: string) => {
         setPaymentRows((rows) => rows.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
@@ -289,8 +304,10 @@ const PoClosurePage: React.FC = () => {
                             </div>
                             <div className="text-right">
                                 <p className="text-lg font-semibold">{formatINR(totalPaymentDone)}</p>
-                                {totalPaymentDone >= amountAfterTds ? (
+                                {remainingToPay <= 0 ? (
                                     <Badge variant="default" className="mt-1">Settled</Badge>
+                                ) : paySettled ? (
+                                    <Badge variant="secondary" className="mt-1">Within tolerance</Badge>
                                 ) : (
                                     <Badge variant="outline" className="mt-1">Pending</Badge>
                                 )}
@@ -304,8 +321,10 @@ const PoClosurePage: React.FC = () => {
                             </div>
                             <div className="text-right">
                                 <p className="text-lg font-semibold">{formatINR(totalPiAmount)}</p>
-                                {totalPiAmount >= amountAfterTds ? (
+                                {remainingInvoice <= 0 ? (
                                     <Badge variant="default" className="mt-1">Settled</Badge>
+                                ) : invoiceSettled ? (
+                                    <Badge variant="secondary" className="mt-1">Within tolerance</Badge>
                                 ) : (
                                     <Badge variant="outline" className="mt-1">Pending</Badge>
                                 )}
@@ -322,7 +341,7 @@ const PoClosurePage: React.FC = () => {
                                     <span className="font-semibold">{formatINR(remainingToPay)}</span>
                                 </div>
                             )}
-                            {remainingInvoice > 0 && (
+                            {withinRoundOff(remainingInvoice) && (
                                 <div className="flex items-center justify-between text-amber-600">
                                     <span className="flex items-center gap-2">
                                         <AlertCircle className="h-4 w-4" />
@@ -330,6 +349,11 @@ const PoClosurePage: React.FC = () => {
                                     </span>
                                     <span className="font-semibold">{formatINR(remainingInvoice)}</span>
                                 </div>
+                            )}
+                            {(withinRoundOff(remainingToPay) || withinRoundOff(remainingInvoice)) && (
+                                <p className="text-xs text-amber-600">
+                                    Difference under ₹{CLOSURE_TOLERANCE} — will be absorbed as round-off on closure.
+                                </p>
                             )}
                             {canClose && (
                                 <div className="flex items-center justify-between text-green-600 pt-2">
@@ -716,21 +740,46 @@ const PoClosurePage: React.FC = () => {
             </Card>
 
             <CardFooter className="flex gap-3">
-                {canClose && hasClosePermission("accounts.purchase-orders") && (
-                    <Button
-                        className="bg-green-600 hover:bg-green-700"
-                        onClick={handleClosePo}
-                        disabled={closingPo}
-                    >
-                        {closingPo ? (
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                            <CheckCircle2 className="h-4 w-4 mr-2" />
+                {po.closedAt ? (
+                    <div className="flex flex-col gap-1 text-sm">
+                        <span className="flex items-center gap-2 font-medium text-green-700">
+                            <CheckCircle2 className="h-5 w-5" />
+                            Closed on {formatDate(po.closedAt)}
+                            {po.closedByName ? ` by ${po.closedByName}` : ""}
+                        </span>
+                        {po.closureNote && (
+                            <span className="text-muted-foreground">Closure note: {po.closureNote}</span>
                         )}
-                        Close PO
-                    </Button>
+                    </div>
+                ) : (
+                    canClose &&
+                    hasClosePermission("accounts.purchase-orders") && (
+                        <Button
+                            className="bg-green-600 hover:bg-green-700"
+                            onClick={() => {
+                                setCloseError(null);
+                                setShowCloseDialog(true);
+                            }}
+                        >
+                            <CheckCircle2 className="h-4 w-4 mr-2" />
+                            Close PO
+                        </Button>
+                    )
                 )}
             </CardFooter>
+
+            <CloseClosureDialog
+                open={showCloseDialog}
+                onClose={() => setShowCloseDialog(false)}
+                onConfirm={handleClosePo}
+                pending={closingPo}
+                error={closeError}
+                title="Close Purchase Order"
+                referenceNo={po.poNumber}
+                amountAfterTds={amountAfterTds}
+                totalPaymentDone={totalPaymentDone}
+                totalPiAmount={totalPiAmount}
+            />
 
             {/* Delete Payment Request Confirmation Dialog */}
             <AlertDialog open={!!deletePaymentRequest} onOpenChange={(open) => !open && setDeletePaymentRequest(null)}>
