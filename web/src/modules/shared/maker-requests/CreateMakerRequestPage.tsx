@@ -119,7 +119,7 @@ const CATEGORY_UPLOAD_CONFIG: Record<string, { allowedUserIds?: number[]; upload
     electricity: { uploadInvoice: true, uploadPI: false, uploadInvoiceAfterPayment: false },
     rent: { uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: true },
     emi: { uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
-    salary: { allowedUserIds: [13, 7, 21, 42, 26], uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
+    salary: { allowedUserIds: [13, 7, 21, 42, 26, 97, 33], uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
     software: { uploadInvoice: true, uploadPI: true, uploadInvoiceAfterPayment: true },
     asset_purchase: { uploadInvoice: false, uploadPI: true, uploadInvoiceAfterPayment: true },
     inventory_purchase: { uploadInvoice: false, uploadPI: true, uploadInvoiceAfterPayment: true },
