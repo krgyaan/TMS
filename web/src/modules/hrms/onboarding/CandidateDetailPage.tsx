@@ -1073,12 +1073,11 @@ export default function CandidateDetailPage() {
 
         <ActionModal
           open={createUserOpen}
-          type="approved"
           joinee={joinee}
           onClose={() => setCreateUserOpen(false)}
-          onConfirm={(note) => {
+          onConfirm={() => {
             createUserMutation.mutate(
-              { id: candidateId, dto: { status: "approved", note } },
+              { id: candidateId, dto: { status: "approved" } },
               { onSuccess: () => setCreateUserOpen(false) }
             );
           }}

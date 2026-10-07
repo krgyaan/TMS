@@ -26,7 +26,7 @@ export interface OnboardingRequest {
 }
 
 export interface UpdateStatusDto {
-  status: "approved" | "rejected";
+  status: "approved";
   note?: string;
 }
 
