@@ -23,7 +23,7 @@ import { Logger } from 'winston';
 // ─── DTOs ─────────────────────────────────────────────────────────────────────
 
 export interface UpdateStatusDto {
-  status: 'approved' | 'rejected';
+  status: 'approved';
   note?: string;
 }
 
@@ -1314,7 +1314,8 @@ export class OnboardingService {
 
   /**
    * PATCH /hrms/onboarding/:id/status
-   * Approve or reject a pending request (HR action).
+   * Approve a pending request and create the joinee's user (HR action).
+   * Request-level rejection is no longer supported.
    */
   async updateStatus(
     id: number,
@@ -1336,10 +1337,10 @@ export class OnboardingService {
         );
       }
 
-      // ── 1. Create User and Seed Tasks if Approved ────────────────────────
+      // ── 1. Create User and Seed Tasks ────────────────────────────────────
       let newUserId: number | null = null;
-      
-      if (dto.status === 'approved') {
+
+      {
         if ((request as any).requestType === 're_onboarding' || request.userId) {
           // User already exists — just seed tasks
           await this.seedInductionTasks(tx, id);
@@ -1425,7 +1426,7 @@ export class OnboardingService {
       // ── 3. Log the HR action ─────────────────────────────────────────────
       await tx.insert(onboardingActivityLogs).values({
         onboardingId: id,
-        action: dto.status === 'approved' ? 'APPROVED' : 'REJECTED',
+        action: 'APPROVED',
         performedBy: adminId,
         metadata: {
           note: dto.note ?? null,
