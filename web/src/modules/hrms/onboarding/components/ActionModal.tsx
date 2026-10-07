@@ -58,7 +58,7 @@ export const ActionModal: React.FC<{
             </div>
             <div>
               <DialogTitle className="text-base">
-                {isApprove ? "Approve" : "Reject"} Registration
+                {isApprove ? "Create user for this candidate?" : "Reject Registration"}
               </DialogTitle>
               <DialogDescription className="mt-0.5 text-xs">
                 {joinee?.name} · {joinee?.email}
@@ -70,7 +70,7 @@ export const ActionModal: React.FC<{
         <div className="px-6 py-5 space-y-4">
           <p className="text-sm text-muted-foreground leading-relaxed">
             {isApprove
-              ? "This will approve the registration and notify the joinee. You can add an optional note below."
+              ? "This will create the user account for this candidate, approve their registration, and notify the joinee. You can add an optional note below."
               : "Please provide a reason for rejection. The joinee will be notified."}
           </p>
           <div className="space-y-2">
@@ -121,7 +121,7 @@ export const ActionModal: React.FC<{
             )}
           >
             {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Confirm {isApprove ? "Approval" : "Rejection"}
+            {isApprove ? "Create User & Approve" : "Confirm Rejection"}
           </Button>
         </DialogFooter>
       </DialogContent>
