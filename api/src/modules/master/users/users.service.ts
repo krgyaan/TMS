@@ -524,14 +524,26 @@ export class UsersService {
         return rows[0];
     }
 
-    async update(id: number, data: Partial<Pick<NewUser, "name" | "username" | "email" | "mobile" | "password" | "isActive" | "roleId">>): Promise<User> {
+    async update(
+        id: number,
+        data: Partial<Pick<NewUser, "name" | "username" | "email" | "mobile" | "password" | "isActive" | "roleId">> & {
+            teamId?: number;
+            subTeamId?: number | null;
+        },
+    ): Promise<User> {
+        const { teamId, subTeamId, ...rest } = data;
         const updatePayload: Partial<NewUser> = {
-            ...data,
+            ...rest,
             updatedAt: new Date(),
         };
 
         if (data.password) {
             updatePayload.password = await this.hashPassword(data.password);
+        }
+
+        if (teamId !== undefined) {
+            updatePayload.primaryTeamId = teamId;
+            updatePayload.team = subTeamId ?? teamId;
         }
 
         const rows = (await this.db
