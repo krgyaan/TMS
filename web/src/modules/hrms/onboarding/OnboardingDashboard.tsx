@@ -1,5 +1,5 @@
-import React, { useState, useDeferredValue, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useDeferredValue, useMemo } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -240,9 +240,29 @@ const OnboardingDashboard: React.FC = () => {
     isError,
   } = useOnboardingDashboard();
 
-  const [activeTab, setActiveTab] = useState<TabValue>("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawTab = searchParams.get("tab");
+  const activeTab: TabValue =
+    rawTab === "pending" || rawTab === "approved" || rawTab === "rejected"
+      ? rawTab
+      : "all";
+  const searchQuery = searchParams.get("q") ?? "";
   const deferredSearch = useDeferredValue(searchQuery);
+
+  const updateParams = (key: string, value: string) => {
+    setSearchParams(
+      (prev) => {
+        if (value) prev.set(key, value);
+        else prev.delete(key);
+        return prev;
+      },
+      { replace: true }
+    );
+  };
+
+  const handleTabChange = (v: string) => {
+    updateParams("tab", v === "all" ? "" : v);
+  };
 
   const stats = useMemo(
     () => ({
@@ -353,10 +373,7 @@ const OnboardingDashboard: React.FC = () => {
 
         {/* Filters Bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-2">
-          <Tabs
-            value={activeTab}
-            onValueChange={(v) => setActiveTab(v as TabValue)}
-          >
+          <Tabs value={activeTab} onValueChange={handleTabChange}>
             <TabsList className="h-10 bg-muted/50 p-1 rounded-xl">
               {tabs.map((tab) => (
                 <TabsTrigger
@@ -383,12 +400,12 @@ const OnboardingDashboard: React.FC = () => {
               className="pl-10 h-10 text-sm rounded-xl border-border/60 focus-visible:border-primary/40"
               placeholder="Search by name, email, phone..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => updateParams("q", e.target.value)}
             />
             {searchQuery && (
               <button
                 type="button"
-                onClick={() => setSearchQuery("")}
+                onClick={() => updateParams("q", "")}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
               >
                 <X className="h-4 w-4" />
