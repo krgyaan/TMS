@@ -5,7 +5,7 @@ import { OnboardingService, type UpdateProfileDto } from './onboarding.service';
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
 const UpdateStatusSchema = z.object({
-  status: z.enum(['approved', 'rejected']),
+  status: z.literal('approved'),
   note: z.string().optional(),
 });
 
