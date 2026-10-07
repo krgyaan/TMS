@@ -54,7 +54,7 @@ const TrainingDashboard = () => {
             isPublished: v.isPublished,
             reactions: (v as any).reactions || { helpful: 0, important: 0, confusing: 0 },
             thumbnailPath: v.thumbnailPath,
-            videoUrl: v.videoUrl
+            videoUrl: v.videoUrl ?? ""
         }));
     }, [rawVideos, progressList]);
 
