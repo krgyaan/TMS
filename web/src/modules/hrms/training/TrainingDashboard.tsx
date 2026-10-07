@@ -2,12 +2,11 @@ import { paths } from "@/app/routes/paths";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useAssignTrainingVideo, useDeleteTrainingVideo, useLearnersProgress, useTogglePublishTrainingVideo, useTrainingEmployees, useTrainingVideos } from "@/hooks/api/useTraining";
+import { useDeleteTrainingVideo, useLearnersProgress, useTogglePublishTrainingVideo, useTrainingVideos } from "@/hooks/api/useTraining";
 import { GraduationCap, Plus, UserPlus, Users, Video } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { VideoPlayerView } from "../employees/VideoPlayer";
-import AssignCourseModal from "./components/AssignCourseModal";
 import CourseTable from "./components/CourseTable";
 import LearnerProgressAccordion from "./components/LearnerProgressAccordion";
 import TrainingKpiCards from "./components/TrainingKpiCards";
@@ -18,28 +17,15 @@ const TrainingDashboard = () => {
 
     const { data: rawVideos = [], isLoading: isVideosLoading } = useTrainingVideos();
     const { data: progressList = [] } = useLearnersProgress();
-    const { data: dbEmployees = [] } = useTrainingEmployees();
 
     const deleteVideoMutation = useDeleteTrainingVideo();
     const togglePublishMutation = useTogglePublishTrainingVideo();
-    const assignMutation = useAssignTrainingVideo();
 
     const [activeTab, setActiveTab] = useState("courses");
     const [searchQuery, setSearchQuery] = useState("");
     const [deptFilter, setDeptFilter] = useState("All");
-    const [isAssignOpen, setIsAssignOpen] = useState(false);
     const [expandedUsers, setExpandedUsers] = useState<string[]>([]);
     const [previewVideo, setPreviewVideo] = useState<any | null>(null);
-
-    const employeesList = useMemo(() => {
-        return dbEmployees.map(e => ({
-            id: e.id,
-            name: e.name,
-            dept: e.dept || "General",
-            designation: e.designation || "Staff",
-            avatar: e.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
-        }));
-    }, [dbEmployees]);
 
     const videos = useMemo(() => {
         return rawVideos.map(v => ({
@@ -107,10 +93,6 @@ const TrainingDashboard = () => {
         }
     };
 
-    const handleAssign = (videoId: number, userIds: number[]) => {
-        assignMutation.mutate({ videoId, userIds });
-    };
-
     const toggleUserAccordion = (userName: string) => {
         setExpandedUsers(prev => prev.includes(userName) ? prev.filter(u => u !== userName) : [...prev, userName]);
     };
@@ -153,7 +135,7 @@ const TrainingDashboard = () => {
                         Upload Video
                     </Button>
                     <Button
-                        onClick={() => setIsAssignOpen(true)}
+                        onClick={() => navigate(paths.hrms.assignCourse)}
                         variant="outline"
                         className="rounded-lg px-5 py-2.5 flex items-center gap-2"
                     >
@@ -212,15 +194,6 @@ const TrainingDashboard = () => {
                     </div>
                 </div>
             </CardContent>
-
-            <AssignCourseModal
-                open={isAssignOpen}
-                onOpenChange={setIsAssignOpen}
-                videos={videos}
-                employees={employeesList}
-                onAssign={handleAssign}
-                isAssigning={assignMutation.isPending}
-            />
         </Card>
     );
 };
