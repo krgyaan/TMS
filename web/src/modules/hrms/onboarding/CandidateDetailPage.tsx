@@ -55,6 +55,7 @@ import {
   useProfile,
   useUpdateEntryStatus,
   useUpdateSectionStatus,
+  useUpdateOnboardingStatus,
 } from "@/hooks/api/useOnboarding";
 import { useEmployeeInduction } from "@/hooks/api/useInduction";
 import { paths } from "@/app/routes/paths";
@@ -63,6 +64,7 @@ import { HrStatusBadge } from "./components/HrStatusBadge";
 import { DataItem } from "./components/DataItem";
 import { SectionHeader } from "./components/SectionHeader";
 import { SectionApproveModal } from "./components/SectionApproveModal";
+import { ActionModal } from "./components/ActionModal";
 import {
   formatDate,
   timeAgo,
@@ -282,17 +284,23 @@ export default function CandidateDetailPage() {
     bankDetails: useUpdateSectionStatus("bankDetails"),
   };
   const profileMutation = useUpdateEntryStatus("profile");
+  const createUserMutation = useUpdateOnboardingStatus();
+  const [createUserOpen, setCreateUserOpen] = useState(false);
 
   const handleConfirmSectionAction = (note: string) => {
     if (!sectionAction) return;
     const { stage, type } = sectionAction;
-    const onSuccess = () => setSectionAction(null);
     if (stage === "profile") {
+      const onSuccess = () => {
+        setSectionAction(null);
+        if (type === "approved") setCreateUserOpen(true);
+      };
       profileMutation.mutate(
         { onboardingId: candidateId, status: type, reason: note },
         { onSuccess }
       );
     } else {
+      const onSuccess = () => setSectionAction(null);
       sectionMutations[stage].mutate(
         { onboardingId: candidateId, status: type, reason: note },
         { onSuccess }
@@ -1046,6 +1054,20 @@ export default function CandidateDetailPage() {
           onClose={() => setSectionAction(null)}
           onConfirm={handleConfirmSectionAction}
           isLoading={isSectionLoading}
+        />
+
+        <ActionModal
+          open={createUserOpen}
+          type="approved"
+          joinee={joinee}
+          onClose={() => setCreateUserOpen(false)}
+          onConfirm={(note) => {
+            createUserMutation.mutate(
+              { id: candidateId, dto: { status: "approved", note } },
+              { onSuccess: () => setCreateUserOpen(false) }
+            );
+          }}
+          isLoading={createUserMutation.isPending}
         />
       </div>
     </TooltipProvider>

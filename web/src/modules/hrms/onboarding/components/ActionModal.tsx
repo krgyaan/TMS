@@ -70,29 +70,25 @@ export const ActionModal: React.FC<{
         <div className="px-6 py-5 space-y-4">
           <p className="text-sm text-muted-foreground leading-relaxed">
             {isApprove
-              ? "This will create the user account for this candidate, approve their registration, and notify the joinee. You can add an optional note below."
+              ? "This will create the user account for this candidate, approve their registration, and notify the joinee."
               : "Please provide a reason for rejection. The joinee will be notified."}
           </p>
-          <div className="space-y-2">
-            <label className="text-sm font-medium flex items-center gap-1.5">
-              <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
-              {isApprove ? "Approval Note" : "Rejection Reason"}
-              {!isApprove && (
+          {!isApprove && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-1.5">
+                <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
+                Rejection Reason
                 <span className="text-red-500 ml-0.5">*</span>
-              )}
-            </label>
-            <Textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder={
-                isApprove
-                  ? "Optional — e.g. Everything looks good."
-                  : "e.g. Incomplete documentation — missing ID proof."
-              }
-              rows={3}
-              className="resize-none rounded-xl"
-            />
-          </div>
+              </label>
+              <Textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="e.g. Incomplete documentation — missing ID proof."
+                rows={3}
+                className="resize-none rounded-xl"
+              />
+            </div>
+          )}
         </div>
 
         <DialogFooter className="px-6 py-4 border-t bg-muted/20">
