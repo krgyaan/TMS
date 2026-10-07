@@ -22,6 +22,7 @@ export interface OnboardingRequest {
   updatedAt: string;
   reviewedBy: string | null;
   profilePhoto?: string | null;
+  userId?: number | null;
 }
 
 export interface UpdateStatusDto {
