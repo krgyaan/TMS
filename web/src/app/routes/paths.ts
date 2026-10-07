@@ -507,6 +507,7 @@ export const paths = {
 
         // =========================training =======================//
         trainingDashboard: "/hrms/training",
-        uploadVideo: "/hrms/training/upload-video"
+        uploadVideo: "/hrms/training/upload-video",
+        assignCourse: "/hrms/training/assign-course"
     },
 };

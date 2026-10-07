@@ -83,15 +83,60 @@ export const useTrainingEmployees = () => {
     });
 };
 
+interface AssignTrainingPayload {
+    videoId?: number;
+    videoIds?: number[];
+    userIds: number[];
+}
+
+interface AssignTrainingResult {
+    succeeded: number;
+    failed: number;
+    total: number;
+}
+
 export const useAssignTrainingVideo = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (data: { videoId: number; userIds: number[] }) => 
-            trainingApiService.assignVideo(data.videoId, data.userIds),
-        onSuccess: () => {
+        mutationFn: async (data: AssignTrainingPayload): Promise<AssignTrainingResult> => {
+            const ids = data.videoIds ?? (data.videoId != null ? [data.videoId] : []);
+
+            if (ids.length === 0) return { succeeded: 0, failed: 0, total: 0 };
+
+            // Single course — identical to the previous behaviour: one request, and a
+            // rejected promise still propagates so UploadVideo's catch block fires.
+            if (ids.length === 1) {
+                await trainingApiService.assignVideo(ids[0], data.userIds);
+                return { succeeded: 1, failed: 0, total: 1 };
+            }
+
+            // Each call targets a distinct videoId, so concurrent inserts cannot
+            // collide on the (videoId, userId) pair.
+            const results = await Promise.allSettled(
+                ids.map(id => trainingApiService.assignVideo(id, data.userIds)),
+            );
+            const succeeded = results.filter(r => r.status === "fulfilled").length;
+            const rejected = results.find(r => r.status === "rejected") as PromiseRejectedResult | undefined;
+
+            if (rejected && succeeded === 0) throw rejected.reason;
+
+            return { succeeded, failed: ids.length - succeeded, total: ids.length };
+        },
+        onSuccess: (result) => {
             queryClient.invalidateQueries({ queryKey: trainingKey.progress() });
-            toast.success("Video assigned successfully.");
+
+            if (result.total === 0) return;
+            if (result.total === 1) {
+                toast.success("Video assigned successfully.");
+                return;
+            }
+
+            if (result.failed > 0) {
+                toast.warning(`Assigned ${result.succeeded} of ${result.total} courses.`);
+            } else {
+                toast.success(`Assigned ${result.succeeded} courses.`);
+            }
         },
         onError: (error: any) => {
             const message = error?.response?.data?.message || "Failed to assign video";

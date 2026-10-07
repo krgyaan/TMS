@@ -72,6 +72,9 @@ export interface UpdateUserDto {
     email?: string;
     mobile?: string | null;
     password?: string;
+    roleId?: number;
+    teamId?: number;
+    subTeamId?: number | null;
     isActive?: boolean;
 }
 
