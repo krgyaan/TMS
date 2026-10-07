@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAssignTrainingVideo, useLearnersProgress, useTrainingEmployees, useTrainingVideos } from "@/hooks/api/useTraining";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, CheckCircle2, Clock, Eye, Film, Loader2, Play, Search, Sparkles, UserPlus, Users, Video, X } from "lucide-react";
@@ -38,7 +37,7 @@ const AssignCoursePage = () => {
     const { data: progressList = [] } = useLearnersProgress();
     const assignMutation = useAssignTrainingVideo();
 
-    const [assignVideoId, setAssignVideoId] = useState("");
+    const [selectedVideoIds, setSelectedVideoIds] = useState<number[]>([]);
     const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<number[]>([]);
     const [employeeSearch, setEmployeeSearch] = useState("");
 
@@ -76,28 +75,31 @@ const AssignCoursePage = () => {
         );
     }, [employees, employeeSearch]);
 
+    const handleToggleVideo = (id: number) => {
+        setSelectedVideoIds(prev => prev.includes(id) ? prev.filter(vId => vId !== id) : [...prev, id]);
+    };
+
     const handleToggleEmployee = (id: number) => {
         setSelectedEmployeeIds(prev => prev.includes(id) ? prev.filter(empId => empId !== id) : [...prev, id]);
     };
 
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
-        if (!assignVideoId) { toast.error("Please select a video."); return; }
+        if (selectedVideoIds.length === 0) { toast.error("Please select at least one course."); return; }
         if (selectedEmployeeIds.length === 0) { toast.error("Please select at least one employee."); return; }
 
         assignMutation.mutate(
-            { videoId: Number(assignVideoId), userIds: selectedEmployeeIds },
+            { videoIds: selectedVideoIds, userIds: selectedEmployeeIds },
             {
                 onSuccess: () => {
-                    // Stay on the page — clear the form so another course can be assigned.
+                    // Stay on the page — clear the form so another batch can be assigned.
+                    setSelectedVideoIds([]);
                     setSelectedEmployeeIds([]);
-                    setAssignVideoId("");
+                    setEmployeeSearch("");
                 },
             },
         );
     };
-
-    const selectedVideo = videos.find(v => v.id === Number(assignVideoId));
 
     return (
         <Card>
@@ -163,57 +165,80 @@ const AssignCoursePage = () => {
                 ) : (
                     <form onSubmit={handleSubmit} className="space-y-5">
                         <div className="space-y-2">
-                            <Label className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground flex items-center gap-1.5">
-                                <Video className="h-3 w-3" />
-                                Select Training Course
-                                <span className="text-destructive">*</span>
-                            </Label>
-                            <Select value={assignVideoId} onValueChange={setAssignVideoId}>
-                                <SelectTrigger className="h-12 text-sm rounded-xl">
-                                    <SelectValue placeholder="Choose a course to assign..." />
-                                </SelectTrigger>
-                                <SelectContent className="rounded-xl">
-                                    {readyVideos.map(v => (
-                                        <SelectItem key={v.id} value={String(v.id)} className="rounded-lg">
-                                            <div className="flex items-center gap-3 py-0.5">
-                                                <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                                    <Play className="h-3 w-3 text-primary" />
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs font-semibold">{v.title}</p>
-                                                    <p className="text-[9px] text-muted-foreground">{v.category} &bull; {v.duration}</p>
-                                                </div>
-                                            </div>
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <div className="flex items-center justify-between gap-3">
+                                <Label className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground flex items-center gap-1.5">
+                                    <Video className="h-3 w-3" />
+                                    Select Training Courses
+                                    <span className="text-destructive">*</span>
+                                </Label>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                        if (selectedVideoIds.length === readyVideos.length) {
+                                            setSelectedVideoIds([]);
+                                        } else {
+                                            setSelectedVideoIds(readyVideos.map(v => v.id));
+                                        }
+                                    }}
+                                    disabled={readyVideos.length === 0}
+                                    className="rounded-xl h-8 text-[10px] font-bold px-3"
+                                >
+                                    {selectedVideoIds.length === readyVideos.length && readyVideos.length > 0 ? "Deselect All" : "Select All"}
+                                </Button>
+                            </div>
 
-                            {selectedVideo && (
-                                <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/[0.03] border border-primary/10">
-                                    <div className="w-16 aspect-video rounded-lg bg-primary/10 border border-primary/10 flex items-center justify-center flex-shrink-0">
-                                        <Play className="h-4 w-4 text-primary/70" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-xs font-bold truncate">{selectedVideo.title}</p>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <Badge className={cn("text-[8px] font-bold px-1.5 py-0 rounded-md border", getCategoryColor(selectedVideo.category))}>
-                                                {selectedVideo.category}
-                                            </Badge>
-                                            <span className="text-[9px] text-muted-foreground flex items-center gap-1">
-                                                <Clock className="h-2 w-2" />{selectedVideo.duration}
-                                            </span>
-                                            <span className="text-[9px] text-muted-foreground flex items-center gap-1">
-                                                <Eye className="h-2 w-2" />{selectedVideo.views} views
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <Badge className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[8px] font-bold rounded-md">
-                                        <CheckCircle2 className="h-2 w-2 mr-0.5" />
-                                        Ready
-                                    </Badge>
+                            <div className="border rounded-2xl bg-background/20 p-2 max-h-[280px] overflow-y-auto">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
+                                    {readyVideos.map((video) => {
+                                        const isSelected = selectedVideoIds.includes(video.id);
+                                        return (
+                                            <div
+                                                key={video.id}
+                                                className={cn(
+                                                    "relative flex items-start gap-3 p-3 rounded-xl transition-all cursor-pointer border-2",
+                                                    isSelected
+                                                        ? "bg-primary/[0.06] border-primary/20"
+                                                        : "border-transparent hover:bg-muted/8 hover:border-border/20"
+                                                )}
+                                                onClick={() => handleToggleVideo(video.id)}
+                                            >
+                                                <div className="w-14 aspect-video rounded-lg bg-primary/10 border border-primary/10 flex items-center justify-center flex-shrink-0">
+                                                    <Play className="h-3.5 w-3.5 text-primary/70" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className={cn("text-xs font-bold leading-tight truncate", isSelected && "text-primary")}>
+                                                        {video.title}
+                                                    </p>
+                                                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                                        <Badge className={cn("text-[8px] font-bold px-1.5 py-0 rounded-md border", getCategoryColor(video.category))}>
+                                                            {video.category}
+                                                        </Badge>
+                                                        <span className="text-[9px] text-muted-foreground flex items-center gap-1">
+                                                            <Clock className="h-2 w-2" />{video.duration}
+                                                        </span>
+                                                        <span className="text-[9px] text-muted-foreground flex items-center gap-1">
+                                                            <Eye className="h-2 w-2" />{video.views}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                {isSelected && (
+                                                    <div className="absolute -top-1 -right-1 h-4.5 w-4.5 rounded-full bg-primary border-2 border-card flex items-center justify-center">
+                                                        <CheckCircle2 className="h-3 w-3 text-white" />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+
+                                    {readyVideos.length === 0 && (
+                                        <p className="col-span-full text-xs text-muted-foreground py-8 text-center">
+                                            No ready courses available to assign.
+                                        </p>
+                                    )}
                                 </div>
-                            )}
+                            </div>
                         </div>
 
                         <div className="flex items-center gap-3">
@@ -309,7 +334,15 @@ const AssignCoursePage = () => {
                                 </div>
                             </div>
 
-                            {selectedEmployeeIds.length > 0 && (
+{selectedVideoIds.length > 0 && (
+                        <div className="flex items-center gap-1.5 bg-primary/10 border border-primary/15 px-3 py-1.5 rounded-xl">
+                            <CheckCircle2 className="h-3 w-3 text-primary" />
+                            <span className="text-[10px] font-bold text-primary">
+                                {selectedVideoIds.length} courses selected
+                            </span>
+                        </div>
+                    )}
+                    {selectedEmployeeIds.length > 0 && (
                                 <div className="bg-primary/[0.03] border border-primary/10 rounded-xl p-3.5">
                                     <div className="flex items-center justify-between mb-2.5">
                                         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
@@ -353,13 +386,13 @@ const AssignCoursePage = () => {
 
                         <div className="flex items-center justify-between pt-3 border-t">
                             <p className="text-[10px] text-muted-foreground">
-                                {!assignVideoId && !selectedEmployeeIds.length
-                                    ? "Select a course and team members to assign"
-                                    : !assignVideoId
-                                        ? "Select a course to continue"
+                                {!selectedVideoIds.length && !selectedEmployeeIds.length
+                                    ? "Select courses and team members to assign"
+                                    : !selectedVideoIds.length
+                                        ? "Select at least one course"
                                         : selectedEmployeeIds.length === 0
                                             ? "Select at least one team member"
-                                            : `Ready to assign to ${selectedEmployeeIds.length} member${selectedEmployeeIds.length > 1 ? "s" : ""}`
+                                            : `Ready to assign ${selectedVideoIds.length} course${selectedVideoIds.length > 1 ? "s" : ""} to ${selectedEmployeeIds.length} member${selectedEmployeeIds.length > 1 ? "s" : ""}`
                                 }
                             </p>
                             <div className="flex items-center gap-3">
@@ -373,11 +406,11 @@ const AssignCoursePage = () => {
                                 </Button>
                                 <Button
                                     type="submit"
-                                    disabled={!assignVideoId || selectedEmployeeIds.length === 0 || assignMutation.isPending}
+                                    disabled={selectedVideoIds.length === 0 || selectedEmployeeIds.length === 0 || assignMutation.isPending}
                                     className="rounded-xl h-10 px-6 flex items-center gap-2 text-sm font-semibold"
                                 >
                                     <Sparkles className="h-3.5 w-3.5" />
-                                    {assignMutation.isPending ? "Assigning..." : "Assign Course"}
+                                    {assignMutation.isPending ? "Assigning..." : "Assign Courses"}
                                 </Button>
                             </div>
                         </div>
