@@ -2,7 +2,7 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { eq, desc, asc, sql, and, or, ilike } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
-import { financeDocuments } from '@db/schemas/shared/finance_docs.schema';
+import { financeDocuments, financeDocTypes, financialYears } from '@db/schemas/shared';
 import type {
     CreateFinanceDocumentDto,
     UpdateFinanceDocumentDto,
@@ -96,9 +96,9 @@ export class FinanceDocumentsService {
             sortBy === 'documentName'
                 ? financeDocuments.documentName
                 : sortBy === 'documentType'
-                    ? financeDocuments.documentType
+                    ? financeDocTypes.documentType
                     : sortBy === 'financialYear'
-                        ? financeDocuments.financialYear
+                        ? financialYears.financialYear
                         : financeDocuments.createdAt;
         const orderFn = sortOrder === 'desc' ? desc : asc;
 
@@ -107,8 +107,8 @@ export class FinanceDocumentsService {
             conditions.push(
                 or(
                     ilike(financeDocuments.documentName, `%${search}%`),
-                    ilike(financeDocuments.documentType, `%${search}%`),
-                    ilike(financeDocuments.financialYear, `%${search}%`),
+                    ilike(financeDocTypes.documentType, `%${search}%`),
+                    ilike(financialYears.financialYear, `%${search}%`),
                 ) as never,
             );
         }
@@ -118,11 +118,23 @@ export class FinanceDocumentsService {
             this.db
                 .select({ count: sql<number>`count(*)::int` })
                 .from(financeDocuments)
+                .leftJoin(financeDocTypes, eq(financeDocuments.documentType, financeDocTypes.id))
+                .leftJoin(financialYears, eq(financeDocuments.financialYear, financialYears.id))
                 .where(whereClause)
                 .then(([r]) => Number(r?.count ?? 0)),
             this.db
-                .select()
+                .select({
+                    id: financeDocuments.id,
+                    documentName: financeDocuments.documentName,
+                    documentType: financeDocuments.documentType,
+                    financialYear: financeDocuments.financialYear,
+                    documentPath: financeDocuments.documentPath,
+                    createdAt: financeDocuments.createdAt,
+                    updatedAt: financeDocuments.updatedAt,
+                })
                 .from(financeDocuments)
+                .leftJoin(financeDocTypes, eq(financeDocuments.documentType, financeDocTypes.id))
+                .leftJoin(financialYears, eq(financeDocuments.financialYear, financialYears.id))
                 .where(whereClause)
                 .orderBy(orderFn(orderColumn))
                 .limit(limit)
