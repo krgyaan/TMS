@@ -34,10 +34,17 @@ import { isAdminOrAbove } from "@/types/auth.types";
  */
 const USER_ONLY_MODULES = new Set(["tenders"]);
 
-const GroupHeader = ({ children }: { children: ReactNode }) => (
+const GroupHeader = ({ children, action }: { children: ReactNode; action?: ReactNode }) => (
     <TableRow className="bg-muted/50">
         <TableCell colSpan={4} className="font-semibold text-sm">
-            {children}
+            {action ? (
+                <div className="flex items-center justify-between gap-2">
+                    <span>{children}</span>
+                    {action}
+                </div>
+            ) : (
+                children
+            )}
         </TableCell>
     </TableRow>
 );
@@ -247,7 +254,20 @@ export default function UserViewPage() {
                         </TableRow>
 
                         {/* Permissions */}
-                        <GroupHeader>{hasFullAccess ? "Permissions" : `Permissions (${effectiveCount})`}</GroupHeader>
+                        <GroupHeader
+                            action={
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => navigate(paths.master.users_permissions(userId))}
+                                >
+                                    <ShieldCheck className="mr-2 h-4 w-4" />
+                                    Update Permissions
+                                </Button>
+                            }
+                        >
+                            {hasFullAccess ? "Permissions" : `Permissions (${effectiveCount})`}
+                        </GroupHeader>
                         {permsLoading ? (
                             <TableRow>
                                 <TableCell colSpan={4} className="p-4">
