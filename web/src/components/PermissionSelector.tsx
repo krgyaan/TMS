@@ -3,10 +3,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ChevronDown, ChevronRight, Search, X } from "lucide-react";
 import type { Permission, UserPermission } from "@/types/api.types";
 
 const ACTION_ORDER = ["create", "delete", "read", "update"];
+
+function includesText(haystack: string | null | undefined, needle: string) {
+    if (!needle) return true;
+    return (haystack ?? "").toLowerCase().includes(needle);
+}
 
 /** Sidebar areas, in the same order as app-sidebar.tsx navMain (Dashboard has no permission module). */
 const AREA_ORDER = [
@@ -95,10 +101,34 @@ export function PermissionSelector({
     rolePermissions?: UserPermission[];
     onChange: (permissionId: number, granted: boolean) => void;
 }) {
+    const [query, setQuery] = useState("");
+    const q = query.trim().toLowerCase();
+
+    /** Modules with at least one matching permission; `null` means no filtering is active. */
+    const matchingModules = useMemo(() => {
+        if (!q) return null;
+        const set = new Set<string>();
+        for (const p of permissions) {
+            if (
+                includesText(p.module, q) ||
+                includesText(p.action, q) ||
+                includesText(p.description, q) ||
+                includesText(`${p.module}.${p.action}`, q)
+            ) {
+                set.add(p.module);
+            }
+        }
+        return set;
+    }, [permissions, q]);
+
+    const totalModules = useMemo(() => new Set(permissions.map(p => p.module)).size, [permissions]);
+
     const areas = useMemo<AreaGroup[]>(() => {
         const byArea = new Map<string, Map<string, Permission[]>>();
 
         for (const perm of permissions) {
+            // Filtered at module level so a matched module keeps all of its actions.
+            if (matchingModules && !matchingModules.has(perm.module)) continue;
             const area = areaOf(perm.module);
             const modules = byArea.get(area) ?? new Map<string, Permission[]>();
             const list = modules.get(perm.module) ?? [];
@@ -133,7 +163,7 @@ export function PermissionSelector({
                 if (ai !== bi) return ai - bi;
                 return a.area.localeCompare(b.area);
             });
-    }, [permissions]);
+    }, [permissions, matchingModules]);
 
     const byAreaModule = useMemo(() => {
         const map = new Map<string, Permission[]>();
@@ -186,7 +216,40 @@ export function PermissionSelector({
 
     return (
         <div className="space-y-3">
-            {areas.map(group => {
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="relative w-full max-w-md">
+                    <Search className="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                        value={query}
+                        onChange={e => setQuery(e.target.value)}
+                        placeholder="Search modules, actions or descriptions..."
+                        className="h-8 pl-8 pr-8 text-sm"
+                    />
+                    {query && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-0.5 top-1/2 -translate-y-1/2 h-7 w-7"
+                            onClick={() => setQuery("")}
+                            aria-label="Clear search"
+                        >
+                            <X className="h-3.5 w-3.5" />
+                        </Button>
+                    )}
+                </div>
+                {q && (
+                    <span className="text-xs text-muted-foreground">
+                        {areas.reduce((total, group) => total + group.modules.length, 0)} of {totalModules} modules
+                    </span>
+                )}
+            </div>
+
+            {areas.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                    {q ? "No modules match your search" : "No permissions found"}
+                </p>
+            ) : (
+                areas.map(group => {
                 const { total, granted } = areaGrantCount(group);
                 return (
                     <AreaCard
@@ -195,6 +258,7 @@ export function PermissionSelector({
                         total={total}
                         granted={granted}
                         moduleCount={group.modules.length}
+                        forcedOpen={q.length > 0}
                     >
                         <div className="grid grid-cols-[minmax(8rem,1fr)_auto_auto] gap-x-6">
                             {group.modules.map(entry => {
@@ -275,7 +339,8 @@ export function PermissionSelector({
                         </div>
                     </AreaCard>
                 );
-            })}
+            })
+            )}
         </div>
     );
 }
@@ -285,23 +350,26 @@ function AreaCard({
     total,
     granted,
     moduleCount,
+    forcedOpen,
     children,
 }: {
     area: string;
     total: number;
     granted: number;
     moduleCount: number;
+    forcedOpen?: boolean;
     children: React.ReactNode;
 }) {
     const [open, setOpen] = useState(false);
+    const isOpen = forcedOpen || open;
 
     return (
-        <Collapsible open={open} onOpenChange={setOpen} asChild>
+        <Collapsible open={isOpen} onOpenChange={setOpen} asChild>
             <div className="rounded-md border bg-card">
                 <CollapsibleTrigger asChild>
                     <div className="flex items-center justify-between px-3 py-3 cursor-pointer hover:bg-accent/50 transition-colors">
                         <div className="flex items-center gap-2">
-                            {open ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                            {isOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                             <span className="font-semibold">{area}</span>
                             <span className="text-xs text-muted-foreground">({granted}/{total} granted)</span>
                             <Badge variant="secondary">
