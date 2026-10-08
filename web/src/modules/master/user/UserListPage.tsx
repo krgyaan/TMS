@@ -8,6 +8,7 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import DataTable from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/api/usePermissions";
 import { useRoles } from "@/hooks/api/useRoles";
 import { useTeams } from "@/hooks/api/useTeams";
@@ -21,6 +22,8 @@ import { AlertCircle, ArrowRight, KeyRound, Search, Shield, UserRound, Users } f
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 
+const PERMISSION_MODULE = "master.users";
+
 const rowSelection: RowSelectionOptions = {
     mode: "multiRow",
     headerCheckbox: false,
@@ -28,6 +31,7 @@ const rowSelection: RowSelectionOptions = {
 
 export default function UserListPage() {
     const navigate = useNavigate();
+    const { canDelete } = useAuth();
     const { data: users, isLoading, error, refetch } = useUsers();
     const { data: roles = [] } = useRoles();
     const { data: teams = [] } = useTeams();
@@ -63,6 +67,7 @@ export default function UserListPage() {
         {
             label: "Delete",
             className: "text-red-600",
+            visible: () => canDelete(PERMISSION_MODULE),
             onClick: async row => {
                 if (!confirm(`Are you sure you want to delete ${row.name}?`)) {
                     return;
