@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import {
     ArrowLeft,
     CalendarClock,
@@ -8,7 +8,6 @@ import {
     Hash,
     Languages,
     Mail,
-    Pencil,
     Phone,
     PhoneCall,
     ShieldCheck,
@@ -24,7 +23,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import { useRolePermissions } from "@/hooks/api/useRoles";
 import { useUser } from "@/hooks/api/useUsers";
+import { useUserPermissions } from "@/hooks/api/useUserPermissions";
+import { isAdminOrAbove } from "@/types/auth.types";
+
+/**
+ * Modules whose access is granted per-user only — role permissions are ignored.
+ * Mirrors USER_ONLY_MODULES in api/src/modules/auth/services/permission.service.ts.
+ */
+const USER_ONLY_MODULES = new Set(["tenders"]);
 
 const GroupHeader = ({ children }: { children: ReactNode }) => (
     <TableRow className="bg-muted/50">
@@ -54,7 +62,53 @@ export default function UserViewPage() {
     const userId = Number(id);
     const navigate = useNavigate();
     const { data: user, isLoading, error, refetch } = useUser(userId);
+    const { data: overrides = [], isLoading: overridesLoading } = useUserPermissions(userId);
+    const { data: rolePermissions = [], isLoading: roleLoading } = useRolePermissions(user?.role?.id ?? null);
     const [retrying, setRetrying] = useState(false);
+
+    const permsLoading = overridesLoading || roleLoading;
+
+    const byModule = useMemo(() => {
+        const effective = new Set<string>();
+
+        rolePermissions.forEach(perm => {
+            if (!USER_ONLY_MODULES.has(perm.module)) {
+                effective.add(`${perm.module}:${perm.action}`);
+            }
+        });
+
+        overrides.forEach(override => {
+            const key = `${override.module}:${override.action}`;
+            if (override.granted) {
+                effective.add(key);
+            } else {
+                effective.delete(key);
+            }
+        });
+
+        const grouped = new Map<string, Set<string>>();
+        effective.forEach(key => {
+            const [module, action] = key.split(":");
+            const actions = grouped.get(module) ?? new Set<string>();
+            actions.add(action);
+            grouped.set(module, actions);
+        });
+
+        return Array.from(grouped.entries())
+            .map(([module, actions]) => ({ module, actions: Array.from(actions).sort() }))
+            .sort((a, b) => a.module.localeCompare(b.module));
+    }, [rolePermissions, overrides]);
+
+    const effectiveCount = byModule.reduce((total, entry) => total + entry.actions.length, 0);
+    const hasFullAccess = isAdminOrAbove(user?.role?.name);
+
+    const permissionRows = useMemo(() => {
+        const rows: Array<Array<(typeof byModule)[number] | undefined>> = [];
+        for (let i = 0; i < byModule.length; i += 2) {
+            rows.push([byModule[i], byModule[i + 1]]);
+        }
+        return rows;
+    }, [byModule]);
 
     if (!userId) {
         return (
@@ -125,14 +179,10 @@ export default function UserViewPage() {
                         <CardDescription>User account details</CardDescription>
                     </div>
                 </div>
-                <CardAction className="flex gap-2">
+                <CardAction>
                     <Button variant="outline" onClick={() => navigate(paths.master.users)}>
                         <ArrowLeft className="mr-2 h-4 w-4" />
                         Back to users
-                    </Button>
-                    <Button variant="outline" onClick={() => navigate(paths.master.users_edit(userId))}>
-                        <Pencil className="mr-2 h-4 w-4" />
-                        Edit
                     </Button>
                 </CardAction>
             </CardHeader>
@@ -195,6 +245,54 @@ export default function UserViewPage() {
                             <FieldLabel icon={<UsersRound className="h-4 w-4" />}>Sub Team</FieldLabel>
                             <FieldValue>{user.subTeam?.name || "—"}</FieldValue>
                         </TableRow>
+
+                        {/* Permissions */}
+                        <GroupHeader>{hasFullAccess ? "Permissions" : `Permissions (${effectiveCount})`}</GroupHeader>
+                        {permsLoading ? (
+                            <TableRow>
+                                <TableCell colSpan={4} className="p-4">
+                                    <Skeleton className="h-10 w-full" />
+                                </TableCell>
+                            </TableRow>
+                        ) : hasFullAccess ? (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <FieldLabel icon={<ShieldCheck className="h-4 w-4" />}>Access</FieldLabel>
+                                <FieldValue span={3}>
+                                    <Badge variant="default">Full access — all modules and actions</Badge>
+                                </FieldValue>
+                            </TableRow>
+                        ) : byModule.length === 0 ? (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <FieldLabel icon={<ShieldCheck className="h-4 w-4" />}>Access</FieldLabel>
+                                <FieldValue span={3}>— No permissions assigned</FieldValue>
+                            </TableRow>
+                        ) : (
+                            permissionRows.map((pair, rowIndex) => (
+                                <TableRow key={`row-${rowIndex}`} className="hover:bg-muted/30 transition-colors">
+                                    {pair.map(entry =>
+                                        entry ? (
+                                            <Fragment key={entry.module}>
+                                                <FieldLabel icon={<Users className="h-4 w-4" />}>{entry.module}</FieldLabel>
+                                                <FieldValue>
+                                                    <span className="flex flex-wrap gap-1">
+                                                        {entry.actions.map(action => (
+                                                            <Badge key={action} variant="secondary" className="capitalize">
+                                                                {action}
+                                                            </Badge>
+                                                        ))}
+                                                    </span>
+                                                </FieldValue>
+                                            </Fragment>
+                                        ) : (
+                                            <Fragment key={`empty-${rowIndex}`}>
+                                                <TableCell className="w-1/4" />
+                                                <TableCell />
+                                            </Fragment>
+                                        )
+                                    )}
+                                </TableRow>
+                            ))
+                        )}
                     </TableBody>
                 </Table>
             </CardContent>
