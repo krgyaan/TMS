@@ -96,12 +96,6 @@ export default function UserListPage() {
             field: "name",
             headerName: "Name",
             flex: 1.2,
-            cellRenderer: ({ data }: { data: User }): ReactNode => (
-                <div>
-                    <div className="font-semibold">{data.name}</div>
-                    <div className="text-xs text-muted-foreground">@{data.username ?? (data.email ? data.email.split("@")[0] : "")}</div>
-                </div>
-            ),
         },
         { field: "email", headerName: "Email", flex: 1 },
         {
