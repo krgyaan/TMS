@@ -8,11 +8,12 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import DataTable from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/api/usePermissions";
 import { useRoles } from "@/hooks/api/useRoles";
 import { useTeams } from "@/hooks/api/useTeams";
 import { useDeleteUser, useUsers } from "@/hooks/api/useUsers";
-import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
+import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { RolesDrawer } from "@/modules/master/role/components/RolesDrawer";
 import { TeamsDrawer } from "@/modules/master/team/components/TeamsDrawer";
 import type { User } from "@/types/api.types";
@@ -20,7 +21,8 @@ import type { ColDef, GridApi, GridReadyEvent, RowSelectionOptions } from "ag-gr
 import { AlertCircle, ArrowRight, KeyRound, Search, Shield, UserRound, Users } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import UserView from "./components/UserView";
+
+const PERMISSION_MODULE = "master.users";
 
 const rowSelection: RowSelectionOptions = {
     mode: "multiRow",
@@ -29,17 +31,19 @@ const rowSelection: RowSelectionOptions = {
 
 export default function UserListPage() {
     const navigate = useNavigate();
+    const { canUpdate, canDelete } = useAuth();
     const { data: users, isLoading, error, refetch } = useUsers();
     const { data: roles = [] } = useRoles();
     const { data: teams = [] } = useTeams();
     const { data: permissions = [] } = usePermissions();
     const deleteUser = useDeleteUser();
-    const [viewState, setViewState] = useState<{ open: boolean; data: User | null }>({ open: false, data: null });
     const [rolesDrawerOpen, setRolesDrawerOpen] = useState(false);
     const [teamsDrawerOpen, setTeamsDrawerOpen] = useState(false);
     const [gridApi, setGridApi] = useState<GridApi | null>(null);
-    const [search, setSearch] = useState("");
-    const debouncedSearch = useDebouncedSearch(search, 300);
+    const { search, setSearch, debouncedSearch } = usePersistentTableState({
+        storageKey: "user-list",
+        defaultTab: "" as const,
+    });
 
     useEffect(() => {
         gridApi?.setGridOption("quickFilterText", debouncedSearch || undefined);
@@ -52,19 +56,22 @@ export default function UserListPage() {
     const employeeActions: ActionItem<User>[] = [
         {
             label: "View",
-            onClick: row => setViewState({ open: true, data: row }),
+            onClick: row => navigate(paths.master.users_view(row.id)),
         },
         {
             label: "Permissions",
+            visible: () => canUpdate(PERMISSION_MODULE),
             onClick: row => navigate(paths.master.users_permissions(row.id)),
         },
         {
             label: "Edit",
+            visible: () => canUpdate(PERMISSION_MODULE),
             onClick: row => navigate(paths.master.users_edit(row.id)),
         },
         {
             label: "Delete",
             className: "text-red-600",
+            visible: () => canDelete(PERMISSION_MODULE),
             onClick: async row => {
                 if (!confirm(`Are you sure you want to delete ${row.name}?`)) {
                     return;
@@ -89,12 +96,6 @@ export default function UserListPage() {
             field: "name",
             headerName: "Name",
             flex: 1.2,
-            cellRenderer: ({ data }: { data: User }): ReactNode => (
-                <div>
-                    <div className="font-semibold">{data.name}</div>
-                    <div className="text-xs text-muted-foreground">@{data.username ?? (data.email ? data.email.split("@")[0] : "")}</div>
-                </div>
-            ),
         },
         { field: "email", headerName: "Email", flex: 1 },
         {
@@ -273,8 +274,6 @@ export default function UserListPage() {
                     />
                 </CardContent>
             </Card>
-
-            <UserView open={viewState.open} onOpenChange={open => setViewState(prev => ({ open, data: open ? prev.data : null }))} user={viewState.data} />
 
             <RolesDrawer open={rolesDrawerOpen} onOpenChange={setRolesDrawerOpen} />
             <TeamsDrawer open={teamsDrawerOpen} onOpenChange={setTeamsDrawerOpen} />
