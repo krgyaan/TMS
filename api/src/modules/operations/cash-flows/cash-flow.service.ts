@@ -16,22 +16,52 @@ export class CashFlowService {
   }
 
   async createInTransaction(tx: DbInstance, entry: CreateCashFlowDto) {
+    const values = {
+      projectId: entry.projectId,
+      eventType: entry.eventType,
+      amount: entry.amount?.toString() ?? '0.00',
+      direction: entry.direction ?? 'outflow',
+      referenceType: entry.referenceType,
+      referenceId: entry.referenceId,
+      referenceNo: entry.referenceNo,
+      tdsPercentage: entry.tdsPercentage?.toString(),
+      tdsAmount: entry.tdsAmount?.toString(),
+      gstAmount: entry.gstAmount?.toString(),
+      remark: entry.remark,
+      createdBy: entry.createdBy,
+      updatedAt: new Date(),
+    };
+
+    if (entry.referenceType && entry.referenceId && entry.eventType) {
+      const result = await tx
+        .insert(projectCashFlows)
+        .values(values)
+        .onConflictDoUpdate({
+          target: [
+            projectCashFlows.referenceType,
+            projectCashFlows.referenceId,
+            projectCashFlows.eventType,
+          ],
+          set: {
+            projectId: entry.projectId,
+            amount: entry.amount?.toString() ?? '0.00',
+            direction: entry.direction ?? 'outflow',
+            referenceNo: entry.referenceNo,
+            tdsPercentage: entry.tdsPercentage?.toString(),
+            tdsAmount: entry.tdsAmount?.toString(),
+            gstAmount: entry.gstAmount?.toString(),
+            remark: entry.remark,
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+
+      return result[0];
+    }
+
     const result = await tx
       .insert(projectCashFlows)
-      .values({
-        projectId: entry.projectId,
-        eventType: entry.eventType,
-        amount: entry.amount?.toString(),
-        direction: entry.direction ?? 'outflow',
-        referenceType: entry.referenceType,
-        referenceId: entry.referenceId,
-        referenceNo: entry.referenceNo,
-        tdsPercentage: entry.tdsPercentage?.toString(),
-        tdsAmount: entry.tdsAmount?.toString(),
-        gstAmount: entry.gstAmount?.toString(),
-        remark: entry.remark,
-        createdBy: entry.createdBy,
-      })
+      .values(values)
       .returning();
 
     return result[0];

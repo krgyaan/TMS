@@ -41,7 +41,7 @@ export const createCashFlowSchema = z.object({
   tdsAmount: decimalString.optional(),
   gstAmount: decimalString.optional(),
   remark: z.string().optional(),
-  createdBy: z.number().int().positive().optional(),
+  createdBy: z.number().int().nonnegative().optional(),
 });
 
 export const updateCashFlowSchema = z.object({

@@ -458,7 +458,13 @@ export class BiddingRequirementsService {
 
             this.logger.error(
                 `[BiddingRequirementsJob] Job ${jobId} failed for tender ${tenderId} [${code}]: ${message}`,
-                err instanceof Error ? err.stack : undefined,
+                {
+                    jobId,
+                    tenderId,
+                    code,
+                    errorMessage: message,
+                    stack: err instanceof Error ? err.stack : undefined,
+                },
             );
 
             await this.db
@@ -693,6 +699,7 @@ export class BiddingRequirementsService {
             if (error.name === 'TimeoutError' || error.name === 'AbortError') {
                 this.logger.error(
                     `Bidding requirements analysis timed out after ${timeoutMs}ms for tender ${tenderId} (URL: ${endpoint})`,
+                    { tenderId, endpoint, timeoutMs },
                 );
                 throw new GatewayTimeoutException({
                     statusCode: HttpStatus.GATEWAY_TIMEOUT,
@@ -702,7 +709,7 @@ export class BiddingRequirementsService {
             }
             this.logger.error(
                 `Failed to connect to VolksAI service at ${endpoint} for tender ${tenderId}: ${error.message}`,
-                error.stack,
+                { tenderId, endpoint, stack: error.stack },
             );
             throw new BadGatewayException({
                 statusCode: HttpStatus.BAD_GATEWAY,

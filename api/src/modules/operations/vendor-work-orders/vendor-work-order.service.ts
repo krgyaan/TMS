@@ -606,7 +606,7 @@ export class VendorWorkOrderService {
                         remark: `VWO approved with TDS @ ${tdsPercentage}%`,
                         createdBy: userId ?? 0,
                     })
-                    .catch(err => this.logger.warn(`Cash flow creation failed for VWO approval #${wo.id}: ${err}`));
+                    .catch(err => this.logger.warn(`Cash flow creation failed for VWO approval #${wo.id}: ${err?.message || err}`, { error: err }));
             }
 
             return updated;
