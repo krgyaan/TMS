@@ -8,6 +8,7 @@ const Master_User_List = lazy(() => import("@/modules/master/user/UserListPage")
 const Master_User_Create = lazy(() => import("@/modules/master/user/UserCreatePage"));
 const Master_User_Edit = lazy(() => import("@/modules/master/user/UserEditPage"));
 const Master_User_Permissions = lazy(() => import("@/modules/master/user/UserPermissionsPage"));
+const Master_User_View = lazy(() => import("@/modules/master/user/UserViewPage"));
 
 // Statuses
 const Master_Status = lazy(() => import("@/modules/master/status"));
@@ -147,6 +148,14 @@ export default function MasterRoutes() {
                     element={
                         <RouteWrapper>
                             <Master_User_Permissions />
+                        </RouteWrapper>
+                    }
+                />
+                <Route
+                    path=":id"
+                    element={
+                        <RouteWrapper>
+                            <Master_User_View />
                         </RouteWrapper>
                     }
                 />

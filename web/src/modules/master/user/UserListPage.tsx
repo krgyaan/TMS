@@ -20,7 +20,6 @@ import type { ColDef, GridApi, GridReadyEvent, RowSelectionOptions } from "ag-gr
 import { AlertCircle, ArrowRight, KeyRound, Search, Shield, UserRound, Users } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import UserView from "./components/UserView";
 
 const rowSelection: RowSelectionOptions = {
     mode: "multiRow",
@@ -34,7 +33,6 @@ export default function UserListPage() {
     const { data: teams = [] } = useTeams();
     const { data: permissions = [] } = usePermissions();
     const deleteUser = useDeleteUser();
-    const [viewState, setViewState] = useState<{ open: boolean; data: User | null }>({ open: false, data: null });
     const [rolesDrawerOpen, setRolesDrawerOpen] = useState(false);
     const [teamsDrawerOpen, setTeamsDrawerOpen] = useState(false);
     const [gridApi, setGridApi] = useState<GridApi | null>(null);
@@ -52,7 +50,7 @@ export default function UserListPage() {
     const employeeActions: ActionItem<User>[] = [
         {
             label: "View",
-            onClick: row => setViewState({ open: true, data: row }),
+            onClick: row => navigate(paths.master.users_view(row.id)),
         },
         {
             label: "Permissions",
@@ -273,8 +271,6 @@ export default function UserListPage() {
                     />
                 </CardContent>
             </Card>
-
-            <UserView open={viewState.open} onOpenChange={open => setViewState(prev => ({ open, data: open ? prev.data : null }))} user={viewState.data} />
 
             <RolesDrawer open={rolesDrawerOpen} onOpenChange={setRolesDrawerOpen} />
             <TeamsDrawer open={teamsDrawerOpen} onOpenChange={setTeamsDrawerOpen} />
