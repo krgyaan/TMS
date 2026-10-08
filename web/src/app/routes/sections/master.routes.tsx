@@ -122,7 +122,7 @@ export default function MasterRoutes() {
                 <Route
                     index
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper permission={{ module: "master.users", action: "read" }}>
                             <Master_User_List />
                         </RouteWrapper>
                     }
@@ -130,7 +130,7 @@ export default function MasterRoutes() {
                 <Route
                     path="create"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper permission={{ module: "master.users", action: "create" }}>
                             <Master_User_Create />
                         </RouteWrapper>
                     }
@@ -138,7 +138,7 @@ export default function MasterRoutes() {
                 <Route
                     path=":id/edit"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper permission={{ module: "master.users", action: "update" }}>
                             <Master_User_Edit />
                         </RouteWrapper>
                     }
@@ -146,7 +146,7 @@ export default function MasterRoutes() {
                 <Route
                     path=":id/permissions"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper permission={{ module: "master.users", action: "update" }}>
                             <Master_User_Permissions />
                         </RouteWrapper>
                     }
@@ -154,7 +154,7 @@ export default function MasterRoutes() {
                 <Route
                     path=":id"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper permission={{ module: "master.users", action: "read" }}>
                             <Master_User_View />
                         </RouteWrapper>
                     }

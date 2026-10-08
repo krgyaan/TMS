@@ -31,7 +31,7 @@ const rowSelection: RowSelectionOptions = {
 
 export default function UserListPage() {
     const navigate = useNavigate();
-    const { canDelete } = useAuth();
+    const { canUpdate, canDelete } = useAuth();
     const { data: users, isLoading, error, refetch } = useUsers();
     const { data: roles = [] } = useRoles();
     const { data: teams = [] } = useTeams();
@@ -58,10 +58,12 @@ export default function UserListPage() {
         },
         {
             label: "Permissions",
+            visible: () => canUpdate(PERMISSION_MODULE),
             onClick: row => navigate(paths.master.users_permissions(row.id)),
         },
         {
             label: "Edit",
+            visible: () => canUpdate(PERMISSION_MODULE),
             onClick: row => navigate(paths.master.users_edit(row.id)),
         },
         {
