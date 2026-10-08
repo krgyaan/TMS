@@ -13,7 +13,7 @@ import { usePermissions } from "@/hooks/api/usePermissions";
 import { useRoles } from "@/hooks/api/useRoles";
 import { useTeams } from "@/hooks/api/useTeams";
 import { useDeleteUser, useUsers } from "@/hooks/api/useUsers";
-import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
+import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { RolesDrawer } from "@/modules/master/role/components/RolesDrawer";
 import { TeamsDrawer } from "@/modules/master/team/components/TeamsDrawer";
 import type { User } from "@/types/api.types";
@@ -40,8 +40,10 @@ export default function UserListPage() {
     const [rolesDrawerOpen, setRolesDrawerOpen] = useState(false);
     const [teamsDrawerOpen, setTeamsDrawerOpen] = useState(false);
     const [gridApi, setGridApi] = useState<GridApi | null>(null);
-    const [search, setSearch] = useState("");
-    const debouncedSearch = useDebouncedSearch(search, 300);
+    const { search, setSearch, debouncedSearch } = usePersistentTableState({
+        storageKey: "user-list",
+        defaultTab: "" as const,
+    });
 
     useEffect(() => {
         gridApi?.setGridOption("quickFilterText", debouncedSearch || undefined);
