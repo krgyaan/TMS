@@ -32,12 +32,10 @@ const ClientSchema = z.object({
     clientName: z.string().min(1, 'Client name is required'),
     clientDesignation: optionalString,
     clientMobile: optionalString,
-    clientEmail: z
-        .string()
-        .email('Invalid email')
-        .optional()
-        .or(z.literal(''))
-        .transform((v) => (v === '' ? null : v)),
+    clientEmail: z.preprocess(
+        (v) => (v === null || v === undefined || (typeof v === 'string' && v.trim() === '') ? null : v),
+        z.string().email('Invalid email').nullable(),
+    ),
 });
 
 export const TenderInfoSheetPayloadSchema = z

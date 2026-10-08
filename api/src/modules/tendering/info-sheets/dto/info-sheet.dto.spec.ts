@@ -85,5 +85,19 @@ describe('TenderInfoSheetPayloadSchema numeric fields', () => {
         expect(parsed.grievanceEmail).toBe('sharikumar@gail.co.in');
         expect(parsed.llm_status).toBe('ok');
     });
+
+    it('accepts clients with clientEmail as null, undefined, or empty string when mobile is present', () => {
+        const parsedNull = TenderInfoSheetPayloadSchema.parse({
+            teRecommendation: 'YES',
+            clients: [{ clientName: 'Vendor Lead', clientEmail: null, clientMobile: '9876543210' }],
+        });
+        expect(parsedNull.clients?.[0].clientEmail).toBeNull();
+
+        const parsedEmpty = TenderInfoSheetPayloadSchema.parse({
+            teRecommendation: 'YES',
+            clients: [{ clientName: 'Vendor Lead', clientEmail: '', clientMobile: '9876543210' }],
+        });
+        expect(parsedEmpty.clients?.[0].clientEmail).toBeNull();
+    });
 });
 

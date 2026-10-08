@@ -317,10 +317,21 @@ def test_requires_bidder_letterhead_when_form_asks_for_it(annexure):
     _form("Annexure-IA: Third Party Deposit Confirmation Letter",
           "a confirmation letter in original on letter head from the issuing bank to GAIL"),
     _form("Dealer Certificate", "on letterhead issued by the manufacturer"),
+])
+def test_no_bidder_letterhead_for_stamp_paper_or_third_party(annexure):
+    assert requires_bidder_letterhead(annexure) is False
+
+
+@pytest.mark.parametrize("annexure", [
+    _form('Annexure - A: Technical specification for "250 AH, VRLA Battery Bank"',
+          "Description of item: Manufacturing, testing, inspection at manufacturer's works..."),
+    _form("Annexure-B: Schedule of Deviations", "Bidder confirms no deviation."),
+    _form("Annexure-I: Guaranteed Technical Particulars", "To be filled by Bidder."),
+    _form("Format F-1: Bidder Information", "Details of bidder..."),
     _form("Plain declaration", "We declare that ..."),
 ])
-def test_no_bidder_letterhead_for_stamp_paper_third_party_or_unmarked_forms(annexure):
-    assert requires_bidder_letterhead(annexure) is False
+def test_requires_bidder_letterhead_for_bidder_annexures(annexure):
+    assert requires_bidder_letterhead(annexure) is True
 
 
 def test_letterhead_detected_in_table_and_blank_field_text():
