@@ -2,44 +2,44 @@ import { paths } from "@/app/routes/paths";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useAssignTrainingVideo, useDeleteTrainingVideo, useLearnersProgress, useTogglePublishTrainingVideo, useTrainingEmployees, useTrainingVideos } from "@/hooks/api/useTraining";
+import { useDeleteTrainingVideo, useLearnersProgress, useTogglePublishTrainingVideo, useTrainingVideos } from "@/hooks/api/useTraining";
+import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { GraduationCap, Plus, UserPlus, Users, Video } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { VideoPlayerView } from "../employees/VideoPlayer";
-import AssignCourseModal from "./components/AssignCourseModal";
 import CourseTable from "./components/CourseTable";
 import LearnerProgressAccordion from "./components/LearnerProgressAccordion";
 import TrainingKpiCards from "./components/TrainingKpiCards";
 import { formatDuration, formatFileSize } from "./helpers/training.utils";
+
+type TrainingTab = "courses" | "progress";
 
 const TrainingDashboard = () => {
     const navigate = useNavigate();
 
     const { data: rawVideos = [], isLoading: isVideosLoading } = useTrainingVideos();
     const { data: progressList = [] } = useLearnersProgress();
-    const { data: dbEmployees = [] } = useTrainingEmployees();
 
     const deleteVideoMutation = useDeleteTrainingVideo();
     const togglePublishMutation = useTogglePublishTrainingVideo();
-    const assignMutation = useAssignTrainingVideo();
 
-    const [activeTab, setActiveTab] = useState("courses");
-    const [searchQuery, setSearchQuery] = useState("");
+    const {
+        activeTab,
+        setActiveTab,
+        search: searchQuery,
+        setSearch: setSearchQuery,
+    } = usePersistentTableState<TrainingTab>({
+        storageKey: "training-dashboard",
+        defaultTab: "courses",
+    });
+
+    // Guard against an unknown ?tab= value, which would otherwise match no
+    // TabsContent and render an empty card.
+    const currentTab: TrainingTab = activeTab === "progress" ? "progress" : "courses";
     const [deptFilter, setDeptFilter] = useState("All");
-    const [isAssignOpen, setIsAssignOpen] = useState(false);
     const [expandedUsers, setExpandedUsers] = useState<string[]>([]);
     const [previewVideo, setPreviewVideo] = useState<any | null>(null);
-
-    const employeesList = useMemo(() => {
-        return dbEmployees.map(e => ({
-            id: e.id,
-            name: e.name,
-            dept: e.dept || "General",
-            designation: e.designation || "Staff",
-            avatar: e.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
-        }));
-    }, [dbEmployees]);
 
     const videos = useMemo(() => {
         return rawVideos.map(v => ({
@@ -54,7 +54,7 @@ const TrainingDashboard = () => {
             isPublished: v.isPublished,
             reactions: (v as any).reactions || { helpful: 0, important: 0, confusing: 0 },
             thumbnailPath: v.thumbnailPath,
-            videoUrl: v.videoUrl
+            videoUrl: v.videoUrl ?? ""
         }));
     }, [rawVideos, progressList]);
 
@@ -107,10 +107,6 @@ const TrainingDashboard = () => {
         }
     };
 
-    const handleAssign = (videoId: number, userIds: number[]) => {
-        assignMutation.mutate({ videoId, userIds });
-    };
-
     const toggleUserAccordion = (userName: string) => {
         setExpandedUsers(prev => prev.includes(userName) ? prev.filter(u => u !== userName) : [...prev, userName]);
     };
@@ -153,7 +149,7 @@ const TrainingDashboard = () => {
                         Upload Video
                     </Button>
                     <Button
-                        onClick={() => setIsAssignOpen(true)}
+                        onClick={() => navigate(paths.hrms.assignCourse)}
                         variant="outline"
                         className="rounded-lg px-5 py-2.5 flex items-center gap-2"
                     >
@@ -169,7 +165,7 @@ const TrainingDashboard = () => {
                 {/* Tabs */}
                 <div className="my-5">
                     <div className="flex-none m-auto mb-4">
-                        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full m-auto">
+                        <Tabs value={currentTab} onValueChange={(value) => setActiveTab(value as TrainingTab)} className="w-full m-auto">
                             <div className="flex-none m-auto mb-4">
                                 <TabsList>
                                     <TabsTrigger value="courses" className="rounded-lg font-semibold text-sm py-2.5">
@@ -212,15 +208,6 @@ const TrainingDashboard = () => {
                     </div>
                 </div>
             </CardContent>
-
-            <AssignCourseModal
-                open={isAssignOpen}
-                onOpenChange={setIsAssignOpen}
-                videos={videos}
-                employees={employeesList}
-                onAssign={handleAssign}
-                isAssigning={assignMutation.isPending}
-            />
         </Card>
     );
 };
