@@ -34,8 +34,8 @@ from app.services.bidding_requirements_resolver import (
 router = APIRouter(tags=["Bidding Requirements"])
 logger = logging.getLogger(__name__)
 
-BIDDING_REQ_MAX_PAGES = int(os.getenv("BIDDING_REQ_MAX_PAGES", "100"))
-ATC_MAX_PAGES = int(os.getenv("ATC_MAX_PAGES", "50"))
+BIDDING_REQ_MAX_PAGES = int(os.getenv("BIDDING_REQ_MAX_PAGES", "150"))
+ATC_MAX_PAGES = int(os.getenv("ATC_MAX_PAGES", "80"))
 
 
 def _process_bidding_analysis(
@@ -47,12 +47,20 @@ def _process_bidding_analysis(
 ) -> Dict[str, Any]:
     """Runs synchronous CPU/IO extraction and LLM call in a background thread."""
     page_texts = extract_pdf_text_hybrid(
-        str(temp_pdf_path), pages_dir, max_pages=BIDDING_REQ_MAX_PAGES
+        str(temp_pdf_path),
+        pages_dir,
+        max_pages=BIDDING_REQ_MAX_PAGES,
+        smart_sampling=True,
     )
     atc_page_texts: List[Dict[str, Any]] = []
     for atc_dest in atc_paths:
         atc_page_texts.extend(
-            extract_pdf_text_hybrid(str(atc_dest), pages_dir, max_pages=ATC_MAX_PAGES)
+            extract_pdf_text_hybrid(
+                str(atc_dest),
+                pages_dir,
+                max_pages=ATC_MAX_PAGES,
+                smart_sampling=True,
+            )
         )
     page_tagged_text = build_page_tagged_text(page_texts, atc_page_texts)
     return analyze_bidding_requirements(
