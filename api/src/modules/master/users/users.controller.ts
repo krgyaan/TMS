@@ -1,10 +1,11 @@
 import { RoleName, hasMinimumRole } from "@/common/constants/roles.constant";
-import { Public } from "@/modules/auth/decorators";
 import { CurrentUser } from "@/modules/auth/decorators/current-user.decorator";
-import { CanDelete, CanRead, CanUpdate } from "@/modules/auth/decorators/permissions.decorator";
+import { CanCreate, CanDelete, CanRead, CanUpdate } from "@/modules/auth/decorators/permissions.decorator";
+import { PermissionGuard } from "@/modules/auth/guards/permission.guard";
+import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
 import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
 import { UsersService } from "@/modules/master/users/users.service";
-import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, HttpStatus, NotFoundException, Param, ParseIntPipe, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, HttpStatus, NotFoundException, Param, ParseIntPipe, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 
 const CreateUserSchema = z.object({
@@ -29,22 +30,24 @@ const UpdateUserSchema = z.object({
     mobile: z.string().max(20, "Mobile number too long").optional().nullable(),
     password: z.string().min(6, "Password must be at least 6 characters long").max(255).optional(),
     roleId: z.number().int().positive("Role ID must be a positive integer").optional(),
+    teamId: z.number().int().positive("Team ID must be a positive integer").optional(),
+    subTeamId: z.number().int().positive().optional().nullable(),
     isActive: z.boolean().optional(),
 });
 
 type UpdateUserDto = z.infer<typeof UpdateUserSchema>;
 
 @Controller("users")
+@UseGuards(JwtAuthGuard, PermissionGuard)
 export class UsersController {
     constructor(private readonly usersService: UsersService) {}
 
     @Get()
-    @CanRead("users")
+    @CanRead("master.users")
     async list() {
         return this.usersService.findAll();
     }
 
-    @Public()
     @Get("generate-info")
     async getGenerateInfo(@Query("email") email?: string) {
         const employeeCode = await this.usersService.generateEmployeeCode();
@@ -63,7 +66,6 @@ export class UsersController {
         return { employeeCode, username };
     }
 
-    @Public()
     @Get("by-role/:roleId")
     async getUsersByRole(@Param("roleId") roleId: number) {
         return this.usersService.findUsersByRole(roleId);
@@ -80,7 +82,7 @@ export class UsersController {
     }
 
     @Get(":id")
-    @CanRead("users")
+    @CanRead("master.users")
     async getById(@Param("id", ParseIntPipe) id: number) {
         const user = await this.usersService.findDetailById(id);
         if (!user) {
@@ -89,9 +91,9 @@ export class UsersController {
         return user;
     }
 
-    @Public()
     @Post()
     @HttpCode(HttpStatus.CREATED)
+    @CanCreate("master.users")
     async create(@Body() body: unknown) {
         const parsed = CreateUserSchema.parse(body);
         const user = await this.usersService.createWithDetails({
@@ -110,7 +112,7 @@ export class UsersController {
     }
 
     @Patch(":id")
-    // @CanUpdate("users")
+    @CanUpdate("master.users")
     async update(@Param("id", ParseIntPipe) id: number, @Body() body: unknown, @CurrentUser() currentUser: ValidatedUser) {
         const parsed = UpdateUserSchema.parse(body);
 
@@ -142,7 +144,7 @@ export class UsersController {
 
     @Delete(":id")
     @HttpCode(HttpStatus.NO_CONTENT)
-    @CanDelete("users")
+    @CanDelete("master.users")
     async delete(@Param("id", ParseIntPipe) id: number, @CurrentUser() currentUser: ValidatedUser) {
         await this.usersService.delete(id, currentUser.sub);
     }
@@ -150,7 +152,7 @@ export class UsersController {
     // User Activation/Deactivation
     @Patch(":id/activate")
     @HttpCode(HttpStatus.OK)
-    @CanUpdate("users")
+    @CanUpdate("master.users")
     async activate(@Param("id", ParseIntPipe) id: number, @CurrentUser() currentUser: ValidatedUser) {
         // Check if user has coordinator+ role
         const canActivate = hasMinimumRole(currentUser.role ?? "", RoleName.COORDINATOR);
@@ -165,7 +167,7 @@ export class UsersController {
 
     @Patch(":id/deactivate")
     @HttpCode(HttpStatus.OK)
-    @CanUpdate("users")
+    @CanUpdate("master.users")
     async deactivate(@Param("id", ParseIntPipe) id: number, @CurrentUser() currentUser: ValidatedUser) {
         // Check if user has coordinator+ role
         const canDeactivate = hasMinimumRole(currentUser.role ?? "", RoleName.COORDINATOR);
@@ -181,7 +183,7 @@ export class UsersController {
     // User Roles Management
     @Post(":id/roles")
     @HttpCode(HttpStatus.CREATED)
-    @CanUpdate("users")
+    @CanUpdate("master.users")
     async assignRole(@Param("id", ParseIntPipe) userId: number, @Body() body: unknown) {
         const schema = z.object({
             roleId: z.number().int().positive("Role ID must be a positive integer"),
@@ -192,14 +194,14 @@ export class UsersController {
     }
 
     @Get(":id/roles")
-    @CanRead("users")
+    @CanRead("master.users")
     async getUserRole(@Param("id", ParseIntPipe) userId: number) {
         const role = await this.usersService.getUserRole(userId);
         return role;
     }
 
     @Patch(":id/roles")
-    @CanUpdate("users")
+    @CanUpdate("master.users")
     async updateUserRole(@Param("id", ParseIntPipe) userId: number, @Body() body: unknown) {
         const schema = z.object({
             roleId: z.number().int().positive("Role ID must be a positive integer"),
@@ -212,7 +214,7 @@ export class UsersController {
     // User Permissions Management
     @Post(":id/permissions")
     @HttpCode(HttpStatus.CREATED)
-    @CanUpdate("users")
+    @CanUpdate("master.users")
     async assignPermissions(@Param("id", ParseIntPipe) userId: number, @Body() body: unknown) {
         const schema = z.object({
             permissions: z.array(
@@ -232,14 +234,14 @@ export class UsersController {
     }
 
     @Get(":id/permissions")
-    @CanRead("users")
+    @CanRead("master.users")
     async getUserPermissions(@Param("id", ParseIntPipe) userId: number) {
         const permissions = await this.usersService.getUserPermissions(userId);
         return permissions;
     }
 
     @Patch(":id/permissions")
-    @CanUpdate("users")
+    @CanUpdate("master.users")
     async updateUserPermissions(@Param("id", ParseIntPipe) userId: number, @Body() body: unknown) {
         const schema = z.object({
             permissions: z.array(
@@ -260,13 +262,15 @@ export class UsersController {
 
     @Delete(":id/permissions/:permissionId")
     @HttpCode(HttpStatus.NO_CONTENT)
-    @CanUpdate("users")
+    @CanUpdate("master.users")
     async removeUserPermission(@Param("id", ParseIntPipe) userId: number, @Param("permissionId", ParseIntPipe) permissionId: number) {
         await this.usersService.removeUserPermission(userId, permissionId);
     }
 
     @Get("team/:teamId/members")
-    @CanRead("users")
+    // Intentionally not permission-gated: used app-wide as a shared member lookup
+    // (purchase orders, vendor work orders, checklists, select options). Any
+    // authenticated user may read team member lists.
     async getTeamMembers(@Param("teamId", ParseIntPipe) teamId: number) {
         const members = await this.usersService.getTeamMembers(teamId);
         return members;

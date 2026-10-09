@@ -56,7 +56,7 @@ describe('PDF Extraction Queue Integration (Phase 8)', () => {
             producer = new PdfExtractionProducer(mockQueue, mockLogger);
         });
 
-        it('should enqueue a new job with deterministic jobId and attempts: 2', async () => {
+        it('should enqueue a new job with deterministic jobId and attempts: 1', async () => {
             mockQueue.getJob.mockResolvedValue(null);
             mockQueue.add.mockResolvedValue({ id: 'extract-tender-101' });
 
@@ -79,7 +79,7 @@ describe('PDF Extraction Queue Integration (Phase 8)', () => {
                 jobData,
                 expect.objectContaining({
                     jobId: 'extract-tender-101',
-                    attempts: 2,
+                    attempts: 1,
                     backoff: {
                         type: 'exponential',
                         delay: 5000,

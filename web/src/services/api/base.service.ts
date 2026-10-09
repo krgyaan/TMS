@@ -58,9 +58,10 @@ export class BaseApiService {
         return response.data
     }
 
-    protected async delete<T>(endpoint: string): Promise<T> {
+    protected async delete<T>(endpoint: string, config?: Record<string, any>): Promise<T> {
         const response: AxiosResponse<T> = await axiosInstance.delete(
-            `${this.basePath}${endpoint}`
+            `${this.basePath}${endpoint}`,
+            config
         )
         return response.data
     }

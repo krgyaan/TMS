@@ -48,6 +48,7 @@ import {
   ListChecks,
   ChevronDown,
   RotateCcw,
+  UserPlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -55,6 +56,7 @@ import {
   useProfile,
   useUpdateEntryStatus,
   useUpdateSectionStatus,
+  useUpdateOnboardingStatus,
 } from "@/hooks/api/useOnboarding";
 import { useEmployeeInduction } from "@/hooks/api/useInduction";
 import { paths } from "@/app/routes/paths";
@@ -63,6 +65,7 @@ import { HrStatusBadge } from "./components/HrStatusBadge";
 import { DataItem } from "./components/DataItem";
 import { SectionHeader } from "./components/SectionHeader";
 import { SectionApproveModal } from "./components/SectionApproveModal";
+import { ActionModal } from "./components/ActionModal";
 import {
   formatDate,
   timeAgo,
@@ -282,17 +285,28 @@ export default function CandidateDetailPage() {
     bankDetails: useUpdateSectionStatus("bankDetails"),
   };
   const profileMutation = useUpdateEntryStatus("profile");
+  const createUserMutation = useUpdateOnboardingStatus();
+  const [createUserOpen, setCreateUserOpen] = useState(false);
+
+  const showCreateUser =
+    joinee?.profileStatus === "approved" &&
+    joinee?.status === "pending" &&
+    !joinee?.userId;
 
   const handleConfirmSectionAction = (note: string) => {
     if (!sectionAction) return;
     const { stage, type } = sectionAction;
-    const onSuccess = () => setSectionAction(null);
     if (stage === "profile") {
+      const onSuccess = () => {
+        setSectionAction(null);
+        if (type === "approved") setCreateUserOpen(true);
+      };
       profileMutation.mutate(
         { onboardingId: candidateId, status: type, reason: note },
         { onSuccess }
       );
     } else {
+      const onSuccess = () => setSectionAction(null);
       sectionMutations[stage].mutate(
         { onboardingId: candidateId, status: type, reason: note },
         { onSuccess }
@@ -358,10 +372,10 @@ export default function CandidateDetailPage() {
       <div className="flex flex-col h-full min-h-0">
         {/* Header */}
         <div className="flex items-center justify-between gap-4 px-8 py-4 border-b bg-background/80 backdrop-blur-sm sticky top-0 z-10">
-          <div className="flex items-center gap-4 min-w-0">
-            <Button
-              variant="ghost"
-              size="icon"
+<div className="flex items-center gap-4 min-w-0 flex-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
               className="h-9 w-9 rounded-xl shrink-0"
               onClick={() => navigate(paths.hrms.onboardingDashboard)}
             >
@@ -391,7 +405,7 @@ export default function CandidateDetailPage() {
                 {joinee.hrStatus && (
                   <HrStatusBadge status={joinee.hrStatus} size="md" />
                 )}
-              </div>
+                </div>
               <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Mail className="h-3.5 w-3.5" />
@@ -407,7 +421,16 @@ export default function CandidateDetailPage() {
               </div>
             </div>
           </div>
-
+            {showCreateUser && (
+              <Button
+                size="sm"
+                className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shrink-0"
+                onClick={() => setCreateUserOpen(true)}
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                Create User
+              </Button>
+            )}
         </div>
 
         {/* Body */}
@@ -1046,6 +1069,19 @@ export default function CandidateDetailPage() {
           onClose={() => setSectionAction(null)}
           onConfirm={handleConfirmSectionAction}
           isLoading={isSectionLoading}
+        />
+
+        <ActionModal
+          open={createUserOpen}
+          joinee={joinee}
+          onClose={() => setCreateUserOpen(false)}
+          onConfirm={() => {
+            createUserMutation.mutate(
+              { id: candidateId, dto: { status: "approved" } },
+              { onSuccess: () => setCreateUserOpen(false) }
+            );
+          }}
+          isLoading={createUserMutation.isPending}
         />
       </div>
     </TooltipProvider>

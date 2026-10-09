@@ -21,6 +21,9 @@ from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
+MAIN_TENDER_MAX_PAGES = int(os.getenv("MAIN_TENDER_MAX_PAGES", "150"))
+CHILD_PDF_MAX_PAGES = int(os.getenv("CHILD_PDF_MAX_PAGES", "60"))
+
 
 # BUG 3 FIX: Field precedence constants defining field ownership rules
 ATC_SOURCED_LABELS = {
@@ -362,7 +365,7 @@ def ingest_parent_tender_pdf(
     pages_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info(f"[INGEST_PIPELINE][Job {job_id}] Step 1: Extracting text & page structures from PDF...")
-    page_texts = extract_pdf_text_hybrid(str(pdf_path), pages_dir)
+    page_texts = extract_pdf_text_hybrid(str(pdf_path), pages_dir, max_pages=MAIN_TENDER_MAX_PAGES)
     all_pages = list(page_texts)
     # Read before anything is appended to page_texts (self-classified ATC aliases it).
     main_identity = extract_document_identity(page_texts)
@@ -538,7 +541,7 @@ def ingest_parent_tender_pdf(
                 atc_sections = [{"id": "sec-atc", "title": "ATC-Sourced Fields", "fields": []}]
             else:
                 atc_pages_dir = job_dir / "atc_pages"
-                atc_page_texts = extract_pdf_text_hybrid(str(atc_path), atc_pages_dir)
+                atc_page_texts = extract_pdf_text_hybrid(str(atc_path), atc_pages_dir, max_pages=CHILD_PDF_MAX_PAGES)
                 # The primary ATC's own number, before spec/schedule child PDFs are merged in.
                 atc_identity = extract_document_identity(atc_page_texts)
                 all_pages.extend(atc_page_texts)
@@ -570,7 +573,7 @@ def ingest_parent_tender_pdf(
 
             for c_pdf in valid_child_pdfs:
                 try:
-                    c_texts = extract_pdf_text_hybrid(str(c_pdf), job_dir / "atc_pages")
+                    c_texts = extract_pdf_text_hybrid(str(c_pdf), job_dir / "atc_pages", max_pages=CHILD_PDF_MAX_PAGES)
                     all_pages.extend(c_texts)
                     atc_page_texts.extend(c_texts)
                     logger.info(f"[ATC_RESOLVER] Appended child PDF text: '{c_pdf.name}' ({len(c_texts)} pages)")
@@ -767,7 +770,7 @@ def ingest_parent_tender_pdf(
         boq_p = Path(explicit_boq_path)
         if boq_p.exists() and boq_p != pdf_path and boq_p != atc_path:
             try:
-                boq_page_texts = extract_pdf_text_hybrid(str(boq_p), job_dir / "boq_pages")
+                boq_page_texts = extract_pdf_text_hybrid(str(boq_p), job_dir / "boq_pages", max_pages=CHILD_PDF_MAX_PAGES)
                 all_pages.extend(boq_page_texts)
                 boq_full_text = "\n".join([p.get("text", "") for p in boq_page_texts])
                 logger.info(f"[BOQ] Merged explicit BOQ file text: '{boq_p}' ({len(boq_page_texts)} pages)")

@@ -19,7 +19,9 @@ from typing import Any, Dict, List, Optional, Union
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.shared import Inches, Pt
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from docx.shared import Inches, Pt, RGBColor
 
 BLOCK_TYPES = ("heading", "paragraph", "blank_field", "table", "signature_line")
 
@@ -64,6 +66,78 @@ def _clean(value: Any) -> str:
     return _XML_INVALID_CHARS.sub("", str(value if value is not None else "")).strip()
 
 
+def _set_table_styling(table) -> None:
+    """
+    Applies executive table styling:
+    - Inner cell margins (5 pt top/bottom, 7 pt left/right) so text never touches borders
+    - Subtle slate borders (#CBD5E1) instead of harsh dark lines
+    - Repeating table header across page breaks (w:tblHeader)
+    - Row-break protection (w:cantSplit) so individual rows don't break awkwardly across pages
+    - Light slate header cell fill (#F1F5F9)
+    """
+    tblPr = table._element.tblPr
+
+    # Cell margins (dxa = 1/20 pt)
+    tblCellMar = OxmlElement("w:tblCellMar")
+    for m, val in (("top", 5), ("bottom", 5), ("left", 7), ("right", 7)):
+        node = OxmlElement(f"w:{m}")
+        node.set(qn("w:w"), str(int(val * 20)))
+        node.set(qn("w:type"), "dxa")
+        tblCellMar.append(node)
+    tblPr.append(tblCellMar)
+
+    # Subtle borders
+    tblBorders = OxmlElement("w:tblBorders")
+    for b_name in ("top", "left", "bottom", "right", "insideH", "insideV"):
+        border = OxmlElement(f"w:{b_name}")
+        border.set(qn("w:val"), "single")
+        border.set(qn("w:sz"), "4")
+        border.set(qn("w:space"), "0")
+        border.set(qn("w:color"), "CBD5E1")
+        tblBorders.append(border)
+    tblPr.append(tblBorders)
+
+    for i, row in enumerate(table.rows):
+        trPr = row._element.get_or_add_trPr()
+        cantSplit = OxmlElement("w:cantSplit")
+        trPr.append(cantSplit)
+        if i == 0:
+            tblHeader = OxmlElement("w:tblHeader")
+            trPr.append(tblHeader)
+            for cell in row.cells:
+                tcPr = cell._element.get_or_add_tcPr()
+                shd = OxmlElement("w:shd")
+                shd.set(qn("w:val"), "clear")
+                shd.set(qn("w:color"), "auto")
+                shd.set(qn("w:fill"), "F1F5F9")
+                tcPr.append(shd)
+
+
+def _apply_document_styles(doc: Document) -> None:
+    """Configures corporate typography tokens on Normal and Heading 1 styles."""
+    try:
+        normal = doc.styles["Normal"]
+        normal.font.name = "Calibri"
+        normal.font.size = Pt(10)
+        normal.font.color.rgb = RGBColor(0x1F, 0x29, 0x37)
+        normal.paragraph_format.line_spacing = 1.15
+        normal.paragraph_format.space_after = Pt(4)
+    except Exception:
+        pass
+
+    try:
+        h1 = doc.styles["Heading 1"]
+        h1.font.name = "Calibri"
+        h1.font.size = Pt(13)
+        h1.font.bold = True
+        h1.font.color.rgb = RGBColor(0x1E, 0x3A, 0x8A)
+        h1.paragraph_format.space_before = Pt(8)
+        h1.paragraph_format.space_after = Pt(6)
+        h1.paragraph_format.keep_with_next = True
+    except Exception:
+        pass
+
+
 def _add_table(doc, headers: List[Any], rows: List[Any]) -> None:
     headers = [_clean(h) for h in (headers or [])]
     rows = [r for r in (rows or []) if isinstance(r, list)]
@@ -78,8 +152,13 @@ def _add_table(doc, headers: List[Any], rows: List[Any]) -> None:
         cells = table.add_row().cells
         for i, h in enumerate(headers):
             cells[i].text = h
-            for run in cells[i].paragraphs[0].runs:
-                run.bold = True
+            for p in cells[i].paragraphs:
+                p.paragraph_format.space_before = Pt(2)
+                p.paragraph_format.space_after = Pt(2)
+                for run in p.runs:
+                    run.bold = True
+                    run.font.size = Pt(9.5)
+                    run.font.color.rgb = RGBColor(0x0F, 0x17, 0x2A)
 
     for row in rows:
         # Pad short rows / truncate long ones to the header width so a slightly
@@ -89,31 +168,71 @@ def _add_table(doc, headers: List[Any], rows: List[Any]) -> None:
         cells = table.add_row().cells
         for i, v in enumerate(values):
             cells[i].text = v
+            for p in cells[i].paragraphs:
+                p.paragraph_format.space_before = Pt(2)
+                p.paragraph_format.space_after = Pt(2)
+                for run in p.runs:
+                    run.font.size = Pt(9.5)
+                    run.font.color.rgb = RGBColor(0x1F, 0x29, 0x37)
+
+    _set_table_styling(table)
 
 
-# "letterhead" / "letter head" / "letter-head"
-_LETTERHEAD = re.compile(r"letter\s*-?\s*head", re.IGNORECASE)
-# Parties whose letterhead a form may name instead of the bidder's ("on the bank's
-# letterhead", "on letterhead of the OEM") -- those forms must NOT get our letterhead.
-_THIRD_PARTY = (
-    r"bank(?:er)?|manufacturer|oem|principal|supporting\s+company|guarantor|chartered\s+accountant"
-    r"|c\.?\s*a\.?|auditor|company\s+secretary|vendor|supplier|sub-?\s*contractor|issuing\s+authority"
-)
-_THIRD_PARTY_BEFORE = re.compile(rf"\b(?:{_THIRD_PARTY})(?:'s|s'|’s)?\s+$", re.IGNORECASE)
-_THIRD_PARTY_AFTER = re.compile(
-    rf"^\s+(?:issued\s+)?(?:of|from|by)\s+(?:the\s+|their\s+|its\s+)?(?:issuing\s+)?(?:{_THIRD_PARTY})\b", re.IGNORECASE,
-)
+# Patterns indicating third-party forms or stamp-paper legal instruments.
+# These must NOT be printed on the bidder's (Volks Energie's) company letterhead.
+_THIRD_PARTY_OR_STAMP_PATTERNS = [
+    # Bank / Bank Guarantee (issued by bank on bank letterhead or stamp paper)
+    re.compile(r"\bbank(?:er)?(?:'s)?\s+letter\s*-?\s*head\b", re.IGNORECASE),
+    re.compile(r"\b(?:proforma|format)\s+(?:of|for)\s+(?:bank\s+guarantee|bg|pbg)\b", re.IGNORECASE),
+    re.compile(r"\bbank\s+guarantee\b", re.IGNORECASE),
+    re.compile(r"\bfrom\s+(?:the\s+)?issuing\s+bank\b", re.IGNORECASE),
+    re.compile(r"\bissuing\s+bank\s+to\b", re.IGNORECASE),
+    # OEM / Manufacturer Authorization (issued by manufacturer on OEM letterhead)
+    re.compile(r"\bmanufacturer(?:'s)?\s+authorization\b", re.IGNORECASE),
+    re.compile(r"\boem\s+authorization\b", re.IGNORECASE),
+    re.compile(r"\boem\s+undertaking\b", re.IGNORECASE),
+    re.compile(r"\bdealer\s+certificate\b", re.IGNORECASE),
+    re.compile(r"\bletter\s*-?\s*head\s+of\s+(?:the\s+)?oem\b", re.IGNORECASE),
+    re.compile(r"\bmanufacturer(?:'s)?\s+letter\s*-?\s*head\b", re.IGNORECASE),
+    re.compile(r"\bto\s+be\s+issued\s+on\s+(?:the\s+)?manufacturer(?:'s)?\s+letter\s*-?\s*head\b", re.IGNORECASE),
+    re.compile(r"\bletter\s*-?\s*head\s+issued\s+by\s+(?:the\s+)?manufacturer\b", re.IGNORECASE),
+    # Chartered Accountant Certificate (issued by CA on CA letterhead)
+    re.compile(r"\bturnover\s+certificate\b", re.IGNORECASE),
+    re.compile(r"\bnet\s*worth\s+certificate\b", re.IGNORECASE),
+    re.compile(r"\bsolvency\s+certificate\b", re.IGNORECASE),
+    re.compile(r"\bletter\s*-?\s*head\s+of\s+(?:the\s+)?chartered\s+accountant\b", re.IGNORECASE),
+    re.compile(r"\bchartered\s+accountant(?:'s)?\s+letter\s*-?\s*head\b", re.IGNORECASE),
+    re.compile(r"\bauditor(?:'s)?\s+certificate\b", re.IGNORECASE),
+    # Supporting Company / Guarantor (issued by parent or supporting company)
+    re.compile(r"\bforeign\s+based\s+supporting\s+company\b", re.IGNORECASE),
+    re.compile(r"\bsupporting\s+company\b", re.IGNORECASE),
+    re.compile(r"\bparent\s+company\s+guarantee\b", re.IGNORECASE),
+    re.compile(r"\bdeed\s+of\s+guarantee\b", re.IGNORECASE),
+    # Stamp Paper / Legal instruments (printed on physical stamp paper)
+    re.compile(r"\b(?:non-?\s*judicial\s+)?stamp\s+paper\b", re.IGNORECASE),
+    re.compile(r"\bindian\s+stamp\s+paper\b", re.IGNORECASE),
+    re.compile(r"\bformat\s+of\s+agreement\b", re.IGNORECASE),
+    re.compile(r"\bcontract\s+agreement\b", re.IGNORECASE),
+    re.compile(r"\bindemnity\s+bond\b", re.IGNORECASE),
+]
 
 
 def requires_bidder_letterhead(annexure: Dict[str, Any]) -> bool:
     """
-    True when the annexure's own text says it is to be given on (the bidder's) letterhead,
-    e.g. "UNDERTAKING ON LETTERHEAD", "on the letterhead of the bidder", "on company
-    letterhead". Deterministic text check over the stored name and blocks -- no Claude call.
+    Determines if an annexure should be rendered with the bidder's (Volks Energie) official letterhead.
 
-    A letterhead mention qualified by another party ("on bank's letterhead", "letterhead
-    of the OEM") does not count, and forms with no letterhead mention (stamp-paper
-    agreements, bank guarantees) stay plain.
+    In tender bidding, all bidder submissions (Technical Specifications compliance, GTPs,
+    Schedules of Deviations, Declarations, Undertakings, Formats, and Annexures) are submitted
+    on the bidder's official corporate letterhead.
+
+    Forms that do NOT receive bidder letterhead are:
+      1. Third-party documents:
+         - Bank Guarantees (issued by issuing bank)
+         - Manufacturer Authorization Forms / MAF (issued by OEM / manufacturer)
+         - CA Turnover / Net Worth certificates (issued by Chartered Accountant)
+         - Supporting company / Parent company guarantees
+      2. Stamp paper legal instruments:
+         - Non-judicial stamp paper undertakings, Deeds, Agreements, Indemnity Bonds
     """
     parts = [str(annexure.get("annexureName") or "")]
     for block in annexure.get("blocks") or []:
@@ -122,12 +241,14 @@ def requires_bidder_letterhead(annexure: Dict[str, Any]) -> bool:
             for row in [block.get("headers") or []] + list(block.get("rows") or []):
                 if isinstance(row, list):
                     parts += [str(c) for c in row]
-    for text in parts:
-        for m in _LETTERHEAD.finditer(text):
-            before, after = text[max(0, m.start() - 40):m.start()], text[m.end():m.end() + 50]
-            if not (_THIRD_PARTY_BEFORE.search(before) or _THIRD_PARTY_AFTER.search(after)):
-                return True
-    return False
+
+    combined_text = "\n".join(parts)
+
+    for pattern in _THIRD_PARTY_OR_STAMP_PATTERNS:
+        if pattern.search(combined_text):
+            return False
+
+    return True
 
 
 def _normalize_label(label: str) -> str:
@@ -225,16 +346,16 @@ def _fill_paragraph_text(text: str, context: Dict[str, Any]) -> str:
     tender_no = context.get("tender_no") or context.get("tenderNo")
     date_val = context.get("date")
 
-    # Replace M/s ______ (Name of Bidder) or M/s _______
+    # Replace M/s ______ (Name of Bidder) or M/s _______ safely using lambdas (prevents backslash escape crashes)
     text = re.sub(
         r"M/s[._\s]*_{2,}\s*(?:\((?:Name of Bidder|Bidder)\))?",
-        f"M/s {company_name}",
+        lambda _: f"M/s {company_name}",
         text,
         flags=re.IGNORECASE,
     )
     text = re.sub(
         r"\(Name of Bidder\)\s*_{2,}",
-        f"{company_name}",
+        lambda _: f"{company_name}",
         text,
         flags=re.IGNORECASE,
     )
@@ -242,7 +363,7 @@ def _fill_paragraph_text(text: str, context: Dict[str, Any]) -> str:
     if tender_no:
         text = re.sub(
             r"((?:offer/?\s*bid\s+no|bid\s+no|tender\s+no|nit\s+no|rfp\s+no)[.:\s]*)_{2,}",
-            rf"\g<1>{tender_no}",
+            lambda m: f"{m.group(1)}{tender_no}",
             text,
             flags=re.IGNORECASE,
         )
@@ -250,12 +371,46 @@ def _fill_paragraph_text(text: str, context: Dict[str, Any]) -> str:
     if date_val:
         text = re.sub(
             r"(dated[.:\s]*)_{2,}",
-            rf"\g<1>{date_val}",
+            lambda m: f"{m.group(1)}{date_val}",
             text,
             flags=re.IGNORECASE,
         )
 
     return text
+
+
+def _ensure_letterhead_bands(header_file: Path, footer_file: Path) -> bool:
+    """If png bands are missing, attempts to render them from letterhead pdf if available."""
+    if header_file.is_file() and footer_file.is_file():
+        return True
+
+    pdf_candidates = [
+        header_file.parent / "letterhead_volks.pdf",
+        header_file.parent / "letterhead volks pdf.pdf",
+        header_file.parent.parent / "letterhead volks pdf.pdf",
+        header_file.parent.parent / "letterhead_volks.pdf",
+    ]
+    for pdf_path in pdf_candidates:
+        if pdf_path.is_file():
+            try:
+                import fitz
+                pdf = fitz.open(str(pdf_path))
+                if len(pdf) > 0:
+                    page = pdf[0]
+                    pix = page.get_pixmap(dpi=300)
+                    header_file.parent.mkdir(parents=True, exist_ok=True)
+                    # Render header band (top ~459px at 300 DPI)
+                    header_rect = fitz.Rect(0, 0, page.rect.width, 110.16)
+                    pix_h = page.get_pixmap(dpi=300, clip=header_rect)
+                    pix_h.save(str(header_file))
+                    # Render footer band (bottom ~47px at 300 DPI)
+                    footer_rect = fitz.Rect(0, page.rect.height - 43.28, page.rect.width, page.rect.height - 32.0)
+                    pix_f = page.get_pixmap(dpi=300, clip=footer_rect)
+                    pix_f.save(str(footer_file))
+                    return True
+            except Exception:
+                pass
+    return header_file.is_file() and footer_file.is_file()
 
 
 def build_annexure_docx(
@@ -284,6 +439,7 @@ def build_annexure_docx(
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     doc = Document()
+    _apply_document_styles(doc)
     doc.core_properties.title = _clean(annexure.get("annexureName"))[:255]
     # Indian tender forms are A4; python-docx's default template is US Letter.
     for section in doc.sections:
@@ -310,10 +466,14 @@ def build_annexure_docx(
             value = None
             if letterhead and context:
                 value = _resolve_field_value(label, context)
+            p = doc.add_paragraph()
+            if label:
+                lbl_run = p.add_run(f"{label}{sep}")
+                lbl_run.bold = True
             if value:
-                doc.add_paragraph(f"{label}{sep}{value}")
+                p.add_run(_clean(value))
             else:
-                doc.add_paragraph(f"{label}{sep}{BLANK}" if label else BLANK)
+                p.add_run(BLANK)
         elif btype == "table":
             _add_table(doc, block.get("headers"), block.get("rows"))
         elif btype == "signature_line":
@@ -323,7 +483,8 @@ def build_annexure_docx(
             label = _clean(block.get("label"))
             if label:
                 run.add_break()
-                p.add_run(label)
+                lbl_run = p.add_run(label)
+                lbl_run.bold = True
             if letterhead and context:
                 comp_name = context.get("company_name") or context.get("companyName") or "Volks Energie Private Limited"
                 run.add_break()
@@ -343,23 +504,12 @@ def apply_letterhead(
 
     - Page size is set to standard A4 (595.3 pt x 841.9 pt).
     - Page margins are adjusted so the content area flows cleanly between the header
-      and footer bands without overlapping:
-        * top margin = 128 pt (header height 110.16 pt + ~18 pt gap)
-        * bottom margin = 65 pt (footer top 43.28 pt + ~22 pt gap)
-        * left/right margins = 36 pt (0.5 in), matching the logo and footer alignment
-        * header_distance = 0 pt (header band sits flush at top of page)
-        * footer_distance = 32 pt (footer band sits flush with measured footer baseline)
-    - header_band.png is inserted into document's header section
-    - footer_band.png is inserted into document's footer section
-    Word automatically repeats both bands on every page.
+      and footer bands without overlapping.
+    - If letterhead images are available, header and footer bands are inserted.
     """
     header_file = Path(header_path)
     footer_file = Path(footer_path)
-
-    if not header_file.is_file():
-        raise FileNotFoundError(f"Letterhead header image not found at {header_file}")
-    if not footer_file.is_file():
-        raise FileNotFoundError(f"Letterhead footer image not found at {footer_file}")
+    has_images = _ensure_letterhead_bands(header_file, footer_file)
 
     for section in document.sections:
         # Standard A4 paper dimensions
@@ -374,24 +524,25 @@ def apply_letterhead(
         section.header_distance = Pt(HEADER_DISTANCE_PT)
         section.footer_distance = Pt(FOOTER_DISTANCE_PT)
 
-        # Header band: full-bleed width from left margin to right margin
-        header = section.header
-        header_p = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
-        header_p.text = ""
-        header_p.paragraph_format.space_before = Pt(0)
-        header_p.paragraph_format.space_after = Pt(0)
-        header_p.paragraph_format.left_indent = -section.left_margin
-        header_p.paragraph_format.right_indent = -section.right_margin
-        header_run = header_p.add_run()
-        header_run.add_picture(str(header_file), width=section.page_width)
+        if has_images:
+            # Header band: full-bleed width from left margin to right margin
+            header = section.header
+            header_p = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
+            header_p.text = ""
+            header_p.paragraph_format.space_before = Pt(0)
+            header_p.paragraph_format.space_after = Pt(0)
+            header_p.paragraph_format.left_indent = -section.left_margin
+            header_p.paragraph_format.right_indent = -section.right_margin
+            header_run = header_p.add_run()
+            header_run.add_picture(str(header_file), width=section.page_width)
 
-        # Footer band: full-bleed width from left margin to right margin
-        footer = section.footer
-        footer_p = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
-        footer_p.text = ""
-        footer_p.paragraph_format.space_before = Pt(0)
-        footer_p.paragraph_format.space_after = Pt(0)
-        footer_p.paragraph_format.left_indent = -section.left_margin
-        footer_p.paragraph_format.right_indent = -section.right_margin
-        footer_run = footer_p.add_run()
-        footer_run.add_picture(str(footer_file), width=section.page_width)
+            # Footer band: full-bleed width from left margin to right margin
+            footer = section.footer
+            footer_p = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+            footer_p.text = ""
+            footer_p.paragraph_format.space_before = Pt(0)
+            footer_p.paragraph_format.space_after = Pt(0)
+            footer_p.paragraph_format.left_indent = -section.left_margin
+            footer_p.paragraph_format.right_indent = -section.right_margin
+            footer_run = footer_p.add_run()
+            footer_run.add_picture(str(footer_file), width=section.page_width)

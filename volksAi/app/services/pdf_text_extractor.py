@@ -1,8 +1,14 @@
+import os
+import re
+import logging
 from pathlib import Path
 from PIL import Image, ImageEnhance, ImageFilter
 from app.ocr.ocr_engine import OcrEngine
 from typing import List, Dict, Any, Optional
 from app.models.models import TextBlock
+
+logger = logging.getLogger("backend.app.services.pdf_text_extractor")
+MAX_OCR_PAGES_PER_DOC = int(os.getenv("MAX_OCR_PAGES_PER_DOC", "25"))
 
 def preprocess_image_for_ocr(img_path: Path) -> Path:
     """
@@ -130,7 +136,55 @@ def build_text_blocks_from_words(words: list) -> list[dict]:
         })
     return blocks
 
-def extract_pdf_text_hybrid(pdf_path: str, pages_dir: Path, max_pages: Optional[int] = None) -> List[Dict[str, Any]]:
+ANNEXURE_KEYWORDS_RE = re.compile(
+    r"\b(?:annexure|proforma|format|undertaking|declaration|schedule\s+of\s+deviation|deviation\s+schedule|gtp|guaranteed\s+technical|bank\s+guarantee|maf|manufacturer(?:'s)?\s+authorization|local\s+content|make\s+in\s+india|bid\s+form|form\s+f-?\d+|integrity\s+pact|blacklisting|debarment)\b",
+    re.IGNORECASE,
+)
+
+
+def select_smart_pages(doc: Any, max_pages: int) -> List[int]:
+    """
+    Selects up to `max_pages` pages prioritizing:
+    1. First 40 pages (Notice Inviting Tender, ITB, BEC, Eligibility criteria).
+    2. Last 45 pages (Where Annexures, Formats, Proformas, Undertakings, Declarations always live).
+    3. Any middle page containing Annexure/Format/Deviation/Undertaking keywords.
+    """
+    total_len = len(doc)
+    if total_len <= max_pages:
+        return list(range(total_len))
+
+    head_budget = min(40, max_pages // 2)
+    tail_budget = min(45, max_pages // 2)
+
+    head_pages = set(range(head_budget))
+    tail_pages = set(range(max(0, total_len - tail_budget), total_len))
+
+    # Fast scan of middle pages (<20ms across hundreds of pages in PyMuPDF)
+    middle_keyword_pages = []
+    for i in range(head_budget, total_len - tail_budget):
+        try:
+            txt = doc[i].get_text()
+            if ANNEXURE_KEYWORDS_RE.search(txt):
+                middle_keyword_pages.append(i)
+        except Exception:
+            continue
+
+    remaining = max_pages - len(head_pages) - len(tail_pages)
+    if remaining > 0 and len(middle_keyword_pages) > remaining:
+        middle_keyword_pages = middle_keyword_pages[:remaining]
+    elif remaining <= 0:
+        middle_keyword_pages = []
+
+    selected = sorted(head_pages | tail_pages | set(middle_keyword_pages))
+    return selected
+
+
+def extract_pdf_text_hybrid(
+    pdf_path: str,
+    pages_dir: Path,
+    max_pages: Optional[int] = None,
+    smart_sampling: bool = False,
+) -> List[Dict[str, Any]]:
     """
     Hybrid PDF extraction.
     Determines if a page is a text-based digital PDF or a scanned image page.
@@ -139,10 +193,17 @@ def extract_pdf_text_hybrid(pdf_path: str, pages_dir: Path, max_pages: Optional[
     import fitz
     doc = fitz.open(pdf_path)
     ocr_engine = None
+    ocr_count = 0
     results = []
-    
-    total_pages = min(len(doc), max_pages) if max_pages is not None else len(doc)
-    for page_num in range(total_pages):
+
+    if max_pages is not None and len(doc) > max_pages and smart_sampling:
+        page_indices = select_smart_pages(doc, max_pages)
+    elif max_pages is not None:
+        page_indices = list(range(min(len(doc), max_pages)))
+    else:
+        page_indices = list(range(len(doc)))
+
+    for page_num in page_indices:
         page = doc.load_page(page_num)
         native_text = page.get_text()
         
@@ -175,9 +236,13 @@ def extract_pdf_text_hybrid(pdf_path: str, pages_dir: Path, max_pages: Optional[
             })
         else:
             # Check if an OCR engine (PaddleOCR primary, Tesseract fallback) is usable
-            has_ocr_engine = OcrEngine.is_available()
+            has_ocr_engine = OcrEngine.is_available() and ocr_count < MAX_OCR_PAGES_PER_DOC
 
             if not has_ocr_engine:
+                if ocr_count >= MAX_OCR_PAGES_PER_DOC and OcrEngine.is_available():
+                    logger.warning(
+                        f"Skipping OCR for page {page_num + 1}: Reached MAX_OCR_PAGES_PER_DOC limit ({MAX_OCR_PAGES_PER_DOC}). Using native text fallback."
+                    )
                 # Fast fallback directly to native words without image I/O overhead
                 native_words = page.get_text("words")
                 blocks_data = build_text_blocks_from_words(native_words)
@@ -200,11 +265,12 @@ def extract_pdf_text_hybrid(pdf_path: str, pages_dir: Path, max_pages: Optional[
                 })
                 continue
 
+            ocr_count += 1
             # Scanned page detected and tesseract available -> render to image
             if not ocr_engine:
                 ocr_engine = OcrEngine(lang="eng+hin")
                 
-            zoom = 4.16  # ~300 DPI for high-precision character matching
+            zoom = float(os.getenv("PDF_OCR_ZOOM", "2.08"))  # ~150 DPI for fast character matching without massive memory overhead
             mat = fitz.Matrix(zoom, zoom)
             pix = page.get_pixmap(matrix=mat, alpha=False)
             

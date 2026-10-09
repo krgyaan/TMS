@@ -331,6 +331,7 @@ export const paths = {
         users_create: "/master/users/create",
         users_edit: (id: number | string) => `/master/users/${id}/edit`,
         users_permissions: (id: number | string) => `/master/users/${id}/permissions`,
+        users_view: (id: number | string) => `/master/users/${id}`,
 
         statuses: "/master/statuses",
         statuses_create: "/master/statuses/create",
@@ -507,6 +508,7 @@ export const paths = {
 
         // =========================training =======================//
         trainingDashboard: "/hrms/training",
-        uploadVideo: "/hrms/training/upload-video"
+        uploadVideo: "/hrms/training/upload-video",
+        assignCourse: "/hrms/training/assign-course"
     },
 };

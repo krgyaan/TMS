@@ -13,8 +13,10 @@ full ingestion pipeline -- this endpoint does not call
 ingest_parent_tender_pdf(), build_infosheet_data(), or touch the existing
 /extract endpoint or its Layer 1/2 extraction logic.
 """
+import asyncio
 import json
 import logging
+import os
 import tempfile
 import uuid
 from pathlib import Path
@@ -32,6 +34,40 @@ from app.services.bidding_requirements_resolver import (
 router = APIRouter(tags=["Bidding Requirements"])
 logger = logging.getLogger(__name__)
 
+BIDDING_REQ_MAX_PAGES = int(os.getenv("BIDDING_REQ_MAX_PAGES", "150"))
+ATC_MAX_PAGES = int(os.getenv("ATC_MAX_PAGES", "80"))
+
+
+def _process_bidding_analysis(
+    temp_pdf_path: Path,
+    pages_dir: Path,
+    atc_paths: List[Path],
+    library_docs: List[Dict[str, Any]],
+    job_id: str,
+) -> Dict[str, Any]:
+    """Runs synchronous CPU/IO extraction and LLM call in a background thread."""
+    page_texts = extract_pdf_text_hybrid(
+        str(temp_pdf_path),
+        pages_dir,
+        max_pages=BIDDING_REQ_MAX_PAGES,
+        smart_sampling=True,
+    )
+    atc_page_texts: List[Dict[str, Any]] = []
+    for atc_dest in atc_paths:
+        atc_page_texts.extend(
+            extract_pdf_text_hybrid(
+                str(atc_dest),
+                pages_dir,
+                max_pages=ATC_MAX_PAGES,
+                smart_sampling=True,
+            )
+        )
+    page_tagged_text = build_page_tagged_text(page_texts, atc_page_texts)
+    return analyze_bidding_requirements(
+        page_tagged_text=page_tagged_text,
+        library_documents=library_docs,
+    )
+
 
 @router.post("/analyze-bidding-requirements")
 async def analyze_bidding_requirements_endpoint(
@@ -48,34 +84,6 @@ async def analyze_bidding_requirements_endpoint(
     "document_type": str | null} -- the caller's company document library.
     VolksAI has no database of its own, so this is always supplied by the
     caller, never queried here.
-
-    Response shape (schemaVersion 1):
-    {
-      "schemaVersion": 1,
-      "job_id": str,
-      "requirements": [
-        {
-          "documentName": str,
-          "category": "oem" | "standard" | "company" | "other",
-          "required": bool,
-          "source": { "document": "main" | "atc", "page": int, "snippet": str },
-          "matchedLibraryId": str | null,
-          "confidence": "high" | "medium" | "low",
-          "reasoning": str
-        }, ...
-      ],
-      "annexures": [
-        {
-          "annexureName": str,
-          "source": { "document": "main" | "atc", "page": int, "snippet": str },
-          "blocks": [ { "type": "heading" | "paragraph" | "blank_field" | "table" | "signature_line", ... } ],
-          "droppedBlocks": int
-        }, ...
-      ],
-      "rejectedAnnexures": [ { "annexureName": str | null, "reason": str }, ... ],
-      "truncated": bool,
-      "llm_usage": { "input_tokens": int, "output_tokens": int, ... } | null
-    }
     """
     filename = pdf_file.filename or "unknown.pdf"
     if not filename.lower().endswith(".pdf"):
@@ -107,25 +115,27 @@ async def analyze_bidding_requirements_endpoint(
             temp_pdf_path.write_bytes(await pdf_file.read())
 
             pages_dir = temp_dir_path / "pages"
-            page_texts = extract_pdf_text_hybrid(str(temp_pdf_path), pages_dir)
 
-            atc_page_texts: List[Dict[str, Any]] = []
+            atc_paths: List[Path] = []
             for idx, atc_upload in enumerate(atc_files or []):
                 if not atc_upload or not atc_upload.filename:
                     continue
                 atc_dest = temp_dir_path / f"atc_{idx}_{atc_upload.filename}"
                 atc_dest.write_bytes(await atc_upload.read())
-                atc_page_texts.extend(extract_pdf_text_hybrid(str(atc_dest), pages_dir))
+                atc_paths.append(atc_dest)
                 logger.info(
-                    "[BIDDING_REQUIREMENTS_API] ATC file '%s' saved and parsed (job_id: %s)",
+                    "[BIDDING_REQUIREMENTS_API] ATC file '%s' saved (job_id: %s)",
                     atc_upload.filename, job_id,
                 )
 
-            page_tagged_text = build_page_tagged_text(page_texts, atc_page_texts)
-
-            result = analyze_bidding_requirements(
-                page_tagged_text=page_tagged_text,
-                library_documents=library_docs,
+            # Run in worker thread so event loop is not blocked for concurrent requests
+            result = await asyncio.to_thread(
+                _process_bidding_analysis,
+                temp_pdf_path,
+                pages_dir,
+                atc_paths,
+                library_docs,
+                job_id,
             )
 
             requirements = result.get("requirements", [])

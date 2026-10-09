@@ -1,15 +1,12 @@
-import React, { useState, useDeferredValue, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useDeferredValue, useMemo } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  Tooltip,
-  TooltipContent,
   TooltipProvider,
-  TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
   Plus,
@@ -17,8 +14,6 @@ import {
   Loader2,
   Users,
   Eye,
-  Check,
-  X,
   UserCheck,
   UserX,
   Phone,
@@ -27,17 +22,16 @@ import {
   Clock,
   UserPlus,
   XCircle,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   useOnboardingDashboard,
-  useUpdateOnboardingStatus,
 } from "@/hooks/api/useOnboarding";
 import { type OnboardingRequest } from "@/services/api/onboarding.service";
 import { paths } from "@/app/routes/paths";
 import { StatusBadge } from "./components/StatusBadge";
 import { HrStatusBadge } from "./components/HrStatusBadge";
-import { ActionModal } from "./components/ActionModal";
 import { timeAgo, getInitials, getAvatarColor } from "./helpers/onboarding.type";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -45,17 +39,12 @@ import { timeAgo, getInitials, getAvatarColor } from "./helpers/onboarding.type"
 interface JoineeCardProps {
   joinee: OnboardingRequest;
   onView: (j: OnboardingRequest) => void;
-  onApprove: (j: OnboardingRequest) => void;
-  onReject: (j: OnboardingRequest) => void;
 }
 
 const JoineeCard: React.FC<JoineeCardProps> = ({
     joinee,
     onView,
-    onApprove,
-    onReject,
   }) => {
-    const isPending = joinee.status === "pending";
 
     return (
       <div
@@ -187,52 +176,6 @@ const JoineeCard: React.FC<JoineeCardProps> = ({
             <Eye className="h-3.5 w-3.5" />
             View Details
           </Button>
-
-          {isPending && (
-            <div className="flex items-center gap-1.5">
-              <TooltipProvider delayDuration={100}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onReject(joinee);
-                      }}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="text-xs">
-                    Reject
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-
-              <TooltipProvider delayDuration={100}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onApprove(joinee);
-                      }}
-                    >
-                      <Check className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="text-xs">
-                    Approve
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-          )}
         </div>
       </div>
     );
@@ -296,17 +239,30 @@ const OnboardingDashboard: React.FC = () => {
     isLoading,
     isError,
   } = useOnboardingDashboard();
-  const updateStatus = useUpdateOnboardingStatus();
 
-  const [activeTab, setActiveTab] = useState<TabValue>("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawTab = searchParams.get("tab");
+  const activeTab: TabValue =
+    rawTab === "pending" || rawTab === "approved" || rawTab === "rejected"
+      ? rawTab
+      : "all";
+  const searchQuery = searchParams.get("q") ?? "";
   const deferredSearch = useDeferredValue(searchQuery);
 
-  const [actionType, setActionType] = useState<
-    "approved" | "rejected" | null
-  >(null);
-  const [actionJoinee, setActionJoinee] =
-    useState<OnboardingRequest | null>(null);
+  const updateParams = (key: string, value: string) => {
+    setSearchParams(
+      (prev) => {
+        if (value) prev.set(key, value);
+        else prev.delete(key);
+        return prev;
+      },
+      { replace: true }
+    );
+  };
+
+  const handleTabChange = (v: string) => {
+    updateParams("tab", v === "all" ? "" : v);
+  };
 
   const stats = useMemo(
     () => ({
@@ -333,30 +289,6 @@ const OnboardingDashboard: React.FC = () => {
 
   const openView = (j: OnboardingRequest) => {
     navigate(paths.hrms.onboardingCandidate(j.id));
-  };
-  const openApprove = (j: OnboardingRequest) => {
-    setActionJoinee(j);
-    setActionType("approved");
-  };
-  const openReject = (j: OnboardingRequest) => {
-    setActionJoinee(j);
-    setActionType("rejected");
-  };
-
-  const handleConfirmAction = async (note: string) => {
-    if (!actionJoinee || !actionType) return;
-    updateStatus.mutate(
-      {
-        id: actionJoinee.id,
-        dto: { status: actionType, note },
-      },
-      {
-        onSuccess: () => {
-          setActionType(null);
-          setActionJoinee(null);
-        },
-      }
-    );
   };
 
   // Loading state
@@ -441,10 +373,7 @@ const OnboardingDashboard: React.FC = () => {
 
         {/* Filters Bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-2">
-          <Tabs
-            value={activeTab}
-            onValueChange={(v) => setActiveTab(v as TabValue)}
-          >
+          <Tabs value={activeTab} onValueChange={handleTabChange}>
             <TabsList className="h-10 bg-muted/50 p-1 rounded-xl">
               {tabs.map((tab) => (
                 <TabsTrigger
@@ -471,12 +400,12 @@ const OnboardingDashboard: React.FC = () => {
               className="pl-10 h-10 text-sm rounded-xl border-border/60 focus-visible:border-primary/40"
               placeholder="Search by name, email, phone..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => updateParams("q", e.target.value)}
             />
             {searchQuery && (
               <button
                 type="button"
-                onClick={() => setSearchQuery("")}
+                onClick={() => updateParams("q", "")}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
               >
                 <X className="h-4 w-4" />
@@ -507,27 +436,13 @@ const OnboardingDashboard: React.FC = () => {
                   key={joinee.id}
                   joinee={joinee}
                   onView={openView}
-                  onApprove={openApprove}
-                  onReject={openReject}
                 />
               ))}
             </div>
           )}
         </div>
 
-        {/* Modals */}
-        <ActionModal
-          open={!!actionType}
-          type={actionType}
-          joinee={actionJoinee}
-          onClose={() => {
-            setActionType(null);
-            setActionJoinee(null);
-          }}
-          onConfirm={handleConfirmAction}
-          isLoading={updateStatus.isPending}
-        />
-      </div>
+        </div>
     </TooltipProvider>
   );
 };

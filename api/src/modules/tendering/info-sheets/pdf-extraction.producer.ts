@@ -244,7 +244,7 @@ export class PdfExtractionProducer {
 
         await this.queue.add('extract-pdf', data, {
             jobId,
-            attempts: 2,
+            attempts: 1, // Heavy PDF extraction does not benefit from blind retries if it timed out after 120s
             backoff: {
                 type: 'exponential',
                 delay: 5000,
