@@ -800,6 +800,7 @@ export class PurchaseOrderService {
                 partyName: paymentRequests.partyName,
                 amount: paymentRequests.amount,
                 status: paymentRequests.status,
+                actualTdsDeducted: paymentRequests.actualTdsDeducted,
                 requestedByName: users.name,
                 createdAt: paymentRequests.createdAt,
             })

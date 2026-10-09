@@ -77,20 +77,20 @@ export class PurchaseInvoiceService {
                     .from(gst2bReco)
                     .where(and(
                         eq(gst2bReco.poId, body.purchaseOrderId),
-                        eq(gst2bReco.invoiceId, pi.id)
+                        eq(gst2bReco.invoiceId, row.id)
                     ))
                     .limit(1)
                     .then(rows => rows[0]);
 
                 if (!existingGst2b) {
                     await tx.insert(gst2bReco).values({
-                        projectId: pi.projectId,
+                        projectId: row.projectId,
                         poId: body.purchaseOrderId,
-                        invoiceId: pi.id,
+                        invoiceId: row.id,
                         invoiceDate: body.invoiceDate,
                         invoiceUploadedAt: new Date(),
                         gstAmount: body.gstAmount,
-                    }).catch((err) => this.logger.warn(`GST 2B reconciliation creation failed for invoice #${pi.id}: ${err}`));
+                    }).catch((err) => this.logger.warn(`GST 2B reconciliation creation failed for invoice #${row.id}: ${err}`));
                 }
             }
 

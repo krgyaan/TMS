@@ -643,6 +643,7 @@ export class PaymentRequestService {
         rejectionReason: paymentRequests.rejectionReason,
         status: paymentRequests.status,
         tdsPercentage: paymentRequests.tdsPercentage,
+        actualTdsDeducted: paymentRequests.actualTdsDeducted,
         requestedBy: paymentRequests.requestedBy,
         createdAt: paymentRequests.createdAt,
         updatedAt: paymentRequests.updatedAt,
