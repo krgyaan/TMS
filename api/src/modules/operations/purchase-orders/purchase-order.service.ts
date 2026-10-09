@@ -1244,6 +1244,7 @@ export class PurchaseOrderService {
                 paymentMode: paymentRequests.paymentMode,
                 paymentAgainst: paymentRequests.paymentAgainst,
                 utrNumber: paymentRequests.utrNumber,
+                actualTdsDeducted: paymentRequests.actualTdsDeducted,
                 createdAt: paymentRequests.createdAt,
             })
             .from(paymentRequests)
@@ -1267,6 +1268,10 @@ export class PurchaseOrderService {
 
         const totalPaymentDone = round2(paymentRequestsData.filter(pr => pr.status === "payment_done").reduce((sum, pr) => sum + Number(pr.amount || 0), 0));
 
+        const totalTdsDeducted = round2(paymentRequestsData.filter(pr => pr.status === "payment_done").reduce((sum, pr) => sum + Number(pr.actualTdsDeducted || 0), 0));
+
+        const totalPaidAfterTds = round2(totalPaymentDone - totalTdsDeducted);
+
         const totalPiAmount = round2(purchaseInvoicesData.reduce((sum, inv) => sum + Number(inv.valuePreGst || 0) + Number(inv.gstAmount || 0), 0));
 
         const closedByName = po.closedBy ? ((await this.db.select({ name: users.name }).from(users).where(eq(users.id, po.closedBy)))[0]?.name ?? null) : null;
@@ -1280,9 +1285,13 @@ export class PurchaseOrderService {
             poDate: po.poDate,
             poApproved: po.poApproved,
             amountAfterTds: po.amountAfterTds,
+            tdsAmount: po.tdsAmount,
+            tdsPercentage: po.tdsPercentage,
             grandTotal: round2(totalWithGst),
             totalGst: round2(totalGst),
             totalPaymentDone,
+            totalTdsDeducted,
+            totalPaidAfterTds,
             totalPiAmount,
             closedAt: po.closedAt,
             closedBy: po.closedBy,

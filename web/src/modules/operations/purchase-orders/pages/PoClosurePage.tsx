@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { purchaseOrderApi } from "@/services/api/purchase-order.api";
@@ -45,9 +45,13 @@ interface PoClosureData {
     poDate?: string;
     poApproved?: boolean;
     amountAfterTds?: number | string;
+    tdsAmount?: number | string;
+    tdsPercentage?: number | string;
     grandTotal: number;
     totalGst: number;
     totalPaymentDone: number;
+    totalTdsDeducted: number;
+    totalPaidAfterTds: number;
     totalPiAmount: number;
     closedAt?: string | null;
     closedBy?: number | null;
@@ -62,6 +66,7 @@ interface PoClosureData {
         paymentMode?: string;
         paymentAgainst?: string;
         utrNumber?: string;
+        actualTdsDeducted?: number | string;
         createdAt?: string;
     }>;
     purchaseInvoices: Array<{
@@ -206,7 +211,16 @@ const PoClosurePage: React.FC = () => {
 
     const amountAfterTds = round2(Number(po?.amountAfterTds || po?.grandTotal || 0));
     const totalPaymentDone = round2(Number(po?.totalPaymentDone || 0));
+    const totalTdsDeducted = round2(Number(po?.totalTdsDeducted || 0));
+    const totalPaidAfterTds = round2(Number(po?.totalPaidAfterTds || 0));
     const totalPiAmount = round2(Number(po?.totalPiAmount || 0));
+    // TDS-aware column/footer/reconciliation are shown only when TDS was actually
+    // deducted, so non-TDS POs keep the previous look.
+    const showTdsColumn = totalTdsDeducted > 0;
+    // Settlement gating stays on the GROSS payment total so the page always
+    // agrees with the API's close gate (checkClosure sums gross PR amounts vs
+    // amountAfterTds with a ₹CLOSURE_TOLERANCE tolerance). TDS is displayed
+    // separately as an after-TDS reconciliation.
     const remainingToPay = round2(amountAfterTds - totalPaymentDone);
     const remainingInvoice = round2(amountAfterTds - totalPiAmount);
     // A difference strictly below CLOSURE_TOLERANCE rupees is absorbed as
@@ -299,11 +313,11 @@ const PoClosurePage: React.FC = () => {
                     <div className="space-y-3">
                         <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
                             <div>
-                                <p className="text-sm font-medium">Payment Done (Paid Out)</p>
-                                <p className="text-xs text-muted-foreground">Amount we have paid</p>
+                                <p className="text-sm font-medium">Payment Done (After TDS)</p>
+                                <p className="text-xs text-muted-foreground">Amount paid out after TDS deduction</p>
                             </div>
                             <div className="text-right">
-                                <p className="text-lg font-semibold">{formatINR(totalPaymentDone)}</p>
+                                <p className="text-lg font-semibold">{formatINR(totalPaidAfterTds)}</p>
                                 {remainingToPay <= 0 ? (
                                     <Badge variant="default" className="mt-1">Settled</Badge>
                                 ) : paySettled ? (
@@ -313,6 +327,18 @@ const PoClosurePage: React.FC = () => {
                                 )}
                             </div>
                         </div>
+
+                        {totalTdsDeducted > 0 && (
+                            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                                <div>
+                                    <p className="text-sm font-medium">TDS Deducted</p>
+                                    <p className="text-xs text-muted-foreground">Withheld from payments (pending TDS returns)</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-lg font-semibold">{formatINR(totalTdsDeducted)}</p>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
                             <div>
@@ -611,6 +637,7 @@ const PoClosurePage: React.FC = () => {
                                         <TableHead className="text-xs uppercase">Date</TableHead>
                                         <TableHead className="text-xs uppercase">Party</TableHead>
                                         <TableHead className="text-xs uppercase text-right">Amount</TableHead>
+                                        {showTdsColumn && <TableHead className="text-xs uppercase text-right">TDS Deducted</TableHead>}
                                         <TableHead className="text-xs uppercase">Status</TableHead>
                                         <TableHead className="text-xs uppercase">Mode</TableHead>
                                         <TableHead className="text-xs uppercase">UTR</TableHead>
@@ -626,6 +653,7 @@ const PoClosurePage: React.FC = () => {
                                                 <TableCell className="text-sm">{formatDate(pr.createdAt)}</TableCell>
                                                 <TableCell className="text-sm">{pr.partyName || "—"}</TableCell>
                                                 <TableCell className="text-sm text-right font-medium">{formatINR(Number(pr.amount || 0))}</TableCell>
+                                                {showTdsColumn && <TableCell className="text-sm text-right">{formatINR(Number(pr.actualTdsDeducted || 0))}</TableCell>}
                                                 <TableCell><Badge variant={cfg.variant}>{cfg.label}</Badge></TableCell>
                                                 <TableCell className="text-sm">{pr.paymentMode || "—"}</TableCell>
                                                 <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">{pr.utrNumber || "—"}</TableCell>
@@ -661,6 +689,16 @@ const PoClosurePage: React.FC = () => {
                                         );
                                     })}
                                 </TableBody>
+                                {showTdsColumn && (
+                                    <TableFooter>
+                                        <TableRow className="bg-muted/50">
+                                            <TableCell colSpan={3} className="font-semibold">Total (After TDS Deduction)</TableCell>
+                                            <TableCell className="text-right font-semibold">{formatINR(totalPaidAfterTds)}</TableCell>
+                                            <TableCell className="text-right font-semibold">{formatINR(totalTdsDeducted)}</TableCell>
+                                            <TableCell colSpan={5}></TableCell>
+                                        </TableRow>
+                                    </TableFooter>
+                                )}
                             </Table>
                         </div>
                     )}
