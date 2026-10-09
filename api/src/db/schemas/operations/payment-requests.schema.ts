@@ -30,6 +30,7 @@ export const paymentRequests = pgTable(
         rejectionReason: text("rejection_reason"),
         status: varchar("status", { length: 50 }).notNull().default("pending"),
         tdsPercentage: numeric("tds_percentage", { precision: 5, scale: 2 }),
+        actualTdsDeducted: numeric("actual_tds_deducted", { precision: 14, scale: 2 }).default("0"),
         requestedBy: bigint("requested_by", { mode: "number" }),
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
         updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -38,6 +39,7 @@ export const paymentRequests = pgTable(
         index("idx_pr_request_no").on(table.requestNo),
         index("idx_pr_project_id").on(table.projectId),
         index("idx_pr_status").on(table.status),
+        index("idx_pr_actual_tds").on(table.actualTdsDeducted),
     ])
 );
 
