@@ -9,6 +9,14 @@ import type { Permission, UserPermission } from "@/types/api.types";
 
 const ACTION_ORDER = ["create", "delete", "read", "update"];
 
+/**
+ * Modules where role permissions are ignored and access is granted per-user only.
+ * Mirrors USER_ONLY_MODULES in api/src/modules/auth/services/permission.service.ts.
+ */
+const USER_ONLY_MODULES = new Set(["tenders"]);
+
+
+
 function includesText(haystack: string | null | undefined, needle: string) {
     if (!needle) return true;
     return (haystack ?? "").toLowerCase().includes(needle);
@@ -98,7 +106,8 @@ export function PermissionSelector({
 }: {
     permissions: Permission[];
     selectedPermissions: UserPermission[];
-    rolePermissions?: UserPermission[];
+    /** Catalogue permissions granted to the user's role (Permission[].id is permissions.id). */
+    rolePermissions?: Permission[];
     onChange: (permissionId: number, granted: boolean) => void;
 }) {
     const [query, setQuery] = useState("");
@@ -176,7 +185,12 @@ export function PermissionSelector({
     }, [areas]);
 
     const selectedMap = new Map(selectedPermissions.map((p) => [p.permissionId, p.granted]));
-    const inheritedSet = new Set((rolePermissions ?? []).map((p) => p.id));
+    const inheritedSet = new Set(
+        (rolePermissions ?? [])
+            // Role permissions are ignored for user-only modules such as tenders.
+            .filter((p) => !USER_ONLY_MODULES.has(p.module))
+            .map((p) => p.id)
+    );
 
     const getState = (id: number) => {
         if (selectedMap.has(id)) return selectedMap.get(id) ? "granted" : "denied";
@@ -191,13 +205,13 @@ export function PermissionSelector({
 
     const countFor = (perms: Permission[]) => {
         let granted = 0;
-        let inherited = 0;
         for (const p of perms) {
+            // Inherited boxes render ticked, so they must count toward the
+            // numerator or the counter contradicts what the user sees.
             const state = getState(p.id);
-            if (state === "granted") granted++;
-            if (state === "inherited") inherited++;
+            if (state === "granted" || state === "inherited") granted++;
         }
-        return { total: perms.length, granted, inherited };
+        return { total: perms.length, granted };
     };
 
     const moduleGrantCount = (module: string) => countFor(byAreaModule.get(module) ?? []);
@@ -270,9 +284,8 @@ export function PermissionSelector({
                                     >
                                         <div className="flex min-w-0 items-baseline gap-2">
                                             <span className="truncate font-medium capitalize">{entry.label}</span>
-                                            <span className="shrink-0 text-xs text-muted-foreground">
-                                                ({counts.granted}/{counts.total} granted
-                                                {counts.inherited > 0 && `, ${counts.inherited} from role`})
+<span className="shrink-0 text-xs text-muted-foreground">
+                                                ({counts.granted}/{counts.total} granted)
                                             </span>
                                         </div>
 
@@ -299,15 +312,11 @@ export function PermissionSelector({
                                                     >
                                                         <Checkbox
                                                             checked={checked}
-                                                            disabled={isInherited}
                                                             onCheckedChange={() => toggle(perm.id)}
                                                         />
                                                         <span className={isInherited ? "text-muted-foreground" : ""}>
                                                             {action}
                                                         </span>
-                                                        {isInherited && (
-                                                            <span className="text-[10px] text-muted-foreground">(inherited)</span>
-                                                        )}
                                                     </label>
                                                 );
                                             })}

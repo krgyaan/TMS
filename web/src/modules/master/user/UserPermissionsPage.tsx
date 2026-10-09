@@ -6,6 +6,7 @@ import { paths } from "@/app/routes/paths";
 import { useUser } from "@/hooks/api/useUsers";
 import { usePermissions } from "@/hooks/api/usePermissions";
 import { useUserPermissions } from "@/hooks/api/useUserPermissions";
+import { useRolePermissions } from "@/hooks/api/useRoles";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
@@ -18,8 +19,9 @@ export default function UserPermissionsPage() {
     const { data: user, isLoading: userLoading, error: userError } = useUser(userId);
     const { data: allPermissions = [] } = usePermissions();
     const { data: userPermissionsData, isLoading: permsLoading } = useUserPermissions(userId);
+    const { data: rolePermissions, isLoading: rolePermsLoading } = useRolePermissions(user?.role?.id ?? null);
 
-    const loading = userLoading || permsLoading;
+    const loading = userLoading || permsLoading || rolePermsLoading;
 
     if (!userId) {
         return (
@@ -85,6 +87,7 @@ export default function UserPermissionsPage() {
                     userId={userId}
                     allPermissions={allPermissions}
                     userPermissionsData={userPermissionsData}
+                    rolePermissions={rolePermissions}
                 />
             </CardContent>
         </Card>
