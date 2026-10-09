@@ -1,20 +1,13 @@
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 import {
     ArrowLeft,
-    Building,
     CalendarClock,
     CalendarPlus,
     CircleDot,
-    Clock,
     CreditCard,
-    Droplet,
     Facebook,
-    FileCheck,
-    Globe,
     Hash,
     Home,
-    ImageIcon,
-    Languages,
     Mail,
     MapPin,
     Phone,
@@ -212,6 +205,8 @@ export default function UserViewPage() {
         );
     }
 
+    const emergency = (user.profile?.emergencyContact ?? {}) as Record<string, string | null>;
+
     return (
         <Card>
             <CardHeader>
@@ -241,19 +236,6 @@ export default function UserViewPage() {
                             <FieldValue>{user.profile?.employeeCode || "—"}</FieldValue>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
-                            <FieldLabel icon={<FileCheck className="h-4 w-4" />}>Profile Status</FieldLabel>
-                            <FieldValue>
-                                <Badge variant={user.profile?.profileCompleted ? "default" : "secondary"}>
-                                    {user.profile?.profileCompleted ? "Complete" : "Incomplete"}
-                                </Badge>
-                            </FieldValue>
-                            <FieldLabel icon={<ImageIcon className="h-4 w-4" />}>Photo</FieldLabel>
-                            <FieldValue>{user.profile?.image || "—"}</FieldValue>
-                        </TableRow>
-
-                        {/* Account */}
-                        <GroupHeader>Account</GroupHeader>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
                             <FieldLabel icon={<Hash className="h-4 w-4" />}>User ID</FieldLabel>
                             <FieldValue>{user.id}</FieldValue>
                             <FieldLabel icon={<UserRound className="h-4 w-4" />}>Username</FieldLabel>
@@ -268,10 +250,20 @@ export default function UserViewPage() {
                             <FieldValue>{user.role?.name || "—"}</FieldValue>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
-                            <FieldLabel icon={<Clock className="h-4 w-4" />}>Timezone</FieldLabel>
-                            <FieldValue>{user.profile?.timezone || "—"}</FieldValue>
-                            <FieldLabel icon={<Languages className="h-4 w-4" />}>Locale</FieldLabel>
-                            <FieldValue>{user.profile?.locale || "—"}</FieldValue>
+                            <FieldLabel icon={<CalendarPlus className="h-4 w-4" />}>Date of Birth</FieldLabel>
+                            <FieldValue>{formatDate(user.profile?.dateOfBirth)}</FieldValue>
+                            <FieldLabel icon={<Users className="h-4 w-4" />}>Marital Status</FieldLabel>
+                            <FieldValue>{user.profile?.maritalStatus || "—"}</FieldValue>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <FieldLabel icon={<CreditCard className="h-4 w-4" />}>Aadhaar Number</FieldLabel>
+                            <FieldValue>{user.profile?.aadharNumber || "—"}</FieldValue>
+                            <FieldLabel icon={<Ruler className="h-4 w-4" />}>PAN Number</FieldLabel>
+                            <FieldValue>{user.profile?.panNumber || "—"}</FieldValue>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <FieldLabel icon={<Facebook className="h-4 w-4" />}>LinkedIn</FieldLabel>
+                            <FieldValue span={3}>{user.profile?.linkedinProfile || "—"}</FieldValue>
                         </TableRow>
 
                         {/* Contact */}
@@ -289,14 +281,20 @@ export default function UserViewPage() {
                             <FieldValue>{user.profile?.phone || "—"}</FieldValue>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
-                            <FieldLabel icon={<PhoneCall className="h-4 w-4" />}>Emergency Contact</FieldLabel>
-                            <FieldValue>{user.profile?.emergencyContactName || "—"}</FieldValue>
-                            <FieldLabel icon={<PhoneCall className="h-4 w-4" />}>Contact Phone</FieldLabel>
-                            <FieldValue>{user.profile?.emergencyContactPhone || "—"}</FieldValue>
+                            <FieldLabel icon={<PhoneCall className="h-4 w-4" />}>Emergency Name</FieldLabel>
+                            <FieldValue>{emergency.name || "—"}</FieldValue>
+                            <FieldLabel icon={<Mail className="h-4 w-4" />}>Emergency Email</FieldLabel>
+                            <FieldValue>{emergency.email || "—"}</FieldValue>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
-                            <FieldLabel icon={<PhoneCall className="h-4 w-4" />}>Emergency Details</FieldLabel>
-                            <FieldValue span={3}>{formatJson(user.profile?.emergencyContact)}</FieldValue>
+                            <FieldLabel icon={<PhoneCall className="h-4 w-4" />}>Emergency Phone</FieldLabel>
+                            <FieldValue>{emergency.phone || "—"}</FieldValue>
+                            <FieldLabel icon={<Phone className="h-4 w-4" />}>Alternate Phone</FieldLabel>
+                            <FieldValue>{emergency.altPhone || "—"}</FieldValue>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <FieldLabel icon={<Users className="h-4 w-4" />}>Relationship</FieldLabel>
+                            <FieldValue span={3}>{emergency.relationship || "—"}</FieldValue>
                         </TableRow>
 
                         {/* Employment */}
@@ -316,33 +314,8 @@ export default function UserViewPage() {
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <FieldLabel icon={<Users className="h-4 w-4" />}>Gender</FieldLabel>
                             <FieldValue>{user.profile?.gender || "—"}</FieldValue>
-                            <FieldLabel icon={<UsersRound className="h-4 w-4" />}>Marital Status</FieldLabel>
-                            <FieldValue>{user.profile?.maritalStatus || "—"}</FieldValue>
-                        </TableRow>
-
-                        {/* Personal */}
-                        <GroupHeader>Personal</GroupHeader>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <FieldLabel icon={<CalendarPlus className="h-4 w-4" />}>Date of Birth</FieldLabel>
-                            <FieldValue>{formatDate(user.profile?.dateOfBirth)}</FieldValue>
-                            <FieldLabel icon={<Globe className="h-4 w-4" />}>Nationality</FieldLabel>
-                            <FieldValue>{user.profile?.nationality || "—"}</FieldValue>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <FieldLabel icon={<Droplet className="h-4 w-4" />}>Blood Group</FieldLabel>
-                            <FieldValue>{user.profile?.bloodGroup || "—"}</FieldValue>
-                            <FieldLabel icon={<CreditCard className="h-4 w-4" />}>Aadhaar Number</FieldLabel>
-                            <FieldValue>{user.profile?.aadharNumber || "—"}</FieldValue>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <FieldLabel icon={<Ruler className="h-4 w-4" />}>PAN Number</FieldLabel>
-                            <FieldValue>{user.profile?.panNumber || "—"}</FieldValue>
-                            <FieldLabel icon={<Building className="h-4 w-4" />}>PF Number</FieldLabel>
-                            <FieldValue>{user.profile?.pfNumber || "—"}</FieldValue>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <FieldLabel icon={<Facebook className="h-4 w-4" />}>LinkedIn</FieldLabel>
-                            <FieldValue span={3}>{user.profile?.linkedinProfile || "—"}</FieldValue>
+                            <FieldLabel icon={<CalendarPlus className="h-4 w-4" />}>Created</FieldLabel>
+                            <FieldValue>{formatDateTime(String(user.createdAt))}</FieldValue>
                         </TableRow>
 
                         {/* Addresses */}
@@ -354,15 +327,6 @@ export default function UserViewPage() {
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <FieldLabel icon={<MapPin className="h-4 w-4" />}>Permanent Address</FieldLabel>
                             <FieldValue span={3}>{formatJson(user.profile?.permanentAddress)}</FieldValue>
-                        </TableRow>
-
-                        {/* Audit */}
-                        <GroupHeader>Audit</GroupHeader>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <FieldLabel icon={<CalendarPlus className="h-4 w-4" />}>Created</FieldLabel>
-                            <FieldValue>{formatDateTime(String(user.createdAt))}</FieldValue>
-                            <FieldLabel icon={<CalendarClock className="h-4 w-4" />}>Updated</FieldLabel>
-                            <FieldValue>{formatDateTime(String(user.updatedAt))}</FieldValue>
                         </TableRow>
                         
 
