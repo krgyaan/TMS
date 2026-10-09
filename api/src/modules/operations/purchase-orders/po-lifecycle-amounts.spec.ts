@@ -66,13 +66,13 @@ describeDb("PO lifecycle amount tracking", () => {
       INSERT INTO gst2b_reco (project_id, po_id, invoice_id, invoice_date, invoice_uploaded_at, gst_amount)
       VALUES (99, 1, ${invoiceId}, '2026-09-15', '2026-09-15', 300)`);
 
-        // 5. Insert payment requests: PR1 1500, PR2 760 (sum 2260 ≤ cap 2300)
+        // 5. Insert payment requests: PR1 1500, PR2 800 (sum 2300 = gross value)
         await command(`
       INSERT INTO project_payment_requests (project_id, request_no, party_name, account_number, ifsc, amount, payment_against, purchase_order_id, status, tds_percentage, requested_by)
       VALUES (99, 'PR001', 'Vendor A', '123456789', 'TEST000123', 1500, 'material', 1, 'po_approval_pending', 2, 1),
-             (99, 'PR002', 'Vendor B', '987654321', 'TEST000123', 760, 'material', 1, 'po_approval_pending', 2, 1)`);
+             (99, 'PR002', 'Vendor B', '987654321', 'TEST000123', 800, 'material', 1, 'po_approval_pending', 2, 1)`);
 
-        // 6. Approve PO: set tdsPercentage 2%, tdsAmount 40, amountAfterTds 2260, poApproved true
+        // 6. Approve PO: set tdsPercentage 2%, tdsAmount 40, amountAfterTds 2260 (2300 − 40), poApproved true
         await command(`
       UPDATE purchase_orders SET tds_percentage = '2.00', tds_amount = 40, amount_after_tds = 2260, po_approved = true WHERE id = 1`);
 
@@ -84,11 +84,11 @@ describeDb("PO lifecycle amount tracking", () => {
         await command(`
       UPDATE project_payment_requests SET status = 'payment_done', utr_number = 'UTR123ABC' WHERE purchase_order_id = 1`);
 
-        // 8. checkClosure concept:
-        //    effectiveAmount = amountAfterTds = 2260 (set above)
-        //    paid = 1500 + 760 = 2260 → remainingToPay = 0
-        //    invoiced = 2000 + 300 = 2300 → remainingInvoice = -40 (< 10 one-sided)
-        //    canClose = (open PRs = 0) && (0 < 10) && (-40 < 10) = true
+        // 8. checkClosure concept (symmetric gross settlement):
+        //    grandTotal = products 1180 + 1120 = 2300
+        //    paid = 1500 + 800 = 2300 → remainingToPay = 0
+        //    invoiced = 2000 + 300 = 2300 → remainingInvoice = 0
+        //    canClose = (open PRs = 0) && (|0| < 10) && (|0| < 10) = true
         const allPrs = await query<{ status: string }>(`SELECT status FROM project_payment_requests WHERE purchase_order_id = 1`);
         const openPRs = allPrs.filter(r => r.status !== "payment_done").length;
         expect(openPRs).toBe(0);
@@ -100,7 +100,7 @@ describeDb("PO lifecycle amount tracking", () => {
         const [{ paid }] = await query<{ paid: string }>(
             `SELECT COALESCE(SUM(amount), 0) AS paid FROM project_payment_requests WHERE purchase_order_id = 1 AND status = 'payment_done'`
         );
-        expect(Number(paid)).toBe(2260);
+        expect(Number(paid)).toBe(2300);
         const [{ invoiced }] = await query<{ invoiced: string }>(
             `SELECT COALESCE(SUM(value_pre_gst), 0) + COALESCE(SUM(gst_amount), 0) AS invoiced FROM project_purchase_invoices WHERE purchase_order_id = 1`
         );

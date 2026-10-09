@@ -749,7 +749,7 @@ export class PurchaseOrderService {
 
         const closureStatus = await this.checkClosure(id);
         if (!closureStatus.canClose) {
-            throw new BadRequestException(`Purchase Order cannot be closed until payments and invoices are settled (difference must be under ₹${CLOSURE_TOLERANCE}).`);
+            throw new BadRequestException(`Purchase Order cannot be closed until invoices cover the PO value and payments match the invoices (each difference under ₹${CLOSURE_TOLERANCE}).`);
         }
 
         const [updated] = await this.db
@@ -1193,27 +1193,54 @@ export class PurchaseOrderService {
 
         // Sums are computed in SQL (exact numeric) instead of JS floats so the
         // API gate can never disagree with the closure page's rounded values.
-        const [totals] = await this.db
+        // NOTE: drizzle renders a column reference inside a raw `sql` subquery as a
+        // bare column name (e.g. `"id"`), so correlated references to the outer
+        // table would bind to the subquery's own table and always return 0. The id
+        // is therefore bound as a parameter instead:
+        const [productTotals] = await this.db
             .select({
-                effectiveAmount: sql<string>`COALESCE(${purchaseOrders.amountAfterTds}::numeric, (SELECT COALESCE(SUM(${purchaseOrderProducts.totalAmount}::numeric), 0) FROM ${purchaseOrderProducts} WHERE ${purchaseOrderProducts.purchaseOrderId} = ${purchaseOrders.id}))`,
-                paid: sql<string>`COALESCE((SELECT SUM(${paymentRequests.amount}::numeric) FROM ${paymentRequests} WHERE ${paymentRequests.purchaseOrderId} = ${purchaseOrders.id} AND ${paymentRequests.status} = 'payment_done'), 0)`,
-                invoiced: sql<string>`COALESCE((SELECT SUM(${purchaseInvoices.valuePreGst}::numeric + ${purchaseInvoices.gstAmount}::numeric) FROM ${purchaseInvoices} WHERE ${purchaseInvoices.purchaseOrderId} = ${purchaseOrders.id}), 0)`,
+                total: sql<string>`COALESCE(SUM(${purchaseOrderProducts.totalAmount}::numeric), 0)`,
             })
-            .from(purchaseOrders)
-            .where(eq(purchaseOrders.id, id));
+            .from(purchaseOrderProducts)
+            .where(eq(purchaseOrderProducts.purchaseOrderId, id));
 
-        const effectiveAmount = round2(totals.effectiveAmount);
-        const totalPaymentDone = round2(totals.paid);
-        const totalPiAmount = round2(totals.invoiced);
-        const remainingToPay = round2(effectiveAmount - totalPaymentDone);
-        const remainingInvoice = round2(effectiveAmount - totalPiAmount);
+        const [paymentTotals] = await this.db
+            .select({
+                gross: sql<string>`COALESCE(SUM(${paymentRequests.amount}::numeric), 0)`,
+                tds: sql<string>`COALESCE(SUM(${paymentRequests.actualTdsDeducted}::numeric), 0)`,
+            })
+            .from(paymentRequests)
+            .where(and(eq(paymentRequests.purchaseOrderId, id), eq(paymentRequests.status, "payment_done")));
 
-        const canClose = paymentRequestsData.length === 0 && remainingToPay < CLOSURE_TOLERANCE && remainingInvoice < CLOSURE_TOLERANCE;
+        const [invoiceTotals] = await this.db
+            .select({
+                invoiced: sql<string>`COALESCE(SUM(${purchaseInvoices.valuePreGst}::numeric + ${purchaseInvoices.gstAmount}::numeric), 0)`,
+            })
+            .from(purchaseInvoices)
+            .where(eq(purchaseInvoices.purchaseOrderId, id));
+
+        // Closure reconciles against the GROSS PO value (products incl. GST);
+        // for POs without product rows, fall back to amountAfterTds + tdsAmount.
+        const grandTotal = round2(Number(productTotals.total) > 0 ? productTotals.total : Number(po.amountAfterTds ?? 0) + Number(po.tdsAmount ?? 0));
+        const totalPaymentDone = round2(paymentTotals.gross);
+        const totalTdsDeducted = round2(paymentTotals.tds);
+        const totalPaidAfterTds = round2(totalPaymentDone - totalTdsDeducted);
+        const totalPiAmount = round2(invoiceTotals.invoiced);
+        const effectiveAmount = round2(po.amountAfterTds ?? grandTotal);
+        const remainingToPay = round2(grandTotal - totalPaymentDone);
+        const remainingInvoice = round2(grandTotal - totalPiAmount);
+
+        // Symmetric settlement: invoices must cover the PO value AND payments must
+        // match the invoices, each within CLOSURE_TOLERANCE (over- and under-side).
+        const canClose = paymentRequestsData.length === 0 && Math.abs(remainingToPay) < CLOSURE_TOLERANCE && Math.abs(remainingInvoice) < CLOSURE_TOLERANCE;
 
         return {
             canClose,
             effectiveAmount,
+            grandTotal,
             totalPaymentDone,
+            totalTdsDeducted,
+            totalPaidAfterTds,
             totalPiAmount,
             remainingToPay,
             remainingInvoice,
