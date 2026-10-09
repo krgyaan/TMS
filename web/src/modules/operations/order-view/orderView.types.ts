@@ -23,6 +23,7 @@ export interface OrderPaymentRequestRow {
     partyName: string;
     amount: string;
     status: string;
+    actualTdsDeducted?: number | string;
     requestedByName: string;
     createdAt: string;
 }
