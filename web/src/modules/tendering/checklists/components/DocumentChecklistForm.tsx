@@ -284,27 +284,25 @@ export default function DocumentChecklistForm({
                                             variant="outline"
                                             size="sm"
                                             disabled
-                                            title="AI analysis is temporarily paused"
+                                            className="opacity-75 cursor-not-allowed select-none text-muted-foreground"
+                                            title="AI analysis is temporarily closed"
                                         >
-                                            <Sparkles className="mr-2 h-4 w-4" />
-                                            Analyze Tender Documents
+                                            <PauseCircle className="mr-2 h-4 w-4 text-amber-600" />
+                                            Temporarily Closed
                                         </Button>
-                                        <Badge variant="secondary" className="text-xs gap-1">
-                                            <PauseCircle className="h-3 w-3" />
-                                            Paused
-                                        </Badge>
                                     </div>
                                 )}
                                 {suggestionPanel.showReanalyze && (
                                     <Button
                                         type="button"
-                                        variant="ghost"
+                                        variant="outline"
                                         size="sm"
-                                        onClick={() => suggestMutation.mutate({ tenderId, forceRefresh: true })}
-                                        title="Run a new analysis of the tender documents (replaces the saved result)"
+                                        disabled
+                                        className="opacity-75 cursor-not-allowed select-none text-muted-foreground"
+                                        title="AI analysis is temporarily closed"
                                     >
-                                        <RefreshCw className="mr-2 h-4 w-4" />
-                                        Re-analyze
+                                        <PauseCircle className="mr-2 h-4 w-4 text-amber-600" />
+                                        Temporarily Closed
                                     </Button>
                                 )}
                                 {suggestMutation.isPending && (
