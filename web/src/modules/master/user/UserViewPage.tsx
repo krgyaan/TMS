@@ -1,15 +1,25 @@
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 import {
     ArrowLeft,
+    Building,
     CalendarClock,
     CalendarPlus,
     CircleDot,
     Clock,
+    CreditCard,
+    Droplet,
+    Facebook,
+    FileCheck,
+    Globe,
     Hash,
+    Home,
+    ImageIcon,
     Languages,
     Mail,
+    MapPin,
     Phone,
     PhoneCall,
+    Ruler,
     ShieldCheck,
     UserRound,
     Users,
@@ -63,6 +73,32 @@ const FieldValue = ({ children, span }: { children: ReactNode; span?: number }) 
         {children ?? "—"}
     </TableCell>
 );
+
+const formatDate = (value?: string | null) => {
+    if (!value) return "—";
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime())
+        ? "—"
+        : parsed.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+};
+
+const formatDateTime = (value?: string | null) => {
+    if (!value) return "—";
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? "—" : parsed.toLocaleString();
+};
+
+/** Renders a jsonb object, skipping null/empty values so we never show a wall of em-dashes. */
+const formatJson = (value?: unknown) => {
+    if (!value || typeof value !== "object") return "—";
+    const entries = Object.entries(value as Record<string, unknown>).filter(([, v]) => {
+        if (v === null || v === undefined || v === "") return false;
+        if (typeof v === "object" && Object.keys(v as object).length === 0) return false;
+        return true;
+    });
+    if (entries.length === 0) return "—";
+    return entries.map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`).join(" · ");
+};
 
 export default function UserViewPage() {
     const { id } = useParams<{ id: string }>();
@@ -196,13 +232,32 @@ export default function UserViewPage() {
             <CardContent>
                 <Table>
                     <TableBody>
-                        {/* Account Information */}
-                        <GroupHeader>Account Information</GroupHeader>
+                        {/* Identity */}
+                        <GroupHeader>Identity</GroupHeader>
                         <TableRow className="hover:bg-muted/30 transition-colors">
-                            <FieldLabel icon={<UserRound className="h-4 w-4" />}>Username</FieldLabel>
-                            <FieldValue>{`@${user.username ?? "—"}`}</FieldValue>
+                            <FieldLabel icon={<UserRound className="h-4 w-4" />}>Full Name</FieldLabel>
+                            <FieldValue>{user.name}</FieldValue>
                             <FieldLabel icon={<Hash className="h-4 w-4" />}>Employee Code</FieldLabel>
                             <FieldValue>{user.profile?.employeeCode || "—"}</FieldValue>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <FieldLabel icon={<FileCheck className="h-4 w-4" />}>Profile Status</FieldLabel>
+                            <FieldValue>
+                                <Badge variant={user.profile?.profileCompleted ? "default" : "secondary"}>
+                                    {user.profile?.profileCompleted ? "Complete" : "Incomplete"}
+                                </Badge>
+                            </FieldValue>
+                            <FieldLabel icon={<ImageIcon className="h-4 w-4" />}>Photo</FieldLabel>
+                            <FieldValue>{user.profile?.image || "—"}</FieldValue>
+                        </TableRow>
+
+                        {/* Account */}
+                        <GroupHeader>Account</GroupHeader>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <FieldLabel icon={<Hash className="h-4 w-4" />}>User ID</FieldLabel>
+                            <FieldValue>{user.id}</FieldValue>
+                            <FieldLabel icon={<UserRound className="h-4 w-4" />}>Username</FieldLabel>
+                            <FieldValue>{user.username ? `@${user.username}` : "—"}</FieldValue>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <FieldLabel icon={<CircleDot className="h-4 w-4" />}>Status</FieldLabel>
@@ -218,15 +273,9 @@ export default function UserViewPage() {
                             <FieldLabel icon={<Languages className="h-4 w-4" />}>Locale</FieldLabel>
                             <FieldValue>{user.profile?.locale || "—"}</FieldValue>
                         </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <FieldLabel icon={<CalendarPlus className="h-4 w-4" />}>Created</FieldLabel>
-                            <FieldValue>{user.createdAt ? new Date(user.createdAt).toLocaleString() : "—"}</FieldValue>
-                            <FieldLabel icon={<CalendarClock className="h-4 w-4" />}>Updated</FieldLabel>
-                            <FieldValue>{user.updatedAt ? new Date(user.updatedAt).toLocaleString() : "—"}</FieldValue>
-                        </TableRow>
 
-                        {/* Contact Information */}
-                        <GroupHeader>Contact Information</GroupHeader>
+                        {/* Contact */}
+                        <GroupHeader>Contact</GroupHeader>
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <FieldLabel icon={<Mail className="h-4 w-4" />}>Email</FieldLabel>
                             <FieldValue>{user.email}</FieldValue>
@@ -236,22 +285,86 @@ export default function UserViewPage() {
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <FieldLabel icon={<Phone className="h-4 w-4" />}>Mobile</FieldLabel>
                             <FieldValue>{user.mobile || "—"}</FieldValue>
-                            <FieldLabel icon={<PhoneCall className="h-4 w-4" />}>Emergency Contact</FieldLabel>
-                            <FieldValue>{user.profile?.emergencyContactName || "—"}</FieldValue>
+                            <FieldLabel icon={<PhoneCall className="h-4 w-4" />}>Phone</FieldLabel>
+                            <FieldValue>{user.profile?.phone || "—"}</FieldValue>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
+                            <FieldLabel icon={<PhoneCall className="h-4 w-4" />}>Emergency Contact</FieldLabel>
+                            <FieldValue>{user.profile?.emergencyContactName || "—"}</FieldValue>
                             <FieldLabel icon={<PhoneCall className="h-4 w-4" />}>Contact Phone</FieldLabel>
-                            <FieldValue span={3}>{user.profile?.emergencyContactPhone || "—"}</FieldValue>
+                            <FieldValue>{user.profile?.emergencyContactPhone || "—"}</FieldValue>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <FieldLabel icon={<PhoneCall className="h-4 w-4" />}>Emergency Details</FieldLabel>
+                            <FieldValue span={3}>{formatJson(user.profile?.emergencyContact)}</FieldValue>
                         </TableRow>
 
-                        {/* Team Information */}
-                        <GroupHeader>Team Information</GroupHeader>
+                        {/* Employment */}
+                        <GroupHeader>Employment</GroupHeader>
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <FieldLabel icon={<Users className="h-4 w-4" />}>Team</FieldLabel>
                             <FieldValue>{user.team?.name || "—"}</FieldValue>
                             <FieldLabel icon={<UsersRound className="h-4 w-4" />}>Sub Team</FieldLabel>
                             <FieldValue>{user.subTeam?.name || "—"}</FieldValue>
                         </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <FieldLabel icon={<CalendarPlus className="h-4 w-4" />}>Date of Joining</FieldLabel>
+                            <FieldValue>{formatDate(user.profile?.dateOfJoining)}</FieldValue>
+                            <FieldLabel icon={<CalendarClock className="h-4 w-4" />}>Date of Exit</FieldLabel>
+                            <FieldValue>{formatDate(user.profile?.dateOfExit)}</FieldValue>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <FieldLabel icon={<Users className="h-4 w-4" />}>Gender</FieldLabel>
+                            <FieldValue>{user.profile?.gender || "—"}</FieldValue>
+                            <FieldLabel icon={<UsersRound className="h-4 w-4" />}>Marital Status</FieldLabel>
+                            <FieldValue>{user.profile?.maritalStatus || "—"}</FieldValue>
+                        </TableRow>
+
+                        {/* Personal */}
+                        <GroupHeader>Personal</GroupHeader>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <FieldLabel icon={<CalendarPlus className="h-4 w-4" />}>Date of Birth</FieldLabel>
+                            <FieldValue>{formatDate(user.profile?.dateOfBirth)}</FieldValue>
+                            <FieldLabel icon={<Globe className="h-4 w-4" />}>Nationality</FieldLabel>
+                            <FieldValue>{user.profile?.nationality || "—"}</FieldValue>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <FieldLabel icon={<Droplet className="h-4 w-4" />}>Blood Group</FieldLabel>
+                            <FieldValue>{user.profile?.bloodGroup || "—"}</FieldValue>
+                            <FieldLabel icon={<CreditCard className="h-4 w-4" />}>Aadhaar Number</FieldLabel>
+                            <FieldValue>{user.profile?.aadharNumber || "—"}</FieldValue>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <FieldLabel icon={<Ruler className="h-4 w-4" />}>PAN Number</FieldLabel>
+                            <FieldValue>{user.profile?.panNumber || "—"}</FieldValue>
+                            <FieldLabel icon={<Building className="h-4 w-4" />}>PF Number</FieldLabel>
+                            <FieldValue>{user.profile?.pfNumber || "—"}</FieldValue>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <FieldLabel icon={<Facebook className="h-4 w-4" />}>LinkedIn</FieldLabel>
+                            <FieldValue span={3}>{user.profile?.linkedinProfile || "—"}</FieldValue>
+                        </TableRow>
+
+                        {/* Addresses */}
+                        <GroupHeader>Addresses</GroupHeader>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <FieldLabel icon={<Home className="h-4 w-4" />}>Current Address</FieldLabel>
+                            <FieldValue span={3}>{formatJson(user.profile?.currentAddress)}</FieldValue>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <FieldLabel icon={<MapPin className="h-4 w-4" />}>Permanent Address</FieldLabel>
+                            <FieldValue span={3}>{formatJson(user.profile?.permanentAddress)}</FieldValue>
+                        </TableRow>
+
+                        {/* Audit */}
+                        <GroupHeader>Audit</GroupHeader>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <FieldLabel icon={<CalendarPlus className="h-4 w-4" />}>Created</FieldLabel>
+                            <FieldValue>{formatDateTime(String(user.createdAt))}</FieldValue>
+                            <FieldLabel icon={<CalendarClock className="h-4 w-4" />}>Updated</FieldLabel>
+                            <FieldValue>{formatDateTime(String(user.updatedAt))}</FieldValue>
+                        </TableRow>
+                        
 
                         {/* Permissions */}
                         <GroupHeader
