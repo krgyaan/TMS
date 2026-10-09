@@ -321,6 +321,7 @@ export class PaymentRequestService {
             pending: ["maker_done", "rejected"],
             po_approval_pending: ["pending", "rejected"],
             maker_done: ["payment_done", "rejected"],
+            payment_done: ["payment_done"],
         };
 
         if (!validTransitions[existing.status]?.includes(body.status)) {
