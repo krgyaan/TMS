@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import tempfile
 import uuid
@@ -17,6 +18,21 @@ logger = logging.getLogger(__name__)
 # for the reference-ID / GEM / ATC / BOQ signals, which are almost always
 # near the front of the document, without paying full-document OCR latency.
 CLASSIFICATION_MAX_PAGES = 5
+
+
+def _extract_and_classify(temp_pdf_path: Path, pages_dir: Path, filename: str) -> Any:
+    page_text_combined = ""
+    try:
+        page_texts = extract_pdf_text_hybrid(
+            str(temp_pdf_path), pages_dir, max_pages=CLASSIFICATION_MAX_PAGES
+        )
+        page_text_combined = " ".join(p.get("text", "") for p in page_texts)
+    except Exception as exc:
+        logger.warning(
+            f"[CLASSIFY_API] Text extraction failed for '{filename}': {exc}. "
+            "Falling back to filename-only classification."
+        )
+    return classify_document_category(name=filename, page_text_combined=page_text_combined)
 
 
 @router.post("/classify-document")
@@ -39,7 +55,6 @@ async def classify_document_endpoint(pdf_file: UploadFile = File(...)) -> Dict[s
         )
 
     job_id = f"classify_{uuid.uuid4().hex[:12]}"
-    page_text_combined = ""
 
     with tempfile.TemporaryDirectory(prefix=f"{job_id}_") as temp_dir:
         temp_dir_path = Path(temp_dir)
@@ -47,18 +62,12 @@ async def classify_document_endpoint(pdf_file: UploadFile = File(...)) -> Dict[s
         contents = await pdf_file.read()
         temp_pdf_path.write_bytes(contents)
 
-        try:
-            page_texts = extract_pdf_text_hybrid(
-                str(temp_pdf_path), temp_dir_path / "pages", max_pages=CLASSIFICATION_MAX_PAGES
-            )
-            page_text_combined = " ".join(p.get("text", "") for p in page_texts)
-        except Exception as exc:
-            logger.warning(
-                f"[CLASSIFY_API] Text extraction failed for '{filename}' (job_id: {job_id}): {exc}. "
-                "Falling back to filename-only classification."
-            )
-
-    result = classify_document_category(name=filename, page_text_combined=page_text_combined)
+        result = await asyncio.to_thread(
+            _extract_and_classify,
+            temp_pdf_path,
+            temp_dir_path / "pages",
+            filename,
+        )
 
     return {
         "suggestedType": result.suggested_type,

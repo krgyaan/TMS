@@ -59,14 +59,24 @@ async def generate_annexure_docx_endpoint(payload: GenerateAnnexureDocxRequest) 
     annexure = {"annexureName": payload.annexureName, "blocks": blocks}
     # Deterministic letterhead: uses explicit caller override if provided, else auto-detects
     letterhead = payload.letterhead if payload.letterhead is not None else requires_bidder_letterhead(annexure)
-    with tempfile.TemporaryDirectory(prefix="volksai_annexure_docx_") as temp_dir:
-        out_path = build_annexure_docx(
-            annexure,
-            Path(temp_dir) / filename,
-            letterhead=letterhead,
-            context=payload.context,
+    try:
+        with tempfile.TemporaryDirectory(prefix="volksai_annexure_docx_") as temp_dir:
+            out_path = build_annexure_docx(
+                annexure,
+                Path(temp_dir) / filename,
+                letterhead=letterhead,
+                context=payload.context,
+            )
+            content = out_path.read_bytes()
+    except Exception as exc:
+        logger.error(
+            "[ANNEXURE_DOCX_ERROR] Failed to generate docx for '%s': %s",
+            payload.annexureName, exc, exc_info=True,
         )
-        content = out_path.read_bytes()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate docx for '{payload.annexureName}': {exc}",
+        )
 
     logger.info(
         "[ANNEXURE_DOCX] Generated '%s' (%d block(s), %d bytes, letterhead=%s)",

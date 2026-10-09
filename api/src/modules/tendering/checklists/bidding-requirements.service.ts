@@ -458,7 +458,13 @@ export class BiddingRequirementsService {
 
             this.logger.error(
                 `[BiddingRequirementsJob] Job ${jobId} failed for tender ${tenderId} [${code}]: ${message}`,
-                err instanceof Error ? err.stack : undefined,
+                {
+                    jobId,
+                    tenderId,
+                    code,
+                    errorMessage: message,
+                    stack: err instanceof Error ? err.stack : undefined,
+                },
             );
 
             await this.db
@@ -693,6 +699,7 @@ export class BiddingRequirementsService {
             if (error.name === 'TimeoutError' || error.name === 'AbortError') {
                 this.logger.error(
                     `Bidding requirements analysis timed out after ${timeoutMs}ms for tender ${tenderId} (URL: ${endpoint})`,
+                    { tenderId, endpoint, timeoutMs },
                 );
                 throw new GatewayTimeoutException({
                     statusCode: HttpStatus.GATEWAY_TIMEOUT,
@@ -702,7 +709,7 @@ export class BiddingRequirementsService {
             }
             this.logger.error(
                 `Failed to connect to VolksAI service at ${endpoint} for tender ${tenderId}: ${error.message}`,
-                error.stack,
+                { tenderId, endpoint, stack: error.stack },
             );
             throw new BadGatewayException({
                 statusCode: HttpStatus.BAD_GATEWAY,
@@ -859,7 +866,7 @@ export class BiddingRequirementsService {
                 .onConflictDoUpdate({
                     target: tenderExtractions.tenderId,
                     set: {
-                        fields: sql`COALESCE(${tenderExtractions.fields}, '{}'::jsonb) || ${JSON.stringify({ biddingRequirementsAnalysis: analysisResult })}::jsonb`,
+                        fields: mergedFields,
                         updatedAt: new Date(),
                         ...(userId ? { userId } : {}),
                     },
@@ -878,9 +885,11 @@ export class BiddingRequirementsService {
     /**
      * Read-only: the current cached analysis for this tender, or null when absent or older than
      * BIDDING_REQUIREMENTS_SCHEMA_VERSION.
+     * Checks both the latest completed job in bidding_requirements_jobs and tender_extractions.
      */
     async getCachedAnalysis(tenderId: number): Promise<BiddingRequirementsAnalysisResult | null> {
         await this.tenderInfosService.validateExists(tenderId);
+
         const [existingExtraction] = await this.db
             .select()
             .from(tenderExtractions)
@@ -979,30 +988,34 @@ export class BiddingRequirementsService {
         });
     }
 
+    private normalizeAnalysisResult(data: unknown, tenderId: number): BiddingRequirementsAnalysisResult | null {
+        if (!data || typeof data !== 'object') return null;
+        const raw = data as Record<string, any>;
+        const version = Number(raw.schemaVersion) || 0;
+        if (version < BIDDING_REQUIREMENTS_SCHEMA_VERSION) {
+            this.logger.log(
+                `Ignoring stale bidding-requirements cache for tender ${tenderId} ` +
+                `(schemaVersion ${raw.schemaVersion ?? 'missing'} < ${BIDDING_REQUIREMENTS_SCHEMA_VERSION})`,
+            );
+            return null;
+        }
+        return {
+            jobId: raw.jobId || raw.job_id || `job_${tenderId}`,
+            requirements: raw.requirements || [],
+            llmUsage: raw.llmUsage ?? raw.llm_usage ?? null,
+            schemaVersion: version,
+            annexures: Array.isArray(raw.annexures) ? raw.annexures : [],
+            rejectedAnnexures: Array.isArray(raw.rejectedAnnexures) ? raw.rejectedAnnexures : [],
+            truncated: Boolean(raw.truncated),
+        };
+    }
+
     private readCurrentCache(fields: unknown, tenderId: number): BiddingRequirementsAnalysisResult | null {
         const cached =
             fields && typeof fields === 'object'
                 ? (fields as Record<string, any>).biddingRequirementsAnalysis
                 : null;
-        if (!cached || typeof cached !== 'object') return null;
-
-        const version = Number(cached.schemaVersion) || 0;
-        if (version < BIDDING_REQUIREMENTS_SCHEMA_VERSION) {
-            this.logger.log(
-                `Ignoring stale bidding-requirements cache for tender ${tenderId} ` +
-                `(schemaVersion ${cached.schemaVersion ?? 'missing'} < ${BIDDING_REQUIREMENTS_SCHEMA_VERSION})`,
-            );
-            return null;
-        }
-        return {
-            jobId: cached.jobId || `cached_${tenderId}`,
-            requirements: cached.requirements || [],
-            llmUsage: cached.llmUsage ?? null,
-            schemaVersion: version,
-            annexures: Array.isArray(cached.annexures) ? cached.annexures : [],
-            rejectedAnnexures: Array.isArray(cached.rejectedAnnexures) ? cached.rejectedAnnexures : [],
-            truncated: Boolean(cached.truncated),
-        };
+        return this.normalizeAnalysisResult(cached, tenderId);
     }
 
     private getServiceUrl(): string {

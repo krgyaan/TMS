@@ -10,21 +10,29 @@ export class AppLogger {
   ) {}
 
   withContext(context: string) {
+    const normalizeMeta = (meta?: unknown) => {
+      if (!meta) return { context };
+      if (typeof meta === 'string') return { context, stack: meta };
+      if (meta instanceof Error) return { context, error: meta.message, stack: meta.stack };
+      if (typeof meta === 'object' && meta !== null) return { context, ...meta };
+      return { context, meta };
+    };
+
     return {
-      log: (message: string, meta?: Record<string, unknown>) =>
-        this.logger.info(message, { context, ...meta }),
+      log: (message: string, meta?: unknown) =>
+        this.logger.info(message, normalizeMeta(meta)),
 
-      info: (message: string, meta?: Record<string, unknown>) =>
-        this.logger.info(message, { context, ...meta }),
+      info: (message: string, meta?: unknown) =>
+        this.logger.info(message, normalizeMeta(meta)),
 
-      error: (message: string, meta?: Record<string, unknown>) =>
-        this.logger.error(message, { context, ...meta }),
+      error: (message: string, meta?: unknown) =>
+        this.logger.error(message, normalizeMeta(meta)),
 
-      warn: (message: string, meta?: Record<string, unknown>) =>
-        this.logger.warn(message, { context, ...meta }),
+      warn: (message: string, meta?: unknown) =>
+        this.logger.warn(message, normalizeMeta(meta)),
 
-      debug: (message: string, meta?: Record<string, unknown>) =>
-        this.logger.debug(message, { context, ...meta }),
+      debug: (message: string, meta?: unknown) =>
+        this.logger.debug(message, normalizeMeta(meta)),
     };
   }
 

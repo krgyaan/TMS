@@ -228,27 +228,74 @@ def _sanitize_block(block: Any) -> Optional[Dict[str, Any]]:
     """Returns a clean copy of a valid block, or None if the block is unusable."""
     if not isinstance(block, dict):
         return None
-    btype = block.get("type")
+
+    raw_btype = str(block.get("type") or "").strip().lower()
+
+    # Map common variations and synonyms
+    if raw_btype in ("heading", "title", "header", "section"):
+        btype = "heading"
+    elif raw_btype in ("paragraph", "text", "body", "clause", "content"):
+        btype = "paragraph"
+    elif raw_btype in ("blank_field", "field", "blank", "input"):
+        btype = "blank_field"
+    elif raw_btype in ("signature_line", "signature", "signature-line", "sign", "signature_block"):
+        btype = "signature_line"
+    elif raw_btype == "table":
+        btype = "table"
+    else:
+        if "rows" in block or "headers" in block:
+            btype = "table"
+        elif "label" in block:
+            btype = "blank_field"
+        elif "text" in block or "content" in block:
+            btype = "paragraph"
+        else:
+            return None
+
     if btype in ("heading", "paragraph"):
-        text = block.get("text")
+        text = (
+            block.get("text")
+            or block.get("content")
+            or block.get("title")
+            or block.get("value")
+            or block.get("body")
+        )
         if isinstance(text, str) and text.strip():
             return {"type": btype, "text": text.strip()}
         return None
+
     if btype in ("blank_field", "signature_line"):
-        label = block.get("label")
+        label = (
+            block.get("label")
+            or block.get("text")
+            or block.get("name")
+            or block.get("field")
+            or block.get("description")
+        )
         if isinstance(label, str) and label.strip():
             return {"type": btype, "label": label.strip()}
         return None
+
     if btype == "table":
-        headers = block.get("headers") or []
-        rows = block.get("rows") or []
-        if not isinstance(headers, list) or not isinstance(rows, list):
-            return None
-        headers = [str(h) for h in headers]
-        rows = [[str(c) for c in r] for r in rows if isinstance(r, list)]
+        raw_headers = block.get("headers") or []
+        raw_rows = block.get("rows") or []
+        if not isinstance(raw_headers, list):
+            raw_headers = []
+        headers = [str(h) for h in raw_headers]
+
+        rows = []
+        if isinstance(raw_rows, list):
+            for r in raw_rows:
+                if isinstance(r, list):
+                    rows.append([str(c) if c is not None else "" for c in r])
+                elif isinstance(r, dict):
+                    rows.append([str(v) if v is not None else "" for v in r.values()])
+                elif isinstance(r, (str, int, float)):
+                    rows.append([str(r)])
         if not headers and not rows:
             return None
         return {"type": "table", "headers": headers, "rows": rows}
+
     return None
 
 
@@ -299,13 +346,23 @@ def validate_annexures(
             reject(raw, "missing source citation")
             continue
         document = source.get("document")
+        if isinstance(document, str):
+            doc_clean = document.strip().lower()
+            if doc_clean in VALID_SOURCE_DOCUMENTS:
+                document = doc_clean
+
         page = source.get("page")
         snippet = source.get("snippet")
         if document not in VALID_SOURCE_DOCUMENTS:
             reject(raw, f"invalid source.document {document!r}")
             continue
         # bool is a subclass of int -- exclude it explicitly.
-        if isinstance(page, bool) or not isinstance(page, int) or page < 1:
+        if isinstance(page, bool):
+            reject(raw, f"missing or invalid source.page {page!r}")
+            continue
+        if isinstance(page, str) and page.strip().isdigit():
+            page = int(page.strip())
+        if not isinstance(page, int) or page < 1:
             reject(raw, f"missing or invalid source.page {page!r}")
             continue
         if (document, page) not in available:

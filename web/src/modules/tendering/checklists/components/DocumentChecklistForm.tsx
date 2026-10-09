@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Save, AlertCircle, Plus, Trash2, FileText, Sparkles, Check, RefreshCw, Download, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, AlertCircle, Plus, Trash2, FileText, Sparkles, Check, RefreshCw, Download, Loader2, PauseCircle } from 'lucide-react';
 import { CompactFileUploader } from '@/components/file-upload';
 import { paths } from '@/app/routes/paths';
 import { MultiSelectField } from '@/components/form/MultiSelectField';
@@ -278,15 +278,22 @@ export default function DocumentChecklistForm({
                                     Suggested Requirements (AI)
                                 </h4>
                                 {suggestionPanel.showAnalyze && (
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => suggestMutation.mutate({ tenderId })}
-                                    >
-                                        <Sparkles className="mr-2 h-4 w-4" />
-                                        Analyze Tender Documents
-                                    </Button>
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            disabled
+                                            title="AI analysis is temporarily paused"
+                                        >
+                                            <Sparkles className="mr-2 h-4 w-4" />
+                                            Analyze Tender Documents
+                                        </Button>
+                                        <Badge variant="secondary" className="text-xs gap-1">
+                                            <PauseCircle className="h-3 w-3" />
+                                            Paused
+                                        </Badge>
+                                    </div>
                                 )}
                                 {suggestionPanel.showReanalyze && (
                                     <Button
