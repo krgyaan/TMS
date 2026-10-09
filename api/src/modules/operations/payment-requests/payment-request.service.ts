@@ -4,6 +4,7 @@ import { users } from "@/db/schemas/";
 import { projects } from "@/db/schemas/master/projects.schema";
 import { beneficiaries } from "@/db/schemas/operations/beneficiaries.schema";
 import { paymentRequests, type PaymentRequest as OperationPaymentRequest } from "@/db/schemas/operations/payment-requests.schema";
+import { tdsReturns } from "@/db/schemas/operations/tds-returns.schema";
 import { employeeImprestTransactions } from "@/db/schemas/shared/employee-imprest-transaction.schema";
 import { purchaseInvoices } from "@/db/schemas/operations/purchase-invoices.schema";
 import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
@@ -18,6 +19,18 @@ import { InsurancePolicyService } from "@/modules/insurance/insurance-policy.ser
 import { CashFlowService } from "@/modules/operations/cash-flows/cash-flow.service";
 import { insurancePayloadSchema, insurancePolicySchema, type InsurancePayload } from "@/modules/insurance/zod/insurance-policy.schema";
 import { OperationNotificationService } from "@/modules/operations/operation-notification.service";
+
+export function computeTdsDeducted(
+    amount: number,
+    poTdsPct: number,
+    poTdsAmount: number,
+    alreadyDeducted: number,
+): number {
+    if (poTdsAmount <= 0 || amount <= 0) return 0;
+    const remaining = Math.max(0, poTdsAmount - alreadyDeducted);
+    const prTds = (amount * poTdsPct) / 100;
+    return Math.min(prTds, remaining);
+}
 
 @Injectable()
 export class PaymentRequestService {
@@ -321,6 +334,7 @@ export class PaymentRequestService {
             pending: ["maker_done", "rejected"],
             po_approval_pending: ["pending", "rejected"],
             maker_done: ["payment_done", "rejected"],
+            payment_done: ["payment_done"],
         };
 
         if (!validTransitions[existing.status]?.includes(body.status)) {
@@ -330,6 +344,49 @@ export class PaymentRequestService {
         }
 
         return await this.db.transaction(async tx => {
+            const tdsCapSet: { actualTdsDeducted?: string } = {};
+            let tdsReturn: { projectId: number; poId: number; prId: number; tdsAmount: string } | null = null;
+
+            if (body.status === "payment_done" && existing.purchaseOrderId != null) {
+                const [po] = await tx
+                    .select()
+                    .from(purchaseOrders)
+                    .where(eq(purchaseOrders.id, existing.purchaseOrderId))
+                    .for("update");
+
+                if (po && po.tdsAmount != null) {
+                    const [{ used }] = await tx
+                        .select({
+                            used: sql<string>`COALESCE(SUM(${paymentRequests.actualTdsDeducted}::numeric), 0)`,
+                        })
+                        .from(paymentRequests)
+                        .where(and(
+                            eq(paymentRequests.purchaseOrderId, existing.purchaseOrderId),
+                            eq(paymentRequests.status, "payment_done"),
+                            ne(paymentRequests.id, existing.id),
+                        ));
+
+                    const actualTds = computeTdsDeducted(
+                        Number(existing.amount ?? 0),
+                        Number(po.tdsPercentage ?? 0),
+                        Number(po.tdsAmount),
+                        Number(used),
+                    );
+
+                    if (actualTds > 0) {
+                        tdsCapSet.actualTdsDeducted = actualTds.toFixed(2);
+                        if (existing.projectId != null) {
+                            tdsReturn = {
+                                projectId: existing.projectId,
+                                poId: existing.purchaseOrderId,
+                                prId: existing.id,
+                                tdsAmount: actualTds.toFixed(2),
+                            };
+                        }
+                    }
+                }
+            }
+
             const updated = (
                 await tx
                     .update(paymentRequests)
@@ -338,10 +395,18 @@ export class PaymentRequestService {
                         utrNumber: body.utrNumber || null,
                         rejectionReason: body.rejectionReason || null,
                         updatedAt: new Date(),
+                        ...tdsCapSet,
                     })
                     .where(eq(paymentRequests.id, id))
                     .returning()
             )[0];
+
+            if (tdsReturn) {
+                await tx
+                    .insert(tdsReturns)
+                    .values({ ...tdsReturn, tdsReturnDate: new Date().toISOString().slice(0, 10) })
+                    .onConflictDoNothing();
+            }
 
             if (existing.paymentAgainst != null && body.status === "payment_done" && ["imprest", "others"].includes(existing.paymentAgainst)) {
                 await this.creditImprestForPaymentRequest(tx, existing);
@@ -578,6 +643,7 @@ export class PaymentRequestService {
         rejectionReason: paymentRequests.rejectionReason,
         status: paymentRequests.status,
         tdsPercentage: paymentRequests.tdsPercentage,
+        actualTdsDeducted: paymentRequests.actualTdsDeducted,
         requestedBy: paymentRequests.requestedBy,
         createdAt: paymentRequests.createdAt,
         updatedAt: paymentRequests.updatedAt,

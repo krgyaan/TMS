@@ -346,16 +346,16 @@ def _fill_paragraph_text(text: str, context: Dict[str, Any]) -> str:
     tender_no = context.get("tender_no") or context.get("tenderNo")
     date_val = context.get("date")
 
-    # Replace M/s ______ (Name of Bidder) or M/s _______
+    # Replace M/s ______ (Name of Bidder) or M/s _______ safely using lambdas (prevents backslash escape crashes)
     text = re.sub(
         r"M/s[._\s]*_{2,}\s*(?:\((?:Name of Bidder|Bidder)\))?",
-        f"M/s {company_name}",
+        lambda _: f"M/s {company_name}",
         text,
         flags=re.IGNORECASE,
     )
     text = re.sub(
         r"\(Name of Bidder\)\s*_{2,}",
-        f"{company_name}",
+        lambda _: f"{company_name}",
         text,
         flags=re.IGNORECASE,
     )
@@ -363,7 +363,7 @@ def _fill_paragraph_text(text: str, context: Dict[str, Any]) -> str:
     if tender_no:
         text = re.sub(
             r"((?:offer/?\s*bid\s+no|bid\s+no|tender\s+no|nit\s+no|rfp\s+no)[.:\s]*)_{2,}",
-            rf"\g<1>{tender_no}",
+            lambda m: f"{m.group(1)}{tender_no}",
             text,
             flags=re.IGNORECASE,
         )
@@ -371,12 +371,46 @@ def _fill_paragraph_text(text: str, context: Dict[str, Any]) -> str:
     if date_val:
         text = re.sub(
             r"(dated[.:\s]*)_{2,}",
-            rf"\g<1>{date_val}",
+            lambda m: f"{m.group(1)}{date_val}",
             text,
             flags=re.IGNORECASE,
         )
 
     return text
+
+
+def _ensure_letterhead_bands(header_file: Path, footer_file: Path) -> bool:
+    """If png bands are missing, attempts to render them from letterhead pdf if available."""
+    if header_file.is_file() and footer_file.is_file():
+        return True
+
+    pdf_candidates = [
+        header_file.parent / "letterhead_volks.pdf",
+        header_file.parent / "letterhead volks pdf.pdf",
+        header_file.parent.parent / "letterhead volks pdf.pdf",
+        header_file.parent.parent / "letterhead_volks.pdf",
+    ]
+    for pdf_path in pdf_candidates:
+        if pdf_path.is_file():
+            try:
+                import fitz
+                pdf = fitz.open(str(pdf_path))
+                if len(pdf) > 0:
+                    page = pdf[0]
+                    pix = page.get_pixmap(dpi=300)
+                    header_file.parent.mkdir(parents=True, exist_ok=True)
+                    # Render header band (top ~459px at 300 DPI)
+                    header_rect = fitz.Rect(0, 0, page.rect.width, 110.16)
+                    pix_h = page.get_pixmap(dpi=300, clip=header_rect)
+                    pix_h.save(str(header_file))
+                    # Render footer band (bottom ~47px at 300 DPI)
+                    footer_rect = fitz.Rect(0, page.rect.height - 43.28, page.rect.width, page.rect.height - 32.0)
+                    pix_f = page.get_pixmap(dpi=300, clip=footer_rect)
+                    pix_f.save(str(footer_file))
+                    return True
+            except Exception:
+                pass
+    return header_file.is_file() and footer_file.is_file()
 
 
 def build_annexure_docx(
@@ -437,7 +471,7 @@ def build_annexure_docx(
                 lbl_run = p.add_run(f"{label}{sep}")
                 lbl_run.bold = True
             if value:
-                p.add_run(str(value))
+                p.add_run(_clean(value))
             else:
                 p.add_run(BLANK)
         elif btype == "table":
@@ -470,23 +504,12 @@ def apply_letterhead(
 
     - Page size is set to standard A4 (595.3 pt x 841.9 pt).
     - Page margins are adjusted so the content area flows cleanly between the header
-      and footer bands without overlapping:
-        * top margin = 128 pt (header height 110.16 pt + ~18 pt gap)
-        * bottom margin = 65 pt (footer top 43.28 pt + ~22 pt gap)
-        * left/right margins = 36 pt (0.5 in), matching the logo and footer alignment
-        * header_distance = 0 pt (header band sits flush at top of page)
-        * footer_distance = 32 pt (footer band sits flush with measured footer baseline)
-    - header_band.png is inserted into document's header section
-    - footer_band.png is inserted into document's footer section
-    Word automatically repeats both bands on every page.
+      and footer bands without overlapping.
+    - If letterhead images are available, header and footer bands are inserted.
     """
     header_file = Path(header_path)
     footer_file = Path(footer_path)
-
-    if not header_file.is_file():
-        raise FileNotFoundError(f"Letterhead header image not found at {header_file}")
-    if not footer_file.is_file():
-        raise FileNotFoundError(f"Letterhead footer image not found at {footer_file}")
+    has_images = _ensure_letterhead_bands(header_file, footer_file)
 
     for section in document.sections:
         # Standard A4 paper dimensions
@@ -501,24 +524,25 @@ def apply_letterhead(
         section.header_distance = Pt(HEADER_DISTANCE_PT)
         section.footer_distance = Pt(FOOTER_DISTANCE_PT)
 
-        # Header band: full-bleed width from left margin to right margin
-        header = section.header
-        header_p = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
-        header_p.text = ""
-        header_p.paragraph_format.space_before = Pt(0)
-        header_p.paragraph_format.space_after = Pt(0)
-        header_p.paragraph_format.left_indent = -section.left_margin
-        header_p.paragraph_format.right_indent = -section.right_margin
-        header_run = header_p.add_run()
-        header_run.add_picture(str(header_file), width=section.page_width)
+        if has_images:
+            # Header band: full-bleed width from left margin to right margin
+            header = section.header
+            header_p = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
+            header_p.text = ""
+            header_p.paragraph_format.space_before = Pt(0)
+            header_p.paragraph_format.space_after = Pt(0)
+            header_p.paragraph_format.left_indent = -section.left_margin
+            header_p.paragraph_format.right_indent = -section.right_margin
+            header_run = header_p.add_run()
+            header_run.add_picture(str(header_file), width=section.page_width)
 
-        # Footer band: full-bleed width from left margin to right margin
-        footer = section.footer
-        footer_p = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
-        footer_p.text = ""
-        footer_p.paragraph_format.space_before = Pt(0)
-        footer_p.paragraph_format.space_after = Pt(0)
-        footer_p.paragraph_format.left_indent = -section.left_margin
-        footer_p.paragraph_format.right_indent = -section.right_margin
-        footer_run = footer_p.add_run()
-        footer_run.add_picture(str(footer_file), width=section.page_width)
+            # Footer band: full-bleed width from left margin to right margin
+            footer = section.footer
+            footer_p = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+            footer_p.text = ""
+            footer_p.paragraph_format.space_before = Pt(0)
+            footer_p.paragraph_format.space_after = Pt(0)
+            footer_p.paragraph_format.left_indent = -section.left_margin
+            footer_p.paragraph_format.right_indent = -section.right_margin
+            footer_run = footer_p.add_run()
+            footer_run.add_picture(str(footer_file), width=section.page_width)

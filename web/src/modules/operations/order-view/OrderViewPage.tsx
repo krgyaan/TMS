@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableFooter, TableRow } from "@/components/ui/table";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { PaymentRequestDetailDialog } from "@/modules/operations/payment-requests/components/PaymentRequestDetailDialog";
@@ -136,6 +136,18 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
     );
     const totalPaymentDone = useMemo(() =>
         round2(data?.paymentRequests?.filter(pr => pr.status === 'payment_done').reduce((s, pr) => s + Number(pr.amount), 0) ?? 0),
+        [data?.paymentRequests]
+    );
+    const tdsColumnVisible = useMemo(
+        () => (data?.paymentRequests ?? []).some(pr => pr.actualTdsDeducted != null),
+        [data?.paymentRequests]
+    );
+    const totalPaidAfterTds = useMemo(() =>
+        round2((data?.paymentRequests ?? []).filter(pr => pr.status === 'payment_done').reduce((s, pr) => s + Number(pr.amount ?? 0) - Number(pr.actualTdsDeducted ?? 0), 0)),
+        [data?.paymentRequests]
+    );
+    const totalTdsDeducted = useMemo(() =>
+        round2((data?.paymentRequests ?? []).filter(pr => pr.status === 'payment_done').reduce((s, pr) => s + Number(pr.actualTdsDeducted ?? 0), 0)),
         [data?.paymentRequests]
     );
     const totalPiAmount = useMemo(() =>
@@ -372,6 +384,7 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
                                             <TableCell className="font-semibold text-xs uppercase">Date</TableCell>
                                             <TableCell className="font-semibold text-xs uppercase">Beneficiary</TableCell>
                                             <TableCell className="font-semibold text-xs uppercase text-right">Amount</TableCell>
+                                            {tdsColumnVisible && <TableCell className="font-semibold text-xs uppercase text-right">TDS Deducted</TableCell>}
                                             <TableCell className="font-semibold text-xs uppercase">Status</TableCell>
                                             <TableCell className="font-semibold text-xs uppercase">Raised By</TableCell>
                                             <TableCell className="font-semibold text-xs uppercase">View</TableCell>
@@ -386,6 +399,9 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
                                                     <TableCell className="text-sm">{formatDate(pr.createdAt)}</TableCell>
                                                     <TableCell className="text-sm">{pr.partyName}</TableCell>
                                                     <TableCell className="text-sm text-right font-medium">{formatINR(Number(pr.amount))}</TableCell>
+                                                    {tdsColumnVisible && (
+                                                        <TableCell className="text-sm text-right">{formatINR(Number(pr.actualTdsDeducted ?? 0))}</TableCell>
+                                                    )}
                                                     <TableCell><Badge variant={cfg.variant}>{cfg.label}</Badge></TableCell>
                                                     <TableCell className="text-sm">{pr.requestedByName}</TableCell>
                                                     <TableCell>
@@ -397,6 +413,16 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
                                             );
                                         })}
                                     </TableBody>
+                                    {tdsColumnVisible && (
+                                        <TableFooter>
+                                            <TableRow>
+                                                <TableCell colSpan={3} className="font-semibold">Total (After TDS Deduction)</TableCell>
+                                                <TableCell className="text-right font-semibold">{formatINR(totalPaidAfterTds)}</TableCell>
+                                                <TableCell className="text-right font-semibold">{formatINR(totalTdsDeducted)}</TableCell>
+                                                <TableCell colSpan={3}></TableCell>
+                                            </TableRow>
+                                        </TableFooter>
+                                    )}
                                 </Table>
                             </div>
                         )}

@@ -21,7 +21,7 @@ import { formatINR } from "@/hooks/useINRFormatter";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { useTeamFilter } from "@/hooks/useTeamFilter";
 import { referenceName } from "@/lib/id-utils";
-import { PaymentRequestViewModal } from "@/modules/operations/payment-requests/components/PaymentRequestViewModal";
+import { PaymentRequestDetailDialog } from "@/modules/operations/payment-requests/components/PaymentRequestDetailDialog";
 import type { PaymentRequestRow } from "@/modules/operations/payment-requests/helpers/paymentRequest.types";
 import { calculateTds } from "@/modules/operations/payment-requests/helpers/tds-calculator";
 import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
@@ -402,7 +402,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                 </CardContent>
             </Card>
             {/* View Modal */}
-            <PaymentRequestViewModal
+            <PaymentRequestDetailDialog
                 viewingId={viewingId}
                 onClose={() => setViewingId(null)}
             />

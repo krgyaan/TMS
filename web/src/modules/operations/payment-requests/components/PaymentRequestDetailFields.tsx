@@ -1,9 +1,7 @@
 import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { getShortId } from "@/lib/id-utils";
-import { formatDate } from "@/hooks/useFormatedDate";
+import { formatDateTime } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { fileUploadService } from "@/services/api/file-upload.service";
 import { purchaseOrderApi } from "@/services/api/purchase-order.api";
@@ -20,14 +18,7 @@ export const PaymentRequestDetailFields: React.FC<PaymentRequestDetailFieldsProp
     <div className="grid grid-cols-2 gap-x-6 gap-y-4 py-4">
         <div className="col-span-2">
             <Label className="text-muted-foreground text-xs">Request No</Label>
-            <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <p className="font-mono font-medium">{getShortId(detail.requestNo)}</p>
-                    </TooltipTrigger>
-                    <TooltipContent>{detail.requestNo}</TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
+            <p className="font-mono font-medium">{detail.requestNo}</p>
         </div>
         <div>
             <Label className="text-muted-foreground text-xs">Project</Label>
@@ -41,15 +32,26 @@ export const PaymentRequestDetailFields: React.FC<PaymentRequestDetailFieldsProp
             <Label className="text-muted-foreground text-xs">Amount</Label>
             <p className="font-medium">{formatINR(detail.amount)}</p>
         </div>
-        {Number(detail.tdsPercentage) > 0 && (() => {
-            const { tdsAmount, netPayable } = calculateTds(Number(detail.amount), Number(detail.tdsPercentage));
+        {(() => {
+            const actualTds = Number(detail.actualTdsDeducted ?? 0);
+            const tdsPct = Number(detail.tdsPercentage ?? 0);
+            if (tdsPct <= 0 && actualTds <= 0) return null;
+            const useCapped = actualTds > 0;
+            const { tdsAmount, netPayable } = calculateTds(Number(detail.amount), tdsPct);
+            const displayTds = useCapped ? actualTds : tdsAmount;
+            const displayNet = useCapped ? Number(detail.amount) - actualTds : netPayable;
             return (
                 <div className="col-span-2 mt-2">
                     <Label className="text-muted-foreground text-xs">Net Payable</Label>
-                    <p className="font-medium text-green-500">{formatINR(netPayable)}</p>
+                    <p className="font-medium text-green-500">{formatINR(displayNet)}</p>
                     <Label className="text-muted-foreground text-xs font-mono">
-                        TDS @ {Number(detail.tdsPercentage)}% (-{formatINR(tdsAmount)}) = Net Payable {formatINR(netPayable)}
+                        TDS @ {tdsPct}% (-{formatINR(displayTds)}) = Net Payable {formatINR(displayNet)}
                     </Label>
+                    {useCapped && (
+                        <Label className="text-muted-foreground text-xs font-medium">
+                            TDS Deducted (Capped): {formatINR(actualTds)}
+                        </Label>
+                    )}
                 </div>
             );
         })()}
@@ -132,7 +134,7 @@ export const PaymentRequestDetailFields: React.FC<PaymentRequestDetailFieldsProp
                         <span>{formatINR(detail.poTotalPaymentDone || 0)}</span>
                     </div>
                     {(() => {
-                        const cap = detail.poAmountAfterTds ? Number(detail.poAmountAfterTds) : Number(detail.poGrandTotal || 0);
+                        const cap = Number(detail.poGrandTotal || 0);
                         const remaining = cap - Number(detail.poTotalPaymentRequested || 0);
                         return (
                             <div className={`flex justify-between font-medium ${remaining < 0 ? "text-destructive" : ""}`}>
@@ -235,7 +237,7 @@ export const PaymentRequestDetailFields: React.FC<PaymentRequestDetailFieldsProp
         </div>
         <div>
             <Label className="text-muted-foreground text-xs">Created At</Label>
-            <p>{formatDate(detail.createdAt)}</p>
+            <p>{formatDateTime(detail.createdAt)}</p>
         </div>
         {detail.utrNumber && (
             <div>

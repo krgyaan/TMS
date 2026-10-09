@@ -1,8 +1,9 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { eq, like, desc, sql } from "drizzle-orm";
+import { eq, like, desc, sql, and } from "drizzle-orm";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { purchaseInvoices } from "@/db/schemas/operations/purchase-invoices.schema";
+import { gst2bReco } from "@/db/schemas/operations/gst2b-reco.schema";
 import { tryMaterializePoInventory } from "@/modules/operations/inventory/inventory.materialize";
 import { CashFlowService } from "@/modules/operations/cash-flows/cash-flow.service";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
@@ -67,6 +68,30 @@ export class PurchaseInvoiceService {
 
             if (isPoInvoice) {
                 await tryMaterializePoInventory(tx, Number(body.purchaseOrderId), userId);
+            }
+
+            // Create GST 2B reconciliation record for the invoice
+            if (body.purchaseOrderId && body.gstAmount > 0) {
+                const existingGst2b = await tx
+                    .select()
+                    .from(gst2bReco)
+                    .where(and(
+                        eq(gst2bReco.poId, body.purchaseOrderId),
+                        eq(gst2bReco.invoiceId, row.id)
+                    ))
+                    .limit(1)
+                    .then(rows => rows[0]);
+
+                if (!existingGst2b) {
+                    await tx.insert(gst2bReco).values({
+                        projectId: row.projectId,
+                        poId: body.purchaseOrderId,
+                        invoiceId: row.id,
+                        invoiceDate: body.invoiceDate,
+                        invoiceUploadedAt: new Date(),
+                        gstAmount: body.gstAmount,
+                    }).catch((err) => this.logger.warn(`GST 2B reconciliation creation failed for invoice #${row.id}: ${err}`));
+                }
             }
 
             return row;

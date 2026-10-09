@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Save, AlertCircle, Plus, Trash2, FileText, Sparkles, Check, RefreshCw, Download, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, AlertCircle, Plus, Trash2, FileText, Sparkles, Check, RefreshCw, Download, Loader2, PauseCircle } from 'lucide-react';
 import { CompactFileUploader } from '@/components/file-upload';
 import { paths } from '@/app/routes/paths';
 import { MultiSelectField } from '@/components/form/MultiSelectField';
@@ -278,26 +278,31 @@ export default function DocumentChecklistForm({
                                     Suggested Requirements (AI)
                                 </h4>
                                 {suggestionPanel.showAnalyze && (
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => suggestMutation.mutate({ tenderId })}
-                                    >
-                                        <Sparkles className="mr-2 h-4 w-4" />
-                                        Analyze Tender Documents
-                                    </Button>
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            disabled
+                                            className="opacity-75 cursor-not-allowed select-none text-muted-foreground"
+                                            title="AI analysis is temporarily closed"
+                                        >
+                                            <PauseCircle className="mr-2 h-4 w-4 text-amber-600" />
+                                            Temporarily Closed
+                                        </Button>
+                                    </div>
                                 )}
                                 {suggestionPanel.showReanalyze && (
                                     <Button
                                         type="button"
-                                        variant="ghost"
+                                        variant="outline"
                                         size="sm"
-                                        onClick={() => suggestMutation.mutate({ tenderId, forceRefresh: true })}
-                                        title="Run a new analysis of the tender documents (replaces the saved result)"
+                                        disabled
+                                        className="opacity-75 cursor-not-allowed select-none text-muted-foreground"
+                                        title="AI analysis is temporarily closed"
                                     >
-                                        <RefreshCw className="mr-2 h-4 w-4" />
-                                        Re-analyze
+                                        <PauseCircle className="mr-2 h-4 w-4 text-amber-600" />
+                                        Temporarily Closed
                                     </Button>
                                 )}
                                 {suggestMutation.isPending && (

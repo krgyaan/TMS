@@ -1041,11 +1041,20 @@ export class FollowUpService {
 
     private getOrderColumn(sortBy: string) {
         const columnMap: Record<string, any> = {
+            id: followUps.id,
             startFrom: followUps.startFrom,
+            start_from: followUps.startFrom,
             createdAt: followUps.createdAt,
+            created_at: followUps.createdAt,
             updatedAt: followUps.updatedAt,
+            updated_at: followUps.updatedAt,
             amount: followUps.amount,
             partyName: followUps.partyName,
+            party_name: followUps.partyName,
+            status: followUps.assignmentStatus,
+            assignmentStatus: followUps.assignmentStatus,
+            assignment_status: followUps.assignmentStatus,
+            frequency: followUps.frequency,
         };
 
         if (!columnMap[sortBy]) {

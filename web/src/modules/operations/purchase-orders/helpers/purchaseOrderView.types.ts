@@ -66,6 +66,7 @@ export interface PoPaymentRequest {
     partyName: string;
     amount: string;
     status: string;
+    actualTdsDeducted?: number | string;
     requestedByName: string;
     createdAt: string;
 }

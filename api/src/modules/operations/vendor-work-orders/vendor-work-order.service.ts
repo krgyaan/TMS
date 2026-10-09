@@ -762,27 +762,54 @@ export class VendorWorkOrderService {
 
         // Sums are computed in SQL (exact numeric) instead of JS floats so the
         // API gate can never disagree with the closure page's rounded values.
-        const [totals] = await this.db
+        // NOTE: drizzle renders a column reference inside a raw `sql` subquery as a
+        // bare column name (e.g. `"id"`), so correlated references to the outer
+        // table would bind to the subquery's own table and always return 0. The id
+        // is therefore bound as a parameter instead:
+        const [itemTotals] = await this.db
             .select({
-                effectiveAmount: sql<string>`COALESCE(${vendorWorkOrders.amountAfterTds}::numeric, (SELECT COALESCE(SUM(${vendorWorkOrderItems.totalAmount}::numeric), 0) FROM ${vendorWorkOrderItems} WHERE ${vendorWorkOrderItems.vendorWorkOrderId} = ${vendorWorkOrders.id}))`,
-                paid: sql<string>`COALESCE((SELECT SUM(${paymentRequests.amount}::numeric) FROM ${paymentRequests} WHERE ${paymentRequests.vendorWorkOrderId} = ${vendorWorkOrders.id} AND ${paymentRequests.status} = 'payment_done'), 0)`,
-                invoiced: sql<string>`COALESCE((SELECT SUM(${purchaseInvoices.valuePreGst}::numeric + ${purchaseInvoices.gstAmount}::numeric) FROM ${purchaseInvoices} WHERE ${purchaseInvoices.vendorWorkOrderId} = ${vendorWorkOrders.id}), 0)`,
+                total: sql<string>`COALESCE(SUM(${vendorWorkOrderItems.totalAmount}::numeric), 0)`,
             })
-            .from(vendorWorkOrders)
-            .where(eq(vendorWorkOrders.id, id));
+            .from(vendorWorkOrderItems)
+            .where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
 
-        const effectiveAmount = round2(totals.effectiveAmount);
-        const totalPaymentDone = round2(totals.paid);
-        const totalPiAmount = round2(totals.invoiced);
-        const remainingToPay = round2(effectiveAmount - totalPaymentDone);
-        const remainingInvoice = round2(effectiveAmount - totalPiAmount);
+        const [paymentTotals] = await this.db
+            .select({
+                gross: sql<string>`COALESCE(SUM(${paymentRequests.amount}::numeric), 0)`,
+                tds: sql<string>`COALESCE(SUM(${paymentRequests.actualTdsDeducted}::numeric), 0)`,
+            })
+            .from(paymentRequests)
+            .where(and(eq(paymentRequests.vendorWorkOrderId, id), eq(paymentRequests.status, "payment_done")));
 
-        const canClose = paymentRequestsData.length === 0 && remainingToPay < CLOSURE_TOLERANCE && remainingInvoice < CLOSURE_TOLERANCE;
+        const [invoiceTotals] = await this.db
+            .select({
+                invoiced: sql<string>`COALESCE(SUM(${purchaseInvoices.valuePreGst}::numeric + ${purchaseInvoices.gstAmount}::numeric), 0)`,
+            })
+            .from(purchaseInvoices)
+            .where(eq(purchaseInvoices.vendorWorkOrderId, id));
+
+        // Closure reconciles against the GROSS VWO value (items incl. GST);
+        // for VWOs without item rows, fall back to amountAfterTds + tdsAmount.
+        const grandTotal = round2(Number(itemTotals.total) > 0 ? itemTotals.total : Number(wo.amountAfterTds ?? 0) + Number(wo.tdsAmount ?? 0));
+        const totalPaymentDone = round2(paymentTotals.gross);
+        const totalTdsDeducted = round2(paymentTotals.tds);
+        const totalPaidAfterTds = round2(totalPaymentDone - totalTdsDeducted);
+        const totalPiAmount = round2(invoiceTotals.invoiced);
+        const effectiveAmount = round2(wo.amountAfterTds ?? grandTotal);
+        const remainingToPay = round2(grandTotal - totalPaymentDone);
+        const remainingInvoice = round2(grandTotal - totalPiAmount);
+
+        // Symmetric settlement: invoices must cover the VWO value AND payments must
+        // match the invoices, each within CLOSURE_TOLERANCE (over- and under-side).
+        const canClose = paymentRequestsData.length === 0 && Math.abs(remainingToPay) < CLOSURE_TOLERANCE && Math.abs(remainingInvoice) < CLOSURE_TOLERANCE;
 
         return {
             canClose,
             effectiveAmount,
+            grandTotal,
             totalPaymentDone,
+            totalTdsDeducted,
+            totalPaidAfterTds,
             totalPiAmount,
             remainingToPay,
             remainingInvoice,
@@ -814,7 +841,7 @@ export class VendorWorkOrderService {
 
         const closureStatus = await this.checkClosure(id);
         if (!closureStatus.canClose) {
-            throw new BadRequestException(`Vendor Work Order cannot be closed until payments and invoices are settled (difference must be under ₹${CLOSURE_TOLERANCE}).`);
+            throw new BadRequestException(`Vendor Work Order cannot be closed until invoices cover the VWO value and payments match the invoices (each difference under ₹${CLOSURE_TOLERANCE}).`);
         }
 
         const [updated] = await this.db
@@ -862,6 +889,7 @@ export class VendorWorkOrderService {
                 paymentMode: paymentRequests.paymentMode,
                 paymentAgainst: paymentRequests.paymentAgainst,
                 utrNumber: paymentRequests.utrNumber,
+                actualTdsDeducted: paymentRequests.actualTdsDeducted,
                 createdAt: paymentRequests.createdAt,
             })
             .from(paymentRequests)
@@ -885,6 +913,10 @@ export class VendorWorkOrderService {
 
         const totalPaymentDone = round2(paymentRequestsData.filter(pr => pr.status === "payment_done").reduce((sum, pr) => sum + Number(pr.amount || 0), 0));
 
+        const totalTdsDeducted = round2(paymentRequestsData.filter(pr => pr.status === "payment_done").reduce((sum, pr) => sum + Number(pr.actualTdsDeducted || 0), 0));
+
+        const totalPaidAfterTds = round2(totalPaymentDone - totalTdsDeducted);
+
         const totalPiAmount = round2(purchaseInvoicesData.reduce((sum, inv) => sum + Number(inv.valuePreGst || 0) + Number(inv.gstAmount || 0), 0));
 
         const closedByName = wo.closedBy ? ((await this.db.select({ name: users.name }).from(users).where(eq(users.id, wo.closedBy)))[0]?.name ?? null) : null;
@@ -898,9 +930,13 @@ export class VendorWorkOrderService {
             woDate: wo.woDate,
             woApproved: wo.woApproved,
             amountAfterTds: wo.amountAfterTds,
+            tdsAmount: wo.tdsAmount,
+            tdsPercentage: wo.tdsPercentage,
             grandTotal,
             totalGst,
             totalPaymentDone,
+            totalTdsDeducted,
+            totalPaidAfterTds,
             totalPiAmount,
             closedAt: wo.closedAt,
             closedBy: wo.closedBy,
