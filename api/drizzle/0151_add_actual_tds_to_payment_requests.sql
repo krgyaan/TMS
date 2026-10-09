@@ -1,0 +1,1 @@
+ALTER TABLE "project_payment_requests" ADD COLUMN "actualTdsDeducted" numeric(14,2) DEFAULT 0;
