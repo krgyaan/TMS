@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { FileText, Receipt, Users, Eye } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
-import { formatDate } from '@/hooks/useFormatedDate';
+import { formatDate, formatDateTime } from '@/hooks/useFormatedDate';
 import { fileUploadService } from '@/services/api/file-upload.service';
 import type { DDFollowupData } from '../helpers/demandDraft.types';
 
@@ -243,6 +243,11 @@ export function DemandDraftView({
                                 {data.requestedByName || '—'}
                             </TableCell>
                         </TableRow>
+                        <FieldRow
+                            label="Requested Date"
+                            value={data.requestCreatedAt ? formatDateTime(data.requestCreatedAt) : '—'}
+                            fullWidth
+                        />
                         {data.requestRemarks && (
                             <FieldRow label="Request Remarks" value={data.requestRemarks} fullWidth />
                         )}

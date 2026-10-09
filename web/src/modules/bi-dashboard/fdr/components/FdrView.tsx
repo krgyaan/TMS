@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Wallet, Receipt, Shield, Users, FileText, Eye } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
-import { formatDate } from '@/hooks/useFormatedDate';
+import { formatDate, formatDateTime } from '@/hooks/useFormatedDate';
 import { fileUploadService } from '@/services/api/file-upload.service';
 import type { FDRFollowupData } from '../helpers/fdr.types';
 
@@ -255,6 +255,11 @@ export function FdrView({
                                 {data.tenderStatusName || '—'}
                             </TableCell>
                         </TableRow>
+                        <FieldRow
+                            label="Requested Date"
+                            value={data.requestCreatedAt ? formatDateTime(data.requestCreatedAt) : '—'}
+                            fullWidth
+                        />
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Delivery Method
