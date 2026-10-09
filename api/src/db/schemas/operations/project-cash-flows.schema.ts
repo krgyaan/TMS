@@ -1,4 +1,4 @@
-import { pgTable, bigserial, bigint, varchar, numeric, text, timestamp, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, bigserial, bigint, varchar, numeric, text, timestamp, index } from "drizzle-orm/pg-core";
 import { projects } from "@/db/schemas/master/projects.schema";
 
 export const projectCashFlows = pgTable(
@@ -27,7 +27,6 @@ export const projectCashFlows = pgTable(
     index("idx_cf_event_type").on(table.eventType),
     index("idx_cf_reference").on(table.referenceType, table.referenceId),
     index("idx_cf_created_at").on(table.createdAt),
-    uniqueIndex("idx_cf_unique_event").on(table.referenceType, table.referenceId, table.eventType),
   ]
 );
 

@@ -677,7 +677,7 @@ export class PurchaseOrderService {
                         remark: `PO approved with TDS @ ${tdsPercentage}%`,
                         createdBy: userId ?? 0,
                     })
-                    .catch(err => this.logger.warn(`Cash flow creation failed for PO approval #${po.id}: ${err?.message || err}`, { error: err }));
+                    .catch(err => this.logger.warn(`Cash flow creation failed for PO approval #${po.id}: ${err}`));
             }
 
             return updated;
