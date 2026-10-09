@@ -2,7 +2,7 @@ import { paths } from "@/app/routes/paths";
 import { MultiSelectDropdown, type MultiSelectOption } from "@/components/form/MultiSelectDropdown";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { useAssignTrainingVideo, useLearnersProgress, useTrainingEmployees, useTrainingVideos } from "@/hooks/api/useTraining";
 import { ArrowLeft, CheckCircle2, Clock, Eye, Film, Loader2, Sparkles, UserPlus, Users, Video, X } from "lucide-react";
@@ -132,19 +132,13 @@ const AssignCoursePage = () => {
         <Card>
             {/* Header */}
             <CardHeader className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-                <div>
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="h-10 w-10 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
-                            <UserPlus className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-                                Assign Training Course
-                            </h1>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                                Select a course and assign it to your team members
-                            </p>
-                        </div>
+                <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+                        <UserPlus className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                        <CardTitle>Assign Training Course</CardTitle>
+                        <CardDescription>Select a course and assign it to your team members</CardDescription>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">

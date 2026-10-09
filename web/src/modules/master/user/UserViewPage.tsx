@@ -236,18 +236,16 @@ export default function UserViewPage() {
                             <FieldValue>{user.profile?.employeeCode || "—"}</FieldValue>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
-                            <FieldLabel icon={<Hash className="h-4 w-4" />}>User ID</FieldLabel>
-                            <FieldValue>{user.id}</FieldValue>
                             <FieldLabel icon={<UserRound className="h-4 w-4" />}>Username</FieldLabel>
                             <FieldValue>{user.username ? `@${user.username}` : "—"}</FieldValue>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
                             <FieldLabel icon={<CircleDot className="h-4 w-4" />}>Status</FieldLabel>
                             <FieldValue>
                                 <Badge variant={user.isActive ? "default" : "secondary"}>{user.isActive ? "Active" : "Inactive"}</Badge>
                             </FieldValue>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
                             <FieldLabel icon={<ShieldCheck className="h-4 w-4" />}>Role</FieldLabel>
-                            <FieldValue>{user.role?.name || "—"}</FieldValue>
+                            <FieldValue span={3}>{user.role?.name || "—"}</FieldValue>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <FieldLabel icon={<CalendarPlus className="h-4 w-4" />}>Date of Birth</FieldLabel>
