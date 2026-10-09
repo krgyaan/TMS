@@ -38,9 +38,13 @@ interface VwoClosureData {
   woDate?: string;
   woApproved?: boolean;
   amountAfterTds?: number | string;
+  tdsAmount?: number | string;
+  tdsPercentage?: number | string;
   grandTotal: number;
   totalGst: number;
   totalPaymentDone: number;
+  totalTdsDeducted: number;
+  totalPaidAfterTds: number;
   totalPiAmount: number;
   closedAt?: string | null;
   closedBy?: number | null;
@@ -55,6 +59,7 @@ interface VwoClosureData {
     paymentMode?: string;
     paymentAgainst?: string;
     utrNumber?: string;
+    actualTdsDeducted?: number | string | null;
     createdAt?: string;
   }>;
   purchaseInvoices: Array<{
@@ -175,17 +180,26 @@ const VwoClosurePage = () => {
     if (woId) load();
   }, [woId]);
 
-  const amountAfterTds = round2(Number(wo?.amountAfterTds || wo?.grandTotal || 0));
+  const amountAfterTds = round2(Number(wo?.amountAfterTds || 0));
+  const grandTotal = round2(Number(wo?.grandTotal || 0));
   const totalPaymentDone = round2(Number(wo?.totalPaymentDone || 0));
+  const totalTdsDeducted = round2(Number(wo?.totalTdsDeducted || 0));
+  const totalPaidAfterTds = round2(Number(wo?.totalPaidAfterTds || 0));
   const totalPiAmount = round2(Number(wo?.totalPiAmount || 0));
-  const remainingToPay = round2(amountAfterTds - totalPaymentDone);
-  const remainingInvoice = round2(amountAfterTds - totalPiAmount);
-  // A difference strictly below CLOSURE_TOLERANCE rupees is absorbed as
-  // round-off; anything at or above it keeps the VWO open.
-  const paySettled = remainingToPay < CLOSURE_TOLERANCE;
-  const invoiceSettled = remainingInvoice < CLOSURE_TOLERANCE;
-  const withinRoundOff = (r: number) => r > 0 && r < CLOSURE_TOLERANCE;
-  const canClose = paySettled && invoiceSettled && !wo?.closedAt;
+  const showTdsColumn = totalTdsDeducted > 0;
+  // Settlement reconciles against the GROSS VWO value: invoices must cover the
+  // VWO value and payments must match the invoices, each within ₹CLOSURE_TOLERANCE
+  // (symmetric — over- and under-side both block closure). This matches the
+  // API gate in checkClosure.
+  const paymentsRemaining = round2(grandTotal - totalPaymentDone);
+  const invoicesRemaining = round2(grandTotal - totalPiAmount);
+  const paySettled = Math.abs(paymentsRemaining) < CLOSURE_TOLERANCE;
+  const invoiceSettled = Math.abs(invoicesRemaining) < CLOSURE_TOLERANCE;
+  const withinRoundOff = (r: number) => Math.abs(r) > 0 && Math.abs(r) < CLOSURE_TOLERANCE;
+  // The API gate also requires every payment request to be payment_done, so the
+  // page mirrors that instead of silently showing "Ready to close".
+  const openPrs = (wo?.paymentRequests ?? []).filter((pr) => pr.status !== "payment_done").length;
+  const canClose = paySettled && invoiceSettled && openPrs === 0 && !wo?.closedAt;
 
   // `canClose` above is the derived "everything settled" state, so the
   // permission check needs its own name to avoid shadowing it.
@@ -296,15 +310,15 @@ const VwoClosurePage = () => {
           <div className="space-y-3">
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
               <div>
-                <p className="text-sm font-medium">Payment Done (Paid Out)</p>
-                <p className="text-xs text-muted-foreground">Amount we have paid</p>
+                <p className="text-sm font-medium">Invoice Received</p>
+                <p className="text-xs text-muted-foreground">Invoices received against the VWO value ({formatINR(grandTotal)})</p>
               </div>
               <div className="text-right">
-                <p className="text-lg font-semibold">{formatINR(totalPaymentDone)}</p>
-                {remainingToPay <= 0 ? (
+                <p className="text-lg font-semibold">{formatINR(totalPiAmount)}</p>
+                {invoiceSettled ? (
                   <Badge variant="default" className="mt-1">Settled</Badge>
-                ) : paySettled ? (
-                  <Badge variant="secondary" className="mt-1">Within tolerance</Badge>
+                ) : invoicesRemaining < 0 ? (
+                  <Badge variant="outline" className="mt-1">Over</Badge>
                 ) : (
                   <Badge variant="outline" className="mt-1">Pending</Badge>
                 )}
@@ -313,44 +327,92 @@ const VwoClosurePage = () => {
 
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
               <div>
-                <p className="text-sm font-medium">Invoice Received</p>
-                <p className="text-xs text-muted-foreground">Invoices received against payment</p>
+                <p className="text-sm font-medium">Payment Done (Gross)</p>
+                <p className="text-xs text-muted-foreground">Gross paid incl. TDS</p>
               </div>
               <div className="text-right">
-                <p className="text-lg font-semibold">{formatINR(totalPiAmount)}</p>
-                {remainingInvoice <= 0 ? (
+                <p className="text-lg font-semibold">{formatINR(totalPaymentDone)}</p>
+                {paySettled ? (
                   <Badge variant="default" className="mt-1">Settled</Badge>
-                ) : invoiceSettled ? (
-                  <Badge variant="secondary" className="mt-1">Within tolerance</Badge>
+                ) : paymentsRemaining < 0 ? (
+                  <Badge variant="outline" className="mt-1">Over</Badge>
                 ) : (
                   <Badge variant="outline" className="mt-1">Pending</Badge>
                 )}
               </div>
             </div>
 
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+              <div>
+                <p className="text-sm font-medium">Payment Done (After TDS)</p>
+                <p className="text-xs text-muted-foreground">Net paid to vendor (gross minus TDS)</p>
+              </div>
+              <div className="text-right">
+                <p className="text-lg font-semibold">{formatINR(totalPaidAfterTds)}</p>
+              </div>
+            </div>
+
+            {totalTdsDeducted > 0 && (
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                <div>
+                  <p className="text-sm font-medium">TDS Deducted</p>
+                  <p className="text-xs text-muted-foreground">Withheld from payments (pending TDS returns)</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-semibold">{formatINR(totalTdsDeducted)}</p>
+                </div>
+              </div>
+            )}
+
             <div className="border-t pt-3 space-y-2">
-              {remainingToPay > 0 && (
+              {paymentsRemaining > 0 && (
                 <div className="flex items-center justify-between text-amber-600">
                   <span className="flex items-center gap-2">
                     <AlertCircle className="h-4 w-4" />
                     Remaining to Pay
                   </span>
-                  <span className="font-semibold">{formatINR(remainingToPay)}</span>
+                  <span className="font-semibold">{formatINR(paymentsRemaining)}</span>
                 </div>
               )}
-              {remainingInvoice > 0 && (
+              {invoicesRemaining > 0 && (
                 <div className="flex items-center justify-between text-amber-600">
                   <span className="flex items-center gap-2">
                     <AlertCircle className="h-4 w-4" />
                     Remaining Invoice
                   </span>
-                  <span className="font-semibold">{formatINR(remainingInvoice)}</span>
+                  <span className="font-semibold">{formatINR(invoicesRemaining)}</span>
                 </div>
               )}
-              {(withinRoundOff(remainingToPay) || withinRoundOff(remainingInvoice)) && (
+              {paymentsRemaining < 0 && (
+                <div className="flex items-center justify-between text-amber-600">
+                  <span className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    Over-paid against VWO value
+                  </span>
+                  <span className="font-semibold">{formatINR(-paymentsRemaining)}</span>
+                </div>
+              )}
+              {invoicesRemaining < 0 && (
+                <div className="flex items-center justify-between text-amber-600">
+                  <span className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    Over-invoiced against VWO value
+                  </span>
+                  <span className="font-semibold">{formatINR(-invoicesRemaining)}</span>
+                </div>
+              )}
+              {(withinRoundOff(paymentsRemaining) || withinRoundOff(invoicesRemaining)) && (
                 <p className="text-xs text-amber-600">
-                  Difference under ₹{CLOSURE_TOLERANCE} — will be absorbed as round-off on closure.
+                  Difference under ₹{CLOSURE_TOLERANCE} — absorbed as round-off on closure.
                 </p>
+              )}
+              {openPrs > 0 && (
+                <div className="flex items-center justify-between text-amber-600">
+                  <span className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    {openPrs} payment request(s) not yet payment_done
+                  </span>
+                </div>
               )}
               {canClose && (
                 <div className="flex items-center justify-between text-green-600 pt-2">
@@ -371,7 +433,7 @@ const VwoClosurePage = () => {
         </div>
       )}
 
-      {remainingToPay > 0 && (
+      {paymentsRemaining > 0 && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Record Payments</CardTitle>
@@ -479,7 +541,7 @@ const VwoClosurePage = () => {
         </Card>
       )}
 
-      {remainingInvoice > 0 && (
+      {invoicesRemaining > 0 && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Record Invoices</CardTitle>
@@ -608,6 +670,7 @@ const VwoClosurePage = () => {
                     <TableHead className="text-xs uppercase">Date</TableHead>
                     <TableHead className="text-xs uppercase">Party</TableHead>
                     <TableHead className="text-xs uppercase text-right">Amount</TableHead>
+                    {showTdsColumn && <TableHead className="text-xs uppercase text-right">TDS</TableHead>}
                     <TableHead className="text-xs uppercase">Status</TableHead>
                     <TableHead className="text-xs uppercase">Mode</TableHead>
                     <TableHead className="text-xs uppercase">UTR</TableHead>
@@ -623,6 +686,9 @@ const VwoClosurePage = () => {
                         <TableCell className="text-sm">{formatDate(pr.createdAt)}</TableCell>
                         <TableCell className="text-sm">{pr.partyName || "—"}</TableCell>
                         <TableCell className="text-sm text-right font-medium">{formatINR(Number(pr.amount || 0))}</TableCell>
+                        {showTdsColumn && (
+                          <TableCell className="text-sm text-right">{pr.actualTdsDeducted ? formatINR(Number(pr.actualTdsDeducted)) : "—"}</TableCell>
+                        )}
                         <TableCell><Badge variant={cfg.variant}>{cfg.label}</Badge></TableCell>
                         <TableCell className="text-sm">{pr.paymentMode || "—"}</TableCell>
                         <TableCell className="text-sm font-mono">{pr.utrNumber || "—"}</TableCell>
@@ -659,6 +725,16 @@ const VwoClosurePage = () => {
                   })}
                 </TableBody>
               </Table>
+              {showTdsColumn && (
+                <div className="flex justify-end gap-6 px-4 py-2 bg-muted/30 text-sm">
+                  <span className="text-muted-foreground">Total Paid (Gross)</span>
+                  <span className="font-semibold">{formatINR(totalPaymentDone)}</span>
+                  <span className="text-muted-foreground">TDS Deducted</span>
+                  <span className="font-semibold">{formatINR(totalTdsDeducted)}</span>
+                  <span className="text-muted-foreground">After TDS</span>
+                  <span className="font-semibold">{formatINR(totalPaidAfterTds)}</span>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
@@ -774,7 +850,10 @@ const VwoClosurePage = () => {
         title="Close Vendor Work Order"
         referenceNo={wo.woNumber}
         amountAfterTds={amountAfterTds}
+        grandTotal={grandTotal}
         totalPaymentDone={totalPaymentDone}
+        totalTdsDeducted={totalTdsDeducted}
+        totalPaidAfterTds={totalPaidAfterTds}
         totalPiAmount={totalPiAmount}
       />
 

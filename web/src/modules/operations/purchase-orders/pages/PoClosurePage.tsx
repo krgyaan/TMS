@@ -209,7 +209,8 @@ const PoClosurePage: React.FC = () => {
         if (id) load();
     }, [id]);
 
-    const amountAfterTds = round2(Number(po?.amountAfterTds || po?.grandTotal || 0));
+    const amountAfterTds = round2(Number(po?.amountAfterTds || 0));
+    const grandTotal = round2(Number(po?.grandTotal || 0));
     const totalPaymentDone = round2(Number(po?.totalPaymentDone || 0));
     const totalTdsDeducted = round2(Number(po?.totalTdsDeducted || 0));
     const totalPaidAfterTds = round2(Number(po?.totalPaidAfterTds || 0));
@@ -217,18 +218,19 @@ const PoClosurePage: React.FC = () => {
     // TDS-aware column/footer/reconciliation are shown only when TDS was actually
     // deducted, so non-TDS POs keep the previous look.
     const showTdsColumn = totalTdsDeducted > 0;
-    // Settlement gating stays on the GROSS payment total so the page always
-    // agrees with the API's close gate (checkClosure sums gross PR amounts vs
-    // amountAfterTds with a ₹CLOSURE_TOLERANCE tolerance). TDS is displayed
-    // separately as an after-TDS reconciliation.
-    const remainingToPay = round2(amountAfterTds - totalPaymentDone);
-    const remainingInvoice = round2(amountAfterTds - totalPiAmount);
-    // A difference strictly below CLOSURE_TOLERANCE rupees is absorbed as
-    // round-off; anything at or above it keeps the PO open.
-    const paySettled = remainingToPay < CLOSURE_TOLERANCE;
-    const invoiceSettled = remainingInvoice < CLOSURE_TOLERANCE;
-    const withinRoundOff = (r: number) => r > 0 && r < CLOSURE_TOLERANCE;
-    const canClose = paySettled && invoiceSettled && !po?.closedAt;
+    // Settlement reconciles against the GROSS PO value: invoices must cover the
+    // PO value and payments must match the invoices, each within ₹CLOSURE_TOLERANCE
+    // (symmetric — over- and under-side both block closure). This matches the
+    // API gate in checkClosure.
+    const paymentsRemaining = round2(grandTotal - totalPaymentDone);
+    const invoicesRemaining = round2(grandTotal - totalPiAmount);
+    const paySettled = Math.abs(paymentsRemaining) < CLOSURE_TOLERANCE;
+    const invoiceSettled = Math.abs(invoicesRemaining) < CLOSURE_TOLERANCE;
+    const withinRoundOff = (r: number) => Math.abs(r) > 0 && Math.abs(r) < CLOSURE_TOLERANCE;
+    // The API gate also requires every payment request to be payment_done, so the
+    // page mirrors that instead of silently showing "Ready to close".
+    const openPrs = (po?.paymentRequests ?? []).filter((pr) => pr.status !== "payment_done").length;
+    const canClose = paySettled && invoiceSettled && openPrs === 0 && !po?.closedAt;
 
     const updatePaymentRow = (index: number, field: keyof PaymentRow, value: string) => {
         setPaymentRows((rows) => rows.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
@@ -313,18 +315,45 @@ const PoClosurePage: React.FC = () => {
                     <div className="space-y-3">
                         <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
                             <div>
-                                <p className="text-sm font-medium">Payment Done (After TDS)</p>
-                                <p className="text-xs text-muted-foreground">Amount paid out after TDS deduction</p>
+                                <p className="text-sm font-medium">Invoice Received</p>
+                                <p className="text-xs text-muted-foreground">Invoices received against the PO value ({formatINR(grandTotal)})</p>
                             </div>
                             <div className="text-right">
-                                <p className="text-lg font-semibold">{formatINR(totalPaidAfterTds)}</p>
-                                {remainingToPay <= 0 ? (
+                                <p className="text-lg font-semibold">{formatINR(totalPiAmount)}</p>
+                                {invoiceSettled ? (
                                     <Badge variant="default" className="mt-1">Settled</Badge>
-                                ) : paySettled ? (
-                                    <Badge variant="secondary" className="mt-1">Within tolerance</Badge>
+                                ) : invoicesRemaining < 0 ? (
+                                    <Badge variant="outline" className="mt-1">Over</Badge>
                                 ) : (
                                     <Badge variant="outline" className="mt-1">Pending</Badge>
                                 )}
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                            <div>
+                                <p className="text-sm font-medium">Payment Done (Gross)</p>
+                                <p className="text-xs text-muted-foreground">Gross paid incl. TDS</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-lg font-semibold">{formatINR(totalPaymentDone)}</p>
+                                {paySettled ? (
+                                    <Badge variant="default" className="mt-1">Settled</Badge>
+                                ) : paymentsRemaining < 0 ? (
+                                    <Badge variant="outline" className="mt-1">Over</Badge>
+                                ) : (
+                                    <Badge variant="outline" className="mt-1">Pending</Badge>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                            <div>
+                                <p className="text-sm font-medium">Payment Done (After TDS)</p>
+                                <p className="text-xs text-muted-foreground">Net paid to vendor (gross minus TDS)</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-lg font-semibold">{formatINR(totalPaidAfterTds)}</p>
                             </div>
                         </div>
 
@@ -340,46 +369,55 @@ const PoClosurePage: React.FC = () => {
                             </div>
                         )}
 
-                        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                            <div>
-                                <p className="text-sm font-medium">Invoice Received</p>
-                                <p className="text-xs text-muted-foreground">Invoices received against payment</p>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-lg font-semibold">{formatINR(totalPiAmount)}</p>
-                                {remainingInvoice <= 0 ? (
-                                    <Badge variant="default" className="mt-1">Settled</Badge>
-                                ) : invoiceSettled ? (
-                                    <Badge variant="secondary" className="mt-1">Within tolerance</Badge>
-                                ) : (
-                                    <Badge variant="outline" className="mt-1">Pending</Badge>
-                                )}
-                            </div>
-                        </div>
-
                         <div className="border-t pt-3 space-y-2">
-                            {remainingToPay > 0 && (
+                            {paymentsRemaining > 0 && (
                                 <div className="flex items-center justify-between text-amber-600">
                                     <span className="flex items-center gap-2">
                                         <AlertCircle className="h-4 w-4" />
                                         Remaining to Pay
                                     </span>
-                                    <span className="font-semibold">{formatINR(remainingToPay)}</span>
+                                    <span className="font-semibold">{formatINR(paymentsRemaining)}</span>
                                 </div>
                             )}
-                            {withinRoundOff(remainingInvoice) && (
+                            {invoicesRemaining > 0 && (
                                 <div className="flex items-center justify-between text-amber-600">
                                     <span className="flex items-center gap-2">
                                         <AlertCircle className="h-4 w-4" />
                                         Remaining Invoice
                                     </span>
-                                    <span className="font-semibold">{formatINR(remainingInvoice)}</span>
+                                    <span className="font-semibold">{formatINR(invoicesRemaining)}</span>
                                 </div>
                             )}
-                            {(withinRoundOff(remainingToPay) || withinRoundOff(remainingInvoice)) && (
+                            {paymentsRemaining < 0 && (
+                                <div className="flex items-center justify-between text-amber-600">
+                                    <span className="flex items-center gap-2">
+                                        <AlertCircle className="h-4 w-4" />
+                                        Over-paid against PO value
+                                    </span>
+                                    <span className="font-semibold">{formatINR(-paymentsRemaining)}</span>
+                                </div>
+                            )}
+                            {invoicesRemaining < 0 && (
+                                <div className="flex items-center justify-between text-amber-600">
+                                    <span className="flex items-center gap-2">
+                                        <AlertCircle className="h-4 w-4" />
+                                        Over-invoiced against PO value
+                                    </span>
+                                    <span className="font-semibold">{formatINR(-invoicesRemaining)}</span>
+                                </div>
+                            )}
+                            {(withinRoundOff(paymentsRemaining) || withinRoundOff(invoicesRemaining)) && (
                                 <p className="text-xs text-amber-600">
-                                    Difference under ₹{CLOSURE_TOLERANCE} — will be absorbed as round-off on closure.
+                                    Difference under ₹{CLOSURE_TOLERANCE} — absorbed as round-off on closure.
                                 </p>
+                            )}
+                            {openPrs > 0 && (
+                                <div className="flex items-center justify-between text-amber-600">
+                                    <span className="flex items-center gap-2">
+                                        <AlertCircle className="h-4 w-4" />
+                                        {openPrs} payment request(s) not yet payment_done
+                                    </span>
+                                </div>
                             )}
                             {canClose && (
                                 <div className="flex items-center justify-between text-green-600 pt-2">
@@ -400,7 +438,7 @@ const PoClosurePage: React.FC = () => {
                 </div>
             )}
 
-            {remainingToPay > 0 && (
+            {paymentsRemaining > 0 && (
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Record Payments</CardTitle>
@@ -508,7 +546,7 @@ const PoClosurePage: React.FC = () => {
                 </Card>
             )}
 
-            {remainingInvoice > 0 && (
+            {invoicesRemaining > 0 && (
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Record Invoices</CardTitle>
@@ -815,7 +853,10 @@ const PoClosurePage: React.FC = () => {
                 title="Close Purchase Order"
                 referenceNo={po.poNumber}
                 amountAfterTds={amountAfterTds}
+                grandTotal={grandTotal}
                 totalPaymentDone={totalPaymentDone}
+                totalTdsDeducted={totalTdsDeducted}
+                totalPaidAfterTds={totalPaidAfterTds}
                 totalPiAmount={totalPiAmount}
             />
 
