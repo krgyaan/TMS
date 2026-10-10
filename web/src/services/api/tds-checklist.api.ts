@@ -7,6 +7,8 @@ export interface ChecklistListParams {
     search?: string;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
+    year?: number;
+    month?: number;
 }
 
 export interface TdsChecklistRow {
@@ -21,12 +23,21 @@ export interface TdsChecklistRow {
     invoiceDate: string | null;
 }
 
+export interface TdsChecklistSummary {
+    totalAmount: number;
+    totalTdsAmount: number;
+}
+
+export type TdsChecklistListResponse = PaginatedResponse<TdsChecklistRow> & {
+    summary: TdsChecklistSummary;
+};
+
 class TdsChecklistApiService extends BaseApiService {
     constructor() {
         super('/accounts/tds-checklists');
     }
 
-    async getAll(params: ChecklistListParams = {}): Promise<PaginatedResponse<TdsChecklistRow>> {
+    async getAll(params: ChecklistListParams = {}): Promise<TdsChecklistListResponse> {
         const search = new URLSearchParams();
 
         if (params.page) {
@@ -44,9 +55,15 @@ class TdsChecklistApiService extends BaseApiService {
         if (params.sortOrder) {
             search.set('sortOrder', params.sortOrder);
         }
+        if (params.year) {
+            search.set('year', String(params.year));
+        }
+        if (params.month) {
+            search.set('month', String(params.month));
+        }
 
         const queryString = search.toString();
-        return this.get<PaginatedResponse<TdsChecklistRow>>(queryString ? `?${queryString}` : '');
+        return this.get<TdsChecklistListResponse>(queryString ? `?${queryString}` : '');
     }
 }
 

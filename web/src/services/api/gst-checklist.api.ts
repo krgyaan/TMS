@@ -14,12 +14,21 @@ export interface GstChecklistRow {
     invoiceDate: string;
 }
 
+export interface GstChecklistSummary {
+    totalInvoiceValue: number;
+    totalGstAmount: number;
+}
+
+export type GstChecklistListResponse = PaginatedResponse<GstChecklistRow> & {
+    summary: GstChecklistSummary;
+};
+
 class GstChecklistApiService extends BaseApiService {
     constructor() {
         super('/accounts/gst-checklists');
     }
 
-    async getAll(params: ChecklistListParams = {}): Promise<PaginatedResponse<GstChecklistRow>> {
+    async getAll(params: ChecklistListParams = {}): Promise<GstChecklistListResponse> {
         const search = new URLSearchParams();
 
         if (params.page) {
@@ -37,9 +46,15 @@ class GstChecklistApiService extends BaseApiService {
         if (params.sortOrder) {
             search.set('sortOrder', params.sortOrder);
         }
+        if (params.year) {
+            search.set('year', String(params.year));
+        }
+        if (params.month) {
+            search.set('month', String(params.month));
+        }
 
         const queryString = search.toString();
-        return this.get<PaginatedResponse<GstChecklistRow>>(queryString ? `?${queryString}` : '');
+        return this.get<GstChecklistListResponse>(queryString ? `?${queryString}` : '');
     }
 }
 

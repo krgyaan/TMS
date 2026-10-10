@@ -4,12 +4,16 @@ import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
 import { currencyCol, dateOnlyCol } from '@/components/data-grid';
 import { usePersistentTableState } from '@/hooks/usePersistentTableState';
+import { useYearMonthFilter } from '@/hooks/useYearMonthFilter';
 import { useGstChecklists } from '@/hooks/api/useGstChecklist';
 import type { GstChecklistRow } from '@/services/api/gst-checklist.api';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, FileX2, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { formatINR } from '@/hooks/useINRFormatter';
 
 const GstChecklistListPage = () => {
     const {
@@ -26,13 +30,32 @@ const GstChecklistListPage = () => {
         defaultSortOrder: 'desc',
     });
 
+    const yearMonth = useYearMonthFilter();
+
+    const handleYearChange = (value: string) => {
+        yearMonth.setYear(value);
+        setPagination((p) => ({ ...p, pageIndex: 0 }));
+    };
+
+    const handleMonthChange = (value: string) => {
+        yearMonth.setMonth(value);
+        setPagination((p) => ({ ...p, pageIndex: 0 }));
+    };
+
     const { data: apiResponse, isLoading: loading, error } = useGstChecklists(
-        { page: pagination.pageIndex + 1, limit: pagination.pageSize, search: debouncedSearch || undefined },
+        {
+            page: pagination.pageIndex + 1,
+            limit: pagination.pageSize,
+            search: debouncedSearch || undefined,
+            year: yearMonth.filterYear,
+            month: yearMonth.filterMonth,
+        },
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
 
     const tableData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || tableData.length;
+    const summary = apiResponse?.summary;
 
     const colDefs = useMemo<ColDef<GstChecklistRow>[]>(
         () => [
@@ -107,8 +130,13 @@ const GstChecklistListPage = () => {
         return (
             <Card>
                 <CardHeader>
-                    <Skeleton className="h-8 w-64" />
-                    <Skeleton className="h-4 w-48 mt-2" />
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <Skeleton className="h-8 w-64" />
+                            <Skeleton className="h-4 w-48 mt-2" />
+                        </div>
+                        <Skeleton className="h-6 w-72" />
+                    </div>
                 </CardHeader>
                 <CardContent className="p-6">
                     <Skeleton className="h-[500px] w-full" />
@@ -145,10 +173,51 @@ const GstChecklistListPage = () => {
                             All GST 2B reconciliations listed
                         </CardDescription>
                     </div>
+                    <div className="flex items-center gap-2">
+                        <Badge variant="secondary">
+                            Invoice Value: {formatINR(summary?.totalInvoiceValue ?? 0)}
+                        </Badge>
+                        <Badge variant="secondary">
+                            GST Amount: {formatINR(summary?.totalGstAmount ?? 0)}
+                        </Badge>
+                    </div>
                 </div>
             </CardHeader>
             <CardContent className="px-0">
-                <div className="flex items-center gap-4 px-6 pb-4">
+                <div className="flex items-start gap-4 px-6 pb-4">
+                    <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                            <Select value={yearMonth.year} onValueChange={handleYearChange}>
+                                <SelectTrigger className="w-[130px]">
+                                    <SelectValue placeholder="Year" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {yearMonth.yearOptions.map((option) => (
+                                        <SelectItem key={option.value} value={option.value}>
+                                            {option.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <Select
+                                value={yearMonth.month}
+                                onValueChange={handleMonthChange}
+                                disabled={yearMonth.year === 'all'}
+                            >
+                                <SelectTrigger className="w-[150px]">
+                                    <SelectValue placeholder="Month" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {yearMonth.monthOptions.map((option) => (
+                                        <SelectItem key={option.value} value={option.value}>
+                                            {option.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{yearMonth.description}</p>
+                    </div>
                     <div className="flex-1 flex justify-end">
                         <div className="relative">
                             <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />

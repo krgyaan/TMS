@@ -9,13 +9,15 @@ export const TDS_CHECKLIST_KEYS = {
 };
 
 export const useTdsChecklists = (
-    pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 },
+    pagination: { page: number; limit: number; search?: string; year?: number; month?: number } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
     const params: ChecklistListParams = {
         page: pagination.page,
         limit: pagination.limit,
         search: pagination.search,
+        year: pagination.year,
+        month: pagination.month,
         sortBy: sort?.sortBy,
         sortOrder: sort?.sortOrder,
     };
