@@ -8,6 +8,7 @@ import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
 import { purchaseInvoices } from "@/db/schemas/operations/purchase-invoices.schema";
 import { wrapPaginatedResponse } from "@/utils/responseWrapper";
 import type { PaginatedResult } from "@/modules/tendering/types/shared.types";
+import { buildDateRange } from "./tds-checklist.service";
 import type { ChecklistListFilters } from "./tds-checklist.service";
 
 export interface GstChecklistRow {
@@ -22,11 +23,20 @@ export interface GstChecklistRow {
     invoiceDate: string;
 }
 
+export interface GstChecklistSummary {
+    totalInvoiceValue: number;
+    totalGstAmount: number;
+}
+
+export type GstChecklistResult = PaginatedResult<GstChecklistRow> & {
+    summary: GstChecklistSummary;
+};
+
 @Injectable()
 export class GstChecklistService {
     constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
 
-    async findAll(filters: ChecklistListFilters = {}): Promise<PaginatedResult<GstChecklistRow>> {
+    async findAll(filters: ChecklistListFilters = {}): Promise<GstChecklistResult> {
         const page = filters.page || 1;
         const limit = filters.limit || 50;
         const offset = (page - 1) * limit;
@@ -48,16 +58,29 @@ export class GstChecklistService {
             `);
         }
 
+        const dateRange = buildDateRange(filters.year, filters.month);
+        if (dateRange) {
+            conditions.push(sql`${gst2bReco.invoiceDate} >= ${dateRange.start} AND ${gst2bReco.invoiceDate} < ${dateRange.end}`);
+        }
+
         const whereClause = conditions.length ? and(...conditions) : undefined;
 
-        const [countResult] = await this.db
-            .select({ count: sql<number>`count(*)` })
+        const [aggregate] = await this.db
+            .select({
+                count: sql<number>`count(*)`,
+                totalInvoiceValue: sql<number>`coalesce(sum(${purchaseInvoices.valuePreGst}), 0)`,
+                totalGstAmount: sql<number>`coalesce(sum(${gst2bReco.gstAmount}), 0)`,
+            })
             .from(gst2bReco)
             .leftJoin(projects, eq(projects.id, gst2bReco.projectId))
             .leftJoin(purchaseOrders, eq(purchaseOrders.id, gst2bReco.poId))
             .leftJoin(purchaseInvoices, eq(purchaseInvoices.id, gst2bReco.invoiceId))
             .where(whereClause);
-        const total = Number(countResult?.count ?? 0);
+        const total = Number(aggregate?.count ?? 0);
+        const summary: GstChecklistSummary = {
+            totalInvoiceValue: Number(aggregate?.totalInvoiceValue ?? 0),
+            totalGstAmount: Number(aggregate?.totalGstAmount ?? 0),
+        };
 
         const sortFn = filters.sortOrder === "desc" ? desc : asc;
         let orderByClause = desc(gst2bReco.id);
@@ -109,6 +132,9 @@ export class GstChecklistService {
             .limit(limit)
             .offset(offset);
 
-        return wrapPaginatedResponse(rows as GstChecklistRow[], total, page, limit);
+        return {
+            ...wrapPaginatedResponse(rows as GstChecklistRow[], total, page, limit),
+            summary,
+        };
     }
 }

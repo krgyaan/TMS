@@ -12,7 +12,9 @@ export class TdsChecklistController {
         @Query("limit") limit?: string,
         @Query("search") search?: string,
         @Query("sortBy") sortBy?: string,
-        @Query("sortOrder") sortOrder?: "asc" | "desc"
+        @Query("sortOrder") sortOrder?: "asc" | "desc",
+        @Query("year") year?: string,
+        @Query("month") month?: string
     ) {
         const filters: ChecklistListFilters = {
             page: page ? parseInt(page, 10) : undefined,
@@ -20,6 +22,8 @@ export class TdsChecklistController {
             search,
             sortBy,
             sortOrder,
+            year: year ? parseInt(year, 10) : undefined,
+            month: month ? parseInt(month, 10) : undefined,
         };
         return this.tdsChecklistService.findAll(filters);
     }
