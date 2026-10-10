@@ -128,7 +128,7 @@ export function ChequeView({
                                     {data.requestedByName || '—'}
                                 </TableCell>
                                 <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Requeste Date
+                                    Requested Date
                                 </TableCell>
                                 <TableCell className="text-sm">
                                     {formatDateTime(data.requestCreatedAt)}

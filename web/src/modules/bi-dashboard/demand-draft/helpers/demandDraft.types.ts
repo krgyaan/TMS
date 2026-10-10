@@ -43,6 +43,7 @@ export interface DDActionFormData {
     tenderNo: string;
     tenderName: string;
     tenderId: number;
+    requestCreatedAt: string | null;
     amount: number | null;
     favouring: string | null;
     payableAt: string | null;

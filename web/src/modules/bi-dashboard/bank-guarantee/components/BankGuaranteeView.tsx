@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Shield, Eye } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
-import { formatDate } from '@/hooks/useFormatedDate';
+import { formatDate, formatDateTime } from '@/hooks/useFormatedDate';
 import { fileUploadService } from '@/services/api/file-upload.service';
 
 const FileLink = ({ file }: { file?: string }) => {
@@ -189,10 +189,15 @@ export function BankGuaranteeView({
                             />
                             <DataRow
                                 label1="Requested By"
-                                value1={data.requestedByName || '—'}
+                                value1={data.requestedByName || '-'}
                                 label2="Rejection Reasons"
-                                value2={data.reasonReq || '—'}
+                                value2={data.reasonReq || '-'}
                             />
+                            <DataRow
+                                label1="Requested Date"
+                                value1={data.requestCreatedAt ? formatDateTime(data.requestCreatedAt) : '—'}
+                            />
+
                             <DataRow
                                 label1="Prefilled Forms (Unsigned)"
                                 value1={<FileLink file={data.bgFormatTe} />}
