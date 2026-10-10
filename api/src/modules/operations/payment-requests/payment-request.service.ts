@@ -12,25 +12,24 @@ import { purchaseOrderProducts } from "@/db/schemas/operations/purchase-order-pr
 import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.schema";
 import { vendorWorkOrderItems } from "@/db/schemas/operations/vendor-work-order-items.schema";
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, desc, eq, like, ne, sql } from "drizzle-orm";
+import { and, desc, eq, like, ne, sql, type SQL } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 import { InsurancePolicyService } from "@/modules/insurance/insurance-policy.service";
 import { CashFlowService } from "@/modules/operations/cash-flows/cash-flow.service";
 import { insurancePayloadSchema, insurancePolicySchema, type InsurancePayload } from "@/modules/insurance/zod/insurance-policy.schema";
 import { OperationNotificationService } from "@/modules/operations/operation-notification.service";
+import { computeTdsDeducted } from "./helpers/tds-calculator";
 
-export function computeTdsDeducted(
-    amount: number,
-    poTdsPct: number,
-    poTdsAmount: number,
-    alreadyDeducted: number,
-): number {
-    if (poTdsAmount <= 0 || amount <= 0) return 0;
-    const remaining = Math.max(0, poTdsAmount - alreadyDeducted);
-    const prTds = (amount * poTdsPct) / 100;
-    return Math.min(prTds, remaining);
-}
+export { computeTdsDeducted };
+
+export type DocumentTdsReturn = {
+    projectId: number;
+    poId: number | null;
+    vwoId: number | null;
+    prId: number;
+    tdsAmount: string;
+};
 
 @Injectable()
 export class PaymentRequestService {
@@ -345,7 +344,51 @@ export class PaymentRequestService {
 
         return await this.db.transaction(async tx => {
             const tdsCapSet: { actualTdsDeducted?: string } = {};
-            let tdsReturn: { projectId: number; poId: number; prId: number; tdsAmount: string } | null = null;
+            let tdsReturn: DocumentTdsReturn | null = null;
+
+            const computeDocumentTds = async (
+                tdsPercentage: string | null,
+                tdsAmount: string | null,
+                usedFilter: SQL,
+                poId: number | null,
+                vwoId: number | null,
+            ): Promise<{ actualTdsDeducted?: string; tdsReturn?: DocumentTdsReturn }> => {
+                if (tdsAmount == null) return {};
+
+                const [{ used }] = await tx
+                    .select({
+                        used: sql<string>`COALESCE(SUM(${paymentRequests.actualTdsDeducted}::numeric), 0)`,
+                    })
+                    .from(paymentRequests)
+                    .where(and(
+                        usedFilter,
+                        eq(paymentRequests.status, "payment_done"),
+                        ne(paymentRequests.id, existing.id),
+                    ));
+
+                const actualTds = computeTdsDeducted(
+                    Number(existing.amount ?? 0),
+                    Number(tdsPercentage ?? 0),
+                    Number(tdsAmount),
+                    Number(used),
+                );
+
+                if (actualTds <= 0) return {};
+
+                const result: { actualTdsDeducted?: string; tdsReturn?: DocumentTdsReturn } = {
+                    actualTdsDeducted: actualTds.toFixed(2),
+                };
+                if (existing.projectId != null) {
+                    result.tdsReturn = {
+                        projectId: existing.projectId,
+                        poId,
+                        vwoId,
+                        prId: existing.id,
+                        tdsAmount: actualTds.toFixed(2),
+                    };
+                }
+                return result;
+            };
 
             if (body.status === "payment_done" && existing.purchaseOrderId != null) {
                 const [po] = await tx
@@ -354,36 +397,34 @@ export class PaymentRequestService {
                     .where(eq(purchaseOrders.id, existing.purchaseOrderId))
                     .for("update");
 
-                if (po && po.tdsAmount != null) {
-                    const [{ used }] = await tx
-                        .select({
-                            used: sql<string>`COALESCE(SUM(${paymentRequests.actualTdsDeducted}::numeric), 0)`,
-                        })
-                        .from(paymentRequests)
-                        .where(and(
-                            eq(paymentRequests.purchaseOrderId, existing.purchaseOrderId),
-                            eq(paymentRequests.status, "payment_done"),
-                            ne(paymentRequests.id, existing.id),
-                        ));
-
-                    const actualTds = computeTdsDeducted(
-                        Number(existing.amount ?? 0),
-                        Number(po.tdsPercentage ?? 0),
-                        Number(po.tdsAmount),
-                        Number(used),
+                if (po) {
+                    const result = await computeDocumentTds(
+                        po.tdsPercentage,
+                        po.tdsAmount,
+                        eq(paymentRequests.purchaseOrderId, existing.purchaseOrderId),
+                        existing.purchaseOrderId,
+                        null,
                     );
+                    if (result.actualTdsDeducted) tdsCapSet.actualTdsDeducted = result.actualTdsDeducted;
+                    if (result.tdsReturn) tdsReturn = result.tdsReturn;
+                }
+            } else if (body.status === "payment_done" && existing.vendorWorkOrderId != null) {
+                const [wo] = await tx
+                    .select()
+                    .from(vendorWorkOrders)
+                    .where(eq(vendorWorkOrders.id, existing.vendorWorkOrderId))
+                    .for("update");
 
-                    if (actualTds > 0) {
-                        tdsCapSet.actualTdsDeducted = actualTds.toFixed(2);
-                        if (existing.projectId != null) {
-                            tdsReturn = {
-                                projectId: existing.projectId,
-                                poId: existing.purchaseOrderId,
-                                prId: existing.id,
-                                tdsAmount: actualTds.toFixed(2),
-                            };
-                        }
-                    }
+                if (wo) {
+                    const result = await computeDocumentTds(
+                        wo.tdsPercentage,
+                        wo.tdsAmount,
+                        eq(paymentRequests.vendorWorkOrderId, existing.vendorWorkOrderId),
+                        null,
+                        existing.vendorWorkOrderId,
+                    );
+                    if (result.actualTdsDeducted) tdsCapSet.actualTdsDeducted = result.actualTdsDeducted;
+                    if (result.tdsReturn) tdsReturn = result.tdsReturn;
                 }
             }
 

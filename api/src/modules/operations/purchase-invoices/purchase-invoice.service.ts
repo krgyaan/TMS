@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { eq, like, desc, sql, and } from "drizzle-orm";
+import { eq, like, desc, sql } from "drizzle-orm";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { purchaseInvoices } from "@/db/schemas/operations/purchase-invoices.schema";
@@ -70,22 +70,20 @@ export class PurchaseInvoiceService {
                 await tryMaterializePoInventory(tx, Number(body.purchaseOrderId), userId);
             }
 
-            // Create GST 2B reconciliation record for the invoice
-            if (body.purchaseOrderId && body.gstAmount > 0) {
+            // Create GST 2B reconciliation record for the invoice (PO or VWO)
+            if ((body.purchaseOrderId || body.vendorWorkOrderId) && body.gstAmount > 0) {
                 const existingGst2b = await tx
                     .select()
                     .from(gst2bReco)
-                    .where(and(
-                        eq(gst2bReco.poId, body.purchaseOrderId),
-                        eq(gst2bReco.invoiceId, row.id)
-                    ))
+                    .where(eq(gst2bReco.invoiceId, row.id))
                     .limit(1)
                     .then(rows => rows[0]);
 
                 if (!existingGst2b) {
                     await tx.insert(gst2bReco).values({
                         projectId: row.projectId,
-                        poId: body.purchaseOrderId,
+                        poId: body.purchaseOrderId || null,
+                        vwoId: body.vendorWorkOrderId || null,
                         invoiceId: row.id,
                         invoiceDate: body.invoiceDate,
                         invoiceUploadedAt: new Date(),

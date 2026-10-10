@@ -5,6 +5,7 @@ import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { gst2bReco } from "@/db/schemas/operations/gst2b-reco.schema";
 import { projects } from "@/db/schemas/master/projects.schema";
 import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
+import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.schema";
 import { purchaseInvoices } from "@/db/schemas/operations/purchase-invoices.schema";
 import { wrapPaginatedResponse } from "@/utils/responseWrapper";
 import type { PaginatedResult } from "@/modules/tendering/types/shared.types";
@@ -49,6 +50,7 @@ export class GstChecklistService {
                 ${projects.projectName} ILIKE ${searchStr} OR
                 ${purchaseOrders.poNumber} ILIKE ${searchStr} OR
                 ${purchaseOrders.sellerName} ILIKE ${searchStr} OR
+                ${vendorWorkOrders.woNumber} ILIKE ${searchStr} OR
                 ${purchaseInvoices.invoiceNo} ILIKE ${searchStr} OR
                 ${purchaseInvoices.partyName} ILIKE ${searchStr} OR
                 ${purchaseInvoices.category} ILIKE ${searchStr} OR
@@ -74,6 +76,7 @@ export class GstChecklistService {
             .from(gst2bReco)
             .leftJoin(projects, eq(projects.id, gst2bReco.projectId))
             .leftJoin(purchaseOrders, eq(purchaseOrders.id, gst2bReco.poId))
+            .leftJoin(vendorWorkOrders, eq(vendorWorkOrders.id, gst2bReco.vwoId))
             .leftJoin(purchaseInvoices, eq(purchaseInvoices.id, gst2bReco.invoiceId))
             .where(whereClause);
         const total = Number(aggregate?.count ?? 0);
@@ -89,7 +92,7 @@ export class GstChecklistService {
                 orderByClause = sortFn(projects.projectName);
                 break;
             case "poNumber":
-                orderByClause = sortFn(purchaseOrders.poNumber);
+                orderByClause = sortFn(sql`COALESCE(${purchaseOrders.poNumber}, ${vendorWorkOrders.woNumber})`);
                 break;
             case "invoiceNo":
                 orderByClause = sortFn(purchaseInvoices.invoiceNo);
@@ -115,7 +118,7 @@ export class GstChecklistService {
             .select({
                 id: gst2bReco.id,
                 projectName: projects.projectName,
-                poNumber: purchaseOrders.poNumber,
+                poNumber: sql<string | null>`COALESCE(${purchaseOrders.poNumber}, ${vendorWorkOrders.woNumber})`,
                 invoiceNo: purchaseInvoices.invoiceNo,
                 partyName: purchaseInvoices.partyName,
                 category: purchaseInvoices.category,
@@ -126,6 +129,7 @@ export class GstChecklistService {
             .from(gst2bReco)
             .leftJoin(projects, eq(projects.id, gst2bReco.projectId))
             .leftJoin(purchaseOrders, eq(purchaseOrders.id, gst2bReco.poId))
+            .leftJoin(vendorWorkOrders, eq(vendorWorkOrders.id, gst2bReco.vwoId))
             .leftJoin(purchaseInvoices, eq(purchaseInvoices.id, gst2bReco.invoiceId))
             .where(whereClause)
             .orderBy(orderByClause)

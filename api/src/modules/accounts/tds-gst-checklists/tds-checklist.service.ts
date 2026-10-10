@@ -5,6 +5,7 @@ import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { tdsReturns } from "@/db/schemas/operations/tds-returns.schema";
 import { projects } from "@/db/schemas/master/projects.schema";
 import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
+import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.schema";
 import { paymentRequests } from "@/db/schemas/operations/payment-requests.schema";
 import { wrapPaginatedResponse } from "@/utils/responseWrapper";
 import type { PaginatedResult } from "@/modules/tendering/types/shared.types";
@@ -78,6 +79,8 @@ export class TdsChecklistService {
                 ${projects.projectName} ILIKE ${searchStr} OR
                 ${purchaseOrders.poNumber} ILIKE ${searchStr} OR
                 ${purchaseOrders.sellerName} ILIKE ${searchStr} OR
+                ${vendorWorkOrders.woNumber} ILIKE ${searchStr} OR
+                ${vendorWorkOrders.sellerName} ILIKE ${searchStr} OR
                 ${paymentRequests.partyName} ILIKE ${searchStr} OR
                 ${paymentRequests.amount}::text ILIKE ${searchStr} OR
                 ${tdsReturns.tdsAmount}::text ILIKE ${searchStr} OR
@@ -102,6 +105,7 @@ export class TdsChecklistService {
             .from(tdsReturns)
             .leftJoin(projects, eq(projects.id, tdsReturns.projectId))
             .leftJoin(purchaseOrders, eq(purchaseOrders.id, tdsReturns.poId))
+            .leftJoin(vendorWorkOrders, eq(vendorWorkOrders.id, tdsReturns.vwoId))
             .leftJoin(paymentRequests, eq(paymentRequests.id, tdsReturns.prId))
             .where(whereClause);
         const total = Number(aggregate?.count ?? 0);
@@ -117,13 +121,13 @@ export class TdsChecklistService {
                 orderByClause = sortFn(projects.projectName);
                 break;
             case "poNumber":
-                orderByClause = sortFn(purchaseOrders.poNumber);
+                orderByClause = sortFn(sql`COALESCE(${purchaseOrders.poNumber}, ${vendorWorkOrders.woNumber})`);
                 break;
             case "partyName":
                 orderByClause = sortFn(paymentRequests.partyName);
                 break;
             case "sellerName":
-                orderByClause = sortFn(purchaseOrders.sellerName);
+                orderByClause = sortFn(sql`COALESCE(${purchaseOrders.sellerName}, ${vendorWorkOrders.sellerName})`);
                 break;
             case "amount":
                 orderByClause = sortFn(paymentRequests.amount);
@@ -143,9 +147,9 @@ export class TdsChecklistService {
             .select({
                 id: tdsReturns.id,
                 projectName: projects.projectName,
-                poNumber: purchaseOrders.poNumber,
+                poNumber: sql<string | null>`COALESCE(${purchaseOrders.poNumber}, ${vendorWorkOrders.woNumber})`,
                 partyName: paymentRequests.partyName,
-                sellerName: purchaseOrders.sellerName,
+                sellerName: sql<string | null>`COALESCE(${purchaseOrders.sellerName}, ${vendorWorkOrders.sellerName})`,
                 amount: paymentRequests.amount,
                 tdsAmount: tdsReturns.tdsAmount,
                 tdsReturnDate: tdsReturns.tdsReturnDate,
@@ -154,6 +158,7 @@ export class TdsChecklistService {
             .from(tdsReturns)
             .leftJoin(projects, eq(projects.id, tdsReturns.projectId))
             .leftJoin(purchaseOrders, eq(purchaseOrders.id, tdsReturns.poId))
+            .leftJoin(vendorWorkOrders, eq(vendorWorkOrders.id, tdsReturns.vwoId))
             .leftJoin(paymentRequests, eq(paymentRequests.id, tdsReturns.prId))
             .where(whereClause)
             .orderBy(orderByClause)
