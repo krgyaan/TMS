@@ -1,0 +1,215 @@
+import { Banknote, BarChart3, Briefcase, FileSearch, Gauge, Headset, LayoutDashboard, Settings, Share2, Shield, Users, Wrench } from "lucide-react";
+
+import { paths } from "@/app/routes/paths";
+import { FIELD_DASHBOARD_TILES } from "@/lib/field-mode";
+
+import type { AuthUser } from "@/types/auth.types";
+import { canRead } from "@/types/auth.types";
+import type { LucideIcon } from "lucide-react";
+
+export type NavItem = {
+    title: string;
+    url: string;
+    permission?: string;
+};
+
+export type NavGroup = {
+    title: string;
+    url?: string;
+    icon?: LucideIcon;
+    items?: NavItem[];
+};
+
+export const navMain: NavGroup[] = [
+    {
+        title: "Dashboard",
+        url: paths.dashboard,
+        icon: LayoutDashboard,
+    },
+    {
+        title: "Tendering",
+        icon: FileSearch,
+        items: [
+            { title: "Tender", url: paths.tendering.tenders, permission: "tenders" },
+            { title: "Tender Approval", url: paths.tendering.tenderApproval, permission: "tender-approval" },
+            { title: "Physical Docs", url: paths.tendering.physicalDocs, permission: "physical-docs" },
+            { title: "RFQs", url: paths.tendering.rfqs, permission: "rfqs" },
+            { title: "EMD/Tender fees", url: paths.tendering.emdsTenderFees, permission: "emds" },
+            { title: "Checklists", url: paths.tendering.checklists, permission: "checklists" },
+            { title: "Costing Sheets", url: paths.tendering.costingSheets, permission: "costing-sheets" },
+            { title: "Costing Approval", url: paths.tendering.costingApprovals, permission: "costing-approvals" },
+            { title: "Bid Submissions", url: paths.tendering.bidSubmissions, permission: "bid-submissions" },
+            { title: "TQ Management", url: paths.tendering.tqManagement, permission: "tq-management" },
+            { title: "RA Management", url: paths.tendering.ras, permission: "reverse-auction" },
+            { title: "Results", url: paths.tendering.results, permission: "tender-result" },
+            // { title: "Timer Dashboard", url: paths.tendering.timerDashboard, permission: "tenders" },
+        ],
+    },
+    {
+        title: "Operations",
+        icon: Wrench,
+        items: [
+            { title: "Work Order", url: paths.operations.woBasicDetailListPage, permission: "ops.work-order" },
+            { title: "WO Approval", url: paths.operations.woDetailAcceptanceListPage, permission: "ops.wo-approval" },
+            { title: "Kick Off", url: paths.operations.woKickOffListPage, permission: "ops.kick-off" },
+            { title: "Contract Agreement", url: paths.operations.contractAgreementListPage, permission: "ops.contract-agreement" },
+            { title: "Project Dashboard", url: paths.operations.projectListPage, permission: "ops.dashboard" },
+            { title: "Purchase Orders", url: paths.operations.purchaseOrders, permission: "ops.purchase-orders" },
+            { title: "Vendor Work Orders", url: paths.operations.vendorWorkOrders, permission: "ops.vendor-work-orders" },
+            { title: "Sale Invoices", url: paths.operations.saleInvoices, permission: "ops.sale-invoices" },
+            { title: "Payment Requests", url: paths.operations.paymentRequests, permission: "ops.payment-requests" },
+        ],
+    },
+    {
+        title: "Services",
+        icon: Headset,
+        items: [
+            { title: "Customer", url: paths.services.customer, permission: "services.customers" },
+            { title: "Conference", url: paths.services.conference, permission: "services.conferences" },
+            { title: "Visit", url: paths.services.visit, permission: "services.visits" },
+            { title: "Feedback", url: paths.services.feedback, permission: "services.feedbacks" },
+            { title: "AMC", url: paths.services.amc, permission: "services.amc" },
+            { title: "AMC Services", url: paths.services.amcServices, permission: "services.amc" },
+            { title: "AMC Billing", url: paths.services.amcBilling, permission: "services.amc" },
+        ],
+    },
+    {
+        title: "BI Dashboard",
+        icon: BarChart3,
+        items: [
+            { title: "Bank Guarantee", url: paths.bi.bankGuarantee, permission: "bi.bank-guarantee" },
+            { title: "Demand Draft", url: paths.bi.demandDraft, permission: "bi.demand-draft" },
+            { title: "Bank Transfer", url: paths.bi.bankTransfer, permission: "bi.bank-transfer" },
+            { title: "Pay on Portal", url: paths.bi.payOnPortal, permission: "bi.pay-on-portal" },
+            { title: "Cheque", url: paths.bi.cheque, permission: "bi.cheque" },
+            { title: "FDR", url: paths.bi.fdr, permission: "bi.fdr" },
+            { title: "Tender Fee", url: paths.bi.tenderFee, permission: "bi.tender-fee" },
+        ],
+    },
+    {
+        title: "Accounts",
+        icon: Banknote,
+        items: [
+            { title: "Imprests", url: paths.accounts.imprests, permission: "accounts.imprests" },
+            // { title: "Financial Docs", url: paths.accounts.financialDocs, permission: "accounts.financial-docs" },
+            { title: "Loan & Advances", url: paths.accounts.loanAdvances, permission: "accounts.loan-advances" },
+            { title: "Insurance", url: paths.accounts.insurance, permission: "accounts.insurance" },
+            { title: "Accounts Checklists", url: paths.accounts.taskChecklists, permission: "accounts.checklists" },
+            { title: "TDS Checklists", url: paths.accounts.tdsChecklists, permission: "accounts.tds-checklists" },
+            { title: "GST Checklists", url: paths.accounts.gstChecklists, permission: "accounts.gst-checklists" },
+            { title: "Fixed Expenses", url: paths.accounts.fixedExpenses, permission: "accounts.fixed-expenses" },
+            { title: "Delegation Dashboard", url: paths.accounts.delegation, permission: "accounts.delegation" },
+            { title: "Purchase Orders", url: paths.accounts.purchaseOrders, permission: "accounts.purchase-orders" },
+            { title: "Vendor Work Orders", url: paths.accounts.vendorWorkOrders, permission: "accounts.vendor-work-orders" },
+            { title: "Payment Requests", url: paths.accounts.paymentRequests, permission: "accounts.payment-requests" },
+            { title: "Sale Invoices", url: paths.accounts.saleInvoices, permission: "accounts.sale-invoices" },
+            { title: "Inventory", url: paths.accounts.inventory, permission: "accounts.inventory" },
+            { title: "Vendor Master", url: paths.accounts.vendorMaster, permission: "master.vendors" },
+            { title: "Parties & Beneficiaries", url: paths.accounts.parties, permission: "master.vendors" },
+        ],
+    },
+    {
+        title: "Document Dashboard",
+        icon: Briefcase,
+        items: [
+            { title: "Projects", url: paths.documentDashboard.projects, permission: "document-dashboard.projects" },
+            { title: "PQR Documents", url: paths.documentDashboard.pqr, permission: "document-dashboard.pqr" },
+            { title: "Finance Document", url: paths.documentDashboard.financeDocument, permission: "document-dashboard.finance-document" },
+            { title: "Client Directory", url: paths.documentDashboard.clientDirectory, permission: "shared.client-directory" },
+        ],
+    },
+    {
+        title: "CRM",
+        icon: Users,
+        items: [
+            { title: "Happy Calling", url: paths.crm.happyCalling, permission: "crm.happy_calling" },
+            { title: "Leads", url: paths.crm.leads, permission: "crm.leads" },
+            { title: "Enquiries", url: paths.crm.enquiries, permission: "crm.enquiries" },
+        ],
+    },
+    {
+        title: "Performance",
+        icon: Gauge,
+        items: [
+            { title: "Tender Executive", url: paths.performance.tenderExecutive, permission: "performance.tender-executive" },
+            { title: "Team Leader", url: paths.performance.teamLeader, permission: "performance.team-leader" },
+            { title: "OEM Dashboard", url: paths.performance.oemDashboard, permission: "performance.oem-dashboard" },
+            { title: "Business Dashboard", url: paths.performance.businessDashboard, permission: "performance.business-dashboard" },
+            { title: "Customer Dashboard", url: paths.performance.customerDashboard, permission: "performance.customer-dashboard" },
+            { title: "Location Dashboard", url: paths.performance.locationDashboard, permission: "performance.location-dashboard" },
+            { title: "Operation Team", url: paths.performance.operationTeam, permission: "performance.operation-team" },
+            { title: "Account Team", url: paths.performance.accountTeam, permission: "performance.account-team" },
+        ],
+    },
+    {
+        title: "HRMS",
+        icon: Shield,
+        items: [
+            // { title: "Recruitment", url: "", permission: "hrms.admin" },
+            { title: "Onboarding", url: paths.hrms.onboardingDashboard, permission: "hrms.admin" },
+            { title: "Induction", url: paths.hrms.inductionDashboard, permission: "hrms.admin" },
+            { title: "Assets", url: "/hrms/admin/assets", permission: "hrms.admin" },
+            { title: "Training", url: "/hrms/training", permission: "hrms.admin"},
+            { title: "Complaints", url: paths.hrms.complaints.list, permission: "hrms.admin" },
+            // { title: "Probation", url: "", permission: "hrms.admin" },
+        ],
+    },
+    {
+        title: "Settings",
+        icon: Settings,
+        items: [
+            { title: "Users", url: paths.master.users, permission: "master.users" },
+            { title: "Permissions", url: paths.master.permissions, permission: "master.permissions" },
+            { title: "Status", url: paths.master.statuses, permission: "master.statuses" },
+            { title: "Items", url: paths.master.items, permission: "master.items" },
+            { title: "Locations", url: paths.master.locations, permission: "master.locations" },
+            { title: "Organizations", url: paths.master.organizations, permission: "master.organizations" },
+            { title: "Vendors", url: paths.master.vendors, permission: "master.vendors" },
+            { title: "Websites", url: paths.master.websites, permission: "master.websites" },
+            { title: "Document Submitted", url: paths.master.documentSubmitted, permission: "master.documents-submitted" },
+            { title: "Imprest Categories", url: paths.master.imprestCategories, permission: "master.imprest-categories" },
+            { title: "Followup Categories", url: paths.master.followupCategories, permission: "master.followup-categories" },
+            // { title: "Financial Year", url: paths.master.financialYears, permission: "master.financial-years" },
+            { title: "EMD Responsibilities", url: paths.master.emdsResponsibilities, permission: "master.emd-responsibilities" },
+            { title: "Lead Types", url: paths.master.leadTypes, permission: "master.lead-types" },
+            { title: "TQ Types", url: paths.master.tqTypes, permission: "master.tq-types" },
+            { title: "Loan Parties", url: paths.master.loanParties, permission: "master.loan-parties" },
+            { title: "Circulars" , url: paths.master.circulars, permission: "master.circulars"},
+        ],
+    },
+    {
+        title: "Shared",
+        icon: Share2,
+        items: [
+            { title: "Follow Ups", url: paths.shared.followUp, permission: "shared.followups" },
+            { title: "Couriers", url: paths.shared.couriers, permission: "shared.couriers" },
+            { title: "Imprests", url: paths.shared.imprest, permission: "shared.imprests" },
+            { title: "Maker Requests", url: paths.shared.makerRequests, permission: "shared.imprests" },
+        ],
+    },
+];
+
+export function filterMenu(user: AuthUser | null, menu: NavGroup[]): NavGroup[] {
+    return menu
+        .map(group => {
+            if (group.title === "Dashboard") return group;
+            if (!group.items) return group;
+
+            const visibleItems = group.items.filter(item => !item.permission || canRead(user, item.permission));
+
+            if (visibleItems.length === 0) return null;
+            return { ...group, items: visibleItems };
+        })
+        .filter(Boolean) as NavGroup[];
+}
+
+export function buildFieldMenu(user: AuthUser | null): NavGroup[] {
+    return [
+        ...navMain.filter(group => group.title === "Dashboard"),
+        ...FIELD_DASHBOARD_TILES.filter(tile => canRead(user, tile.permission)).map(tile => ({
+            title: tile.title,
+            url: tile.url,
+            icon: tile.icon,
+        })),
+    ];
+}

@@ -1,5 +1,9 @@
+import { useEffect, useState } from "react";
+
 import { AppSidebar } from "@/components/app-sidebar";
+import { CommandPalette } from "@/components/command-palette";
 import { ModeToggle } from "@/components/mode-toggle";
+import { SearchBar } from "@/components/search-bar";
 import { DocumentTitle } from "@/components/document-title";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
@@ -20,6 +24,18 @@ export default function DashboardLayout() {
     const { data } = useProfileContext();
     const navigate = useNavigate();
     const location = useLocation();
+    const [searchOpen, setSearchOpen] = useState(false);
+
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+                event.preventDefault();
+                setSearchOpen(open => !open);
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, []);
 
     const isOnboarding = data?.isOnboarding;
     const onboardingStatus = data?.onboardingStatus;
@@ -33,6 +49,7 @@ export default function DashboardLayout() {
         <TooltipProvider>
             <SidebarProvider>
                 <AppSidebar />
+                <CommandPalette open={searchOpen} onOpenChange={setSearchOpen} />
 
                 {/* MAIN LAYOUT FIXED → flex, h-full, min-h-0 */}
                 <SidebarInset className="flex flex-col h-full min-h-0">
@@ -51,7 +68,9 @@ export default function DashboardLayout() {
                                 </BreadcrumbList>
                             </Breadcrumb>
                         </div>
-                        
+
+                        <SearchBar onClick={() => setSearchOpen(true)} />
+
                         <div className="flex items-center gap-4">
                             <Tooltip>
                                 <TooltipTrigger asChild>
