@@ -109,8 +109,14 @@ export function BankTransferView({ data, followupData }: BankTransferViewProps) 
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Tender Name
                             </TableCell>
-                            <TableCell className="text-sm col-span-3">
+                            <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
                                 {data.tenderName || '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Requested Date
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.requestCreatedAt ? formatDateTime(data.requestCreatedAt) : '—'}
                             </TableCell>
                         </TableRow>
 

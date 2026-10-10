@@ -496,6 +496,12 @@ const EmdsAndTenderFeesPage = () => {
                         icon: <RefreshCw className="w-4 h-4" />,
                         onClick: (r) => navigate(paths.tendering.emdsTenderFeesEdit(r.id)),
                     });
+                    actions.unshift({
+                        label: 'Create Request',
+                        icon: <Plus className="w-4 h-4" />,
+                        onClick: (r) => navigate(paths.tendering.emdsTenderFeesCreate(r.tenderId)),
+                        visible: (r) => r.tenderId > 0,
+                    });
                 }
                 if (activeTab === 'paid') {
                     actions.unshift({
