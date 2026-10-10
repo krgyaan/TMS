@@ -13,12 +13,7 @@ import { useProfileContext } from "@/modules/profile/contexts/ProfileContext";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, CheckCircle2, XCircle, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default function DashboardLayout() {
     const { data } = useProfileContext();
@@ -56,7 +51,7 @@ export default function DashboardLayout() {
                     <DocumentTitle title={"Dashboard - TMS"} />
 
                     {/* HEADER (fixed height) */}
-                    <header className="flex h-16 shrink-0 items-center justify-between gap-2 bg-accent px-4">
+                    <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between gap-2 bg-accent px-4">
                         <div className="flex items-center gap-2">
                             <SidebarTrigger className="-ml-1 cursor-pointer" />
                             <Separator orientation="vertical" className="h-4" />
@@ -69,9 +64,8 @@ export default function DashboardLayout() {
                             </Breadcrumb>
                         </div>
 
-                        <SearchBar onClick={() => setSearchOpen(true)} />
-
                         <div className="flex items-center gap-4">
+                            <SearchBar onClick={() => setSearchOpen(true)} />
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button 
