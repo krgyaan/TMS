@@ -59,30 +59,11 @@ const GstChecklistListPage = () => {
 
     const colDefs = useMemo<ColDef<GstChecklistRow>[]>(
         () => [
-            {
-                field: 'id',
-                colId: 'id',
-                headerName: 'ID',
-                width: 80,
-                sortable: true,
-                filter: true,
-            },
-            {
-                field: 'projectName',
-                colId: 'projectName',
-                headerName: 'Project',
-                width: 220,
-                sortable: true,
-                filter: true,
-            },
-            {
-                field: 'poNumber',
-                colId: 'poNumber',
-                headerName: 'PO Number',
-                width: 250,
-                sortable: true,
-                filter: true,
-            },
+            dateOnlyCol<GstChecklistRow>('invoiceDate', {
+                headerName: 'Invoice Date',
+                colId: 'invoiceDate',
+                width: 140,
+            }),
             {
                 field: 'invoiceNo',
                 colId: 'invoiceNo',
@@ -100,10 +81,10 @@ const GstChecklistListPage = () => {
                 filter: true,
             },
             {
-                field: 'category',
-                colId: 'category',
-                headerName: 'Category',
-                width: 150,
+                field: 'projectName',
+                colId: 'projectName',
+                headerName: 'Project',
+                width: 220,
                 sortable: true,
                 filter: true,
             },
@@ -117,11 +98,22 @@ const GstChecklistListPage = () => {
                 colId: 'gstAmount',
                 width: 140,
             }),
-            dateOnlyCol<GstChecklistRow>('invoiceDate', {
-                headerName: 'Invoice Date',
-                colId: 'invoiceDate',
-                width: 140,
-            }),
+            {
+                field: 'poNumber',
+                colId: 'poNumber',
+                headerName: 'PO Number',
+                width: 250,
+                sortable: true,
+                filter: true,
+            },
+            {
+                field: 'category',
+                colId: 'category',
+                headerName: 'Category',
+                width: 150,
+                sortable: true,
+                filter: true,
+            },
         ],
         []
     );

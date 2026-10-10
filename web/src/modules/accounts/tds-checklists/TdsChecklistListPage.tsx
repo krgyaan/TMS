@@ -59,14 +59,11 @@ const TdsChecklistListPage = () => {
 
     const colDefs = useMemo<ColDef<TdsChecklistRow>[]>(
         () => [
-            {
-                field: 'id',
-                colId: 'id',
-                headerName: 'ID',
-                width: 80,
-                sortable: true,
-                filter: true,
-            },
+            dateOnlyCol<TdsChecklistRow>('tdsReturnDate', {
+                headerName: 'TDS Return On',
+                colId: 'tdsReturnDate',
+                width: 140,
+            }),
             {
                 field: 'projectName',
                 colId: 'projectName',
@@ -76,26 +73,10 @@ const TdsChecklistListPage = () => {
                 filter: true,
             },
             {
-                field: 'poNumber',
-                colId: 'poNumber',
-                headerName: 'PO Number',
-                width: 250,
-                sortable: true,
-                filter: true,
-            },
-            {
                 field: 'partyName',
                 colId: 'partyName',
                 headerName: 'Party Name',
                 width: 180,
-                sortable: true,
-                filter: true,
-            },
-            {
-                field: 'sellerName',
-                colId: 'sellerName',
-                headerName: 'Seller',
-                width: 150,
                 sortable: true,
                 filter: true,
             },
@@ -109,11 +90,22 @@ const TdsChecklistListPage = () => {
                 colId: 'tdsAmount',
                 width: 130,
             }),
-            dateOnlyCol<TdsChecklistRow>('tdsReturnDate', {
-                headerName: 'TDS Return Date',
-                colId: 'tdsReturnDate',
-                width: 140,
-            }),
+            {
+                field: 'poNumber',
+                colId: 'poNumber',
+                headerName: 'PO Number',
+                width: 250,
+                sortable: true,
+                filter: true,
+            },
+            {
+                field: 'sellerName',
+                colId: 'sellerName',
+                headerName: 'Seller',
+                width: 150,
+                sortable: true,
+                filter: true,
+            },
             dateOnlyCol<TdsChecklistRow>('invoiceDate', {
                 headerName: 'Invoice Date',
                 colId: 'invoiceDate',
