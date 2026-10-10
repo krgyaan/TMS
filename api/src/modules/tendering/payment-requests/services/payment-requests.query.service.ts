@@ -942,8 +942,6 @@ export class PaymentRequestsQueryService {
 
         if (!request) return null;
 
-        console.log("request in findByIdWithTender", request);
-
         const instruments = await this.db
             .select({
                 id: paymentInstruments.id,
@@ -964,8 +962,6 @@ export class PaymentRequestsQueryService {
                 eq(paymentInstruments.requestId, requestId),
                 eq(paymentInstruments.isActive, true)
             ));
-
-        console.log("instruments in findByIdWithTender", instruments);
 
         const instrumentsWithDetails = await Promise.all(instruments.map(async (instrument) => {
             let details: any = null;
@@ -1003,6 +999,7 @@ export class PaymentRequestsQueryService {
                     bgPo: instrumentBgDetails.bgPo,
                     bgBankAcc: instrumentBgDetails.bgBankAcc,
                     bgBankIfsc: instrumentBgDetails.bgBankIfsc,
+                    bgBankAccName: instrumentBgDetails.bgBankAccName,
                     bgClientUser: instrumentBgDetails.bgClientUser,
                     bgClientCp: instrumentBgDetails.bgClientCp,
                     bgClientFin: instrumentBgDetails.bgClientFin,
@@ -1035,8 +1032,6 @@ export class PaymentRequestsQueryService {
             return this.mapInstrumentResponse(instrument, details);
         }));
 
-        console.log("instrumentsWithDetails in findByIdWithTender", instrumentsWithDetails);
-        
         return {
             ...this.mapPaymentRequest(request),
             requestedByName: request.requestedByName,
@@ -1421,6 +1416,7 @@ export class PaymentRequestsQueryService {
                         bgPo: details.bgPo,
                         bgBankAcc: details.bgBankAcc,
                         bgBankIfsc: details.bgBankIfsc,
+                        bgBankAccName: details.bgBankAccName,
                         bgClientUser: details.bgClientUser,
                         bgClientCp: details.bgClientCp,
                         bgClientFin: details.bgClientFin,
@@ -1579,7 +1575,7 @@ export class PaymentRequestsQueryService {
             bgClientUserEmail: details?.bgClientUser || '',
             bgClientCpEmail: details?.bgClientCp || '',
             bgClientFinanceEmail: details?.bgClientFin || '',
-            bgBankAccountName: details?.beneficiaryName || '',
+            bgBankAccountName: details?.bgBankAccName || '',
             bgBankAccountNo: details?.bgBankAcc || '',
             bgBankIfsc: details?.bgBankIfsc || '',
             bgCourierAddress: instrument?.courierAddress || '',

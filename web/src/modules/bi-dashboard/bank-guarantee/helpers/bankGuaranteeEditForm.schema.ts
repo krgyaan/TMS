@@ -22,7 +22,6 @@ export const BankGuaranteeEditFormSchema = z.object({
     // BG Details fields
     bgNo: z.string().optional().nullable(),
     bgDate: z.string().optional().nullable(),
-    beneficiaryName: z.string().optional().nullable(),
     beneficiaryAddress: z.string().optional().nullable(),
     bankName: z.string().optional().nullable(),
     cashMarginPercent: z.coerce.number().optional().nullable(),
@@ -72,6 +71,7 @@ export const BankGuaranteeEditFormSchema = z.object({
     bgClientFin: z.string().optional().nullable(),
     bgBankAcc: z.string().optional().nullable(),
     bgBankIfsc: z.string().optional().nullable(),
+    bgBankAccName: z.string().optional().nullable(),
     courierNo: z.string().optional().nullable(),
     cancelRemark: z.string().optional().nullable(),
     bgFdrCancelDate: z.string().optional().nullable(),

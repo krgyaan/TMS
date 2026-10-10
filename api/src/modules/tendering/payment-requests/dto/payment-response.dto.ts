@@ -56,6 +56,7 @@ export const BgDetailsResponse = z.object({
   bgPo: nullishString,
   bgBankAcc: nullishString,
   bgBankIfsc: nullishString,
+  bgBankAccName: nullishString,
   bgClientUser: nullishString,
   bgClientCp: nullishString,
   bgClientFin: nullishString,

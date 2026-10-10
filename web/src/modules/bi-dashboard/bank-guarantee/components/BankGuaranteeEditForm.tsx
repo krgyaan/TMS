@@ -109,7 +109,19 @@ export function BankGuaranteeEditForm({ instrumentId, initialData }: BankGuarant
                 }
             });
 
-            await updateMutation.mutateAsync({ id: instrumentId, payload });
+            // `payment_instruments.favouring` (the "BG in Favour of" input above) and
+            // `instrument_bg_details.beneficiary_name` are two mirrors of the same
+            // value -- create writes both from bgFavouring (payment-requests
+            // command.service.ts :580 and :635), as does update (:862 / :923).
+            // There is deliberately no separate Beneficiary Name input here, so
+            // mirror the value across to keep the BG dashboard's "Beneficiary
+            // name" column populated from this single field.
+            const finalPayload: Record<string, unknown> = { ...payload };
+            if (finalPayload.favouring !== undefined) {
+                finalPayload.beneficiaryName = finalPayload.favouring;
+            }
+
+            await updateMutation.mutateAsync({ id: instrumentId, payload: finalPayload });
             toast.success('Bank Guarantee updated successfully');
             navigate(-1);
         } catch (error: any) {
@@ -179,7 +191,7 @@ export function BankGuaranteeEditForm({ instrumentId, initialData }: BankGuarant
                         <Separator />
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <FieldWrapper control={form.control} name="beneficiaryName" label="Bank Account Name">
+                            <FieldWrapper control={form.control} name="bgBankAccName" label="Bank Account Name">
                                 {(field) => <Input {...field} value={field.value || ''} placeholder="e.g., Individual or Company Name" />}
                             </FieldWrapper>
                             <FieldWrapper control={form.control} name="bgBankAcc" label="Bank Account Number">

@@ -242,13 +242,19 @@ export function BankGuaranteeView({
                                 label1="Beneficiary Address"
                                 value1={data.beneficiaryAddress || '—'}
                                 label2="Client Emails"
-                                value2={data.clientEmails?.join(', ') || '—'}
+                                value2={[
+                                    data.bgClientUser,
+                                    data.bgClientCp,
+                                    data.bgClientFin,
+                                ]
+                                    .filter(Boolean)
+                                    .join(', ') || '—'}
                             />
                             <DataRow
                                 label1="Client Bank Account Name"
-                                value1={data.clientBankAccName || '—'}
+                                value1={data.bgBankAccName || '—'}
                                 label2="Client Account No"
-                                value2={data.clientAccNo || '—'}
+                                value2={data.bgBankAcc || '—'}
                             />
                             <DataRow
                                 label1="Client Bank IFSC"

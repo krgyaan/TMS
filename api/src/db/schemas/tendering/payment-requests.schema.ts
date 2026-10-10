@@ -247,6 +247,7 @@ export const instrumentBgDetails = pgTable('instrument_bg_details', {
     // Bank Account Details
     bgBankAcc: varchar('bg_bank_acc', { length: 255 }), // emd_bgs.bg_bank_acc
     bgBankIfsc: varchar('bg_bank_ifsc', { length: 255 }), // emd_bgs.bg_bank_ifsc
+    bgBankAccName: varchar('bg_bank_acc_name', { length: 255 }),
 
     // Courier
     courierNo: varchar('courier_no', { length: 255 }), // emd_bgs.courier_no

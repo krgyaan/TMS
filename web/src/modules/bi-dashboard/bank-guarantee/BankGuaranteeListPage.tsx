@@ -95,14 +95,14 @@ const BankGuaranteeListPage = () => {
         const out: Record<string, any> = {};
         if (data.bgNo) out['BG No'] = data.bgNo;
         if (data.bgDate) out['BG Date'] = new Date(data.bgDate).toLocaleDateString('en-GB');
-        if (data.beneficiaryName) out['Beneficiary'] = data.beneficiaryName;
         if (data.bgPurpose) out['BG Purpose'] = data.bgPurpose;
         if (data.bgNeeds) out['BG Needs'] = data.bgNeeds;
         if (data.bankName) out['Bank'] = data.bankName;
         if (data.issueDate) out['Issue Date'] = new Date(data.issueDate).toLocaleDateString('en-GB');
         if (data.expiryDate) out['Expiry Date'] = new Date(data.expiryDate).toLocaleDateString('en-GB');
         if (data.payableAt) out['Payable At'] = data.payableAt;
-        if (data.favouring) out['Favouring'] = data.favouring;
+        // NOTE: "BG in Favour of" is intentionally not emitted here. It would
+        // duplicate the 'BG in Favour of' column that mapRow already produces.
         return out;
     };
 
@@ -119,7 +119,7 @@ const BankGuaranteeListPage = () => {
             'Tender No': r.projectNo || '',
             'BG Date': r.bgDate ? new Date(r.bgDate).toLocaleDateString('en-GB') : '',
             'BG No': r.bgNo || '',
-            'Beneficiary name': r.beneficiaryName || '',
+            'BG in Favour of': r.favouring || r.beneficiaryName || '',
             'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
             'Amount': r.amount || '',
             'Expiry Date': r.bgExpiryDate ? new Date(r.bgExpiryDate).toLocaleDateString('en-GB') : '',
@@ -138,7 +138,7 @@ const BankGuaranteeListPage = () => {
                 'Tender No': r.tenderNo || r.projectNo || '',
                 'BG Date': r.bgDate ? new Date(r.bgDate).toLocaleDateString('en-GB') : '',
                 'BG No': r.bgNo || '',
-                'Beneficiary name': r.beneficiaryName || '',
+                'BG in Favour of': r.favouring || r.beneficiaryName || '',
                 'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
                 'Amount': r.amount || '',
                 'Expiry Date': r.bgExpiryDate ? new Date(r.bgExpiryDate).toLocaleDateString('en-GB') : '',
@@ -226,7 +226,7 @@ const BankGuaranteeListPage = () => {
             },
             {
                 field: 'beneficiaryName',
-                headerName: 'Beneficiary name',
+                headerName: 'BG in Favour of',
                 width: 180,
                 maxWidth: 180,
                 colId: 'beneficiaryName',
