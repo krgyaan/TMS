@@ -1006,6 +1006,7 @@ export class PaymentRequestsQueryService {
                     bgClientUser: instrumentBgDetails.bgClientUser,
                     bgClientCp: instrumentBgDetails.bgClientCp,
                     bgClientFin: instrumentBgDetails.bgClientFin,
+                    stampCharges: instrumentBgDetails.stampCharges,
                 }).from(instrumentBgDetails).where(eq(instrumentBgDetails.instrumentId, instrument.id)).limit(1);
             } else if (instrument.instrumentType === 'Cheque') {
                 [details] = await this.db.select({
@@ -1137,7 +1138,7 @@ export class PaymentRequestsQueryService {
                     bgSoftCopy: instrumentBgDetails.bgSoftCopy,
                     bgPo: instrumentBgDetails.bgPo,
                     courierNo: instrumentBgDetails.courierNo,
-                    stampCharge: instrumentBgDetails.stampCharge,
+                    stampCharges: instrumentBgDetails.stampCharges,
                     extensionLetter: instrumentBgDetails.extensionLetter,
                     newBgClaim: instrumentBgDetails.newBgClaim,
                     extendedAmount: instrumentBgDetails.extendedAmount,
@@ -1416,6 +1417,14 @@ export class PaymentRequestsQueryService {
                         bankName: details.bankName,
                         bgNeeds: details.bgNeeds,
                         bgPurpose: details.bgPurpose,
+                        bgSoftCopy: details.bgSoftCopy,
+                        bgPo: details.bgPo,
+                        bgBankAcc: details.bgBankAcc,
+                        bgBankIfsc: details.bgBankIfsc,
+                        bgClientUser: details.bgClientUser,
+                        bgClientCp: details.bgClientCp,
+                        bgClientFin: details.bgClientFin,
+                        stampCharges: details.stampCharges,
                     } : null,
                 };
             case 'Cheque':
@@ -1562,7 +1571,7 @@ export class PaymentRequestsQueryService {
             bgPurpose: details?.bgPurpose || '',
             bgFavouring: details?.beneficiaryName || instrument?.favouring || '',
             bgAddress: details?.beneficiaryAddress || '',
-            bgExpiryDate: details?.bgDate || instrument?.expiryDate || null,
+            bgExpiryDate: details?.validityDate || details?.bgDate || instrument?.expiryDate || null,
             bgClaimPeriod: details?.claimExpiryDate || null,
             bgStampValue: details?.stampCharges ? Number(details.stampCharges) : null,
             bgFormatFiles: details?.bgSoftCopy ? [details.bgSoftCopy] : [],

@@ -252,7 +252,6 @@ export const instrumentBgDetails = pgTable('instrument_bg_details', {
     courierNo: varchar('courier_no', { length: 255 }), // emd_bgs.courier_no
 
     // New fields
-    stampCharge: decimal('stamp_charge', { precision: 15, scale: 2 }), // Maps to emd_bgs.bg_stamp
     extensionLetter: varchar('extension_letter', { length: 500 }), // Maps to emd_bgs.ext_letter
     newBgClaim: decimal('new_bg_claim', { precision: 15, scale: 2 }), // Maps to emd_bgs.new_bg_claim
 

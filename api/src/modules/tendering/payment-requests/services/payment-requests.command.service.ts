@@ -642,7 +642,9 @@ export class PaymentRequestsCommandService {
                     bgClientUser: details.bgClientUserEmail || null,
                     bgClientCp: details.bgClientCpEmail || null,
                     bgClientFin: details.bgClientFinanceEmail || null,
-                    stampCharge: details.bgStampValue || null,
+                    stampCharges: details.bgStampValue || null,
+                    bgSoftCopy: details.bgFormatFiles?.[0] || null,
+                    bgPo: details.bgPoFiles?.[0] || null,
                 }).execute();
                 break;
 
@@ -925,7 +927,9 @@ export class PaymentRequestsCommandService {
                     bgClientUser: details.bgClientUserEmail || null,
                     bgClientCp: details.bgClientCpEmail || null,
                     bgClientFin: details.bgClientFinanceEmail || null,
-                    stampCharge: details.bgStampValue || null,
+                    stampCharges: details.bgStampValue || null,
+                    bgSoftCopy: details.bgFormatFiles?.[0] || null,
+                    bgPo: details.bgPoFiles?.[0] || null,
                 }).where(eq(instrumentBgDetails.instrumentId, instrumentId));
                 break;
 
