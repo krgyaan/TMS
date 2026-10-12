@@ -180,6 +180,7 @@ key === 'stop_remarks' ||
                                     name="bg_approved_fdr_per"
                                     options={FDR_PERCENTAGE_OPTIONS}
                                     placeholder="Select percentage"
+                                    valueType="string"
                                 />
                                 <SelectField
                                     label="Approved BG Format"
@@ -387,6 +388,7 @@ key === 'stop_remarks' ||
                                 name="fdr_per"
                                 options={FDR_PERCENTAGE_OPTIONS}
                                 placeholder="Select percentage"
+                                valueType="string"
                             />
                             <FieldWrapper control={form.control} name="fdr_amt" label="FDR Amount">
                                 {(field) => <NumberInput {...field} placeholder="Enter amount" />}
