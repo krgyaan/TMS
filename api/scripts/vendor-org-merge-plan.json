@@ -1,0 +1,159 @@
+{
+  "_instructions": "Review every entry in `candidates`, then set needsReview to false.\n  action \"merge\"  applies keep+drops as written (keep survives, drops are deleted).\n  action \"skip\"   leaves the group untouched.\n  keep/drops may be re-assigned to any org ids listed in `orgs`.\n`pollution` is report-only (identifiers shared by unrelated companies).\nTo merge a pollution group anyway, copy it into `candidates` with your\nown key, action \"merge\", keep/drops filled in, and needsReview false.\nRe-running --detect preserves your edits for groups whose members did not change.",
+  "generatedAt": "2026-10-12T06:39:17.885Z",
+  "candidates": [],
+  "pollution": [
+    {
+      "orgs": [
+        {
+          "id": 2,
+          "name": "Hbl",
+          "pan": null
+        },
+        {
+          "id": 71,
+          "name": "HBL Engineering Limited",
+          "pan": "AAACH8421K"
+        }
+      ],
+      "matchedOn": [
+        "gst"
+      ],
+      "why": "identifier(s) gst shared by 2 companies with different names and no address agreement - do NOT merge; fix the vendor master instead"
+    },
+    {
+      "orgs": [
+        {
+          "id": 20,
+          "name": "Best Power Equipments India Private Limited",
+          "pan": "AAACT2688L"
+        },
+        {
+          "id": 70,
+          "name": "Statcon Energiaa Private Limited",
+          "pan": "AAACT2688L"
+        },
+        {
+          "id": 125,
+          "name": "Dee Key Yes Associates",
+          "pan": "AAACT2688L"
+        }
+      ],
+      "matchedOn": [
+        "gst",
+        "pan"
+      ],
+      "why": "identifier(s) pan, gst shared by 3 companies with different names and no address agreement - do NOT merge; fix the vendor master instead"
+    },
+    {
+      "orgs": [
+        {
+          "id": 60,
+          "name": "Richards and Stevens Trading",
+          "pan": "AD ET MINUS INCIDUNT"
+        },
+        {
+          "id": 63,
+          "name": "Haier Appliances India Private Limited",
+          "pan": "AABCH3162L"
+        }
+      ],
+      "matchedOn": [
+        "gst"
+      ],
+      "why": "identifier(s) gst shared by 2 companies with different names and no address agreement - do NOT merge; fix the vendor master instead"
+    },
+    {
+      "orgs": [
+        {
+          "id": 78,
+          "name": "Whirlpool of India Limited",
+          "pan": "AAACW1336L"
+        },
+        {
+          "id": 80,
+          "name": "Daikin Airconditioning India Private Limited",
+          "pan": "AABCD0971F"
+        }
+      ],
+      "matchedOn": [
+        "gst"
+      ],
+      "why": "identifier(s) gst shared by 2 companies with different names and no address agreement - do NOT merge; fix the vendor master instead"
+    },
+    {
+      "orgs": [
+        {
+          "id": 79,
+          "name": "Stem Factory Solutions Private Limited",
+          "pan": "ABBCS5844D"
+        },
+        {
+          "id": 122,
+          "name": "Cords Cable",
+          "pan": "ABBCS5844D"
+        }
+      ],
+      "matchedOn": [
+        "gst",
+        "pan"
+      ],
+      "why": "identifier(s) pan, gst shared by 2 companies with different names and no address agreement - do NOT merge; fix the vendor master instead"
+    },
+    {
+      "orgs": [
+        {
+          "id": 82,
+          "name": "A One Air Conditioners",
+          "pan": "DEQPS6678R"
+        },
+        {
+          "id": 170,
+          "name": "Manish Devishankar Sharma",
+          "pan": "DEQPS6678R"
+        }
+      ],
+      "matchedOn": [
+        "gst",
+        "pan"
+      ],
+      "why": "identifier(s) pan, gst shared by 2 companies with different names and no address agreement - do NOT merge; fix the vendor master instead"
+    },
+    {
+      "orgs": [
+        {
+          "id": 147,
+          "name": "ICICI Lombard General Insurance Co. Ltd",
+          "pan": "AAACI7904G"
+        },
+        {
+          "id": 148,
+          "name": "Indian Oil Corporation Limited",
+          "pan": "AAACI1681G"
+        }
+      ],
+      "matchedOn": [
+        "gst"
+      ],
+      "why": "identifier(s) gst shared by 2 companies with different names and no address agreement - do NOT merge; fix the vendor master instead"
+    },
+    {
+      "orgs": [
+        {
+          "id": 163,
+          "name": "Kundli Enterprises",
+          "pan": "CUQPK3638G"
+        },
+        {
+          "id": 164,
+          "name": "KV Fire Chemicals India Private Limited",
+          "pan": "AAACK5054B"
+        }
+      ],
+      "matchedOn": [
+        "gst"
+      ],
+      "why": "identifier(s) gst shared by 2 companies with different names and no address agreement - do NOT merge; fix the vendor master instead"
+    }
+  ]
+}
