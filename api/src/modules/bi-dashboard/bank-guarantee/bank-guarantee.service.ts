@@ -1343,6 +1343,21 @@ private parseStringArray(v: unknown): string[] | null {
                 bankMailIdsCc: instrumentBgDetails.bankMailIdsCc,
                 courierNo: instrumentBgDetails.courierNo,
                 stampCharges: instrumentBgDetails.stampCharges,
+                // Accounts Form 1 (request to bank)
+                approveBg: instrumentBgDetails.approveBg,
+                reasonReq: instrumentBgDetails.reasonReq,
+                prefilledSignedBg: instrumentBgDetails.prefilledSignedBg,
+                bgFormatTe: instrumentBgDetails.bgFormatTe,
+                // Accounts Form 2 (after BG creation)
+                bg2Remark: instrumentBgDetails.bg2Remark,
+                // Accounts Form 3 (capture FDR details)
+                fdrPer: instrumentBgDetails.fdrPer,
+                fdrCopy: instrumentBgDetails.fdrCopy,
+                sfmsConf: instrumentBgDetails.sfmsConf,
+                bgChargeDeducted: instrumentBgDetails.bgChargeDeducted,
+                sfmsChargesDeducted: instrumentBgDetails.sfmsChargesDeducted,
+                stampChargesDeducted: instrumentBgDetails.stampChargesDeducted,
+                otherChargesDeducted: instrumentBgDetails.otherChargesDeducted,
                 extendedAmount: instrumentBgDetails.extendedAmount,
                 extendedValidityDate: instrumentBgDetails.extendedValidityDate,
                 extendedClaimExpiryDate: instrumentBgDetails.extendedClaimExpiryDate,
@@ -1405,6 +1420,23 @@ private parseStringArray(v: unknown): string[] | null {
             courierAddress: result.courierAddress,
             courierDeadline: result.courierDeadline ? Number(result.courierDeadline) : null,
             stampCharges: result.stampCharges ? Number(result.stampCharges) : null,
+            // Accounts Form 1 (request to bank)
+            approveBg: result.approveBg,
+            reasonReq: result.reasonReq,
+            prefilledSignedBg: result.prefilledSignedBg,
+            bgFormatTe: result.bgFormatTe,
+            // Accounts Form 2 (after BG creation)
+            bg2Remark: result.bg2Remark,
+            // Accounts Form 3 (capture FDR details). fdrPer is returned as a
+            // string because the form field is z.enum(['10','15','100']) and the
+            // SelectField emits strings for it.
+            fdrPer: result.fdrPer != null ? String(result.fdrPer) : null,
+            fdrCopy: result.fdrCopy,
+            sfmsConf: result.sfmsConf,
+            bgChargeDeducted: result.bgChargeDeducted ? Number(result.bgChargeDeducted) : null,
+            sfmsChargesDeducted: result.sfmsChargesDeducted ? Number(result.sfmsChargesDeducted) : null,
+            stampChargesDeducted: result.stampChargesDeducted ? Number(result.stampChargesDeducted) : null,
+            otherChargesDeducted: result.otherChargesDeducted ? Number(result.otherChargesDeducted) : null,
             utr: result.utr,
             docketNo: result.docketNo,
             generatedPdf: result.generatedPdf,

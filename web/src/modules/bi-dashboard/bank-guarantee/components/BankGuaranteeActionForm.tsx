@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useFieldArray, useForm, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { useEffect } from 'react';
 import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { SelectField } from '@/components/form/SelectField';
@@ -17,9 +18,11 @@ import { ConditionalSection } from '@/components/form/ConditionalSection';
 import { NumberInput } from '@/components/form/NumberInput';
 import DateInput from '@/components/form/DateInput';
 import { BankGuaranteeActionFormSchema, type BankGuaranteeActionFormValues } from '../helpers/bankGuaranteeActionForm.schema';
-import { useUpdateBankGuaranteeAction } from '@/hooks/api/useBankGuarantees';
+import { useUpdateBankGuaranteeAction, useBGActionFormData } from '@/hooks/api/useBankGuarantees';
+import type { Checkpoint } from '@/components/tendering/SubmissionChecklist';
 import { useCourierOptions } from '@/modules/shared/courier/courier.hooks';
-import { Plus, Trash2 } from 'lucide-react';
+import { CheckCircle2, Plus, Trash2, XCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useWatch } from 'react-hook-form';
 
@@ -41,6 +44,40 @@ const ACTION_OPTIONS = [
     { value: 'fdr-cancellation-confirmation', label: 'FDR Cancellation Confirmation' },
 ];
 
+/**
+ * DateInput is an <input type="date"> that expects a 'yyyy-MM-dd' string, while
+ * the API returns ISO timestamps (e.g. 2026-10-17T00:00:00.000Z).
+ */
+const toDateString = (v: unknown): string | undefined =>
+    v ? new Date(v as string).toISOString().slice(0, 10) : undefined;
+
+/**
+ * `prefilled_signed_bg` is persisted as a JSON-stringified array of paths. Tolerate
+ * a bare string too, mirroring the defensive parse in the service's updateAction.
+ */
+const safeParseArray = (v: string | null | undefined): string[] => {
+    if (!v) return [];
+    try {
+        const parsed = JSON.parse(v);
+        return Array.isArray(parsed) ? parsed : [v];
+    } catch {
+        return [v];
+    }
+};
+
+/** Bank mail ids are stored as string[]; useFieldArray needs row objects. */
+const toMailRows = (v?: string[] | null) =>
+    v && v.length ? v.map((email) => ({ email })) : [{ email: '' }];
+
+
+const toFdrEnum = (v: unknown): '10' | '15' | '100' | undefined => {
+    if (v == null) return undefined;
+    const n = Number(v);
+    if (!Number.isFinite(n)) return undefined;
+    const s = String(n);
+    return s === '10' || s === '15' || s === '100' ? s : undefined;
+};
+
 interface BankGuaranteeActionFormProps {
     instrumentId: number;
 }
@@ -49,6 +86,7 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
     const navigate = useNavigate();
     const updateMutation = useUpdateBankGuaranteeAction();
     const courierOptions = useCourierOptions();
+    const { data: formData } = useBGActionFormData(instrumentId);
 
     const form = useForm<BankGuaranteeActionFormValues>({
         resolver: zodResolver(BankGuaranteeActionFormSchema) as Resolver<BankGuaranteeActionFormValues>,
@@ -69,6 +107,59 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
 
     const bankMailIds = useFieldArray({ control: form.control, name: 'bank_mail_ids' });
     const bankMailIdsCc = useFieldArray({ control: form.control, name: 'bank_mail_ids_cc' });
+
+    // `payment_instruments.action` advances 0 -> 9 as each step is actioned, so it
+    // tells us how far the accounts forms have progressed.
+    const currentAction = formData?.action ?? 0;
+    const accountsCheckpoints: Checkpoint[] = [
+        { id: 'accounts-form-1', label: 'Accounts Form 1', status: currentAction >= 1 ? 'fulfilled' : 'pending' },
+        { id: 'accounts-form-2', label: 'Accounts Form 2', status: currentAction >= 2 ? 'fulfilled' : 'pending' },
+        { id: 'accounts-form-3', label: 'Accounts Form 3', status: currentAction >= 3 ? 'fulfilled' : 'pending' },
+    ];
+
+    // Pre-fill the selected step from whatever was saved previously, so revisiting
+    // a completed accounts form shows the stored values instead of a blank form.
+    useEffect(() => {
+        if (!formData || !action) return;
+
+        if (action === 'accounts-form-1') {
+            // The API only exposes the mapped status label, which stops
+            // distinguishing accepted/rejected once a later step runs. reasonReq is
+            // written only on rejection, so its presence tells us which it was.
+            if (currentAction >= 1) {
+                form.setValue('bg_req', formData.reasonReq ? 'Rejected' : 'Accepted');
+            }
+            form.setValue('reason_req', formData.reasonReq ?? undefined);
+            form.setValue('approve_bg', formData.approveBg ?? undefined);
+            form.setValue('bg_approved_fdr_per', toFdrEnum(formData.approvedFdrPer));
+            form.setValue('prefilled_signed_bg', safeParseArray(formData.prefilledSignedBg));
+            form.setValue('bg_format_imran', formData.bgFormatTe ?? undefined);
+            // Field arrays must use replace(), not setValue.
+            bankMailIds.replace(toMailRows(formData.bankMailIds));
+            bankMailIdsCc.replace(toMailRows(formData.bankMailIdsCc));
+        } else if (action === 'accounts-form-2') {
+            form.setValue('bg_no', formData.bgNo ?? undefined);
+            form.setValue('bg_date', toDateString(formData.bgDate));
+            form.setValue('bg_validity', toDateString(formData.validityDate));
+            form.setValue('bg_claim_period', toDateString(formData.claimExpiryDate));
+            form.setValue('courier_no', formData.courierNo ?? undefined);
+            form.setValue('bg2_remark', formData.bg2Remark ?? undefined);
+        } else if (action === 'accounts-form-3') {
+            // API returns fdrPer as a string; the field is a narrow enum.
+            form.setValue('fdr_per', toFdrEnum(formData.fdrPer));
+            form.setValue('fdr_amt', formData.fdrAmt ?? undefined);
+            form.setValue('fdr_copy', formData.fdrCopy ?? undefined);
+            form.setValue('sfms_conf', formData.sfmsConf ?? undefined);
+            form.setValue('fdr_no', formData.fdrNo ?? undefined);
+            form.setValue('fdr_validity', toDateString(formData.fdrValidity));
+            form.setValue('fdr_roi', formData.fdrRoi ?? undefined);
+            form.setValue('bg_charge_deducted', formData.bgChargeDeducted ?? undefined);
+            form.setValue('sfms_charge_deducted', formData.sfmsChargesDeducted ?? undefined);
+            form.setValue('stamp_charge_deducted', formData.stampChargesDeducted ?? undefined);
+            form.setValue('other_charge_deducted', formData.otherChargesDeducted ?? undefined);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [action, formData]);
 
     const isSubmitting = form.formState.isSubmitting || updateMutation.isPending;
 
@@ -135,6 +226,42 @@ key === 'stop_remarks' ||
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+                {/* Accounts forms progress. Tiles mirror the shared SubmissionChecklist
+                    markup, rendered bare (no Card/title/"Action Required" pill)
+                    so the shared component stays untouched for its other pages. */}
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {accountsCheckpoints.map((cp) => (
+                        <div
+                            key={cp.id}
+                            className={cn(
+                                "flex items-start gap-3 p-3 rounded-md border transition-colors",
+                                cp.status === 'fulfilled' && "border-green-100",
+                                cp.status === 'pending' && "border-red-100"
+                            )}
+                        >
+                            <div className="mt-0.5">
+                                {cp.status === 'fulfilled'
+                                    ? <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                    : <XCircle className="h-5 w-5 text-red-600" />}
+                            </div>
+                            <div>
+                                <p className={cn(
+                                    "text-sm font-semibold",
+                                    cp.status === 'fulfilled' ? "text-green-900" : "text-red-900"
+                                )}>
+                                    {cp.label}
+                                </p>
+                                <p className={cn(
+                                    "text-[10px] font-medium uppercase tracking-wider",
+                                    cp.status === 'fulfilled' ? "text-green-600" : "text-red-500"
+                                )}>
+                                    {cp.status === 'fulfilled' ? 'Completed' : 'Pending'}
+                                </p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
                 {/* Action Selection */}
                 <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
 
