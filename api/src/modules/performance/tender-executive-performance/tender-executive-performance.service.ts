@@ -251,7 +251,10 @@ export class TenderExecutiveService {
         const toLocal = `(DATE '${toDay}' + TIME '23:59:59.999')`;
 
         const tenders = (await this.db.execute(sql.raw(`
-            SELECT DISTINCT ti.*
+            SELECT DISTINCT ti.*,
+                ti.tender_no   AS "tenderNo",
+                ti.tender_name AS "tenderName",
+                ti.due_date    AS "dueDate"
             FROM tender_infos ti
             WHERE ti.team_member = ${userId}
               AND ti.delete_status = 0
