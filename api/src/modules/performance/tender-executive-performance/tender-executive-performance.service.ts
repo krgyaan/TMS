@@ -2060,7 +2060,7 @@ export class TenderExecutiveService {
                     itd.transaction_date,
                     pr.created_at
                 ) AS paid_at,
-                COALESCE(itd.return_transfer_date, itd.transfer_date, pi.updated_at) AS returned_at,
+                COALESCE(itd.return_transfer_date, pi.transfer_date, pi.updated_at) AS returned_at,
                 (
                        (pi.instrument_type IN ('DD','FDR')                      AND pi.action IN (3,4,7))
                     OR (pi.instrument_type IN ('Bank Transfer','Portal Payment') AND pi.action IN (3,4))
