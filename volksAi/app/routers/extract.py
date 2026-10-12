@@ -943,6 +943,7 @@ async def extract_tender(
                 "processing_time_ms": processing_time_ms,
                 "llm_usage": infosheet_data.get("_llm_usage"),
                 "llm_status": infosheet_data.get("_llm_status", "ok"),
+                "failed_categories": infosheet_data.get("_failed_categories", []),
                 "self_classified_atc": is_self_classified_atc,
                 "has_atc": has_atc,
                 "ambiguous_field_conflicts": ambiguous_field_conflicts,
