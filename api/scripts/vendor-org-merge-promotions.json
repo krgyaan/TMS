@@ -1,0 +1,35 @@
+{
+    "_note": "Pollution groups verified as real duplicates and approved for merge. Used by: pnpm merge:vendor-orgs --promote. orgIds must exactly match a pollution group from vendor-org-merge-plan.json (run --detect first). Keep = the org that survives (prefer PAN + most GSTs + most po/vwo/contact refs - check the dry-run output). This file is the review record; entries are applied with needsReview=false.",
+    "promotions": [
+        {
+            "orgIds": [98, 245],
+            "keep": 98,
+            "why": "Asys Insta Power - same PAN; names differ only by 'M/s ' prefix. Verify keeper against dry-run refs (flip keep to 245 if richer)."
+        },
+        {
+            "orgIds": [184, 281],
+            "keep": 184,
+            "why": "P.S Engineers vs Ps Engineers - same PAN; names differ only by periods. Verify keeper against dry-run refs."
+        },
+        {
+            "orgIds": [71, 179],
+            "keep": 71,
+            "why": "Power Build Batteries / Ned Energy - same PAN AAACP8227F + shared GSTs + same Medchal address on staging where both addresses present; same company (already merged on staging as #76/#184)."
+        },
+        {
+            "orgIds": [29, 58],
+            "keep": 58,
+            "why": "Haier Appliances '(india) Pvt Ltd.' vs 'India Private Limited' - same PAN; naming variant of one company."
+        },
+        {
+            "orgIds": [38, 59, 264],
+            "keep": 38,
+            "why": "LG Electronics: two 'Lg Electronics India Pvt Ltd' rows (case dup) + 'LG Electronics India Limited'; one PAN = one legal entity. Verify keeper is the richest of the three via dry-run refs."
+        },
+        {
+            "orgIds": [27, 73],
+            "keep": 27,
+            "why": "Whirlpool Of India Limited case-dup. Daikin #75 is in the same detected group via one mis-attached GST row and is deliberately EXCLUDED - do not add it."
+        }
+    ]
+}

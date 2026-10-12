@@ -22,7 +22,11 @@
  *   2. Review the JSON: confirm/change keep+drops, set action, set
  *      needsReview to false. --apply refuses to run while any candidate
  *      still needsReview.
+ *      OR: to merge a pollution group you have verified as a real duplicate,
+ *      add it to scripts/vendor-org-merge-promotions.json (orgIds + keep)
+ *      and run with --promote - that file is the review record.
  *   3. pnpm merge:vendor-orgs              # dry run (SELECT only)
+ *      pnpm merge:vendor-orgs --promote    # dry run incl. promotions (also persists them)
  *      pnpm merge:vendor-orgs --apply      # archive + re-point + delete
  *   4. pnpm merge:vendor-orgs --rollback   # undo every merge in the archive
  *
@@ -93,6 +97,20 @@ interface PlanFile {
     pollution: PollutionGroup[];
 }
 
+/** One human-approved promotion of a pollution group into a merge candidate. */
+interface PromotionSpec {
+    /** exact org-id set of the pollution group being promoted */
+    orgIds: number[];
+    keep: number;
+    drops?: number[];
+    why?: string;
+}
+
+interface PromotionsFile {
+    _note?: string;
+    promotions: PromotionSpec[];
+}
+
 interface RefColumn {
     table: string;
     column: string;
@@ -137,6 +155,7 @@ const REF_COLUMNS: RefColumn[] = [
 const FILL_COLUMNS = ["alias", "pan", "msme", "msme_type", "address"] as const;
 
 const DEFAULT_PLAN_PATH = path.join(__dirname, "vendor-org-merge-plan.json");
+const DEFAULT_PROMOTIONS_PATH = path.join(__dirname, "vendor-org-merge-promotions.json");
 
 const INSTRUCTIONS = [
     "Review every entry in `candidates`, then set needsReview to false.",
@@ -144,20 +163,25 @@ const INSTRUCTIONS = [
     '  action "skip"   leaves the group untouched.',
     "  keep/drops may be re-assigned to any org ids listed in `orgs`.",
     "`pollution` is report-only (identifiers shared by unrelated companies).",
-    "To merge a pollution group anyway, copy it into `candidates` with your",
-    'own key, action "merge", keep/drops filled in, and needsReview false.',
-    "Re-running --detect preserves your edits for groups whose members did not change.",
+    "To merge a pollution group anyway, add an entry to",
+    "scripts/vendor-org-merge-promotions.json and re-run with --promote",
+    "(that file is the review record: set keep/drops there).",
+    "Re-running --detect preserves your edits and promotions for groups",
+    "whose members did not change.",
 ].join("\n");
 
 // ------------------------------------------------------------------ flags ---
 
-const FLAGS = new Set(process.argv.filter(a => !a.startsWith("--plan")));
+const FLAGS = new Set(process.argv.filter(a => !a.startsWith("--plan") && !a.startsWith("--promotions")));
 const planArgIndex = process.argv.indexOf("--plan");
+const promotionsArgIndex = process.argv.indexOf("--promotions");
 const PLAN_PATH = planArgIndex >= 0 && process.argv[planArgIndex + 1] ? path.resolve(process.argv[planArgIndex + 1]) : DEFAULT_PLAN_PATH;
+const PROMOTIONS_PATH = promotionsArgIndex >= 0 && process.argv[promotionsArgIndex + 1] ? path.resolve(process.argv[promotionsArgIndex + 1]) : DEFAULT_PROMOTIONS_PATH;
 const DETECT = FLAGS.has("--detect");
 const APPLY = FLAGS.has("--apply");
 const ROLLBACK = FLAGS.has("--rollback");
 const ALLOW_UNREVIEWED = FLAGS.has("--allow-unreviewed");
+const PROMOTE = FLAGS.has("--promote");
 
 const failures: string[] = [];
 const check = (label: string, ok: boolean, detail = ""): boolean => {
@@ -422,11 +446,33 @@ async function detect(db: Executor): Promise<PlanFile> {
                 )
             );
         } else {
-            pollution.push({
-                orgs: members.map(o => ({ id: o.id, name: o.name, pan: o.pan })),
-                matchedOn: [...matched].sort(),
-                why: `identifier(s) ${[...matched].join(", ")} shared by ${members.length} companies with different names and no address agreement - do NOT merge; fix the vendor master instead`,
-            });
+            // No automatic merge signal - but keep a group as a candidate when a
+            // prior run already promoted/decided it (manual edits and --promote
+            // must survive re-detection).
+            const priorCandidate = priorBySignature.get(signature(memberIds));
+            if (priorCandidate) {
+                candidates.push(
+                    withPrior(
+                        {
+                            ...base,
+                            classification: "shared-identifier",
+                            addressMatch: false,
+                            why: `carried forward from a previous decision; identifiers shared: ${[...matched].join(", ")}`,
+                            action: "skip",
+                            keep: suggestedKeep,
+                            drops: memberIds.filter(id => id !== suggestedKeep),
+                            needsReview: true,
+                        },
+                        priorCandidate
+                    )
+                );
+            } else {
+                pollution.push({
+                    orgs: members.map(o => ({ id: o.id, name: o.name, pan: o.pan })),
+                    matchedOn: [...matched].sort(),
+                    why: `identifier(s) ${[...matched].join(", ")} shared by ${members.length} companies with different names and no address agreement - do NOT merge; fix the vendor master instead`,
+                });
+            }
         }
     }
 
@@ -478,6 +524,70 @@ function withPrior(fresh: Candidate, prior?: Candidate): Candidate {
 function loadPlan(filePath: string): PlanFile | null {
     if (!fs.existsSync(filePath)) return null;
     return JSON.parse(fs.readFileSync(filePath, "utf8")) as PlanFile;
+}
+
+// --------------------------------------------------------------- promotions ---
+
+/**
+ * Moves the pollution groups listed in the promotions file into `candidates`
+ * with action=merge. The promotions file IS the review record: keep/drops
+ * there are treated as decided (needsReview=false). Groups whose exact id set
+ * is not found in pollution are reported - a miss usually means the ids come
+ * from a different environment or the group was already promoted.
+ */
+function applyPromotions(plan: PlanFile, promotions: PromotionSpec[]): void {
+    for (const spec of promotions) {
+        const want = new Set(spec.orgIds.map(Number));
+        const idx = plan.pollution.findIndex(g => {
+            const ids = g.orgs.map(o => Number(o.id));
+            return ids.length === want.size && ids.every(id => want.has(id));
+        });
+        if (idx === -1) {
+            const asCandidate = plan.candidates.find(c => {
+                const ids = c.orgs.map(o => Number(o.id));
+                return ids.length === want.size && ids.every(id => want.has(id));
+            });
+            if (asCandidate) {
+                console.log(`PROMOTE  orgs [${spec.orgIds.join(", ")}] already a candidate (${asCandidate.key}) - keeping existing decision`);
+                continue;
+            }
+            check(`promotion [${spec.orgIds.join(", ")}] found in pollution`, false, "no matching pollution group - wrong environment ids or already merged?");
+            continue;
+        }
+        const grp = plan.pollution.splice(idx, 1)[0];
+        const keep = Number(spec.keep);
+        const drops = (spec.drops ?? grp.orgs.map(o => Number(o.id)).filter(id => id !== keep)).map(Number);
+        const orgs: OrgDetail[] = grp.orgs.map(o => ({
+            id: Number(o.id),
+            name: o.name,
+            pan: o.pan,
+            address: null,
+            status: true,
+            createdAt: "",
+            gsts: 0,
+            contacts: 0,
+            banks: 0,
+            files: 0,
+            poRefs: 0,
+            vwoRefs: 0,
+            rfqRefs: 0,
+            projectRefs: 0,
+        }));
+        plan.candidates.push({
+            key: `promoted:${[...want].sort((a, b) => a - b).join("-")}`,
+            classification: "shared-identifier",
+            addressMatch: false,
+            matchedOn: grp.matchedOn,
+            orgs,
+            suggestedKeep: keep,
+            why: spec.why ? `promoted from pollution: ${spec.why}` : `promoted from pollution: ${grp.why}`,
+            action: "merge",
+            keep,
+            drops,
+            needsReview: false,
+        });
+        console.log(`PROMOTE  orgs [${spec.orgIds.join(", ")}] -> candidate keep #${keep}, drops [${drops.join(", ")}]`);
+    }
 }
 
 // ---------------------------------------------------------------- validate ---
@@ -744,6 +854,20 @@ async function main(): Promise<void> {
             console.error(`No plan file at ${PLAN_PATH} - run with --detect first.`);
             process.exit(1);
         }
+
+        if (PROMOTE) {
+            if (!fs.existsSync(PROMOTIONS_PATH)) {
+                console.error(`No promotions file at ${PROMOTIONS_PATH} - create it (see _instructions in the plan file).`);
+                process.exit(1);
+            }
+            const promoFile = JSON.parse(fs.readFileSync(PROMOTIONS_PATH, "utf8")) as PromotionsFile;
+            console.log(`Promoting from ${PROMOTIONS_PATH} (${promoFile.promotions?.length ?? 0} entr(y/ies)):\n`);
+            applyPromotions(plan, promoFile.promotions ?? []);
+            // persist so subsequent dry-run/--apply runs keep the promotions
+            fs.writeFileSync(PLAN_PATH, JSON.stringify(plan, null, 2) + "\n");
+            console.log(`\nSaved updated plan to ${PLAN_PATH}\n`);
+        }
+
         validatePlan(plan);
 
         const unreviewed = plan.candidates.filter(c => c.needsReview);
