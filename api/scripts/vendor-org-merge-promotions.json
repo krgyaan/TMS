@@ -1,5 +1,5 @@
 {
-    "_note": "Pollution groups verified as real duplicates and approved for merge. Used by: pnpm merge:vendor-orgs --promote. orgIds must exactly match a pollution group from vendor-org-merge-plan.json (run --detect first). Keep = the org that survives (prefer PAN + most GSTs + most po/vwo/contact refs - check the dry-run output). This file is the review record; entries are applied with needsReview=false.",
+    "_note": "Pollution groups verified as real duplicates and approved for merge. Used by: pnpm merge:vendor-orgs --promote. orgIds must match a pollution group from vendor-org-merge-plan.json either exactly or as a strict SUBSET (e.g. [27,73] splits a [27,73,75] group; leftovers stay in pollution). Run --detect first. Keep = the org that survives (prefer PAN + most GSTs + most po/vwo/contact refs - check the dry-run output). Merging deactivates the dropped rows, it never deletes them. This file is the review record; entries are applied with needsReview=false.",
     "promotions": [
         {
             "orgIds": [98, 245],

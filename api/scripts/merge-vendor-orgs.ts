@@ -27,8 +27,12 @@
  *      and run with --promote - that file is the review record.
  *   3. pnpm merge:vendor-orgs              # dry run (SELECT only)
  *      pnpm merge:vendor-orgs --promote    # dry run incl. promotions (also persists them)
- *      pnpm merge:vendor-orgs --apply      # archive + re-point + delete
+ *      pnpm merge:vendor-orgs --apply      # archive + re-point + deactivate
  *   4. pnpm merge:vendor-orgs --rollback   # undo every merge in the archive
+ *
+ * Merging NEVER deletes a vendor_organizations row: the duplicate is
+ * deactivated (status = false) after its references are re-pointed to the
+ * keeper, so historical rows keep existing (and keep their ids).
  *
  * Per merge (--apply, one transaction per drop):
  *   archive the dropped row into vendor_organizations_dups_archive (with the
@@ -36,7 +40,8 @@
  *   identifying fields from the dropped row -> re-point every reference
  *   (vendors, vendor_gsts, vendor_accs, vendor_files, projects,
  *   purchase_orders, vendor_work_orders, rfq_responses, seller archive) ->
- *   refuse to delete while anything still points at the dropped id -> delete.
+ *   refuse to finish while anything still points at the dropped id ->
+ *   deactivate the dropped row (status = false).
  *
  * --detect preserves decisions already recorded in the plan file for groups
  * whose member set has not changed.
@@ -159,7 +164,7 @@ const DEFAULT_PROMOTIONS_PATH = path.join(__dirname, "vendor-org-merge-promotion
 
 const INSTRUCTIONS = [
     "Review every entry in `candidates`, then set needsReview to false.",
-    '  action "merge"  applies keep+drops as written (keep survives, drops are deleted).',
+    '  action "merge"  applies keep+drops as written (keep survives, drops are re-pointed to keep and deactivated - never deleted).',
     '  action "skip"   leaves the group untouched.',
     "  keep/drops may be re-assigned to any org ids listed in `orgs`.",
     "`pollution` is report-only (identifiers shared by unrelated companies).",
@@ -279,11 +284,15 @@ const REF_COUNT_COLUMNS = [
 ] as const;
 
 async function detect(db: Executor): Promise<PlanFile> {
+    // Only ACTIVE orgs participate: rows deactivated by a previous merge are
+    // finished business and must never re-appear as candidates.
     const orgs = await rows<RawOrg>(
         db,
         sql`select id::int as id, name, pan, address, alias, msme,
                    msme_type as "msmeType", status, created_at::text as "createdAt"
-            from vendor_organizations order by id`
+            from vendor_organizations
+            where status
+            order by id`
     );
     const gsts = await rows<RawGst>(db, sql`select org_id::int as "orgId", gst_no as "gstNo" from vendor_gsts`);
 
@@ -359,6 +368,7 @@ async function detect(db: Executor): Promise<PlanFile> {
     }
     for (const g of gsts) {
         if (g.orgId === null) continue;
+        if (!orgById.has(g.orgId)) continue; // gst attached to an inactive/unknown org
         const gk = normGst(g.gstNo);
         if (gk.length !== 15) continue; // real GSTINs are 15 chars; shorter values are junk/truncated
         addKey(`g:${gk}`, g.orgId);
@@ -531,33 +541,29 @@ function loadPlan(filePath: string): PlanFile | null {
 /**
  * Moves the pollution groups listed in the promotions file into `candidates`
  * with action=merge. The promotions file IS the review record: keep/drops
- * there are treated as decided (needsReview=false). Groups whose exact id set
- * is not found in pollution are reported - a miss usually means the ids come
- * from a different environment or the group was already promoted.
+ * there are treated as decided (needsReview=false).
+ *
+ * Matching: the spec's orgIds may be the EXACT member set of a pollution
+ * group, or a STRICT SUBSET of one - in the subset case the group is split:
+ * the promoted members become a candidate and the remaining members (e.g. a
+ * mis-attached third-party GST row) stay in pollution.
+ *
+ * A spec that matches nothing is reported - a miss usually means the ids come
+ * from a different environment or the group was already handled.
  */
 function applyPromotions(plan: PlanFile, promotions: PromotionSpec[]): void {
-    for (const spec of promotions) {
-        const want = new Set(spec.orgIds.map(Number));
-        const idx = plan.pollution.findIndex(g => {
-            const ids = g.orgs.map(o => Number(o.id));
-            return ids.length === want.size && ids.every(id => want.has(id));
-        });
-        if (idx === -1) {
-            const asCandidate = plan.candidates.find(c => {
-                const ids = c.orgs.map(o => Number(o.id));
-                return ids.length === want.size && ids.every(id => want.has(id));
-            });
-            if (asCandidate) {
-                console.log(`PROMOTE  orgs [${spec.orgIds.join(", ")}] already a candidate (${asCandidate.key}) - keeping existing decision`);
-                continue;
-            }
-            check(`promotion [${spec.orgIds.join(", ")}] found in pollution`, false, "no matching pollution group - wrong environment ids or already merged?");
-            continue;
-        }
-        const grp = plan.pollution.splice(idx, 1)[0];
+    const idsOf = (orgs: { id: number }[]): Set<number> => new Set(orgs.map(o => Number(o.id)));
+    const matches = (spec: Set<number>, group: Set<number>): "exact" | "subset" | "none" =>
+        spec.size === group.size && [...spec].every(id => group.has(id))
+            ? "exact"
+            : [...spec].every(id => group.has(id))
+              ? "subset"
+              : "none";
+
+    const buildCandidate = (memberOrgs: PollutionGroup["orgs"], spec: PromotionSpec, why: string): Candidate => {
         const keep = Number(spec.keep);
-        const drops = (spec.drops ?? grp.orgs.map(o => Number(o.id)).filter(id => id !== keep)).map(Number);
-        const orgs: OrgDetail[] = grp.orgs.map(o => ({
+        const drops = (spec.drops ?? memberOrgs.map(o => Number(o.id)).filter(id => id !== keep)).map(Number);
+        const orgs: OrgDetail[] = memberOrgs.map(o => ({
             id: Number(o.id),
             name: o.name,
             pan: o.pan,
@@ -573,20 +579,58 @@ function applyPromotions(plan: PlanFile, promotions: PromotionSpec[]): void {
             rfqRefs: 0,
             projectRefs: 0,
         }));
-        plan.candidates.push({
-            key: `promoted:${[...want].sort((a, b) => a - b).join("-")}`,
+        return {
+            key: `promoted:${orgs.map(o => o.id).sort((a, b) => a - b).join("-")}`,
             classification: "shared-identifier",
             addressMatch: false,
-            matchedOn: grp.matchedOn,
+            matchedOn: [],
             orgs,
             suggestedKeep: keep,
-            why: spec.why ? `promoted from pollution: ${spec.why}` : `promoted from pollution: ${grp.why}`,
+            why,
             action: "merge",
             keep,
             drops,
             needsReview: false,
-        });
-        console.log(`PROMOTE  orgs [${spec.orgIds.join(", ")}] -> candidate keep #${keep}, drops [${drops.join(", ")}]`);
+        };
+    };
+
+    for (const spec of promotions) {
+        const want = idsOf(spec.orgIds.map(id => ({ id })));
+        if (want.size === 0 || !Number.isFinite(spec.keep) || !want.has(Number(spec.keep))) {
+            check(`promotion [${spec.orgIds.join(", ")}] has keep inside orgIds`, false, `keep=${spec.keep}`);
+            continue;
+        }
+
+        // 1. exact match in pollution
+        let idx = plan.pollution.findIndex(g => matches(want, idsOf(g.orgs)) === "exact");
+        if (idx >= 0) {
+            const grp = plan.pollution.splice(idx, 1)[0];
+            plan.candidates.push(buildCandidate(grp.orgs, spec, spec.why ? `promoted from pollution: ${spec.why}` : `promoted from pollution: ${grp.why}`));
+            console.log(`PROMOTE  orgs [${spec.orgIds.join(", ")}] -> candidate keep #${spec.keep}`);
+            continue;
+        }
+
+        // 2. already promoted/decided in an earlier run
+        const asCandidate = plan.candidates.find(c => matches(want, idsOf(c.orgs)) === "exact");
+        if (asCandidate) {
+            console.log(`PROMOTE  orgs [${spec.orgIds.join(", ")}] already a candidate (${asCandidate.key}) - keeping existing decision`);
+            continue;
+        }
+
+        // 3. strict subset of a pollution group -> split the group
+        idx = plan.pollution.findIndex(g => matches(want, idsOf(g.orgs)) === "subset");
+        if (idx >= 0) {
+            const grp = plan.pollution[idx];
+            const subset = grp.orgs.filter(o => want.has(Number(o.id)));
+            const remainder = grp.orgs.filter(o => !want.has(Number(o.id)));
+            if (remainder.length >= 2) plan.pollution[idx] = { ...grp, orgs: remainder };
+            else plan.pollution.splice(idx, 1); // a lone leftover shares nothing with anyone
+            plan.candidates.push(buildCandidate(subset, spec, spec.why ? `promoted from pollution (split from [${grp.orgs.map(o => o.id).join(",")}]): ${spec.why}` : `promoted from pollution (split): ${grp.why}`));
+            console.log(`PROMOTE  orgs [${spec.orgIds.join(", ")}] -> candidate keep #${spec.keep}  (split off pollution group [${grp.orgs.map(o => o.id).join(", ")}]; leftovers stay pollution)`);
+            continue;
+        }
+
+        check(`promotion [${spec.orgIds.join(", ")}] found in pollution`, false, "no matching pollution group (exact or subset) - wrong environment ids or already merged?");
     }
 }
 
@@ -754,7 +798,8 @@ async function applyDrop(db: import("../src/db").DbInstance, keepId: number, dro
         }
         if (orphans.length > 0) throw new Error(`org ${dropId} still referenced after move: ${orphans.join(", ")}`);
 
-        await tx.execute(sql`delete from vendor_organizations where id = ${dropId}`);
+        // never DELETE the duplicate - deactivate it so the row (and its id) survive
+        await tx.execute(sql`update vendor_organizations set status = false where id = ${dropId}`);
     });
 
     const movedSummary =
@@ -763,8 +808,8 @@ async function applyDrop(db: import("../src/db").DbInstance, keepId: number, dro
             : Object.entries(moved)
                   .map(([k, ids]) => `${k}: ${ids.length} row(s)`)
                   .join("; ");
-    log(`merged org ${dropId} -> ${keep.id}: filled=[${Object.keys(filled).join(", ") || "-"}] moved=${movedSummary}`);
-    console.log(`  merged #${dropId} -> #${keep.id}   filled: ${Object.keys(filled).join(", ") || "(none)"}   moved: ${movedSummary}`);
+    log(`merged org ${dropId} -> ${keep.id} (deactivated ${dropId}): filled=[${Object.keys(filled).join(", ") || "-"}] moved=${movedSummary}`);
+    console.log(`  merged #${dropId} -> #${keep.id} (deactivated #${dropId})   filled: ${Object.keys(filled).join(", ") || "(none)"}   moved: ${movedSummary}`);
 }
 
 // --------------------------------------------------------------- rollback ---
@@ -776,17 +821,20 @@ async function rollback(db: import("../src/db").DbInstance, log: (s: string) => 
         return;
     }
     for (const rec of archived) {
-        if (await orgRow(db, rec.id)) {
-            console.log(`SKIP  org ${rec.id} already exists in vendor_organizations`);
-            continue;
-        }
+        const exists = Boolean(await orgRow(db, rec.id));
         await db.transaction(async tx => {
-            await tx.execute(sql`
-                insert into vendor_organizations
-                    (id, name, alias, address, pan, msme, msme_type, status, created_at, updated_at)
-                values (${rec.id}, ${rec.name}, ${rec.alias}, ${rec.address}, ${rec.pan},
-                        ${rec.msme}, ${rec.msme_type}, coalesce(${rec.status}, true),
-                        ${rec.created_at}, ${rec.updated_at})`);
+            if (exists) {
+                // merge was applied as a deactivation - bring the row back
+                await tx.execute(sql`update vendor_organizations set status = coalesce(${rec.status}, true) where id = ${rec.id}`);
+            } else {
+                // legacy merge actually deleted the row - re-insert it
+                await tx.execute(sql`
+                    insert into vendor_organizations
+                        (id, name, alias, address, pan, msme, msme_type, status, created_at, updated_at)
+                    values (${rec.id}, ${rec.name}, ${rec.alias}, ${rec.address}, ${rec.pan},
+                            ${rec.msme}, ${rec.msme_type}, coalesce(${rec.status}, true),
+                            ${rec.created_at}, ${rec.updated_at})`);
+            }
 
             const moved = rec.moved_refs ?? {};
             for (const [key, ids] of Object.entries(moved)) {
@@ -807,8 +855,8 @@ async function rollback(db: import("../src/db").DbInstance, log: (s: string) => 
             }
             await tx.execute(sql`delete from vendor_organizations_dups_archive where id = ${rec.id}`);
         });
-        log(`rolled back merge of org ${rec.id} (restored from archive, was merged into ${rec.kept_id})`);
-        console.log(`  restored org ${rec.id} (was merged into ${rec.kept_id})`);
+        log(`rolled back merge of org ${rec.id} (${exists ? "reactivated" : "restored from archive"}, was merged into ${rec.kept_id})`);
+        console.log(`  ${exists ? "reactivated" : "restored"} org ${rec.id} (was merged into ${rec.kept_id})`);
     }
 }
 
@@ -910,7 +958,7 @@ async function main(): Promise<void> {
                 await applyDrop(db, c.keep, dropId, `${c.key}: ${c.why}`, s => logger.log(s));
             }
         }
-        const summary = `Merged ${toMerge.reduce((n, c) => n + c.drops.length, 0)} org(s) into keepers across ${toMerge.length} group(s).`;
+        const summary = `Merged and deactivated ${toMerge.reduce((n, c) => n + c.drops.length, 0)} duplicate org(s) into keepers across ${toMerge.length} group(s). No rows were deleted.`;
         console.log(`\n${summary}`);
         logger.summary(summary);
 
