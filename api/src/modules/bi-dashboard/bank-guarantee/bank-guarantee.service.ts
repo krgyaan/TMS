@@ -706,9 +706,23 @@ export class BankGuaranteeService {
         return [];
     }
 
-    /**
-     * Get file path from body if it's a string (from FileUploader)
-     */
+/**
+ * Parse a repeatable string field sent from a form as a JSON string.
+ * Tolerates a bare string too, and returns null when absent so an omitted field
+ * leaves the column alone (an emptied list arrives as "[]" and clears it).
+ */
+private parseStringArray(v: unknown): string[] | null {
+    if (v === undefined || v === null) return null;
+    const arr = typeof v === 'string'
+        ? (() => { try { return JSON.parse(v); } catch { return [v]; } })()
+        : v;
+    if (!Array.isArray(arr)) return null;
+    return arr.map((x) => String(x).trim()).filter(Boolean);
+}
+
+/**
+ * Get file path from body if it's a string (from FileUploader)
+ */
     private getFilePathFromBody(fieldname: string, body: any): string | null {
         if (body[fieldname] && typeof body[fieldname] === 'string') {
             return body[fieldname];
@@ -803,7 +817,8 @@ export class BankGuaranteeService {
             'bgPo', 'bgClientUser', 'bgClientCp', 'bgClientFin',
             'bgBankAcc', 'bgBankIfsc', 'bgBankAccName', 'courierNo',
             'extensionLetter', 'newBgClaim', 'approveBg',
-            'fdrAmt', 'fdrPer', 'fdrNo', 'fdrValidity', 'fdrRoi',
+            'fdrAmt', 'fdrPer', 'fdrNo', 'fdrValidity', 'fdrRoi', 'approvedFdrPer',
+            'bankMailIds', 'bankMailIdsCc',
             'bgChargeDeducted', 'newStampChargeDeducted', 'cancelRemark',
             'bgFdrCancelDate', 'bgFdrCancelAmount', 'bgFdrCancelRefNo',
             'bg2Remark', 'reasonReq'
@@ -988,6 +1003,18 @@ export class BankGuaranteeService {
             if (body.bg_req === 'Rejected' && body.reason_req) {
                 bgDetailsUpdate.reasonReq = body.reason_req;
             }
+
+            // FDR % agreed at approval time -- kept separate from fdrPer, which
+            // is captured in accounts-form-3.
+            if (body.bg_approved_fdr_per) {
+                bgDetailsUpdate.approvedFdrPer = Number(body.bg_approved_fdr_per);
+            }
+
+            // Bank mail ids / CC -- capture only for now; nothing reads these yet.
+            const mailIds = this.parseStringArray(body.bank_mail_ids);
+            if (mailIds !== null) bgDetailsUpdate.bankMailIds = mailIds;
+            const mailIdsCc = this.parseStringArray(body.bank_mail_ids_cc);
+            if (mailIdsCc !== null) bgDetailsUpdate.bankMailIdsCc = mailIdsCc;
 
             // Handle bg_format_imran file (single file)
             const bgFormatImranFile = this.getFileForField('bg_format_imran', files, body, fileIndexTracker);
@@ -1202,7 +1229,10 @@ export class BankGuaranteeService {
                 bgPurpose: instrumentBgDetails.bgPurpose,
                 bgSoftCopy: instrumentBgDetails.bgSoftCopy,
                 bgPo: instrumentBgDetails.bgPo,
-                bgClientUser: instrumentBgDetails.bgClientUser,
+                approvedFdrPer: instrumentBgDetails.approvedFdrPer,
+                bankMailIds: instrumentBgDetails.bankMailIds,
+                bankMailIdsCc: instrumentBgDetails.bankMailIdsCc,
+                bankClientUser: instrumentBgDetails.bgClientUser,
                 bgClientCp: instrumentBgDetails.bgClientCp,
                 bgClientFin: instrumentBgDetails.bgClientFin,
                 bgBankAcc: instrumentBgDetails.bgBankAcc,
@@ -1308,6 +1338,9 @@ export class BankGuaranteeService {
                 bgSoftCopy: instrumentBgDetails.bgSoftCopy,
                 bgPo: instrumentBgDetails.bgPo,
                 bgBankAccName: instrumentBgDetails.bgBankAccName,
+                approvedFdrPer: instrumentBgDetails.approvedFdrPer,
+                bankMailIds: instrumentBgDetails.bankMailIds,
+                bankMailIdsCc: instrumentBgDetails.bankMailIdsCc,
                 courierNo: instrumentBgDetails.courierNo,
                 stampCharges: instrumentBgDetails.stampCharges,
                 extendedAmount: instrumentBgDetails.extendedAmount,
@@ -1365,6 +1398,9 @@ export class BankGuaranteeService {
             bgSoftCopy: result.bgSoftCopy,
             bgPo: result.bgPo,
             bgBankAccName: result.bgBankAccName,
+            approvedFdrPer: result.approvedFdrPer,
+            bankMailIds: result.bankMailIds ?? [],
+            bankMailIdsCc: result.bankMailIdsCc ?? [],
             courierNo: result.courierNo,
             courierAddress: result.courierAddress,
             courierDeadline: result.courierDeadline ? Number(result.courierDeadline) : null,

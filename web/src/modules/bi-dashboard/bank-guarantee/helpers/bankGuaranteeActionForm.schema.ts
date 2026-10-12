@@ -7,6 +7,13 @@ const ContactPersonSchema = z.object({
     email: z.string().email().optional().nullable(),
 });
 
+// Bank mail ids are repeatable rows (useFieldArray). A freshly added row starts
+// blank, so an empty string has to validate -- otherwise the default row would
+// block submit. Same `.or(z.literal(''))` shape as the bgClient* emails below.
+const MailRowSchema = z.object({
+    email: z.email().optional().or(z.literal('')),
+});
+
 // Base schema with common fields
 const BaseActionFormSchema = z.object({
     action: z.string().min(1, 'Action is required'),
@@ -20,6 +27,10 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     approve_bg: z.enum(['Accept the BG given by TE', 'Upload by Imran']).optional(),
     bg_format_imran: z.any().optional(), // File
     prefilled_signed_bg: z.array(z.any()).optional(), // Files
+    // FDR % agreed at approval time. Separate from `fdr_per` (step 3).
+    bg_approved_fdr_per: z.enum(['10', '15', '100']).optional(),
+    bank_mail_ids: z.array(MailRowSchema).optional(),
+    bank_mail_ids_cc: z.array(MailRowSchema).optional(),
 
     // Accounts Form (BG) 2 - After BG Creation
     bg_no: z.string().optional(),

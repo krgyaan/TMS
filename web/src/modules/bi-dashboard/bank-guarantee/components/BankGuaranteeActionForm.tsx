@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, type Resolver } from 'react-hook-form';
+import { useFieldArray, useForm, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
@@ -19,6 +19,7 @@ import DateInput from '@/components/form/DateInput';
 import { BankGuaranteeActionFormSchema, type BankGuaranteeActionFormValues } from '../helpers/bankGuaranteeActionForm.schema';
 import { useUpdateBankGuaranteeAction } from '@/hooks/api/useBankGuarantees';
 import { useCourierOptions } from '@/modules/shared/courier/courier.hooks';
+import { Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useWatch } from 'react-hook-form';
 
@@ -54,6 +55,10 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
         defaultValues: {
             action: '',
             contacts: [],
+            // One blank row each so the user always has a visible input to type
+            // into. Delete removes the row entirely, so the list can go to zero.
+            bank_mail_ids: [{ email: '' }],
+            bank_mail_ids_cc: [{ email: '' }],
         },
     });
 
@@ -61,6 +66,9 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
     const bgReq = useWatch({ control: form.control, name: 'bg_req' });
     const approveBg = useWatch({ control: form.control, name: 'approve_bg' });
     const modificationRequired = useWatch({ control: form.control, name: 'modification_required' });
+
+    const bankMailIds = useFieldArray({ control: form.control, name: 'bank_mail_ids' });
+    const bankMailIdsCc = useFieldArray({ control: form.control, name: 'bank_mail_ids_cc' });
 
     const isSubmitting = form.formState.isSubmitting || updateMutation.isPending;
 
@@ -76,8 +84,14 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
                     key === 'frequency' ||
                     key === 'stop_reason' ||
                     key === 'proof_text' ||
-                    key === 'stop_remarks' ||
-                    key === 'proof_image') {
+key === 'stop_remarks' ||
+                key === 'proof_image') {
+                    return;
+                }
+
+                // Repeatable bank mail id rows -- handled explicitly below so the
+                // generic loop doesn't JSON-stringify the raw row objects.
+                if (key === 'bank_mail_ids' || key === 'bank_mail_ids_cc') {
                     return;
                 }
 
@@ -97,6 +111,16 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
                     payload[key] = String(value);
                 }
             });
+
+            // Flatten the repeatable bank mail rows to plain address lists. Blank
+            // rows are dropped, and an emptied list is sent as [] (rather than
+            // being omitted) so clearing the fields actually persists.
+            payload.bank_mail_ids = JSON.stringify(
+                (values.bank_mail_ids ?? []).map((r) => r.email).filter(Boolean),
+            );
+            payload.bank_mail_ids_cc = JSON.stringify(
+                (values.bank_mail_ids_cc ?? []).map((r) => r.email).filter(Boolean),
+            );
 
             await updateMutation.mutateAsync({ id: instrumentId, payload });
             toast.success('Action submitted successfully');
@@ -147,9 +171,35 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
                             )}
                         </FieldWrapper>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3">
+                        {/* Row 1 — FDR % and Approved BG Format */}
+                        {bgReq === 'Accepted' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-start pt-3">
+                                <SelectField
+                                    label="FDR %"
+                                    control={form.control}
+                                    name="bg_approved_fdr_per"
+                                    options={FDR_PERCENTAGE_OPTIONS}
+                                    placeholder="Select percentage"
+                                />
+                                <SelectField
+                                    label="Approved BG Format"
+                                    control={form.control}
+                                    name="approve_bg"
+                                    options={[{ value: 'Accept the BG given by TE', label: 'Accept the BG given by TE' }, { value: 'Upload by Imran', label: 'Upload by Imran' }]}
+                                    placeholder="Select an option"
+                                />
+                            </div>
+                        )}
+
+                        {/* Row 2 — rejection reason, or the file uploaders */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-start pt-3">
                             {bgReq === 'Rejected' && (
-                                <FieldWrapper control={form.control} name="reason_req" label="Reason for Rejection *">
+                                <FieldWrapper
+                                    control={form.control}
+                                    name="reason_req"
+                                    label="Reason for Rejection *"
+                                    className="md:col-span-2"
+                                >
                                     {(field) => (
                                         <Textarea
                                             {...field}
@@ -160,24 +210,15 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
                                 </FieldWrapper>
                             )}
                             {bgReq === 'Accepted' && (
-                                <>
-                                    <SelectField
-                                        label="Approved BG Format"
-                                        control={form.control}
-                                        name="approve_bg"
-                                        options={[{ value: 'Accept the BG given by TE', label: 'Accept the BG given by TE' }, { value: 'Upload by Imran', label: 'Upload by Imran' }]}
-                                        placeholder="Select an option"
-                                    />
-                                    <FieldWrapper control={form.control} name="prefilled_signed_bg" label="Prefilled Bank Formats">
-                                        {(field) => (
-                                            <FileUploader
-                                                context="bg-prefilled-signed"
-                                                value={field.value || []}
-                                                onChange={field.onChange}
-                                            />
-                                        )}
-                                    </FieldWrapper>
-                                </>
+                                <FieldWrapper control={form.control} name="prefilled_signed_bg" label="Prefilled Bank Formats">
+                                    {(field) => (
+                                        <FileUploader
+                                            context="bg-prefilled-signed"
+                                            value={field.value || []}
+                                            onChange={field.onChange}
+                                        />
+                                    )}
+                                </FieldWrapper>
                             )}
                             {approveBg === 'Upload by Imran' && (
                                 <FieldWrapper control={form.control} name="bg_format_imran" label="Upload Documents *">
@@ -191,6 +232,108 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
                                 </FieldWrapper>
                             )}
 
+                        </div>
+
+                        {/* Bank Mail Ids / CC -- capture only for now; the
+                            notification service does not read these yet. */}
+                        <div className="space-y-6 pt-4">
+                            <div className="flex items-center justify-between border-b pb-2">
+                                <h4 className="font-semibold text-base text-primary">Bank Mail Ids</h4>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => bankMailIds.append({ email: '' })}
+                                >
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Add
+                                </Button>
+                            </div>
+                            {bankMailIds.fields.length === 0 && (
+                                <p className="text-sm text-muted-foreground">
+                                    No mail ids added. Click &quot;Add&quot; to add one.
+                                </p>
+                            )}
+                            <div className="flex flex-wrap items-end gap-2">
+                                {bankMailIds.fields.map((field, index) => (
+                                    <div key={field.id} className="flex items-center gap-1 w-full sm:w-72">
+                                        <FieldWrapper
+                                            control={form.control}
+                                            name={`bank_mail_ids.${index}.email`}
+                                            label=""
+                                        >
+                                            {(f) => (
+                                                <Input
+                                                    {...f}
+                                                    value={f.value ?? ''}
+                                                    type="email"
+                                                    placeholder="e.g., bank.manager@bank.com"
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => bankMailIds.remove(index)}
+                                            className="text-destructive hover:text-destructive shrink-0"
+                                            aria-label="Remove mail id"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="space-y-6 pt-4">
+                            <div className="flex items-center justify-between border-b pb-2">
+                                <h4 className="font-semibold text-base text-primary">Bank Mail Ids CC</h4>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => bankMailIdsCc.append({ email: '' })}
+                                >
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Add
+                                </Button>
+                            </div>
+                            {bankMailIdsCc.fields.length === 0 && (
+                                <p className="text-sm text-muted-foreground">
+                                    No CC mail ids added. Click &quot;Add&quot; to add one.
+                                </p>
+                            )}
+                            <div className="flex flex-wrap items-end gap-2">
+                                {bankMailIdsCc.fields.map((field, index) => (
+                                    <div key={field.id} className="flex items-center gap-1 w-full sm:w-72">
+                                        <FieldWrapper
+                                            control={form.control}
+                                            name={`bank_mail_ids_cc.${index}.email`}
+                                            label=""
+                                        >
+                                            {(f) => (
+                                                <Input
+                                                    {...f}
+                                                    value={f.value ?? ''}
+                                                    type="email"
+                                                    placeholder="e.g., branch@bank.com"
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => bankMailIdsCc.remove(index)}
+                                            className="text-destructive hover:text-destructive shrink-0"
+                                            aria-label="Remove CC mail id"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </ConditionalSection>

@@ -260,6 +260,16 @@ export function BankGuaranteeView({
                                 label1="Client Bank IFSC"
                                 value1={data.bgBankIfsc || '—'}
                             />
+                            <DataRow
+                                label1="Approved FDR %"
+                                value1={data.approvedFdrPer != null ? `${data.approvedFdrPer}%` : '—'}
+                            />
+                            <DataRow
+                                label1="Bank Mail Ids"
+                                value1={data.bankMailIds?.length ? data.bankMailIds.join(', ') : '—'}
+                                label2="Bank Mail Ids CC"
+                                value2={data.bankMailIdsCc?.length ? data.bankMailIdsCc.join(', ') : '—'}
+                            />
 
                             {/* Section 5: BG Validity & Dates */}
                             <SectionHeader title="BG Validity & Dates" />

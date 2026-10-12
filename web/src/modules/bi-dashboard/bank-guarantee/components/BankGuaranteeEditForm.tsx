@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, type Resolver } from 'react-hook-form';
+import { useFieldArray, useForm, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { BG_PURPOSE_OPTIONS, BG_NEEDED_IN_OPTIONS, BANKS } from '@/modules/tendering/emds-tenderfees/constants';
+import { Plus, Trash2 } from 'lucide-react';
 
 const FDR_PERCENTAGE_OPTIONS = [
     { value: '10', label: '10%' },
@@ -78,8 +79,19 @@ export function BankGuaranteeEditForm({ instrumentId, initialData }: BankGuarant
             extension_letter_path: initialData.extension_letter_path || null,
             stamp_covering_letter: initialData.stamp_covering_letter || null,
             cancell_confirm: initialData.cancell_confirm || null,
+            // Bank mail ids arrive as string[] from the API; useFieldArray needs
+            // row objects. Fall back to one blank row when nothing is stored.
+            bankMailIds: initialData.bankMailIds?.length
+                ? initialData.bankMailIds.map((email: string) => ({ email }))
+                : [{ email: '' }],
+            bankMailIdsCc: initialData.bankMailIdsCc?.length
+                ? initialData.bankMailIdsCc.map((email: string) => ({ email }))
+                : [{ email: '' }],
         },
     });
+
+    const bankMailIds = useFieldArray({ control: form.control, name: 'bankMailIds' });
+    const bankMailIdsCc = useFieldArray({ control: form.control, name: 'bankMailIdsCc' });
 
     const isSubmitting = form.formState.isSubmitting || updateMutation.isPending;
 
@@ -96,6 +108,10 @@ export function BankGuaranteeEditForm({ instrumentId, initialData }: BankGuarant
 
                 // Handle all other values
                 if (value === undefined || value === null) return;
+
+                // Repeatable bank mail id rows -- serialized explicitly below so
+                // the generic loop doesn't stringify the raw row objects.
+                if (key === 'bankMailIds' || key === 'bankMailIdsCc') return;
 
                 if (value instanceof Date) {
                     payload[key] = value.toISOString();
@@ -120,6 +136,15 @@ export function BankGuaranteeEditForm({ instrumentId, initialData }: BankGuarant
             if (finalPayload.favouring !== undefined) {
                 finalPayload.beneficiaryName = finalPayload.favouring;
             }
+
+            // Flatten the bank mail rows to plain address lists. Blank rows are
+            // dropped; an emptied list serializes to [] so it actually clears.
+            finalPayload.bankMailIds = JSON.stringify(
+                (values.bankMailIds ?? []).map((r) => r.email).filter(Boolean),
+            );
+            finalPayload.bankMailIdsCc = JSON.stringify(
+                (values.bankMailIdsCc ?? []).map((r) => r.email).filter(Boolean),
+            );
 
             await updateMutation.mutateAsync({ id: instrumentId, payload: finalPayload });
             toast.success('Bank Guarantee updated successfully');
@@ -211,6 +236,100 @@ export function BankGuaranteeEditForm({ instrumentId, initialData }: BankGuarant
                             </FieldWrapper>
                         </div>
 
+                        {/* Bank Mail Ids / CC -- capture only for now; the
+                            notification service does not read these yet. */}
+                        <div className="space-y-6">
+                            <div className="flex items-center justify-between border-b pb-2">
+                                <h4 className="font-semibold text-base text-primary">Bank Mail Ids</h4>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => bankMailIds.append({ email: '' })}
+                                >
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Add
+                                </Button>
+                            </div>
+                            {bankMailIds.fields.length === 0 && (
+                                <p className="text-sm text-muted-foreground">
+                                    No mail ids stored. Click &quot;Add&quot; to add one.
+                                </p>
+                            )}
+                            <div className="flex flex-wrap items-end gap-2">
+                                {bankMailIds.fields.map((field, index) => (
+                                    <div key={field.id} className="flex items-center gap-1 w-full sm:w-72">
+                                        <FieldWrapper control={form.control} name={`bankMailIds.${index}.email`} label="">
+                                            {(f) => (
+                                                <Input
+                                                    {...f}
+                                                    value={f.value ?? ''}
+                                                    type="email"
+                                                    placeholder="e.g., bank.manager@bank.com"
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => bankMailIds.remove(index)}
+                                            className="text-destructive hover:text-destructive shrink-0"
+                                            aria-label="Remove mail id"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div className="flex items-center justify-between border-b pb-2">
+                                <h4 className="font-semibold text-base text-primary">Bank Mail Ids CC</h4>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => bankMailIdsCc.append({ email: '' })}
+                                >
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Add
+                                </Button>
+                            </div>
+                            {bankMailIdsCc.fields.length === 0 && (
+                                <p className="text-sm text-muted-foreground">
+                                    No CC mail ids stored. Click &quot;Add&quot; to add one.
+                                </p>
+                            )}
+                            <div className="flex flex-wrap items-end gap-2">
+                                {bankMailIdsCc.fields.map((field, index) => (
+                                    <div key={field.id} className="flex items-center gap-1 w-full sm:w-72">
+                                        <FieldWrapper control={form.control} name={`bankMailIdsCc.${index}.email`} label="">
+                                            {(f) => (
+                                                <Input
+                                                    {...f}
+                                                    value={f.value ?? ''}
+                                                    type="email"
+                                                    placeholder="e.g., branch@bank.com"
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => bankMailIdsCc.remove(index)}
+                                            className="text-destructive hover:text-destructive shrink-0"
+                                            aria-label="Remove CC mail id"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                             <FieldWrapper control={form.control} name="bg_format_te" label="BG Format (Max 5 files)">
                                 {(field) => (
@@ -294,6 +413,13 @@ export function BankGuaranteeEditForm({ instrumentId, initialData }: BankGuarant
                                 control={form.control}
                                 name="fdrPer"
                                 label="FDR Percentage"
+                                options={FDR_PERCENTAGE_OPTIONS}
+                                placeholder="Select %"
+                            />
+                            <SelectField
+                                control={form.control}
+                                name="approvedFdrPer"
+                                label="Approved FDR % (Step 1)"
                                 options={FDR_PERCENTAGE_OPTIONS}
                                 placeholder="Select %"
                             />
