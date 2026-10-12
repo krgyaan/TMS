@@ -1900,11 +1900,39 @@ export class TenderInfoSheetsService {
     ) {
         await this.tenderInfosService.validateExists(tenderId);
 
-        const effectiveLlmStatus = data.llm_status || (data.fields as any)?.metadata?.llm_status || 'ok';
+        // Retrieve existing metadata if caller sends none (never default to 'ok')
+        let existingMetadata: any = null;
+        const callerLlmStatus = data.llm_status ?? (data.fields as any)?.metadata?.llm_status;
+        const callerFailedCats = data.failed_categories ?? (data.fields as any)?.metadata?.failed_categories;
+
+        if (callerLlmStatus === undefined || callerFailedCats === undefined) {
+            try {
+                const [storedRow] = await this.db
+                    .select({ fields: tenderExtractions.fields })
+                    .from(tenderExtractions)
+                    .where(eq(tenderExtractions.tenderId, tenderId))
+                    .limit(1);
+                if (storedRow && storedRow.fields && typeof storedRow.fields === 'object') {
+                    existingMetadata = (storedRow.fields as any)?.metadata;
+                }
+            } catch {
+                // Ignore DB read error on missing table or initial write
+            }
+        }
+
+        const effectiveLlmStatus =
+            callerLlmStatus !== undefined
+                ? callerLlmStatus
+                : existingMetadata?.llm_status !== undefined
+                ? existingMetadata.llm_status
+                : null; // NEVER default to "ok"
+
         const effectiveFailedCategories =
-            effectiveLlmStatus === 'ok'
-                ? (data.failed_categories || [])
-                : (data.failed_categories || (data.fields as any)?.metadata?.failed_categories || []);
+            callerFailedCats !== undefined
+                ? callerFailedCats
+                : existingMetadata?.failed_categories !== undefined
+                ? existingMetadata.failed_categories
+                : [];
 
         const fieldsToPersist: Record<string, any> = {
             ...data.fields,

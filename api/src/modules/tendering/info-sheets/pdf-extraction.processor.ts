@@ -254,6 +254,39 @@ export class PdfExtractionProcessor implements OnModuleInit {
 
         // Durable Database Persistence: Save extraction result to tender_extractions table (if db is provided)
         if (this.db) {
+            let existingMetadata: any = null;
+            const callerLlmStatus = extractionResult.llm_status ?? (extractionResult.fields as any)?.metadata?.llm_status;
+            const callerFailedCats = extractionResult.failed_categories ?? (extractionResult.fields as any)?.metadata?.failed_categories;
+
+            if (callerLlmStatus === undefined || callerFailedCats === undefined) {
+                try {
+                    const [storedRow] = await this.db
+                        .select({ fields: tenderExtractions.fields })
+                        .from(tenderExtractions)
+                        .where(eq(tenderExtractions.tenderId, tenderId))
+                        .limit(1);
+                    if (storedRow && storedRow.fields && typeof storedRow.fields === 'object') {
+                        existingMetadata = (storedRow.fields as any)?.metadata;
+                    }
+                } catch {
+                    // Ignore DB read error on missing table or initial write
+                }
+            }
+
+            const effectiveLlmStatus =
+                callerLlmStatus !== undefined
+                    ? callerLlmStatus
+                    : existingMetadata?.llm_status !== undefined
+                    ? existingMetadata.llm_status
+                    : null; // NEVER default to "ok"
+
+            const effectiveFailedCategories =
+                callerFailedCats !== undefined
+                    ? callerFailedCats
+                    : existingMetadata?.failed_categories !== undefined
+                    ? existingMetadata.failed_categories
+                    : [];
+
             const fieldsToPersist: Record<string, any> = {};
             for (const [key, fieldVal] of Object.entries(extractionResult.fields || {})) {
                 if (key === 'metadata' || key === 'biddingRequirementsAnalysis') {
@@ -268,8 +301,8 @@ export class PdfExtractionProcessor implements OnModuleInit {
                 }
             }
             fieldsToPersist.metadata = {
-                llm_status: extractionResult.llm_status || 'ok',
-                failed_categories: extractionResult.failed_categories || [],
+                llm_status: effectiveLlmStatus,
+                failed_categories: effectiveFailedCategories,
             };
             extractionResult.fields = fieldsToPersist as any;
             const totalPersistFieldCount = Object.keys(fieldsToPersist).length;

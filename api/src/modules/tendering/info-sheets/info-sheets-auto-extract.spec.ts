@@ -515,5 +515,132 @@ describe('TenderInfoSheetsService Auto-Extract & Path Resolution', () => {
                 confidence: 'high',
             });
         });
+
+        it('should keep stored llm_status and failed_categories when caller sends none (never default to ok)', async () => {
+            let insertedFields: any = null;
+            const storedRowFields = {
+                emdAmount: { value: 20000 },
+                metadata: {
+                    llm_status: 'llm_unavailable',
+                    failed_categories: ['pbg_sd', 'experience'],
+                },
+            };
+
+            const mockDb: any = {
+                select: jest.fn().mockReturnValue({
+                    from: jest.fn().mockReturnValue({
+                        where: jest.fn().mockReturnValue({
+                            limit: jest.fn().mockResolvedValue([
+                                {
+                                    id: 10,
+                                    tenderId: 3665,
+                                    fields: storedRowFields,
+                                },
+                            ]),
+                        }),
+                    }),
+                }),
+                insert: jest.fn().mockReturnValue({
+                    values: jest.fn().mockImplementation((val) => {
+                        insertedFields = val.fields;
+                        return {
+                            onConflictDoUpdate: jest.fn().mockResolvedValue({}),
+                        };
+                    }),
+                }),
+            };
+
+            const mockAppLogger = {
+                withContext: jest.fn().mockReturnValue(mockLogger),
+            };
+            const testService = new TenderInfoSheetsService(
+                mockAppLogger as any,
+                mockDb,
+                {} as any,
+                mockTenderInfosService,
+                {} as any,
+                {} as any,
+                {} as any,
+                {} as any,
+                {} as any,
+                mockProducer,
+            );
+
+            mockTenderInfosService.validateExists.mockResolvedValue({ id: 3665 });
+
+            // Caller payload has NO llm_status and NO failed_categories
+            const payload = {
+                fields: {
+                    tenderValue: { value: 1000000, confidence: 'high' },
+                },
+                missing_fields: [],
+                extraction_version: '1.0.0',
+                processing_time_ms: 800,
+            };
+
+            const saveResult = await testService.saveExtractionResult(3665, payload, 10);
+
+            expect(saveResult.success).toBe(true);
+            expect(mockDb.insert).toHaveBeenCalled();
+            expect(insertedFields).not.toBeNull();
+            // Stored non-ok metadata must be strictly preserved, never defaulted to 'ok'
+            expect(insertedFields.metadata).toEqual({
+                llm_status: 'llm_unavailable',
+                failed_categories: ['pbg_sd', 'experience'],
+            });
+        });
+
+        it('should set null and never default to ok when caller sends none and no stored metadata exists', async () => {
+            let insertedFields: any = null;
+
+            const mockDb: any = {
+                select: jest.fn().mockReturnValue({
+                    from: jest.fn().mockReturnValue({
+                        where: jest.fn().mockReturnValue({
+                            limit: jest.fn().mockResolvedValue([]), // No stored row
+                        }),
+                    }),
+                }),
+                insert: jest.fn().mockReturnValue({
+                    values: jest.fn().mockImplementation((val) => {
+                        insertedFields = val.fields;
+                        return {
+                            onConflictDoUpdate: jest.fn().mockResolvedValue({}),
+                        };
+                    }),
+                }),
+            };
+
+            const mockAppLogger = {
+                withContext: jest.fn().mockReturnValue(mockLogger),
+            };
+            const testService = new TenderInfoSheetsService(
+                mockAppLogger as any,
+                mockDb,
+                {} as any,
+                mockTenderInfosService,
+                {} as any,
+                {} as any,
+                {} as any,
+                {} as any,
+                {} as any,
+                mockProducer,
+            );
+
+            mockTenderInfosService.validateExists.mockResolvedValue({ id: 3665 });
+
+            const payload = {
+                fields: {
+                    tenderValue: { value: 1000000, confidence: 'high' },
+                },
+                missing_fields: [],
+            };
+
+            const saveResult = await testService.saveExtractionResult(3665, payload, 10);
+
+            expect(saveResult.success).toBe(true);
+            expect(insertedFields.metadata.llm_status).toBeNull();
+            expect(insertedFields.metadata.failed_categories).toEqual([]);
+        });
     });
 });

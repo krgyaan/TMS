@@ -106,7 +106,12 @@ describeDb('tender_extractions writers keep the cached analysis (real Postgres)'
     afterAll(async () => { await pool.end(); });
 
     it('extraction save: new extraction replaces old extraction keys, analysis kept exactly', async () => {
-        await seed({ emdAmount: { value: 1 }, oldOnlyKey: { value: 'stale' }, biddingRequirementsAnalysis: ANALYSIS });
+        await seed({
+            emdAmount: { value: 1 },
+            oldOnlyKey: { value: 'stale' },
+            biddingRequirementsAnalysis: ANALYSIS,
+            metadata: { llm_status: 'ok', failed_categories: [] },
+        });
 
         const result = await makeInfoSheetsService().saveExtractionResult(
             1175, { fields: { emdAmount: { value: 80144 }, tenderValue: { value: 500000 } } }, 7,
@@ -122,7 +127,7 @@ describeDb('tender_extractions writers keep the cached analysis (real Postgres)'
     });
 
     it('extraction save: a stale analysis copy in the payload does not overwrite the stored one', async () => {
-        await seed({ emdAmount: { value: 1 }, biddingRequirementsAnalysis: ANALYSIS });
+        await seed({ emdAmount: { value: 1 }, biddingRequirementsAnalysis: ANALYSIS, metadata: { llm_status: 'ok', failed_categories: [] } });
         await makeInfoSheetsService().saveExtractionResult(
             1175, { fields: { emdAmount: { value: 2 }, biddingRequirementsAnalysis: { jobId: 'stale_copy' } } }, 7,
         );
@@ -130,7 +135,7 @@ describeDb('tender_extractions writers keep the cached analysis (real Postgres)'
     });
 
     it('extraction save: a tender never analysed gets no analysis key added', async () => {
-        await seed({ emdAmount: { value: 1 } });
+        await seed({ emdAmount: { value: 1 }, metadata: { llm_status: 'ok', failed_categories: [] } });
         await makeInfoSheetsService().saveExtractionResult(1175, { fields: { emdAmount: { value: 2 } } }, 7);
         expect(await storedFields()).toEqual({
             emdAmount: { value: 2 },
@@ -139,15 +144,33 @@ describeDb('tender_extractions writers keep the cached analysis (real Postgres)'
     });
 
     it('extraction save: first save for a tender inserts the fields as sent', async () => {
-        await makeInfoSheetsService().saveExtractionResult(1175, { fields: { emdAmount: { value: 3 } } }, 7);
+        await makeInfoSheetsService().saveExtractionResult(1175, { fields: { emdAmount: { value: 3 } }, llm_status: 'ok', failed_categories: [] }, 7);
         expect(await storedFields()).toEqual({
             emdAmount: { value: 3 },
             metadata: { llm_status: 'ok', failed_categories: [] },
         });
     });
 
-    it('PDF auto-extract worker: a re-extraction keeps the analysis', async () => {
-        await seed({ emdAmount: { value: 1 }, biddingRequirementsAnalysis: ANALYSIS });
+    it('extraction save: keeps stored non-ok llm_status and failed_categories when caller sends none', async () => {
+        await seed({
+            emdAmount: { value: 1 },
+            metadata: { llm_status: 'llm_unavailable', failed_categories: ['pbg_sd'] },
+        });
+
+        await makeInfoSheetsService().saveExtractionResult(
+            1175,
+            { fields: { emdAmount: { value: 500 } } },
+            7,
+        );
+
+        expect(await storedFields()).toEqual({
+            emdAmount: { value: 500 },
+            metadata: { llm_status: 'llm_unavailable', failed_categories: ['pbg_sd'] },
+        });
+    });
+
+    it('PDF auto-extract worker: a re-extraction keeps the analysis and flags AI values with reviewed: false', async () => {
+        await seed({ emdAmount: { value: 1 }, biddingRequirementsAnalysis: ANALYSIS, metadata: { llm_status: 'ok', failed_categories: [] } });
 
         const tempPdf = path.join(__dirname, 'temp_merge_test.pdf');
         fs.writeFileSync(tempPdf, '%PDF-1.4 dummy');
@@ -155,7 +178,7 @@ describeDb('tender_extractions writers keep the cached analysis (real Postgres)'
         global.fetch = jest.fn().mockResolvedValue({
             ok: true,
             status: 200,
-            json: async () => ({ extraction_version: '1.0.0', fields: { emdAmount: { value: 80144 } }, missing_fields: [], processing_time_ms: 10 }),
+            json: async () => ({ extraction_version: '1.0.0', fields: { emdAmount: { value: 80144 } }, missing_fields: [], processing_time_ms: 10, llm_status: 'ok', failed_categories: [] }),
         } as any);
         try {
             const processor = new PdfExtractionProcessor(
@@ -176,9 +199,52 @@ describeDb('tender_extractions writers keep the cached analysis (real Postgres)'
         }
 
         expect(await storedFields()).toEqual({
-            emdAmount: { value: 80144 },
+            emdAmount: { value: 80144, reviewed: false },
             biddingRequirementsAnalysis: ANALYSIS,
             metadata: { llm_status: 'ok', failed_categories: [] },
+        });
+    });
+
+    it('PDF auto-extract worker: keeps stored non-ok llm_status and failed_categories when worker result omits them', async () => {
+        await seed({
+            emdAmount: { value: 1 },
+            metadata: { llm_status: 'llm_unavailable', failed_categories: ['prs_ld'] },
+        });
+
+        const tempPdf = path.join(__dirname, 'temp_merge_test2.pdf');
+        fs.writeFileSync(tempPdf, '%PDF-1.4 dummy');
+        const originalFetch = global.fetch;
+        global.fetch = jest.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({
+                extraction_version: '1.0.0',
+                fields: { emdAmount: { value: 80144 } },
+                missing_fields: [],
+                processing_time_ms: 10,
+            }),
+        } as any);
+        try {
+            const processor = new PdfExtractionProcessor(
+                { get: jest.fn() } as any,
+                { getAbsolutePath: jest.fn().mockReturnValue(tempPdf) } as any,
+                { recordUsage: jest.fn(), recordTpmEntry: jest.fn(), getCurrentTpm: jest.fn().mockResolvedValue(0) } as any,
+                logger as any,
+                db as any,
+            );
+            await processor.processJob(
+                { id: 'extract-tender-1175', data: { tenderId: 1175, pdfPath: tempPdf, userId: 7 } } as any,
+                'http://localhost:8001',
+                120000,
+            );
+        } finally {
+            global.fetch = originalFetch;
+            fs.unlinkSync(tempPdf);
+        }
+
+        expect(await storedFields()).toEqual({
+            emdAmount: { value: 80144, reviewed: false },
+            metadata: { llm_status: 'llm_unavailable', failed_categories: ['prs_ld'] },
         });
     });
 });
