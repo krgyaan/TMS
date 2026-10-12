@@ -3,8 +3,8 @@ import {
   LoanAdvanceFormSchema,
   LoanClosureFormSchema,
   BankContactFormSchema,
-  DueEmiFormSchema,
-  TdsRecoveryFormSchema,
+  EmiDueFormSchema,
+  TdsRecoveredFormSchema,
   LoanAdvanceQuerySchema,
 } from './loanAdvance.schema';
 
@@ -13,8 +13,8 @@ import {
 export type LoanAdvanceFormValues = z.infer<typeof LoanAdvanceFormSchema>;
 export type LoanClosureFormValues = z.infer<typeof LoanClosureFormSchema>;
 export type BankContactFormValues = z.infer<typeof BankContactFormSchema>;
-export type DueEmiFormValues = z.infer<typeof DueEmiFormSchema>;
-export type TdsRecoveryFormValues = z.infer<typeof TdsRecoveryFormSchema>;
+export type DueEmiFormValues = z.infer<typeof EmiDueFormSchema>;
+export type TdsRecoveryFormValues = z.infer<typeof TdsRecoveredFormSchema>;
 export type LoanAdvanceQueryValues = z.infer<typeof LoanAdvanceQuerySchema>;
 
 // ===================== API RESPONSE TYPES =====================
