@@ -181,7 +181,7 @@ export const ExtractionPreviewPanel: React.FC<ExtractionPreviewPanelProps> = ({
     // Collect metrics & conflicts
     const fieldEntries = useMemo(() => {
         if (!fields) return [];
-        return Object.entries(fields);
+        return Object.entries(fields).filter(([key]) => key !== 'metadata');
     }, [fields]);
 
     const conflicts = useMemo(() => {

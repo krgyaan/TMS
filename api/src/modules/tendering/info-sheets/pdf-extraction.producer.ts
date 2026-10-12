@@ -99,6 +99,7 @@ export class PdfExtractionProducer {
                             }
                         }
                     }
+                    const metadata = (saved.fields as any)?.metadata;
                     return {
                         jobId,
                         status: 'existing_completed',
@@ -106,6 +107,8 @@ export class PdfExtractionProducer {
                         missing_fields: saved.missingFields || [],
                         self_classified_atc: selfClassifiedAtc,
                         has_atc: hasAtc,
+                        llm_status: metadata?.llm_status || 'ok',
+                        failed_categories: metadata?.failed_categories || [],
                         // Not persisted in tender_extractions (needs a column + migration), so a
                         // DB-cached result cannot report the identity check. null = unknown, not a match.
                         documentIdentityCheck: null,
@@ -310,6 +313,7 @@ export class PdfExtractionProducer {
                         .limit(1);
 
                     if (saved && saved.fields) {
+                        const metadata = (saved.fields as any)?.metadata;
                         return {
                             jobId,
                             state: 'completed',
@@ -319,6 +323,8 @@ export class PdfExtractionProducer {
                                 fields: saved.fields as any,
                                 missing_fields: saved.missingFields || [],
                                 processing_time_ms: saved.processingTimeMs || 0,
+                                llm_status: metadata?.llm_status || 'ok',
+                                failed_categories: metadata?.failed_categories || [],
                             },
                         };
                     }

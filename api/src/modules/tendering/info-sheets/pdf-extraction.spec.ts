@@ -446,6 +446,158 @@ describe('PDF Extraction Queue Integration (Phase 8)', () => {
                 global.fetch = originalFetch;
             }
         });
+
+        it('should persist metadata (llm_status and failed_categories) into tender_extractions.fields on LLM failure', async () => {
+            const mockLlmFailureResult: PdfExtractionJobResult = {
+                fields: {
+                    tenderValue: { value: 2000000, confidence: 'high', source: 'regex' },
+                },
+                missing_fields: ['pbgPercentage', 'ldPercentage'],
+                extraction_version: '1.0.0',
+                processing_time_ms: 3200,
+                llm_status: 'llm_unavailable',
+                failed_categories: ['pbg_sd', 'prs_ld'],
+            };
+
+            const originalFetch = global.fetch;
+            global.fetch = jest.fn().mockResolvedValue({
+                ok: true,
+                status: 200,
+                json: async () => mockLlmFailureResult,
+            } as any);
+
+            let persistedValues: any = null;
+            const mockDb: any = {
+                insert: jest.fn().mockReturnValue({
+                    values: jest.fn().mockImplementation((val) => {
+                        persistedValues = val;
+                        return {
+                            onConflictDoUpdate: jest.fn().mockResolvedValue({}),
+                        };
+                    }),
+                }),
+                select: jest.fn().mockReturnValue({
+                    from: jest.fn().mockReturnValue({
+                        where: jest.fn().mockReturnValue({
+                            limit: jest.fn().mockImplementation(() =>
+                                Promise.resolve([{
+                                    id: 1,
+                                    tenderId: 101,
+                                    fields: persistedValues?.fields,
+                                }])
+                            ),
+                        }),
+                    }),
+                }),
+            };
+
+            const processorWithDb = new PdfExtractionProcessor(
+                mockConfigService,
+                mockFileUploadService,
+                { recordUsage: jest.fn(), recordTpmEntry: jest.fn(), getCurrentTpm: jest.fn() } as any,
+                mockLogger,
+                mockDb,
+            );
+
+            try {
+                const mockJob: any = {
+                    id: 'extract-tender-101',
+                    data: { tenderId: 101, pdfPath: tempPdfFile, userId: 1 },
+                };
+
+                const result = await processorWithDb.processJob(mockJob, 'http://localhost:8001', 120000);
+
+                expect(result.llm_status).toBe('llm_unavailable');
+                expect(result.failed_categories).toEqual(['pbg_sd', 'prs_ld']);
+
+                expect(mockDb.insert).toHaveBeenCalled();
+                expect(persistedValues).not.toBeNull();
+                expect(persistedValues.fields.metadata).toEqual({
+                    llm_status: 'llm_unavailable',
+                    failed_categories: ['pbg_sd', 'prs_ld'],
+                });
+                expect(persistedValues.fields.tenderValue).toEqual({
+                    value: 2000000,
+                    confidence: 'high',
+                    source: 'regex',
+                });
+            } finally {
+                global.fetch = originalFetch;
+            }
+        });
+
+        it('should persist metadata with llm_status: ok and empty failed_categories on successful extraction', async () => {
+            const mockSuccessResult: PdfExtractionJobResult = {
+                fields: {
+                    tenderValue: { value: 5000000, confidence: 'high', source: 'regex' },
+                    pbgPercentage: { value: 5, confidence: 'high', source: 'claude' },
+                },
+                missing_fields: [],
+                extraction_version: '1.0.0',
+                processing_time_ms: 2100,
+                llm_status: 'ok',
+                failed_categories: [],
+            };
+
+            const originalFetch = global.fetch;
+            global.fetch = jest.fn().mockResolvedValue({
+                ok: true,
+                status: 200,
+                json: async () => mockSuccessResult,
+            } as any);
+
+            let persistedValues: any = null;
+            const mockDb: any = {
+                insert: jest.fn().mockReturnValue({
+                    values: jest.fn().mockImplementation((val) => {
+                        persistedValues = val;
+                        return {
+                            onConflictDoUpdate: jest.fn().mockResolvedValue({}),
+                        };
+                    }),
+                }),
+                select: jest.fn().mockReturnValue({
+                    from: jest.fn().mockReturnValue({
+                        where: jest.fn().mockReturnValue({
+                            limit: jest.fn().mockImplementation(() =>
+                                Promise.resolve([{
+                                    id: 2,
+                                    tenderId: 102,
+                                    fields: persistedValues?.fields,
+                                }])
+                            ),
+                        }),
+                    }),
+                }),
+            };
+
+            const processorWithDb = new PdfExtractionProcessor(
+                mockConfigService,
+                mockFileUploadService,
+                { recordUsage: jest.fn(), recordTpmEntry: jest.fn(), getCurrentTpm: jest.fn() } as any,
+                mockLogger,
+                mockDb,
+            );
+
+            try {
+                const mockJob: any = {
+                    id: 'extract-tender-102',
+                    data: { tenderId: 102, pdfPath: tempPdfFile, userId: 1 },
+                };
+
+                const result = await processorWithDb.processJob(mockJob, 'http://localhost:8001', 120000);
+
+                expect(result.llm_status).toBe('ok');
+                expect(result.failed_categories).toEqual([]);
+
+                expect(persistedValues.fields.metadata).toEqual({
+                    llm_status: 'ok',
+                    failed_categories: [],
+                });
+            } finally {
+                global.fetch = originalFetch;
+            }
+        });
     });
 });
 

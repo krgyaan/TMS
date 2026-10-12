@@ -254,19 +254,29 @@ export class PdfExtractionProcessor implements OnModuleInit {
 
         // Durable Database Persistence: Save extraction result to tender_extractions table (if db is provided)
         if (this.db) {
+            const fieldsToPersist: Record<string, any> = {
+                ...extractionResult.fields,
+                metadata: {
+                    llm_status: extractionResult.llm_status || 'ok',
+                    failed_categories: extractionResult.failed_categories || [],
+                },
+            };
+            extractionResult.fields = fieldsToPersist as any;
+            const totalPersistFieldCount = Object.keys(fieldsToPersist).length;
+
             try {
                 this.logger.info(`[AutoExtract] Sending save request to persist extraction for tender ${tenderId}`, {
                     event_type: 'autoextract_save',
                     action: 'save_request_sent',
                     tenderId,
-                    fieldsCount: fieldCount,
+                    fieldsCount: totalPersistFieldCount,
                 });
 
                 await this.db
                     .insert(tenderExtractions)
                     .values({
                         tenderId,
-                        fields: extractionResult.fields,
+                        fields: fieldsToPersist,
                         missingFields: extractionResult.missing_fields,
                         extractionVersion: extractionResult.extraction_version || '1.0.0',
                         processingTimeMs: extractionResult.processing_time_ms,
@@ -278,7 +288,7 @@ export class PdfExtractionProcessor implements OnModuleInit {
                         set: {
                             // Replace the extraction data but keep other features' cached keys
                             // (the bidding-requirements analysis) instead of wiping them.
-                            fields: extractionFieldsUpsertValue(extractionResult.fields),
+                            fields: extractionFieldsUpsertValue(fieldsToPersist),
                             missingFields: extractionResult.missing_fields,
                             extractionVersion: extractionResult.extraction_version || '1.0.0',
                             processingTimeMs: extractionResult.processing_time_ms,
@@ -291,7 +301,7 @@ export class PdfExtractionProcessor implements OnModuleInit {
                     event_type: 'autoextract_save',
                     action: 'save_success',
                     tenderId,
-                    fieldsCount: fieldCount,
+                    fieldsCount: totalPersistFieldCount,
                 });
 
                 // Follow-up check: confirm persisted data matches
@@ -302,7 +312,7 @@ export class PdfExtractionProcessor implements OnModuleInit {
                     .limit(1);
 
                 const persistedFieldsCount = persistedRow ? Object.keys(persistedRow.fields || {}).length : 0;
-                const matches = Boolean(persistedRow && persistedFieldsCount === fieldCount);
+                const matches = Boolean(persistedRow && persistedFieldsCount === totalPersistFieldCount);
 
                 this.logger.info(`[AutoExtract] Follow-up check for tender ${tenderId}: verified=${matches}`, {
                     event_type: 'autoextract_save',
@@ -321,7 +331,7 @@ export class PdfExtractionProcessor implements OnModuleInit {
                     failureTimestamp: new Date().toISOString(),
                     error: underlyingError,
                     rawExtraction: {
-                        fields: extractionResult.fields,
+                        fields: fieldsToPersist,
                         missing_fields: extractionResult.missing_fields,
                         extraction_version: extractionResult.extraction_version || '1.0.0',
                         processing_time_ms: extractionResult.processing_time_ms,

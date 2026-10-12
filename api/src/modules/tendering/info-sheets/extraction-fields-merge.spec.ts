@@ -60,8 +60,8 @@ describe('extractionFieldsUpsertValue (SQL shape)', () => {
         expect(PRESERVED_EXTRACTION_FIELD_KEYS).toContain('biddingRequirementsAnalysis');
     });
 
-    it('countExtractionFieldKeys ignores preserved keys', () => {
-        expect(countExtractionFieldKeys({ a: 1, b: 2, biddingRequirementsAnalysis: ANALYSIS })).toBe(2);
+    it('countExtractionFieldKeys ignores preserved keys and metadata', () => {
+        expect(countExtractionFieldKeys({ a: 1, b: 2, biddingRequirementsAnalysis: ANALYSIS, metadata: { llm_status: 'ok' } })).toBe(2);
         expect(countExtractionFieldKeys(null)).toBe(0);
     });
 });
@@ -116,6 +116,7 @@ describeDb('tender_extractions writers keep the cached analysis (real Postgres)'
             emdAmount: { value: 80144 },
             tenderValue: { value: 500000 },
             biddingRequirementsAnalysis: ANALYSIS,
+            metadata: { llm_status: 'ok', failed_categories: [] },
         });
         expect(result).toMatchObject({ success: true, fieldsCount: 2, verified: true });
     });
@@ -131,12 +132,18 @@ describeDb('tender_extractions writers keep the cached analysis (real Postgres)'
     it('extraction save: a tender never analysed gets no analysis key added', async () => {
         await seed({ emdAmount: { value: 1 } });
         await makeInfoSheetsService().saveExtractionResult(1175, { fields: { emdAmount: { value: 2 } } }, 7);
-        expect(await storedFields()).toEqual({ emdAmount: { value: 2 } });
+        expect(await storedFields()).toEqual({
+            emdAmount: { value: 2 },
+            metadata: { llm_status: 'ok', failed_categories: [] },
+        });
     });
 
     it('extraction save: first save for a tender inserts the fields as sent', async () => {
         await makeInfoSheetsService().saveExtractionResult(1175, { fields: { emdAmount: { value: 3 } } }, 7);
-        expect(await storedFields()).toEqual({ emdAmount: { value: 3 } });
+        expect(await storedFields()).toEqual({
+            emdAmount: { value: 3 },
+            metadata: { llm_status: 'ok', failed_categories: [] },
+        });
     });
 
     it('PDF auto-extract worker: a re-extraction keeps the analysis', async () => {
@@ -168,6 +175,10 @@ describeDb('tender_extractions writers keep the cached analysis (real Postgres)'
             fs.unlinkSync(tempPdf);
         }
 
-        expect(await storedFields()).toEqual({ emdAmount: { value: 80144 }, biddingRequirementsAnalysis: ANALYSIS });
+        expect(await storedFields()).toEqual({
+            emdAmount: { value: 80144 },
+            biddingRequirementsAnalysis: ANALYSIS,
+            metadata: { llm_status: 'ok', failed_categories: [] },
+        });
     });
 });

@@ -334,6 +334,8 @@ describe('TenderInfoSheetsService Auto-Extract & Path Resolution', () => {
                 missing_fields: ['tenderValue'],
                 extraction_version: '1.0.0',
                 processing_time_ms: 2150,
+                llm_status: 'ok',
+                failed_categories: [],
             });
         });
 
@@ -436,6 +438,82 @@ describe('TenderInfoSheetsService Auto-Extract & Path Resolution', () => {
                     }),
                 }),
             );
+        });
+
+        it('should reset llm_status to ok and empty failed_categories on successful re-extraction save', async () => {
+            let insertedFields: any = null;
+            const mockDb: any = {
+                insert: jest.fn().mockReturnValue({
+                    values: jest.fn().mockImplementation((val) => {
+                        insertedFields = val.fields;
+                        return {
+                            onConflictDoUpdate: jest.fn().mockResolvedValue({}),
+                        };
+                    }),
+                }),
+                select: jest.fn().mockReturnValue({
+                    from: jest.fn().mockReturnValue({
+                        where: jest.fn().mockReturnValue({
+                            limit: jest.fn().mockImplementation(() =>
+                                Promise.resolve([{
+                                    id: 10,
+                                    tenderId: 3665,
+                                    fields: insertedFields,
+                                }])
+                            ),
+                        }),
+                    }),
+                }),
+            };
+            const mockAppLogger = {
+                withContext: jest.fn().mockReturnValue(mockLogger),
+            };
+            const testService = new TenderInfoSheetsService(
+                mockAppLogger as any,
+                mockDb,
+                {} as any,
+                mockTenderInfosService,
+                {} as any,
+                {} as any,
+                {} as any,
+                {} as any,
+                {} as any,
+                mockProducer,
+            );
+
+            mockTenderInfosService.validateExists.mockResolvedValue({ id: 3665 });
+
+            // Re-extraction payload where prior fields had an old llm_unavailable metadata,
+            // but the new extraction succeeded (llm_status: 'ok', failed_categories: [])
+            const payload = {
+                fields: {
+                    emdAmount: { value: 50000, confidence: 'high' },
+                    metadata: {
+                        llm_status: 'llm_unavailable',
+                        failed_categories: ['pbg_sd', 'prs_ld'],
+                    },
+                },
+                missing_fields: [],
+                extraction_version: '1.0.0',
+                processing_time_ms: 1500,
+                llm_status: 'ok',
+                failed_categories: [],
+            };
+
+            const saveResult = await testService.saveExtractionResult(3665, payload, 10);
+
+            expect(saveResult.success).toBe(true);
+            expect(mockDb.insert).toHaveBeenCalled();
+            expect(insertedFields).not.toBeNull();
+            // Confirms metadata is reset to ok and failed_categories is cleared
+            expect(insertedFields.metadata).toEqual({
+                llm_status: 'ok',
+                failed_categories: [],
+            });
+            expect(insertedFields.emdAmount).toEqual({
+                value: 50000,
+                confidence: 'high',
+            });
         });
     });
 });

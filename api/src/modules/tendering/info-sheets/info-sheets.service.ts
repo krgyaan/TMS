@@ -1859,6 +1859,7 @@ export class TenderInfoSheetsService {
                 }
             }
 
+            const metadata = (row.fields as any)?.metadata;
             return {
                 tenderId: row.tenderId,
                 fields: row.fields as Record<string, any>,
@@ -1869,6 +1870,8 @@ export class TenderInfoSheetsService {
                 self_classified_atc: selfClassifiedAtc,
                 has_atc: hasAtc,
                 ambiguous_field_conflicts: conflicts,
+                llm_status: metadata?.llm_status || 'ok',
+                failed_categories: metadata?.failed_categories || [],
             };
         } catch (error: any) {
             const underlyingError = error?.cause?.message || error?.message || String(error);
@@ -1890,14 +1893,31 @@ export class TenderInfoSheetsService {
             missing_fields?: string[];
             extraction_version?: string;
             processing_time_ms?: number;
+            llm_status?: string;
+            failed_categories?: string[];
         },
         userId: number,
     ) {
         await this.tenderInfosService.validateExists(tenderId);
 
+        const effectiveLlmStatus = data.llm_status || (data.fields as any)?.metadata?.llm_status || 'ok';
+        const effectiveFailedCategories =
+            effectiveLlmStatus === 'ok'
+                ? (data.failed_categories || [])
+                : (data.failed_categories || (data.fields as any)?.metadata?.failed_categories || []);
+
+        const fieldsToPersist: Record<string, any> = {
+            ...data.fields,
+            metadata: {
+                ...((data.fields as any)?.metadata || {}),
+                llm_status: effectiveLlmStatus,
+                failed_categories: effectiveFailedCategories,
+            },
+        };
+
         // Extraction-owned keys only: preserved keys (e.g. biddingRequirementsAnalysis) are
         // carried over from the stored row and must not skew the save verification below.
-        const fieldsCount = countExtractionFieldKeys(data.fields);
+        const fieldsCount = countExtractionFieldKeys(fieldsToPersist);
 
         this.logger.log(`[AutoExtract] Save request initiated for tender ${tenderId}`, {
             event_type: 'autoextract_save',
@@ -1912,7 +1932,7 @@ export class TenderInfoSheetsService {
                 .insert(tenderExtractions)
                 .values({
                     tenderId,
-                    fields: data.fields,
+                    fields: fieldsToPersist,
                     missingFields: data.missing_fields || [],
                     extractionVersion: data.extraction_version || '1.0.0',
                     processingTimeMs: data.processing_time_ms || null,
@@ -1924,7 +1944,7 @@ export class TenderInfoSheetsService {
                     set: {
                         // Replace the extraction data but keep other features' cached keys
                         // (the bidding-requirements analysis) instead of wiping them.
-                        fields: extractionFieldsUpsertValue(data.fields),
+                        fields: extractionFieldsUpsertValue(fieldsToPersist),
                         missingFields: data.missing_fields || [],
                         extractionVersion: data.extraction_version || '1.0.0',
                         processingTimeMs: data.processing_time_ms || null,
@@ -2007,6 +2027,7 @@ export class TenderInfoSheetsService {
         }
 
         if (jobStatus.state === 'completed') {
+            const metadata = (jobStatus.result?.fields as any)?.metadata;
             return {
                 jobId: jobStatus.jobId,
                 status: 'completed',
@@ -2018,6 +2039,8 @@ export class TenderInfoSheetsService {
                 has_atc: jobStatus.result?.has_atc,
                 ambiguous_field_conflicts: jobStatus.result?.ambiguous_field_conflicts,
                 documentIdentityCheck: jobStatus.result?.documentIdentityCheck,
+                llm_status: jobStatus.result?.llm_status ?? metadata?.llm_status ?? 'ok',
+                failed_categories: jobStatus.result?.failed_categories ?? metadata?.failed_categories ?? [],
             };
         }
 
