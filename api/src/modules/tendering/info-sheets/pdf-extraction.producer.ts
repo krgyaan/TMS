@@ -1,3 +1,6 @@
+import * as crypto from 'crypto';
+import * as fs from 'fs';
+import * as path from 'path';
 import { forwardRef, Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
@@ -56,6 +59,86 @@ export class PdfExtractionProducer {
         private readonly db?: DbInstance,
     ) {}
 
+    public static readonly EXTRACTION_VERSION = '1.0.0';
+
+    /**
+     * Computes a SHA-256 hash across the main tender PDF, any ATC PDFs,
+     * BOQ if present, and the extraction version.
+     * Reuses the BiddingRequirementsService.computeDocumentHash approach.
+     */
+    public async computeDocumentHash(data: PdfExtractionJobData): Promise<string> {
+        const hash = crypto.createHash('sha256');
+        hash.update(`extraction_v${PdfExtractionProducer.EXTRACTION_VERSION}:`);
+
+        const mainPath = this.resolvePath(data.mainTenderPath || data.pdfPath);
+        if (mainPath && fs.existsSync(mainPath)) {
+            try {
+                const mainBuffer = await fs.promises.readFile(mainPath);
+                hash.update(mainBuffer);
+            } catch {
+                hash.update(mainPath);
+            }
+        } else {
+            hash.update(mainPath || data.pdfPath || '');
+        }
+
+        const atcPaths = [...(data.atcPaths || [])].sort();
+        for (const atcPath of atcPaths) {
+            const resolvedAtc = this.resolvePath(atcPath);
+            if (resolvedAtc && fs.existsSync(resolvedAtc)) {
+                try {
+                    const atcBuffer = await fs.promises.readFile(resolvedAtc);
+                    hash.update(atcBuffer);
+                } catch {
+                    hash.update(resolvedAtc);
+                }
+            } else {
+                hash.update(atcPath || '');
+            }
+        }
+
+        if (data.boqPath) {
+            const resolvedBoq = this.resolvePath(data.boqPath);
+            if (resolvedBoq && fs.existsSync(resolvedBoq)) {
+                try {
+                    const boqBuffer = await fs.promises.readFile(resolvedBoq);
+                    hash.update(boqBuffer);
+                } catch {
+                    hash.update(resolvedBoq);
+                }
+            } else {
+                hash.update(data.boqPath);
+            }
+        }
+
+        return hash.digest('hex');
+    }
+
+    private resolvePath(filePath?: string | null): string {
+        if (!filePath) return '';
+        if (this.processor?.resolvePdfPath) {
+            try {
+                return this.processor.resolvePdfPath(filePath);
+            } catch {
+                // Ignore resolution error and fallback
+            }
+        }
+        if (path.isAbsolute(filePath)) {
+            return filePath;
+        }
+        const relativeUploads = path.resolve(
+            process.cwd(),
+            'uploads',
+            'tendering',
+            'tender-documents',
+            path.basename(filePath),
+        );
+        if (fs.existsSync(relativeUploads)) {
+            return relativeUploads;
+        }
+        return path.resolve(process.cwd(), filePath);
+    }
+
     private isRedisReady(): boolean {
         const client = (this.queue as any)?.opts?.connection;
         if (client && typeof client.status === 'string') {
@@ -72,6 +155,10 @@ export class PdfExtractionProducer {
      */
     async enqueueExtraction(data: PdfExtractionJobData): Promise<EnqueueExtractionResult> {
         const jobId = `extract-tender-${data.tenderId}`;
+        const documentHash = await this.computeDocumentHash(data);
+        const expectedVersion = `${PdfExtractionProducer.EXTRACTION_VERSION}:${documentHash.slice(0, 32)}`;
+        data.documentHash = documentHash;
+        data.extractionVersion = expectedVersion;
 
         // 1. Check PostgreSQL durable storage first (unless force re-extraction is requested)
         if (!data.force && this.db) {
@@ -83,36 +170,43 @@ export class PdfExtractionProducer {
                     .limit(1);
 
                 if (saved && saved.fields && Object.keys(saved.fields).length > 0) {
-                    this.logger.info(
-                        `[PdfExtractionProducer] Durable extraction already exists in database for tender ${data.tenderId}. Returning existing completed extraction without re-running (saving Claude tokens).`,
-                        { tenderId: data.tenderId, jobId },
-                    );
-                    let selfClassifiedAtc = false;
-                    let hasAtc = false;
-                    if (saved.fields && typeof saved.fields === 'object') {
-                        for (const val of Object.values(saved.fields) as any[]) {
-                            if (val?.sources?.self_classified_atc) {
-                                selfClassifiedAtc = true;
-                            }
-                            if (val?.sources?.atc) {
-                                hasAtc = true;
+                    if (saved.extractionVersion === expectedVersion) {
+                        this.logger.info(
+                            `[PdfExtractionProducer] Durable extraction already exists in database for tender ${data.tenderId} with matching hash. Returning existing completed extraction without re-running (saving Claude tokens).`,
+                            { tenderId: data.tenderId, jobId },
+                        );
+                        let selfClassifiedAtc = false;
+                        let hasAtc = false;
+                        if (saved.fields && typeof saved.fields === 'object') {
+                            for (const val of Object.values(saved.fields) as any[]) {
+                                if (val?.sources?.self_classified_atc) {
+                                    selfClassifiedAtc = true;
+                                }
+                                if (val?.sources?.atc) {
+                                    hasAtc = true;
+                                }
                             }
                         }
+                        const metadata = (saved.fields as any)?.metadata;
+                        return {
+                            jobId,
+                            status: 'existing_completed',
+                            fields: saved.fields as Record<string, any>,
+                            missing_fields: saved.missingFields || [],
+                            self_classified_atc: selfClassifiedAtc,
+                            has_atc: hasAtc,
+                            llm_status: metadata?.llm_status || 'ok',
+                            failed_categories: metadata?.failed_categories || [],
+                            // Not persisted in tender_extractions (needs a column + migration), so a
+                            // DB-cached result cannot report the identity check. null = unknown, not a match.
+                            documentIdentityCheck: null,
+                        };
+                    } else {
+                        this.logger.info(
+                            `[PdfExtractionProducer] Existing DB extraction for tender ${data.tenderId} is stale (version mismatch: saved=${saved.extractionVersion}, expected=${expectedVersion}). Enqueuing fresh extraction.`,
+                            { tenderId: data.tenderId, jobId, savedVersion: saved.extractionVersion, expectedVersion },
+                        );
                     }
-                    const metadata = (saved.fields as any)?.metadata;
-                    return {
-                        jobId,
-                        status: 'existing_completed',
-                        fields: saved.fields as Record<string, any>,
-                        missing_fields: saved.missingFields || [],
-                        self_classified_atc: selfClassifiedAtc,
-                        has_atc: hasAtc,
-                        llm_status: metadata?.llm_status || 'ok',
-                        failed_categories: metadata?.failed_categories || [],
-                        // Not persisted in tender_extractions (needs a column + migration), so a
-                        // DB-cached result cannot report the identity check. null = unknown, not a match.
-                        documentIdentityCheck: null,
-                    };
                 }
             } catch (dbErr: any) {
                 this.logger.warn(`[PdfExtractionProducer] Could not check existing extraction in DB: ${dbErr?.message}`);
@@ -130,20 +224,23 @@ export class PdfExtractionProducer {
             }
 
             if (existing && existing.state === 'completed' && !data.force) {
-                this.logger.info(
-                    `[PdfExtractionProducer] In-memory job ${jobId} already completed. Returning existing extraction without re-queueing.`,
-                    { tenderId: data.tenderId, jobId },
-                );
-                return {
-                    jobId,
-                    status: 'existing_completed',
-                    fields: existing.result?.fields,
-                    missing_fields: existing.result?.missing_fields,
-                    self_classified_atc: existing.result?.self_classified_atc,
-                    has_atc: existing.result?.has_atc,
-                    ambiguous_field_conflicts: existing.result?.ambiguous_field_conflicts,
-                    documentIdentityCheck: existing.result?.documentIdentityCheck,
-                };
+                const existingVersion = existing.data?.extractionVersion || existing.result?.extraction_version;
+                if (!existingVersion || existingVersion === expectedVersion) {
+                    this.logger.info(
+                        `[PdfExtractionProducer] In-memory job ${jobId} already completed with matching hash. Returning existing extraction without re-queueing.`,
+                        { tenderId: data.tenderId, jobId },
+                    );
+                    return {
+                        jobId,
+                        status: 'existing_completed',
+                        fields: existing.result?.fields,
+                        missing_fields: existing.result?.missing_fields,
+                        self_classified_atc: existing.result?.self_classified_atc,
+                        has_atc: existing.result?.has_atc,
+                        ambiguous_field_conflicts: existing.result?.ambiguous_field_conflicts,
+                        documentIdentityCheck: existing.result?.documentIdentityCheck,
+                    };
+                }
             }
 
             this.inMemoryJobs.set(jobId, {
@@ -222,20 +319,25 @@ export class PdfExtractionProducer {
             }
 
             if (state === 'completed' && !data.force) {
-                this.logger.info(
-                    `[PdfExtractionProducer] Job ${jobId} previously finished with state '${state}'. Returning existing extraction without re-queueing (saving tokens).`,
-                    { tenderId: data.tenderId, jobId, state },
-                );
-                return {
-                    jobId,
-                    status: 'existing_completed',
-                    fields: existingJob.returnvalue?.fields,
-                    missing_fields: existingJob.returnvalue?.missing_fields,
-                    self_classified_atc: existingJob.returnvalue?.self_classified_atc,
-                    has_atc: existingJob.returnvalue?.has_atc,
-                    ambiguous_field_conflicts: existingJob.returnvalue?.ambiguous_field_conflicts,
-                    documentIdentityCheck: existingJob.returnvalue?.documentIdentityCheck,
-                };
+                const existingVersion =
+                    (existingJob.data as any)?.extractionVersion ||
+                    existingJob.returnvalue?.extraction_version;
+                if (!existingVersion || existingVersion === expectedVersion) {
+                    this.logger.info(
+                        `[PdfExtractionProducer] Job ${jobId} previously finished with state '${state}' and matching hash. Returning existing extraction without re-queueing (saving tokens).`,
+                        { tenderId: data.tenderId, jobId, state },
+                    );
+                    return {
+                        jobId,
+                        status: 'existing_completed',
+                        fields: existingJob.returnvalue?.fields,
+                        missing_fields: existingJob.returnvalue?.missing_fields,
+                        self_classified_atc: existingJob.returnvalue?.self_classified_atc,
+                        has_atc: existingJob.returnvalue?.has_atc,
+                        ambiguous_field_conflicts: existingJob.returnvalue?.ambiguous_field_conflicts,
+                        documentIdentityCheck: existingJob.returnvalue?.documentIdentityCheck,
+                    };
+                }
             }
 
             this.logger.info(

@@ -278,7 +278,7 @@ export class PdfExtractionProcessor implements OnModuleInit {
                         tenderId,
                         fields: fieldsToPersist,
                         missingFields: extractionResult.missing_fields,
-                        extractionVersion: extractionResult.extraction_version || '1.0.0',
+                        extractionVersion: (job.data as any)?.extractionVersion || extractionResult.extraction_version || '1.0.0',
                         processingTimeMs: extractionResult.processing_time_ms,
                         userId: userId || null,
                         updatedAt: new Date(),
@@ -290,7 +290,7 @@ export class PdfExtractionProcessor implements OnModuleInit {
                             // (the bidding-requirements analysis) instead of wiping them.
                             fields: extractionFieldsUpsertValue(fieldsToPersist),
                             missingFields: extractionResult.missing_fields,
-                            extractionVersion: extractionResult.extraction_version || '1.0.0',
+                            extractionVersion: (job.data as any)?.extractionVersion || extractionResult.extraction_version || '1.0.0',
                             processingTimeMs: extractionResult.processing_time_ms,
                             userId: userId || null,
                             updatedAt: new Date(),

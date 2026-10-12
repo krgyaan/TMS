@@ -6,6 +6,8 @@ export interface VolksAiExtractionPayload {
     boqPath: string | null;
     userId: number;
     force?: boolean;
+    documentHash?: string;
+    extractionVersion?: string;
 }
 
 export interface PdfExtractionJobData {
@@ -16,6 +18,8 @@ export interface PdfExtractionJobData {
     boqPath?: string | null;
     userId: number;
     force?: boolean;
+    documentHash?: string;
+    extractionVersion?: string;
 }
 
 export interface FieldSourceCitation {

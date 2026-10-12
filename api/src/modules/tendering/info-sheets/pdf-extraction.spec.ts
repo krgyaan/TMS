@@ -176,6 +176,113 @@ describe('PDF Extraction Queue Integration (Phase 8)', () => {
             );
         });
 
+        it('should re-enqueue a new job when ATC file changes because document hash no longer matches stale cache', async () => {
+            const initialData: PdfExtractionJobData = {
+                tenderId: 101,
+                pdfPath: 'tenders/gem_101.pdf',
+                mainTenderPath: 'tenders/gem_101.pdf',
+                atcPaths: ['tenders/old_atc.pdf'],
+                userId: 42,
+            };
+
+            const oldHash = await producer.computeDocumentHash(initialData);
+            const oldVersion = `1.0.0:${oldHash.slice(0, 32)}`;
+
+            const mockDb: any = {
+                select: jest.fn().mockReturnValue({
+                    from: jest.fn().mockReturnValue({
+                        where: jest.fn().mockReturnValue({
+                            limit: jest.fn().mockResolvedValue([
+                                {
+                                    id: 1,
+                                    tenderId: 101,
+                                    fields: { tenderValue: { value: 500 } },
+                                    extractionVersion: oldVersion,
+                                    missingFields: [],
+                                },
+                            ]),
+                        }),
+                    }),
+                }),
+            };
+
+            const producerWithDb = new PdfExtractionProducer(
+                mockQueue,
+                mockLogger,
+                undefined,
+                undefined,
+                mockDb,
+            );
+
+            mockQueue.getJob.mockResolvedValue(null);
+            mockQueue.add.mockResolvedValue({ id: 'extract-tender-101' });
+
+            // Call with changed ATC file
+            const changedData: PdfExtractionJobData = {
+                tenderId: 101,
+                pdfPath: 'tenders/gem_101.pdf',
+                mainTenderPath: 'tenders/gem_101.pdf',
+                atcPaths: ['tenders/new_atc.pdf'],
+                userId: 42,
+            };
+
+            const result = await producerWithDb.enqueueExtraction(changedData);
+
+            expect(result).toEqual({
+                jobId: 'extract-tender-101',
+                status: 'enqueued',
+            });
+            expect(mockQueue.add).toHaveBeenCalledWith(
+                'extract-pdf',
+                changedData,
+                expect.any(Object),
+            );
+        });
+
+        it('should return existing_completed from DB cache when ATC file and hash match', async () => {
+            const data: PdfExtractionJobData = {
+                tenderId: 101,
+                pdfPath: 'tenders/gem_101.pdf',
+                mainTenderPath: 'tenders/gem_101.pdf',
+                atcPaths: ['tenders/atc.pdf'],
+                userId: 42,
+            };
+
+            const hash = await producer.computeDocumentHash(data);
+            const matchingVersion = `1.0.0:${hash.slice(0, 32)}`;
+
+            const mockDb: any = {
+                select: jest.fn().mockReturnValue({
+                    from: jest.fn().mockReturnValue({
+                        where: jest.fn().mockReturnValue({
+                            limit: jest.fn().mockResolvedValue([
+                                {
+                                    id: 1,
+                                    tenderId: 101,
+                                    fields: { tenderValue: { value: 500 } },
+                                    extractionVersion: matchingVersion,
+                                    missingFields: [],
+                                },
+                            ]),
+                        }),
+                    }),
+                }),
+            };
+
+            const producerWithDb = new PdfExtractionProducer(
+                mockQueue,
+                mockLogger,
+                undefined,
+                undefined,
+                mockDb,
+            );
+
+            const result = await producerWithDb.enqueueExtraction(data);
+
+            expect(result.status).toBe('existing_completed');
+            expect(mockQueue.add).not.toHaveBeenCalled();
+        });
+
         it('should return job status, returnvalue result, and failed reason', async () => {
             mockQueue.getJob.mockResolvedValue({
                 id: 'extract-tender-101',
