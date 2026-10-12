@@ -627,7 +627,87 @@ describe('PDF Extraction Queue Integration (Phase 8)', () => {
                     value: 2000000,
                     confidence: 'high',
                     source: 'regex',
+                    reviewed: false,
                 });
+            } finally {
+                global.fetch = originalFetch;
+            }
+        });
+
+        it('should execute DB write inside a single transaction and flag AI values with reviewed: false', async () => {
+            const mockResult: PdfExtractionJobResult = {
+                fields: {
+                    tenderValue: { value: 100000, confidence: 'high', source: 'regex' },
+                    emdAmount: { value: 2000, confidence: 'medium', source: 'regex' },
+                },
+                missing_fields: [],
+                extraction_version: '1.0.0',
+                processing_time_ms: 1000,
+                llm_status: 'ok',
+                failed_categories: [],
+            };
+
+            const originalFetch = global.fetch;
+            global.fetch = jest.fn().mockResolvedValue({
+                ok: true,
+                status: 200,
+                json: async () => mockResult,
+            } as any);
+
+            let transactionExecuted = false;
+            let persistedValues: any = null;
+
+            const mockTx: any = {
+                insert: jest.fn().mockReturnValue({
+                    values: jest.fn().mockImplementation((val) => {
+                        persistedValues = val;
+                        return {
+                            onConflictDoUpdate: jest.fn().mockResolvedValue({}),
+                        };
+                    }),
+                }),
+            };
+
+            const mockDb: any = {
+                transaction: jest.fn().mockImplementation(async (callback) => {
+                    transactionExecuted = true;
+                    return callback(mockTx);
+                }),
+                select: jest.fn().mockReturnValue({
+                    from: jest.fn().mockReturnValue({
+                        where: jest.fn().mockReturnValue({
+                            limit: jest.fn().mockImplementation(() =>
+                                Promise.resolve([{
+                                    id: 1,
+                                    tenderId: 505,
+                                    fields: persistedValues?.fields,
+                                }])
+                            ),
+                        }),
+                    }),
+                }),
+            };
+
+            const processor = new PdfExtractionProcessor(
+                mockConfigService,
+                mockFileUploadService,
+                { recordUsage: jest.fn(), recordTpmEntry: jest.fn(), getCurrentTpm: jest.fn() } as any,
+                mockLogger,
+                mockDb,
+            );
+
+            try {
+                const mockJob: any = {
+                    id: 'extract-tender-505',
+                    data: { tenderId: 505, pdfPath: tempPdfFile, userId: 1 },
+                };
+
+                await processor.processJob(mockJob, 'http://localhost:8001', 120000);
+
+                expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+                expect(transactionExecuted).toBe(true);
+                expect(persistedValues.fields.tenderValue.reviewed).toBe(false);
+                expect(persistedValues.fields.emdAmount.reviewed).toBe(false);
             } finally {
                 global.fetch = originalFetch;
             }

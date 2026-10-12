@@ -228,51 +228,18 @@ export function TenderInformationForm({
                         const indicators = extractFieldIndicators(statusRes.fields as any, statusRes.missing_fields);
                         setFieldIndicators(indicators);
 
-                        // Save extraction permanently to backend
-                        try {
-                            console.log('[AutoExtract] Saving extraction result to backend', {
-                                event_type: 'autoextract_save',
-                                action: 'save_request_sent',
-                                tender_id: tenderId,
-                            });
-                            if (statusRes.fields) {
-                                await infoSheetsService.saveExtraction(tenderId, {
-                                    fields: statusRes.fields as unknown as Record<string, unknown>,
-                                    missing_fields: statusRes.missing_fields,
-                                    self_classified_atc: statusRes.self_classified_atc,
-                                    has_atc: statusRes.has_atc,
-                                    ambiguous_field_conflicts: statusRes.ambiguous_field_conflicts,
-                                    processing_time_ms: statusRes.processing_time_ms,
-                                    llm_status: statusRes.llm_status,
-                                    failed_categories: statusRes.failed_categories,
-                                });
-                                setIsExtractionSaved(true);
-                            }
-                            console.log('[AutoExtract] Extraction result saved successfully', {
-                                event_type: 'autoextract_save',
-                                action: 'save_success',
-                                tender_id: tenderId,
-                            });
-                        } catch (saveErr) {
-                            console.error('[AutoExtract] Failed to persist extraction to backend', {
-                                event_type: 'autoextract_save',
-                                action: 'save_failure',
-                                tender_id: tenderId,
-                                error: saveErr,
-                            });
-                        }
-
+                        setIsExtractionSaved(true);
                         const missingCount = statusRes.missing_fields?.length || 0;
                         const fallbackCount = Object.values(indicators).filter((i) => i.type === 'fallback').length;
 
                         if (statusRes.llm_status === 'llm_unavailable') {
                             toast.warning(
-                                `AI step failed, some fields were not extracted. Partial extraction saved (${populateResult.populatedCount} fields auto-populated).`,
+                                `AI step failed, some fields were not extracted. Partial extraction completed (${populateResult.populatedCount} fields auto-populated).`,
                                 { id: 'auto-extract', duration: 7000 },
                             );
                         } else {
                             toast.success(
-                                `AI Extraction complete & saved! ${populateResult.populatedCount} fields auto-populated.${
+                                `AI Extraction complete! ${populateResult.populatedCount} fields auto-populated.${
                                     fallbackCount > 0 ? ` (${fallbackCount} fallback values)` : ''
                                 }${missingCount > 0 ? ` (${missingCount} missing)` : ''}`,
                                 { id: 'auto-extract', duration: 6000 },

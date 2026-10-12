@@ -254,48 +254,61 @@ export class PdfExtractionProcessor implements OnModuleInit {
 
         // Durable Database Persistence: Save extraction result to tender_extractions table (if db is provided)
         if (this.db) {
-            const fieldsToPersist: Record<string, any> = {
-                ...extractionResult.fields,
-                metadata: {
-                    llm_status: extractionResult.llm_status || 'ok',
-                    failed_categories: extractionResult.failed_categories || [],
-                },
+            const fieldsToPersist: Record<string, any> = {};
+            for (const [key, fieldVal] of Object.entries(extractionResult.fields || {})) {
+                if (key === 'metadata' || key === 'biddingRequirementsAnalysis') {
+                    fieldsToPersist[key] = fieldVal;
+                } else if (fieldVal && typeof fieldVal === 'object') {
+                    fieldsToPersist[key] = {
+                        ...(fieldVal as any),
+                        reviewed: false,
+                    };
+                } else {
+                    fieldsToPersist[key] = fieldVal;
+                }
+            }
+            fieldsToPersist.metadata = {
+                llm_status: extractionResult.llm_status || 'ok',
+                failed_categories: extractionResult.failed_categories || [],
             };
             extractionResult.fields = fieldsToPersist as any;
             const totalPersistFieldCount = Object.keys(fieldsToPersist).length;
 
             try {
-                this.logger.info(`[AutoExtract] Sending save request to persist extraction for tender ${tenderId}`, {
+                this.logger.info(`[AutoExtract] Sending save request to persist extraction in single transaction for tender ${tenderId}`, {
                     event_type: 'autoextract_save',
                     action: 'save_request_sent',
                     tenderId,
                     fieldsCount: totalPersistFieldCount,
                 });
 
-                await this.db
-                    .insert(tenderExtractions)
-                    .values({
-                        tenderId,
-                        fields: fieldsToPersist,
-                        missingFields: extractionResult.missing_fields,
-                        extractionVersion: (job.data as any)?.extractionVersion || extractionResult.extraction_version || '1.0.0',
-                        processingTimeMs: extractionResult.processing_time_ms,
-                        userId: userId || null,
-                        updatedAt: new Date(),
-                    })
-                    .onConflictDoUpdate({
-                        target: tenderExtractions.tenderId,
-                        set: {
-                            // Replace the extraction data but keep other features' cached keys
-                            // (the bidding-requirements analysis) instead of wiping them.
-                            fields: extractionFieldsUpsertValue(fieldsToPersist),
+                const runner = this.db.transaction ? this.db.transaction.bind(this.db) : async (fn: any) => fn(this.db);
+                await runner(async (tx: any) => {
+                    await tx
+                        .insert(tenderExtractions)
+                        .values({
+                            tenderId,
+                            fields: fieldsToPersist,
                             missingFields: extractionResult.missing_fields,
                             extractionVersion: (job.data as any)?.extractionVersion || extractionResult.extraction_version || '1.0.0',
                             processingTimeMs: extractionResult.processing_time_ms,
                             userId: userId || null,
                             updatedAt: new Date(),
-                        },
-                    });
+                        })
+                        .onConflictDoUpdate({
+                            target: tenderExtractions.tenderId,
+                            set: {
+                                // Replace the extraction data but keep other features' cached keys
+                                // (the bidding-requirements analysis) instead of wiping them.
+                                fields: extractionFieldsUpsertValue(fieldsToPersist),
+                                missingFields: extractionResult.missing_fields,
+                                extractionVersion: (job.data as any)?.extractionVersion || extractionResult.extraction_version || '1.0.0',
+                                processingTimeMs: extractionResult.processing_time_ms,
+                                userId: userId || null,
+                                updatedAt: new Date(),
+                            },
+                        });
+                });
 
                 this.logger.info(`[AutoExtract] Extraction result saved successfully for tender ${tenderId}`, {
                     event_type: 'autoextract_save',
