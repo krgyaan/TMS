@@ -303,14 +303,6 @@ async function detect(db: Executor): Promise<PlanFile> {
     }
 
     const refCounts = new Map<number, Record<string, number>>();
-    const bump = (id: number, field: string): void => {
-        let rec = refCounts.get(id);
-        if (!rec) {
-            rec = {};
-            refCounts.set(id, rec);
-        }
-        rec[field] = (rec[field] ?? 0) + 1;
-    };
     for (const ref of REF_COUNT_COLUMNS) {
         const counted = await rows<{ orgId: number; n: number }>(
             db,
@@ -319,7 +311,11 @@ async function detect(db: Executor): Promise<PlanFile> {
                 where ${ident(ref.column)} is not null
                 group by 1`
         );
-        for (const c of counted) bump(Number(c.orgId), ref.field);
+        for (const c of counted) {
+            const rec = refCounts.get(Number(c.orgId));
+            if (rec) rec[ref.field] = (rec[ref.field] ?? 0) + Number(c.n);
+            else refCounts.set(Number(c.orgId), { [ref.field]: Number(c.n) });
+        }
     }
 
     const orgById = new Map<number, OrgDetail>();
@@ -554,11 +550,7 @@ function loadPlan(filePath: string): PlanFile | null {
 function applyPromotions(plan: PlanFile, promotions: PromotionSpec[]): void {
     const idsOf = (orgs: { id: number }[]): Set<number> => new Set(orgs.map(o => Number(o.id)));
     const matches = (spec: Set<number>, group: Set<number>): "exact" | "subset" | "none" =>
-        spec.size === group.size && [...spec].every(id => group.has(id))
-            ? "exact"
-            : [...spec].every(id => group.has(id))
-              ? "subset"
-              : "none";
+        spec.size === group.size && [...spec].every(id => group.has(id)) ? "exact" : [...spec].every(id => group.has(id)) ? "subset" : "none";
 
     const buildCandidate = (memberOrgs: PollutionGroup["orgs"], spec: PromotionSpec, why: string): Candidate => {
         const keep = Number(spec.keep);
@@ -580,7 +572,10 @@ function applyPromotions(plan: PlanFile, promotions: PromotionSpec[]): void {
             projectRefs: 0,
         }));
         return {
-            key: `promoted:${orgs.map(o => o.id).sort((a, b) => a - b).join("-")}`,
+            key: `promoted:${orgs
+                .map(o => o.id)
+                .sort((a, b) => a - b)
+                .join("-")}`,
             classification: "shared-identifier",
             addressMatch: false,
             matchedOn: [],
@@ -625,8 +620,16 @@ function applyPromotions(plan: PlanFile, promotions: PromotionSpec[]): void {
             const remainder = grp.orgs.filter(o => !want.has(Number(o.id)));
             if (remainder.length >= 2) plan.pollution[idx] = { ...grp, orgs: remainder };
             else plan.pollution.splice(idx, 1); // a lone leftover shares nothing with anyone
-            plan.candidates.push(buildCandidate(subset, spec, spec.why ? `promoted from pollution (split from [${grp.orgs.map(o => o.id).join(",")}]): ${spec.why}` : `promoted from pollution (split): ${grp.why}`));
-            console.log(`PROMOTE  orgs [${spec.orgIds.join(", ")}] -> candidate keep #${spec.keep}  (split off pollution group [${grp.orgs.map(o => o.id).join(", ")}]; leftovers stay pollution)`);
+            plan.candidates.push(
+                buildCandidate(
+                    subset,
+                    spec,
+                    spec.why ? `promoted from pollution (split from [${grp.orgs.map(o => o.id).join(",")}]): ${spec.why}` : `promoted from pollution (split): ${grp.why}`
+                )
+            );
+            console.log(
+                `PROMOTE  orgs [${spec.orgIds.join(", ")}] -> candidate keep #${spec.keep}  (split off pollution group [${grp.orgs.map(o => o.id).join(", ")}]; leftovers stay pollution)`
+            );
             continue;
         }
 
