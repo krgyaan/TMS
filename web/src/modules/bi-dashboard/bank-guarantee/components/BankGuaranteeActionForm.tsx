@@ -271,6 +271,7 @@ key === 'stop_remarks' ||
                         name="action"
                         options={ACTION_OPTIONS}
                         placeholder="Select an action"
+                        valueType="string"
                     />
                 </div>
 
@@ -490,6 +491,7 @@ key === 'stop_remarks' ||
                                 name="courier_no"
                                 options={courierOptions}
                                 placeholder="Select courier request number"
+                                valueType="string"
                             />
 
                             <FieldWrapper control={form.control} name="bg2_remark" label="Remarks">
