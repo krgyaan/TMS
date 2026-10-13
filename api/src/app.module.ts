@@ -102,6 +102,7 @@ import { join } from "path";
 import { AllExceptionsFilter } from "./logger/all-exception.filter";
 import { AccountChecklistModule } from "./modules/accounts/account-checklist/account-checklist.module";
 import { LoanAdvanceModule } from "./modules/accounts/loan-advance/loan-advance.module";
+import { TdsGstChecklistsModule } from "./modules/accounts/tds-gst-checklists/tds-gst-checklists.module";
 import { EmployeeOnboardingModule } from "./modules/hrms/employee-onboarding/employee-onboarding.module";
 import { OnboardingModule } from "./modules/hrms/onboarding/onboarding.module";
 import { TrainingModule } from "./modules/hrms/training/training.module";
@@ -252,6 +253,7 @@ import { VendorMasterModule } from "./modules/master/vendor-master/vendor-master
         RequestExtensionsModule,
         SubmitQueriesModule,
         LoanAdvanceModule,
+        TdsGstChecklistsModule,
         CustomerPerformanceModule,
         LocationPerformanceModule,
         ContractAgreementModule,

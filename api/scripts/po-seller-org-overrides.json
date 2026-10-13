@@ -1,0 +1,17 @@
+{
+    "po:2": {
+        "action": "skip",
+        "reason": "individual person (sajid@volksenergie.in), not a vendor org - left NULL by decision",
+        "needsReview": false
+    },
+    "po:3": {
+        "action": "skip",
+        "reason": "test garbage (PAN CORRUPTI, GST VERITATIS EXERC) - left NULL by decision",
+        "needsReview": false
+    },
+    "vwo:1": {
+        "action": "skip",
+        "reason": "test garbage TEST PARTY 2 - left NULL by decision",
+        "needsReview": false
+    }
+}
