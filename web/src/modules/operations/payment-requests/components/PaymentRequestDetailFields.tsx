@@ -36,7 +36,11 @@ export const PaymentRequestDetailFields: React.FC<PaymentRequestDetailFieldsProp
             const actualTds = Number(detail.actualTdsDeducted ?? 0);
             const tdsPct = Number(detail.tdsPercentage ?? 0);
             if (tdsPct <= 0 && actualTds <= 0) return null;
-            const useCapped = actualTds > 0;
+            // For a completed payment the backend persists the capped TDS
+            // (including 0 once the document's TDS budget is exhausted), so
+            // trust that value. Only preview an uncapped estimate otherwise.
+            const isFinal = detail.status === "payment_done";
+            const useCapped = isFinal && (tdsPct > 0 || actualTds > 0);
             const { tdsAmount, netPayable } = calculateTds(Number(detail.amount), tdsPct);
             const displayTds = useCapped ? actualTds : tdsAmount;
             const displayNet = useCapped ? Number(detail.amount) - actualTds : netPayable;
@@ -45,13 +49,10 @@ export const PaymentRequestDetailFields: React.FC<PaymentRequestDetailFieldsProp
                     <Label className="text-muted-foreground text-xs">Net Payable</Label>
                     <p className="font-medium text-green-500">{formatINR(displayNet)}</p>
                     <Label className="text-muted-foreground text-xs font-mono">
-                        TDS @ {tdsPct}% (-{formatINR(displayTds)}) = Net Payable {formatINR(displayNet)}
+                        {useCapped
+                            ? `TDS Deducted${tdsPct > 0 ? ` (capped @ ${tdsPct}%)` : ""} (-${formatINR(displayTds)}) = Net Payable ${formatINR(displayNet)}`
+                            : `TDS @ ${tdsPct}% (est.) (-${formatINR(displayTds)}) = Net Payable ${formatINR(displayNet)}`}
                     </Label>
-                    {useCapped && (
-                        <Label className="text-muted-foreground text-xs font-medium">
-                            TDS Deducted (Capped): {formatINR(actualTds)}
-                        </Label>
-                    )}
                 </div>
             );
         })()}
