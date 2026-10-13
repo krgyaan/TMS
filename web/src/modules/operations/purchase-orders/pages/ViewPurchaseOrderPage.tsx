@@ -29,13 +29,21 @@ function toOrderViewData(po: PurchaseOrderView): OrderViewData {
         shippingAddress: po.shippingAddress,
         shipToGst: po.shipToGst,
         shipToPan: po.shipToPan,
-        products: (po.products ?? []).map((product) => ({
+        products: (po.products ?? []).map(product => ({
             ...product,
             name: (product as any).name ?? (product as any).productName ?? "",
             unit: (product as any).unit ?? (product as any).uom ?? "",
             quantity: Number((product as any).quantity ?? 0),
             price: Number((product as any).price ?? 0),
-            amount: Number((product as any).amount ?? (Number((product as any).quantity ?? 0) * Number((product as any).price ?? 0))),
+            amount: Number((product as any).amount ?? Number((product as any).quantity ?? 0) * Number((product as any).price ?? 0)),
+        })),
+        extraCharges: (po.extraCharges ?? []).map(charge => ({
+            id: charge.id,
+            label: charge.label,
+            gstRate: charge.gstRate,
+            taxableAmount: charge.taxableAmount,
+            gstAmount: charge.gstAmount,
+            totalAmount: charge.totalAmount,
         })),
         paymentRequests: po.paymentRequests,
         purchaseInvoices: po.purchaseInvoices,
@@ -49,7 +57,7 @@ function toOrderViewData(po: PurchaseOrderView): OrderViewData {
             ...(po.poType === "pi" ? [{ title: "Invoice Copy", paths: parseAttachments(po.piAttachments) }] : []),
             { title: "Technical Specs", paths: parseAttachments(po.technicalSpecsAttachments) },
             { title: "Accessories / Packaging List", paths: parseAttachments(po.accessoriesPackagingListAttachments) },
-        ].filter((group) => group.paths.length > 0),
+        ].filter(group => group.paths.length > 0),
         generatedPdfVersions: po.generatedPdfVersions,
     };
 }
