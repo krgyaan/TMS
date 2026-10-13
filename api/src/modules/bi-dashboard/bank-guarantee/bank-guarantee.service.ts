@@ -817,7 +817,7 @@ private parseStringArray(v: unknown): string[] | null {
             'bgPo', 'bgClientUser', 'bgClientCp', 'bgClientFin',
             'bgBankAcc', 'bgBankIfsc', 'bgBankAccName', 'courierNo',
             'extensionLetter', 'newBgClaim', 'approveBg',
-            'fdrAmt', 'fdrPer', 'fdrNo', 'fdrValidity', 'fdrRoi', 'approvedFdrPer',
+            'fdrAmt', 'fdrPer', 'fdrNo', 'fdrValidity', 'fdrRoi',
             'bankMailIds', 'bankMailIdsCc',
             'bgChargeDeducted', 'newStampChargeDeducted', 'cancelRemark',
             'bgFdrCancelDate', 'bgFdrCancelAmount', 'bgFdrCancelRefNo',
@@ -1004,10 +1004,11 @@ private parseStringArray(v: unknown): string[] | null {
                 bgDetailsUpdate.reasonReq = body.reason_req;
             }
 
-            // FDR % agreed at approval time -- kept separate from fdrPer, which
-            // is captured in accounts-form-3.
+            // FDR % agreed at approval time. Accounts Form 1 and Form 3 share the
+            // single `fdr_per` column, so a later Form 3 submission overwrites
+            // the value captured here.
             if (body.bg_approved_fdr_per) {
-                bgDetailsUpdate.approvedFdrPer = Number(body.bg_approved_fdr_per);
+                bgDetailsUpdate.fdrPer = Number(body.bg_approved_fdr_per);
             }
 
             // Bank mail ids / CC -- capture only for now; nothing reads these yet.
@@ -1229,7 +1230,6 @@ private parseStringArray(v: unknown): string[] | null {
                 bgPurpose: instrumentBgDetails.bgPurpose,
                 bgSoftCopy: instrumentBgDetails.bgSoftCopy,
                 bgPo: instrumentBgDetails.bgPo,
-                approvedFdrPer: instrumentBgDetails.approvedFdrPer,
                 bankMailIds: instrumentBgDetails.bankMailIds,
                 bankMailIdsCc: instrumentBgDetails.bankMailIdsCc,
                 bankClientUser: instrumentBgDetails.bgClientUser,
@@ -1338,7 +1338,6 @@ private parseStringArray(v: unknown): string[] | null {
                 bgSoftCopy: instrumentBgDetails.bgSoftCopy,
                 bgPo: instrumentBgDetails.bgPo,
                 bgBankAccName: instrumentBgDetails.bgBankAccName,
-                approvedFdrPer: instrumentBgDetails.approvedFdrPer,
                 bankMailIds: instrumentBgDetails.bankMailIds,
                 bankMailIdsCc: instrumentBgDetails.bankMailIdsCc,
                 courierNo: instrumentBgDetails.courierNo,
@@ -1413,7 +1412,6 @@ private parseStringArray(v: unknown): string[] | null {
             bgSoftCopy: result.bgSoftCopy,
             bgPo: result.bgPo,
             bgBankAccName: result.bgBankAccName,
-            approvedFdrPer: result.approvedFdrPer,
             bankMailIds: result.bankMailIds ?? [],
             bankMailIdsCc: result.bankMailIdsCc ?? [],
             courierNo: result.courierNo,

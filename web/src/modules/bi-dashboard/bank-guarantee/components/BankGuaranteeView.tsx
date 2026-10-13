@@ -261,8 +261,8 @@ export function BankGuaranteeView({
                                 value1={data.bgBankIfsc || '—'}
                             />
                             <DataRow
-                                label1="Approved FDR %"
-                                value1={data.approvedFdrPer != null ? `${data.approvedFdrPer}%` : '—'}
+                                label1="FDR %"
+                                value1={data.fdrPer != null ? `${Number(data.fdrPer)}%` : '—'}
                             />
                             <DataRow
                                 label1="Bank Mail Ids"

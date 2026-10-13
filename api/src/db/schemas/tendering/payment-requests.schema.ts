@@ -273,9 +273,6 @@ export const instrumentBgDetails = pgTable('instrument_bg_details', {
     // FDR Details (for BG)
     fdrAmt: decimal('fdr_amt', { precision: 15, scale: 2 }), // emd_bgs.fdr_amt
     fdrPer: decimal('fdr_per', { precision: 15, scale: 2 }), // emd_bgs.fdr_per
-    // FDR % selected when the BG request is approved (Accounts Form BG 1).
-    // Deliberately separate from `fdrPer` above, which is the step-3 FDR capture.
-    approvedFdrPer: decimal('approved_fdr_per', { precision: 15, scale: 2 }),
     fdrCopy: varchar('fdr_copy', { length: 255 }), // emd_bgs.fdr_copy
     fdrNo: varchar('fdr_no', { length: 255 }), // emd_bgs.fdr_no
     fdrValidity: date('fdr_validity'), // emd_bgs.fdr_validity

@@ -416,13 +416,6 @@ export function BankGuaranteeEditForm({ instrumentId, initialData }: BankGuarant
                                 options={FDR_PERCENTAGE_OPTIONS}
                                 placeholder="Select %"
                             />
-                            <SelectField
-                                control={form.control}
-                                name="approvedFdrPer"
-                                label="Approved FDR % (Step 1)"
-                                options={FDR_PERCENTAGE_OPTIONS}
-                                placeholder="Select %"
-                            />
                             <FieldWrapper control={form.control} name="fdrAmt" label="FDR Amount">
                                 {(field) => <NumberInput {...field} placeholder="0.00" />}
                             </FieldWrapper>

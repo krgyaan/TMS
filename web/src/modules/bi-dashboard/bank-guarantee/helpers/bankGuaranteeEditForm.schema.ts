@@ -40,8 +40,6 @@ export const BankGuaranteeEditFormSchema = z.object({
     fdrValidity: z.string().optional().nullable(),
     fdrRoi: z.coerce.number().optional().nullable(),
 
-    // FDR % agreed at approval time (Accounts Form BG 1). Separate from fdrPer.
-    approvedFdrPer: z.coerce.number().optional().nullable(),
     // Bank mail ids are repeatable rows; an empty string must validate so a
     // blank row doesn't block submit.
     bankMailIds: z.array(z.object({ email: z.email().optional().or(z.literal('')) })).optional(),

@@ -131,7 +131,8 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
             }
             form.setValue('reason_req', formData.reasonReq ?? undefined);
             form.setValue('approve_bg', formData.approveBg ?? undefined);
-            form.setValue('bg_approved_fdr_per', toFdrEnum(formData.approvedFdrPer));
+            // Forms 1 and 3 share the single fdr_per column.
+            form.setValue('bg_approved_fdr_per', toFdrEnum(formData.fdrPer));
             form.setValue('prefilled_signed_bg', safeParseArray(formData.prefilledSignedBg));
             form.setValue('bg_format_imran', formData.bgFormatTe ?? undefined);
             // Field arrays must use replace(), not setValue.
