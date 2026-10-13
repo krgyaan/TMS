@@ -24,14 +24,6 @@ export function useProjectPurchaseInvoices(projectId: number) {
     });
 }
 
-export function useNextPINumber(projectName?: string, type?: "po" | "vwo") {
-    return useQuery({
-        queryKey: ["purchase-invoices", "next-number", projectName, type],
-        queryFn: () => purchaseInvoiceApi.getNextNumber(projectName, type),
-        enabled: !!projectName,
-    });
-}
-
 export function useCreatePurchaseInvoice() {
     const queryClient = useQueryClient();
     return useMutation({
@@ -46,8 +38,7 @@ export function useCreatePurchaseInvoice() {
 export function useUpdatePurchaseInvoice() {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: any }) =>
-            purchaseInvoiceApi.update(id, data),
+        mutationFn: ({ id, data }: { id: number; data: any }) => purchaseInvoiceApi.update(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["purchase-invoices"] });
             queryClient.invalidateQueries({ queryKey: ["vendor-work-orders"] });
