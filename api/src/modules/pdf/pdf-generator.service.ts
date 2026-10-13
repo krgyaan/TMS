@@ -291,6 +291,9 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
         // Increment helper (for 1-based index)
         Handlebars.registerHelper('inc', (value: number) => value + 1);
 
+        // Subtract helper (a - b)
+        Handlebars.registerHelper('sub', (a: number | string, b: number | string) => Number(a) - Number(b));
+
         // Format date helper (dd-mm-yyyy)
         Handlebars.registerHelper('formatDate', (date: Date | string | null | undefined) => {
             if (!date) return 'N/A';
