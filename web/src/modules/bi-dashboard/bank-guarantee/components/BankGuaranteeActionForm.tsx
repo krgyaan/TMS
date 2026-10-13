@@ -78,6 +78,17 @@ const toFdrEnum = (v: unknown): '10' | '15' | '100' | undefined => {
     return s === '10' || s === '15' || s === '100' ? s : undefined;
 };
 
+const APPROVE_BG_OPTIONS = ['Accept the BG given by TE', 'Upload by Imran'] as const;
+type ApproveBg = (typeof APPROVE_BG_OPTIONS)[number];
+
+/**
+ * Ignore stored values that aren't a known option. Some rows hold a stray file
+ * path (e.g. "bg-prefilled-signed/2") in approve_bg; feeding that to SelectField
+ * matches no option and leaves the dropdown on its placeholder.
+ */
+const toApproveBg = (v: unknown): ApproveBg | undefined =>
+    APPROVE_BG_OPTIONS.find((o) => o === v);
+
 interface BankGuaranteeActionFormProps {
     instrumentId: number;
 }
@@ -130,10 +141,16 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
                 form.setValue('bg_req', formData.reasonReq ? 'Rejected' : 'Accepted');
             }
             form.setValue('reason_req', formData.reasonReq ?? undefined);
-            form.setValue('approve_bg', formData.approveBg ?? undefined);
+            form.setValue('approve_bg', toApproveBg(formData.approveBg));
             // Forms 1 and 3 share the single fdr_per column.
             form.setValue('bg_approved_fdr_per', toFdrEnum(formData.fdrPer));
-            form.setValue('prefilled_signed_bg', safeParseArray(formData.prefilledSignedBg));
+            // Prefilled Bank Formats normally lives in prefilled_signed_bg, but older rows
+// only have the creation form's bg_soft_copy (a single path, not JSON).
+const prefilledFiles = safeParseArray(formData.prefilledSignedBg);
+if (prefilledFiles.length === 0 && formData.bgSoftCopy) {
+    prefilledFiles.push(formData.bgSoftCopy);
+}
+form.setValue('prefilled_signed_bg', prefilledFiles);
             form.setValue('bg_format_imran', formData.bgFormatTe ?? undefined);
             // Field arrays must use replace(), not setValue.
             bankMailIds.replace(toMailRows(formData.bankMailIds));
@@ -176,8 +193,8 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
                     key === 'frequency' ||
                     key === 'stop_reason' ||
                     key === 'proof_text' ||
-key === 'stop_remarks' ||
-                key === 'proof_image') {
+                    key === 'stop_remarks' ||
+                    key === 'proof_image') {
                     return;
                 }
 

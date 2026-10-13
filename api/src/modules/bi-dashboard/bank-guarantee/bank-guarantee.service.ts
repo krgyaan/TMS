@@ -1172,8 +1172,10 @@ private parseStringArray(v: unknown): string[] | null {
                 payableAt: paymentInstruments.payableAt,
                 issueDate: paymentInstruments.issueDate,
                 expiryDate: paymentInstruments.expiryDate,
-                validityDate: paymentInstruments.validityDate,
-                claimExpiryDate: paymentInstruments.claimExpiryDate,
+                // Validity / claim expiry are written by Accounts Form 2 to
+                // instrument_bg_details (see updateAction), not to payment_instruments.
+                validityDate: instrumentBgDetails.validityDate,
+                claimExpiryDate: instrumentBgDetails.claimExpiryDate,
                 utr: paymentInstruments.utr,
                 docketNo: paymentInstruments.docketNo,
                 courierAddress: paymentInstruments.courierAddress,
@@ -1312,8 +1314,10 @@ private parseStringArray(v: unknown): string[] | null {
                 payableAt: paymentInstruments.payableAt,
                 issueDate: paymentInstruments.issueDate,
                 expiryDate: paymentInstruments.expiryDate,
-                validityDate: paymentInstruments.validityDate,
-                claimExpiryDate: paymentInstruments.claimExpiryDate,
+                // Validity / claim expiry are written by Accounts Form 2 to
+                // instrument_bg_details (see updateAction), not to payment_instruments.
+                validityDate: instrumentBgDetails.validityDate,
+                claimExpiryDate: instrumentBgDetails.claimExpiryDate,
                 utr: paymentInstruments.utr,
                 docketNo: paymentInstruments.docketNo,
                 courierAddress: paymentInstruments.courierAddress,
