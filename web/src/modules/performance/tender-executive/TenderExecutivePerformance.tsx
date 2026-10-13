@@ -30,7 +30,7 @@ import {
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { EmdBacklogTable } from "./components/EmdBacklogTable";
-import { EmdTotalsRow } from "./components/EmdTotalsRow";
+import { EmdTotalsSummary } from "./components/EmdTotalsSummary";
 import { StageBacklogV4Table } from "./components/StageBacklogV4Table";
 import { ScoreDrilldownPopover } from "./components/ScoreDrilldownPopover";
 
@@ -622,7 +622,7 @@ const [selectedMetric, setSelectedMetric] = useState<TenderKpiKey | null>(null);
                         {/* ===== EMD BACKLOG ===== */}
                         {sharedQuery && <EmdBacklogTable {...sharedQuery} />}
 
-                        {sharedQuery && <EmdTotalsRow {...sharedQuery} />}
+                        {sharedQuery && <EmdTotalsSummary {...sharedQuery} />}
 
                         {appliedScope.view === "user" && (
                             <>
