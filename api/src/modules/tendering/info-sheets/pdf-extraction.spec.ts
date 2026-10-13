@@ -51,6 +51,18 @@ describe('PDF Extraction Queue Integration (Phase 8)', () => {
 
     describe('PdfExtractionProducer', () => {
         let producer: PdfExtractionProducer;
+        const tempProducerPdf = path.join(__dirname, 'temp_producer_test.pdf');
+        const tempProducerAtc = path.join(__dirname, 'temp_producer_atc.pdf');
+
+        beforeAll(() => {
+            fs.writeFileSync(tempProducerPdf, '%PDF-1.4 producer test');
+            fs.writeFileSync(tempProducerAtc, '%PDF-1.4 producer atc');
+        });
+
+        afterAll(() => {
+            if (fs.existsSync(tempProducerPdf)) fs.unlinkSync(tempProducerPdf);
+            if (fs.existsSync(tempProducerAtc)) fs.unlinkSync(tempProducerAtc);
+        });
 
         beforeEach(() => {
             producer = new PdfExtractionProducer(mockQueue, mockLogger);
@@ -128,7 +140,7 @@ describe('PDF Extraction Queue Integration (Phase 8)', () => {
 
             const jobData: PdfExtractionJobData = {
                 tenderId: 101,
-                pdfPath: 'tenders/gem_101.pdf',
+                pdfPath: tempProducerPdf,
                 userId: 42,
             };
 
@@ -242,9 +254,9 @@ describe('PDF Extraction Queue Integration (Phase 8)', () => {
         it('should return existing_completed from DB cache when ATC file and hash match', async () => {
             const data: PdfExtractionJobData = {
                 tenderId: 101,
-                pdfPath: 'tenders/gem_101.pdf',
-                mainTenderPath: 'tenders/gem_101.pdf',
-                atcPaths: ['tenders/atc.pdf'],
+                pdfPath: tempProducerPdf,
+                mainTenderPath: tempProducerPdf,
+                atcPaths: [tempProducerAtc],
                 userId: 42,
             };
 
@@ -281,6 +293,62 @@ describe('PDF Extraction Queue Integration (Phase 8)', () => {
 
             expect(result.status).toBe('existing_completed');
             expect(mockQueue.add).not.toHaveBeenCalled();
+        });
+
+        it('should log warning with file name only when file is missing/unreadable, mark non-cacheable, and always enqueue', async () => {
+            const data: PdfExtractionJobData = {
+                tenderId: 202,
+                pdfPath: 'nonexistent/secret_tender_doc.pdf',
+                userId: 42,
+            };
+
+            const hash = await producer.computeDocumentHash(data);
+            expect(typeof hash).toBe('string');
+            expect(data.isNonCacheable).toBe(true);
+
+            // Log warning must contain file name only, no directory path, no content
+            expect(mockLogger.warn).toHaveBeenCalledWith(
+                expect.stringContaining('secret_tender_doc.pdf'),
+            );
+            expect(mockLogger.warn).not.toHaveBeenCalledWith(
+                expect.stringContaining('nonexistent/secret_tender_doc.pdf'),
+            );
+
+            // Even if DB has a matching extractionVersion, because isNonCacheable=true, it MUST NOT return existing_completed
+            const matchingVersion = `1.0.0:${hash.slice(0, 32)}`;
+            const mockDb: any = {
+                select: jest.fn().mockReturnValue({
+                    from: jest.fn().mockReturnValue({
+                        where: jest.fn().mockReturnValue({
+                            limit: jest.fn().mockResolvedValue([
+                                {
+                                    id: 1,
+                                    tenderId: 202,
+                                    fields: { tenderValue: { value: 500 } },
+                                    extractionVersion: matchingVersion,
+                                },
+                            ]),
+                        }),
+                    }),
+                }),
+            };
+
+            mockQueue.getJob.mockResolvedValue(null);
+            mockQueue.add.mockResolvedValue({ id: 'extract-tender-202' });
+
+            const producerWithDb = new PdfExtractionProducer(
+                mockQueue,
+                mockLogger,
+                undefined,
+                undefined,
+                mockDb,
+            );
+
+            const result = await producerWithDb.enqueueExtraction(data);
+
+            // Must NOT return existing_completed, must enqueue fresh job
+            expect(result.status).toBe('enqueued');
+            expect(mockQueue.add).toHaveBeenCalled();
         });
 
         it('should return job status, returnvalue result, and failed reason', async () => {

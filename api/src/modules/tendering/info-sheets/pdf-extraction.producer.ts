@@ -69,46 +69,41 @@ export class PdfExtractionProducer {
     public async computeDocumentHash(data: PdfExtractionJobData): Promise<string> {
         const hash = crypto.createHash('sha256');
         hash.update(`extraction_v${PdfExtractionProducer.EXTRACTION_VERSION}:`);
+        let hasMissingOrUnreadable = false;
 
-        const mainPath = this.resolvePath(data.mainTenderPath || data.pdfPath);
-        if (mainPath && fs.existsSync(mainPath)) {
-            try {
-                const mainBuffer = await fs.promises.readFile(mainPath);
-                hash.update(mainBuffer);
-            } catch {
-                hash.update(mainPath);
+        const checkAndHashFile = async (rawPath?: string | null): Promise<void> => {
+            if (!rawPath) return;
+            const resolved = this.resolvePath(rawPath);
+            const fileName = path.basename(resolved || rawPath);
+            if (resolved && fs.existsSync(resolved)) {
+                try {
+                    const buf = await fs.promises.readFile(resolved);
+                    hash.update(buf);
+                } catch {
+                    hasMissingOrUnreadable = true;
+                    this.logger.warn(`[PdfExtractionProducer] File unreadable during hash computation: ${fileName}`);
+                    hash.update(resolved);
+                }
+            } else {
+                hasMissingOrUnreadable = true;
+                this.logger.warn(`[PdfExtractionProducer] File missing during hash computation: ${fileName}`);
+                hash.update(resolved || rawPath);
             }
-        } else {
-            hash.update(mainPath || data.pdfPath || '');
-        }
+        };
+
+        await checkAndHashFile(data.mainTenderPath || data.pdfPath);
 
         const atcPaths = [...(data.atcPaths || [])].sort();
         for (const atcPath of atcPaths) {
-            const resolvedAtc = this.resolvePath(atcPath);
-            if (resolvedAtc && fs.existsSync(resolvedAtc)) {
-                try {
-                    const atcBuffer = await fs.promises.readFile(resolvedAtc);
-                    hash.update(atcBuffer);
-                } catch {
-                    hash.update(resolvedAtc);
-                }
-            } else {
-                hash.update(atcPath || '');
-            }
+            await checkAndHashFile(atcPath);
         }
 
         if (data.boqPath) {
-            const resolvedBoq = this.resolvePath(data.boqPath);
-            if (resolvedBoq && fs.existsSync(resolvedBoq)) {
-                try {
-                    const boqBuffer = await fs.promises.readFile(resolvedBoq);
-                    hash.update(boqBuffer);
-                } catch {
-                    hash.update(resolvedBoq);
-                }
-            } else {
-                hash.update(data.boqPath);
-            }
+            await checkAndHashFile(data.boqPath);
+        }
+
+        if (hasMissingOrUnreadable) {
+            data.isNonCacheable = true;
         }
 
         return hash.digest('hex');
@@ -160,8 +155,10 @@ export class PdfExtractionProducer {
         data.documentHash = documentHash;
         data.extractionVersion = expectedVersion;
 
-        // 1. Check PostgreSQL durable storage first (unless force re-extraction is requested)
-        if (!data.force && this.db) {
+        const isCacheable = !data.isNonCacheable;
+
+        // 1. Check PostgreSQL durable storage first (unless force re-extraction is requested or non-cacheable)
+        if (!data.force && isCacheable && this.db) {
             try {
                 const [saved] = await this.db
                     .select()
@@ -223,7 +220,7 @@ export class PdfExtractionProducer {
                 return { jobId, status: 'existing_active' };
             }
 
-            if (existing && existing.state === 'completed' && !data.force) {
+            if (existing && existing.state === 'completed' && !data.force && isCacheable) {
                 const existingVersion = existing.data?.extractionVersion || existing.result?.extraction_version;
                 if (!existingVersion || existingVersion === expectedVersion) {
                     this.logger.info(
@@ -318,7 +315,7 @@ export class PdfExtractionProducer {
                 return { jobId, status: 'existing_active' };
             }
 
-            if (state === 'completed' && !data.force) {
+            if (state === 'completed' && !data.force && isCacheable) {
                 const existingVersion =
                     (existingJob.data as any)?.extractionVersion ||
                     existingJob.returnvalue?.extraction_version;

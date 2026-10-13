@@ -8,6 +8,7 @@ export interface VolksAiExtractionPayload {
     force?: boolean;
     documentHash?: string;
     extractionVersion?: string;
+    isNonCacheable?: boolean;
 }
 
 export interface PdfExtractionJobData {
@@ -20,6 +21,7 @@ export interface PdfExtractionJobData {
     force?: boolean;
     documentHash?: string;
     extractionVersion?: string;
+    isNonCacheable?: boolean;
 }
 
 export interface FieldSourceCitation {
