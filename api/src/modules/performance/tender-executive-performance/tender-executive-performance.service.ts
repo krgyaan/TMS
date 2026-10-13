@@ -2067,13 +2067,11 @@ export class TenderExecutiveService {
                 (
                        (pi.instrument_type IN ('DD','FDR')                      AND pi.action IN (3,4,7))
                     OR (pi.instrument_type IN ('Bank Transfer','Portal Payment') AND pi.action IN (3,4))
-                    OR (pi.instrument_type = 'Cheque'                           AND pi.action IN (3,4,5,6))
                     OR (pi.instrument_type = 'BG'                               AND pi.action IN (6,8,9))
                 ) AS has_return,
                 CASE
                     WHEN (pi.instrument_type IN ('DD','FDR')                      AND pi.action IN (3,4,7))
                       OR (pi.instrument_type IN ('Bank Transfer','Portal Payment') AND pi.action IN (3))
-                      OR (pi.instrument_type = 'Cheque'                           AND pi.action IN (3,6))
                       OR (pi.instrument_type = 'BG'                               AND pi.action IN (6,8,9)) THEN 'RETURNED'
                     WHEN (pi.instrument_type IN ('DD','FDR')                      AND pi.action IN (5))
                       OR (pi.instrument_type IN ('Bank Transfer','Portal Payment') AND pi.action IN (4))
