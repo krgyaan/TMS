@@ -11,6 +11,7 @@ import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
 import { purchaseOrderProducts } from "@/db/schemas/operations/purchase-order-products.schema";
 import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.schema";
 import { vendorWorkOrderItems } from "@/db/schemas/operations/vendor-work-order-items.schema";
+import { orderExtraCharges } from "@/db/schemas/operations/order-extra-charges.schema";
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, desc, eq, like, ne, sql, type SQL } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
@@ -38,8 +39,24 @@ export class PaymentRequestService {
         @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
         private readonly insurancePolicyService: InsurancePolicyService,
         private readonly notifications: OperationNotificationService,
-        private readonly cashFlowService: CashFlowService,
+        private readonly cashFlowService: CashFlowService
     ) {}
+
+    private async extraChargeTotalForPo(poId: number): Promise<number> {
+        const [row] = await this.db
+            .select({ total: sql<number>`COALESCE(SUM(total_amount::numeric), 0)` })
+            .from(orderExtraCharges)
+            .where(eq(orderExtraCharges.purchaseOrderId, poId));
+        return Number(row?.total ?? 0);
+    }
+
+    private async extraChargeTotalForWo(woId: number): Promise<number> {
+        const [row] = await this.db
+            .select({ total: sql<number>`COALESCE(SUM(total_amount::numeric), 0)` })
+            .from(orderExtraCharges)
+            .where(eq(orderExtraCharges.vendorWorkOrderId, woId));
+        return Number(row?.total ?? 0);
+    }
 
     async generateNumber(projectName?: string) {
         const now = new Date();
@@ -68,15 +85,11 @@ export class PaymentRequestService {
     }
 
     async create(body: any, userId: number) {
-        const requestNo = body.requestNo || await this.generateNumber(body.projectName);
+        const requestNo = body.requestNo || (await this.generateNumber(body.projectName));
 
         // WC insurance gate: block PO/VWO/Others payment requests if no active WC policy
         if (body.projectId && body.paymentAgainst && !["insurance", "imprest", "gem_charges"].includes(body.paymentAgainst)) {
-            const [project] = await this.db
-                .select({ insuranceRequired: projects.insuranceRequired })
-                .from(projects)
-                .where(eq(projects.id, body.projectId))
-                .limit(1);
+            const [project] = await this.db.select({ insuranceRequired: projects.insuranceRequired }).from(projects).where(eq(projects.id, body.projectId)).limit(1);
             if (project?.insuranceRequired) {
                 const hasWC = await this.insurancePolicyService.hasActiveWCInsurance(body.projectId);
                 if (!hasWC) {
@@ -103,26 +116,20 @@ export class PaymentRequestService {
                 .select({ total: sql<number>`COALESCE(SUM(total_amount::numeric), 0)` })
                 .from(purchaseOrderProducts)
                 .where(eq(purchaseOrderProducts.purchaseOrderId, body.purchaseOrderId));
-            const poGrandTotal = Number(poGrandTotalResult[0]?.total ?? 0);
+            const poGrandTotal = Number(poGrandTotalResult[0]?.total ?? 0) + Number(await this.extraChargeTotalForPo(body.purchaseOrderId));
 
             const existingSumResult = await this.db
                 .select({
                     total: sql<number>`COALESCE(SUM(amount::numeric), 0)`,
                 })
                 .from(paymentRequests)
-                .where(
-                    and(
-                        eq(paymentRequests.purchaseOrderId, body.purchaseOrderId),
-                        ne(paymentRequests.status, 'rejected'),
-                    )
-                );
+                .where(and(eq(paymentRequests.purchaseOrderId, body.purchaseOrderId), ne(paymentRequests.status, "rejected")));
             const existingSum = Number(existingSumResult[0]?.total ?? 0);
             const requestedAmount = Number(body.amount ?? 0);
 
             if (existingSum + requestedAmount > poGrandTotal) {
                 throw new BadRequestException(
-                    `Payment request amount (${requestedAmount}) exceeds remaining PO limit. ` +
-                    `Available: ${poGrandTotal - existingSum}, Already used: ${existingSum}`
+                    `Payment request amount (${requestedAmount}) exceeds remaining PO limit. ` + `Available: ${poGrandTotal - existingSum}, Already used: ${existingSum}`
                 );
             }
         }
@@ -143,7 +150,7 @@ export class PaymentRequestService {
                 .select({ total: sql<number>`COALESCE(SUM(total_amount::numeric), 0)` })
                 .from(vendorWorkOrderItems)
                 .where(eq(vendorWorkOrderItems.vendorWorkOrderId, body.vendorWorkOrderId));
-            const woGrandTotal = Number(woGrandTotalResult[0]?.total ?? 0);
+            const woGrandTotal = Number(woGrandTotalResult[0]?.total ?? 0) + Number(await this.extraChargeTotalForWo(body.vendorWorkOrderId));
 
             const existingSumResult = await this.db
                 .select({
@@ -156,14 +163,13 @@ export class PaymentRequestService {
 
             if (existingSum + requestedAmount > woGrandTotal) {
                 throw new BadRequestException(
-                    `Payment request amount (${requestedAmount}) exceeds remaining WO limit. ` +
-                    `Available: ${woGrandTotal - existingSum}, Already used: ${existingSum}`,
+                    `Payment request amount (${requestedAmount}) exceeds remaining WO limit. ` + `Available: ${woGrandTotal - existingSum}, Already used: ${existingSum}`
                 );
             }
         }
 
         // Determine initial status based on PO/VWO approval
-        let initialStatus = 'pending';
+        let initialStatus = "pending";
         let tdsPercentage: number | null = null;
         if (body.purchaseOrderId) {
             const po = await this.db
@@ -172,7 +178,7 @@ export class PaymentRequestService {
                 .where(eq(purchaseOrders.id, body.purchaseOrderId))
                 .then(rows => rows[0]);
             if (po && po.poApproved !== true) {
-                initialStatus = 'po_approval_pending';
+                initialStatus = "po_approval_pending";
             }
             if (po?.tdsPercentage) tdsPercentage = Number(po.tdsPercentage);
         } else if (body.vendorWorkOrderId) {
@@ -182,7 +188,7 @@ export class PaymentRequestService {
                 .where(eq(vendorWorkOrders.id, body.vendorWorkOrderId))
                 .then(rows => rows[0]);
             if (wo && wo.woApproved !== true) {
-                initialStatus = 'po_approval_pending';
+                initialStatus = "po_approval_pending";
             }
             if (wo?.tdsPercentage) tdsPercentage = Number(wo.tdsPercentage);
         }
@@ -207,7 +213,7 @@ export class PaymentRequestService {
                     vendorWorkOrderId: body.vendorWorkOrderId,
                     uploadedInvoiceFile: body.uploadedInvoiceFile,
                     poFile: body.poFile,
-                    paymentMode: body.paymentMode || 'BANK_TRANSFER',
+                    paymentMode: body.paymentMode || "BANK_TRANSFER",
                     portalLink: body.portalLink || null,
                     billFiles: body.billFiles || [],
                     remark: body.remark,
@@ -232,39 +238,39 @@ export class PaymentRequestService {
 
         if (pr.projectId) {
             const prAmount = Number(pr.amount);
-            const tdsAmt = tdsPercentage ? (prAmount * tdsPercentage / 100) : undefined;
-            await this.cashFlowService.create({
-                projectId: pr.projectId,
-                eventType: 'payment_requested',
-                amount: prAmount.toString(),
-                direction: 'outflow',
-                referenceType: 'payment_request',
-                referenceId: pr.id,
-                referenceNo: requestNo ?? `PR #${pr.id}`,
-                tdsPercentage: tdsPercentage?.toString(),
-                tdsAmount: tdsAmt?.toString(),
-                remark: `Payment requested against ${pr.paymentAgainst}`,
-                createdBy: userId,
-            }).catch((err) => this.logger.warn(`Cash flow creation failed for PR #${pr.id}: ${err}`));
+            const tdsAmt = tdsPercentage ? (prAmount * tdsPercentage) / 100 : undefined;
+            await this.cashFlowService
+                .create({
+                    projectId: pr.projectId,
+                    eventType: "payment_requested",
+                    amount: prAmount.toString(),
+                    direction: "outflow",
+                    referenceType: "payment_request",
+                    referenceId: pr.id,
+                    referenceNo: requestNo ?? `PR #${pr.id}`,
+                    tdsPercentage: tdsPercentage?.toString(),
+                    tdsAmount: tdsAmt?.toString(),
+                    remark: `Payment requested against ${pr.paymentAgainst}`,
+                    createdBy: userId,
+                })
+                .catch(err => this.logger.warn(`Cash flow creation failed for PR #${pr.id}: ${err}`));
         }
 
         // Use the requestNo stored in the DB (not the transient local value)
-        const [storedPr] = await this.db
-            .select({ requestNo: paymentRequests.requestNo })
-            .from(paymentRequests)
-            .where(eq(paymentRequests.id, pr.id))
-            .limit(1);
+        const [storedPr] = await this.db.select({ requestNo: paymentRequests.requestNo }).from(paymentRequests).where(eq(paymentRequests.id, pr.id)).limit(1);
 
         // Fire-and-forget WhatsApp notification (skip for po_approval_pending)
-        if (initialStatus !== 'po_approval_pending') {
-            this.notifications.notifyNewPaymentRequest({
-              requestNo: storedPr?.requestNo ?? pr.requestNo ?? '',
-              amount: pr.amount ?? 0,
-              partyName: pr.partyName ?? null,
-              portalLink: pr.portalLink ?? null,
-              requestedBy: userId,
-              category: pr.paymentAgainst ?? '',
-            }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+        if (initialStatus !== "po_approval_pending") {
+            this.notifications
+                .notifyNewPaymentRequest({
+                    requestNo: storedPr?.requestNo ?? pr.requestNo ?? "",
+                    amount: pr.amount ?? 0,
+                    partyName: pr.partyName ?? null,
+                    portalLink: pr.portalLink ?? null,
+                    requestedBy: userId,
+                    category: pr.paymentAgainst ?? "",
+                })
+                .catch(err => this.logger.warn(`WhatsApp notification failed: ${err}`));
         }
 
         return pr;
@@ -337,9 +343,7 @@ export class PaymentRequestService {
         };
 
         if (!validTransitions[existing.status]?.includes(body.status)) {
-            throw new BadRequestException(
-                `Cannot transition from "${existing.status}" to "${body.status}"`
-            );
+            throw new BadRequestException(`Cannot transition from "${existing.status}" to "${body.status}"`);
         }
 
         return await this.db.transaction(async tx => {
@@ -351,7 +355,7 @@ export class PaymentRequestService {
                 tdsAmount: string | null,
                 usedFilter: SQL,
                 poId: number | null,
-                vwoId: number | null,
+                vwoId: number | null
             ): Promise<{ actualTdsDeducted?: string; tdsReturn?: DocumentTdsReturn }> => {
                 if (tdsAmount == null) return {};
 
@@ -360,18 +364,9 @@ export class PaymentRequestService {
                         used: sql<string>`COALESCE(SUM(${paymentRequests.actualTdsDeducted}::numeric), 0)`,
                     })
                     .from(paymentRequests)
-                    .where(and(
-                        usedFilter,
-                        eq(paymentRequests.status, "payment_done"),
-                        ne(paymentRequests.id, existing.id),
-                    ));
+                    .where(and(usedFilter, eq(paymentRequests.status, "payment_done"), ne(paymentRequests.id, existing.id)));
 
-                const actualTds = computeTdsDeducted(
-                    Number(existing.amount ?? 0),
-                    Number(tdsPercentage ?? 0),
-                    Number(tdsAmount),
-                    Number(used),
-                );
+                const actualTds = computeTdsDeducted(Number(existing.amount ?? 0), Number(tdsPercentage ?? 0), Number(tdsAmount), Number(used));
 
                 // Always persist the capped value (including 0) whenever the
                 // document has a TDS budget, so the UI can distinguish "cap
@@ -392,11 +387,7 @@ export class PaymentRequestService {
             };
 
             if (body.status === "payment_done" && existing.purchaseOrderId != null) {
-                const [po] = await tx
-                    .select()
-                    .from(purchaseOrders)
-                    .where(eq(purchaseOrders.id, existing.purchaseOrderId))
-                    .for("update");
+                const [po] = await tx.select().from(purchaseOrders).where(eq(purchaseOrders.id, existing.purchaseOrderId)).for("update");
 
                 if (po) {
                     const result = await computeDocumentTds(
@@ -404,17 +395,13 @@ export class PaymentRequestService {
                         po.tdsAmount,
                         eq(paymentRequests.purchaseOrderId, existing.purchaseOrderId),
                         existing.purchaseOrderId,
-                        null,
+                        null
                     );
                     if (result.actualTdsDeducted !== undefined) tdsCapSet.actualTdsDeducted = result.actualTdsDeducted;
                     if (result.tdsReturn) tdsReturn = result.tdsReturn;
                 }
             } else if (body.status === "payment_done" && existing.vendorWorkOrderId != null) {
-                const [wo] = await tx
-                    .select()
-                    .from(vendorWorkOrders)
-                    .where(eq(vendorWorkOrders.id, existing.vendorWorkOrderId))
-                    .for("update");
+                const [wo] = await tx.select().from(vendorWorkOrders).where(eq(vendorWorkOrders.id, existing.vendorWorkOrderId)).for("update");
 
                 if (wo) {
                     const result = await computeDocumentTds(
@@ -422,7 +409,7 @@ export class PaymentRequestService {
                         wo.tdsAmount,
                         eq(paymentRequests.vendorWorkOrderId, existing.vendorWorkOrderId),
                         null,
-                        existing.vendorWorkOrderId,
+                        existing.vendorWorkOrderId
                     );
                     if (result.actualTdsDeducted !== undefined) tdsCapSet.actualTdsDeducted = result.actualTdsDeducted;
                     if (result.tdsReturn) tdsReturn = result.tdsReturn;
@@ -456,75 +443,85 @@ export class PaymentRequestService {
 
             this.logger.info(`Payment Request #${id} status updated to "${body.status}"`);
 
-            if (body.status === 'payment_done') {
-              this.notifications.notifyPaymentDone({
-                requestNo: existing.requestNo ?? undefined,
-                amount: updated.amount ?? 0,
-                partyName: updated.partyName ?? null,
-                portalLink: updated.portalLink ?? null,
-                utrNumber: updated.utrNumber ?? null,
-                requestedBy: existing.requestedBy ?? 0,
-                category: existing.paymentAgainst ?? '',
-              }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+            if (body.status === "payment_done") {
+                this.notifications
+                    .notifyPaymentDone({
+                        requestNo: existing.requestNo ?? undefined,
+                        amount: updated.amount ?? 0,
+                        partyName: updated.partyName ?? null,
+                        portalLink: updated.portalLink ?? null,
+                        utrNumber: updated.utrNumber ?? null,
+                        requestedBy: existing.requestedBy ?? 0,
+                        category: existing.paymentAgainst ?? "",
+                    })
+                    .catch(err => this.logger.warn(`WhatsApp notification failed: ${err}`));
 
-              if (existing.projectId) {
-                  const tdsPct = existing.tdsPercentage ? Number(existing.tdsPercentage).toString() : undefined;
-                  const tdsAmt = existing.tdsPercentage ? (Number(existing.amount) * Number(existing.tdsPercentage) / 100) : 0;
-                  await this.cashFlowService.createInTransaction(tx, {
-                      projectId: existing.projectId,
-                      eventType: 'payment_paid',
-                      amount: Number(updated.amount).toString(),
-                      direction: 'outflow',
-                      referenceType: 'payment_request',
-                      referenceId: existing.id,
-                      referenceNo: existing.requestNo ?? `PR #${existing.id}`,
-                      tdsPercentage: tdsPct,
-                      tdsAmount: tdsAmt.toString(),
-                      remark: `Payment done. UTR: ${updated.utrNumber ?? 'N/A'}`,
-                      createdBy: existing.requestedBy ?? 0,
-                  }).catch((err) => this.logger.warn(`Cash flow creation failed for payment_paid PR #${existing.id}: ${err}`));
-              }
+                if (existing.projectId) {
+                    const tdsPct = existing.tdsPercentage ? Number(existing.tdsPercentage).toString() : undefined;
+                    const tdsAmt = existing.tdsPercentage ? (Number(existing.amount) * Number(existing.tdsPercentage)) / 100 : 0;
+                    await this.cashFlowService
+                        .createInTransaction(tx, {
+                            projectId: existing.projectId,
+                            eventType: "payment_paid",
+                            amount: Number(updated.amount).toString(),
+                            direction: "outflow",
+                            referenceType: "payment_request",
+                            referenceId: existing.id,
+                            referenceNo: existing.requestNo ?? `PR #${existing.id}`,
+                            tdsPercentage: tdsPct,
+                            tdsAmount: tdsAmt.toString(),
+                            remark: `Payment done. UTR: ${updated.utrNumber ?? "N/A"}`,
+                            createdBy: existing.requestedBy ?? 0,
+                        })
+                        .catch(err => this.logger.warn(`Cash flow creation failed for payment_paid PR #${existing.id}: ${err}`));
+                }
             }
 
-            if (body.status === 'rejected') {
-              this.notifications.notifyRejection({
-                requestNo: existing.requestNo ?? undefined,
-                amount: updated.amount ?? 0,
-                partyName: updated.partyName ?? null,
-                portalLink: updated.portalLink ?? null,
-                rejectionReason: body.rejectionReason ?? null,
-                requestedBy: existing.requestedBy ?? 0,
-                category: existing.paymentAgainst ?? '',
-              }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+            if (body.status === "rejected") {
+                this.notifications
+                    .notifyRejection({
+                        requestNo: existing.requestNo ?? undefined,
+                        amount: updated.amount ?? 0,
+                        partyName: updated.partyName ?? null,
+                        portalLink: updated.portalLink ?? null,
+                        rejectionReason: body.rejectionReason ?? null,
+                        requestedBy: existing.requestedBy ?? 0,
+                        category: existing.paymentAgainst ?? "",
+                    })
+                    .catch(err => this.logger.warn(`WhatsApp notification failed: ${err}`));
             }
 
-            if (body.status === 'maker_done') {
-              this.notifications.notifyMakerDone({
-                requestNo: existing.requestNo ?? undefined,
-                amount: updated.amount ?? 0,
-                partyName: updated.partyName ?? null,
-                portalLink: updated.portalLink ?? null,
-                requestedBy: existing.requestedBy ?? 0,
-                category: existing.paymentAgainst ?? '',
-              }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+            if (body.status === "maker_done") {
+                this.notifications
+                    .notifyMakerDone({
+                        requestNo: existing.requestNo ?? undefined,
+                        amount: updated.amount ?? 0,
+                        partyName: updated.partyName ?? null,
+                        portalLink: updated.portalLink ?? null,
+                        requestedBy: existing.requestedBy ?? 0,
+                        category: existing.paymentAgainst ?? "",
+                    })
+                    .catch(err => this.logger.warn(`WhatsApp notification failed: ${err}`));
 
-              if (existing.projectId) {
-                  const tdsPct = existing.tdsPercentage ? Number(existing.tdsPercentage).toString() : undefined;
-                  const tdsAmt = existing.tdsPercentage ? (Number(existing.amount) * Number(existing.tdsPercentage) / 100) : 0;
-                  await this.cashFlowService.createInTransaction(tx, {
-                      projectId: existing.projectId,
-                      eventType: 'payment_approved',
-                      amount: Number(updated.amount).toString(),
-                      direction: 'outflow',
-                      referenceType: 'payment_request',
-                      referenceId: existing.id,
-                      referenceNo: existing.requestNo ?? `PR #${existing.id}`,
-                      tdsPercentage: tdsPct,
-                      tdsAmount: tdsAmt.toString(),
-                      remark: `Payment approved by maker for ${existing.paymentAgainst}`,
-                      createdBy: existing.requestedBy ?? 0,
-                  }).catch((err) => this.logger.warn(`Cash flow creation failed for payment_approved PR #${existing.id}: ${err}`));
-              }
+                if (existing.projectId) {
+                    const tdsPct = existing.tdsPercentage ? Number(existing.tdsPercentage).toString() : undefined;
+                    const tdsAmt = existing.tdsPercentage ? (Number(existing.amount) * Number(existing.tdsPercentage)) / 100 : 0;
+                    await this.cashFlowService
+                        .createInTransaction(tx, {
+                            projectId: existing.projectId,
+                            eventType: "payment_approved",
+                            amount: Number(updated.amount).toString(),
+                            direction: "outflow",
+                            referenceType: "payment_request",
+                            referenceId: existing.id,
+                            referenceNo: existing.requestNo ?? `PR #${existing.id}`,
+                            tdsPercentage: tdsPct,
+                            tdsAmount: tdsAmt.toString(),
+                            remark: `Payment approved by maker for ${existing.paymentAgainst}`,
+                            createdBy: existing.requestedBy ?? 0,
+                        })
+                        .catch(err => this.logger.warn(`Cash flow creation failed for payment_approved PR #${existing.id}: ${err}`));
+                }
             }
 
             return updated;
@@ -543,22 +540,14 @@ export class PaymentRequestService {
         const userId = await this.resolveImprestUserId(tx, existing);
 
         if (userId == null) {
-            this.logger.warn(
-                `Imprest credit skipped for payment request #${existing.id} (${existing.requestNo}): no linked user for beneficiary`
-            );
+            this.logger.warn(`Imprest credit skipped for payment request #${existing.id} (${existing.requestNo}): no linked user for beneficiary`);
             return;
         }
 
-        const [user] = await tx
-            .select({ id: users.id, name: users.name })
-            .from(users)
-            .where(eq(users.id, userId))
-            .limit(1);
+        const [user] = await tx.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, userId)).limit(1);
 
         if (!user) {
-            this.logger.warn(
-                `Imprest credit skipped for payment request #${existing.id}: linked user #${userId} not found`
-            );
+            this.logger.warn(`Imprest credit skipped for payment request #${existing.id}: linked user #${userId} not found`);
             return;
         }
 
@@ -572,19 +561,13 @@ export class PaymentRequestService {
             updatedAt: new Date(),
         });
 
-        this.logger.info(
-            `Imprest credited ${existing.amount} to user #${user.id} (${user.name}) for payment request #${existing.id} (${existing.requestNo})`
-        );
+        this.logger.info(`Imprest credited ${existing.amount} to user #${user.id} (${user.name}) for payment request #${existing.id} (${existing.requestNo})`);
     }
 
     private async resolveImprestUserId(tx: DbInstance, existing: OperationPaymentRequest): Promise<number | null> {
         if (existing.beneficiaryId == null) return null;
 
-        const [ben] = await tx
-            .select({ userId: beneficiaries.userId })
-            .from(beneficiaries)
-            .where(eq(beneficiaries.id, existing.beneficiaryId))
-            .limit(1);
+        const [ben] = await tx.select({ userId: beneficiaries.userId }).from(beneficiaries).where(eq(beneficiaries.id, existing.beneficiaryId)).limit(1);
 
         if (ben?.userId == null) {
             this.logger.warn(`Imprest credit: beneficiary #${existing.beneficiaryId} has no linked user`);
@@ -604,9 +587,7 @@ export class PaymentRequestService {
 
         const allowedSourceStatuses = ["rejected", "payment_done", "maker_done"];
         if (!allowedSourceStatuses.includes(existing.status)) {
-            throw new BadRequestException(
-                `Cannot revert from "${existing.status}". Only rejected, payment_done, or maker_done can be reverted.`
-            );
+            throw new BadRequestException(`Cannot revert from "${existing.status}". Only rejected, payment_done, or maker_done can be reverted.`);
         }
 
         const allStatuses = ["pending", "po_approval_pending", "maker_done", "payment_done", "rejected"];
@@ -706,18 +687,18 @@ export class PaymentRequestService {
                 projectName: projects.projectName,
                 poNumber: purchaseOrders.poNumber,
                 vwoNumber: vendorWorkOrders.woNumber,
-                poTotalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
-                poTotalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
-                poGrandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                poTotalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0) + COALESCE((SELECT SUM(taxable_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                poTotalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0) + COALESCE((SELECT SUM(gst_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                poGrandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0) + COALESCE((SELECT SUM(total_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                 poTdsPercentage: purchaseOrders.tdsPercentage,
                 poTdsAmount: purchaseOrders.tdsAmount,
                 poAmountAfterTds: purchaseOrders.amountAfterTds,
                 poTotalPaymentRequested: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status != 'rejected'), 0)`,
                 poTotalMakerDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'maker_done'), 0)`,
                 poTotalPaymentDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'payment_done'), 0)`,
-                vwoTotalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
-                vwoTotalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
-                vwoGrandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
+                vwoTotalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0) + COALESCE((SELECT SUM(taxable_amount::numeric) FROM order_extra_charges WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
+                vwoTotalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0) + COALESCE((SELECT SUM(gst_amount::numeric) FROM order_extra_charges WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
+                vwoGrandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0) + COALESCE((SELECT SUM(total_amount::numeric) FROM order_extra_charges WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
                 vwoTdsPercentage: vendorWorkOrders.tdsPercentage,
                 vwoTdsAmount: vendorWorkOrders.tdsAmount,
                 vwoAmountAfterTds: vendorWorkOrders.amountAfterTds,
@@ -738,14 +719,14 @@ export class PaymentRequestService {
         return pr;
     }
 
-    async getAll(teamId?: number, type?: 'project' | 'maker') {
+    async getAll(teamId?: number, type?: "project" | "maker") {
         const conditions: ReturnType<typeof eq>[] = [];
         // if (teamId !== undefined) {
         //     conditions.push(eq(users.team, teamId));
         // }
-        if (type === 'project') {
+        if (type === "project") {
             conditions.push(sql`${paymentRequests.projectId} IS NOT NULL`);
-        } else if (type === 'maker') {
+        } else if (type === "maker") {
             conditions.push(sql`${paymentRequests.projectId} IS NULL`);
         }
 
@@ -804,10 +785,7 @@ export class PaymentRequestService {
     }
 
     async listBeneficiaries() {
-        return this.db
-            .select()
-            .from(beneficiaries)
-            .orderBy(desc(beneficiaries.createdAt));
+        return this.db.select().from(beneficiaries).orderBy(desc(beneficiaries.createdAt));
     }
 
     async getBeneficiary(id: number) {
@@ -847,8 +825,8 @@ export class PaymentRequestService {
 
     private sanitizeProjectName(name: string): string {
         return name
-            .replace(/[^a-zA-Z0-9\s-]/g, '')
+            .replace(/[^a-zA-Z0-9\s-]/g, "")
             .trim()
-            .replace(/[\s-]+/g, '_');
+            .replace(/[\s-]+/g, "_");
     }
 }

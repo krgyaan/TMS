@@ -15,6 +15,7 @@ import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.sch
 import { projects } from "@/db/schemas/master/projects.schema";
 import { vendorWorkOrderItems } from "@/db/schemas/operations/vendor-work-order-items.schema";
 import { purchaseInvoices } from "@/db/schemas/operations/purchase-invoices.schema";
+import { orderExtraCharges } from "@/db/schemas/operations/order-extra-charges.schema";
 import { paymentRequests } from "@/db/schemas/operations";
 import { projectParties } from "@/db/schemas/operations/project-parties.schema";
 import { vendorOrganizations } from "@/db/schemas/vendors/vendor-organizations.schema";
@@ -342,10 +343,28 @@ export class VendorWorkOrderService {
             { totalAmount: 0, totalGstAmt: 0, grandTotal: 0 }
         );
 
-        const total = {
+        const extraCharges = await this.db.select().from(orderExtraCharges).where(eq(orderExtraCharges.vendorWorkOrderId, id)).orderBy(asc(orderExtraCharges.id));
+
+        const extraChargesTotals = extraCharges.reduce(
+            (acc, c) => {
+                acc.total += Number(c.taxableAmount ?? 0);
+                acc.totalGst += Number(c.gstAmount ?? 0);
+                acc.totalWithGst += Number(c.totalAmount ?? 0);
+                return acc;
+            },
+            { total: 0, totalGst: 0, totalWithGst: 0 }
+        );
+
+        const itemTotals = {
             total: rawTotal.totalAmount,
             totalGst: rawTotal.totalGstAmt,
             totalWithGst: rawTotal.grandTotal,
+        };
+
+        const total = {
+            total: rawTotal.totalAmount + extraChargesTotals.total,
+            totalGst: rawTotal.totalGstAmt + extraChargesTotals.totalGst,
+            totalWithGst: rawTotal.grandTotal + extraChargesTotals.totalWithGst,
         };
 
         const enrichedProducts = items.map(product => {
@@ -401,6 +420,9 @@ export class VendorWorkOrderService {
             ...wo,
             products: enrichedProducts,
             total,
+            itemTotals,
+            extraCharges,
+            extraChargesTotals,
             raisedByName,
             paymentRequests: paymentRequestsData,
             purchaseInvoices: purchaseInvoicesData,
@@ -415,7 +437,7 @@ export class VendorWorkOrderService {
             }
         }
 
-        const effectiveAmount = sql`COALESCE(${vendorWorkOrders.amountAfterTds}::numeric, (SELECT SUM(total_amount::numeric) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}))`;
+        const effectiveAmount = sql`COALESCE(${vendorWorkOrders.amountAfterTds}::numeric, (SELECT SUM(total_amount::numeric) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}) + COALESCE((SELECT SUM(total_amount::numeric) FROM order_extra_charges WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0))`;
         const paymentDoneTotal = sql`(SELECT COALESCE(SUM(amount::numeric), 0) FROM project_payment_requests WHERE vendor_work_order_id = ${vendorWorkOrders.id} AND status = 'payment_done')`;
         const piTotal = sql`(SELECT COALESCE(SUM(value_pre_gst::numeric + gst_amount::numeric), 0) FROM project_purchase_invoices WHERE vendor_work_order_id = ${vendorWorkOrders.id})`;
 
@@ -463,9 +485,12 @@ export class VendorWorkOrderService {
                 woApproved: vendorWorkOrders.woApproved,
                 woApprovalRemark: vendorWorkOrders.woApprovalRemark,
                 closedAt: vendorWorkOrders.closedAt,
-                totalAmount: sql<number>`COALESCE((SELECT SUM(CAST(taxable_amount AS numeric)) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
-                totalGstAmt: sql<number>`COALESCE((SELECT SUM(CAST(gst_amount AS numeric)) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
-                grandTotal: sql<number>`COALESCE((SELECT SUM(CAST(total_amount AS numeric)) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
+                totalAmount: sql<number>`COALESCE((SELECT SUM(CAST(taxable_amount AS numeric)) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0) + COALESCE((SELECT SUM(CAST(taxable_amount AS numeric)) FROM order_extra_charges WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
+                totalGstAmt: sql<number>`COALESCE((SELECT SUM(CAST(gst_amount AS numeric)) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0) + COALESCE((SELECT SUM(CAST(gst_amount AS numeric)) FROM order_extra_charges WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
+                grandTotal: sql<number>`COALESCE((SELECT SUM(CAST(total_amount AS numeric)) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0) + COALESCE((SELECT SUM(CAST(total_amount AS numeric)) FROM order_extra_charges WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
+                extraChargesTaxable: sql<number>`COALESCE((SELECT SUM(CAST(taxable_amount AS numeric)) FROM order_extra_charges WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
+                extraChargesGst: sql<number>`COALESCE((SELECT SUM(CAST(gst_amount AS numeric)) FROM order_extra_charges WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
+                extraChargesTotal: sql<number>`COALESCE((SELECT SUM(CAST(total_amount AS numeric)) FROM order_extra_charges WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
                 totalVwiAmount: sql<number>`COALESCE((SELECT SUM(value_pre_gst::numeric + gst_amount::numeric) FROM project_purchase_invoices WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
                 totalVwiCount: sql<number>`COALESCE((SELECT COUNT(*) FROM project_purchase_invoices WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
                 totalPaymentRequested: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE vendor_work_order_id = ${vendorWorkOrders.id} AND status != 'rejected'), 0)`,
@@ -491,7 +516,7 @@ export class VendorWorkOrderService {
             return rows.length;
         };
 
-        const effectiveAmount = sql`COALESCE(${vendorWorkOrders.amountAfterTds}::numeric, (SELECT SUM(total_amount::numeric) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}))`;
+        const effectiveAmount = sql`COALESCE(${vendorWorkOrders.amountAfterTds}::numeric, (SELECT SUM(total_amount::numeric) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}) + COALESCE((SELECT SUM(total_amount::numeric) FROM order_extra_charges WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0))`;
         const paymentDoneTotal = sql`(SELECT COALESCE(SUM(amount::numeric), 0) FROM project_payment_requests WHERE vendor_work_order_id = ${vendorWorkOrders.id} AND status = 'payment_done')`;
         const piTotal = sql`(SELECT COALESCE(SUM(value_pre_gst::numeric + gst_amount::numeric), 0) FROM project_purchase_invoices WHERE vendor_work_order_id = ${vendorWorkOrders.id})`;
 
@@ -525,7 +550,10 @@ export class VendorWorkOrderService {
             const items = await this.db.select().from(vendorWorkOrderItems).where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
 
             const subtotal = items.reduce((acc, item) => acc + Number(item.taxableAmount), 0);
-            const grandTotal = items.reduce((acc, item) => acc + Number(item.totalAmount), 0);
+            const charges = await this.db.select().from(orderExtraCharges).where(eq(orderExtraCharges.vendorWorkOrderId, id));
+            const chargesTotal = charges.reduce((sum, c) => sum + Number(c.totalAmount ?? 0), 0);
+            // Extra charges roll into the grand total but stay out of the TDS base.
+            const grandTotal = items.reduce((acc, item) => acc + Number(item.totalAmount), 0) + chargesTotal;
             const tdsAmt = (subtotal * tdsPercentage) / 100;
             const amountAfterTds = grandTotal - tdsAmt;
 
@@ -688,6 +716,16 @@ export class VendorWorkOrderService {
             rows.map(async wo => {
                 const items = await this.db.select().from(vendorWorkOrderItems).where(eq(vendorWorkOrderItems.vendorWorkOrderId, wo.id));
 
+                const charges = await this.db.select().from(orderExtraCharges).where(eq(orderExtraCharges.vendorWorkOrderId, wo.id));
+                const chargesTotals = charges.reduce(
+                    (acc, c) => ({
+                        taxable: acc.taxable + Number(c.taxableAmount),
+                        gst: acc.gst + Number(c.gstAmount),
+                        total: acc.total + Number(c.totalAmount),
+                    }),
+                    { taxable: 0, gst: 0, total: 0 }
+                );
+
                 const totals = items.reduce(
                     (acc, item) => ({
                         totalAmount: acc.totalAmount + Number(item.taxableAmount),
@@ -696,6 +734,9 @@ export class VendorWorkOrderService {
                     }),
                     { totalAmount: 0, totalGstAmt: 0, grandTotal: 0 }
                 );
+                totals.totalAmount += chargesTotals.taxable;
+                totals.totalGstAmt += chargesTotals.gst;
+                totals.grandTotal += chargesTotals.total;
 
                 const [invoiceTotals] = await this.db
                     .select({
@@ -774,6 +815,13 @@ export class VendorWorkOrderService {
             .from(vendorWorkOrderItems)
             .where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
 
+        const [chargesTotals] = await this.db
+            .select({
+                total: sql<string>`COALESCE(SUM(${orderExtraCharges.totalAmount}::numeric), 0)`,
+            })
+            .from(orderExtraCharges)
+            .where(eq(orderExtraCharges.vendorWorkOrderId, id));
+
         const [paymentTotals] = await this.db
             .select({
                 gross: sql<string>`COALESCE(SUM(${paymentRequests.amount}::numeric), 0)`,
@@ -791,7 +839,9 @@ export class VendorWorkOrderService {
 
         // Closure reconciles against the GROSS VWO value (items incl. GST);
         // for VWOs without item rows, fall back to amountAfterTds + tdsAmount.
-        const grandTotal = round2(Number(itemTotals.total) > 0 ? itemTotals.total : Number(wo.amountAfterTds ?? 0) + Number(wo.tdsAmount ?? 0));
+        const grandTotal = round2(
+            Number(itemTotals.total) > 0 ? Number(itemTotals.total) + Number(chargesTotals.total) : Number(wo.amountAfterTds ?? 0) + Number(wo.tdsAmount ?? 0)
+        );
         const totalPaymentDone = round2(paymentTotals.gross);
         const totalTdsDeducted = round2(paymentTotals.tds);
         const totalPaidAfterTds = round2(totalPaymentDone - totalTdsDeducted);
@@ -842,7 +892,9 @@ export class VendorWorkOrderService {
 
         const closureStatus = await this.checkClosure(id);
         if (!closureStatus.canClose) {
-            throw new BadRequestException(`Vendor Work Order cannot be closed until invoices cover the VWO value and payments match the invoices (each difference under ₹${CLOSURE_TOLERANCE}).`);
+            throw new BadRequestException(
+                `Vendor Work Order cannot be closed until invoices cover the VWO value and payments match the invoices (each difference under ₹${CLOSURE_TOLERANCE}).`
+            );
         }
 
         const [updated] = await this.db
@@ -879,6 +931,10 @@ export class VendorWorkOrderService {
 
         const grandTotal = round2(items.reduce((sum, item) => sum + Number(item.totalAmount), 0));
         const totalGst = round2(items.reduce((sum, item) => sum + Number(item.gstAmount), 0));
+
+        const extraCharges = await this.db.select().from(orderExtraCharges).where(eq(orderExtraCharges.vendorWorkOrderId, id)).orderBy(asc(orderExtraCharges.id));
+        const extraChargesGrandTotal = round2(extraCharges.reduce((sum, c) => sum + Number(c.totalAmount ?? 0), 0));
+        const extraChargesGst = round2(extraCharges.reduce((sum, c) => sum + Number(c.gstAmount ?? 0), 0));
 
         const paymentRequestsData = await this.db
             .select({
@@ -933,8 +989,9 @@ export class VendorWorkOrderService {
             amountAfterTds: wo.amountAfterTds,
             tdsAmount: wo.tdsAmount,
             tdsPercentage: wo.tdsPercentage,
-            grandTotal,
-            totalGst,
+            grandTotal: round2(grandTotal + extraChargesGrandTotal),
+            totalGst: round2(totalGst + extraChargesGst),
+            extraCharges,
             totalPaymentDone,
             totalTdsDeducted,
             totalPaidAfterTds,
@@ -999,7 +1056,21 @@ export class VendorWorkOrderService {
 
         const created: any[] = [];
         for (const item of items) {
-            const invoiceNo = await this.generatePurchaseInvoiceNumber(wo.projectName ?? undefined);
+            const invoiceNo = (item.invoiceNo ?? "").toString().trim();
+            if (!invoiceNo) {
+                throw new BadRequestException("Invoice number is required for every purchase invoice");
+            }
+
+            const duplicate = await this.db
+                .select({ id: purchaseInvoices.id })
+                .from(purchaseInvoices)
+                .where(and(eq(purchaseInvoices.projectId, wo.projectId), eq(purchaseInvoices.invoiceNo, invoiceNo)))
+                .limit(1)
+                .then(rows => rows[0]);
+            if (duplicate) {
+                throw new BadRequestException(`Invoice number "${invoiceNo}" already exists for this project`);
+            }
+
             const pi = (
                 await this.db
                     .insert(purchaseInvoices)
@@ -1007,7 +1078,7 @@ export class VendorWorkOrderService {
                         projectId: wo.projectId,
                         vendorWorkOrderId: id,
                         invoiceNo,
-                        category: item.category,
+                        category: item.category ?? wo.category ?? null,
                         partyName: item.partyName ?? wo.sellerName ?? null,
                         valuePreGst: item.valuePreGst?.toString(),
                         gstAmount: item.gstAmount?.toString(),
@@ -1146,31 +1217,17 @@ export class VendorWorkOrderService {
         return `${prefix}/PR${next.toString().padStart(4, "0")}`;
     }
 
-    private async generatePurchaseInvoiceNumber(projectName?: string) {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = now.getMonth() + 1;
-        const from = month >= 4 ? year.toString().slice(-2) : (year - 1).toString().slice(-2);
-        const to = ((Number.parseInt(from) + 1) % 100).toString().padStart(2, "0");
-        const fy = `${from}${to}`;
-
-        const sanitizedName = projectName ? this.sanitizeProjectName(projectName) : "PROJECT";
-        const prefix = `VE/${sanitizedName}/${fy}`;
-        const series = "WOI";
-
-        const last = await this.db
-            .select({ id: purchaseInvoices.id, invoiceNo: purchaseInvoices.invoiceNo })
-            .from(purchaseInvoices)
-            .where(like(purchaseInvoices.invoiceNo, `VE/%/${fy}/${series}%`))
-            .orderBy(desc(purchaseInvoices.id));
-
-        let next = 1;
-        if (last[0]?.invoiceNo) {
-            const match = last[0].invoiceNo.match(new RegExp(`${series}(\\d{4})$`));
-            if (match) next = parseInt(match[1]) + 1;
-        }
-
-        return `${prefix}/${series}${next.toString().padStart(4, "0")}`;
+    // Regenerates the latest VWO PDF (items + extra charges) after the PI form
+    // has altered the order. Fire-and-forget from the invoice service.
+    async regeneratePdf(id: number): Promise<void> {
+        const wo = await this.db
+            .select()
+            .from(vendorWorkOrders)
+            .where(eq(vendorWorkOrders.id, id))
+            .then(rows => rows[0]);
+        if (!wo) throw new NotFoundException("Vendor Work Order not found");
+        const items = await this.db.select().from(vendorWorkOrderItems).where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
+        await this.generatePdfForWO(wo, items);
     }
 
     async listParties(type?: string) {
@@ -1492,7 +1549,7 @@ export class VendorWorkOrderService {
         }
     }
 
-    private computeWOHash(wo: any, products: any[]): string {
+    private computeWOHash(wo: any, products: any[], extraCharges: any[] = []): string {
         const fields = {
             woDate: wo.woDate,
             woNumber: wo.woNumber,
@@ -1524,12 +1581,20 @@ export class VendorWorkOrderService {
                 rate: p.rate,
                 gstRate: p.gstRate,
             })),
+            extraCharges: (extraCharges || []).map((c: any) => ({
+                label: c.label,
+                gstRate: c.gstRate,
+                taxableAmount: c.taxableAmount,
+                gstAmount: c.gstAmount,
+                totalAmount: c.totalAmount,
+            })),
         };
         return createHash("sha256").update(JSON.stringify(fields)).digest("hex");
     }
 
     private async generatePdfForWO(wo: any, products: any[]) {
-        const contentHash = this.computeWOHash(wo, products);
+        const extraCharges = await this.db.select().from(orderExtraCharges).where(eq(orderExtraCharges.vendorWorkOrderId, wo.id)).orderBy(asc(orderExtraCharges.id));
+        const contentHash = this.computeWOHash(wo, products, extraCharges);
 
         const versions = (wo.generatedPdfVersions ?? {}) as Record<string, { path: string; hash: string }>;
         const existingVersion = Object.values(versions).find(v => v.hash === contentHash);
@@ -1556,9 +1621,23 @@ export class VendorWorkOrderService {
             };
         });
 
-        const totalAmount = items.reduce((s: number, i: any) => s + i.amount, 0);
-        const totalGstAmt = items.reduce((s: number, i: any) => s + i.gst_amount, 0);
-        const grandTotal = totalAmount + totalGstAmt;
+        const itemsAmount = items.reduce((s: number, i: any) => s + i.amount, 0);
+        const itemsGstAmt = items.reduce((s: number, i: any) => s + i.gst_amount, 0);
+
+        const otherCharges = extraCharges.map((c: any) => ({
+            label: c.label || "",
+            amount: Number(c.taxableAmount ?? 0),
+            gst_rate: Number(c.gstRate ?? 0),
+            gst_amount: Number(c.gstAmount ?? 0),
+            total: Number(c.totalAmount ?? 0),
+        }));
+        const chargesTotalAmount = otherCharges.reduce((s: number, c: any) => s + c.amount, 0);
+        const chargesGstAmt = otherCharges.reduce((s: number, c: any) => s + c.gst_amount, 0);
+        const chargesGrandTotal = otherCharges.reduce((s: number, c: any) => s + c.total, 0);
+
+        const totalAmount = itemsAmount + chargesTotalAmount;
+        const totalGstAmt = itemsGstAmt + chargesGstAmt;
+        const grandTotal = itemsAmount + itemsGstAmt + chargesGrandTotal;
 
         // Determine signature image based on creator's team
         const [creatorUser] = await this.db.select({ team: users.team }).from(users).where(eq(users.id, wo.woRaisedBy)).limit(1);
@@ -1591,6 +1670,11 @@ export class VendorWorkOrderService {
             shipping_to_pan: wo.shipToPan || "",
             shipping_to_gst: wo.shipToGst || "",
             items,
+            other_charges: otherCharges,
+            has_other_charges: otherCharges.length > 0,
+            charges_total_amount: chargesTotalAmount,
+            charges_gst_amt: chargesGstAmt,
+            charges_grand_total: chargesGrandTotal,
             total_amount: totalAmount,
             total_gst_amt: totalGstAmt,
             grand_total: grandTotal,
