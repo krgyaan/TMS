@@ -51,9 +51,6 @@ export type PurchaseInvoiceFormValues = z.infer<typeof purchaseInvoiceFormSchema
 export type InvoiceItemFormValues = z.infer<typeof invoiceItemFormSchema>;
 export type ExtraChargeFormValues = z.infer<typeof extraChargeFormSchema>;
 
-export const EXTRA_CHARGE_PRESETS = [
-    { id: "Freight", name: "Freight" },
-    { id: "Security", name: "Security" },
-] as const;
+export const EXTRA_CHARGE_PRESETS = [{ id: "Freight", name: "Freight" }] as const;
 
 export const GST_RATES = [0, 5, 12, 18, 28] as const;

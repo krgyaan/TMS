@@ -91,12 +91,22 @@ interface CreateReference {
     charges: ExtraChargePayload[];
 }
 
-export function mapPurchaseInvoiceFormToCreateDTO(values: PurchaseInvoiceFormValues, projectId: number, reference: Partial<CreateReference> = {}): CreatePurchaseInvoiceDTO {
+interface CreateOptions {
+    itemsEdited: boolean;
+    chargesEdited: boolean;
+}
+
+export function mapPurchaseInvoiceFormToCreateDTO(
+    values: PurchaseInvoiceFormValues,
+    projectId: number,
+    reference: Partial<CreateReference> = {},
+    options: Partial<CreateOptions> = {}
+): CreatePurchaseInvoiceDTO {
     const items = itemsToPayload(values.items);
     const extraCharges = chargesToPayload(values.extraCharges);
 
-    const itemsChanged = JSON.stringify(items) !== JSON.stringify(reference.items ?? []);
-    const chargesChanged = JSON.stringify(extraCharges) !== JSON.stringify(reference.charges ?? []);
+    const itemsChanged = options.itemsEdited !== false && JSON.stringify(items) !== JSON.stringify(reference.items ?? []);
+    const chargesChanged = options.chargesEdited !== false && JSON.stringify(extraCharges) !== JSON.stringify(reference.charges ?? []);
 
     return {
         projectId,
