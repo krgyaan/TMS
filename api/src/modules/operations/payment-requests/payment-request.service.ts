@@ -373,12 +373,13 @@ export class PaymentRequestService {
                     Number(used),
                 );
 
-                if (actualTds <= 0) return {};
-
+                // Always persist the capped value (including 0) whenever the
+                // document has a TDS budget, so the UI can distinguish "cap
+                // exhausted / no TDS due" from "never computed".
                 const result: { actualTdsDeducted?: string; tdsReturn?: DocumentTdsReturn } = {
                     actualTdsDeducted: actualTds.toFixed(2),
                 };
-                if (existing.projectId != null) {
+                if (actualTds > 0 && existing.projectId != null) {
                     result.tdsReturn = {
                         projectId: existing.projectId,
                         poId,
@@ -405,7 +406,7 @@ export class PaymentRequestService {
                         existing.purchaseOrderId,
                         null,
                     );
-                    if (result.actualTdsDeducted) tdsCapSet.actualTdsDeducted = result.actualTdsDeducted;
+                    if (result.actualTdsDeducted !== undefined) tdsCapSet.actualTdsDeducted = result.actualTdsDeducted;
                     if (result.tdsReturn) tdsReturn = result.tdsReturn;
                 }
             } else if (body.status === "payment_done" && existing.vendorWorkOrderId != null) {
@@ -423,7 +424,7 @@ export class PaymentRequestService {
                         null,
                         existing.vendorWorkOrderId,
                     );
-                    if (result.actualTdsDeducted) tdsCapSet.actualTdsDeducted = result.actualTdsDeducted;
+                    if (result.actualTdsDeducted !== undefined) tdsCapSet.actualTdsDeducted = result.actualTdsDeducted;
                     if (result.tdsReturn) tdsReturn = result.tdsReturn;
                 }
             }
@@ -622,6 +623,7 @@ export class PaymentRequestService {
                         remark: body.remark,
                         utrNumber: existing.status === "payment_done" ? null : existing.utrNumber,
                         rejectionReason: existing.status === "rejected" ? null : existing.rejectionReason,
+                        actualTdsDeducted: existing.status === "payment_done" ? "0.00" : existing.actualTdsDeducted,
                         updatedAt: new Date(),
                     })
                     .where(eq(paymentRequests.id, id))

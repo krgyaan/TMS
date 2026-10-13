@@ -92,6 +92,9 @@ export const PaymentRequestsSection: React.FC<PaymentRequestsSectionProps> = ({
             sortable: false,
             valueGetter: (p) => {
                 const amount = Number(p.data?.amount || 0);
+                if (p.data?.status === "payment_done") {
+                    return amount - Number(p.data?.actualTdsDeducted ?? 0);
+                }
                 const tdsPct = Number(p.data?.tdsPercentage || 0);
                 return tdsPct > 0 ? calculateTds(amount, tdsPct).netPayable : amount;
             },
