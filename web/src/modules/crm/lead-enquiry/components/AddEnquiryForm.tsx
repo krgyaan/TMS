@@ -20,6 +20,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { paths } from "@/app/routes/paths";
 import { useCreateEnquiryWithLead } from "@/hooks/api/useLeadEnquiry";
 import { useLocations } from "@/hooks/api/useLocations";
+import { useOrganizationNameOptions } from "@/hooks/useSelectOptions";
 import axiosInstance from "@/lib/axios";
 import type { Location } from "@/types/api.types";
 
@@ -100,6 +101,7 @@ export function AddEnquiryForm() {
     const createEnquiryWithLead = useCreateEnquiryWithLead();
 
     const { data: itemOptions = [] } = useQuery({ queryKey: ["items"], queryFn: fetchItems });
+    const orgOptions = useOrganizationNameOptions();
     const { data: teamOptions = [] } = useQuery({ queryKey: ["teams"], queryFn: fetchTeams });
     const { data: stateOptions = [] } = useQuery({ queryKey: ["states"], queryFn: fetchStates });
     const { data: locations = [] } = useLocations();
@@ -132,10 +134,23 @@ export function AddEnquiryForm() {
     });
 
     const orgAbb = useWatch({ control: form.control, name: "orgAbbName" });
+    const organizationVal = useWatch({ control: form.control, name: "organizationName" });
+    const selectedOrg = orgOptions.find((o) => o.id === organizationVal);
     const itemIdVal = useWatch({ control: form.control, name: "itemId" });
     const locationVal = useWatch({ control: form.control, name: "locationCode" });
     const country = useWatch({ control: form.control, name: "country" });
     const isIndia = country === "India";
+
+    // Mirror the selected organization's acronym into the (read-only)
+    // abbreviation field. Fall back to the full name when the organization
+    // master has no acronym, so the required-field validation still passes.
+    useEffect(() => {
+        if (!selectedOrg) {
+            form.setValue("orgAbbName", "", { shouldValidate: false });
+            return;
+        }
+        form.setValue("orgAbbName", selectedOrg.acronym || selectedOrg.orgName);
+    }, [selectedOrg, form]);
 
     const isInitialLoad = useRef(true);
     const previousCountry = useRef<string>("");
@@ -171,6 +186,9 @@ export function AddEnquiryForm() {
         try {
             const payload = {
                 ...values,
+                // The dropdown stores the organization id; send its real name
+                // (not the "<acronym> — <name>" label).
+                organizationName: selectedOrg?.orgName ?? "",
                 itemId: Number(values.itemId),
                 siteVisitRequired: values.siteVisitRequired === "yes",
                 dueDate: values.dueDate || null,
@@ -225,15 +243,26 @@ export function AddEnquiryForm() {
                                 placeholder="-- Select Team --"
                             />
 
-                            <FieldWrapper control={form.control} name="organizationName" label="Organisation (End user)">
-                                {(field) => (
-                                    <Input placeholder="Enter organisation name" {...field} />
-                                )}
-                            </FieldWrapper>
+                            <SelectField
+                                control={form.control}
+                                name="organizationName"
+                                label="Organisation (End user)"
+                                options={orgOptions}
+                                placeholder="-- Select Organisation --"
+                                valueType="string"
+                            />
 
                             {/* Row 2: Org Abbreviation + Item + Location */}
                             <FieldWrapper control={form.control} name="orgAbbName" label="Organisation Abbreviation">
-                                {(field) => <Input placeholder="Enter abbreviation" {...field} />}
+                                {(field) => (
+                                    <Input
+                                        placeholder="Select an organisation"
+                                        {...field}
+                                        value={field.value ?? ""}
+                                        readOnly
+                                        className="bg-muted/30"
+                                    />
+                                )}
                             </FieldWrapper>
 
                             <SelectField

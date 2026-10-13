@@ -45,6 +45,29 @@ export function useOrganizationOptions(status: boolean = true) {
     );
 }
 
+/**
+ * Organization picker that renders "<acronym> — <full name>" in a single
+ * colour. `acronym` / `orgName` are kept separately so callers can auto-fill an
+ * abbreviation field or persist the real organization name (never the label).
+ */
+export function useOrganizationNameOptions(status: boolean = true) {
+    const { data: organizations = [] } = useOrganizations();
+
+    return useMemo(
+        () =>
+            organizations
+                .filter((o) => o.status === status)
+                .map((o) => ({
+                    id: String(o.id),
+                    acronym: o.acronym ?? '',
+                    orgName: o.name,
+                    name: o.acronym ? `${o.acronym} — ${o.name}` : o.name,
+                }))
+                .sort((a, b) => (a.acronym || a.orgName).localeCompare(b.acronym || b.orgName)),
+        [organizations, status]
+    );
+}
+
 export function useUserOptions(teamId?: number) {
     const { data: users = [] } = useGetTeamMembers(teamId ?? 2);
     return useMemo(

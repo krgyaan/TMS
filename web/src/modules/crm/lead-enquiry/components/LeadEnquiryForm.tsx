@@ -23,6 +23,7 @@ import { useInfoSheet } from "@/hooks/api/useInfoSheets";
 import { useLocations } from "@/hooks/api/useLocations";
 import { useLead } from "@/hooks/api/useLeads";
 import { useHappyCalling } from "@/hooks/api/useHappyCalling";
+import { useOrganizationNameOptions } from "@/hooks/useSelectOptions";
 import axiosInstance from "@/lib/axios";
 import type { Location } from "@/types/api.types";
 import type { LeadEnquiryWithNames } from "../helpers/lead-enquiry.type";
@@ -96,6 +97,11 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
     const { data: locations = [] } = useLocations();
     const { data: leadData } = useLead(defaultLeadId ?? null);
     const { data: happyCallingRecord } = useHappyCalling(defaultHappyCallingId ?? null);
+    const orgOptions = useOrganizationNameOptions();
+
+    // When the enquiry is opened from a lead / happy-calling record the
+    // organisation is pre-filled as free text and must not be editable.
+    const isOrgLocked = !!defaultLeadId || !!defaultHappyCallingId || !!prefillOrganizationName;
     const { data: infoSheet } = useInfoSheet(mode === "edit" ? (enquiry?.tenderId ?? null) : null);
 
     const tenderClients = useMemo(
@@ -144,8 +150,26 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
     });
 
     const orgAbb = useWatch({ control: form.control, name: "orgAbbName" });
+    const organizationVal = useWatch({ control: form.control, name: "organizationName" });
     const itemIdVal = useWatch({ control: form.control, name: "itemId" });
     const locationVal = useWatch({ control: form.control, name: "locationCode" });
+
+    // Auto-fill the read-only abbreviation from the selected organization.
+    // When the form is opened from a lead / happy-calling record the field holds
+    // free text, so match on the organization name instead of the id. When no
+    // master record matches we fall back to that text so the required-field
+    // validation still passes.
+    useEffect(() => {
+        const value = organizationVal ?? "";
+        if (!value) {
+            form.setValue("orgAbbName", "", { shouldValidate: false });
+            return;
+        }
+        const matched = isOrgLocked
+            ? orgOptions.find((o) => o.orgName === value)
+            : orgOptions.find((o) => o.id === value);
+        form.setValue("orgAbbName", matched?.acronym || matched?.orgName || value);
+    }, [organizationVal, isOrgLocked, orgOptions, form]);
 
     useEffect(() => {
         if (leadData) {
@@ -225,6 +249,12 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
 
             const payload = {
                 ...values,
+                // When unlocked the dropdown stores the organization id; send its
+                // real name, never the "<acronym> — <name>" label. When locked the
+                // field already holds the plain name.
+                organizationName: isOrgLocked
+                    ? (values.organizationName ?? "")
+                    : (orgOptions.find((o) => o.id === values.organizationName)?.orgName ?? ""),
                 leadId: values.leadId ? Number(values.leadId) : null,
                 happyCallingId: defaultHappyCallingId ? Number(defaultHappyCallingId) : null,
                 itemId: Number(values.itemId),
@@ -283,20 +313,40 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
                                 placeholder="-- Select Team --"
                             />
 
-                            <FieldWrapper control={form.control} name="organizationName" label="Organisation (End user)">
-                                {(field) => (
-                                    <Input
-                                        placeholder="Enter organisation name"
-                                        {...field}
-                                        readOnly={!!defaultLeadId || !!prefillOrganizationName}
-                                        className={defaultLeadId || prefillOrganizationName ? "bg-muted/30" : ""}
-                                    />
-                                )}
-                            </FieldWrapper>
+                            {isOrgLocked ? (
+                                <FieldWrapper control={form.control} name="organizationName" label="Organisation (End user)">
+                                    {(field) => (
+                                        <Input
+                                            placeholder="Enter organisation name"
+                                            {...field}
+                                            value={field.value ?? ""}
+                                            readOnly
+                                            className="bg-muted/30"
+                                        />
+                                    )}
+                                </FieldWrapper>
+                            ) : (
+                                <SelectField
+                                    control={form.control}
+                                    name="organizationName"
+                                    label="Organisation (End user)"
+                                    options={orgOptions}
+                                    placeholder="-- Select Organisation --"
+                                    valueType="string"
+                                />
+                            )}
 
                             {/* Row 2: Org Abbreviation + Item + Location */}
                             <FieldWrapper control={form.control} name="orgAbbName" label="Organisation Abbreviation">
-                                {(field) => <Input placeholder="Enter abbreviation" {...field} />}
+                                {(field) => (
+                                    <Input
+                                        placeholder="Select an organisation"
+                                        {...field}
+                                        value={field.value ?? ""}
+                                        readOnly
+                                        className="bg-muted/30"
+                                    />
+                                )}
                             </FieldWrapper>
 
                             <SelectField

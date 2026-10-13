@@ -159,7 +159,7 @@ export function Combobox({
                                 }}
                                 className={cn("flex items-center justify-between gap-2", isCreateNew && "text-primary font-semibold")}
                             >
-                                <div className="flex items-center gap-2 min-w-0">
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
                                     <svg
                                         xmlns="http://www.w3.org/2000/svg"
                                         viewBox="0 0 20 20"
@@ -172,11 +172,14 @@ export function Combobox({
                                             clipRule="evenodd"
                                         />
                                     </svg>
-                                    <div className="flex flex-col truncate">
-                                        <span className="truncate">{o.name}</span>
-                                        {o.description && <span className="text-xs text-muted-foreground truncate">{o.description}</span>}
-                                    </div>
+                                    <span className="flex-1 min-w-0 truncate text-foreground">{o.name}</span>
                                 </div>
+
+                                {o.description && (
+                                    <span className="shrink-0 max-w-[45%] truncate text-xs text-muted-foreground">
+                                        {o.description}
+                                    </span>
+                                )}
 
                                 {isAiSuggested && (
                                     <span
