@@ -169,4 +169,68 @@ describe('TenderInfosService document invalidation (Prompt 2A b)', () => {
         expect(updateCalls.some((c) => c.table === tenderExtractions)).toBe(false);
         expect(updateCalls.some((c) => c.table === biddingRequirementsJobs)).toBe(false);
     });
+
+    it('should preserve all user-edited fields and info-sheet values when marking extraction stale', async () => {
+        const tenderId = 456;
+        const currentTenderWithEdits: any = {
+            id: tenderId,
+            tenderNo: 'TND-456-USER-EDITED',
+            documents: 'initial_doc.pdf',
+            tenderValue: 12500000,
+            remarks: 'User custom notes on tender',
+            status: 'IN_REVIEW',
+        };
+
+        const updatedRow: any = {
+            ...currentTenderWithEdits,
+            documents: 'new_addendum_doc.pdf',
+        };
+
+        jest.spyOn(service, 'findById').mockResolvedValue(currentTenderWithEdits);
+        jest.spyOn(service as any, 'sendTenderUpdateEmail').mockResolvedValue(undefined);
+
+        const updateCalls: Array<{ table: any; setArgs: any }> = [];
+
+        mockDb.update.mockImplementation((table: any) => {
+            return {
+                set: jest.fn().mockImplementation((setArgs: any) => {
+                    updateCalls.push({ table, setArgs });
+                    return {
+                        where: jest.fn().mockImplementation(() => {
+                            return {
+                                returning: jest.fn().mockResolvedValue([updatedRow]),
+                            };
+                        }),
+                    };
+                }),
+            };
+        });
+
+        // Trigger document change
+        await service.update(tenderId, { documents: 'new_addendum_doc.pdf' }, 10);
+
+        // 1. Verify the extraction update touched ONLY extractionVersion and updatedAt
+        const extractionsUpdate = updateCalls.find((c) => c.table === tenderExtractions);
+        expect(extractionsUpdate).toBeDefined();
+        expect(extractionsUpdate?.setArgs).toHaveProperty('extractionVersion', 'stale');
+        expect(extractionsUpdate?.setArgs).toHaveProperty('updatedAt');
+
+        // Crucial: ensure no user-edited fields or missingFields were wiped/overwritten
+        const extractionKeys = Object.keys(extractionsUpdate?.setArgs || {});
+        expect(extractionKeys.sort()).toEqual(['extractionVersion', 'updatedAt'].sort());
+        expect(extractionsUpdate?.setArgs).not.toHaveProperty('fields');
+        expect(extractionsUpdate?.setArgs).not.toHaveProperty('missingFields');
+
+        // 2. Verify bidding requirements update touched ONLY status and updatedAt
+        const biddingJobsUpdate = updateCalls.find((c) => c.table === biddingRequirementsJobs);
+        expect(biddingJobsUpdate).toBeDefined();
+        const biddingKeys = Object.keys(biddingJobsUpdate?.setArgs || {});
+        expect(biddingKeys.sort()).toEqual(['status', 'updatedAt'].sort());
+        expect(biddingJobsUpdate?.setArgs).not.toHaveProperty('result');
+
+        // 3. User tender fields on tenderInfos update preserved
+        const tenderInfosUpdate = updateCalls.find((c) => c.table === tenderInfos);
+        expect(tenderInfosUpdate).toBeDefined();
+        expect(tenderInfosUpdate?.setArgs.documents).toBe('new_addendum_doc.pdf');
+    });
 });

@@ -247,4 +247,71 @@ describeDb('tender_extractions writers keep the cached analysis (real Postgres)'
             metadata: { llm_status: 'llm_unavailable', failed_categories: ['prs_ld'] },
         });
     });
+
+    it('PDF auto-extract worker: failure midway through transaction rolls back write leaving pre-existing row unchanged', async () => {
+        const initialRow = {
+            emdAmount: { value: 55555 },
+            metadata: { llm_status: 'ok', failed_categories: [] },
+        };
+        await seed(initialRow);
+
+        const tempPdf = path.join(__dirname, 'temp_merge_rollback_test.pdf');
+        fs.writeFileSync(tempPdf, '%PDF-1.4 dummy');
+        const originalFetch = global.fetch;
+        global.fetch = jest.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({
+                extraction_version: '1.0.0',
+                fields: { emdAmount: { value: 999999 } },
+                missing_fields: [],
+                processing_time_ms: 10,
+                llm_status: 'ok',
+                failed_categories: [],
+            }),
+        } as any);
+
+        const originalTransaction = db.transaction.bind(db);
+        const failingDb = Object.create(db);
+        failingDb.transaction = async (fn: any) => {
+            return originalTransaction(async (tx: any) => {
+                await fn(tx);
+                throw new Error('Midway transaction failure before commit');
+            });
+        };
+
+        try {
+            const processor = new PdfExtractionProcessor(
+                { get: jest.fn() } as any,
+                { getAbsolutePath: jest.fn().mockReturnValue(tempPdf) } as any,
+                { recordUsage: jest.fn(), recordTpmEntry: jest.fn(), getCurrentTpm: jest.fn().mockResolvedValue(0) } as any,
+                logger as any,
+                failingDb as any,
+            );
+
+            await expect(
+                processor.processJob(
+                    { id: 'extract-tender-1175', data: { tenderId: 1175, pdfPath: tempPdf, userId: 7 } } as any,
+                    'http://localhost:8001',
+                    120000,
+                ),
+            ).rejects.toThrow(/EXTRACTION_SAVE_FAILED/);
+        } finally {
+            global.fetch = originalFetch;
+            if (fs.existsSync(tempPdf)) {
+                fs.unlinkSync(tempPdf);
+            }
+        }
+
+        // Real Postgres verification: transaction rollback leaves pre-existing row completely unchanged
+        const currentFields = await storedFields();
+        expect(currentFields).toEqual(initialRow);
+
+        // Also verify for an unseeded tender 9999: nothing saved
+        const [unseededRow] = await db
+            .select()
+            .from(tenderExtractions)
+            .where(eq(tenderExtractions.tenderId, 9999));
+        expect(unseededRow).toBeUndefined();
+    });
 });
