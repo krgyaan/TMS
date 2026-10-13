@@ -785,6 +785,101 @@ describe('PDF Extraction Queue Integration (Phase 8)', () => {
                 global.fetch = originalFetch;
             }
         });
+
+        it('should persist extended keys (requiredDocuments, doc1-doc9, miiPreference, gemBidEndDate, etc.) in tender_extractions.fields', async () => {
+            const mockExtendedResult: PdfExtractionJobResult = {
+                fields: {
+                    tenderValue: { value: 5000000, confidence: 'high' },
+                    requiredDocuments: { value: ['PAN Card', 'GST Registration'], confidence: 'high' },
+                    doc1: { value: 'PAN Card', confidence: 'high' },
+                    doc2: { value: 'GST Registration', confidence: 'high' },
+                    doc3: { value: 'Experience Certificate', confidence: 'high' },
+                    doc4: { value: null, confidence: 'missing' },
+                    doc5: { value: null, confidence: 'missing' },
+                    doc6: { value: null, confidence: 'missing' },
+                    doc7: { value: null, confidence: 'missing' },
+                    doc8: { value: null, confidence: 'missing' },
+                    doc9: { value: null, confidence: 'missing' },
+                    miiPreference: { value: 'YES', confidence: 'high' },
+                    miiRequired: { value: 'YES', confidence: 'high' },
+                    gemBidEndDate: { value: '2026-03-31 15:00:00', confidence: 'high' },
+                    gemBidOpeningDate: { value: '2026-03-31 15:30:00', confidence: 'high' },
+                    grievanceContact: { value: 'Nodal Officer', confidence: 'high' },
+                    grievanceEmail: { value: 'grievance@dept.gov.in', confidence: 'high' },
+                    ldType: { value: 'PRS', confidence: 'high' },
+                },
+                missing_fields: [],
+                extraction_version: '1.0.0',
+                processing_time_ms: 1800,
+                llm_status: 'ok',
+                failed_categories: [],
+            };
+
+            const originalFetch = global.fetch;
+            global.fetch = jest.fn().mockResolvedValue({
+                ok: true,
+                status: 200,
+                json: async () => mockExtendedResult,
+            } as any);
+
+            let persistedValues: any = null;
+            const mockDb: any = {
+                insert: jest.fn().mockReturnValue({
+                    values: jest.fn().mockImplementation((val) => {
+                        persistedValues = val;
+                        return {
+                            onConflictDoUpdate: jest.fn().mockResolvedValue({}),
+                        };
+                    }),
+                }),
+                select: jest.fn().mockReturnValue({
+                    from: jest.fn().mockReturnValue({
+                        where: jest.fn().mockReturnValue({
+                            limit: jest.fn().mockImplementation(() =>
+                                Promise.resolve([{
+                                    id: 3,
+                                    tenderId: 103,
+                                    fields: persistedValues?.fields,
+                                }])
+                            ),
+                        }),
+                    }),
+                }),
+            };
+
+            const processorWithDb = new PdfExtractionProcessor(
+                mockConfigService,
+                mockFileUploadService,
+                { recordUsage: jest.fn(), recordTpmEntry: jest.fn(), getCurrentTpm: jest.fn() } as any,
+                mockLogger,
+                mockDb,
+            );
+
+            try {
+                const mockJob: any = {
+                    id: 'extract-tender-103',
+                    data: { tenderId: 103, pdfPath: tempPdfFile, userId: 1 },
+                };
+
+                await processorWithDb.processJob(mockJob, 'http://localhost:8001', 120000);
+
+                expect(persistedValues.fields.metadata.llm_status).toBe('ok');
+                expect(persistedValues.fields.requiredDocuments.value).toEqual(['PAN Card', 'GST Registration']);
+                expect(persistedValues.fields.doc1.value).toBe('PAN Card');
+                expect(persistedValues.fields.doc2.value).toBe('GST Registration');
+                expect(persistedValues.fields.doc3.value).toBe('Experience Certificate');
+                expect(persistedValues.fields.miiPreference.value).toBe('YES');
+                expect(persistedValues.fields.miiRequired.value).toBe('YES');
+                expect(persistedValues.fields.gemBidEndDate.value).toBe('2026-03-31 15:00:00');
+                expect(persistedValues.fields.gemBidOpeningDate.value).toBe('2026-03-31 15:30:00');
+                expect(persistedValues.fields.grievanceContact.value).toBe('Nodal Officer');
+                expect(persistedValues.fields.grievanceEmail.value).toBe('grievance@dept.gov.in');
+                expect(persistedValues.fields.ldType.value).toBe('PRS');
+                expect(persistedValues.fields.requiredDocuments.reviewed).toBe(false);
+            } finally {
+                global.fetch = originalFetch;
+            }
+        });
     });
 });
 

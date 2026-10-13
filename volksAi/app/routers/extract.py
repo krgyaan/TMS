@@ -128,6 +128,8 @@ TMS_TO_SOURCE_KEY_MAP: Dict[str, str] = {
     "grievanceContact": "grievance_contact_display",
     "grievanceEmail": "grievance_email_display",
     "courierAddress": "courier_address_display",
+    "gemBidEndDate": "gem_bid_end_date_display",
+    "gemBidOpeningDate": "gem_bid_opening_date_display",
 }
 
 # Explicit alias map from TMS display keys and DTO field names to Layer-1 snapshot labels,
