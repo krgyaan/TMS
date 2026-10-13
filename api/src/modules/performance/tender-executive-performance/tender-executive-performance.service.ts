@@ -2211,6 +2211,60 @@ export class TenderExecutiveService {
         AND (NOT has_return OR returned_at >= '${to}')
         `);
 
+        type EmdLifetimeRow = {
+            instrumentId: number;
+            tenderId: number | null;
+            value: number | null;
+            status: string | null;
+            instrumentType: string | null;
+            tenderNo: string | null;
+            tenderName: string | null;
+            transferDate: string | null;
+            date: string | null;
+            paidDate: string | null;
+            returnedAt: string | null;
+            returnDate: string | null;
+            returnUtr: string | null;
+            returnReason: string | null;
+            returnDateDerived: boolean | null;
+            emdState: string | null;
+        };
+
+        const lifetime = (await exec(`${emdCte}
+        SELECT
+            instrument_id AS "instrumentId",
+            tender_id AS "tenderId",
+            value,
+            status,
+            instrument_type AS "instrumentType",
+            tender_no AS "tenderNo",
+            tender_name AS "tenderName",
+            transfer_date AS "transferDate",
+            paid_at AS "date",
+            paid_at AS "paidDate",
+            returned_at AS "returnedAt",
+            return_date AS "returnDate",
+            return_utr AS "returnUtr",
+            return_reason AS "returnReason",
+            return_date_derived AS "returnDateDerived",
+            emd_state AS "emdState"
+        FROM emd
+        `)) as EmdLifetimeRow[];
+
+        const lifetimePaid = {
+            count: lifetime.length,
+            value: Number(sumValue(lifetime)),
+            drilldown: lifetime,
+        };
+
+        const lifetimeReceivedRows = lifetime.filter(r => r.emdState === "RETURNED").map(r => ({ ...r, date: r.returnedAt ?? r.date }));
+
+        const lifetimeReceived = {
+            count: lifetimeReceivedRows.length,
+            value: Number(sumValue(lifetimeReceivedRows)),
+            drilldown: lifetimeReceivedRows,
+        };
+
         let otherThanTms: any[] | null = null;
 
         if (query.view === "team" && query.teamId === 1) {
@@ -2268,6 +2322,11 @@ export class TenderExecutiveService {
             },
 
             otherThanTms,
+
+            lifetime: {
+                paid: lifetimePaid,
+                received: lifetimeReceived,
+            },
         };
     }
 }
