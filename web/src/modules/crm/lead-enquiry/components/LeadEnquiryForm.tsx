@@ -39,7 +39,13 @@ const LeadEnquiryFormSchema = z.object({
     orgAbbName: z.string().min(1, { message: "Organisation abbreviation is required" }),
     itemId: z.string().min(1, { message: "Item is required" }),
     locationCode: z.string().min(1, { message: "Location is required" }),
-    approxValue: z.string().min(1, { message: "Approx value is required" }),
+    approxValue: z
+        .string()
+        .trim()
+        .min(1, { message: "Approx value is required" })
+        .refine((v) => !Number.isNaN(Number(v)) && Number(v) >= 0, {
+            message: "Approx value must be a number 0 or greater",
+        }),
     dueDate: z.string().optional(),
     siteVisitRequired: z.enum(["yes", "no"]),
     enquiryType: z.string().optional(),
@@ -139,7 +145,7 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
             orgAbbName: enquiry?.orgAbbName || "",
             itemId: enquiry?.itemId?.toString() || "",
             locationCode: enquiry?.locationCode || "",
-            approxValue: enquiry?.approxValue || "",
+            approxValue: enquiry?.approxValue != null ? String(enquiry.approxValue) : "",
             dueDate: enquiry?.dueDate ? toDatetimeLocal(enquiry.dueDate) : "",
             siteVisitRequired: enquiry?.siteVisitRequired ? "yes" : "no",
             enquiryType: enquiry?.enquiryType || "",
@@ -298,11 +304,23 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
                 ? values.contacts.slice(0, Math.max(values.contacts.length - lockedCount, 0))
                 : null;
 
+            // When the org was picked from the dropdown, send its id: the server
+            // links by id and copies the canonical name from the master instead of
+            // re-matching on a name string (which could create a new org). The
+            // locked read-only field (lead / happy-calling prefill) has no id, so
+            // we send the plain name and let the server match on it.
+            const selected = orgOptions.find((o) => o.id === (values.organizationName ?? ""));
+            const organizationName = selected?.orgName ?? orgText;
+            if (!organizationName) {
+                form.setError("organizationName", { message: "Please select an organisation" });
+                return;
+            }
+
             const payload = {
                 ...values,
-                // The dropdown holds an organization id while leads / saved
-                // enquiries hold a plain name — always send the plain name.
-                organizationName: orgOptions.find((o) => o.id === (values.organizationName ?? ""))?.orgName ?? orgText,
+                organisationId: selected ? Number(selected.id) : null,
+                organizationName,
+                approxValue: Number(values.approxValue),
                 leadId: values.leadId ? Number(values.leadId) : null,
                 happyCallingId: defaultHappyCallingId ? Number(defaultHappyCallingId) : null,
                 itemId: Number(values.itemId),
@@ -415,7 +433,17 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
 
                             {/* Row 3: Approx Value + Due Date + Enquiry Type + Site Visit */}
                             <FieldWrapper control={form.control} name="approxValue" label="Approx Value (₹)">
-                                {(field) => <Input placeholder="Enter approx value" {...field} />}
+                                {(field) => (
+                                    <Input
+                                        type="number"
+                                        inputMode="decimal"
+                                        min={0}
+                                        step="0.01"
+                                        placeholder="Enter approx value"
+                                        {...field}
+                                        value={field.value ?? ""}
+                                    />
+                                )}
                             </FieldWrapper>
 
                             <FieldWrapper control={form.control} name="dueDate" label="Due Date">

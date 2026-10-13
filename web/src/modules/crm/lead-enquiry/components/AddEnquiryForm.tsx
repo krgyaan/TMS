@@ -50,7 +50,13 @@ const AddEnquiryFormSchema = z.object({
     orgAbbName: z.string().min(1, { message: "Organisation abbreviation is required" }),
     itemId: z.string().min(1, { message: "Item is required" }),
     locationCode: z.string().min(1, { message: "Location is required" }),
-    approxValue: z.string().min(1, { message: "Approx value is required" }),
+    approxValue: z
+        .string()
+        .trim()
+        .min(1, { message: "Approx value is required" })
+        .refine((v) => !Number.isNaN(Number(v)) && Number(v) >= 0, {
+            message: "Approx value must be a number 0 or greater",
+        }),
     dueDate: z.string().optional(),
     siteVisitRequired: z.enum(["yes", "no"]),
     enquiryType: z.string().optional(),
@@ -206,11 +212,21 @@ export function AddEnquiryForm() {
 
     const handleSubmit: SubmitHandler<AddEnquiryFormValues> = async (values) => {
         try {
+            // The dropdown stores the organization id, so send it: the server
+            // links by id and copies the canonical name from the master instead
+            // of re-matching on a name string (which could create a new org).
+            const selected = orgOptions.find((o) => o.id === (values.organizationName ?? ""));
+            const organizationName = selected?.orgName ?? "";
+            if (!selected || !organizationName) {
+                form.setError("organizationName", { message: "Please select an organisation" });
+                return;
+            }
+
             const payload = {
                 ...values,
-                // The dropdown stores the organization id; send its real name
-                // (not the "<acronym> — <name>" label).
-                organizationName: selectedOrg?.orgName ?? "",
+                organisationId: Number(selected.id),
+                organizationName,
+                approxValue: Number(values.approxValue),
                 itemId: Number(values.itemId),
                 siteVisitRequired: values.siteVisitRequired === "yes",
                 dueDate: values.dueDate || null,
@@ -305,7 +321,17 @@ export function AddEnquiryForm() {
 
                             {/* Row 3: Approx Value + Due Date + Enquiry Type + Site Visit */}
                             <FieldWrapper control={form.control} name="approxValue" label="Approx Value (₹)">
-                                {(field) => <Input placeholder="Enter approx value" {...field} />}
+                                {(field) => (
+                                    <Input
+                                        type="number"
+                                        inputMode="decimal"
+                                        min={0}
+                                        step="0.01"
+                                        placeholder="Enter approx value"
+                                        {...field}
+                                        value={field.value ?? ""}
+                                    />
+                                )}
                             </FieldWrapper>
 
                             <FieldWrapper control={form.control} name="dueDate" label="Due Date">
