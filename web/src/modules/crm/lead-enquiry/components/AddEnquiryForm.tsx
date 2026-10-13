@@ -62,7 +62,10 @@ type AddEnquiryFormValues = z.infer<typeof AddEnquiryFormSchema>;
 
 const fetchItems = async (): Promise<Option[]> => {
     const res = await axiosInstance.get('/items');
-    return res.data.map((i: { id: number; name: string }) => ({ label: i.name, value: i.id.toString() }));
+    return res.data
+        .filter((i: { status: boolean }) => i.status === true)
+        .map((i: { id: number; name: string }) => ({ label: i.name, value: i.id.toString() }))
+        .sort((a: Option, b: Option) => a.label.localeCompare(b.label));
 };
 
 const fetchTeams = async (): Promise<Option[]> => {
