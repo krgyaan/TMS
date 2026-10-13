@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type SubmitHandler, useForm, useWatch, type Resolver } from "react-hook-form";
@@ -21,10 +21,18 @@ import { paths } from "@/app/routes/paths";
 import { useCreateEnquiryWithLead } from "@/hooks/api/useLeadEnquiry";
 import { useLocations } from "@/hooks/api/useLocations";
 import { useOrganizationNameOptions } from "@/hooks/useSelectOptions";
+import { OrganizationModal } from "@/modules/master/organization/components/OrganizationModal";
 import axiosInstance from "@/lib/axios";
 import type { Location } from "@/types/api.types";
 
 type Option = { value: string; label: string };
+
+/**
+ * Sentinel id rendered by `SelectField` as a highlighted "create new" entry.
+ * Picking it opens the organization modal instead of selecting a real record.
+ */
+const CREATE_NEW_ORG_ID = "__create_new__";
+const CREATE_NEW_ORG_LABEL = "+ Add new organization";
 
 const COUNTRY_OPTIONS: Option[] = [
     { label: "India", value: "India" },
@@ -99,6 +107,7 @@ const SectionSeparator = ({ text }: { text: string }) => (
 export function AddEnquiryForm() {
     const navigate = useNavigate();
     const createEnquiryWithLead = useCreateEnquiryWithLead();
+    const [orgModalOpen, setOrgModalOpen] = useState(false);
 
     const { data: itemOptions = [] } = useQuery({ queryKey: ["items"], queryFn: fetchItems });
     const orgOptions = useOrganizationNameOptions();
@@ -141,9 +150,22 @@ export function AddEnquiryForm() {
     const country = useWatch({ control: form.control, name: "country" });
     const isIndia = country === "India";
 
-    // Mirror the selected organization's acronym into the (read-only)
-    // abbreviation field. Fall back to the full name when the organization
-    // master has no acronym, so the required-field validation still passes.
+    // "Create new organization" is a sentinel entry, not a real selection, so
+    // open the master modal and drop the value before it reaches the payload.
+    useEffect(() => {
+        if (organizationVal !== CREATE_NEW_ORG_ID) return;
+        setOrgModalOpen(true);
+        form.setValue("organizationName", "", { shouldValidate: false });
+    }, [organizationVal, form]);
+
+    const orgOptionsWithCreate = useMemo(
+        () => [
+            { id: CREATE_NEW_ORG_ID, name: CREATE_NEW_ORG_LABEL, acronym: "", orgName: "" },
+            ...orgOptions,
+        ],
+        [orgOptions]
+    );
+
     useEffect(() => {
         if (!selectedOrg) {
             form.setValue("orgAbbName", "", { shouldValidate: false });
@@ -247,7 +269,7 @@ export function AddEnquiryForm() {
                                 control={form.control}
                                 name="organizationName"
                                 label="Organisation (End user)"
-                                options={orgOptions}
+                                options={orgOptionsWithCreate}
                                 placeholder="-- Select Organisation --"
                                 valueType="string"
                             />
@@ -405,6 +427,8 @@ export function AddEnquiryForm() {
                     </form>
                 </Form>
             </CardContent>
+
+            <OrganizationModal open={orgModalOpen} onOpenChange={setOrgModalOpen} />
         </Card>
     );
 }

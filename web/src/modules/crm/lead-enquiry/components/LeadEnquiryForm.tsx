@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type SubmitHandler, useForm, useWatch, type Resolver } from "react-hook-form";
@@ -24,6 +24,7 @@ import { useLocations } from "@/hooks/api/useLocations";
 import { useLead } from "@/hooks/api/useLeads";
 import { useHappyCalling } from "@/hooks/api/useHappyCalling";
 import { useOrganizationNameOptions } from "@/hooks/useSelectOptions";
+import { OrganizationModal } from "@/modules/master/organization/components/OrganizationModal";
 import axiosInstance from "@/lib/axios";
 import type { Location } from "@/types/api.types";
 import type { LeadEnquiryWithNames } from "../helpers/lead-enquiry.type";
@@ -69,6 +70,10 @@ interface LeadEnquiryFormProps {
     prefillOrganizationName?: string;
 }
 
+
+const CREATE_NEW_ORG_ID = "__create_new__";
+const CREATE_NEW_ORG_LABEL = "+ Add new organization";
+
 const fetchItems = async (): Promise<Option[]> => {
     const res = await axiosInstance.get('/items');
     return res.data
@@ -91,6 +96,7 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
     const navigate = useNavigate();
     const createEnquiry = useCreateLeadEnquiry();
     const updateEnquiry = useUpdateLeadEnquiry();
+    const [orgModalOpen, setOrgModalOpen] = useState(false);
 
     const { data: itemOptions = [] } = useQuery({ queryKey: ["items"], queryFn: fetchItems });
     const { data: teamOptions = [] } = useQuery({ queryKey: ["teams"], queryFn: fetchTeams });
@@ -161,7 +167,34 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
     const matchedOrgById = orgOptions.find((o) => o.id === organizationVal);
     const matchedOrgByName = orgOptions.find((o) => o.orgName === organizationVal);
     const matchedOrg = matchedOrgById ?? matchedOrgByName;
-    const orgText = matchedOrg?.orgName ?? organizationVal ?? "";
+    const orgText = matchedOrg?.orgName
+        ?? (organizationVal === CREATE_NEW_ORG_ID ? "" : organizationVal ?? "");
+
+    // "Create new organization" is a sentinel entry, not a real selection, so
+    // open the master modal and drop the value before it reaches the payload.
+    useEffect(() => {
+        if (organizationVal !== CREATE_NEW_ORG_ID) return;
+        setOrgModalOpen(true);
+        form.setValue("organizationName", "", { shouldValidate: false });
+    }, [organizationVal, form]);
+
+    const orgOptionsWithCreate = useMemo(
+        () => [
+            { id: CREATE_NEW_ORG_ID, name: CREATE_NEW_ORG_LABEL, acronym: "", orgName: "" },
+            ...orgOptions,
+        ],
+        [orgOptions]
+    );
+
+    // Read-only when the organisation comes from a lead / happy-calling record,
+    // or when the saved name has no match in the master. Empty and the
+    // create-new sentinel must keep the dropdown visible.
+    const isUnmatchedOrg =
+        !!organizationVal &&
+        organizationVal !== CREATE_NEW_ORG_ID &&
+        !matchedOrgById &&
+        !matchedOrgByName;
+    const showReadOnlyOrg = isOrgLocked || isUnmatchedOrg;
 
     // Saved enquiries carry a plain organization name, but the dropdown needs an
     // id. Swap in the matching id once the master has loaded; when nothing
@@ -328,7 +361,7 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
                                 placeholder="-- Select Team --"
                             />
 
-                            {isOrgLocked || !matchedOrg ? (
+                            {showReadOnlyOrg ? (
                                 <FieldWrapper control={form.control} name="organizationName" label="Organisation (End user)">
                                     {(field) => (
                                         <Input
@@ -345,7 +378,7 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
                                     control={form.control}
                                     name="organizationName"
                                     label="Organisation (End user)"
-                                    options={orgOptions}
+                                    options={orgOptionsWithCreate}
                                     placeholder="-- Select Organisation --"
                                     valueType="string"
                                 />
@@ -471,6 +504,8 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
                     </form>
                 </Form>
             </CardContent>
+
+            <OrganizationModal open={orgModalOpen} onOpenChange={setOrgModalOpen} />
         </Card>
     );
 }
