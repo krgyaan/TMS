@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type SubmitHandler, useForm, useWatch, type Resolver } from "react-hook-form";
@@ -99,9 +99,10 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
     const { data: happyCallingRecord } = useHappyCalling(defaultHappyCallingId ?? null);
     const orgOptions = useOrganizationNameOptions();
 
-    // When the enquiry is opened from a lead / happy-calling record the
-    // organisation is pre-filled as free text and must not be editable.
+    // Opened from a lead / happy-calling record: the organisation comes from that
+    // record and is shown as-is instead of being re-selected.
     const isOrgLocked = !!defaultLeadId || !!defaultHappyCallingId || !!prefillOrganizationName;
+
     const { data: infoSheet } = useInfoSheet(mode === "edit" ? (enquiry?.tenderId ?? null) : null);
 
     const tenderClients = useMemo(
@@ -154,22 +155,39 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
     const itemIdVal = useWatch({ control: form.control, name: "itemId" });
     const locationVal = useWatch({ control: form.control, name: "locationCode" });
 
-    // Auto-fill the read-only abbreviation from the selected organization.
-    // When the form is opened from a lead / happy-calling record the field holds
-    // free text, so match on the organization name instead of the id. When no
-    // master record matches we fall back to that text so the required-field
-    // validation still passes.
+    // Resolve whatever the form currently holds — an organization id from the
+    // dropdown, or a plain name coming from a lead / happy-calling record or a
+    // saved enquiry — to its organization master record.
+    const matchedOrgById = orgOptions.find((o) => o.id === organizationVal);
+    const matchedOrgByName = orgOptions.find((o) => o.orgName === organizationVal);
+    const matchedOrg = matchedOrgById ?? matchedOrgByName;
+    const orgText = matchedOrg?.orgName ?? organizationVal ?? "";
+
+    // Saved enquiries carry a plain organization name, but the dropdown needs an
+    // id. Swap in the matching id once the master has loaded; when nothing
+    // matches we leave the text alone and render a read-only field instead.
+    useEffect(() => {
+        if (mode !== "edit" || isOrgLocked) return;
+        const value = organizationVal ?? "";
+        if (!value || orgOptions.length === 0) return;
+        if (orgOptions.some((o) => o.id === value)) return;
+        const byName = orgOptions.find((o) => o.orgName === value);
+        if (byName) form.setValue("organizationName", byName.id);
+    }, [mode, isOrgLocked, organizationVal, orgOptions, form]);
+
+    // Pre-fill the abbreviation only when the organization changes, so a later
+    // master refetch can never overwrite an abbreviation the user typed.
+    const lastOrgValueRef = useRef<string | null>(null);
     useEffect(() => {
         const value = organizationVal ?? "";
-        if (!value) {
-            form.setValue("orgAbbName", "", { shouldValidate: false });
-            return;
-        }
-        const matched = isOrgLocked
-            ? orgOptions.find((o) => o.orgName === value)
-            : orgOptions.find((o) => o.id === value);
-        form.setValue("orgAbbName", matched?.acronym || matched?.orgName || value);
-    }, [organizationVal, isOrgLocked, orgOptions, form]);
+        if (lastOrgValueRef.current === value) return;
+        lastOrgValueRef.current = value;
+        form.setValue(
+            "orgAbbName",
+            matchedOrg ? matchedOrg.acronym || matchedOrg.orgName : "",
+            { shouldValidate: false }
+        );
+    }, [organizationVal, matchedOrg, form]);
 
     useEffect(() => {
         if (leadData) {
@@ -249,12 +267,9 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
 
             const payload = {
                 ...values,
-                // When unlocked the dropdown stores the organization id; send its
-                // real name, never the "<acronym> — <name>" label. When locked the
-                // field already holds the plain name.
-                organizationName: isOrgLocked
-                    ? (values.organizationName ?? "")
-                    : (orgOptions.find((o) => o.id === values.organizationName)?.orgName ?? ""),
+                // The dropdown holds an organization id while leads / saved
+                // enquiries hold a plain name — always send the plain name.
+                organizationName: orgOptions.find((o) => o.id === (values.organizationName ?? ""))?.orgName ?? orgText,
                 leadId: values.leadId ? Number(values.leadId) : null,
                 happyCallingId: defaultHappyCallingId ? Number(defaultHappyCallingId) : null,
                 itemId: Number(values.itemId),
@@ -313,13 +328,13 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
                                 placeholder="-- Select Team --"
                             />
 
-                            {isOrgLocked ? (
+                            {isOrgLocked || !matchedOrg ? (
                                 <FieldWrapper control={form.control} name="organizationName" label="Organisation (End user)">
                                     {(field) => (
                                         <Input
                                             placeholder="Enter organisation name"
                                             {...field}
-                                            value={field.value ?? ""}
+                                            value={orgText}
                                             readOnly
                                             className="bg-muted/30"
                                         />
@@ -340,11 +355,11 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
                             <FieldWrapper control={form.control} name="orgAbbName" label="Organisation Abbreviation">
                                 {(field) => (
                                     <Input
-                                        placeholder="Select an organisation"
+                                        placeholder={matchedOrg ? "Select an organisation" : "Enter abbreviation"}
                                         {...field}
                                         value={field.value ?? ""}
-                                        readOnly
-                                        className="bg-muted/30"
+                                        readOnly={!!matchedOrg}
+                                        className={matchedOrg ? "bg-muted/30" : ""}
                                     />
                                 )}
                             </FieldWrapper>
