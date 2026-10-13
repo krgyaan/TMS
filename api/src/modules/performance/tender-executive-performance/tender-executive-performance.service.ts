@@ -2115,7 +2115,7 @@ export class TenderExecutiveService {
             emd_state AS "emdState"
         FROM emd
         WHERE paid_at < '${from}'
-        AND (NOT has_return OR returned_at >= '${from}')
+        AND (NOT has_return OR returned_at > '${to}')
         `);
 
         const paidDuring = await exec(`${emdCte}
@@ -2138,6 +2138,7 @@ export class TenderExecutiveService {
             emd_state AS "emdState"
         FROM emd
         WHERE paid_at BETWEEN '${from}' AND '${to}'
+        AND (NOT has_return OR returned_at > '${to}')
         `);
 
         const receivedForPrior = await exec(`${emdCte}
