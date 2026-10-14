@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { happyCallingService } from '@/services/api/happy-calling.service';
 import { broadcastService } from '@/services/api/broadcast.service';
+import { leadsKey } from '@/hooks/api/useLeads';
 import type { HappyCallingRow, HappyCallingListParams, CreateHappyCallingDto, UpdateHappyCallingDto, BroadcastRow } from '@/modules/crm/happy-calling/helpers/happy-calling.types';
 import type { PaginatedResult } from '@/types/api.types';
 import { toast } from 'sonner';
@@ -19,7 +20,7 @@ export const broadcastKey = {
 };
 
 export const useHappyCallings = (
-    pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 },
+    pagination: { page: number; limit: number; search?: string; priority?: string } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' },
 ) => {
     const params: HappyCallingListParams = {
@@ -28,6 +29,7 @@ export const useHappyCallings = (
         ...(sort?.sortBy && { sortBy: sort.sortBy }),
         ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
         ...(pagination.search && { search: pagination.search }),
+        ...(pagination.priority && { priority: pagination.priority }),
     };
 
     return useQuery<PaginatedResult<HappyCallingRow>>({
@@ -35,6 +37,7 @@ export const useHappyCallings = (
             page: pagination.page,
             limit: pagination.limit,
             search: pagination.search ?? undefined,
+            priority: pagination.priority ?? undefined,
             sortBy: sort?.sortBy,
             sortOrder: sort?.sortOrder,
         }),
@@ -77,6 +80,8 @@ export const useUpdateHappyCalling = () => {
             happyCallingService.update(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: happyCallingKey.lists() });
+            // The leads list merges happy calling entries, so refresh it too.
+            queryClient.invalidateQueries({ queryKey: leadsKey.lists() });
         },
         onError: (error: unknown) => {
             const err = error as { response?: { data?: { message?: string } }; message?: string };

@@ -54,6 +54,11 @@ export interface LeadWithNames extends Lead {
     allocatedTeName?: string | null;
     allocatedByName?: string | null;
     nextFollowupDate?: string | null;
+
+    // Set when the list merges happy calling entries alongside leads
+    source?: 'lead' | 'happy_calling';
+    happyCallingStatus?: string | null;
+    cDId?: number | null;
 }
 
 export interface CreateLeadRequest {
@@ -94,4 +99,5 @@ export interface LeadListParams {
     team?: string;          // ✅ NEW
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
+    includeHappyCalling?: boolean;
 }

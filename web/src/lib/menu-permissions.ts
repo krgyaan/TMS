@@ -116,7 +116,6 @@ function getPermissionModule(title: string, parentMenuTitle?: string): string | 
         'Payment Requests': 'accounts.payment-requests',
 
         // CRM sub-items
-        'Leads': 'crm.leads',
         'Enquiries': 'crm.enquiries',
         'Costings': 'crm.costings',
         'Quotations': 'crm.quotations',

@@ -1,3 +1,11 @@
+export interface EnquiryOrgOption {
+    id: string;
+    acronym: string;
+    orgName: string;
+    name: string;
+    keywords: string;
+}
+
 export interface LeadEnquiry {
     id: number;
     leadId: number | null;
@@ -8,7 +16,7 @@ export interface LeadEnquiry {
     organisationId: number | null;
     itemId: number;
     locationCode: string;
-    approxValue: string;
+    approxValue: number;
     dueDate: string | null;
     siteVisitRequired: boolean;
     createdBy: number;
@@ -59,7 +67,7 @@ export interface CreateLeadEnquiryRequest {
     organisationId?: number | null;
     itemId: number;
     locationCode: string;
-    approxValue: string;
+    approxValue: number;
     dueDate?: string | null;
     siteVisitRequired?: boolean;
     orgAbbName?: string | null;
@@ -82,7 +90,7 @@ export interface CreateEnquiryWithLeadRequest {
     organisationId?: number | null;
     itemId: number;
     locationCode: string;
-    approxValue: string;
+    approxValue: number;
     dueDate?: string | null;
     siteVisitRequired?: boolean;
     orgAbbName?: string | null;

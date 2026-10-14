@@ -8,6 +8,7 @@ export const CreateHappyCallingSchema = z.object({
     email: z.string().email().max(255).nullish(),
     phone: z.string().max(20).nullish(),
     status: z.string().max(50).nullish(),
+    leadPriority: z.enum(['Cold', 'Warm', 'Hot']).nullish(),
     broadcast: z.number().int().min(0).default(0),
     details: z.string().max(5000).nullish(),
 });

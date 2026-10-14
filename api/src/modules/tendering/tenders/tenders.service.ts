@@ -703,7 +703,7 @@ export class TenderInfosService {
                 organizationName?: string | null;
                 itemId?: number;
                 locationCode?: string;
-                approxValue?: string;
+                approxValue?: number;
                 dueDate?: Date | null;
                 enquiryFile?: string | null;
                 updatedAt: Date;
@@ -713,7 +713,10 @@ export class TenderInfosService {
             if (data.tenderNo !== undefined) enquirySync.enquiryNumber = data.tenderNo;
             if (data.item !== undefined) enquirySync.itemId = data.item;
             if (data.location !== undefined) enquirySync.locationCode = data.location != null ? String(data.location) : undefined;
-            if (data.gstValues !== undefined) enquirySync.approxValue = data.gstValues;
+            if (data.gstValues !== undefined) {
+                const numeric = Number(data.gstValues);
+                enquirySync.approxValue = Number.isNaN(numeric) ? 0 : numeric;
+            }
             if (data.dueDate !== undefined) enquirySync.dueDate = data.dueDate ? new Date(data.dueDate) : null;
             if (data.documents !== undefined) enquirySync.enquiryFile = data.documents;
             if (data.organization !== undefined) {

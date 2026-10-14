@@ -33,6 +33,7 @@ export class HappyCallingController {
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
         @Query('search') search?: string,
+        @Query('priority') priority?: string,
     ) {
         const filters = {
             page: page ? parseInt(page, 10) : undefined,
@@ -40,6 +41,7 @@ export class HappyCallingController {
             sortBy,
             sortOrder,
             search,
+            priority,
         };
         return this.happyCallingService.findAll(filters);
     }

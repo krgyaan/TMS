@@ -9,6 +9,29 @@ export const EnquiryContactSchema = z.object({
 
 export type EnquiryContactDto = z.infer<typeof EnquiryContactSchema>;
 
+/**
+ * Approx value is stored as numeric(15,2). Callers may send a number or a
+ * numeric string, so both are accepted and the output is always a JS number.
+ * `0` is valid; junk and negatives are rejected. `z.coerce.number()` is avoided
+ * deliberately because it maps "" to 0 and would let an empty field pass.
+ * `z.preprocess()` is avoided because it widens the schema input to `unknown`
+ * in zod v4, which poisons the inferred DTO types.
+ */
+const approxValueSchema = z
+    .union([
+        z
+            .string()
+            .trim()
+            .min(1, { message: 'Approx value is required' })
+            .refine((v) => !Number.isNaN(Number(v)) && Number(v) >= 0, {
+                message: 'Approx value must be a number 0 or greater',
+            }),
+        z
+            .number()
+            .min(0, { message: 'Approx value must be a number 0 or greater' }),
+    ])
+    .transform((v) => Number(v));
+
 export const CreateLeadEnquirySchema = z.object({
     leadId: z.number().int().positive().optional().nullable(),
     happyCallingId: z.number().int().positive().optional().nullable(),
@@ -17,7 +40,7 @@ export const CreateLeadEnquirySchema = z.object({
     organisationId: z.number().int().positive().optional().nullable(),
     itemId: z.number().int().positive({ message: 'Item is required' }),
     locationCode: z.string().min(1, { message: 'Location code is required' }).max(255),
-    approxValue: z.string().min(1, { message: 'Approx value is required' }),
+    approxValue: approxValueSchema,
     dueDate: z.string().optional().nullable(),
     siteVisitRequired: z.boolean().optional().default(false),
     orgAbbName: z.string().max(50).optional().nullable(),
@@ -39,7 +62,7 @@ export const CreateEnquiryWithLeadSchema = z.object({
     organisationId: z.number().int().positive().optional().nullable(),
     itemId: z.number().int().positive({ message: 'Item is required' }),
     locationCode: z.string().min(1, { message: 'Location code is required' }).max(255),
-    approxValue: z.string().min(1, { message: 'Approx value is required' }),
+    approxValue: approxValueSchema,
     dueDate: z.string().optional().nullable(),
     siteVisitRequired: z.boolean().optional().default(false),
     orgAbbName: z.string().max(50).optional().nullable(),
@@ -68,7 +91,7 @@ export const UpdateLeadEnquirySchema = z.object({
     organisationId: z.number().int().positive().optional().nullable(),
     itemId: z.number().int().positive().optional(),
     locationCode: z.string().min(1).max(255).optional(),
-    approxValue: z.string().min(1).optional(),
+    approxValue: approxValueSchema.optional(),
     dueDate: z.string().optional().nullable(),
     siteVisitRequired: z.boolean().optional(),
     orgAbbName: z.string().max(50).optional().nullable(),
