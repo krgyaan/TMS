@@ -1,3 +1,11 @@
+export interface EnquiryOrgOption {
+    id: string;
+    acronym: string;
+    orgName: string;
+    name: string;
+    keywords: string;
+}
+
 export interface LeadEnquiry {
     id: number;
     leadId: number | null;

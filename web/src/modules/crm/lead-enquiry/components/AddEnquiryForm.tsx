@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
+import { AsyncSelectField } from "@/components/form/AsyncSelectField";
 import { ContactPersonForm } from "@/components/form/contactpersonform";
 import { FileUploader } from "@/components/file-upload";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -20,10 +21,11 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { paths } from "@/app/routes/paths";
 import { useCreateEnquiryWithLead } from "@/hooks/api/useLeadEnquiry";
 import { useLocations } from "@/hooks/api/useLocations";
-import { useOrganizationNameOptions } from "@/hooks/useSelectOptions";
 import { OrganizationModal } from "@/modules/master/organization/components/OrganizationModal";
+import { useOrganizations } from "@/hooks/api/useOrganizations";
 import axiosInstance from "@/lib/axios";
 import type { Location } from "@/types/api.types";
+import type { EnquiryOrgOption } from "../helpers/lead-enquiry.type";
 
 type Option = { value: string; label: string };
 
@@ -33,6 +35,29 @@ type Option = { value: string; label: string };
  */
 const CREATE_NEW_ORG_ID = "__create_new__";
 const CREATE_NEW_ORG_LABEL = "+ Add new organization";
+
+const useEnquiryOrganizationOptions = (): EnquiryOrgOption[] => {
+    const { data: organizations = [] } = useOrganizations();
+
+    return useMemo(
+        () =>
+            organizations
+                .filter((o) => o.status === true)
+                .map((o) => {
+                    const fullName = (o.name ?? "").trim();
+                    const acronym = (o.acronym ?? "").trim();
+                    return {
+                        id: String(o.id),
+                        acronym,
+                        orgName: fullName || acronym,
+                        name: acronym || fullName,
+                        keywords: fullName,
+                    };
+                })
+                .sort((a, b) => (a.acronym || a.orgName).localeCompare(b.acronym || b.orgName)),
+        [organizations]
+    );
+};
 
 const COUNTRY_OPTIONS: Option[] = [
     { label: "India", value: "India" },
@@ -116,7 +141,7 @@ export function AddEnquiryForm() {
     const [orgModalOpen, setOrgModalOpen] = useState(false);
 
     const { data: itemOptions = [] } = useQuery({ queryKey: ["items"], queryFn: fetchItems });
-    const orgOptions = useOrganizationNameOptions();
+    const orgOptions = useEnquiryOrganizationOptions();
     const { data: teamOptions = [] } = useQuery({ queryKey: ["teams"], queryFn: fetchTeams });
     const { data: stateOptions = [] } = useQuery({ queryKey: ["states"], queryFn: fetchStates });
     const { data: locations = [] } = useLocations();
@@ -281,7 +306,7 @@ export function AddEnquiryForm() {
                                 placeholder="-- Select Team --"
                             />
 
-                            <SelectField
+                            <AsyncSelectField
                                 control={form.control}
                                 name="organizationName"
                                 label="Organisation (End user)"

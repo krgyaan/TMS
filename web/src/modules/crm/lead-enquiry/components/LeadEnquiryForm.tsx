@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
+import { AsyncSelectField } from "@/components/form/AsyncSelectField";
 import { ContactPersonForm } from "@/components/form/contactpersonform";
 import { FileUploader } from "@/components/file-upload";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -23,11 +24,12 @@ import { useInfoSheet } from "@/hooks/api/useInfoSheets";
 import { useLocations } from "@/hooks/api/useLocations";
 import { useLead } from "@/hooks/api/useLeads";
 import { useHappyCalling } from "@/hooks/api/useHappyCalling";
-import { useOrganizationNameOptions } from "@/hooks/useSelectOptions";
 import { OrganizationModal } from "@/modules/master/organization/components/OrganizationModal";
+import { useOrganizations } from "@/hooks/api/useOrganizations";
 import axiosInstance from "@/lib/axios";
 import type { Location } from "@/types/api.types";
 import type { LeadEnquiryWithNames } from "../helpers/lead-enquiry.type";
+import type { EnquiryOrgOption } from "../helpers/lead-enquiry.type";
 
 type Option = { value: string; label: string };
 
@@ -80,6 +82,29 @@ interface LeadEnquiryFormProps {
 const CREATE_NEW_ORG_ID = "__create_new__";
 const CREATE_NEW_ORG_LABEL = "+ Add new organization";
 
+const useEnquiryOrganizationOptions = (): EnquiryOrgOption[] => {
+    const { data: organizations = [] } = useOrganizations();
+
+    return useMemo(
+        () =>
+            organizations
+                .filter((o) => o.status === true)
+                .map((o) => {
+                    const fullName = (o.name ?? "").trim();
+                    const acronym = (o.acronym ?? "").trim();
+                    return {
+                        id: String(o.id),
+                        acronym,
+                        orgName: fullName || acronym,
+                        name: acronym || fullName,
+                        keywords: fullName,
+                    };
+                })
+                .sort((a, b) => (a.acronym || a.orgName).localeCompare(b.acronym || b.orgName)),
+        [organizations]
+    );
+};
+
 const fetchItems = async (): Promise<Option[]> => {
     const res = await axiosInstance.get('/items');
     return res.data
@@ -109,7 +134,7 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
     const { data: locations = [] } = useLocations();
     const { data: leadData } = useLead(defaultLeadId ?? null);
     const { data: happyCallingRecord } = useHappyCalling(defaultHappyCallingId ?? null);
-    const orgOptions = useOrganizationNameOptions();
+    const orgOptions = useEnquiryOrganizationOptions();
 
     // Opened from a lead / happy-calling record: the organisation comes from that
     // record and is shown as-is instead of being re-selected.
@@ -392,7 +417,7 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
                                     )}
                                 </FieldWrapper>
                             ) : (
-                                <SelectField
+                                <AsyncSelectField
                                     control={form.control}
                                     name="organizationName"
                                     label="Organisation (End user)"

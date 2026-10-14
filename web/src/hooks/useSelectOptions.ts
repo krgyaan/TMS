@@ -45,38 +45,6 @@ export function useOrganizationOptions(status: boolean = true) {
     );
 }
 
-/**
- * Organization picker that renders "<acronym> — <full name>" in a single
- * colour. `acronym` / `orgName` are kept separately so callers can auto-fill an
- * abbreviation field or persist the real organization name (never the label).
- *
- * Some master rows have a blank `name` (the column is NOT NULL but Postgres
- * still allows ''), so `orgName` falls back to the acronym to guarantee a
- * usable value, and the label omits the dash when there is no full name.
- */
-export function useOrganizationNameOptions(status: boolean = true) {
-    const { data: organizations = [] } = useOrganizations();
-
-    return useMemo(
-        () =>
-            organizations
-                .filter((o) => o.status === status)
-                .map((o) => {
-                    const fullName = (o.name ?? "").trim();
-                    const acronym = (o.acronym ?? "").trim();
-                    return {
-                        id: String(o.id),
-                        acronym,
-                        orgName: fullName || acronym,
-                        name:
-                            acronym && fullName ? `${acronym} — ${fullName}` : (acronym || fullName),
-                    };
-                })
-                .sort((a, b) => (a.acronym || a.orgName).localeCompare(b.acronym || b.orgName)),
-        [organizations, status]
-    );
-}
-
 export function useUserOptions(teamId?: number) {
     const { data: users = [] } = useGetTeamMembers(teamId ?? 2);
     return useMemo(
