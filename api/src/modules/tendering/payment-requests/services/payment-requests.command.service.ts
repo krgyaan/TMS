@@ -87,7 +87,7 @@ export class PaymentRequestsCommandService {
                     ? `${payload.EMD.mode} Details`
                     : `${payload.EMD.mode} Details`;
 
-                if (emdAmount >= 0) {
+                if (emdAmount > 0) {
                     const request = await this.createPaymentRequest(
                         tx,
                         tenderId,
@@ -152,7 +152,7 @@ export class PaymentRequestsCommandService {
                     ? `${payload.TENDER_FEES.mode} Details`
                     : `${payload.TENDER_FEES.mode} Details`;
 
-                if (tfAmount >= 0) {
+                if (tfAmount > 0) {
                     const request = await this.createPaymentRequest(
                         tx,
                         tenderId,
@@ -216,12 +216,12 @@ export class PaymentRequestsCommandService {
             if (payload.PROCESSING_FEES?.mode && payload.PROCESSING_FEES?.details) {
                 const pfAmount = isNonTmsRequest
                     ? extractAmountFromDetails(payload.PROCESSING_FEES.mode, payload.PROCESSING_FEES.details)
-                    : 0;
+                    : (Number(infoSheet?.processingFeeAmount) || 0);
                 const pfRemarks = isNonTmsRequest
                     ? `${payload.PROCESSING_FEES.mode} Details`
                     : `${payload.PROCESSING_FEES.mode} Details`;
 
-                if (pfAmount >= 0) {
+                if (pfAmount > 0) {
                     const request = await this.createPaymentRequest(
                         tx,
                         tenderId,
@@ -754,6 +754,12 @@ export class PaymentRequestsCommandService {
         mode: string,
         userId?: number
     ): Promise<any> {
+        const amount = Number(paymentRequest.amountRequired ?? 0);
+        if (!(amount > 0)) {
+            this.logger.warn(`Skipping auto-created project payment request for payment request ${paymentRequest.id}: amount is ${paymentRequest.amountRequired ?? '0'}`);
+            return null;
+        }
+
         this.logger.log(`Auto-creating project payment request from ${mode} payment request: ${paymentRequest.id}`);
 
         const [transferDetail] = await tx

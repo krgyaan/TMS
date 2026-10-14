@@ -351,7 +351,33 @@ export class WoBasicDetailsService {
         }
 
         const response = this.mapRowToResponse(row);
-        return response;
+        const gemCharges = await this.getGemCharges(id);
+        return { ...response, ...gemCharges };
+    }
+
+    /**
+     * Loads the auto-created GeM charges project payment request for a WO Basic Detail
+     * so it can be preloaded into the edit form and reconciled on update.
+     */
+    private async getGemCharges(woBasicDetailId: number) {
+        const [project] = await this.db
+            .select({ id: projects.id })
+            .from(projects)
+            .where(eq(projects.woBasicDetailId, woBasicDetailId))
+            .limit(1);
+
+        if (!project) {
+            return { gemChargesAmount: null, gemChargesPortalLink: null, gemChargesInvoice: null };
+        }
+
+        const requests = await this.paymentRequestService.getByProject(project.id);
+        const gemRequest: any = requests.find((r: any) => r.paymentAgainst === 'gem_charges') ?? null;
+
+        return {
+            gemChargesAmount: gemRequest?.amount != null ? Number(gemRequest.amount) : null,
+            gemChargesPortalLink: gemRequest?.portalLink ?? null,
+            gemChargesInvoice: gemRequest?.billFiles ? JSON.stringify(gemRequest.billFiles) : null,
+        };
     }
 
     async findByIdWithRelations(id: number) {
@@ -652,17 +678,23 @@ export class WoBasicDetailsService {
      */
     private async createProjectPaymentRequest(
         projectId: number,
-        data: CreateWoBasicDetailDto,
+        data: Pick<CreateWoBasicDetailDto, 'projectName' | 'gemChargesAmount' | 'gemChargesPortalLink' | 'gemChargesInvoice'>,
         woBasicDetailId?: number,
         currentUserId?: number
     ): Promise<void> {
         try {
+            const amount = Number(data.gemChargesAmount) || 0;
+            if (!(amount > 0)) {
+                this.logger.log(`Skipping project payment request for WO Basic Detail ${woBasicDetailId}: GeM charges amount is 0`);
+                return;
+            }
+
             const gemInvoiceFiles = data.gemChargesInvoice ? JSON.parse(data.gemChargesInvoice) as string[] : [];
 
             const makerRequestBody: any = {
                 projectId,
                 projectName: data.projectName ?? null,
-                amount: data.gemChargesAmount || 0,
+                amount,
                 paymentAgainst: 'gem_charges',
                 paymentMode: 'PORTAL',
                 portalLink: data.gemChargesPortalLink || null,
@@ -732,7 +764,92 @@ export class WoBasicDetailsService {
             throw new NotFoundException(`WO Basic Detail with ID ${id} not found`);
         }
 
+        // Reconcile the auto-created GeM charges project payment request (create / update / reject)
+        await this.reconcileGemChargesPaymentRequest(id, data, userId);
+
         return this.mapRowToResponse(row);
+    }
+
+    /**
+     * Keeps the auto-created GeM charges project payment request in sync when a
+     * WO Basic Detail is edited:
+     * - amount > 0 and no request          -> create it
+     * - amount > 0 and a pending request   -> update it in place
+     * - amount > 0 and a processed request -> leave it untouched (warn)
+     * - amount = 0 and a pending request   -> reject it
+     * - amount = 0 and a processed request -> leave it untouched (warn)
+     * - amount undefined                   -> no-op
+     */
+    private async reconcileGemChargesPaymentRequest(
+        woBasicDetailId: number,
+        data: UpdateWoBasicDetailDto,
+        currentUserId?: number,
+    ): Promise<void> {
+        if (data.gemChargesAmount === undefined) return;
+
+        const PENDING_STATUSES = ['pending', 'po_approval_pending'];
+
+        try {
+            const [project] = await this.db
+                .select({ id: projects.id, projectName: projects.projectName })
+                .from(projects)
+                .where(eq(projects.woBasicDetailId, woBasicDetailId))
+                .limit(1);
+
+            if (!project) {
+                this.logger.warn(`Skipping GeM charges reconciliation for WO Basic Detail ${woBasicDetailId}: no linked project found`);
+                return;
+            }
+
+            const requests = await this.paymentRequestService.getByProject(project.id);
+            const existing: any = requests.find((r: any) => r.paymentAgainst === 'gem_charges') ?? null;
+
+            const amount = Number(data.gemChargesAmount) || 0;
+
+            if (amount > 0) {
+                if (!existing) {
+                    await this.createProjectPaymentRequest(project.id, data, woBasicDetailId, currentUserId);
+                    return;
+                }
+
+                if (!PENDING_STATUSES.includes(existing.status)) {
+                    this.logger.warn(`Skipping GeM charges update for WO Basic Detail ${woBasicDetailId}: request ${existing.id} is "${existing.status}"`);
+                    return;
+                }
+
+                const gemInvoiceFiles = data.gemChargesInvoice ? JSON.parse(data.gemChargesInvoice) as string[] : [];
+                await this.paymentRequestService.update(existing.id, {
+                    amount,
+                    paymentAgainst: 'gem_charges',
+                    paymentMode: 'PORTAL',
+                    portalLink: data.gemChargesPortalLink || null,
+                    uploadedInvoiceFile: gemInvoiceFiles[0] ?? null,
+                    billFiles: gemInvoiceFiles,
+                    remark: `Auto-created from Basic Detail: ${woBasicDetailId}, for ${data.projectName ?? project.projectName ?? ''}`,
+                });
+                this.logger.log(`Updated project payment request ${existing.id} for WO Basic Detail ${woBasicDetailId}`);
+                return;
+            }
+
+            // amount === 0 -> clear
+            if (!existing) return;
+
+            if (!PENDING_STATUSES.includes(existing.status)) {
+                this.logger.warn(`Skipping GeM charges removal for WO Basic Detail ${woBasicDetailId}: request ${existing.id} is "${existing.status}"`);
+                return;
+            }
+
+            await this.paymentRequestService.updateStatus(existing.id, {
+                status: 'rejected',
+                rejectionReason: 'GeM charges removed from WO Basic Details',
+            });
+            this.logger.log(`Rejected project payment request ${existing.id} for WO Basic Detail ${woBasicDetailId}`);
+        } catch (error) {
+            this.logger.warn(
+                `Failed to reconcile GeM charges payment request for WO Basic Detail: ${woBasicDetailId}`,
+                error instanceof Error ? error.stack : String(error),
+            );
+        }
     }
 
     async delete(id: number): Promise<void> {
