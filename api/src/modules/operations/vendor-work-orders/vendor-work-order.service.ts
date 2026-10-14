@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, eq, like, desc, asc, sql, inArray, isNull, isNotNull, ne } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
@@ -21,6 +21,7 @@ import { projectParties } from "@/db/schemas/operations/project-parties.schema";
 import { vendorOrganizations } from "@/db/schemas/vendors/vendor-organizations.schema";
 import { vendors } from "@/db/schemas/vendors/vendors.schema";
 import { vendorGsts } from "@/db/schemas/vendors/vendor-gsts.schema";
+import { normalizeVendorName, isUniqueViolation } from "@/modules/master/vendor-master/vendor-name.util";
 import { woBasicDetails } from "@/db/schemas/operations/work-order.schema";
 import { users } from "@/db/schemas";
 
@@ -1294,37 +1295,81 @@ export class VendorWorkOrderService {
         return [...sellerOrgs, ...otherParties];
     }
 
+    // See PurchaseOrderService.findSellerOrgByName: seller orgs are unique on
+    // lower(btrim(name)) and the "Add new seller" dialog reused to create
+    // case/space duplicates, so reuse any existing row instead of colliding.
+    private async findSellerOrgByName(name: string) {
+        const normalized = normalizeVendorName(name).toLowerCase();
+        const [org] = await this.db
+            .select()
+            .from(vendorOrganizations)
+            .where(sql`lower(btrim(${vendorOrganizations.name})) = ${normalized}`)
+            .orderBy(desc(vendorOrganizations.status), asc(vendorOrganizations.id))
+            .limit(1);
+        return org;
+    }
+
     async createParty(body: any) {
         const type = body.type || "seller";
 
         if (type === "seller") {
-            const [org] = await this.db
-                .insert(vendorOrganizations)
-                .values({
-                    name: body.name,
-                    alias: body.alias || null,
-                    msme: body.msme || null,
-                    pan: body.pan || null,
-                    address: body.address || null,
-                })
-                .returning();
+            const name = normalizeVendorName(body.name);
+            if (!name) {
+                throw new BadRequestException("Seller name is required");
+            }
 
-            await this.db.insert(vendors).values({
-                orgId: org.id,
-                name: body.contact_person || null,
-                email: body.email || null,
-                mobile: body.mobile_number || null,
-                address: null,
-            });
+            const existing = await this.findSellerOrgByName(name);
+            if (existing) {
+                if (!existing.status) {
+                    await this.db.update(vendorOrganizations).set({ status: true, updatedAt: new Date() }).where(eq(vendorOrganizations.id, existing.id));
+                    existing.status = true;
+                }
+                this.logger.info(`Seller already exists, reusing vendor org: ${existing.name} (ID: ${existing.id})`);
+                return { ...existing, type: "seller", source: "vendor_org" };
+            }
 
-            await this.db.insert(vendorGsts).values({
-                orgId: org.id,
-                gstState: body.gstState || null,
-                gstNo: body.gstNo || null,
-            });
+            try {
+                const org = await this.db.transaction(async tx => {
+                    const [created] = await tx
+                        .insert(vendorOrganizations)
+                        .values({
+                            name,
+                            alias: body.alias || null,
+                            msme: body.msme || null,
+                            pan: body.pan || null,
+                            address: body.address || null,
+                        })
+                        .returning();
 
-            this.logger.info(`Seller created as vendor org: ${org.name} (ID: ${org.id})`);
-            return { ...org, type: "seller", source: "vendor_org" };
+                    await tx.insert(vendors).values({
+                        orgId: created.id,
+                        name: body.contact_person || null,
+                        email: body.email || null,
+                        mobile: body.mobile_number || null,
+                        address: null,
+                    });
+
+                    await tx.insert(vendorGsts).values({
+                        orgId: created.id,
+                        gstState: body.gstState || null,
+                        gstNo: body.gstNo || null,
+                    });
+
+                    return created;
+                });
+
+                this.logger.info(`Seller created as vendor org: ${org.name} (ID: ${org.id})`);
+                return { ...org, type: "seller", source: "vendor_org" };
+            } catch (error) {
+                if (isUniqueViolation(error)) {
+                    const raced = await this.findSellerOrgByName(name);
+                    if (raced) {
+                        this.logger.info(`Seller create raced, reusing vendor org: ${raced.name} (ID: ${raced.id})`);
+                        return { ...raced, type: "seller", source: "vendor_org" };
+                    }
+                }
+                throw error;
+            }
         }
 
         return (
@@ -1380,21 +1425,32 @@ export class VendorWorkOrderService {
         const source = body?.source;
 
         if (source === "vendor_org") {
-            const rows = await this.db
-                .update(vendorOrganizations)
-                .set({
-                    name: body.name ?? undefined,
-                    alias: body.alias ?? undefined,
-                    msme: body.msme ?? undefined,
-                    pan: body.pan ?? undefined,
-                    address: body.address ?? undefined,
-                    updatedAt: new Date(),
-                })
-                .where(eq(vendorOrganizations.id, id))
-                .returning();
-            if (!rows[0]) throw new NotFoundException(`Vendor organization with ID ${id} not found`);
+            const name = body.name === undefined ? undefined : normalizeVendorName(body.name);
+            if (name !== undefined && !name) {
+                throw new BadRequestException("Seller name is required");
+            }
+            try {
+                const rows = await this.db
+                    .update(vendorOrganizations)
+                    .set({
+                        name: name ?? undefined,
+                        alias: body.alias ?? undefined,
+                        msme: body.msme ?? undefined,
+                        pan: body.pan ?? undefined,
+                        address: body.address ?? undefined,
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(vendorOrganizations.id, id))
+                    .returning();
+                if (!rows[0]) throw new NotFoundException(`Vendor organization with ID ${id} not found`);
 
-            return { ...rows[0], type: "seller", source: "vendor_org", isActive: rows[0].status };
+                return { ...rows[0], type: "seller", source: "vendor_org", isActive: rows[0].status };
+            } catch (error) {
+                if (isUniqueViolation(error)) {
+                    throw new ConflictException(`A seller named "${name}" already exists`);
+                }
+                throw error;
+            }
         }
 
         const [existing] = await this.db.select().from(projectParties).where(eq(projectParties.id, id)).limit(1);
@@ -1505,10 +1561,12 @@ export class VendorWorkOrderService {
 
         if (body.sellerOrganizationId) {
             const orgId = body.sellerOrganizationId;
+            // `name` is deliberately not written back: vendor master owns it.
+            // Renaming from a VWO form could collide with another org's name on
+            // the unique index and crash the save with "Duplicate vendor org".
             await this.db
                 .update(vendorOrganizations)
                 .set({
-                    name: body.sellerName,
                     address: body.sellerAddress || undefined,
                     msme: body.sellerMsmeNo || undefined,
                     pan: body.sellerPanNo || undefined,

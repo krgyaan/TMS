@@ -11,6 +11,7 @@ import { vendorGsts, type VendorGst, type NewVendorGst } from "@db/schemas/vendo
 import { vendorAccs, type VendorAcc, type NewVendorAcc } from "@db/schemas/vendors/vendor-banks.schema";
 import { vendorFiles, type VendorFile, type NewVendorFile } from "@db/schemas/vendors/vendor-files.schema";
 import type { BaseFilters } from "@/modules/tendering/types/shared.types";
+import { normalizeVendorName } from "./vendor-name.util";
 
 export type VendorOrganizationListFilters = BaseFilters & { search?: string };
 
@@ -333,22 +334,27 @@ export class VendorMasterService {
     }
 
     async createOrganization(data: NewVendorOrganization): Promise<VendorOrganization> {
+        const name = normalizeVendorName(data.name);
         try {
-            const rows = await this.db.insert(vendorOrganizations).values(data).returning();
+            const rows = await this.db
+                .insert(vendorOrganizations)
+                .values({ ...data, name })
+                .returning();
             return rows[0];
         } catch (error: any) {
             if (error.code === "23505" || error.cause?.code === "23505") {
-                throw new ConflictException(`Vendor Organization with name "${data.name}" already exists`);
+                throw new ConflictException(`Vendor Organization with name "${name}" already exists`);
             }
             throw error;
         }
     }
 
     async updateOrganization(id: number, data: Partial<NewVendorOrganization>): Promise<VendorOrganization> {
+        const normalised = data.name !== undefined ? { ...data, name: normalizeVendorName(data.name) } : data;
         try {
             const rows = await this.db
                 .update(vendorOrganizations)
-                .set({ ...data, updatedAt: new Date() })
+                .set({ ...normalised, updatedAt: new Date() })
                 .where(eq(vendorOrganizations.id, id))
                 .returning();
 
