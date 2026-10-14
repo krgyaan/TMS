@@ -10,6 +10,12 @@ interface Props {
     record: HappyCallingRow;
 }
 
+const priorityColors: Record<string, string> = {
+    Cold: 'text-blue-600 border-blue-500/50',
+    Warm: 'text-yellow-600 border-yellow-500/50',
+    Hot: 'text-red-600 border-red-500/50',
+};
+
 export function HappyCallingView({ record }: Props) {
     const { data: broadcasts = [] } = useBroadcasts();
     const broadcastName = broadcasts.find((b) => b.id === record.broadcast)?.name;
@@ -90,10 +96,22 @@ export function HappyCallingView({ record }: Props) {
                             </TableCell>
                         </TableRow>
                         {record.details && (
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Details
-                                </TableCell>
+<TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Priority
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {record.leadPriority ? (
+                                    <Badge variant="outline" className={priorityColors[record.leadPriority] || ''}>
+                                        {record.leadPriority}
+                                    </Badge>
+                                ) : (
+                                    '—'
+                                )}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Status
+                            </TableCell>
                                 <TableCell className="text-sm break-words" colSpan={3}>
                                     {record.details}
                                 </TableCell>

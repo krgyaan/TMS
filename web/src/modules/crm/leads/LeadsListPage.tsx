@@ -33,7 +33,7 @@ import {
 import { paths } from "@/app/routes/paths";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLeads, useDeleteLead, useUpdateLead } from "@/hooks/api/useLeads";
-import { useHappyCallings } from "@/hooks/api/useHappyCalling";
+import { useHappyCallings, useUpdateHappyCalling } from "@/hooks/api/useHappyCalling";
 import type { LeadWithNames } from "@/modules/crm/leads/helpers/leads.type";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
@@ -58,6 +58,7 @@ const LeadListPage = () => {
     const { canCreate, canUpdate, canDelete } = useAuth();
     const deleteLead = useDeleteLead();
     const updateLead = useUpdateLead();
+    const updateHappyCalling = useUpdateHappyCalling();
 
     const {
         activeTab: activePriority,
@@ -93,7 +94,8 @@ const LeadListPage = () => {
         open: boolean; 
         leadId: number | null; 
         leadName?: string; 
-        currentPriority?: string | null 
+        currentPriority?: string | null;
+        source?: 'lead' | 'happy_calling';
     }>({ 
         open: false, 
         leadId: null 
@@ -132,17 +134,23 @@ const LeadListPage = () => {
         ? hotResponse.length 
         : (hotResponse?.meta?.total ?? 0);
 
-    // Happy calling entries are merged into the Cold tab, so its badge includes them.
-    const { data: happyCallingCountResponse } = useHappyCallings({ page: 1, limit: 1 });
+    // Happy calling entries are merged into the list, so each tab badge adds
+    // the happy calling count for that priority to the leads count.
+    const { data: happyCallingColdResponse } = useHappyCallings({ page: 1, limit: 1, priority: 'Cold' });
+    const { data: happyCallingWarmResponse } = useHappyCallings({ page: 1, limit: 1, priority: 'Warm' });
+    const { data: happyCallingHotResponse } = useHappyCallings({ page: 1, limit: 1, priority: 'Hot' });
 
-    const happyCallingCount = Array.isArray(happyCallingCountResponse)
-        ? happyCallingCountResponse.length
-        : (happyCallingCountResponse?.meta?.total ?? 0);
+    const countOf = (response: typeof happyCallingColdResponse) =>
+        Array.isArray(response) ? response.length : (response?.meta?.total ?? 0);
+
+    const happyCallingCount = countOf(happyCallingColdResponse);
+    const happyCallingWarmCount = countOf(happyCallingWarmResponse);
+    const happyCallingHotCount = countOf(happyCallingHotResponse);
 
     const getCount = (key: LeadPriorityTab) => {
         if (key === 'cold') return coldCount + happyCallingCount;
-        if (key === 'warm') return warmCount;
-        return hotCount;
+        if (key === 'warm') return warmCount + happyCallingWarmCount;
+        return hotCount + happyCallingHotCount;
     };
 
     const { data: apiResponse, isLoading } = useLeads(
@@ -151,7 +159,7 @@ const LeadListPage = () => {
             limit: pagination.pageSize,
             search: debouncedSearch || undefined,
             priority: getPriorityFilter(activePriority as LeadPriorityTab),
-            includeHappyCalling: activePriority === 'cold',
+            includeHappyCalling: true,
         },
         { 
             sortBy: sortModel[0]?.colId, 
@@ -172,6 +180,14 @@ const LeadListPage = () => {
     };
 
     const handlePriorityUpdate = async (leadId: number, priority: string) => {
+        if (priorityModal.source === 'happy_calling') {
+            await updateHappyCalling.mutateAsync({ 
+                id: leadId, 
+                data: { leadPriority: priority } 
+            });
+            return;
+        }
+
         await updateLead.mutateAsync({ 
             id: leadId, 
             data: { leadPriority: priority as 'Cold' | 'Warm' | 'Hot' } 
@@ -197,10 +213,13 @@ const LeadListPage = () => {
                 open: true,
                 leadId: row.id,
                 leadName: row.companyName || undefined,
-                currentPriority: row.leadPriority
+                currentPriority: row.leadPriority,
+                source: row.source ?? 'lead'
             }),
             icon: <Star className="h-4 w-4" />,
-            visible: (row) => !isHappyCalling(row) && canUpdate("crm.leads")
+            visible: (row) => isHappyCalling(row)
+                ? canUpdate("crm.happy_calling")
+                : canUpdate("crm.leads")
         },
         {
             label: "Enquiry Received",
@@ -556,6 +575,7 @@ const LeadListPage = () => {
                 leadId={priorityModal.leadId} 
                 leadName={priorityModal.leadName} 
                 currentPriority={priorityModal.currentPriority} 
+                entityLabel={priorityModal.source === 'happy_calling' ? 'Happy Calling Entry' : 'Lead'} 
                 onConfirm={handlePriorityUpdate} 
             />
         </Card>

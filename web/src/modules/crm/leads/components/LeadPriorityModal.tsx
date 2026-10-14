@@ -19,6 +19,8 @@ interface LeadPriorityModalProps {
     leadName?: string;
     currentPriority?: string | null;
     onConfirm: (leadId: number, priority: string) => Promise<void>;
+    /** Label of the entity being prioritised, e.g. "Lead" or "Happy Calling entry". */
+    entityLabel?: string;
 }
 
 type Priority = "Cold" | "Warm" | "Hot";
@@ -54,6 +56,7 @@ export function LeadPriorityModal({
     leadName,
     currentPriority,
     onConfirm,
+    entityLabel = "Lead",
 }: LeadPriorityModalProps) {
     const [selectedPriority, setSelectedPriority] = useState<Priority>(
         (currentPriority as Priority) || "Cold"
@@ -82,9 +85,9 @@ export function LeadPriorityModal({
         <Dialog open={open} onOpenChange={handleClose}>
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                    <DialogTitle>Update Lead Priority</DialogTitle>
+                    <DialogTitle>Update {entityLabel} Priority</DialogTitle>
                     <DialogDescription>
-                        Set the priority level for: <strong>{leadName || "this lead"}</strong>
+                        Set the priority level for: <strong>{leadName || `this ${entityLabel.toLowerCase()}`}</strong>
                     </DialogDescription>
                 </DialogHeader>
 

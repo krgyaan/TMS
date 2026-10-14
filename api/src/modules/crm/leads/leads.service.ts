@@ -119,10 +119,14 @@ export class LeadsService {
     }
 
     /**
-     * Fetches every happy calling entry matching the search, already mapped onto
-     * the lead list shape so both sources can be merged and paginated together.
+     * Fetches every happy calling entry matching the search and priority, already
+     * mapped onto the lead list shape so both sources can be merged and paginated
+     * together.
      */
-    private async fetchHappyCallingRows(search?: string): Promise<{ rows: LeadListRow[]; total: number }> {
+    private async fetchHappyCallingRows(
+        search?: string,
+        priority?: string
+    ): Promise<{ rows: LeadListRow[]; total: number }> {
         const conditions: SQL[] = [];
         const trimmed = search?.trim();
         if (trimmed) {
@@ -135,6 +139,9 @@ export class LeadsService {
                     ilike(happyCalling.phone, `%${trimmed}%`),
                 ) as SQL
             );
+        }
+        if (priority) {
+            conditions.push(eq(happyCalling.leadPriority, priority));
         }
         const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
         const latestFollowupSubquery = this.getLatestHappyCallingFollowupSubquery();
@@ -202,7 +209,7 @@ export class LeadsService {
                 lastLetterSentAt: null,
                 lastWhatsappSentAt: null,
 
-                leadPriority: 'Cold',
+                leadPriority: entry.leadPriority ?? 'Cold',
                 recentFollowUp: null,
                 isDeleted: false,
                 deleteReason: null,
@@ -234,14 +241,12 @@ export class LeadsService {
         const limit = filters?.limit || 50;
         const offset = (page - 1) * limit;
 
-        // Happy calling entries are surfaced in the Cold tab only: they carry no
-        // priority, no team and no soft-delete flag, so they are skipped whenever
-        // one of those filters is active.
+        // Happy calling entries are merged in alongside leads. They are skipped when a
+        // team or disqualified filter is active, since neither applies to them.
         const includeHappyCalling =
             !!filters?.includeHappyCalling &&
             filters?.status !== 'disqualified' &&
-            !filters?.team &&
-            (!filters?.priority || filters.priority === 'Cold');
+            !filters?.team;
 
         const latestFollowupSubquery = this.getLatestFollowupSubquery();
         const conditions: SQL[] = [];
@@ -341,7 +346,7 @@ export class LeadsService {
 
         // ── Combined list (leads + happy calling) ─────────────────────
         const [happyCalling, allLeadRows] = await Promise.all([
-            this.fetchHappyCallingRows(filters?.search),
+            this.fetchHappyCallingRows(filters?.search, filters?.priority),
             leadsQuery,
         ]);
 
