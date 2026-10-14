@@ -242,7 +242,7 @@ export default function EditPurchaseOrderPage() {
         }
         try {
             const dto: CreatePartyDTO = {
-                name: partyData.name,
+                name: partyData.name.trim(),
                 alias: partyData.alias || undefined,
                 email: partyData.email || undefined,
                 address: partyData.address || undefined,
@@ -253,7 +253,12 @@ export default function EditPurchaseOrderPage() {
                 contact_person: partyData.contact_person || undefined,
                 mobile_number: partyData.mobile_number || undefined,
             };
-            await createPartyMutation.mutateAsync(dto);
+            const created = await createPartyMutation.mutateAsync(dto);
+            // Select the just-created (or de-duplicated) party so the user does
+            // not add the same seller again from the picker.
+            if (created?.id != null) {
+                form.setValue(partyCreationType === "seller" ? "sellerId" : "partyId", String(created.id));
+            }
             toast.success(`Party "${partyData.name}" has been added successfully.`);
             setIsAddPartyOpen(false);
             setIsShipToPartyOpen(false);

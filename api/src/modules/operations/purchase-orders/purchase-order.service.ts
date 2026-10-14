@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, like, ne, or, sql, type SQL } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, rename } from "node:fs/promises";
@@ -16,6 +16,7 @@ import { projectParties } from "@/db/schemas/operations/project-parties.schema";
 import { vendorOrganizations } from "@/db/schemas/vendors/vendor-organizations.schema";
 import { vendors } from "@/db/schemas/vendors/vendors.schema";
 import { vendorGsts } from "@/db/schemas/vendors/vendor-gsts.schema";
+import { normalizeVendorName, isUniqueViolation } from "@/modules/master/vendor-master/vendor-name.util";
 import { purchaseOrderProducts } from "@/db/schemas/operations/purchase-order-products.schema";
 import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
 import { orderExtraCharges } from "@/db/schemas/operations/order-extra-charges.schema";
@@ -982,48 +983,95 @@ export class PurchaseOrderService {
         return { total, totalGst, totalWithGst };
     }
 
+    // Seller orgs are unique on lower(btrim(name)). Reuse the existing row
+    // rather than letting the create path collide with the unique index - the
+    // PO/VWO "Add new seller" dialogs are the historical source of case/space
+    // duplicate vendor_organizations.
+    private async findSellerOrgByName(name: string) {
+        const normalized = normalizeVendorName(name).toLowerCase();
+        const [org] = await this.db
+            .select()
+            .from(vendorOrganizations)
+            .where(sql`lower(btrim(${vendorOrganizations.name})) = ${normalized}`)
+            .orderBy(desc(vendorOrganizations.status), asc(vendorOrganizations.id))
+            .limit(1);
+        return org;
+    }
+
     async createParty(body: any) {
         const type = body.type || "seller";
 
         if (type === "seller") {
-            const [org] = await this.db
-                .insert(vendorOrganizations)
-                .values({
-                    name: body.name,
-                    alias: body.alias || null,
-                    msme: body.msme || null,
-                    pan: body.pan || null,
-                    address: body.address || null,
-                })
-                .returning();
-
-            await this.db.insert(vendors).values({
-                orgId: org.id,
-                name: body.contact_person || null,
-                email: body.email || null,
-                mobile: body.mobile_number || null,
-                address: null,
-            });
-
-            await this.db.insert(vendorGsts).values({
-                orgId: org.id,
-                gstState: body.gstState || null,
-                gstNo: body.gstNo || null,
-            });
-
-            if (org.name) {
-                await this.clientDirectorySyncService.syncToClientDirectory([
-                    {
-                        name: org.name,
-                        email: body.email || null,
-                        phone: body.mobile_number || null,
-                        org: null,
-                    },
-                ]);
+            const name = normalizeVendorName(body.name);
+            if (!name) {
+                throw new BadRequestException("Seller name is required");
             }
 
-            this.logger.info(`Seller created as vendor org: ${org.name} (ID: ${org.id})`);
-            return { ...org, type: "seller", source: "vendor_org" };
+            const existing = await this.findSellerOrgByName(name);
+            if (existing) {
+                if (!existing.status) {
+                    await this.db.update(vendorOrganizations).set({ status: true, updatedAt: new Date() }).where(eq(vendorOrganizations.id, existing.id));
+                    existing.status = true;
+                }
+                this.logger.info(`Seller already exists, reusing vendor org: ${existing.name} (ID: ${existing.id})`);
+                return { ...existing, type: "seller", source: "vendor_org" };
+            }
+
+            try {
+                const org = await this.db.transaction(async tx => {
+                    const [created] = await tx
+                        .insert(vendorOrganizations)
+                        .values({
+                            name,
+                            alias: body.alias || null,
+                            msme: body.msme || null,
+                            pan: body.pan || null,
+                            address: body.address || null,
+                        })
+                        .returning();
+
+                    await tx.insert(vendors).values({
+                        orgId: created.id,
+                        name: body.contact_person || null,
+                        email: body.email || null,
+                        mobile: body.mobile_number || null,
+                        address: null,
+                    });
+
+                    await tx.insert(vendorGsts).values({
+                        orgId: created.id,
+                        gstState: body.gstState || null,
+                        gstNo: body.gstNo || null,
+                    });
+
+                    return created;
+                });
+
+                if (org.name) {
+                    await this.clientDirectorySyncService.syncToClientDirectory([
+                        {
+                            name: org.name,
+                            email: body.email || null,
+                            phone: body.mobile_number || null,
+                            org: null,
+                        },
+                    ]);
+                }
+
+                this.logger.info(`Seller created as vendor org: ${org.name} (ID: ${org.id})`);
+                return { ...org, type: "seller", source: "vendor_org" };
+            } catch (error) {
+                // Lost a concurrent race on the unique index: the other request
+                // won, so reuse its row instead of surfacing a conflict.
+                if (isUniqueViolation(error)) {
+                    const raced = await this.findSellerOrgByName(name);
+                    if (raced) {
+                        this.logger.info(`Seller create raced, reusing vendor org: ${raced.name} (ID: ${raced.id})`);
+                        return { ...raced, type: "seller", source: "vendor_org" };
+                    }
+                }
+                throw error;
+            }
         }
 
         const party = (
@@ -1191,15 +1239,16 @@ export class PurchaseOrderService {
 
     // Vendor master is edited through the Vendor Master module only. PO creation
     // used to write the contact person back into `vendors` (see the removed
-    // syncPersonForOrg), which let a Quick-Filled internal employee permanently
-    // rename the vendor's contact person.
+    // syncPersonForOrg) and, until this changed, also overwrote the org `name`.
+    // Writing `name` here let a PO form rename a vendor into a name that already
+    // belonged to another org, which tripped the unique index and failed PO
+    // creation with "Duplicate vendor org". `name` is now owned by vendor master.
     private async syncPartyFromPO(body: any) {
         if (body.sellerOrganizationId) {
             const orgId = body.sellerOrganizationId;
             await this.db
                 .update(vendorOrganizations)
                 .set({
-                    name: body.sellerName,
                     alias: body.sellerAlias || null,
                     msme: body.sellerMsmeNo || null,
                     pan: body.sellerPanNo || null,
@@ -1837,21 +1886,32 @@ export class PurchaseOrderService {
         const source = body?.source;
 
         if (source === "vendor_org") {
-            const rows = await this.db
-                .update(vendorOrganizations)
-                .set({
-                    name: body.name ?? undefined,
-                    alias: body.alias ?? undefined,
-                    msme: body.msme ?? undefined,
-                    pan: body.pan ?? undefined,
-                    address: body.address ?? undefined,
-                    updatedAt: new Date(),
-                })
-                .where(eq(vendorOrganizations.id, id))
-                .returning();
-            if (!rows[0]) throw new NotFoundException(`Vendor organization with ID ${id} not found`);
+            const name = body.name === undefined ? undefined : normalizeVendorName(body.name);
+            if (name !== undefined && !name) {
+                throw new BadRequestException("Seller name is required");
+            }
+            try {
+                const rows = await this.db
+                    .update(vendorOrganizations)
+                    .set({
+                        name: name ?? undefined,
+                        alias: body.alias ?? undefined,
+                        msme: body.msme ?? undefined,
+                        pan: body.pan ?? undefined,
+                        address: body.address ?? undefined,
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(vendorOrganizations.id, id))
+                    .returning();
+                if (!rows[0]) throw new NotFoundException(`Vendor organization with ID ${id} not found`);
 
-            return { ...rows[0], type: "seller", source: "vendor_org", isActive: rows[0].status };
+                return { ...rows[0], type: "seller", source: "vendor_org", isActive: rows[0].status };
+            } catch (error) {
+                if (isUniqueViolation(error)) {
+                    throw new ConflictException(`A seller named "${name}" already exists`);
+                }
+                throw error;
+            }
         }
 
         const [existing] = await this.db.select().from(projectParties).where(eq(projectParties.id, id)).limit(1);

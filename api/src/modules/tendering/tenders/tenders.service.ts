@@ -1113,7 +1113,7 @@ export class TenderInfosService {
             'tender.updated',
             newTender.id as number,
             coordinatorUserId,
-            `Tender Updated: ${newTender.tenderNo}`,
+            `Tender Updated: ${newTender.tenderName}`,
             'tender-major-update',
             {
                 assignee: assignee.name,
