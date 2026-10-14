@@ -208,7 +208,7 @@ const LeadListPage = () => {
                 : canUpdate("crm.leads")
         },
         {
-            label: "Lead Priority",
+            label: "Priority",
             onClick: (row) => setPriorityModal({
                 open: true,
                 leadId: row.id,
@@ -232,7 +232,7 @@ const LeadListPage = () => {
             visible: () => canCreate("crm.enquiries")
         },
         {
-            label: "View Lead",
+            label: "View",
             onClick: (row) => navigate(
                 isHappyCalling(row)
                     ? paths.crm.happyCallingView(row.id)
@@ -241,7 +241,7 @@ const LeadListPage = () => {
             icon: <Eye className="h-4 w-4" />
         },
         {
-            label: "Edit Lead",
+            label: "Edit",
             onClick: (row) => navigate(
                 isHappyCalling(row)
                     ? paths.crm.happyCallingEdit(row.id)
@@ -491,7 +491,7 @@ const LeadListPage = () => {
                                 onClick={() => navigate(paths.crm.leadCreate)}
                                 className="flex items-center gap-2"
                             >
-                                <Plus className="h-4 w-4" /> Add Lead
+                                <Plus className="h-4 w-4" /> Add New
                             </Button>
                         )}
                     </div>
@@ -575,7 +575,6 @@ const LeadListPage = () => {
                 leadId={priorityModal.leadId} 
                 leadName={priorityModal.leadName} 
                 currentPriority={priorityModal.currentPriority} 
-                entityLabel={priorityModal.source === 'happy_calling' ? 'Happy Calling Entry' : 'Lead'} 
                 onConfirm={handlePriorityUpdate} 
             />
         </Card>
