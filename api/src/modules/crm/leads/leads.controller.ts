@@ -47,6 +47,7 @@ export class LeadsController {
         @Query('team')      team?:      string,   
         @Query('sortBy')    sortBy?:    string,
         @Query('sortOrder') sortOrder?: string,
+        @Query('includeHappyCalling') includeHappyCalling?: string,
     ) {
         const parseNumber = (v?: string): number | undefined => {
             if (!v) return undefined;
@@ -63,6 +64,7 @@ export class LeadsController {
             team,                                  // ✅ ADD THIS
             sortBy,
             sortOrder: sortOrder as 'asc' | 'desc' | undefined,
+            includeHappyCalling: includeHappyCalling === 'true',
         });
     }
 

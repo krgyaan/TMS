@@ -26,6 +26,7 @@ type LeadsPaginationParams = {
     priority?: string;
     status?: string;
     team?: string;      // ✅ NEW - team filter
+    includeHappyCalling?: boolean;
 };
 
 export const useLeads = (
@@ -39,6 +40,7 @@ export const useLeads = (
         priority: pagination.priority,
         status: pagination.status,
         team: pagination.team,          // ✅ NEW
+        ...(pagination.includeHappyCalling && { includeHappyCalling: true }),
         ...(sort?.sortBy    && { sortBy: sort.sortBy }),
         ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
     };

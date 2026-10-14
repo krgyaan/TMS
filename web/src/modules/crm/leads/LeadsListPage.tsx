@@ -33,6 +33,7 @@ import {
 import { paths } from "@/app/routes/paths";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLeads, useDeleteLead, useUpdateLead } from "@/hooks/api/useLeads";
+import { useHappyCallings } from "@/hooks/api/useHappyCalling";
 import type { LeadWithNames } from "@/modules/crm/leads/helpers/leads.type";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
@@ -48,6 +49,9 @@ const PRIORITY_SUBTABS: { key: LeadPriorityTab; label: string }[] = [
     { key: 'warm', label: 'Warm' },
     { key: 'hot',  label: 'Hot'  },
 ];
+
+/** Happy calling entries have no priority yet, so they live in the Cold tab. */
+const isHappyCalling = (row?: LeadWithNames | null) => row?.source === 'happy_calling';
 
 const LeadListPage = () => {
     const navigate = useNavigate();
@@ -128,8 +132,15 @@ const LeadListPage = () => {
         ? hotResponse.length 
         : (hotResponse?.meta?.total ?? 0);
 
+    // Happy calling entries are merged into the Cold tab, so its badge includes them.
+    const { data: happyCallingCountResponse } = useHappyCallings({ page: 1, limit: 1 });
+
+    const happyCallingCount = Array.isArray(happyCallingCountResponse)
+        ? happyCallingCountResponse.length
+        : (happyCallingCountResponse?.meta?.total ?? 0);
+
     const getCount = (key: LeadPriorityTab) => {
-        if (key === 'cold') return coldCount;
+        if (key === 'cold') return coldCount + happyCallingCount;
         if (key === 'warm') return warmCount;
         return hotCount;
     };
@@ -140,6 +151,7 @@ const LeadListPage = () => {
             limit: pagination.pageSize,
             search: debouncedSearch || undefined,
             priority: getPriorityFilter(activePriority as LeadPriorityTab),
+            includeHappyCalling: activePriority === 'cold',
         },
         { 
             sortBy: sortModel[0]?.colId, 
@@ -169,9 +181,15 @@ const LeadListPage = () => {
     const leadActions: ActionItem<LeadWithNames>[] = [
         {
             label: "Update Followup",
-            onClick: (row) => navigate(paths.crm.leadFollowup(row.id)),
+            onClick: (row) => navigate(
+                isHappyCalling(row)
+                    ? paths.crm.happyCallingFollowup(row.id)
+                    : paths.crm.leadFollowup(row.id)
+            ),
             icon: <Calendar className="h-4 w-4" />,
-            visible: () => canUpdate("crm.leads")
+            visible: (row) => isHappyCalling(row)
+                ? canUpdate("crm.happy_calling")
+                : canUpdate("crm.leads")
         },
         {
             label: "Lead Priority",
@@ -182,24 +200,38 @@ const LeadListPage = () => {
                 currentPriority: row.leadPriority
             }),
             icon: <Star className="h-4 w-4" />,
-            visible: () => canUpdate("crm.leads")
+            visible: (row) => !isHappyCalling(row) && canUpdate("crm.leads")
         },
         {
             label: "Enquiry Received",
-            onClick: (row) => navigate(paths.crm.enquiryCreateFromLead(row.id)),
+            onClick: (row) => navigate(
+                isHappyCalling(row)
+                    ? paths.crm.happyCallingEnquiryCreate(row.id)
+                    : paths.crm.enquiryCreateFromLead(row.id)
+            ),
             icon: <Mail className="h-4 w-4" />,
             visible: () => canCreate("crm.enquiries")
         },
         {
             label: "View Lead",
-            onClick: (row) => navigate(paths.crm.leadView(row.id)),
+            onClick: (row) => navigate(
+                isHappyCalling(row)
+                    ? paths.crm.happyCallingView(row.id)
+                    : paths.crm.leadView(row.id)
+            ),
             icon: <Eye className="h-4 w-4" />
         },
         {
             label: "Edit Lead",
-            onClick: (row) => navigate(paths.crm.leadEdit(row.id)),
+            onClick: (row) => navigate(
+                isHappyCalling(row)
+                    ? paths.crm.happyCallingEdit(row.id)
+                    : paths.crm.leadEdit(row.id)
+            ),
             icon: <Pencil className="h-4 w-4" />,
-            visible: () => canUpdate("crm.leads")
+            visible: (row) => isHappyCalling(row)
+                ? canUpdate("crm.happy_calling")
+                : canUpdate("crm.leads")
         },
         {
             label: "Disqualify",
@@ -210,7 +242,7 @@ const LeadListPage = () => {
                 leadName: row.companyName || undefined
             }),
             icon: <Trash2 className="h-4 w-4 text-red-600" />,
-            visible: () => canDelete("crm.leads")
+            visible: (row) => !isHappyCalling(row) && canDelete("crm.leads")
         },
     ];
 
@@ -219,8 +251,13 @@ const LeadListPage = () => {
             field: "companyName",
             headerName: "Company",
             width: 200,
-            cellRenderer: (params: any) => (
-                <TooltipProvider delayDuration={100}>
+            cellRenderer: (params: any) => {
+                // Happy calling entries have no address/country data to show.
+                if (isHappyCalling(params.data)) {
+                    return <span className="font-medium">{params.value || "-"}</span>;
+                }
+                return (
+                    <TooltipProvider delayDuration={100}>
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <span className="cursor-help font-medium">
@@ -248,7 +285,8 @@ const LeadListPage = () => {
                         </TooltipContent>
                     </Tooltip>
                 </TooltipProvider>
-            )
+                );
+            }
         },
         {
             field: "name",
@@ -308,6 +346,9 @@ const LeadListPage = () => {
             headerName: "Allocated To", 
             width: 150, 
             cellRenderer: (params: any) => {
+                if (isHappyCalling(params.data)) {
+                    return <span className="text-muted-foreground">-</span>;
+                }
                 if (!params.value) {
                     return (
                         <span className="text-muted-foreground italic text-xs">
@@ -363,6 +404,14 @@ const LeadListPage = () => {
             headerName: "Status",
             width: 130,
             cellRenderer: (params: any) => {
+                // Happy calling rows carry a plain status, not followup counts.
+                if (isHappyCalling(params.data)) {
+                    return (
+                        <Badge variant="outline" className="capitalize font-medium">
+                            {params.data.happyCallingStatus || "-"}
+                        </Badge>
+                    );
+                }
                 const isNew = !params.value && !params.data?.isDeleted;
                 const displayValue = isNew ? "New" : (params.value || "-");
                 return (
@@ -486,6 +535,8 @@ const LeadListPage = () => {
                             filter: true, 
                             sortable: true 
                         }, 
+                        // Ids overlap between the two tables, so rows are keyed by source.
+                        getRowId: (params) => `${params.data?.source ?? 'lead'}-${params.data?.id}`, 
                         onSortChanged: handleSortChanged 
                     }} 
                     enableFiltering={true} 
