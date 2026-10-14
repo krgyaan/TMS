@@ -91,6 +91,7 @@ interface PaymentRow {
 }
 
 interface InvoiceRow {
+    invoiceNo: string;
     category: string;
     invoiceDate: string;
     partyName: string;
@@ -111,6 +112,7 @@ const emptyPaymentRow = (): PaymentRow => ({
 });
 
 const emptyInvoiceRow = (): InvoiceRow => ({
+    invoiceNo: "",
     category: "",
     invoiceDate: todayISO(),
     partyName: "",
@@ -229,19 +231,19 @@ const PoClosurePage: React.FC = () => {
     const withinRoundOff = (r: number) => Math.abs(r) > 0 && Math.abs(r) < CLOSURE_TOLERANCE;
     // The API gate also requires every payment request to be payment_done, so the
     // page mirrors that instead of silently showing "Ready to close".
-    const openPrs = (po?.paymentRequests ?? []).filter((pr) => pr.status !== "payment_done").length;
+    const openPrs = (po?.paymentRequests ?? []).filter(pr => pr.status !== "payment_done").length;
     const canClose = paySettled && invoiceSettled && openPrs === 0 && !po?.closedAt;
 
     const updatePaymentRow = (index: number, field: keyof PaymentRow, value: string) => {
-        setPaymentRows((rows) => rows.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
+        setPaymentRows(rows => rows.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
     };
 
     const updateInvoiceRow = (index: number, field: keyof InvoiceRow, value: string | string[]) => {
-        setInvoiceRows((rows) => rows.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
+        setInvoiceRows(rows => rows.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
     };
 
     const savePayments = async () => {
-        const valid = paymentRows.filter((r) => r.amount && r.accountNumber && r.ifsc);
+        const valid = paymentRows.filter(r => r.amount && r.accountNumber && r.ifsc);
         if (valid.length === 0) {
             setSaveMsg({ type: "error", text: "Fill amount, account no. and IFSC in at least one payment row." });
             return;
@@ -262,9 +264,9 @@ const PoClosurePage: React.FC = () => {
     };
 
     const saveInvoices = async () => {
-        const valid = invoiceRows.filter((r) => r.category && r.partyName && r.valuePreGst);
+        const valid = invoiceRows.filter(r => r.invoiceNo.trim() && r.category && r.partyName && r.valuePreGst);
         if (valid.length === 0) {
-            setSaveMsg({ type: "error", text: "Fill category, party name and pre-GST in at least one invoice row." });
+            setSaveMsg({ type: "error", text: "Fill invoice number, category, party name and pre-GST in at least one invoice row." });
             return;
         }
         setSavingInvoices(true);
@@ -321,11 +323,17 @@ const PoClosurePage: React.FC = () => {
                             <div className="text-right">
                                 <p className="text-lg font-semibold">{formatINR(totalPiAmount)}</p>
                                 {invoiceSettled ? (
-                                    <Badge variant="default" className="mt-1">Settled</Badge>
+                                    <Badge variant="default" className="mt-1">
+                                        Settled
+                                    </Badge>
                                 ) : invoicesRemaining < 0 ? (
-                                    <Badge variant="outline" className="mt-1">Over</Badge>
+                                    <Badge variant="outline" className="mt-1">
+                                        Over
+                                    </Badge>
                                 ) : (
-                                    <Badge variant="outline" className="mt-1">Pending</Badge>
+                                    <Badge variant="outline" className="mt-1">
+                                        Pending
+                                    </Badge>
                                 )}
                             </div>
                         </div>
@@ -338,11 +346,17 @@ const PoClosurePage: React.FC = () => {
                             <div className="text-right">
                                 <p className="text-lg font-semibold">{formatINR(totalPaymentDone)}</p>
                                 {paySettled ? (
-                                    <Badge variant="default" className="mt-1">Settled</Badge>
+                                    <Badge variant="default" className="mt-1">
+                                        Settled
+                                    </Badge>
                                 ) : paymentsRemaining < 0 ? (
-                                    <Badge variant="outline" className="mt-1">Over</Badge>
+                                    <Badge variant="outline" className="mt-1">
+                                        Over
+                                    </Badge>
                                 ) : (
-                                    <Badge variant="outline" className="mt-1">Pending</Badge>
+                                    <Badge variant="outline" className="mt-1">
+                                        Pending
+                                    </Badge>
                                 )}
                             </div>
                         </div>
@@ -407,9 +421,7 @@ const PoClosurePage: React.FC = () => {
                                 </div>
                             )}
                             {(withinRoundOff(paymentsRemaining) || withinRoundOff(invoicesRemaining)) && (
-                                <p className="text-xs text-amber-600">
-                                    Difference under ₹{CLOSURE_TOLERANCE} — absorbed as round-off on closure.
-                                </p>
+                                <p className="text-xs text-amber-600">Difference under ₹{CLOSURE_TOLERANCE} — absorbed as round-off on closure.</p>
                             )}
                             {openPrs > 0 && (
                                 <div className="flex items-center justify-between text-amber-600">
@@ -442,7 +454,7 @@ const PoClosurePage: React.FC = () => {
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Record Payments</CardTitle>
-                        <Button variant="outline" size="sm" onClick={() => setPaymentRows((rows) => [...rows, emptyPaymentRow()])}>
+                        <Button variant="outline" size="sm" onClick={() => setPaymentRows(rows => [...rows, emptyPaymentRow()])}>
                             <Plus className="h-4 w-4 mr-1" />
                             Add Row
                         </Button>
@@ -468,12 +480,7 @@ const PoClosurePage: React.FC = () => {
                                         {paymentRows.map((row, i) => (
                                             <TableRow key={i} className="hover:bg-muted/30">
                                                 <TableCell>
-                                                    <Input
-                                                        type="date"
-                                                        className="h-8"
-                                                        value={row.paymentDate}
-                                                        onChange={(e) => updatePaymentRow(i, "paymentDate", e.target.value)}
-                                                    />
+                                                    <Input type="date" className="h-8" value={row.paymentDate} onChange={e => updatePaymentRow(i, "paymentDate", e.target.value)} />
                                                 </TableCell>
                                                 <TableCell>
                                                     <Input
@@ -482,7 +489,7 @@ const PoClosurePage: React.FC = () => {
                                                         className="h-8 text-right"
                                                         placeholder="0.00"
                                                         value={row.amount}
-                                                        onChange={(e) => updatePaymentRow(i, "amount", e.target.value)}
+                                                        onChange={e => updatePaymentRow(i, "amount", e.target.value)}
                                                     />
                                                 </TableCell>
                                                 <TableCell>
@@ -490,7 +497,7 @@ const PoClosurePage: React.FC = () => {
                                                         className="h-8"
                                                         placeholder={po.sellerName || "Account name"}
                                                         value={row.accountName}
-                                                        onChange={(e) => updatePaymentRow(i, "accountName", e.target.value)}
+                                                        onChange={e => updatePaymentRow(i, "accountName", e.target.value)}
                                                     />
                                                 </TableCell>
                                                 <TableCell>
@@ -498,7 +505,7 @@ const PoClosurePage: React.FC = () => {
                                                         className="h-8"
                                                         placeholder="Account no."
                                                         value={row.accountNumber}
-                                                        onChange={(e) => updatePaymentRow(i, "accountNumber", e.target.value)}
+                                                        onChange={e => updatePaymentRow(i, "accountNumber", e.target.value)}
                                                     />
                                                 </TableCell>
                                                 <TableCell>
@@ -506,16 +513,11 @@ const PoClosurePage: React.FC = () => {
                                                         className="h-8 font-mono uppercase"
                                                         placeholder="IFSC"
                                                         value={row.ifsc}
-                                                        onChange={(e) => updatePaymentRow(i, "ifsc", e.target.value)}
+                                                        onChange={e => updatePaymentRow(i, "ifsc", e.target.value)}
                                                     />
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Input
-                                                        className="h-8 font-mono"
-                                                        placeholder="UTR"
-                                                        value={row.utr}
-                                                        onChange={(e) => updatePaymentRow(i, "utr", e.target.value)}
-                                                    />
+                                                    <Input className="h-8 font-mono" placeholder="UTR" value={row.utr} onChange={e => updatePaymentRow(i, "utr", e.target.value)} />
                                                 </TableCell>
                                                 <TableCell>
                                                     <Button
@@ -523,7 +525,7 @@ const PoClosurePage: React.FC = () => {
                                                         variant="ghost"
                                                         size="sm"
                                                         className="h-8 p-0 text-destructive"
-                                                        onClick={() => setPaymentRows((rows) => rows.filter((_, idx) => idx !== i))}
+                                                        onClick={() => setPaymentRows(rows => rows.filter((_, idx) => idx !== i))}
                                                     >
                                                         <Trash2 className="h-4 w-4" />
                                                     </Button>
@@ -550,7 +552,7 @@ const PoClosurePage: React.FC = () => {
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Record Invoices</CardTitle>
-                        <Button variant="outline" size="sm" onClick={() => setInvoiceRows((rows) => [...rows, emptyInvoiceRow()])}>
+                        <Button variant="outline" size="sm" onClick={() => setInvoiceRows(rows => [...rows, emptyInvoiceRow()])}>
                             <Plus className="h-4 w-4 mr-1" />
                             Add Row
                         </Button>
@@ -563,6 +565,7 @@ const PoClosurePage: React.FC = () => {
                                 <Table>
                                     <TableHeader>
                                         <TableRow className="bg-muted/50">
+                                            <TableHead className="text-xs uppercase">Invoice No</TableHead>
                                             <TableHead className="text-xs uppercase">Category</TableHead>
                                             <TableHead className="text-xs uppercase">Invoice Date</TableHead>
                                             <TableHead className="text-xs uppercase">Party Name</TableHead>
@@ -576,13 +579,23 @@ const PoClosurePage: React.FC = () => {
                                         {invoiceRows.map((row, i) => (
                                             <TableRow key={i} className="hover:bg-muted/30">
                                                 <TableCell>
-                                                    <Select value={row.category} onValueChange={(v) => updateInvoiceRow(i, "category", v)}>
+                                                    <Input
+                                                        className="h-8 w-32 font-mono"
+                                                        placeholder="Invoice no."
+                                                        value={row.invoiceNo}
+                                                        onChange={e => updateInvoiceRow(i, "invoiceNo", e.target.value)}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Select value={row.category} onValueChange={v => updateInvoiceRow(i, "category", v)}>
                                                         <SelectTrigger size="sm" className="w-36">
                                                             <SelectValue placeholder="Category" />
                                                         </SelectTrigger>
                                                         <SelectContent>
-                                                            {BUDGET_CATEGORIES.map((c) => (
-                                                                <SelectItem key={c} value={c}>{c}</SelectItem>
+                                                            {BUDGET_CATEGORIES.map(c => (
+                                                                <SelectItem key={c} value={c}>
+                                                                    {c}
+                                                                </SelectItem>
                                                             ))}
                                                         </SelectContent>
                                                     </Select>
@@ -592,7 +605,7 @@ const PoClosurePage: React.FC = () => {
                                                         type="date"
                                                         className="h-8 w-36"
                                                         value={row.invoiceDate}
-                                                        onChange={(e) => updateInvoiceRow(i, "invoiceDate", e.target.value)}
+                                                        onChange={e => updateInvoiceRow(i, "invoiceDate", e.target.value)}
                                                     />
                                                 </TableCell>
                                                 <TableCell>
@@ -600,7 +613,7 @@ const PoClosurePage: React.FC = () => {
                                                         className="h-8 w-44"
                                                         placeholder={po.sellerName || "Party name"}
                                                         value={row.partyName}
-                                                        onChange={(e) => updateInvoiceRow(i, "partyName", e.target.value)}
+                                                        onChange={e => updateInvoiceRow(i, "partyName", e.target.value)}
                                                     />
                                                 </TableCell>
                                                 <TableCell>
@@ -610,7 +623,7 @@ const PoClosurePage: React.FC = () => {
                                                         className="h-8 w-32 text-right"
                                                         placeholder="0.00"
                                                         value={row.valuePreGst}
-                                                        onChange={(e) => updateInvoiceRow(i, "valuePreGst", e.target.value)}
+                                                        onChange={e => updateInvoiceRow(i, "valuePreGst", e.target.value)}
                                                     />
                                                 </TableCell>
                                                 <TableCell>
@@ -620,14 +633,14 @@ const PoClosurePage: React.FC = () => {
                                                         className="h-8 w-32 text-right"
                                                         placeholder="0.00"
                                                         value={row.gstAmount}
-                                                        onChange={(e) => updateInvoiceRow(i, "gstAmount", e.target.value)}
+                                                        onChange={e => updateInvoiceRow(i, "gstAmount", e.target.value)}
                                                     />
                                                 </TableCell>
                                                 <TableCell className="min-w-[180px]">
                                                     <FileUploader
                                                         context="tender-documents"
                                                         value={row.invoiceFile}
-                                                        onChange={(paths) => updateInvoiceRow(i, "invoiceFile", paths)}
+                                                        onChange={paths => updateInvoiceRow(i, "invoiceFile", paths)}
                                                     />
                                                 </TableCell>
                                                 <TableCell>
@@ -636,7 +649,7 @@ const PoClosurePage: React.FC = () => {
                                                         variant="ghost"
                                                         size="sm"
                                                         className="h-8 w-8 p-0 text-destructive"
-                                                        onClick={() => setInvoiceRows((rows) => rows.filter((_, idx) => idx !== i))}
+                                                        onClick={() => setInvoiceRows(rows => rows.filter((_, idx) => idx !== i))}
                                                     >
                                                         <Trash2 className="h-4 w-4" />
                                                     </Button>
@@ -683,7 +696,7 @@ const PoClosurePage: React.FC = () => {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {po.paymentRequests.map((pr) => {
+                                    {po.paymentRequests.map(pr => {
                                         const cfg = STATUS_CONFIG[pr.status] || { label: pr.status, variant: "outline" as const };
                                         return (
                                             <TableRow key={pr.id} className="hover:bg-muted/30">
@@ -692,7 +705,9 @@ const PoClosurePage: React.FC = () => {
                                                 <TableCell className="text-sm">{pr.partyName || "—"}</TableCell>
                                                 <TableCell className="text-sm text-right font-medium">{formatINR(Number(pr.amount || 0))}</TableCell>
                                                 {showTdsColumn && <TableCell className="text-sm text-right">{formatINR(Number(pr.actualTdsDeducted || 0))}</TableCell>}
-                                                <TableCell><Badge variant={cfg.variant}>{cfg.label}</Badge></TableCell>
+                                                <TableCell>
+                                                    <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                                                </TableCell>
                                                 <TableCell className="text-sm">{pr.paymentMode || "—"}</TableCell>
                                                 <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">{pr.utrNumber || "—"}</TableCell>
                                                 <TableCell>
@@ -730,7 +745,9 @@ const PoClosurePage: React.FC = () => {
                                 {showTdsColumn && (
                                     <TableFooter>
                                         <TableRow className="bg-muted/50">
-                                            <TableCell colSpan={3} className="font-semibold">Total (After TDS Deduction)</TableCell>
+                                            <TableCell colSpan={3} className="font-semibold">
+                                                Total (After TDS Deduction)
+                                            </TableCell>
                                             <TableCell className="text-right font-semibold">{formatINR(totalPaidAfterTds)}</TableCell>
                                             <TableCell className="text-right font-semibold">{formatINR(totalTdsDeducted)}</TableCell>
                                             <TableCell colSpan={5}></TableCell>
@@ -766,7 +783,7 @@ const PoClosurePage: React.FC = () => {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {po.purchaseInvoices.map((inv) => {
+                                    {po.purchaseInvoices.map(inv => {
                                         const piTotal = Number(inv.valuePreGst || 0) + Number(inv.gstAmount || 0);
                                         return (
                                             <TableRow key={inv.id} className="hover:bg-muted/30">
@@ -823,9 +840,7 @@ const PoClosurePage: React.FC = () => {
                             Closed on {formatDate(po.closedAt)}
                             {po.closedByName ? ` by ${po.closedByName}` : ""}
                         </span>
-                        {po.closureNote && (
-                            <span className="text-muted-foreground">Closure note: {po.closureNote}</span>
-                        )}
+                        {po.closureNote && <span className="text-muted-foreground">Closure note: {po.closureNote}</span>}
                     </div>
                 ) : (
                     canClose &&
@@ -861,7 +876,7 @@ const PoClosurePage: React.FC = () => {
             />
 
             {/* Delete Payment Request Confirmation Dialog */}
-            <AlertDialog open={!!deletePaymentRequest} onOpenChange={(open) => !open && setDeletePaymentRequest(null)}>
+            <AlertDialog open={!!deletePaymentRequest} onOpenChange={open => !open && setDeletePaymentRequest(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Delete Payment Request</AlertDialogTitle>
@@ -879,7 +894,7 @@ const PoClosurePage: React.FC = () => {
             </AlertDialog>
 
             {/* Delete Purchase Invoice Confirmation Dialog */}
-            <AlertDialog open={!!deletePurchaseInvoice} onOpenChange={(open) => !open && setDeletePurchaseInvoice(null)}>
+            <AlertDialog open={!!deletePurchaseInvoice} onOpenChange={open => !open && setDeletePurchaseInvoice(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Delete Purchase Invoice</AlertDialogTitle>

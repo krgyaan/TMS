@@ -28,7 +28,9 @@ const STATUS_CONFIG: Record<string, { label: string; variant: "secondary" | "def
 function SectionHeader({ title }: Readonly<{ title: string }>) {
     return (
         <TableRow className="bg-muted/50">
-            <TableCell colSpan={4} className="font-semibold text-sm">{title}</TableCell>
+            <TableCell colSpan={4} className="font-semibold text-sm">
+                {title}
+            </TableCell>
         </TableRow>
     );
 }
@@ -50,7 +52,13 @@ function PdfVersionsInline({ versions, pdfUrl }: Readonly<{ versions: Record<str
     );
 }
 
-function ApprovalBadge({ approved, tdsPercentage, tdsAmount, amountAfterTds, approvalRemark }: Readonly<{
+function ApprovalBadge({
+    approved,
+    tdsPercentage,
+    tdsAmount,
+    amountAfterTds,
+    approvalRemark,
+}: Readonly<{
     approved?: boolean;
     tdsPercentage?: number | string;
     tdsAmount?: number | string;
@@ -112,55 +120,57 @@ interface OrderViewPageProps {
     pdfUrl: (id: number, label: string) => string;
 }
 
-export const OrderViewPage: React.FC<OrderViewPageProps> = ({
-    data,
-    isLoading,
-    isError,
-    error,
-    title,
-    amountLabel,
-    notFoundMessage,
-    loadErrorMessage,
-    pdfUrl,
-}) => {
+export const OrderViewPage: React.FC<OrderViewPageProps> = ({ data, isLoading, isError, error, title, amountLabel, notFoundMessage, loadErrorMessage, pdfUrl }) => {
     const navigate = useNavigate();
     const [viewingPrId, setViewingPrId] = useState<number | null>(null);
 
-    const totalPaymentRequested = useMemo(() =>
-        round2(data?.paymentRequests?.filter(pr => pr.status !== 'rejected').reduce((s, pr) => s + Number(pr.amount), 0) ?? 0),
+    const totalPaymentRequested = useMemo(
+        () => round2(data?.paymentRequests?.filter(pr => pr.status !== "rejected").reduce((s, pr) => s + Number(pr.amount), 0) ?? 0),
         [data?.paymentRequests]
     );
-    const totalMakerDone = useMemo(() =>
-        round2(data?.paymentRequests?.filter(pr => pr.status === 'maker_done').reduce((s, pr) => s + Number(pr.amount), 0) ?? 0),
+    const totalMakerDone = useMemo(
+        () => round2(data?.paymentRequests?.filter(pr => pr.status === "maker_done").reduce((s, pr) => s + Number(pr.amount), 0) ?? 0),
         [data?.paymentRequests]
     );
-    const totalPaymentDone = useMemo(() =>
-        round2(data?.paymentRequests?.filter(pr => pr.status === 'payment_done').reduce((s, pr) => s + Number(pr.amount), 0) ?? 0),
+    const totalPaymentDone = useMemo(
+        () => round2(data?.paymentRequests?.filter(pr => pr.status === "payment_done").reduce((s, pr) => s + Number(pr.amount), 0) ?? 0),
         [data?.paymentRequests]
     );
-    const tdsColumnVisible = useMemo(
-        () => (data?.paymentRequests ?? []).some(pr => pr.actualTdsDeducted != null),
+    const tdsColumnVisible = useMemo(() => (data?.paymentRequests ?? []).some(pr => pr.actualTdsDeducted != null), [data?.paymentRequests]);
+    const totalPaidAfterTds = useMemo(
+        () => round2((data?.paymentRequests ?? []).filter(pr => pr.status === "payment_done").reduce((s, pr) => s + Number(pr.amount ?? 0) - Number(pr.actualTdsDeducted ?? 0), 0)),
         [data?.paymentRequests]
     );
-    const totalPaidAfterTds = useMemo(() =>
-        round2((data?.paymentRequests ?? []).filter(pr => pr.status === 'payment_done').reduce((s, pr) => s + Number(pr.amount ?? 0) - Number(pr.actualTdsDeducted ?? 0), 0)),
+    const totalTdsDeducted = useMemo(
+        () => round2((data?.paymentRequests ?? []).filter(pr => pr.status === "payment_done").reduce((s, pr) => s + Number(pr.actualTdsDeducted ?? 0), 0)),
         [data?.paymentRequests]
     );
-    const totalTdsDeducted = useMemo(() =>
-        round2((data?.paymentRequests ?? []).filter(pr => pr.status === 'payment_done').reduce((s, pr) => s + Number(pr.actualTdsDeducted ?? 0), 0)),
-        [data?.paymentRequests]
-    );
-    const totalPiAmount = useMemo(() =>
-        round2(data?.purchaseInvoices?.reduce((s, pi) => s + Number(pi.valuePreGst || 0) + Number(pi.gstAmount || 0), 0) ?? 0),
+    const totalPiAmount = useMemo(
+        () => round2(data?.purchaseInvoices?.reduce((s, pi) => s + Number(pi.valuePreGst || 0) + Number(pi.gstAmount || 0), 0) ?? 0),
         [data?.purchaseInvoices]
     );
+    const extraChargesTotals = useMemo(
+        () => ({
+            taxable: round2((data?.extraCharges ?? []).reduce((s, c) => s + Number(c.taxableAmount || 0), 0)),
+            gst: round2((data?.extraCharges ?? []).reduce((s, c) => s + Number(c.gstAmount || 0), 0)),
+            total: round2((data?.extraCharges ?? []).reduce((s, c) => s + Number(c.totalAmount || 0), 0)),
+        }),
+        [data?.extraCharges]
+    );
+    const hasExtraCharges = (data?.extraCharges?.length ?? 0) > 0;
     const amountAfterTds = round2(Number(data?.amountAfterTds || data?.total?.totalWithGst || 0));
 
     if (isLoading) {
         return (
             <div className="space-y-6 p-6">
                 <Skeleton className="h-8 w-64" />
-                <Card><CardContent className="p-6 space-y-4">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-6 w-full" />)}</CardContent></Card>
+                <Card>
+                    <CardContent className="p-6 space-y-4">
+                        {Array.from({ length: 8 }).map((_, i) => (
+                            <Skeleton key={i} className="h-6 w-full" />
+                        ))}
+                    </CardContent>
+                </Card>
             </div>
         );
     }
@@ -179,7 +189,9 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
     if (!data) {
         return (
             <div className="p-6">
-                <Alert><AlertDescription>{notFoundMessage}</AlertDescription></Alert>
+                <Alert>
+                    <AlertDescription>{notFoundMessage}</AlertDescription>
+                </Alert>
             </div>
         );
     }
@@ -201,16 +213,21 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
             <CardContent className="space-y-2">
                 {/* Details */}
                 <Card>
-                    <CardHeader><CardTitle className="flex items-center gap-2 text-base"><FileText className="h-5 w-5" />{title}</CardTitle></CardHeader>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <FileText className="h-5 w-5" />
+                            {title}
+                        </CardTitle>
+                    </CardHeader>
                     <CardContent>
                         <Table>
                             <TableBody>
                                 <SectionHeader title="Basic Information" />
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground w-1/4">Date</TableCell>
-                                    <TableCell className="text-sm w-1/4">{data.date ? formatDate(data.date) : '—'}</TableCell>
+                                    <TableCell className="text-sm w-1/4">{data.date ? formatDate(data.date) : "—"}</TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground w-1/4">Raised By</TableCell>
-                                    <TableCell className="text-sm w-1/4">{data.raisedByName || '—'}</TableCell>
+                                    <TableCell className="text-sm w-1/4">{data.raisedByName || "—"}</TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">Approval Status</TableCell>
@@ -228,62 +245,78 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
                                 <SectionHeader title="Vendor Information" />
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">Name</TableCell>
-                                    <TableCell className="text-sm">{data.sellerName || '—'}</TableCell>
+                                    <TableCell className="text-sm">{data.sellerName || "—"}</TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">Email</TableCell>
-                                    <TableCell className="text-sm">{data.sellerEmail || '—'}</TableCell>
+                                    <TableCell className="text-sm">{data.sellerEmail || "—"}</TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">Address</TableCell>
-                                    <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">{data.sellerAddress || '—'}</TableCell>
+                                    <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">{data.sellerAddress || "—"}</TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">GST</TableCell>
-                                    <TableCell className="text-sm">{data.sellerGstNo || '—'}</TableCell>
+                                    <TableCell className="text-sm">{data.sellerGstNo || "—"}</TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">PAN</TableCell>
-                                    <TableCell className="text-sm">{data.sellerPanNo || '—'}</TableCell>
+                                    <TableCell className="text-sm">{data.sellerPanNo || "—"}</TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">MSME</TableCell>
-                                    <TableCell className="text-sm">{data.sellerMsmeNo || '—'}</TableCell>
+                                    <TableCell className="text-sm">{data.sellerMsmeNo || "—"}</TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">CIN</TableCell>
-                                    <TableCell className="text-sm">{data.sellerCinNo || '—'}</TableCell>
+                                    <TableCell className="text-sm">{data.sellerCinNo || "—"}</TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">Contact Person</TableCell>
-                                    <TableCell className="text-sm">{data.vendorContactPersonName || '—'}</TableCell>
+                                    <TableCell className="text-sm">{data.vendorContactPersonName || "—"}</TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">Contact Phone</TableCell>
-                                    <TableCell className="text-sm">{data.vendorContactPersonPhone || '—'}</TableCell>
+                                    <TableCell className="text-sm">{data.vendorContactPersonPhone || "—"}</TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">Contact Email</TableCell>
-                                    <TableCell className="text-sm">{data.vendorContactPersonEmail || '—'}</TableCell>
+                                    <TableCell className="text-sm">{data.vendorContactPersonEmail || "—"}</TableCell>
                                 </TableRow>
 
                                 <SectionHeader title="Our Contact Person" />
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">Name</TableCell>
-                                    <TableCell className="text-sm">{data.contactPersonName || '—'}</TableCell>
+                                    <TableCell className="text-sm">{data.contactPersonName || "—"}</TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">Phone</TableCell>
-                                    <TableCell className="text-sm">{data.contactPersonPhone || '—'}</TableCell>
+                                    <TableCell className="text-sm">{data.contactPersonPhone || "—"}</TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">Email</TableCell>
-                                    <TableCell className="text-sm" colSpan={3}>{data.contactPersonEmail || '—'}</TableCell>
+                                    <TableCell className="text-sm" colSpan={3}>
+                                        {data.contactPersonEmail || "—"}
+                                    </TableCell>
                                 </TableRow>
 
                                 <SectionHeader title="Ship-to Information" />
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">Name</TableCell>
-                                    <TableCell className="text-sm">{data.shipToName || '—'}</TableCell>
+                                    <TableCell className="text-sm">{data.shipToName || "—"}</TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">Address</TableCell>
-                                    <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">{data.shippingAddress || '—'}</TableCell>
+                                    <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">{data.shippingAddress || "—"}</TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">GST</TableCell>
-                                    <TableCell className="text-sm">{data.shipToGst || '—'}</TableCell>
+                                    <TableCell className="text-sm">{data.shipToGst || "—"}</TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">PAN</TableCell>
-                                    <TableCell className="text-sm">{data.shipToPan || '—'}</TableCell>
+                                    <TableCell className="text-sm">{data.shipToPan || "—"}</TableCell>
                                 </TableRow>
 
                                 <SectionHeader title="Financial Information" />
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Items Pre-GST</TableCell>
+                                    <TableCell className="text-sm">{formatINR((data.total?.total ?? 0) - extraChargesTotals.taxable)}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Items GST</TableCell>
+                                    <TableCell className="text-sm">{formatINR((data.total?.totalGst ?? 0) - extraChargesTotals.gst)}</TableCell>
+                                </TableRow>
+                                {hasExtraCharges && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Other Charges Pre-GST</TableCell>
+                                        <TableCell className="text-sm">{formatINR(extraChargesTotals.taxable)}</TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Other Charges GST</TableCell>
+                                        <TableCell className="text-sm">{formatINR(extraChargesTotals.gst)}</TableCell>
+                                    </TableRow>
+                                )}
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">Pre-GST</TableCell>
                                     <TableCell className="text-sm">{formatINR(data.total?.total ?? 0)}</TableCell>
@@ -294,13 +327,13 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
                                     <TableCell className="text-sm font-medium text-muted-foreground">Total</TableCell>
                                     <TableCell className="text-sm font-semibold">{formatINR(data.total?.totalWithGst ?? 0)}</TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">TDS %</TableCell>
-                                    <TableCell className="text-sm">{data.tdsPercentage != null ? `${data.tdsPercentage}%` : '—'}</TableCell>
+                                    <TableCell className="text-sm">{data.tdsPercentage != null ? `${data.tdsPercentage}%` : "—"}</TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">TDS Amount</TableCell>
-                                    <TableCell className="text-sm">{data.tdsAmount != null ? formatINR(Number(data.tdsAmount)) : '—'}</TableCell>
+                                    <TableCell className="text-sm">{data.tdsAmount != null ? formatINR(Number(data.tdsAmount)) : "—"}</TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">Amount After TDS</TableCell>
-                                    <TableCell className="text-sm font-semibold">{data.amountAfterTds != null ? formatINR(Number(data.amountAfterTds)) : '—'}</TableCell>
+                                    <TableCell className="text-sm font-semibold">{data.amountAfterTds != null ? formatINR(Number(data.amountAfterTds)) : "—"}</TableCell>
                                 </TableRow>
 
                                 {data.attachments.length > 0 && (
@@ -321,7 +354,9 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
                                 <SectionHeader title="Documents" />
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">PDFs</TableCell>
-                                    <TableCell className="text-sm" colSpan={3}><PdfVersionsInline versions={data.generatedPdfVersions} pdfUrl={(label) => pdfUrl(data.id, label)} /></TableCell>
+                                    <TableCell className="text-sm" colSpan={3}>
+                                        <PdfVersionsInline versions={data.generatedPdfVersions} pdfUrl={label => pdfUrl(data.id, label)} />
+                                    </TableCell>
                                 </TableRow>
                             </TableBody>
                         </Table>
@@ -330,7 +365,9 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
 
                 {/* Products */}
                 <Card>
-                    <CardHeader><CardTitle className="text-base">Products / Items</CardTitle></CardHeader>
+                    <CardHeader>
+                        <CardTitle className="text-base">Products / Items</CardTitle>
+                    </CardHeader>
                     <CardContent>
                         {data.products.length === 0 ? (
                             <p className="text-sm text-muted-foreground italic">No items.</p>
@@ -354,7 +391,9 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
                                             <TableRow key={product.id} className="hover:bg-muted/30">
                                                 <TableCell className="text-sm">{idx + 1}</TableCell>
                                                 <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">{product.description}</TableCell>
-                                                <TableCell className="text-sm text-right">{product.qty} {product.unit}</TableCell>
+                                                <TableCell className="text-sm text-right">
+                                                    {product.qty} {product.unit}
+                                                </TableCell>
                                                 <TableCell className="text-sm text-right">{formatINR(product.rate)}</TableCell>
                                                 <TableCell className="text-sm text-right">{formatINR(product.taxableAmount)}</TableCell>
                                                 <TableCell className="text-sm text-right">{product.gstRate}%</TableCell>
@@ -369,9 +408,55 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
                     </CardContent>
                 </Card>
 
+                {/* Other Charges */}
+                {hasExtraCharges && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">Other Charges</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="overflow-x-auto">
+                                <Table>
+                                    <thead>
+                                        <TableRow className="bg-muted/50">
+                                            <TableCell className="font-semibold text-xs uppercase">Label</TableCell>
+                                            <TableCell className="font-semibold text-xs uppercase text-right">Pre-GST</TableCell>
+                                            <TableCell className="font-semibold text-xs uppercase text-right">GST%</TableCell>
+                                            <TableCell className="font-semibold text-xs uppercase text-right">GST Amt</TableCell>
+                                            <TableCell className="font-semibold text-xs uppercase text-right">Total</TableCell>
+                                        </TableRow>
+                                    </thead>
+                                    <TableBody>
+                                        {data.extraCharges.map(charge => (
+                                            <TableRow key={charge.id} className="hover:bg-muted/30">
+                                                <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">{charge.label}</TableCell>
+                                                <TableCell className="text-sm text-right">{formatINR(charge.taxableAmount)}</TableCell>
+                                                <TableCell className="text-sm text-right">{charge.gstRate}%</TableCell>
+                                                <TableCell className="text-sm text-right">{formatINR(charge.gstAmount)}</TableCell>
+                                                <TableCell className="text-sm text-right font-medium">{formatINR(charge.totalAmount)}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                    <TableFooter>
+                                        <TableRow>
+                                            <TableCell className="font-semibold">Total</TableCell>
+                                            <TableCell className="text-right">{formatINR(extraChargesTotals.taxable)}</TableCell>
+                                            <TableCell className="text-right"></TableCell>
+                                            <TableCell className="text-right">{formatINR(extraChargesTotals.gst)}</TableCell>
+                                            <TableCell className="text-right font-semibold">{formatINR(extraChargesTotals.total)}</TableCell>
+                                        </TableRow>
+                                    </TableFooter>
+                                </Table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
                 {/* Payment Requests */}
                 <Card>
-                    <CardHeader><CardTitle className="text-base">Payment Requests</CardTitle></CardHeader>
+                    <CardHeader>
+                        <CardTitle className="text-base">Payment Requests</CardTitle>
+                    </CardHeader>
                     <CardContent>
                         {!data.paymentRequests || data.paymentRequests.length === 0 ? (
                             <p className="text-sm text-muted-foreground italic">No payment requests yet.</p>
@@ -391,7 +476,7 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
                                         </TableRow>
                                     </thead>
                                     <TableBody>
-                                        {data.paymentRequests.map((pr) => {
+                                        {data.paymentRequests.map(pr => {
                                             const cfg = STATUS_CONFIG[pr.status] || { label: pr.status, variant: "outline" as const };
                                             return (
                                                 <TableRow key={pr.id} className="hover:bg-muted/30">
@@ -399,10 +484,10 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
                                                     <TableCell className="text-sm">{formatDate(pr.createdAt)}</TableCell>
                                                     <TableCell className="text-sm">{pr.partyName}</TableCell>
                                                     <TableCell className="text-sm text-right font-medium">{formatINR(Number(pr.amount))}</TableCell>
-                                                    {tdsColumnVisible && (
-                                                        <TableCell className="text-sm text-right">{formatINR(Number(pr.actualTdsDeducted ?? 0))}</TableCell>
-                                                    )}
-                                                    <TableCell><Badge variant={cfg.variant}>{cfg.label}</Badge></TableCell>
+                                                    {tdsColumnVisible && <TableCell className="text-sm text-right">{formatINR(Number(pr.actualTdsDeducted ?? 0))}</TableCell>}
+                                                    <TableCell>
+                                                        <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                                                    </TableCell>
                                                     <TableCell className="text-sm">{pr.requestedByName}</TableCell>
                                                     <TableCell>
                                                         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewingPrId(pr.id)}>
@@ -416,7 +501,9 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
                                     {tdsColumnVisible && (
                                         <TableFooter>
                                             <TableRow>
-                                                <TableCell colSpan={3} className="font-semibold">Total (After TDS Deduction)</TableCell>
+                                                <TableCell colSpan={3} className="font-semibold">
+                                                    Total (After TDS Deduction)
+                                                </TableCell>
                                                 <TableCell className="text-right font-semibold">{formatINR(totalPaidAfterTds)}</TableCell>
                                                 <TableCell className="text-right font-semibold">{formatINR(totalTdsDeducted)}</TableCell>
                                                 <TableCell colSpan={3}></TableCell>
@@ -431,7 +518,9 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
 
                 {/* Purchase Invoices */}
                 <Card>
-                    <CardHeader><CardTitle className="text-base">Purchase Invoices</CardTitle></CardHeader>
+                    <CardHeader>
+                        <CardTitle className="text-base">Purchase Invoices</CardTitle>
+                    </CardHeader>
                     <CardContent>
                         {!data.purchaseInvoices || data.purchaseInvoices.length === 0 ? (
                             <p className="text-sm text-muted-foreground italic">No purchase invoices yet.</p>
@@ -450,7 +539,7 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
                                         </TableRow>
                                     </thead>
                                     <TableBody>
-                                        {data.purchaseInvoices.map((pi) => {
+                                        {data.purchaseInvoices.map(pi => {
                                             const piTotal = Number(pi.valuePreGst || 0) + Number(pi.gstAmount || 0);
                                             return (
                                                 <TableRow key={pi.id} className="hover:bg-muted/30">
@@ -467,7 +556,9 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
                                                                     <ExternalLink className="h-4 w-4" />
                                                                 </a>
                                                             </Button>
-                                                        ) : "—"}
+                                                        ) : (
+                                                            "—"
+                                                        )}
                                                     </TableCell>
                                                 </TableRow>
                                             );
@@ -481,7 +572,12 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
 
                 {/* Summary */}
                 <Card>
-                    <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Calculator className="h-5 w-5" />Summary</CardTitle></CardHeader>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <Calculator className="h-5 w-5" />
+                            Summary
+                        </CardTitle>
+                    </CardHeader>
                     <CardContent>
                         <Table>
                             <TableBody>
@@ -490,7 +586,7 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
                                     <TableCell className="text-sm font-medium text-muted-foreground w-1/4">{amountLabel}</TableCell>
                                     <TableCell className="text-sm font-semibold w-1/4">{formatINR(data.total?.totalWithGst ?? 0)}</TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground w-1/4">TDS Amount</TableCell>
-                                    <TableCell className="text-sm w-1/4">{data.tdsAmount != null ? formatINR(Number(data.tdsAmount)) : '—'}</TableCell>
+                                    <TableCell className="text-sm w-1/4">{data.tdsAmount != null ? formatINR(Number(data.tdsAmount)) : "—"}</TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">Amount After TDS</TableCell>
@@ -506,7 +602,9 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">Remaining (To be Requested)</TableCell>
-                                    <TableCell className="text-sm font-semibold" colSpan={3}>{formatINR(Math.max(0, amountAfterTds - totalPaymentRequested))}</TableCell>
+                                    <TableCell className="text-sm font-semibold" colSpan={3}>
+                                        {formatINR(Math.max(0, amountAfterTds - totalPaymentRequested))}
+                                    </TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">PI Amount Received</TableCell>
@@ -520,10 +618,7 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
                 </Card>
             </CardContent>
 
-            <PaymentRequestDetailDialog
-                viewingId={viewingPrId}
-                onClose={() => setViewingPrId(null)}
-            />
+            <PaymentRequestDetailDialog viewingId={viewingPrId} onClose={() => setViewingPrId(null)} />
         </Card>
     );
 };

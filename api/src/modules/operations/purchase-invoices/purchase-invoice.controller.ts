@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Param, Body, Query, ParseIntPipe, HttpCode, HttpStatus } from "@nestjs/common";
+import { Controller, Get, Post, Put, Param, Body, ParseIntPipe, HttpCode, HttpStatus } from "@nestjs/common";
 import { PurchaseInvoiceService } from "./purchase-invoice.service";
 import { CurrentUser } from "@/modules/auth/decorators/current-user.decorator";
 import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
@@ -15,19 +15,8 @@ export class PurchaseInvoiceController {
 
     @Put(":id")
     @HttpCode(HttpStatus.OK)
-    update(
-        @Param("id", ParseIntPipe) id: number,
-        @Body() body: any,
-    ) {
+    update(@Param("id", ParseIntPipe) id: number, @Body() body: any) {
         return this.service.update(id, body);
-    }
-
-    @Get("next-number")
-    getNextNumber(
-        @Query("projectName") projectName: string,
-        @Query("type") type?: string,
-    ) {
-        return this.service.generateNumber(projectName, type === "vwo" ? "WOI" : "PI");
     }
 
     @Get("project/:projectId")

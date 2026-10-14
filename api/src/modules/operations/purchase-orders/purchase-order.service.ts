@@ -11,13 +11,14 @@ import { InsurancePolicyService } from "@/modules/insurance/insurance-policy.ser
 import { CashFlowService } from "@/modules/operations/cash-flows/cash-flow.service";
 import { users } from "@/db/schemas";
 import { projects } from "@/db/schemas/master/projects.schema";
-import { paymentRequests, purchaseInvoices, saleInvoiceItems, saleInvoices } from "@/db/schemas/operations";
+import { paymentRequests, purchaseInvoices } from "@/db/schemas/operations";
 import { projectParties } from "@/db/schemas/operations/project-parties.schema";
 import { vendorOrganizations } from "@/db/schemas/vendors/vendor-organizations.schema";
 import { vendors } from "@/db/schemas/vendors/vendors.schema";
 import { vendorGsts } from "@/db/schemas/vendors/vendor-gsts.schema";
 import { purchaseOrderProducts } from "@/db/schemas/operations/purchase-order-products.schema";
 import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
+import { orderExtraCharges } from "@/db/schemas/operations/order-extra-charges.schema";
 import { tryMaterializePoInventory, poHasPurchaseInvoice } from "@/modules/operations/inventory/inventory.materialize";
 import { woBasicDetails } from "@/db/schemas/operations/work-order.schema";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
@@ -65,9 +66,12 @@ export class PurchaseOrderService {
                 tdsPercentage: purchaseOrders.tdsPercentage,
                 tdsAmount: purchaseOrders.tdsAmount,
                 amountAfterTds: purchaseOrders.amountAfterTds,
-                totalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
-                totalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
-                grandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                totalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0) + COALESCE((SELECT SUM(taxable_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                totalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0) + COALESCE((SELECT SUM(gst_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                grandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0) + COALESCE((SELECT SUM(total_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                extraChargesTaxable: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                extraChargesGst: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                extraChargesTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                 totalPaymentRequested: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status != 'rejected'), 0)`,
                 totalMakerDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'maker_done'), 0)`,
                 totalPaymentDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'payment_done'), 0)`,
@@ -141,7 +145,7 @@ export class PurchaseOrderService {
             }
         }
 
-        const effectiveAmount = sql`COALESCE(${purchaseOrders.amountAfterTds}::numeric, (SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}))`;
+        const effectiveAmount = sql`COALESCE(${purchaseOrders.amountAfterTds}::numeric, (SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}) + COALESCE((SELECT SUM(total_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0))`;
         const paymentDoneTotal = sql`(SELECT COALESCE(SUM(amount::numeric), 0) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'payment_done')`;
         const piTotal = sql`(SELECT COALESCE(SUM(value_pre_gst::numeric + gst_amount::numeric), 0) FROM project_purchase_invoices WHERE purchase_order_id = ${purchaseOrders.id})`;
 
@@ -190,9 +194,12 @@ export class PurchaseOrderService {
                 poApproved: purchaseOrders.poApproved,
                 poApprovalRemark: purchaseOrders.poApprovalRemark,
                 closedAt: purchaseOrders.closedAt,
-                totalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
-                totalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
-                grandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                totalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0) + COALESCE((SELECT SUM(taxable_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                totalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0) + COALESCE((SELECT SUM(gst_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                grandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0) + COALESCE((SELECT SUM(total_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                extraChargesTaxable: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                extraChargesGst: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                extraChargesTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                 totalPaymentRequested: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status != 'rejected'), 0)`,
                 totalMakerDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'maker_done'), 0)`,
                 totalPaymentDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'payment_done'), 0)`,
@@ -218,7 +225,7 @@ export class PurchaseOrderService {
             return rows.length;
         };
 
-        const effectiveAmount = sql`COALESCE(${purchaseOrders.amountAfterTds}::numeric, (SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}))`;
+        const effectiveAmount = sql`COALESCE(${purchaseOrders.amountAfterTds}::numeric, (SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}) + COALESCE((SELECT SUM(total_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0))`;
         const paymentDoneTotal = sql`(SELECT COALESCE(SUM(amount::numeric), 0) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'payment_done')`;
         const piTotal = sql`(SELECT COALESCE(SUM(value_pre_gst::numeric + gst_amount::numeric), 0) FROM project_purchase_invoices WHERE purchase_order_id = ${purchaseOrders.id})`;
 
@@ -366,17 +373,22 @@ export class PurchaseOrderService {
 
         // Client directory holds external parties, so the vendor's person goes in -
         // not our own contact, which is an internal employee.
-        await this.clientDirectorySyncService.syncToClientDirectory([{
-            name: body.vendorContactPersonName,
-            email: body.vendorContactPersonEmail,
-            phone: body.vendorContactPersonPhone,
-            org: body.sellerName,
-        }, {
-            name: body.sellerName,
-            email: body.sellerEmail,
-            phone: null,
-            org: null,
-        }].filter((c) => c.name));
+        await this.clientDirectorySyncService.syncToClientDirectory(
+            [
+                {
+                    name: body.vendorContactPersonName,
+                    email: body.vendorContactPersonEmail,
+                    phone: body.vendorContactPersonPhone,
+                    org: body.sellerName,
+                },
+                {
+                    name: body.sellerName,
+                    email: body.sellerEmail,
+                    phone: null,
+                    org: null,
+                },
+            ].filter(c => c.name)
+        );
 
         this.logger.info(`Purchase Order created: ${poNumber}`);
 
@@ -423,7 +435,7 @@ export class PurchaseOrderService {
         return this.getPurchaseOrder(po.id);
     }
 
-    private computePOHash(po: any, products: any[]): string {
+    private computePOHash(po: any, products: any[], extraCharges: any[] = []): string {
         const fields = {
             poDate: po.poDate,
             poNumber: po.poNumber,
@@ -458,12 +470,20 @@ export class PurchaseOrderService {
                 rate: p.rate,
                 gstRate: p.gstRate,
             })),
+            extraCharges: (extraCharges || []).map((c: any) => ({
+                label: c.label,
+                gstRate: c.gstRate,
+                taxableAmount: c.taxableAmount,
+                gstAmount: c.gstAmount,
+                totalAmount: c.totalAmount,
+            })),
         };
         return createHash("sha256").update(JSON.stringify(fields)).digest("hex");
     }
 
     private async generatePdfForPO(po: any, products: any[]) {
-        const contentHash = this.computePOHash(po, products);
+        const extraCharges = await this.db.select().from(orderExtraCharges).where(eq(orderExtraCharges.purchaseOrderId, po.id)).orderBy(asc(orderExtraCharges.id));
+        const contentHash = this.computePOHash(po, products, extraCharges);
 
         const versions = (po.generatedPdfVersions ?? {}) as Record<string, { path: string; hash: string }>;
         const existingVersion = Object.values(versions).find(v => v.hash === contentHash);
@@ -492,9 +512,23 @@ export class PurchaseOrderService {
             };
         });
 
-        const totalAmount = items.reduce((s: number, i: any) => s + i.amount, 0);
-        const totalGstAmt = items.reduce((s: number, i: any) => s + i.gst_amount, 0);
-        const grandTotal = totalAmount + totalGstAmt;
+        const itemsAmount = items.reduce((s: number, i: any) => s + i.amount, 0);
+        const itemsGstAmt = items.reduce((s: number, i: any) => s + i.gst_amount, 0);
+
+        const otherCharges = extraCharges.map((c: any) => ({
+            label: c.label || "",
+            amount: Number(c.taxableAmount ?? 0),
+            gst_rate: Number(c.gstRate ?? 0),
+            gst_amount: Number(c.gstAmount ?? 0),
+            total: Number(c.totalAmount ?? 0),
+        }));
+        const chargesTotalAmount = otherCharges.reduce((s: number, c: any) => s + c.amount, 0);
+        const chargesGstAmt = otherCharges.reduce((s: number, c: any) => s + c.gst_amount, 0);
+        const chargesGrandTotal = otherCharges.reduce((s: number, c: any) => s + c.total, 0);
+
+        const totalAmount = itemsAmount + chargesTotalAmount;
+        const totalGstAmt = itemsGstAmt + chargesGstAmt;
+        const grandTotal = itemsAmount + itemsGstAmt + chargesGrandTotal;
 
         const [creatorUser] = await this.db.select({ team: users.team }).from(users).where(eq(users.id, po.poRaisedBy)).limit(1);
         const team = creatorUser?.team;
@@ -527,6 +561,11 @@ export class PurchaseOrderService {
             shipping_to_pan: po.shipToPan || "",
             shipping_to_gst: po.shipToGst || "",
             items,
+            other_charges: otherCharges,
+            has_other_charges: otherCharges.length > 0,
+            charges_total_amount: chargesTotalAmount,
+            charges_gst_amt: chargesGstAmt,
+            charges_grand_total: chargesGrandTotal,
             total_amount: totalAmount,
             total_gst_amt: totalGstAmt,
             grand_total: grandTotal,
@@ -590,7 +629,13 @@ export class PurchaseOrderService {
 
             const products = await this.db.select().from(purchaseOrderProducts).where(eq(purchaseOrderProducts.purchaseOrderId, id));
 
-            const { total: subtotal, totalWithGst: grandTotal } = this.getTotalProductValues(products);
+            const { total: subtotal, totalWithGst: itemsGrandTotal } = this.getTotalProductValues(products);
+            // Extra charges (Freight, Security, ...) add to the order grand total
+            // but are deliberately excluded from the TDS base, which stays the
+            // taxable item subtotal.
+            const charges = await this.db.select().from(orderExtraCharges).where(eq(orderExtraCharges.purchaseOrderId, id));
+            const chargesTotal = charges.reduce((sum, c) => sum + Number(c.totalAmount ?? 0), 0);
+            const grandTotal = itemsGrandTotal + chargesTotal;
             const tdsAmt = (subtotal * tdsPercentage) / 100;
             const amountAfterTds = grandTotal - tdsAmt;
 
@@ -749,7 +794,9 @@ export class PurchaseOrderService {
 
         const closureStatus = await this.checkClosure(id);
         if (!closureStatus.canClose) {
-            throw new BadRequestException(`Purchase Order cannot be closed until invoices cover the PO value and payments match the invoices (each difference under ₹${CLOSURE_TOLERANCE}).`);
+            throw new BadRequestException(
+                `Purchase Order cannot be closed until invoices cover the PO value and payments match the invoices (each difference under ₹${CLOSURE_TOLERANCE}).`
+            );
         }
 
         const [updated] = await this.db
@@ -772,7 +819,25 @@ export class PurchaseOrderService {
         const po = (await this.db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id)))[0];
         if (!po) throw new NotFoundException("Purchase Order not found");
         const poProducts = await this.db.select().from(purchaseOrderProducts).where(eq(purchaseOrderProducts.purchaseOrderId, id));
-        const total = this.getTotalProductValues(poProducts);
+        const itemTotals = this.getTotalProductValues(poProducts);
+
+        const extraCharges = await this.db.select().from(orderExtraCharges).where(eq(orderExtraCharges.purchaseOrderId, id)).orderBy(asc(orderExtraCharges.id));
+
+        const extraChargesTotals = extraCharges.reduce(
+            (acc, c) => {
+                acc.total += Number(c.taxableAmount ?? 0);
+                acc.totalGst += Number(c.gstAmount ?? 0);
+                acc.totalWithGst += Number(c.totalAmount ?? 0);
+                return acc;
+            },
+            { total: 0, totalGst: 0, totalWithGst: 0 }
+        );
+
+        const total = {
+            total: itemTotals.total + extraChargesTotals.total,
+            totalGst: itemTotals.totalGst + extraChargesTotals.totalGst,
+            totalWithGst: itemTotals.totalWithGst + extraChargesTotals.totalWithGst,
+        };
 
         const enrichedProducts = poProducts.map(product => {
             const itemTotal = Number(product.rate) * Number(product.qty);
@@ -828,6 +893,9 @@ export class PurchaseOrderService {
             ...po,
             products: enrichedProducts,
             total,
+            itemTotals,
+            extraCharges,
+            extraChargesTotals,
             raisedByName,
             paymentRequests: paymentRequestsData,
             purchaseInvoices: purchaseInvoicesData,
@@ -1097,12 +1165,16 @@ export class PurchaseOrderService {
             this.logger.error(`Failed to generate PO PDF after update: ${err.message}`);
         });
 
-        await this.clientDirectorySyncService.syncToClientDirectory([{
-            name: body.vendorContactPersonName,
-            email: body.vendorContactPersonEmail,
-            phone: body.vendorContactPersonPhone,
-            org: body.sellerName,
-        }].filter((c) => c.name));
+        await this.clientDirectorySyncService.syncToClientDirectory(
+            [
+                {
+                    name: body.vendorContactPersonName,
+                    email: body.vendorContactPersonEmail,
+                    phone: body.vendorContactPersonPhone,
+                    org: body.sellerName,
+                },
+            ].filter(c => c.name)
+        );
 
         this.logger.info(`Purchase Order updated: ${updatedPO.poNumber}`);
 
@@ -1149,7 +1221,6 @@ export class PurchaseOrderService {
                 .where(eq(projectParties.id, body.shipToPartyId));
         }
     }
-
 
     private async resolveCertRecipientEmails(po: any): Promise<string> {
         const ids: number[] = Array.isArray(po.certRecipients) && po.certRecipients.length > 0 ? po.certRecipients : po.certRecipient ? [po.certRecipient] : [];
@@ -1204,6 +1275,13 @@ export class PurchaseOrderService {
             .from(purchaseOrderProducts)
             .where(eq(purchaseOrderProducts.purchaseOrderId, id));
 
+        const [chargesTotals] = await this.db
+            .select({
+                total: sql<string>`COALESCE(SUM(${orderExtraCharges.totalAmount}::numeric), 0)`,
+            })
+            .from(orderExtraCharges)
+            .where(eq(orderExtraCharges.purchaseOrderId, id));
+
         const [paymentTotals] = await this.db
             .select({
                 gross: sql<string>`COALESCE(SUM(${paymentRequests.amount}::numeric), 0)`,
@@ -1221,7 +1299,9 @@ export class PurchaseOrderService {
 
         // Closure reconciles against the GROSS PO value (products incl. GST);
         // for POs without product rows, fall back to amountAfterTds + tdsAmount.
-        const grandTotal = round2(Number(productTotals.total) > 0 ? productTotals.total : Number(po.amountAfterTds ?? 0) + Number(po.tdsAmount ?? 0));
+        const grandTotal = round2(
+            Number(productTotals.total) > 0 ? Number(productTotals.total) + Number(chargesTotals.total) : Number(po.amountAfterTds ?? 0) + Number(po.tdsAmount ?? 0)
+        );
         const totalPaymentDone = round2(paymentTotals.gross);
         const totalTdsDeducted = round2(paymentTotals.tds);
         const totalPaidAfterTds = round2(totalPaymentDone - totalTdsDeducted);
@@ -1260,6 +1340,10 @@ export class PurchaseOrderService {
             .where(eq(purchaseOrderProducts.purchaseOrderId, id));
 
         const { totalWithGst, totalGst } = this.getTotalProductValues(poProducts);
+
+        const extraCharges = await this.db.select().from(orderExtraCharges).where(eq(orderExtraCharges.purchaseOrderId, id)).orderBy(asc(orderExtraCharges.id));
+        const chargesGst = extraCharges.reduce((s, c) => s + Number(c.gstAmount ?? 0), 0);
+        const chargesGrandTotal = extraCharges.reduce((s, c) => s + Number(c.totalAmount ?? 0), 0);
 
         const paymentRequestsData = await this.db
             .select({
@@ -1314,8 +1398,9 @@ export class PurchaseOrderService {
             amountAfterTds: po.amountAfterTds,
             tdsAmount: po.tdsAmount,
             tdsPercentage: po.tdsPercentage,
-            grandTotal: round2(totalWithGst),
-            totalGst: round2(totalGst),
+            grandTotal: round2(totalWithGst + chargesGrandTotal),
+            totalGst: round2(totalGst + chargesGst),
+            extraCharges,
             totalPaymentDone,
             totalTdsDeducted,
             totalPaidAfterTds,
@@ -1372,7 +1457,21 @@ export class PurchaseOrderService {
 
         const created: any[] = [];
         for (const item of items) {
-            const invoiceNo = await this.generatePurchaseInvoiceNumber(po.projectName ?? undefined);
+            const invoiceNo = (item.invoiceNo ?? "").toString().trim();
+            if (!invoiceNo) {
+                throw new BadRequestException("Invoice number is required for every purchase invoice");
+            }
+
+            const duplicate = await this.db
+                .select({ id: purchaseInvoices.id })
+                .from(purchaseInvoices)
+                .where(and(eq(purchaseInvoices.projectId, po.projectId), eq(purchaseInvoices.invoiceNo, invoiceNo)))
+                .limit(1)
+                .then(rows => rows[0]);
+            if (duplicate) {
+                throw new BadRequestException(`Invoice number "${invoiceNo}" already exists for this project`);
+            }
+
             const pi = (
                 await this.db
                     .insert(purchaseInvoices)
@@ -1380,7 +1479,7 @@ export class PurchaseOrderService {
                         projectId: po.projectId,
                         purchaseOrderId: id,
                         invoiceNo,
-                        category: item.category,
+                        category: item.category ?? po.category ?? null,
                         partyName: item.partyName ?? po.sellerName ?? null,
                         valuePreGst: item.valuePreGst?.toString(),
                         gstAmount: item.gstAmount?.toString(),
@@ -1519,31 +1618,13 @@ export class PurchaseOrderService {
         return `${prefix}/PR${next.toString().padStart(4, "0")}`;
     }
 
-    private async generatePurchaseInvoiceNumber(projectName?: string) {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = now.getMonth() + 1;
-        const from = month >= 4 ? year.toString().slice(-2) : (year - 1).toString().slice(-2);
-        const to = ((Number.parseInt(from) + 1) % 100).toString().padStart(2, "0");
-        const fy = `${from}${to}`;
-
-        const sanitizedName = projectName ? this.sanitizeProjectName(projectName) : "PROJECT";
-        const prefix = `VE/${sanitizedName}/${fy}`;
-        const series = "PI";
-
-        const last = await this.db
-            .select({ id: purchaseInvoices.id, invoiceNo: purchaseInvoices.invoiceNo })
-            .from(purchaseInvoices)
-            .where(like(purchaseInvoices.invoiceNo, `VE/%/${fy}/${series}%`))
-            .orderBy(desc(purchaseInvoices.id));
-
-        let next = 1;
-        if (last[0]?.invoiceNo) {
-            const match = last[0].invoiceNo.match(new RegExp(`${series}(\\d{4})$`));
-            if (match) next = parseInt(match[1]) + 1;
-        }
-
-        return `${prefix}/${series}${next.toString().padStart(4, "0")}`;
+    // Regenerates the latest PO PDF (items + extra charges) after the PI form
+    // has altered the order. Fire-and-forget from the invoice service.
+    async regeneratePdf(id: number): Promise<void> {
+        const po = (await this.db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id)))[0];
+        if (!po) throw new NotFoundException("Purchase Order not found");
+        const products = await this.db.select().from(purchaseOrderProducts).where(eq(purchaseOrderProducts.purchaseOrderId, id));
+        await this.generatePdfForPO(po, products);
     }
 
     async listParties(type?: string) {

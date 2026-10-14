@@ -107,6 +107,10 @@ export interface WoBasicDetail {
   budgetAdmin: string | null;
   budgetBuybackSale: string | null;
   budgetGemCharges: string | null;
+  requestGemCharges?: boolean;
+  gemChargesAmount?: number | null;
+  gemChargesPortalLink?: string | null;
+  gemChargesInvoice?: string | null;
   woDraft: string | null;
   tmsDocuments: TmsDocuments | null;
   oeFirst: number | null;
