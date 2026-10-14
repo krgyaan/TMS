@@ -71,7 +71,7 @@ const AddEnquiryFormSchema = z.object({
     team: z.string().optional(),
     enqName: z.string().min(1, { message: "Enquiry name is required" }),
     organizationName: z.string().min(1, { message: "Organisation is required" }),
-    orgAbbName: z.string().min(1, { message: "Organisation abbreviation is required" }),
+    orgAbbName: z.string().optional(),
     itemId: z.string().min(1, { message: "Item is required" }),
     locationCode: z.string().min(1, { message: "Location is required" }),
     approxValue: z
@@ -389,19 +389,7 @@ export function AddEnquiryForm() {
                                 )}
                             </FieldWrapper>
 
-                            {/* Row 2: Org Abbreviation + Item + Location */}
-                            <FieldWrapper control={form.control} name="orgAbbName" label="Organisation Abbreviation">
-                                {(field) => (
-                                    <Input
-                                        placeholder="Select an organisation"
-                                        {...field}
-                                        value={field.value ?? ""}
-                                        readOnly
-                                        className="bg-muted/30"
-                                    />
-                                )}
-                            </FieldWrapper>
-
+                            {/* Row 2: Item + Location */}
                             <SelectField
                                 control={form.control}
                                 name="itemId"
