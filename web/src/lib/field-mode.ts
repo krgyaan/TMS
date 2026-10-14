@@ -68,7 +68,7 @@ export const FIELD_DASHBOARD_TILES: FieldDashboardTile[] = [
         icon: Users,
         color: "text-emerald-600",
         bgColor: "bg-emerald-50 dark:bg-emerald-950/30",
-        url: paths.crm.leads,
+        url: paths.crm.happyCalling,
         permission: "crm.leads",
     },
     {

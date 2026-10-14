@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useState, useCallback, useMemo } from "react";
 import { LeadDetailsSection } from "./components/LeadView";
 import { LeadFollowupViewPage } from "../leadfollowup/LeadFollowupViewPage";
@@ -12,7 +12,12 @@ import { paths } from "@/app/routes/paths";
 export default function LeadShowPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const location = useLocation();
     const leadId = id ? Number(id) : null;
+
+    // Return to the list page the user came from.
+    const returnTo = (location.state as { from?: string } | null)?.from ?? paths.crm.happyCalling;
+    const backLabel = "Back to Happy Calling";
 
     const { data: lead, isLoading: l1 } = useLead(leadId);
     const { data: followups, isLoading: l2 } = useLeadFollowups({ sourceType: 'lead', sourceId: leadId ?? 0 });
@@ -93,8 +98,8 @@ export default function LeadShowPage() {
                 enquiryId={linkedEnquiry.id}
                 sourceType="lead"
                 defaultExpanded="lead-details"
-                onBack={() => navigate(paths.crm.leads)}
-                backLabel="Back to Leads"
+                onBack={() => navigate(returnTo)}
+                backLabel={backLabel}
             />
         );
     }
@@ -106,8 +111,8 @@ export default function LeadShowPage() {
             onToggleSection={toggleSection}
             onExpandAll={expandAll}
             onCollapseAll={collapseAll}
-            onBack={() => navigate(paths.crm.leads)}
-            backLabel="Back to Leads"
+            onBack={() => navigate(returnTo)}
+            backLabel={backLabel}
             renderSectionContent={renderSimpleContent}
         />
     );

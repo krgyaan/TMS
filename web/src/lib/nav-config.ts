@@ -123,7 +123,7 @@ export const navMain: NavGroup[] = [
         icon: Users,
         items: [
             { title: "Happy Calling", url: paths.crm.happyCalling, permission: "crm.happy_calling" },
-            { title: "Leads", url: paths.crm.leads, permission: "crm.leads" },
+            { title: "Leads", url: paths.crm.happyCalling, permission: "crm.leads" },
             { title: "Enquiries", url: paths.crm.enquiries, permission: "crm.enquiries" },
         ],
     },
