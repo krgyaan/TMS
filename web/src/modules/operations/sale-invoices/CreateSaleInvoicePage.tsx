@@ -202,7 +202,6 @@ export default function CreateSaleInvoicePage() {
         form.setValue("billingCustomerName", party.name || "");
         form.setValue("billingAddress", party.address || "");
         form.setValue("billingGst", party.gstNo || "");
-        form.setValue("billingEmail", party.email || "");
         form.setValue("billingPanNo", party.pan || "");
         form.setValue("billingMsmeNo", party.msme || "");
     }, [selectedSellerId, sellerRows, form]);
