@@ -338,28 +338,10 @@ const HappyCallingListPage = () => {
                 </TooltipProvider>
             )
         },
-        { 
-            field: "industryName", 
-            headerName: "Industry", 
-            width: 150, 
-            valueFormatter: (params) => params.value || "-" 
-        },
-        { 
-            field: "typeName", 
-            headerName: "Lead Type", 
-            width: 130, 
-            valueFormatter: (params) => params.value || "-" 
-        },
-        { 
-            field: "bdPersonName", 
-            headerName: "BD Lead", 
-            width: 150, 
-            valueFormatter: (params) => params.value || "-" 
-        },
-        { 
-            field: "allocatedTeName", 
-            headerName: "Allocated To", 
-            width: 150, 
+        {
+            field: "allocatedTeName",
+            headerName: "Allocated To",
+            width: 150,
             cellRenderer: (params: any) => {
                 if (isHappyCalling(params.data)) {
                     return <span className="text-muted-foreground">-</span>;

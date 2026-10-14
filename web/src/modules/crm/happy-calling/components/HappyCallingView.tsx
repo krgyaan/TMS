@@ -74,6 +74,14 @@ export function HappyCallingView({ record }: Props) {
                             <TableCell className="text-sm">
                                 {formatOrDash(record.phone)}
                             </TableCell>
+                            {record.leadPriority ? (
+                                    <Badge variant="outline" className={priorityColors[record.leadPriority] || ''}>
+                                        {record.leadPriority}
+                                    </Badge>
+                                ) : (
+                                    '—'
+                                )}
+                            </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Status
                             </TableCell>
