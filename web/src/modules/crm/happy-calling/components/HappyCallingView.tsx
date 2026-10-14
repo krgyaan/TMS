@@ -1,4 +1,4 @@
-import { Card, CardContent, } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { User, FileText, CalendarClock } from 'lucide-react';
@@ -20,11 +20,11 @@ export function HappyCallingView({ record }: Props) {
     const { data: broadcasts = [] } = useBroadcasts();
     const broadcastName = broadcasts.find((b) => b.id === record.broadcast)?.name;
 
-    const formatOrDash = (value?: string | null) => (value && value.trim().length > 0 ? value : '—');
+    const formatOrDash = (value?: string | null) =>
+        value && value.trim().length > 0 ? value : '—';
 
     return (
         <Card>
-            
             <CardContent>
                 <Table>
                     <TableBody>
@@ -33,6 +33,7 @@ export function HappyCallingView({ record }: Props) {
                                 <FileText className="h-4 w-4 inline mr-2" /> Basic Information
                             </TableCell>
                         </TableRow>
+
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
                                 Organization
@@ -47,6 +48,7 @@ export function HappyCallingView({ record }: Props) {
                                 {record.name || '—'}
                             </TableCell>
                         </TableRow>
+
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Designation
@@ -67,6 +69,7 @@ export function HappyCallingView({ record }: Props) {
                                 )}
                             </TableCell>
                         </TableRow>
+
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Phone
@@ -74,14 +77,24 @@ export function HappyCallingView({ record }: Props) {
                             <TableCell className="text-sm">
                                 {formatOrDash(record.phone)}
                             </TableCell>
-                            {record.leadPriority ? (
-                                    <Badge variant="outline" className={priorityColors[record.leadPriority] || ''}>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Priority
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {record.leadPriority ? (
+                                    <Badge
+                                        variant="outline"
+                                        className={priorityColors[record.leadPriority] || ''}
+                                    >
                                         {record.leadPriority}
                                     </Badge>
                                 ) : (
                                     '—'
                                 )}
                             </TableCell>
+                        </TableRow>
+
+                        <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Status
                             </TableCell>
@@ -94,32 +107,19 @@ export function HappyCallingView({ record }: Props) {
                                     '—'
                                 )}
                             </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Broadcast
                             </TableCell>
-                            <TableCell className="text-sm" colSpan={3}>
+                            <TableCell className="text-sm">
                                 {broadcastName || record.broadcast || '—'}
                             </TableCell>
                         </TableRow>
+
                         {record.details && (
-<TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Priority
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {record.leadPriority ? (
-                                    <Badge variant="outline" className={priorityColors[record.leadPriority] || ''}>
-                                        {record.leadPriority}
-                                    </Badge>
-                                ) : (
-                                    '—'
-                                )}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Status
-                            </TableCell>
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Details
+                                </TableCell>
                                 <TableCell className="text-sm break-words" colSpan={3}>
                                     {record.details}
                                 </TableCell>
