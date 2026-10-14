@@ -203,9 +203,7 @@ const HappyCallingListPage = () => {
                     : paths.crm.leadFollowup(row.id)
             ),
             icon: <Calendar className="h-4 w-4" />,
-            visible: (row) => isHappyCalling(row)
-                ? canUpdate("crm.happy_calling")
-                : canUpdate("crm.leads")
+            visible: () => canUpdate("crm.happy_calling")
         },
         {
             label: "Priority",
@@ -217,9 +215,7 @@ const HappyCallingListPage = () => {
                 source: row.source ?? 'lead'
             }),
             icon: <Star className="h-4 w-4" />,
-            visible: (row) => isHappyCalling(row)
-                ? canUpdate("crm.happy_calling")
-                : canUpdate("crm.leads")
+            visible: () => canUpdate("crm.happy_calling")
         },
         {
             label: "Enquiry Received",
@@ -250,9 +246,7 @@ const HappyCallingListPage = () => {
                 { state: { from: location.pathname } }
             ),
             icon: <Pencil className="h-4 w-4" />,
-            visible: (row) => isHappyCalling(row)
-                ? canUpdate("crm.happy_calling")
-                : canUpdate("crm.leads")
+            visible: () => canUpdate("crm.happy_calling")
         },
         {
             label: "Disqualify",
@@ -263,7 +257,7 @@ const HappyCallingListPage = () => {
                 leadName: row.companyName || undefined
             }),
             icon: <Trash2 className="h-4 w-4 text-red-600" />,
-            visible: (row) => !isHappyCalling(row) && canDelete("crm.leads")
+            visible: (row) => !isHappyCalling(row) && canDelete("crm.happy_calling")
         },
     ];
 
@@ -488,7 +482,7 @@ const HappyCallingListPage = () => {
                         <CardDescription>Happy calling and lead entries</CardDescription>
                     </div>
                     <div className="flex items-center gap-2">
-                        {canCreate("crm.leads") && (
+                        {canCreate("crm.happy_calling") && (
                             <Button
                                 onClick={() => navigate(paths.crm.leadCreate, { state: { from: location.pathname } })}
                                 className="flex items-center gap-2"
