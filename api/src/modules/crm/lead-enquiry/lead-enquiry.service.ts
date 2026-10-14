@@ -318,6 +318,45 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
         return newOrg.id;
     }
 
+    /**
+     * Resolve the organisation for an enquiry.
+     *
+     * When an organization id is supplied (i.e. the user picked the org from the
+     * dropdown) that row is authoritative: we link by id and copy the canonical
+     * name for display/search, so it can never drift from the master and we never
+     * create a phantom organization. Some master rows have a blank `name`, so the
+     * acronym stands in.
+     *
+     * Only when no id is available (lead / happy-calling prefill, or the locked
+     * read-only field) do we fall back to matching by name.
+     */
+    private async resolveOrganizationSelection(
+        db: DbInstance,
+        params: { id?: number | null; name?: string | null },
+    ): Promise<{ id: number | null; name: string | null }> {
+        if (params.id) {
+            const [row] = await db
+                .select({
+                    id: organizations.id,
+                    name: organizations.name,
+                    acronym: organizations.acronym,
+                })
+                .from(organizations)
+                .where(eq(organizations.id, params.id))
+                .limit(1);
+
+            if (row) {
+                return {
+                    id: row.id,
+                    name: row.name?.trim() || row.acronym?.trim() || null,
+                };
+            }
+        }
+
+        const id = await this.resolveOrganizationId(db, params.name);
+        return { id, name: params.name ?? null };
+    }
+
     private async generateEnquiryNumber(db: DbInstance): Promise<string> {
         const now = new Date();
         const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -351,7 +390,7 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             dueDate?: string | null;
             locationCode?: string | null;
             documents?: string | null;
-            approxValue?: string | null;
+            approxValue?: number | null;
             userId: number;
         },
     ): Promise<TenderInfo> {
@@ -367,7 +406,7 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
                 organization: params.organisationId ?? null,
                 item: params.itemId,
                 location: params.locationCode ? Number(params.locationCode) : null,
-                gstValues: params.approxValue ?? "0",
+                gstValues: params.approxValue != null ? String(params.approxValue) : "0",
                 dueDate,
                 documents: params.documents ?? null,
                 teamMember: null,
@@ -441,8 +480,12 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
     async create(data: CreateLeadEnquiryDto, userId: number): Promise<LeadEnquiry> {
         const db = this.db;
 
-        // 1. Resolve Organization
-        const organisationId = await this.resolveOrganizationId(db, data.organizationName);
+        // 1. Resolve Organization (dropdown id wins; fall back to name matching)
+        const { id: organisationId, name: resolvedOrganizationName } =
+            await this.resolveOrganizationSelection(db, {
+                id: data.organisationId,
+                name: data.organizationName,
+            });
 
         // 2. Location Code stored directly as the location id
         const locationCode = data.locationCode;
@@ -468,7 +511,7 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
                 orgAbbName: data.orgAbbName ?? null,
                 enquiryFile: data.enquiryFile ?? null,
                 enquiryPhotos: data.enquiryPhotos ?? null,
-                organizationName: data.organizationName ?? null,
+                organizationName: resolvedOrganizationName ?? null,
                 enquiryNumber,
                 status: "New",
                 enquiryType: data.enquiryType ?? null,
@@ -503,7 +546,7 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             dueDate: data.dueDate ?? null,
             locationCode: data.locationCode ?? null,
             documents: data.enquiryFile ?? null,
-            approxValue: data.approxValue ?? null,
+            approxValue: data.approxValue ?? 0,
             userId,
         });
 
@@ -535,8 +578,12 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
                 } as NewLead)
                 .returning();
 
-            // 2. Resolve Organization
-            const organisationId = await this.resolveOrganizationId(tx, data.organizationName);
+            // 2. Resolve Organization (dropdown id wins; fall back to name matching)
+            const { id: organisationId, name: resolvedOrganizationName } =
+                await this.resolveOrganizationSelection(tx, {
+                    id: data.organisationId,
+                    name: data.organizationName,
+                });
 
             // 3. Location Code stored directly as the location id
             const locationCode = data.locationCode;
@@ -561,7 +608,7 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
                     orgAbbName: data.orgAbbName ?? null,
                     enquiryFile: data.enquiryFile ?? null,
                     enquiryPhotos: data.enquiryPhotos ?? null,
-                    organizationName: data.organizationName ?? null,
+                    organizationName: resolvedOrganizationName ?? null,
                     enquiryNumber,
                     status: "New",
                     enquiryType: data.enquiryType ?? null,
@@ -597,7 +644,7 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
                 dueDate: data.dueDate ?? null,
                 locationCode: data.locationCode ?? null,
                 documents: data.enquiryFile ?? null,
-                approxValue: data.approxValue ?? null,
+                approxValue: data.approxValue ?? 0,
                 userId,
             });
 
@@ -614,18 +661,29 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
 
         const { contacts, dueDate, enquiryFile, approxValue, ...restData } = data;
 
-        // Re-resolve organisation id when the organisation name is provided so it stays in sync
-        let resolvedOrganisationId: number | null | undefined = data.organisationId ?? undefined;
-        if (data.organizationName != null) {
-            resolvedOrganisationId = await this.resolveOrganizationId(this.db, data.organizationName);
-        }
+        // Resolve the organisation. A supplied id is authoritative (the org was
+        // picked from the dropdown) and gives us a canonical name straight from
+        // the master, so the stored display/search value cannot drift. Only when
+        // no id is given (lead / happy-calling prefill, locked read-only field) do
+        // we fall back to matching by name.
+        const organisationSelection =
+            data.organisationId != null || data.organizationName != null
+                ? await this.resolveOrganizationSelection(this.db, {
+                      id: data.organisationId,
+                      name: data.organizationName,
+                  })
+                : null;
 
         const updateData = {
             ...restData,
-            organisationId: resolvedOrganisationId,
+            organisationId: organisationSelection?.id ?? data.organisationId ?? undefined,
+            ...(organisationSelection?.name != null
+                ? { organizationName: organisationSelection.name }
+                : {}),
             locationCode,
             dueDate: dueDate ? new Date(dueDate) : undefined,
             enquiryFile: enquiryFile !== undefined ? enquiryFile : undefined,
+            approxValue: approxValue !== undefined ? approxValue : undefined,
             updatedBy: userId,
             updatedAt: new Date(),
         };
@@ -655,10 +713,11 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             if (dueDate) tenderSync.dueDate = new Date(dueDate);
             if (locationCode) tenderSync.location = Number(locationCode);
             if (enquiryFile !== undefined) tenderSync.documents = enquiryFile;
-            if (approxValue !== undefined) tenderSync.gstValues = approxValue;
+            if (approxValue !== undefined) tenderSync.gstValues = String(approxValue);
             if (data.enqName) tenderSync.tenderName = data.enqName;
             if (data.enquiryNumber) tenderSync.tenderNo = data.enquiryNumber;
-            if (resolvedOrganisationId != null) tenderSync.organization = resolvedOrganisationId;
+            const syncedOrganisationId = organisationSelection?.id ?? data.organisationId ?? null;
+            if (syncedOrganisationId != null) tenderSync.organization = syncedOrganisationId;
             if (data.itemId != null) tenderSync.item = data.itemId;
 
             if (Object.keys(tenderSync).length > 1) {

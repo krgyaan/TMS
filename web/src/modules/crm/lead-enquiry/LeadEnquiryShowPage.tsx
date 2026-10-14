@@ -82,7 +82,14 @@ export function LeadEnquiryView({ enquiry: manualEnquiry, enquiryId, isLoading: 
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">Approx Value</TableCell>
-                            <TableCell className="text-sm">{enquiry.approxValue || "—"}</TableCell>
+                            <TableCell className="text-sm">
+                                {enquiry.approxValue == null || Number.isNaN(Number(enquiry.approxValue))
+                                    ? "—"
+                                    : `₹${Number(enquiry.approxValue).toLocaleString("en-IN", {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2,
+                                      })}`}
+                            </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">Status</TableCell>
                             <TableCell className="text-sm">{enquiry.status || "—"}</TableCell>
                         </TableRow>

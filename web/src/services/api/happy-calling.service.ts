@@ -14,6 +14,7 @@ class HappyCallingService extends BaseApiService {
         if (params?.sortBy) search.set('sortBy', params.sortBy);
         if (params?.sortOrder) search.set('sortOrder', params.sortOrder);
         if (params?.search) search.set('search', params.search);
+        if (params?.priority) search.set('priority', params.priority);
         const queryString = search.toString();
         return this.get<PaginatedResult<HappyCallingRow>>(queryString ? `?${queryString}` : '');
     }

@@ -1,8 +1,7 @@
 import { lazy } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { RouteWrapper } from '../components/RouteWrapper';
 
-const CRM_Leads        = lazy(() => import('@/modules/crm/leads/LeadsListPage'));
 const CRM_LeadCreate   = lazy(() => import('@/modules/crm/leads/LeadCreatePage'));
 const CRM_LeadEdit     = lazy(() => import('@/modules/crm/leads/LeadEditPage'));
 const CRM_LeadShow     = lazy(() => import('@/modules/crm/leads/LeadShowPage'));
@@ -23,7 +22,7 @@ const CRM_HappyCallingEnquiryCreate = lazy(() => import('@/modules/crm/happy-cal
 export default function CRMRoutes() {
     return (
         <Routes>
-            <Route path="leads"                     element={<RouteWrapper><CRM_Leads /></RouteWrapper>} />
+            <Route path="leads"                     element={<Navigate to="/crm/happy-calling" replace />} />
             <Route path="leads/create"              element={<RouteWrapper><CRM_LeadCreate /></RouteWrapper>} />
             <Route path="leads/:id/edit"            element={<RouteWrapper><CRM_LeadEdit /></RouteWrapper>} />
             <Route path="leads/:id"                 element={<RouteWrapper><CRM_LeadShow /></RouteWrapper>} />

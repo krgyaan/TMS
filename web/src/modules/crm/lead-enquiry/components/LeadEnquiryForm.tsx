@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type SubmitHandler, useForm, useWatch, type Resolver } from "react-hook-form";
@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
+import { AsyncSelectField } from "@/components/form/AsyncSelectField";
 import { ContactPersonForm } from "@/components/form/contactpersonform";
 import { FileUploader } from "@/components/file-upload";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -23,9 +24,12 @@ import { useInfoSheet } from "@/hooks/api/useInfoSheets";
 import { useLocations } from "@/hooks/api/useLocations";
 import { useLead } from "@/hooks/api/useLeads";
 import { useHappyCalling } from "@/hooks/api/useHappyCalling";
+import { OrganizationModal } from "@/modules/master/organization/components/OrganizationModal";
+import { useOrganizations } from "@/hooks/api/useOrganizations";
 import axiosInstance from "@/lib/axios";
 import type { Location } from "@/types/api.types";
 import type { LeadEnquiryWithNames } from "../helpers/lead-enquiry.type";
+import type { EnquiryOrgOption } from "../helpers/lead-enquiry.type";
 
 type Option = { value: string; label: string };
 
@@ -37,7 +41,13 @@ const LeadEnquiryFormSchema = z.object({
     orgAbbName: z.string().min(1, { message: "Organisation abbreviation is required" }),
     itemId: z.string().min(1, { message: "Item is required" }),
     locationCode: z.string().min(1, { message: "Location is required" }),
-    approxValue: z.string().min(1, { message: "Approx value is required" }),
+    approxValue: z
+        .string()
+        .trim()
+        .min(1, { message: "Approx value is required" })
+        .refine((v) => !Number.isNaN(Number(v)) && Number(v) >= 0, {
+            message: "Approx value must be a number 0 or greater",
+        }),
     dueDate: z.string().optional(),
     siteVisitRequired: z.enum(["yes", "no"]),
     enquiryType: z.string().optional(),
@@ -68,9 +78,39 @@ interface LeadEnquiryFormProps {
     prefillOrganizationName?: string;
 }
 
+
+const CREATE_NEW_ORG_ID = "__create_new__";
+const CREATE_NEW_ORG_LABEL = "+ Add new organization";
+
+const useEnquiryOrganizationOptions = (): EnquiryOrgOption[] => {
+    const { data: organizations = [] } = useOrganizations();
+
+    return useMemo(
+        () =>
+            organizations
+                .filter((o) => o.status === true)
+                .map((o) => {
+                    const fullName = (o.name ?? "").trim();
+                    const acronym = (o.acronym ?? "").trim();
+                    return {
+                        id: String(o.id),
+                        acronym,
+                        orgName: fullName || acronym,
+                        name: acronym || fullName,
+                        keywords: fullName,
+                    };
+                })
+                .sort((a, b) => (a.acronym || a.orgName).localeCompare(b.acronym || b.orgName)),
+        [organizations]
+    );
+};
+
 const fetchItems = async (): Promise<Option[]> => {
     const res = await axiosInstance.get('/items');
-    return res.data.map((i: { id: number; name: string }) => ({ label: i.name, value: i.id.toString() }));
+    return res.data
+        .filter((i: { status: boolean }) => i.status === true)
+        .map((i: { id: number; name: string }) => ({ label: i.name, value: i.id.toString() }))
+        .sort((a: Option, b: Option) => a.label.localeCompare(b.label));
 };
 
 const fetchTeams = async (): Promise<Option[]> => {
@@ -87,12 +127,19 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
     const navigate = useNavigate();
     const createEnquiry = useCreateLeadEnquiry();
     const updateEnquiry = useUpdateLeadEnquiry();
+    const [orgModalOpen, setOrgModalOpen] = useState(false);
 
     const { data: itemOptions = [] } = useQuery({ queryKey: ["items"], queryFn: fetchItems });
     const { data: teamOptions = [] } = useQuery({ queryKey: ["teams"], queryFn: fetchTeams });
     const { data: locations = [] } = useLocations();
     const { data: leadData } = useLead(defaultLeadId ?? null);
     const { data: happyCallingRecord } = useHappyCalling(defaultHappyCallingId ?? null);
+    const orgOptions = useEnquiryOrganizationOptions();
+
+    // Opened from a lead / happy-calling record: the organisation comes from that
+    // record and is shown as-is instead of being re-selected.
+    const isOrgLocked = !!defaultLeadId || !!defaultHappyCallingId || !!prefillOrganizationName;
+
     const { data: infoSheet } = useInfoSheet(mode === "edit" ? (enquiry?.tenderId ?? null) : null);
 
     const tenderClients = useMemo(
@@ -123,7 +170,7 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
             orgAbbName: enquiry?.orgAbbName || "",
             itemId: enquiry?.itemId?.toString() || "",
             locationCode: enquiry?.locationCode || "",
-            approxValue: enquiry?.approxValue || "",
+            approxValue: enquiry?.approxValue != null ? String(enquiry.approxValue) : "",
             dueDate: enquiry?.dueDate ? toDatetimeLocal(enquiry.dueDate) : "",
             siteVisitRequired: enquiry?.siteVisitRequired ? "yes" : "no",
             enquiryType: enquiry?.enquiryType || "",
@@ -141,8 +188,70 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
     });
 
     const orgAbb = useWatch({ control: form.control, name: "orgAbbName" });
+    const organizationVal = useWatch({ control: form.control, name: "organizationName" });
     const itemIdVal = useWatch({ control: form.control, name: "itemId" });
     const locationVal = useWatch({ control: form.control, name: "locationCode" });
+
+    // Resolve whatever the form currently holds — an organization id from the
+    // dropdown, or a plain name coming from a lead / happy-calling record or a
+    // saved enquiry — to its organization master record.
+    const matchedOrgById = orgOptions.find((o) => o.id === organizationVal);
+    const matchedOrgByName = orgOptions.find((o) => o.orgName === organizationVal);
+    const matchedOrg = matchedOrgById ?? matchedOrgByName;
+    const orgText = matchedOrg?.orgName
+        ?? (organizationVal === CREATE_NEW_ORG_ID ? "" : organizationVal ?? "");
+
+    // "Create new organization" is a sentinel entry, not a real selection, so
+    // open the master modal and drop the value before it reaches the payload.
+    useEffect(() => {
+        if (organizationVal !== CREATE_NEW_ORG_ID) return;
+        setOrgModalOpen(true);
+        form.setValue("organizationName", "", { shouldValidate: false });
+    }, [organizationVal, form]);
+
+    const orgOptionsWithCreate = useMemo(
+        () => [
+            { id: CREATE_NEW_ORG_ID, name: CREATE_NEW_ORG_LABEL, acronym: "", orgName: "" },
+            ...orgOptions,
+        ],
+        [orgOptions]
+    );
+
+    // Read-only when the organisation comes from a lead / happy-calling record,
+    // or when the saved name has no match in the master. Empty and the
+    // create-new sentinel must keep the dropdown visible.
+    const isUnmatchedOrg =
+        !!organizationVal &&
+        organizationVal !== CREATE_NEW_ORG_ID &&
+        !matchedOrgById &&
+        !matchedOrgByName;
+    const showReadOnlyOrg = isOrgLocked || isUnmatchedOrg;
+
+    // Saved enquiries carry a plain organization name, but the dropdown needs an
+    // id. Swap in the matching id once the master has loaded; when nothing
+    // matches we leave the text alone and render a read-only field instead.
+    useEffect(() => {
+        if (mode !== "edit" || isOrgLocked) return;
+        const value = organizationVal ?? "";
+        if (!value || orgOptions.length === 0) return;
+        if (orgOptions.some((o) => o.id === value)) return;
+        const byName = orgOptions.find((o) => o.orgName === value);
+        if (byName) form.setValue("organizationName", byName.id);
+    }, [mode, isOrgLocked, organizationVal, orgOptions, form]);
+
+    // Pre-fill the abbreviation only when the organization changes, so a later
+    // master refetch can never overwrite an abbreviation the user typed.
+    const lastOrgValueRef = useRef<string | null>(null);
+    useEffect(() => {
+        const value = organizationVal ?? "";
+        if (lastOrgValueRef.current === value) return;
+        lastOrgValueRef.current = value;
+        form.setValue(
+            "orgAbbName",
+            matchedOrg ? matchedOrg.acronym || matchedOrg.orgName : "",
+            { shouldValidate: false }
+        );
+    }, [organizationVal, matchedOrg, form]);
 
     useEffect(() => {
         if (leadData) {
@@ -220,8 +329,23 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
                 ? values.contacts.slice(0, Math.max(values.contacts.length - lockedCount, 0))
                 : null;
 
+            // When the org was picked from the dropdown, send its id: the server
+            // links by id and copies the canonical name from the master instead of
+            // re-matching on a name string (which could create a new org). The
+            // locked read-only field (lead / happy-calling prefill) has no id, so
+            // we send the plain name and let the server match on it.
+            const selected = orgOptions.find((o) => o.id === (values.organizationName ?? ""));
+            const organizationName = selected?.orgName ?? orgText;
+            if (!organizationName) {
+                form.setError("organizationName", { message: "Please select an organisation" });
+                return;
+            }
+
             const payload = {
                 ...values,
+                organisationId: selected ? Number(selected.id) : null,
+                organizationName,
+                approxValue: Number(values.approxValue),
                 leadId: values.leadId ? Number(values.leadId) : null,
                 happyCallingId: defaultHappyCallingId ? Number(defaultHappyCallingId) : null,
                 itemId: Number(values.itemId),
@@ -280,20 +404,40 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
                                 placeholder="-- Select Team --"
                             />
 
-                            <FieldWrapper control={form.control} name="organizationName" label="Organisation (End user)">
-                                {(field) => (
-                                    <Input
-                                        placeholder="Enter organisation name"
-                                        {...field}
-                                        readOnly={!!defaultLeadId || !!prefillOrganizationName}
-                                        className={defaultLeadId || prefillOrganizationName ? "bg-muted/30" : ""}
-                                    />
-                                )}
-                            </FieldWrapper>
+                            {showReadOnlyOrg ? (
+                                <FieldWrapper control={form.control} name="organizationName" label="Organisation (End user)">
+                                    {(field) => (
+                                        <Input
+                                            placeholder="Enter organisation name"
+                                            {...field}
+                                            value={orgText}
+                                            readOnly
+                                            className="bg-muted/30"
+                                        />
+                                    )}
+                                </FieldWrapper>
+                            ) : (
+                                <AsyncSelectField
+                                    control={form.control}
+                                    name="organizationName"
+                                    label="Organisation (End user)"
+                                    options={orgOptionsWithCreate}
+                                    placeholder="-- Select Organisation --"
+                                    valueType="string"
+                                />
+                            )}
 
                             {/* Row 2: Org Abbreviation + Item + Location */}
                             <FieldWrapper control={form.control} name="orgAbbName" label="Organisation Abbreviation">
-                                {(field) => <Input placeholder="Enter abbreviation" {...field} />}
+                                {(field) => (
+                                    <Input
+                                        placeholder={matchedOrg ? "Select an organisation" : "Enter abbreviation"}
+                                        {...field}
+                                        value={field.value ?? ""}
+                                        readOnly={!!matchedOrg}
+                                        className={matchedOrg ? "bg-muted/30" : ""}
+                                    />
+                                )}
                             </FieldWrapper>
 
                             <SelectField
@@ -314,7 +458,17 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
 
                             {/* Row 3: Approx Value + Due Date + Enquiry Type + Site Visit */}
                             <FieldWrapper control={form.control} name="approxValue" label="Approx Value (₹)">
-                                {(field) => <Input placeholder="Enter approx value" {...field} />}
+                                {(field) => (
+                                    <Input
+                                        type="number"
+                                        inputMode="decimal"
+                                        min={0}
+                                        step="0.01"
+                                        placeholder="Enter approx value"
+                                        {...field}
+                                        value={field.value ?? ""}
+                                    />
+                                )}
                             </FieldWrapper>
 
                             <FieldWrapper control={form.control} name="dueDate" label="Due Date">
@@ -403,6 +557,8 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
                     </form>
                 </Form>
             </CardContent>
+
+            <OrganizationModal open={orgModalOpen} onOpenChange={setOrgModalOpen} />
         </Card>
     );
 }

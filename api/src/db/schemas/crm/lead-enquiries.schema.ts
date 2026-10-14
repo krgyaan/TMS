@@ -6,6 +6,7 @@ import {
     text,
     timestamp,
     boolean,
+    numeric,
 } from "drizzle-orm/pg-core";
 import { leads } from "./leads.schema";
 import { happyCalling } from "./happy-calling.schema";
@@ -21,7 +22,7 @@ export const leadEnquiries = pgTable("lead_enquiries", {
     organisationId: bigint("organisation_id", { mode: "number" }),
     itemId: bigint("item_id", { mode: "number" }).notNull(),
     locationCode: varchar("location_code", { length: 255 }).notNull(),
-    approxValue: varchar("approx_value", { length: 255 }).notNull(),
+    approxValue: numeric("approx_value", { precision: 15, scale: 2, mode: "number" }).notNull(),
     dueDate: timestamp("due_date", { withTimezone: true }),
     siteVisitRequired: boolean("site_visit_required").default(false).notNull(),
     createdBy: bigint("created_by", { mode: "number" }).notNull(),

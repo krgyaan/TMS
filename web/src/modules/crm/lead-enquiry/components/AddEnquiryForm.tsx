@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type SubmitHandler, useForm, useWatch, type Resolver } from "react-hook-form";
@@ -10,20 +10,53 @@ import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { ContactPersonForm } from "@/components/form/contactpersonform";
 import { FileUploader } from "@/components/file-upload";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Loader2, Plus } from "lucide-react";
 import { paths } from "@/app/routes/paths";
+import { cn } from "@/lib/utils";
 import { useCreateEnquiryWithLead } from "@/hooks/api/useLeadEnquiry";
 import { useLocations } from "@/hooks/api/useLocations";
+import { OrganizationModal } from "@/modules/master/organization/components/OrganizationModal";
+import { useOrganizations } from "@/hooks/api/useOrganizations";
 import axiosInstance from "@/lib/axios";
 import type { Location } from "@/types/api.types";
+import type { EnquiryOrgOption } from "../helpers/lead-enquiry.type";
 
 type Option = { value: string; label: string };
+
+const useEnquiryOrganizationOptions = (): EnquiryOrgOption[] => {
+    const { data: organizations = [] } = useOrganizations();
+
+    return useMemo(
+        () =>
+            organizations
+                .filter((o) => o.status === true)
+                .map((o) => {
+                    const fullName = (o.name ?? "").trim();
+                    const acronym = (o.acronym ?? "").trim();
+                    return {
+                        id: String(o.id),
+                        acronym,
+                        orgName: fullName || acronym,
+                        name: acronym || fullName,
+                        keywords: fullName,
+                    };
+                })
+                .sort((a, b) => (a.acronym || a.orgName).localeCompare(b.acronym || b.orgName)),
+        [organizations]
+    );
+};
 
 const COUNTRY_OPTIONS: Option[] = [
     { label: "India", value: "India" },
@@ -38,10 +71,16 @@ const AddEnquiryFormSchema = z.object({
     team: z.string().optional(),
     enqName: z.string().min(1, { message: "Enquiry name is required" }),
     organizationName: z.string().min(1, { message: "Organisation is required" }),
-    orgAbbName: z.string().min(1, { message: "Organisation abbreviation is required" }),
+    orgAbbName: z.string().optional(),
     itemId: z.string().min(1, { message: "Item is required" }),
     locationCode: z.string().min(1, { message: "Location is required" }),
-    approxValue: z.string().min(1, { message: "Approx value is required" }),
+    approxValue: z
+        .string()
+        .trim()
+        .min(1, { message: "Approx value is required" })
+        .refine((v) => !Number.isNaN(Number(v)) && Number(v) >= 0, {
+            message: "Approx value must be a number 0 or greater",
+        }),
     dueDate: z.string().optional(),
     siteVisitRequired: z.enum(["yes", "no"]),
     enquiryType: z.string().optional(),
@@ -62,7 +101,10 @@ type AddEnquiryFormValues = z.infer<typeof AddEnquiryFormSchema>;
 
 const fetchItems = async (): Promise<Option[]> => {
     const res = await axiosInstance.get('/items');
-    return res.data.map((i: { id: number; name: string }) => ({ label: i.name, value: i.id.toString() }));
+    return res.data
+        .filter((i: { status: boolean }) => i.status === true)
+        .map((i: { id: number; name: string }) => ({ label: i.name, value: i.id.toString() }))
+        .sort((a: Option, b: Option) => a.label.localeCompare(b.label));
 };
 
 const fetchTeams = async (): Promise<Option[]> => {
@@ -95,8 +137,10 @@ const SectionSeparator = ({ text }: { text: string }) => (
 export function AddEnquiryForm() {
     const navigate = useNavigate();
     const createEnquiryWithLead = useCreateEnquiryWithLead();
+    const [orgModalOpen, setOrgModalOpen] = useState(false);
 
     const { data: itemOptions = [] } = useQuery({ queryKey: ["items"], queryFn: fetchItems });
+    const orgOptions = useEnquiryOrganizationOptions();
     const { data: teamOptions = [] } = useQuery({ queryKey: ["teams"], queryFn: fetchTeams });
     const { data: stateOptions = [] } = useQuery({ queryKey: ["states"], queryFn: fetchStates });
     const { data: locations = [] } = useLocations();
@@ -129,10 +173,31 @@ export function AddEnquiryForm() {
     });
 
     const orgAbb = useWatch({ control: form.control, name: "orgAbbName" });
+    const organizationVal = useWatch({ control: form.control, name: "organizationName" });
+    const selectedOrg = orgOptions.find((o) => o.id === organizationVal);
     const itemIdVal = useWatch({ control: form.control, name: "itemId" });
     const locationVal = useWatch({ control: form.control, name: "locationCode" });
     const country = useWatch({ control: form.control, name: "country" });
     const isIndia = country === "India";
+
+    const [orgQuery, setOrgQuery] = useState("");
+    const [orgOpen, setOrgOpen] = useState(false);
+
+    const filteredOrgs = useMemo(() => {
+        const q = orgQuery.trim().toLowerCase();
+        if (!q) return orgOptions;
+        return orgOptions.filter(
+            (o) => o.acronym.toLowerCase().includes(q) || o.orgName.toLowerCase().includes(q)
+        );
+    }, [orgOptions, orgQuery]);
+
+    useEffect(() => {
+        if (!selectedOrg) {
+            form.setValue("orgAbbName", "", { shouldValidate: false });
+            return;
+        }
+        form.setValue("orgAbbName", selectedOrg.acronym || selectedOrg.orgName);
+    }, [selectedOrg, form]);
 
     const isInitialLoad = useRef(true);
     const previousCountry = useRef<string>("");
@@ -166,8 +231,21 @@ export function AddEnquiryForm() {
 
     const handleSubmit: SubmitHandler<AddEnquiryFormValues> = async (values) => {
         try {
+            // The dropdown stores the organization id, so send it: the server
+            // links by id and copies the canonical name from the master instead
+            // of re-matching on a name string (which could create a new org).
+            const selected = orgOptions.find((o) => o.id === (values.organizationName ?? ""));
+            const organizationName = selected?.orgName ?? "";
+            if (!selected || !organizationName) {
+                form.setError("organizationName", { message: "Please select an organisation" });
+                return;
+            }
+
             const payload = {
                 ...values,
+                organisationId: Number(selected.id),
+                organizationName,
+                approxValue: Number(values.approxValue),
                 itemId: Number(values.itemId),
                 siteVisitRequired: values.siteVisitRequired === "yes",
                 dueDate: values.dueDate || null,
@@ -224,15 +302,94 @@ export function AddEnquiryForm() {
 
                             <FieldWrapper control={form.control} name="organizationName" label="Organisation (End user)">
                                 {(field) => (
-                                    <Input placeholder="Enter organisation name" {...field} />
+                                    <DropdownMenu open={orgOpen} onOpenChange={setOrgOpen}>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                role="combobox"
+                                                aria-expanded={orgOpen}
+                                                className="w-full justify-between min-w-0"
+                                            >
+                                                <span className="truncate">
+                                                    {selectedOrg
+                                                        ? selectedOrg.acronym || selectedOrg.orgName
+                                                        : "-- Select Organisation --"}
+                                                </span>
+                                                <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent
+                                            className="w-(--radix-popper-anchor-width) p-0"
+                                            align="start"
+                                        >
+                                            <div className="p-2 border-b" onMouseDown={(e) => e.preventDefault()}>
+                                                <Input
+                                                    autoFocus
+                                                    placeholder="Search..."
+                                                    value={orgQuery}
+                                                    onChange={(e) => setOrgQuery(e.target.value)}
+                                                    onKeyDown={(e) => e.stopPropagation()}
+                                                    className="h-8"
+                                                />
+                                            </div>
+                                            <div className="max-h-64 overflow-auto py-1">
+                                                <DropdownMenuItem
+                                                    onClick={() => {
+                                                        setOrgModalOpen(true);
+                                                        setOrgOpen(false);
+                                                        setOrgQuery("");
+                                                    }}
+                                                    className="bg-primary/10 font-semibold text-primary hover:bg-primary/15 focus:text-primary"
+                                                >
+                                                    <Plus className="mr-1 h-4 w-4" />
+                                                    Add new organization
+                                                </DropdownMenuItem>
+
+                                                {filteredOrgs.length > 0 && (
+                                                    <div className="my-1 border-t" />
+                                                )}
+
+                                                {filteredOrgs.map((o) => {
+                                                    const isSelected = String(field.value ?? "") === o.id;
+                                                    return (
+                                                        <DropdownMenuItem
+                                                            key={o.id}
+                                                            onClick={() => {
+                                                                field.onChange(o.id);
+                                                                setOrgOpen(false);
+                                                                setOrgQuery("");
+                                                            }}
+                                                            className={cn(
+                                                                "flex items-center justify-between gap-2",
+                                                                isSelected && "bg-accent"
+                                                            )}
+                                                        >
+                                                            <span className="truncate text-foreground">
+                                                                {o.acronym || o.orgName}
+                                                            </span>
+                                                            <Check
+                                                                className={cn(
+                                                                    "h-4 w-4 shrink-0",
+                                                                    isSelected ? "opacity-100" : "opacity-0"
+                                                                )}
+                                                            />
+                                                        </DropdownMenuItem>
+                                                    );
+                                                })}
+
+                                                {filteredOrgs.length === 0 && (
+                                                    <div className="px-2 py-2 text-sm text-muted-foreground">
+                                                        No organizations match
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                 )}
                             </FieldWrapper>
 
-                            {/* Row 2: Org Abbreviation + Item + Location */}
-                            <FieldWrapper control={form.control} name="orgAbbName" label="Organisation Abbreviation">
-                                {(field) => <Input placeholder="Enter abbreviation" {...field} />}
-                            </FieldWrapper>
-
+                            {/* Row 2: Item + Location */}
                             <SelectField
                                 control={form.control}
                                 name="itemId"
@@ -251,7 +408,17 @@ export function AddEnquiryForm() {
 
                             {/* Row 3: Approx Value + Due Date + Enquiry Type + Site Visit */}
                             <FieldWrapper control={form.control} name="approxValue" label="Approx Value (₹)">
-                                {(field) => <Input placeholder="Enter approx value" {...field} />}
+                                {(field) => (
+                                    <Input
+                                        type="number"
+                                        inputMode="decimal"
+                                        min={0}
+                                        step="0.01"
+                                        placeholder="Enter approx value"
+                                        {...field}
+                                        value={field.value ?? ""}
+                                    />
+                                )}
                             </FieldWrapper>
 
                             <FieldWrapper control={form.control} name="dueDate" label="Due Date">
@@ -373,6 +540,8 @@ export function AddEnquiryForm() {
                     </form>
                 </Form>
             </CardContent>
+
+            <OrganizationModal open={orgModalOpen} onOpenChange={setOrgModalOpen} />
         </Card>
     );
 }

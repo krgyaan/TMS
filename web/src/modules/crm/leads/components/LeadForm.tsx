@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type SubmitHandler, useForm, useWatch } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
     Card,
@@ -59,9 +59,9 @@ const COUNTRY_OPTIONS: Option[] = [
 const LeadFormSchema = z.object({
     companyName: z.string().min(1, { message: "Company name is required" }),
     name: z.string().min(1, { message: "Person name is required" }),
-    designation: z.string().optional().nullable(),
+    designation: z.string().optional(),
     phone: z.string().min(1, { message: "Phone is required" }),
-    email: z.string().email({ message: "A valid email is required" }).optional().nullable().or(z.literal("")),
+    email: z.string().email({ message: "A valid email is required" }).optional().or(z.literal("")),
     address: z.string().min(1, { message: "Address is required" }),
     country: z.string().min(1, { message: "Country is required" }),
     state: z.string().min(1, { message: "State is required" }),
@@ -114,6 +114,10 @@ const SectionSeparator = ({ text }: { text: string }) => (
 
 export function LeadForm({ mode, lead }: LeadFormProps) {
     const navigate = useNavigate();
+    const location = useLocation();
+    // Return to whichever list page the user came from (Leads or Happy Calling).
+    const returnTo =
+        (location.state as { from?: string } | null)?.from ?? paths.crm.happyCalling;
     const createLead = useCreateLead();
     const updateLead = useUpdateLead();
     const { user, roleId } = useAuth();
@@ -259,7 +263,7 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
                 });
             }
 
-            navigate(paths.crm.leads);
+            navigate(returnTo);
         } catch (error) {
             console.error("Lead form submission error:", error);
         }
@@ -276,7 +280,7 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
                 <CardAction>
                     <Button
                         variant="outline"
-                        onClick={() => navigate(paths.crm.leads)}
+                        onClick={() => navigate(returnTo)}
                     >
                         <ArrowLeft />
                         Return Back
@@ -544,7 +548,7 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    onClick={() => navigate(paths.crm.leads)}
+                                    onClick={() => navigate(returnTo)}
                                     disabled={saving}
                                 >
                                     Cancel

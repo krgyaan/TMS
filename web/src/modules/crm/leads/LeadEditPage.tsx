@@ -31,7 +31,7 @@ export default function LeadEditPage() {
                         variant="outline"
                         size="sm"
                         className="ml-4"
-                        onClick={() => navigate(paths.crm.leads)}
+                        onClick={() => navigate(paths.crm.happyCalling)}
                     >
                         Back to List
                     </Button>

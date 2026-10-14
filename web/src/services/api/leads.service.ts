@@ -25,6 +25,7 @@ class LeadsService extends BaseApiService {
             if (params.team)      search.set('team',      params.team);      // ✅ ADD THIS
             if (params.sortBy)    search.set('sortBy',    params.sortBy);
             if (params.sortOrder) search.set('sortOrder', params.sortOrder);
+            if (params.includeHappyCalling) search.set('includeHappyCalling', 'true');
         }
         const qs = search.toString();
         return this.get<PaginatedResult<LeadWithNames>>(qs ? `?${qs}` : '');

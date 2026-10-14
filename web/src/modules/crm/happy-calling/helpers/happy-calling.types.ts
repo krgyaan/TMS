@@ -9,6 +9,7 @@ export type HappyCallingRow = {
     email: string | null;
     phone: string | null;
     status: string | null;
+    leadPriority: string | null;
     broadcast: number;
     details: string | null;
     createdBy: number | null;
@@ -25,6 +26,7 @@ export type HappyCallingListParams = {
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
     search?: string;
+    priority?: string;
 };
 
 export type CreateHappyCallingDto = {
@@ -35,6 +37,7 @@ export type CreateHappyCallingDto = {
     email?: string | null;
     phone?: string | null;
     status?: string | null;
+    leadPriority?: string | null;
     broadcast?: number;
     details?: string | null;
 };

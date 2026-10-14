@@ -7,7 +7,7 @@
  * user's own permissions) and the route guard allows only these URL
  * prefixes.
  */
-import { BookUser, Mail, PhoneCall, Users, Wallet, type LucideIcon } from "lucide-react";
+import { BookUser, Mail, PhoneCall, Wallet, type LucideIcon } from "lucide-react";
 import { paths } from "@/app/routes/paths";
 
 /** URL prefixes reachable in field mode (besides "/" and "/profile").
@@ -61,15 +61,6 @@ export const FIELD_DASHBOARD_TILES: FieldDashboardTile[] = [
         bgColor: "bg-purple-50 dark:bg-purple-950/30",
         url: paths.crm.happyCalling,
         permission: "crm.happy_calling",
-    },
-    {
-        title: "Leads",
-        subtitle: "Manage leads",
-        icon: Users,
-        color: "text-emerald-600",
-        bgColor: "bg-emerald-50 dark:bg-emerald-950/30",
-        url: paths.crm.leads,
-        permission: "crm.leads",
     },
     {
         title: "Enquiries",
