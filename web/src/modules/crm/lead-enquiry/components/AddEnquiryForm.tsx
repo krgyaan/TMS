@@ -10,15 +10,21 @@ import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
-import { AsyncSelectField } from "@/components/form/AsyncSelectField";
 import { ContactPersonForm } from "@/components/form/contactpersonform";
 import { FileUploader } from "@/components/file-upload";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Loader2, Plus } from "lucide-react";
 import { paths } from "@/app/routes/paths";
+import { cn } from "@/lib/utils";
 import { useCreateEnquiryWithLead } from "@/hooks/api/useLeadEnquiry";
 import { useLocations } from "@/hooks/api/useLocations";
 import { OrganizationModal } from "@/modules/master/organization/components/OrganizationModal";
@@ -28,13 +34,6 @@ import type { Location } from "@/types/api.types";
 import type { EnquiryOrgOption } from "../helpers/lead-enquiry.type";
 
 type Option = { value: string; label: string };
-
-/**
- * Sentinel id rendered by `SelectField` as a highlighted "create new" entry.
- * Picking it opens the organization modal instead of selecting a real record.
- */
-const CREATE_NEW_ORG_ID = "__create_new__";
-const CREATE_NEW_ORG_LABEL = "+ Add new organization";
 
 const useEnquiryOrganizationOptions = (): EnquiryOrgOption[] => {
     const { data: organizations = [] } = useOrganizations();
@@ -181,21 +180,16 @@ export function AddEnquiryForm() {
     const country = useWatch({ control: form.control, name: "country" });
     const isIndia = country === "India";
 
-    // "Create new organization" is a sentinel entry, not a real selection, so
-    // open the master modal and drop the value before it reaches the payload.
-    useEffect(() => {
-        if (organizationVal !== CREATE_NEW_ORG_ID) return;
-        setOrgModalOpen(true);
-        form.setValue("organizationName", "", { shouldValidate: false });
-    }, [organizationVal, form]);
+    const [orgQuery, setOrgQuery] = useState("");
+    const [orgOpen, setOrgOpen] = useState(false);
 
-    const orgOptionsWithCreate = useMemo(
-        () => [
-            { id: CREATE_NEW_ORG_ID, name: CREATE_NEW_ORG_LABEL, acronym: "", orgName: "" },
-            ...orgOptions,
-        ],
-        [orgOptions]
-    );
+    const filteredOrgs = useMemo(() => {
+        const q = orgQuery.trim().toLowerCase();
+        if (!q) return orgOptions;
+        return orgOptions.filter(
+            (o) => o.acronym.toLowerCase().includes(q) || o.orgName.toLowerCase().includes(q)
+        );
+    }, [orgOptions, orgQuery]);
 
     useEffect(() => {
         if (!selectedOrg) {
@@ -306,14 +300,94 @@ export function AddEnquiryForm() {
                                 placeholder="-- Select Team --"
                             />
 
-                            <AsyncSelectField
-                                control={form.control}
-                                name="organizationName"
-                                label="Organisation (End user)"
-                                options={orgOptionsWithCreate}
-                                placeholder="-- Select Organisation --"
-                                valueType="string"
-                            />
+                            <FieldWrapper control={form.control} name="organizationName" label="Organisation (End user)">
+                                {(field) => (
+                                    <DropdownMenu open={orgOpen} onOpenChange={setOrgOpen}>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                role="combobox"
+                                                aria-expanded={orgOpen}
+                                                className="w-full justify-between min-w-0"
+                                            >
+                                                <span className="truncate">
+                                                    {selectedOrg
+                                                        ? selectedOrg.acronym || selectedOrg.orgName
+                                                        : "-- Select Organisation --"}
+                                                </span>
+                                                <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent
+                                            className="w-(--radix-popper-anchor-width) p-0"
+                                            align="start"
+                                        >
+                                            <div className="p-2 border-b" onMouseDown={(e) => e.preventDefault()}>
+                                                <Input
+                                                    autoFocus
+                                                    placeholder="Search..."
+                                                    value={orgQuery}
+                                                    onChange={(e) => setOrgQuery(e.target.value)}
+                                                    onKeyDown={(e) => e.stopPropagation()}
+                                                    className="h-8"
+                                                />
+                                            </div>
+                                            <div className="max-h-64 overflow-auto py-1">
+                                                <DropdownMenuItem
+                                                    onClick={() => {
+                                                        setOrgModalOpen(true);
+                                                        setOrgOpen(false);
+                                                        setOrgQuery("");
+                                                    }}
+                                                    className="bg-primary/10 font-semibold text-primary hover:bg-primary/15 focus:text-primary"
+                                                >
+                                                    <Plus className="mr-1 h-4 w-4" />
+                                                    Add new organization
+                                                </DropdownMenuItem>
+
+                                                {filteredOrgs.length > 0 && (
+                                                    <div className="my-1 border-t" />
+                                                )}
+
+                                                {filteredOrgs.map((o) => {
+                                                    const isSelected = String(field.value ?? "") === o.id;
+                                                    return (
+                                                        <DropdownMenuItem
+                                                            key={o.id}
+                                                            onClick={() => {
+                                                                field.onChange(o.id);
+                                                                setOrgOpen(false);
+                                                                setOrgQuery("");
+                                                            }}
+                                                            className={cn(
+                                                                "flex items-center justify-between gap-2",
+                                                                isSelected && "bg-accent"
+                                                            )}
+                                                        >
+                                                            <span className="truncate text-foreground">
+                                                                {o.acronym || o.orgName}
+                                                            </span>
+                                                            <Check
+                                                                className={cn(
+                                                                    "h-4 w-4 shrink-0",
+                                                                    isSelected ? "opacity-100" : "opacity-0"
+                                                                )}
+                                                            />
+                                                        </DropdownMenuItem>
+                                                    );
+                                                })}
+
+                                                {filteredOrgs.length === 0 && (
+                                                    <div className="px-2 py-2 text-sm text-muted-foreground">
+                                                        No organizations match
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                )}
+                            </FieldWrapper>
 
                             {/* Row 2: Org Abbreviation + Item + Location */}
                             <FieldWrapper control={form.control} name="orgAbbName" label="Organisation Abbreviation">
