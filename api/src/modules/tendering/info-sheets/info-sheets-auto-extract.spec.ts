@@ -382,6 +382,25 @@ describe('TenderInfoSheetsService Auto-Extract & Path Resolution', () => {
             expect(spy).toHaveBeenCalledWith('extract-tender-200');
             expect(result.status).toBe('processing');
         });
+
+        it('POST /:tenderId/extraction/save should log deprecated warning and call service.saveExtractionResult', async () => {
+            const mockUser = { sub: 42, username: 'testuser' };
+            const spy = jest.spyOn(service, 'saveExtractionResult').mockResolvedValue({
+                success: true,
+                tenderId: 200,
+                extractionVersion: '1.0.0',
+            } as any);
+            const loggerWarnSpy = jest.spyOn((controller as any).logger, 'warn').mockImplementation(() => {});
+
+            const body = { fields: { tenderValue: { value: 100 } } };
+            const result = await controller.saveExtraction(200, body, mockUser as any);
+
+            expect(loggerWarnSpy).toHaveBeenCalledWith(
+                expect.stringContaining('[DEPRECATED] POST /tender-info-sheets/200/extraction/save was called'),
+            );
+            expect(spy).toHaveBeenCalledWith(200, body, 42);
+            expect(result.success).toBe(true);
+        });
     });
 
     describe('saveExtractionResult resilience', () => {
