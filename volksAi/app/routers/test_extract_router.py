@@ -11,7 +11,7 @@ def test_extract_endpoint_response_shape():
     """
     Validates that /extract returns the exact TMS response envelope:
     {
-      "extraction_version": "1.0.0",
+      "extraction_version": "1.1.0",
       "fields": { ... },
       "missing_fields": [ ... ],
       "processing_time_ms": int
@@ -72,7 +72,7 @@ def test_extract_endpoint_response_shape():
     data = response.json()
 
     # 1. Envelope root keys
-    assert data["extraction_version"] == "1.0.0"
+    assert data["extraction_version"] == "1.1.0"
     assert "fields" in data
     assert "missing_fields" in data
     assert "processing_time_ms" in data

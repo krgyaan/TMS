@@ -59,7 +59,7 @@ export class PdfExtractionProducer {
         private readonly db?: DbInstance,
     ) {}
 
-    public static readonly EXTRACTION_VERSION = '1.0.0';
+    public static readonly EXTRACTION_VERSION = '1.1.0';
 
     /**
      * Computes a SHA-256 hash across the main tender PDF, any ATC PDFs,
@@ -418,7 +418,7 @@ export class PdfExtractionProducer {
                             state: 'completed',
                             data: { tenderId: numericTenderId, pdfPath: '', userId: saved.userId || 0 },
                             result: {
-                                extraction_version: saved.extractionVersion || '1.0.0',
+                                extraction_version: saved.extractionVersion || '1.1.0',
                                 fields: saved.fields as any,
                                 missing_fields: saved.missingFields || [],
                                 processing_time_ms: saved.processingTimeMs || 0,

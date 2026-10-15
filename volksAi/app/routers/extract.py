@@ -939,7 +939,7 @@ async def extract_tender(
 
             # 3. Construct final response envelope matching TMS specification
             response: Dict[str, Any] = {
-                "extraction_version": "1.0.0",
+                "extraction_version": "1.1.0",
                 "fields": fields,
                 "missing_fields": missing_fields,
                 "processing_time_ms": processing_time_ms,

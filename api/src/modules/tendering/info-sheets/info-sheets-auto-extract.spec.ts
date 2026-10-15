@@ -717,7 +717,7 @@ describe('TenderInfoSheetsService Auto-Extract & Path Resolution', () => {
                                     tenderId: 3665,
                                     fields: { tenderValue: { value: 500 } },
                                     missingFields: [],
-                                    extractionVersion: '1.0.0:hash123',
+                                    extractionVersion: '1.1.0:hash123',
                                     processingTimeMs: 1200,
                                     updatedAt: new Date().toISOString(),
                                 },
