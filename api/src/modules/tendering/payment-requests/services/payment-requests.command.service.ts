@@ -8,7 +8,7 @@ import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { instrumentBgDetails, instrumentChequeDetails, instrumentDdDetails, instrumentFdrDetails, instrumentStatusHistory, instrumentTransferDetails, paymentInstruments, paymentRequestMom, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
 import { paymentRequests as opsPaymentRequests } from '@db/schemas/operations/payment-requests.schema';
-import { ConflictException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
 import { PaymentRequestService } from '@/modules/operations/payment-requests/payment-request.service';
 import { and, desc, eq, like } from 'drizzle-orm';
 import type { CreateMomRemarkDto } from '../dto/payment-mom.dto';
@@ -87,7 +87,9 @@ export class PaymentRequestsCommandService {
                     ? `${payload.EMD.mode} Details`
                     : `${payload.EMD.mode} Details`;
 
-                if (emdAmount > 0) {
+                const isBlankNonTmsCheque = isNonTmsRequest && payload.EMD.mode === 'CHEQUE';
+
+                if (emdAmount > 0 || isBlankNonTmsCheque) {
                     const request = await this.createPaymentRequest(
                         tx,
                         tenderId,
@@ -281,6 +283,12 @@ export class PaymentRequestsCommandService {
                 }
             }
         });
+
+        if (createdRequests.length === 0) {
+            throw new BadRequestException(
+                'No payment request could be created. Please provide valid payment details.'
+            );
+        }
 
         // Background operations
         this.handleBackgroundOperations(results, tenderId, tender, userId, emdRequested, isNonTmsRequest)
