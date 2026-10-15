@@ -1161,8 +1161,6 @@ def generate_bidder_readiness_summary(
             summary["readiness_site_visit_display"] = "Yes (Mandatory site inspection and certificate required prior to bidding)"
         elif site_visit_deemed:
             summary["readiness_site_visit_display"] = "No / Self-Certification (Deemed site visit acknowledgment in SCC; no mandatory scheduled visit)"
-        elif "site visit" in full_text.lower():
-            summary["readiness_site_visit_display"] = "Not mandatory / Self-acquaintance (Bidder advised to inspect site before bidding)"
         else:
             summary["readiness_site_visit_display"] = "Not specified"
 
@@ -3383,9 +3381,9 @@ def build_infosheet_data(
         full_text, re.IGNORECASE
     )
     site_visit_no = (
-        (m_sv_direct and m_sv_direct.group(1).lower() in ("no", "not applicable", "na"))
+        (m_sv_direct and m_sv_direct.group(1).lower() in ("no", "not required", "not applicable", "na"))
         or (site_visit_val and str(site_visit_val).strip().lower() in ("no", "not required", "not applicable", "false", "na"))
-        or bool(re.search(r"site\s+visit\s+(?:is\s+)?(?:not\s+required|not\s+applicable|not\s+mandatory)", full_text, re.IGNORECASE))
+        or bool(re.search(r"site\s+visit\s+(?:is\s+)?(?:not\s+required|not\s+applicable)", full_text, re.IGNORECASE))
     )
 
     if site_visit_mandatory or (site_visit_val and any(kw in str(site_visit_val).lower() for kw in ["mandatory", "must visit", "required"])) or (m_sv_direct and m_sv_direct.group(1).lower() in ("yes", "mandatory")):
@@ -3396,8 +3394,8 @@ def build_infosheet_data(
         site_visit_display = "No"
     elif site_visit_deemed:
         site_visit_display = "No / Self-Certification (Deemed site visit acknowledgment in SCC; no mandatory scheduled visit)"
-    elif "site visit" in full_text.lower() or "site inspection" in full_text.lower():
-        site_visit_display = "Not mandatory / Self-acquaintance (Bidder advised to inspect site before bidding)"
+    elif bool(re.search(r"site\s+visit\s+(?:is\s+)?(?:not\s+mandatory|optional)", full_text, re.IGNORECASE)):
+        site_visit_display = "Not mandatory"
     else:
         site_visit_display = "Not specified"
 
