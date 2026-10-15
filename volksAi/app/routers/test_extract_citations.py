@@ -580,3 +580,56 @@ def test_fix_k_guard_genuine_disagreement_is_still_value_changed():
 def test_fix_k_guard_true_snapshot_vs_no_is_still_value_changed():
     s = _emd_required_object(True, "NO")["sources"]
     assert s["unlocated"]["unlocated_reason"] == UNLOCATED_VALUE_CHANGED
+
+
+def test_rule_derived_fields_citations_never_invented():
+    """
+    Item 3: Rule-derived fields: source: "rule", located: false, page: null, snippet: null,
+    one-line unlocated_reason; applies to pbgMode, siteVisit*, physicalDocsRequired,
+    physicalDocType, physicalDocsDeadline, ldType, mafRequired. No invented citation.
+    """
+    from app.routers.extract import RULE_DERIVED_FIELDS, UNLOCATED_RULE_DERIVED
+
+    fake_snapshots = {
+        key: {
+            "main_tender": {"value": "Invented", "page": 42, "snippet": "Invented snippet on page 42"},
+            "atc": {"value": "Invented ATC", "page": 99, "snippet": "Invented ATC snippet on page 99"},
+        }
+        for key in RULE_DERIVED_FIELDS
+    }
+
+    test_values = {
+        "pbgMode": ["PBG", "DD"],
+        "siteVisit": "No",
+        "siteVisitRequired": "NO",
+        "physicalDocsRequired": "YES",
+        "physicalDocType": "EMD",
+        "physicalDocsDeadline": "Within 5 days",
+        "ldType": "STANDARD",
+        "mafRequired": "YES_GENERAL",
+    }
+
+    assert len(RULE_DERIVED_FIELDS) == 8
+    for key in RULE_DERIVED_FIELDS:
+        field_obj = _format_field_object(
+            tms_key=key,
+            dto_value=test_values.get(key, "SAMPLE"),
+            source_field_name=f"{key}_display",
+            field_statuses={},
+            field_sources={},
+            dual_sources=fake_snapshots,
+        )
+        assert field_obj["source"] == "rule", f"{key} source should be 'rule', got {field_obj['source']}"
+        assert field_obj["sources"]["located"] is False
+        assert field_obj["sources"]["page"] is None
+        assert field_obj["sources"]["snippet"] is None
+        assert field_obj["sources"]["unlocated_reason"] == UNLOCATED_RULE_DERIVED
+        assert field_obj["sources"]["main_tender"] is None
+        assert field_obj["sources"]["atc"] is None
+        unloc = field_obj["sources"]["unlocated"]
+        assert unloc is not None
+        assert unloc["located"] is False
+        assert unloc["page"] is None
+        assert unloc["snippet"] is None
+        assert unloc["unlocated_reason"] == UNLOCATED_RULE_DERIVED
+

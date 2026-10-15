@@ -476,10 +476,21 @@ def _normalize_extracted_value_for_key(tms_key: str, raw_val: Any) -> Any:
     return s
 
 
-# Reasons a field's citation cannot point at a verified page/snippet.
 UNLOCATED_NO_SOURCE_RECORD = "no_source_record"          # no Layer-1 record exists for this field
 UNLOCATED_VALUE_CHANGED = "value_changed_after_extraction"  # snapshot exists but no longer matches the value
 UNLOCATED_NO_PAGE = "no_page_recorded"                  # value matches, but the page was never captured
+UNLOCATED_RULE_DERIVED = "Derived from tender rules/mode without dedicated text citation"
+
+RULE_DERIVED_FIELDS = {
+    "pbgMode",
+    "siteVisit",
+    "siteVisitRequired",
+    "physicalDocsRequired",
+    "physicalDocType",
+    "physicalDocsDeadline",
+    "ldType",
+    "mafRequired",
+}
 
 
 def _has_real_page(page: Any) -> bool:
@@ -808,16 +819,38 @@ def _format_field_object(
                 else:
                     source = None
 
-    sources_obj = _resolve_dual_source_for_tms_key(
-        tms_key=tms_key,
-        source_field_name=source_field_name,
-        dual_sources=dual_sources or {},
-        is_self_classified_atc=is_self_classified_atc,
-        has_atc=has_atc,
-        clean_value=clean_value,
-        source=source,
-        field_flags=flags_list,
-    )
+    if tms_key in RULE_DERIVED_FIELDS:
+        source = "rule"
+        sources_obj = {
+            "self_classified_atc": bool(is_self_classified_atc),
+            "has_conflict": False,
+            "main_tender": None,
+            "atc": None,
+            "located": False,
+            "page": None,
+            "snippet": None,
+            "unlocated_reason": UNLOCATED_RULE_DERIVED,
+            "unlocated": {
+                "value": clean_value,
+                "raw_value": None if clean_value is None else str(clean_value),
+                "page": None,
+                "snippet": None,
+                "located": False,
+                "unlocated_reason": UNLOCATED_RULE_DERIVED,
+                "document": None,
+            },
+        }
+    else:
+        sources_obj = _resolve_dual_source_for_tms_key(
+            tms_key=tms_key,
+            source_field_name=source_field_name,
+            dual_sources=dual_sources or {},
+            is_self_classified_atc=is_self_classified_atc,
+            has_atc=has_atc,
+            clean_value=clean_value,
+            source=source,
+            field_flags=flags_list,
+        )
 
     return {
         "value": clean_value,
