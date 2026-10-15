@@ -15,6 +15,7 @@ import {
 } from './extraction-fields-merge';
 import { TenderInfoSheetsService } from './info-sheets.service';
 import { PdfExtractionProcessor } from './pdf-extraction.processor';
+import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 
 /**
  * The PDF auto-extract worker and POST /info-sheets/:tenderId/extraction/save used to
@@ -86,6 +87,18 @@ describeDb('tender_extractions writers keep the cached analysis (real Postgres)'
             {} as any, {} as any, {} as any, {} as any, {} as any, {} as any,
         );
 
+    const makeTendersService = () =>
+        new TenderInfosService(
+            appLogger,
+            db as any,
+            {} as any,
+            { sendTenderUpdateEmail: jest.fn() } as any,
+            {} as any,
+            { stopTimer: jest.fn(), startTimer: jest.fn() } as any,
+            { get: jest.fn() } as any,
+            {} as any,
+        );
+
     const seed = async (fields: Record<string, unknown>) => {
         await db.insert(tenderExtractions).values({ tenderId: 1175, fields, missingFields: [] });
     };
@@ -101,6 +114,52 @@ describeDb('tender_extractions writers keep the cached analysis (real Postgres)'
             path.resolve(__dirname, '../../../../drizzle/0137_create_tender_extractions.sql'), 'utf8',
         );
         await pool.query(migration);
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS "tender_infos" (
+                "id" serial PRIMARY KEY,
+                "team" bigint DEFAULT 1,
+                "tender_no" varchar(255) DEFAULT 'TND-1',
+                "organization" bigint,
+                "tender_name" varchar(255) DEFAULT 'TND',
+                "item" bigint DEFAULT 1,
+                "gst_values" numeric(15, 2) DEFAULT '0',
+                "tender_fees" numeric(15, 2) DEFAULT '0',
+                "emd" numeric(15, 2) DEFAULT '0',
+                "team_member" bigint,
+                "due_date" timestamp with time zone DEFAULT now(),
+                "remarks" varchar(200),
+                "status" bigint DEFAULT 1,
+                "location" bigint,
+                "website" bigint,
+                "courier_address" text,
+                "delete_status" integer DEFAULT 0,
+                "documents" text,
+                "tl_remarks" text,
+                "tl_approval_remarks" text,
+                "tl_approval_timestamp" timestamp with time zone,
+                "rfq_to" varchar(200),
+                "tl_status" integer DEFAULT 0,
+                "processing_fee_mode" varchar(100),
+                "tender_fee_mode" varchar(100),
+                "emd_mode" varchar(100),
+                "approve_pqr_selection" varchar(50),
+                "approve_finance_doc_selection" varchar(50),
+                "tender_approval_status" varchar(50),
+                "tl_rejection_remarks" text,
+                "tl_incomplete_remarks" text,
+                "oem_not_allowed" text[],
+                "rfq_required" varchar(10),
+                "quotation_files" text,
+                "created_at" timestamp with time zone DEFAULT now(),
+                "updated_at" timestamp with time zone DEFAULT now()
+            );
+            CREATE TABLE IF NOT EXISTS "bidding_requirements_jobs" (
+                "id" serial PRIMARY KEY,
+                "tender_id" integer NOT NULL,
+                "status" varchar(20) DEFAULT 'pending',
+                "updated_at" timestamp with time zone DEFAULT now()
+            );
+        `);
     });
     beforeEach(async () => { await pool.query('TRUNCATE tender_extractions RESTART IDENTITY'); });
     afterAll(async () => { await pool.end(); });
@@ -313,5 +372,71 @@ describeDb('tender_extractions writers keep the cached analysis (real Postgres)'
             .from(tenderExtractions)
             .where(eq(tenderExtractions.tenderId, 9999));
         expect(unseededRow).toBeUndefined();
+    });
+
+    it('TendersService stale update: marks extractionVersion stale in real Postgres while fields row is byte-identical', async () => {
+        // Complex stored extraction record with diverse types, nested objects, arrays, and unicode
+        const complexFields = {
+            tenderValue: { value: 12500000, confidence: 'high', source: 'regex', page: 3, snippet: 'Tender Value: 1.25 Cr' },
+            emdAmount: { value: 250000, confidence: 'high', source: 'regex', page: 4, snippet: 'EMD: Rs 2,50,000' },
+            deliveryTimeSupply: { value: 180, confidence: 'medium', source: 'llm', page: 7, snippet: 'Supply period is 180 days' },
+            biddingRequirementsAnalysis: ANALYSIS,
+            metadata: {
+                llm_status: 'ok',
+                failed_categories: [],
+                extraction_timestamp: '2026-10-15T18:00:00.000Z',
+                user_notes: 'User verified on 2026-10-15',
+            },
+        };
+
+        const initialVersion = '1.0.0:abcdef1234567890abcdef1234567890';
+        await db.insert(tenderExtractions).values({
+            tenderId: 1175,
+            fields: complexFields,
+            missingFields: ['pbgDuration'],
+            extractionVersion: initialVersion,
+        });
+
+        // Insert matching row in tender_infos
+        await pool.query(`
+            INSERT INTO "tender_infos" ("id", "tender_no", "tender_name", "documents")
+            VALUES (1175, 'TND-1175', 'Test Tender 1175', 'v1_tender.pdf')
+            ON CONFLICT ("id") DO UPDATE SET "documents" = 'v1_tender.pdf'
+        `);
+
+        // Capture raw byte content before the update directly from Postgres
+        const beforeResult = await pool.query(`SELECT fields, missing_fields, extraction_version FROM tender_extractions WHERE tender_id = 1175`);
+        const beforeRow = beforeResult.rows[0];
+        const beforeFieldsJson = JSON.stringify(beforeRow.fields);
+        const beforeMissingJson = JSON.stringify(beforeRow.missing_fields);
+        const beforeBytes = Buffer.from(beforeFieldsJson, 'utf8');
+
+        expect(beforeRow.extraction_version).toBe(initialVersion);
+
+        // Run TendersService.update with changed documents to trigger stale update
+        const tendersService = makeTendersService();
+        jest.spyOn(tendersService, 'findById').mockResolvedValue({
+            id: 1175,
+            tenderNo: 'TND-1175',
+            documents: 'v1_tender.pdf',
+        } as any);
+
+        await tendersService.update(1175, { documents: 'v2_updated_tender.pdf' }, 7);
+
+        // Fetch row from Postgres after the update
+        const afterResult = await pool.query(`SELECT fields, missing_fields, extraction_version FROM tender_extractions WHERE tender_id = 1175`);
+        const afterRow = afterResult.rows[0];
+        const afterFieldsJson = JSON.stringify(afterRow.fields);
+        const afterMissingJson = JSON.stringify(afterRow.missing_fields);
+        const afterBytes = Buffer.from(afterFieldsJson, 'utf8');
+
+        // 1. extractionVersion was updated to 'stale'
+        expect(afterRow.extraction_version).toBe('stale');
+
+        // 2. fields row is byte-identical (both string-equal and Buffer-equal)
+        expect(afterFieldsJson).toBe(beforeFieldsJson);
+        expect(afterBytes.equals(beforeBytes)).toBe(true);
+        expect(afterMissingJson).toBe(beforeMissingJson);
+        expect(afterRow.fields).toEqual(complexFields);
     });
 });
