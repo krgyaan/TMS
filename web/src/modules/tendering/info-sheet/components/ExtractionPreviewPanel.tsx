@@ -29,6 +29,7 @@ export interface ExtractionPreviewPanelProps {
     tenderDocuments?: string | null;
     mainTenderPath?: string | null;
     atcPath?: string | null;
+    isStale?: boolean;
     onClose?: () => void;
 }
 
@@ -126,6 +127,7 @@ export const ExtractionPreviewPanel: React.FC<ExtractionPreviewPanelProps> = ({
     tenderDocuments,
     mainTenderPath,
     atcPath,
+    isStale = false,
     onClose,
 }) => {
     const [viewMode, setViewMode] = useState<ViewMode>('all');
@@ -256,6 +258,11 @@ export const ExtractionPreviewPanel: React.FC<ExtractionPreviewPanelProps> = ({
                                 <Badge variant="outline" className="text-[11px] py-0 border-indigo-500/30 text-indigo-300 bg-indigo-500/5">
                                     Read-Only
                                 </Badge>
+                                {isStale && (
+                                    <Badge variant="outline" data-testid="outdated-badge" className="text-[11px] py-0 border-amber-500/40 bg-amber-500/10 text-amber-300">
+                                        Outdated
+                                    </Badge>
+                                )}
                                 {processingTimeMs && (
                                     <span className="text-[11px] text-slate-500 font-mono">
                                         ({(processingTimeMs / 1000).toFixed(1)}s)
@@ -309,6 +316,16 @@ export const ExtractionPreviewPanel: React.FC<ExtractionPreviewPanelProps> = ({
                     )}
                 </div>
             </div>
+
+            {/* Outdated Notice Banner (When Applicable) */}
+            {isStale && (
+                <div data-testid="outdated-banner" className="border-b border-amber-500/30 bg-amber-950/20 px-4 py-3 flex items-start gap-3">
+                    <AlertTriangle className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                    <div className="text-xs text-amber-200">
+                        <span className="font-semibold text-amber-300">Outdated Extraction:</span> Tender documents changed since the last analysis; run Analyze with AI again. Values are displayed read-only for reference.
+                    </div>
+                </div>
+            )}
 
             {/* 2. Self-Classified Notice Banner (When Applicable) */}
             {selfClassifiedAtc && (
@@ -512,6 +529,11 @@ export const ExtractionPreviewPanel: React.FC<ExtractionPreviewPanelProps> = ({
                                                     </Badge>
                                                 )}
 
+                                                {isStale && (
+                                                    <Badge variant="outline" data-testid="field-outdated-badge" className="border-amber-500/40 bg-amber-500/10 text-amber-300 text-[10px] py-0.5 px-1.5 font-medium">
+                                                        Outdated
+                                                    </Badge>
+                                                )}
                                                 {f?.confidence && f.confidence !== 'high' && (
                                                     <span className="text-[9px] text-slate-400 uppercase font-mono px-1 py-0.2 rounded bg-slate-800/60 border border-slate-700/60">
                                                         {f.confidence}

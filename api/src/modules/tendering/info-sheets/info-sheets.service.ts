@@ -1859,6 +1859,7 @@ export class TenderInfoSheetsService {
                 }
             }
 
+            const isStale = row.extractionVersion === 'stale';
             const metadata = (row.fields as any)?.metadata;
             return {
                 tenderId: row.tenderId,
@@ -1872,6 +1873,8 @@ export class TenderInfoSheetsService {
                 ambiguous_field_conflicts: conflicts,
                 llm_status: metadata?.llm_status || 'ok',
                 failed_categories: metadata?.failed_categories || [],
+                stale: isStale,
+                isStale: isStale,
             };
         } catch (error: any) {
             const underlyingError = error?.cause?.message || error?.message || String(error);

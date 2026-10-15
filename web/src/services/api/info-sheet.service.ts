@@ -50,6 +50,8 @@ class InfoSheetsService extends BaseApiService {
         self_classified_atc?: boolean;
         has_atc?: boolean;
         ambiguous_field_conflicts?: Record<string, any>;
+        stale?: boolean;
+        isStale?: boolean;
     } | null> {
         try {
             return await this.get(`/${tenderId}/extraction`)

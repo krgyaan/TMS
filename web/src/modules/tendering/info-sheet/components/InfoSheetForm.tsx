@@ -82,6 +82,8 @@ export function TenderInformationForm({
         documentIdentityCheck?: DocumentIdentityCheck | null;
         llm_status?: string;
         failed_categories?: string[];
+        stale?: boolean;
+        isStale?: boolean;
     } | null>(null);
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -460,7 +462,16 @@ export function TenderInformationForm({
                     </div>
                     <CardAction className="flex items-center gap-2">
                         {isExtractionSaved && (
-                            extractionData?.llm_status === 'llm_unavailable' ? (
+                            (extractionData?.stale || extractionData?.isStale) ? (
+                                <Badge
+                                    variant="outline"
+                                    data-testid="ai-extracted-outdated-badge"
+                                    className="bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800 flex items-center gap-1 py-1 px-2.5"
+                                >
+                                    <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                                    <span>AI Extracted (Outdated)</span>
+                                </Badge>
+                            ) : extractionData?.llm_status === 'llm_unavailable' ? (
                                 <Badge
                                     variant="outline"
                                     data-testid="ai-extracted-partial-badge"
@@ -513,7 +524,9 @@ export function TenderInformationForm({
                             ) : isExtractionSaved ? (
                                 <>
                                     <Sparkles className="mr-2 h-4 w-4" />
-                                    Re-Extract with AI
+                                    {(extractionData?.stale || extractionData?.isStale)
+                                        ? 'Analyze with AI again'
+                                        : 'Re-Extract with AI'}
                                 </>
                             ) : (
                                 <>
@@ -530,6 +543,25 @@ export function TenderInformationForm({
             </CardHeader>
 
             <CardContent>
+                {(extractionData?.stale || extractionData?.isStale) && (
+                    <Alert
+                        role="alert"
+                        data-testid="ai-extraction-stale"
+                        className="mb-6 border-amber-500 bg-amber-50 dark:bg-amber-950/60"
+                    >
+                        <AlertCircle className="h-4 w-4 text-amber-600" />
+                        <AlertDescription className="text-amber-800 dark:text-amber-200">
+                            <div className="space-y-1.5">
+                                <p className="font-semibold text-base">
+                                    Tender documents changed since the last analysis; run Analyze with AI again
+                                </p>
+                                <p className="text-sm">
+                                    Previously extracted values are displayed below for reference labelled as outdated. Run Analyze with AI again to update them against the latest uploaded documents.
+                                </p>
+                            </div>
+                        </AlertDescription>
+                    </Alert>
+                )}
                 {extractionData?.llm_status === 'llm_unavailable' && (
                     <Alert
                         role="alert"
@@ -586,6 +618,7 @@ export function TenderInformationForm({
                         missingFields={extractionData.missing_fields}
                         processingTimeMs={extractionData.processing_time_ms}
                         tenderDocuments={tender?.documents}
+                        isStale={Boolean(extractionData?.stale || extractionData?.isStale)}
                         onClose={() => setShowPreview(false)}
                     />
                 )}

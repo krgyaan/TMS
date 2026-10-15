@@ -643,4 +643,91 @@ describe('TenderInfoSheetsService Auto-Extract & Path Resolution', () => {
             expect(insertedFields.metadata.failed_categories).toEqual([]);
         });
     });
+
+    describe('getSavedExtraction stale flag', () => {
+        it('should return stale: true and isStale: true when extractionVersion is "stale"', async () => {
+            const mockDb: any = {
+                select: jest.fn().mockReturnValue({
+                    from: jest.fn().mockReturnValue({
+                        where: jest.fn().mockReturnValue({
+                            limit: jest.fn().mockResolvedValue([
+                                {
+                                    tenderId: 3665,
+                                    fields: { tenderValue: { value: 500 } },
+                                    missingFields: [],
+                                    extractionVersion: 'stale',
+                                    processingTimeMs: 1200,
+                                    updatedAt: new Date().toISOString(),
+                                },
+                            ]),
+                        }),
+                    }),
+                }),
+            };
+
+            const mockAppLogger = {
+                withContext: jest.fn().mockReturnValue(mockLogger),
+            };
+            const testService = new TenderInfoSheetsService(
+                mockAppLogger as any,
+                mockDb,
+                {} as any,
+                mockTenderInfosService,
+                {} as any,
+                {} as any,
+                {} as any,
+                {} as any,
+                {} as any,
+                mockProducer,
+            );
+
+            const result = await testService.getSavedExtraction(3665);
+            expect(result).not.toBeNull();
+            expect(result?.stale).toBe(true);
+            expect(result?.isStale).toBe(true);
+            expect(result?.fields).toEqual({ tenderValue: { value: 500 } });
+        });
+
+        it('should return stale: false and isStale: false when extractionVersion is not stale', async () => {
+            const mockDb: any = {
+                select: jest.fn().mockReturnValue({
+                    from: jest.fn().mockReturnValue({
+                        where: jest.fn().mockReturnValue({
+                            limit: jest.fn().mockResolvedValue([
+                                {
+                                    tenderId: 3665,
+                                    fields: { tenderValue: { value: 500 } },
+                                    missingFields: [],
+                                    extractionVersion: '1.0.0:hash123',
+                                    processingTimeMs: 1200,
+                                    updatedAt: new Date().toISOString(),
+                                },
+                            ]),
+                        }),
+                    }),
+                }),
+            };
+
+            const mockAppLogger = {
+                withContext: jest.fn().mockReturnValue(mockLogger),
+            };
+            const testService = new TenderInfoSheetsService(
+                mockAppLogger as any,
+                mockDb,
+                {} as any,
+                mockTenderInfosService,
+                {} as any,
+                {} as any,
+                {} as any,
+                {} as any,
+                {} as any,
+                mockProducer,
+            );
+
+            const result = await testService.getSavedExtraction(3665);
+            expect(result).not.toBeNull();
+            expect(result?.stale).toBe(false);
+            expect(result?.isStale).toBe(false);
+        });
+    });
 });
