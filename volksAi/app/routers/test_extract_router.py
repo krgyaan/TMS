@@ -358,3 +358,64 @@ def test_extract_endpoint_handles_self_classified_atc():
     assert emd_sources["atc"]["value"] == 75000.0
     assert emd_sources["atc"]["page"] == 1
     assert emd_sources["has_conflict"] is False
+
+
+def test_commercial_evaluation_unmapped_option_b():
+    mock_infosheet_data = {
+        "commercial_evaluation_display": "Group wise evaluation",
+        "_info_sheet_statuses": {
+            "commercial_evaluation_display": "extracted",
+        },
+        "_info_sheet_sources": {
+            "commercial_evaluation_display": "main",
+        },
+        "_dual_sources": {
+            "Commercial Evaluation Type": {
+                "self_classified_atc": False,
+                "has_conflict": False,
+                "main_tender": {
+                    "value": "Group Wise Evaluation Method )",
+                    "raw_value": "Group Wise Evaluation Method )",
+                    "page": 7,
+                    "snippet": "Evaluation Method ( Group Wise Evaluation Method )",
+                    "confidence": 0.95,
+                    "status": "extracted",
+                },
+                "atc": None,
+            },
+        },
+        "_self_classified_atc": False,
+        "_has_atc": False,
+        "_ambiguous_field_conflicts": {},
+        "missing_fields": [],
+    }
+
+    with patch("app.routers.extract.ingest_parent_tender_pdf", return_value=mock_infosheet_data):
+        response = client.post(
+            "/extract",
+            files={"pdf_file": ("test_tender.pdf", b"%PDF-1.4 mock content", "application/pdf")},
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    field = data["fields"]["commercialEvaluation"]
+
+    # Option B requirements:
+    # 1. value: null
+    assert field["value"] is None
+    # 2. confidence: "missing"
+    assert field["confidence"] == "missing"
+    # 3. UNMAPPED_VALUE flag with rawValue "Group wise evaluation"
+    assert "flags" in field
+    assert len(field["flags"]) == 1
+    flag = field["flags"][0]
+    assert flag["code"] == "UNMAPPED_VALUE"
+    assert flag["rawValue"] == "Group wise evaluation"
+    assert "Group wise evaluation" in flag["message"]
+    # 4. Sources: page and snippet come ONLY from pipeline's own located record
+    sources = field["sources"]
+    assert sources["located"] is True
+    assert sources["unlocated"] is None
+    assert sources["main_tender"]["page"] == 7
+    assert sources["main_tender"]["snippet"] == "Evaluation Method ( Group Wise Evaluation Method )"
+

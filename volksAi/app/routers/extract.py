@@ -602,6 +602,7 @@ def _resolve_dual_source_for_tms_key(
     has_atc: bool,
     clean_value: Any,
     source: Optional[str],
+    field_flags: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     candidates = [tms_key, tms_key.lower()]
     if source_field_name:
@@ -659,6 +660,12 @@ def _resolve_dual_source_for_tms_key(
         for slot in present
     }
 
+    has_unmapped_flag = any(f.get("code") == "UNMAPPED_VALUE" for f in (field_flags or []))
+    if has_unmapped_flag:
+        for slot in present:
+            if raw_items.get(slot):
+                supports[slot] = True
+
     unlocated: Optional[Dict[str, Any]] = None
     if present and not any(supports.values()):
         # Every snapshot record disagrees with the final value: the value was
@@ -705,6 +712,7 @@ def _format_field_object(
     is_self_classified_atc: bool = False,
     has_atc: bool = False,
     raw_display_value: Optional[Any] = None,
+    field_flags: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """
     Transforms an extracted TMS DTO field into a structured object containing:
@@ -712,9 +720,25 @@ def _format_field_object(
     - confidence: "high" | "fallback" | "missing" | "not_applicable"
     - source: "regex" | "atc" | "llm" | None
     - sources: { self_classified_atc: bool, has_conflict: bool, main_tender: dict | None, atc: dict | None }
+    - flags: [{ code: str, message: str, rawValue: str | null }]
     """
     status_val = field_statuses.get(source_field_name) if source_field_name else None
     raw_source = field_sources.get(source_field_name) if source_field_name else None
+
+    flags_list = list(field_flags or [])
+    if (
+        tms_key == "commercialEvaluation"
+        and dto_value is None
+        and raw_display_value is not None
+        and str(raw_display_value).strip() not in ("", "NA", "N/A", "None", "Not Found", "NOT_APPLICABLE", "Not Applicable", "⚠️ MISSING")
+    ):
+        raw_eval_str = str(raw_display_value).strip()
+        if not any(f.get("code") == "UNMAPPED_VALUE" for f in flags_list):
+            flags_list.append({
+                "code": "UNMAPPED_VALUE",
+                "message": f"Raw value '{raw_eval_str}' could not be mapped to known evaluation modes ('item-wise', 'overall')",
+                "rawValue": raw_eval_str,
+            })
 
     # Derive not-applicable status for fee amounts if sibling mode is not-applicable
     if (
@@ -765,7 +789,8 @@ def _format_field_object(
             clean_value = dto_value
 
     # 2. Determine source: 'regex' | 'atc' | 'llm' | None
-    if confidence == "missing" or clean_value is None:
+    has_unmapped_flag = any(f.get("code") == "UNMAPPED_VALUE" for f in flags_list)
+    if (confidence == "missing" or clean_value is None) and not has_unmapped_flag:
         source: Optional[str] = None
     else:
         if not raw_source:
@@ -791,6 +816,7 @@ def _format_field_object(
         has_atc=has_atc,
         clean_value=clean_value,
         source=source,
+        field_flags=flags_list,
     )
 
     return {
@@ -798,6 +824,7 @@ def _format_field_object(
         "confidence": confidence,
         "source": source,
         "sources": sources_obj,
+        "flags": flags_list,
     }
 
 
@@ -909,6 +936,8 @@ async def extract_tender(
             fields: Dict[str, Any] = {}
             missing_fields: List[str] = []
 
+            field_flags_map: Dict[str, List[Dict[str, Any]]] = infosheet_data.get("_field_flags", {})
+
             # 2. Merge DTO-shaped values with confidence and source metadata
             for tms_key, dto_val in tms_dto.items():
                 source_key = TMS_TO_SOURCE_KEY_MAP.get(tms_key)
@@ -925,6 +954,7 @@ async def extract_tender(
                     is_self_classified_atc=is_self_classified_atc,
                     has_atc=has_atc,
                     raw_display_value=infosheet_data.get(source_key),
+                    field_flags=list(field_flags_map.get(tms_key, [])),
                 )
                 fields[tms_key] = field_obj
 

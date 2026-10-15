@@ -10,7 +10,8 @@ import {
     Layers,
     HelpCircle,
     ExternalLink,
-    Download
+    Download,
+    Flag
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -642,6 +643,27 @@ export const ExtractionPreviewPanel: React.FC<ExtractionPreviewPanelProps> = ({
                                                         </div>
                                                     </div>
                                                 ) : null}
+                                            </div>
+                                        )}
+
+                                        {/* Field Flags Display */}
+                                        {f?.flags && f.flags.length > 0 && (
+                                            <div className="mt-2 space-y-1" data-testid={`field-flags-${key}`}>
+                                                {f.flags.map((flag, idx) => (
+                                                    <div
+                                                        key={idx}
+                                                        className="flex items-center gap-1.5 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded"
+                                                        data-testid="preview-field-flag-item"
+                                                    >
+                                                        <Flag className="h-3 w-3 text-amber-500 shrink-0" />
+                                                        <span>{flag.message}</span>
+                                                        {flag.rawValue && (
+                                                            <span className="text-slate-400 font-mono text-[11px]">
+                                                                (Raw: &ldquo;{flag.rawValue}&rdquo;)
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ))}
                                             </div>
                                         )}
                                     </div>

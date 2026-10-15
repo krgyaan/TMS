@@ -1,15 +1,16 @@
 import type { UseFormReturn } from 'react-hook-form';
 import type { TenderInfoSheetFormValues } from './tenderInfoSheet.types';
 
-import type { FieldSources } from '@/components/form/AiIndicatorsContext';
+import type { FieldSources, FieldFlag } from '@/components/form/AiIndicatorsContext';
 
-export type { FieldSourceCitation, FieldSources } from '@/components/form/AiIndicatorsContext';
+export type { FieldSourceCitation, FieldSources, UnlocatedReason, FieldFlag } from '@/components/form/AiIndicatorsContext';
 
 export interface ExtractedField<T = unknown> {
     value: T;
     confidence: 'high' | 'medium' | 'low' | 'not_applicable' | string;
     source?: string | null;
     sources?: FieldSources;
+    flags?: FieldFlag[];
 }
 
 export interface PopulateResult {
@@ -121,6 +122,22 @@ export function extractFieldIndicators(
                     sources: field.sources,
                     rawKey: key,
                 };
+            }
+            if (field?.flags && field.flags.length > 0) {
+                if (indicators[formKey]) {
+                    indicators[formKey].flags = field.flags;
+                } else {
+                    indicators[formKey] = {
+                        type: 'missing',
+                        label: 'Flagged Value',
+                        message: field.flags[0].message,
+                        suggestedValue: field.value,
+                        source: field.source,
+                        sources: field.sources,
+                        rawKey: key,
+                        flags: field.flags,
+                    };
+                }
             }
         }
     }

@@ -46,11 +46,18 @@ export interface FieldSources {
     unlocated?: FieldSourceCitation | null;
 }
 
+export interface ExtractionFieldFlag {
+    code: string;
+    message: string;
+    rawValue: string | null;
+}
+
 export interface PdfExtractionFieldValue<T = unknown> {
     value: T;
     confidence: 'high' | 'medium' | 'low' | 'not_applicable' | string;
     source: string | null;
     sources?: FieldSources;
+    flags?: ExtractionFieldFlag[];
 }
 
 export interface PdfExtractionJobResult {
