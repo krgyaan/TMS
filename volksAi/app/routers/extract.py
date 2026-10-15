@@ -502,7 +502,10 @@ def _build_citation(tms_key: str, item: Dict[str, Any]) -> Dict[str, Any]:
     raw = item.get("value")
     norm = _normalize_extracted_value_for_key(tms_key, raw)
     if norm is not None:
-        item["raw_value"] = str(raw if raw is not None else "")
+        if "raw_value" in item and item["raw_value"] is None:
+            item["raw_value"] = None
+        else:
+            item["raw_value"] = str(raw if raw is not None else "")
         item["value"] = norm
     snippet = item.get("snippet") or None
     item["snippet"] = snippet
@@ -676,6 +679,13 @@ def _resolve_dual_source_for_tms_key(
         for slot in present:
             if raw_items.get(slot):
                 supports[slot] = True
+
+    has_per_schedule_emd_flag = any(f.get("code") == "PER_SCHEDULE_EMD" for f in (field_flags or []))
+    if has_per_schedule_emd_flag:
+        for slot in present:
+            if items.get(slot):
+                items[slot]["raw_value"] = None
+            supports[slot] = True
 
     unlocated: Optional[Dict[str, Any]] = None
     if present and not any(supports.values()):
@@ -1014,6 +1024,8 @@ async def extract_tender(
                 "ambiguous_field_conflicts": ambiguous_field_conflicts,
                 "documentIdentityCheck": document_identity_check,
             }
+            if infosheet_data.get("per_schedule_emd"):
+                response["per_schedule_emd"] = infosheet_data.get("per_schedule_emd")
 
 
             logger.info(

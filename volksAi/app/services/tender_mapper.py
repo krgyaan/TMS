@@ -1553,6 +1553,7 @@ def build_infosheet_data(
     emd_amount_raw = resolve_field(["EMD Amount", "emd_amount", "EMD Detail"], default=None)
     emd_amount_display = "NA"
     emd_total = 0.0
+    per_schedule_breakdown = []
     
     # 12. EMD Amount Anchor: BDS Tag (E) primary, IFB summary row fallback
     tag_e_match = re.search(
@@ -1581,9 +1582,9 @@ def build_infosheet_data(
                 emd_amount_display = format_currency(emd_total)
                 logger.info(f"[MAIN_TENDER_SCHEDULE_SUM] Resolved field 'emd_amount' via GeM EMD schedule sum ({emd_total})")
 
-                # Locate page number and schedule context lines from page_texts
                 emd_page = 1
                 schedule_lines = []
+                per_schedule_breakdown = []
                 if page_texts:
                     for idx, p in enumerate(page_texts):
                         p_num = p.get("page", p.get("page_number", idx + 1)) if isinstance(p, dict) else (idx + 1)
@@ -1594,24 +1595,36 @@ def build_infosheet_data(
                             for l_idx, line_val in enumerate(lines_p):
                                 if "emd amount" in line_val.lower() and l_idx + 1 < len(lines_p):
                                     nxt_val = lines_p[l_idx + 1]
-                                    if re.match(r"^[\d,]+(?:\.\d+)?$", nxt_val.strip()) and parse_money(nxt_val) is not None:
+                                    parsed_val = parse_money(nxt_val)
+                                    if re.match(r"^[\d,]+(?:\.\d+)?$", nxt_val.strip()) and parsed_val is not None:
                                         part_label = " ".join(lines_p[max(0, l_idx - 2):l_idx])
                                         part_prefix = ""
+                                        sch_name = f"Schedule {len(per_schedule_breakdown)+1}"
                                         if "part a" in part_label.lower():
                                             part_prefix = "Part A: "
+                                            sch_name = "Part A"
                                         elif "part b" in part_label.lower():
                                             part_prefix = "Part B: "
+                                            sch_name = "Part B"
                                         schedule_lines.append(f"{part_prefix}EMD Amount {nxt_val}")
+                                        per_schedule_breakdown.append({"schedule": sch_name, "amount": parsed_val})
 
                 if schedule_lines:
                     emd_snip = "GeM Schedule Sum: " + ", ".join(schedule_lines)
                 else:
                     emd_snip = f"GeM Schedule Sum: total {emd_total} (line-item breakdown unavailable)"
 
+                raw_breakdown_str = ", ".join(schedule_lines) if schedule_lines else ", ".join(f"Schedule: {m}" for m in gem_emd_matches)
+                field_flags.setdefault("emdAmount", []).append({
+                    "code": "PER_SCHEDULE_EMD",
+                    "message": f"EMD is assessed per schedule ({raw_breakdown_str}); total of {format_currency(emd_total)} reflects the sum of schedules, not a single global tender EMD",
+                    "rawValue": raw_breakdown_str,
+                })
+
                 if dual_sources is not None:
                     main_entry = {
                         "value": total_gem_emd,
-                        "raw_value": str(total_gem_emd),
+                        "raw_value": None,
                         "page": emd_page,
                         "snippet": emd_snip,
                         "confidence": 0.95,
@@ -4096,6 +4109,7 @@ def build_infosheet_data(
                     }
 
     res_dict["_field_flags"] = field_flags
+    res_dict["per_schedule_emd"] = per_schedule_breakdown
     res_dict["_dual_sources"] = dual_sources or {}
     res_dict["_self_classified_atc"] = is_self_classified_atc
     res_dict["_has_atc"] = has_atc

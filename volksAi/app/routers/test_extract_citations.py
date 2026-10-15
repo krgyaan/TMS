@@ -633,3 +633,76 @@ def test_rule_derived_fields_citations_never_invented():
         assert unloc["snippet"] is None
         assert unloc["unlocated_reason"] == UNLOCATED_RULE_DERIVED
 
+
+def test_per_schedule_emd_flag_and_null_raw_value():
+    """
+    Item 4: Per-schedule EMD (Noida): store per-schedule amounts with PER_SCHEDULE_EMD flag;
+    single total not presented as verbatim text (raw_value: null in citation).
+    """
+    field_obj = _format_field_object(
+        tms_key="emdAmount",
+        dto_value=200000.0,
+        source_field_name="emd_amount_display",
+        field_statuses={"emd_amount_display": "OK"},
+        field_sources={"emd_amount_display": "main_tender"},
+        dual_sources={
+            "emdAmount": {
+                "main_tender": {
+                    "value": 200000.0,
+                    "raw_value": None,
+                    "page": 1,
+                    "snippet": "GeM Schedule Sum: Part A: EMD Amount 100000, Part B: EMD Amount 100000",
+                }
+            }
+        },
+        field_flags=[{
+            "code": "PER_SCHEDULE_EMD",
+            "message": "EMD is assessed per schedule (Part A: EMD Amount 100000, Part B: EMD Amount 100000); total of ₹ 2,00,000 reflects the sum of schedules, not a single global tender EMD",
+            "rawValue": "Part A: EMD Amount 100000, Part B: EMD Amount 100000",
+        }],
+    )
+
+    assert field_obj["value"] == 200000.0
+    assert field_obj["confidence"] == "high"
+    assert len(field_obj["flags"]) == 1
+    flag = field_obj["flags"][0]
+    assert flag["code"] == "PER_SCHEDULE_EMD"
+    assert flag["rawValue"] == "Part A: EMD Amount 100000, Part B: EMD Amount 100000"
+    assert "₹ 2,00,000" in flag["message"]
+
+    main_tender = field_obj["sources"]["main_tender"]
+    assert main_tender is not None
+    # Single total MUST NOT be presented as verbatim text
+    assert main_tender["raw_value"] is None
+    assert main_tender["page"] == 1
+    assert main_tender["located"] is True
+    assert "Part A: EMD Amount 100000" in main_tender["snippet"]
+    assert field_obj["sources"]["unlocated"] is None
+
+
+def test_build_infosheet_data_per_schedule_emd_noida():
+    from app.services.tender_mapper import build_infosheet_data
+    page_texts = [
+        {
+            "page": 1,
+            "text": "Schedule Wise Evaluation\nEMD Detail\nPart A\nEMD Amount\n100000\nPart B\nEMD Amount\n100000"
+        }
+    ]
+    dual_sources = {}
+    res = build_infosheet_data(
+        sections=[],
+        page_texts=page_texts,
+        dual_sources=dual_sources,
+    )
+    assert res.get("per_schedule_emd") == [
+        {"schedule": "Part A", "amount": 100000.0},
+        {"schedule": "Part B", "amount": 100000.0},
+    ]
+    flags = res.get("_field_flags", {}).get("emdAmount", [])
+    assert any(f["code"] == "PER_SCHEDULE_EMD" for f in flags)
+    dual = res.get("_dual_sources", {}).get("emdAmount", {})
+    assert dual.get("main_tender", {}).get("raw_value") is None
+    assert dual.get("main_tender", {}).get("value") == 200000.0
+
+
+
