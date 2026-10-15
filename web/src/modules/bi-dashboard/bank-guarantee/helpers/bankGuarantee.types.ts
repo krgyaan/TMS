@@ -1,4 +1,4 @@
-export type BankGuaranteeDashboardTab = 'new-requests' | 'live-yes' | 'live-pnb' | 'live-bg-limit' | 'cancelled' | 'rejected';
+export type BankGuaranteeDashboardTab = 'new-requests' | 'live-bgs' | 'cancelled' | 'rejected';
 export type BankGuaranteeExportTab = BankGuaranteeDashboardTab | 'all';
 
 export type BankGuaranteeDashboardFilters = {
@@ -35,9 +35,7 @@ export interface BankGuaranteeDashboardRow {
 
 export interface BankGuaranteeDashboardCounts {
     'new-requests': number;
-    'live-yes': number;
-    'live-pnb': number;
-    'live-bg-limit': number;
+    'live-bgs': number;
     cancelled: number;
     rejected: number;
     total: number;

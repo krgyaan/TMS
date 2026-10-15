@@ -22,9 +22,7 @@ export interface BankGuaranteeDashboardRow {
 
 export interface BankGuaranteeDashboardCounts {
     'new-requests': number;
-    'live-yes': number;
-    'live-pnb': number;
-    'live-bg-limit': number;
+    'live-bgs': number;
     cancelled: number;
     rejected: number;
     total: number;
