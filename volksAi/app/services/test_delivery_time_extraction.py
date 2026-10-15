@@ -256,3 +256,81 @@ def test_role2_delivery_time_separately_stated_installation_extracted():
     assert dto.get("deliveryTimeInstallationDays") == 45
     assert dto.get("deliveryTimeInstallationInclusive") is False
 
+
+def test_delivery_days_column_morena_returns_90_not_160():
+    """
+    Item 1: Morena has 4 line items where quantity of copper piping is 160 foot,
+    but Delivery Days column is 90 for all items.
+    Must return 90 (not 160), and since days do not differ, no DELIVERY_DAYS_DIFFER flag.
+    """
+    morena_text = (
+        "Supply & Installation Of 2 Ton SPLIT AC 5 STAR With Inverter Technology. ( 8 pieces )\n"
+        "Consignees/Reporting Officer and Quantity\n"
+        "S.No. Consignee Address Quantity Delivery Days\n"
+        "1 Naresh Dhariwal 476224,VILLAGE RITHONIA, TEHSIL: KAILARAS, DIST- MORENA,\n8\n90\n"
+        "Supply & Laying Of Copper Piping With Nitrile Insulation ( 160 foot )\n"
+        "Consignees/Reporting Officer and Quantity\n"
+        "S.No. Consignee Address Quantity Delivery Days\n"
+        "1 Naresh Dhariwal 476224,VILLAGE RITHONIA, TEHSIL: KAILARAS, DIST- MORENA,\n160\n90\n"
+        "Supply And Laying Of PVC Drain Pipe ( 130 foot )\n"
+        "Consignees/Reporting Officer and Quantity\n"
+        "S.No. Consignee Address Quantity Delivery Days\n"
+        "1 Naresh Dhariwal 476224,VILLAGE RITHONIA, TEHSIL: KAILARAS, DIST- MORENA,\n130\n90\n"
+        "Supply And Laying Of PVC Insulated 3 Core 2.5 Sqmm Cable ( 240 meter )\n"
+        "Consignees/Reporting Officer and Quantity\n"
+        "S.No. Consignee Address Quantity Delivery Days\n"
+        "1 Naresh Dhariwal 476224,VILLAGE RITHONIA, TEHSIL: KAILARAS, DIST- MORENA,\n240\n90\n"
+    )
+    infosheet = build_infosheet_data([], page_texts=[{"page": 1, "text": morena_text}])
+    assert infosheet.get("delivery_time_supply_display") == "90 Days"
+
+    dto = map_to_tms_dto(infosheet)
+    assert dto.get("deliveryTimeSupply") == 90
+    assert dto.get("deliveryTimeSupply") != 160
+
+    flags = infosheet.get("_field_flags", {}).get("deliveryTimeSupply", [])
+    assert not any(f["code"] == "DELIVERY_DAYS_DIFFER" for f in flags)
+
+    # Also assert against the real Morena PDF file if present
+    from pathlib import Path
+    import pypdf
+    real_pdf_path = Path(__file__).resolve().parents[3] / "api" / "uploads" / "tendering" / "tender-documents" / "1789214369112_GAIL_Split_Morena.pdf"
+    if real_pdf_path.exists():
+        reader = pypdf.PdfReader(str(real_pdf_path))
+        pages = [{"page": i + 1, "text": p.extract_text() or ""} for i, p in enumerate(reader.pages)]
+        real_info = build_infosheet_data([], page_texts=pages)
+        assert real_info.get("delivery_time_supply_display") == "90 Days"
+        real_dto = map_to_tms_dto(real_info)
+        assert real_dto.get("deliveryTimeSupply") == 90
+        assert real_dto.get("deliveryTimeSupply") != 160
+
+
+def test_delivery_days_column_differing_line_items_max_and_flag():
+    """
+    Item 1: When line items specify differing delivery days in the Delivery Days column,
+    take max across line items and attach DELIVERY_DAYS_DIFFER flag.
+    """
+    differing_text = (
+        "Item Category 1: Centrifugal Pumps ( 10 pieces )\n"
+        "Consignees/Reporting Officer and Quantity\n"
+        "S.No. Consignee Address Quantity Delivery Days\n"
+        "1 Officer A 110001,NEW DELHI, DELHI\n10\n60\n"
+        "Item Category 2: Electric Motors ( 5 pieces )\n"
+        "Consignees/Reporting Officer and Quantity\n"
+        "S.No. Consignee Address Quantity Delivery Days\n"
+        "1 Officer B 400001,MUMBAI, MAHARASHTRA\n5\n90\n"
+    )
+    infosheet = build_infosheet_data([], page_texts=[{"page": 1, "text": differing_text}])
+    assert infosheet.get("delivery_time_supply_display") == "90 Days"
+
+    dto = map_to_tms_dto(infosheet)
+    assert dto.get("deliveryTimeSupply") == 90
+
+    flags = infosheet.get("_field_flags", {}).get("deliveryTimeSupply", [])
+    assert len(flags) == 1
+    flag = flags[0]
+    assert flag["code"] == "DELIVERY_DAYS_DIFFER"
+    assert "90" in flag["message"]
+    assert "60 Days, 90 Days" in flag["rawValue"]
+
+
