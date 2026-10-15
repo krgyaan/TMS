@@ -13,6 +13,7 @@ export const happyCalling = pgTable(
         phone: varchar("phone", { length: 200 }),
 
         status: varchar("status", { length: 50 }),
+        leadPriority: varchar("lead_priority", { length: 50 }),
         broadcast: integer("broadcast").notNull().default(0),
         details: text("details"),
         createdBy: bigint("created_by", { mode: "number" }),
@@ -26,6 +27,7 @@ export const happyCalling = pgTable(
     table => ({
         nameIdx: index("idx_happy_calling_name").on(table.name),
         orgIdx: index("idx_happy_calling_org").on(table.organization),
+        priorityIdx: index("idx_happy_calling_priority").on(table.leadPriority),
     })
 );
 

@@ -112,6 +112,9 @@ export interface PurchaseOrderRow {
     totalAmount: number;
     totalGstAmt: number;
     grandTotal: number;
+    extraChargesTaxable?: number;
+    extraChargesGst?: number;
+    extraChargesTotal?: number;
     tdsPercentage?: number | string;
     tdsAmount?: number | string;
     amountAfterTds?: number | string;
@@ -122,7 +125,7 @@ export interface PurchaseOrderRow {
     totalPaymentDone?: number;
     totalPiAmount?: number;
     totalPiCount?: number;
-    purchaseInvoices?: Array<{ invoiceNo: string; totalAmount: number }>
+    purchaseInvoices?: Array<{ invoiceNo: string; totalAmount: number }>;
     poPdfVersions?: Record<string, { path: string; hash: string }>;
 }
 

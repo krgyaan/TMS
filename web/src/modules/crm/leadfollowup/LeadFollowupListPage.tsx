@@ -103,7 +103,7 @@ export default function LeadFollowupListPage() {
                         variant="outline"
                         size="sm"
                         className="ml-4"
-                        onClick={() => navigate(paths.crm.leads)}
+                        onClick={() => navigate(paths.crm.happyCalling)}
                     >
                         Back to Leads
                     </Button>
@@ -121,7 +121,7 @@ export default function LeadFollowupListPage() {
                             variant="ghost"
                             size="sm"
                             className="mb-1 -ml-2"
-                            onClick={() => navigate(paths.crm.leads)}
+                            onClick={() => navigate(paths.crm.happyCalling)}
                         >
                             <ArrowLeft className="h-4 w-4 mr-1" />
                             Back to Leads

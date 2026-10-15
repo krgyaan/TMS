@@ -29,13 +29,21 @@ function toOrderViewData(vwo: VendorWorkOrderView): OrderViewData {
         shippingAddress: vwo.shippingAddress,
         shipToGst: vwo.shipToGst,
         shipToPan: vwo.shipToPan,
-        products: (vwo.products ?? []).map((product) => ({
+        products: (vwo.products ?? []).map(product => ({
             ...product,
             name: (product as any).name ?? (product as any).productName ?? "",
             unit: (product as any).unit ?? (product as any).uom ?? "",
             quantity: Number((product as any).quantity ?? 0),
             price: Number((product as any).price ?? 0),
-            amount: Number((product as any).amount ?? (Number((product as any).quantity ?? 0) * Number((product as any).price ?? 0))),
+            amount: Number((product as any).amount ?? Number((product as any).quantity ?? 0) * Number((product as any).price ?? 0)),
+        })),
+        extraCharges: (vwo.extraCharges ?? []).map(charge => ({
+            id: charge.id,
+            label: charge.label,
+            gstRate: charge.gstRate,
+            taxableAmount: charge.taxableAmount,
+            gstAmount: charge.gstAmount,
+            totalAmount: charge.totalAmount,
         })),
         paymentRequests: vwo.paymentRequests,
         purchaseInvoices: vwo.purchaseInvoices,
@@ -48,7 +56,7 @@ function toOrderViewData(vwo: VendorWorkOrderView): OrderViewData {
         attachments: [
             { title: "Scope of Work", paths: parseAttachments(vwo.scopeOfWork) },
             { title: "Accessories / Packaging List", paths: parseAttachments(vwo.accessoriesPackagingListAttachments) },
-        ].filter((group) => group.paths.length > 0),
+        ].filter(group => group.paths.length > 0),
         generatedPdfVersions: vwo.generatedPdfVersions,
     };
 }

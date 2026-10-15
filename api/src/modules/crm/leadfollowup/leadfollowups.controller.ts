@@ -27,7 +27,7 @@ export class FollowupsController {
     constructor(private readonly followupsService: LeadFollowupsService) {}
 
     @Get(':leadId')
-    @CanRead('crm.leads')
+    @CanRead('crm.happy_calling')
     async findAll(
         @Param('leadId', ParseIntPipe) leadId: number,
     ) {
@@ -35,7 +35,7 @@ export class FollowupsController {
     }
 
     @Get(':leadId/:id')
-    @CanRead('crm.leads')
+    @CanRead('crm.happy_calling')
     async findOne(
         @Param('leadId', ParseIntPipe) leadId: number,
         @Param('id', ParseIntPipe) id: number,
@@ -44,7 +44,7 @@ export class FollowupsController {
     }
 
     @Post(':leadId')
-    @CanUpdate('crm.leads')
+    @CanUpdate('crm.happy_calling')
     @HttpCode(HttpStatus.CREATED)
     async create(
         @Param('leadId', ParseIntPipe) leadId: number,
@@ -56,7 +56,7 @@ export class FollowupsController {
 
     // ✅ ADD THIS ROUTE
     @Patch(':leadId/:id')
-    @CanUpdate('crm.leads')
+    @CanUpdate('crm.happy_calling')
     @HttpCode(HttpStatus.OK)
     async update(
         @Param('leadId', ParseIntPipe) leadId: number,
@@ -68,7 +68,7 @@ export class FollowupsController {
     }
 
     @Patch(':leadId/:id/stop')
-    @CanUpdate('crm.leads')
+    @CanUpdate('crm.happy_calling')
     @HttpCode(HttpStatus.OK)
     async stop(
         @Param('leadId', ParseIntPipe) _leadId: number,
@@ -79,7 +79,7 @@ export class FollowupsController {
     }
 
     @Delete(':leadId/:id')
-    @CanDelete('crm.leads')
+    @CanDelete('crm.happy_calling')
     @HttpCode(HttpStatus.NO_CONTENT)
     async delete(
         @Param('leadId', ParseIntPipe) leadId: number,

@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
-import { User, Phone, Mail, MapPin, Building2, Users, Star, Calendar } from "lucide-react";
+import { User, Phone, Mail, MapPin, Building2, Users, Star, Calendar, UserCheck } from "lucide-react";
 import type { LeadWithNames } from "../helpers/leads.type";
 import { useLead } from "@/hooks/api/useLeads";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -116,6 +116,18 @@ export function LeadView({
                                 ) : (
                                     "—"
                                 )}
+                            </TableCell>
+                        </TableRow>
+
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                <div className="flex items-center gap-2">
+                                    <UserCheck className="h-4 w-4" />
+                                    Allocated TE
+                                </div>
+                            </TableCell>
+                            <TableCell className="text-sm" colSpan={3}>
+                                {lead.allocatedTeName || "—"}
                             </TableCell>
                         </TableRow>
 

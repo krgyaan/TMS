@@ -24,6 +24,7 @@ export interface VendorWorkOrderView {
     woRaisedBy: number;
     raisedByName?: string;
     products: VwoProduct[];
+    extraCharges?: VwoExtraCharge[];
     total: VwoTotal;
     paymentRequests: VwoPaymentRequest[];
     remarks?: string;
@@ -56,12 +57,22 @@ export interface VwoProduct {
     itemTotalWithGst: number;
 }
 
+export interface VwoExtraCharge {
+    id: number;
+    label: string;
+    gstRate: number | string;
+    taxableAmount: number | string;
+    gstAmount: number | string;
+    totalAmount: number | string;
+}
+
 export interface VwoPaymentRequest {
     id: number;
     requestNo: string;
     partyName: string;
     amount: string;
     status: string;
+    actualTdsDeducted?: number | string;
     requestedByName: string;
     createdAt: string;
 }

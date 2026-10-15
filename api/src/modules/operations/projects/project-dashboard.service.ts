@@ -132,11 +132,19 @@ export class ProjectDashboardService {
                 COALESCE((SELECT SUM(pop.total_amount::numeric)
                           FROM purchase_order_products pop
                           JOIN purchase_orders po ON po.id = pop.purchase_order_id
-                          WHERE po.project_id = ${projectId} AND po.po_approved = true), 0) AS po_raised,
+                          WHERE po.project_id = ${projectId} AND po.po_approved = true), 0)
+                + COALESCE((SELECT SUM(oec.total_amount::numeric)
+                            FROM order_extra_charges oec
+                            JOIN purchase_orders po ON po.id = oec.purchase_order_id
+                            WHERE po.project_id = ${projectId} AND po.po_approved = true), 0) AS po_raised,
                 COALESCE((SELECT SUM(vwoi.total_amount::numeric)
                           FROM vendor_work_order_items vwoi
                           JOIN vendor_work_orders vwo ON vwo.id = vwoi.vendor_work_order_id
-                          WHERE vwo.project_id = ${projectId} AND vwo.wo_approved = true), 0) AS wo_raised
+                          WHERE vwo.project_id = ${projectId} AND vwo.wo_approved = true), 0)
+                + COALESCE((SELECT SUM(oec.total_amount::numeric)
+                            FROM order_extra_charges oec
+                            JOIN vendor_work_orders vwo ON vwo.id = oec.vendor_work_order_id
+                            WHERE vwo.project_id = ${projectId} AND vwo.wo_approved = true), 0) AS wo_raised
         `);
         const { expenses_done, po_raised, wo_raised } = rows?.[0] ?? {};
 

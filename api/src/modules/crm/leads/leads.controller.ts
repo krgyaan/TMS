@@ -37,7 +37,7 @@ export class LeadsController {
     constructor(private readonly leadsService: LeadsService) {}
 
     @Get()
-    @CanRead('crm.leads')
+    @CanRead('crm.happy_calling')
     async list(
         @Query('page')      page?:      string,
         @Query('limit')     limit?:     string,
@@ -47,6 +47,7 @@ export class LeadsController {
         @Query('team')      team?:      string,   
         @Query('sortBy')    sortBy?:    string,
         @Query('sortOrder') sortOrder?: string,
+        @Query('includeHappyCalling') includeHappyCalling?: string,
     ) {
         const parseNumber = (v?: string): number | undefined => {
             if (!v) return undefined;
@@ -63,17 +64,18 @@ export class LeadsController {
             team,                                  // ✅ ADD THIS
             sortBy,
             sortOrder: sortOrder as 'asc' | 'desc' | undefined,
+            includeHappyCalling: includeHappyCalling === 'true',
         });
     }
 
     @Get(':id')
-    @CanRead('crm.leads')
+    @CanRead('crm.happy_calling')
     async getById(@Param('id', ParseIntPipe) id: number) {
         return this.leadsService.findById(id);
     }
 
     @Post()
-    @CanCreate('crm.leads')
+    @CanCreate('crm.happy_calling')
     @HttpCode(HttpStatus.CREATED)
     async create(
         @ValidatedBody(CreateLeadSchema) body: CreateLeadDto,
@@ -83,7 +85,7 @@ export class LeadsController {
     }
 
     @Patch(':id')
-    @CanUpdate('crm.leads')
+    @CanUpdate('crm.happy_calling')
     async update(
         @Param('id', ParseIntPipe) id: number,
         @ValidatedBody(UpdateLeadSchema) body: UpdateLeadDto,
@@ -92,7 +94,7 @@ export class LeadsController {
     }
 
     @Patch(':id/allocate')
-    @CanUpdate('crm.leads')
+    @CanUpdate('crm.happy_calling')
     async allocate(
         @Param('id', ParseIntPipe) id: number,
         @ValidatedBody(AllocateLeadSchema) body: AllocateLeadDto,
@@ -102,7 +104,7 @@ export class LeadsController {
     }
 
     @Patch(':id/disqualify')
-    @CanDelete('crm.leads')
+    @CanDelete('crm.happy_calling')
     @HttpCode(HttpStatus.NO_CONTENT)
     async disqualify(
         @Param('id', ParseIntPipe) id: number,
@@ -112,7 +114,7 @@ export class LeadsController {
     }
 
     @Delete(':id')
-    @CanDelete('crm.leads')
+    @CanDelete('crm.happy_calling')
     @HttpCode(HttpStatus.NO_CONTENT)
     async delete(@Param('id', ParseIntPipe) id: number) {
         await this.leadsService.delete(id);
