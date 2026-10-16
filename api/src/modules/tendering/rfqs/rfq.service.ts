@@ -498,10 +498,10 @@ export class RfqsService {
         const { rows } = await this.db.execute(sql`
             SELECT
                 COUNT(DISTINCT ${tenderInfos.id}) FILTER (WHERE ${isNull(rfqs.id)} AND ${notLost} AND ${notTenderMissed}) AS pending,
-                COUNT(DISTINCT ${tenderInfos.id}) FILTER (WHERE ${isNotNull(rfqs.id)} AND ${notLost} AND ${notTenderMissed}) AS sent,
+                COUNT(DISTINCT ${tenderInfos.id}) FILTER (WHERE ${isNotNull(rfqs.id)} AND NOT EXISTS (SELECT 1 FROM rfq_responses rr INNER JOIN rfqs r2 ON r2.id = rr.rfq_id WHERE r2.tender_id = ${tenderInfos.id}) AND ${notLost} AND ${notTenderMissed}) AS sent,
                 COUNT(DISTINCT ${tenderInfos.id}) FILTER (WHERE ${isNull(rfqs.id)} AND ${eq(bidSubmissions.status, "Tender Missed")}) AS rfq_rejected,
                 COUNT(DISTINCT ${tenderInfos.id}) FILTER (WHERE ${isNotNull(rfqs.id)} AND ${eq(bidSubmissions.status, "Tender Missed")}) AS tender_dnb,
-                COUNT(DISTINCT ${rfqResponses.id}) FILTER (WHERE ${isNotNull(rfqs.id)} AND ${isNotNull(rfqResponses.id)} AND ${or(eq(rfqResponses.responseStatus, 1), isNull(rfqResponses.responseStatus))} AND ${notTenderMissed}) AS responses
+                COUNT(DISTINCT ${rfqResponses.id}) FILTER (WHERE ${isNotNull(rfqs.id)} AND ${isNotNull(rfqResponses.id)} AND ${notTenderMissed}) AS responses
             FROM ${tenderInfos}
             LEFT JOIN ${rfqs} ON ${eq(rfqs.tenderId, tenderInfos.id)}
             LEFT JOIN ${bidSubmissions} ON ${eq(bidSubmissions.tenderId, tenderInfos.id)}
@@ -547,15 +547,16 @@ export class RfqsService {
             conditions.push(isNotNull(rfqs.id));
             conditions.push(TenderInfosService.getExcludeStatusCondition(["lost"]));
             conditions.push(or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
+            // Exclude tenders that already have any response recorded; those move to the responses tab
+            conditions.push(sql`NOT EXISTS (
+                SELECT 1 FROM ${rfqResponses}
+                WHERE ${rfqResponses.rfqId} IN (
+                    SELECT ${rfqs.id} FROM ${rfqs} WHERE ${rfqs.tenderId} = ${tenderInfos.id}
+                )
+            )`);
         } else if (tab === "responses") {
             conditions.push(isNotNull(rfqs.id));
             conditions.push(sql`EXISTS (SELECT 1 FROM ${rfqResponses} WHERE ${rfqResponses.rfqId} = ${rfqs.id})`);
-            conditions.push(
-                or(
-                    eq(rfqResponses.responseStatus, 1),
-                    isNull(rfqResponses.responseStatus)
-                )
-            );
             conditions.push(or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
         } else if (tab === "rfq-rejected") {
             conditions.push(isNull(rfqs.id));
