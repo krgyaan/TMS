@@ -201,6 +201,7 @@ import { RfqResponseDetailAccordion } from '@/modules/tendering/rfq-response/com
 import { useMemo } from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
+import { compareRfqBatchOrder } from '@/modules/tendering/rfqs/helpers/rfqBatch';
 
 /** Local component for RFQ item with its responses (from RfqShowPage) */
 function RfqItemWithResponses({ rfq, index }: { rfq: Rfq; index: number }) {
@@ -309,6 +310,9 @@ export function RfqSection({ tenderId }: { tenderId: number | null }) {
     const { data: approvalData } = useTenderApproval(tenderId);
     const { data: rfqData, isLoading } = useRfqByTenderId(tenderId);
 
+    // Keep batch numbering consistent with buildRfqBatches (earliest createdAt, then ID).
+    const orderedRfqs = useMemo(() => [...(rfqData ?? [])].sort(compareRfqBatchOrder), [rfqData]);
+
     if (!approvalData?.rfqRequired) {
         return (
             <Card>
@@ -351,7 +355,7 @@ export function RfqSection({ tenderId }: { tenderId: number | null }) {
 
     return (
         <div className="space-y-4">
-            {rfqData.map((rfq, index) => (
+            {orderedRfqs.map((rfq, index) => (
                 <RfqItemWithResponses
                     key={rfq.id}
                     rfq={rfq}

@@ -440,7 +440,7 @@ export class BidSubmissionsService {
         // RFQ gate: when an RFQ is required for this tender, the bid cannot be submitted
         // until at least one RFQ has been sent and at least one response recorded against
         // it (mirrors the RFQ Quotation checkpoint on the bid submission form).
-        const rfqRequired = currentTender?.rfqRequired !== "no" && currentTender?.rfqTo !== "0" && currentTender?.rfqTo !== "1";
+        const rfqRequired = ["yes", "Yes", "YES"].includes(currentTender?.rfqRequired ?? "") && currentTender?.rfqTo !== "0" && currentTender?.rfqTo !== "1";
 
         if (rfqRequired) {
             const [rfqResponseCount] = await this.db

@@ -9,6 +9,20 @@ export interface RfqBatch {
 }
 
 /**
+ * Stable ordering for RFQ send batches: earliest createdAt first, then ID.
+ * Shared so batch numbering stays consistent across the app.
+ */
+export function compareRfqBatchOrder(
+    a: { createdAt?: Date | string | null; id: number },
+    b: { createdAt?: Date | string | null; id: number },
+): number {
+    const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    if (aTime !== bTime) return aTime - bTime;
+    return a.id - b.id;
+}
+
+/**
  * Builds a stable, ordered list of RFQ send batches for a tender.
  * Batch #1 is the earliest sent RFQ and response counts are derived from
  * the responses grouped by their rfqId.
@@ -17,12 +31,7 @@ export function buildRfqBatches(
     batches: Rfq[] | undefined | null,
     allResponses: Array<{ rfqId?: number | null }> | undefined | null,
 ): RfqBatch[] {
-    const list = [...(batches ?? [])].sort((a, b) => {
-        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        if (aTime !== bTime) return aTime - bTime;
-        return a.id - b.id;
-    });
+    const list = [...(batches ?? [])].sort(compareRfqBatchOrder);
 
     const counts = new Map<number, number>();
     for (const response of allResponses ?? []) {
