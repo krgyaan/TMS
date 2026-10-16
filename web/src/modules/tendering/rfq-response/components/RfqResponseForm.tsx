@@ -244,7 +244,7 @@ export function RfqResponseForm({ rfqId, rfqData, orgs, responseStatus }: RfqRes
 
                         {isQuotationReceived && (
                             <>
-                                <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                     <FieldWrapper
                                         control={form.control}
                                         name="receiptDatetime"

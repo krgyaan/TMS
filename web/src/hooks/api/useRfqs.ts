@@ -36,6 +36,8 @@ export const useRfqsDashboard = (filters?: RfqDashboardFilters) => {
     return useQuery({
         queryKey: [...rfqsKey.all, 'dashboard', queryKeyFilters],
         queryFn: () => rfqsService.getDashboard(effectiveFilters),
+        // Prevents table flashing/focus loss while fetching new search/tab results
+        placeholderData: (previousData) => previousData,
     });
 };
 

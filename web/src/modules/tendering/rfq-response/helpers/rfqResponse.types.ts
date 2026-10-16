@@ -15,6 +15,34 @@ export interface RfqResponseListItem {
     tenderId?: number | null;
 }
 
+/** Response row with the extra fields returned by the by-RFQ endpoint */
+export interface RfqResponseRow extends RfqResponseListItem {
+    organizationId?: number;
+    responseStatus?: number | null;
+    remarks?: string | null;
+    generalRemarks?: string | null;
+    gstPercentage?: string | null;
+    gstType?: string | null;
+    deliveryTime?: number | null;
+    freightType?: string | null;
+    items?: RfqResponseItemRow[];
+    documents?: RfqResponseDocumentRow[];
+}
+
+/** Organization still awaiting a response for a tender */
+export interface RfqPendingOrganization {
+    organizationId: number;
+    organizationName: string;
+    vendors: Array<{ id: number; name: string; email: string }>;
+}
+
+/** Payload for GET /rfqs/:rfqId/responses */
+export interface RfqResponsesByRfq {
+    currentRfqResponses: RfqResponseRow[];
+    allTenderResponses: RfqResponseRow[];
+    pendingTenderResponses: RfqPendingOrganization[];
+}
+
 /** Item row within an RFQ response */
 export interface RfqResponseItemRow {
     id: number;
