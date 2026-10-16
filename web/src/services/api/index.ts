@@ -48,6 +48,15 @@ export { customerService } from "./customer.service";
 export { conferenceService } from "./conference.service";
 export { serviceVisitService } from "./service-visit.service";
 export { serviceFeedbackService } from "./service-feedback.service";
+export {
+    publicNotificationService,
+    type PublicNotificationResponse,
+    type PublicNotificationEntity,
+    type PublicPaymentRequestEntity,
+    type PublicOrderEntity,
+    type PublicVendorWorkOrderEntity,
+    type ApprovalStatus,
+} from "./public-notification.service";
 export { healthService } from "./health.service";
 export { inventoryApi } from "./inventory.api";
 export { customerPerformanceService } from "./customer-performance.service";

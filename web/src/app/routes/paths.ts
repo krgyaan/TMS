@@ -6,6 +6,12 @@ export const paths = {
         forgotPassword: "/forgot-password",
     },
 
+    // ==================== PUBLIC NOTIFICATIONS ====================
+    notify: {
+        route: "/notify/:token",
+        page: (token: string) => `/notify/${token}`,
+    },
+
     // ==================== INTEGRATIONS ====================
     integrations: {
         google: "/integrations/google",
