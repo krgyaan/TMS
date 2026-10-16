@@ -189,10 +189,10 @@ export function BankGuaranteeEditForm({ instrumentId, initialData }: BankGuarant
                             <FieldWrapper control={form.control} name="beneficiaryAddress" label="BG Address *">
                                 {(field) => <Textarea rows={2} {...field} value={field.value || ''} placeholder="e.g., Bank Name or Address" />}
                             </FieldWrapper>
-                            <FieldWrapper control={form.control} name="validityDate" label="BG Expiry Date *">
+                            <FieldWrapper control={form.control} name="bgExpiryDate" label="BG Expiry Date *">
                                 {(field) => <DateInput value={field.value || undefined} onChange={field.onChange} />}
                             </FieldWrapper>
-                            <FieldWrapper control={form.control} name="claimExpiryDate" label="BG Claim Period *">
+                            <FieldWrapper control={form.control} name="bgClaim" label="BG Claim Period *">
                                 {(field) => <DateInput value={field.value || undefined} onChange={field.onChange} />}
                             </FieldWrapper>
                             <FieldWrapper control={form.control} name="stampCharges" label="Stamp Paper Value">

@@ -108,7 +108,9 @@ export class BankGuaranteeService {
                 sql`${paymentInstruments.amount}::text ILIKE ${searchStr}`,
                 sql`${instrumentBgDetails.bgDate}::text ILIKE ${searchStr}`,
                 sql`${instrumentBgDetails.validityDate}::text ILIKE ${searchStr}`,
+                sql`${instrumentBgDetails.bgExpiryDate}::text ILIKE ${searchStr}`,
                 sql`${instrumentBgDetails.claimExpiryDate}::text ILIKE ${searchStr}`,
+                sql`${instrumentBgDetails.bgClaim}::text ILIKE ${searchStr}`,
                 sql`${instrumentBgDetails.fdrNo} ILIKE ${searchStr}`,
                 sql`${instrumentBgDetails.fdrAmt}::text ILIKE ${searchStr}`,
                 sql`${statuses.name} ILIKE ${searchStr}`,
@@ -122,7 +124,7 @@ export class BankGuaranteeService {
         const whereClause = and(...conditions);
 
         // Build order clause - default to validityDate desc, fallback to createdAt
-        let orderClause: any = sql`${instrumentBgDetails.validityDate} DESC NULLS LAST, ${paymentInstruments.createdAt} DESC`;
+        let orderClause: any = sql`coalesce(${instrumentBgDetails.validityDate}, ${instrumentBgDetails.bgExpiryDate}) DESC NULLS LAST, ${paymentInstruments.createdAt} DESC`;
         if (options?.sortBy) {
             const direction = options.sortOrder === 'desc' ? desc : asc;
             switch (options.sortBy) {
@@ -139,7 +141,7 @@ export class BankGuaranteeService {
                     orderClause = direction(paymentInstruments.amount);
                     break;
                 default:
-                    orderClause = sql`${instrumentBgDetails.validityDate} DESC NULLS LAST, ${paymentInstruments.createdAt} DESC`;
+                    orderClause = sql`coalesce(${instrumentBgDetails.validityDate}, ${instrumentBgDetails.bgExpiryDate}) DESC NULLS LAST, ${paymentInstruments.createdAt} DESC`;
             }
         }
 
@@ -160,7 +162,10 @@ export class BankGuaranteeService {
                 requestType: paymentRequests.type,
                 amount: paymentInstruments.amount,
                 bgExpiryDate: paymentInstruments.expiryDate,
-                claimExpiryDate: paymentInstruments.claimExpiryDate,
+                claimExpiryDate: instrumentBgDetails.claimExpiryDate,
+                validityDate: instrumentBgDetails.validityDate,
+                bgClaim: instrumentBgDetails.bgClaim,
+                bgExpiryDateBg: sql<string | null>`coalesce(${paymentInstruments.expiryDate}, ${instrumentBgDetails.bgExpiryDate})`,
                 stampCharges: instrumentBgDetails.stampCharges,
                 sfmsCharges: instrumentBgDetails.sfmsCharges,
                 stampChargesDeducted: instrumentBgDetails.stampChargesDeducted,
@@ -208,6 +213,9 @@ export class BankGuaranteeService {
             const bgDate = row.bgDate ? new Date(row.bgDate) : null;
             const bgExpiryDate = row.bgExpiryDate ? new Date(row.bgExpiryDate) : null;
             const claimExpiryDate = row.claimExpiryDate ? new Date(row.claimExpiryDate) : null;
+            const effectiveClaimDate = claimExpiryDate ?? (row.bgClaim ? new Date(row.bgClaim) : null);
+            const effectiveValidityDate = (row.validityDate ? new Date(row.validityDate) : null)
+                ?? (row.bgExpiryDateBg ? new Date(row.bgExpiryDateBg) : null);
             const amount = row.amount ? Number(row.amount) : null;
 
             return {
@@ -220,7 +228,7 @@ export class BankGuaranteeService {
                 tenderNo: row.tenderNo || row.projectNo,
                 amount,
                 bgExpiryDate,
-                bgClaimPeriod: this.calculateBgClaimPeriod(bgExpiryDate, claimExpiryDate),
+                bgClaimPeriod: this.calculateBgClaimPeriod(effectiveValidityDate, effectiveClaimDate),
                 bgChargesPaid: this.calculateBgChargesPaid(
                     row.bgChargeDeducted ? Number(row.bgChargeDeducted) : null,
                     row.stampChargesDeducted ? Number(row.stampChargesDeducted) : null,
@@ -230,7 +238,7 @@ export class BankGuaranteeService {
                 bgChargesCalculated: this.calculateBgChargesCalculated(
                     amount,
                     bgDate,
-                    claimExpiryDate,
+                    effectiveClaimDate,
                     row.stampCharges ? Number(row.stampCharges) : null,
                     row.sfmsCharges ? Number(row.sfmsCharges) : null
                 ),
@@ -239,8 +247,8 @@ export class BankGuaranteeService {
                 tenderStatus: row.tenderStatusFromTender,
                 bidValidity: row.tenderDueDate || row.requestDueDate,
                 bgStatus: this.statusMap()[row.bgStatus],
-                expiryStatus: this.calculateExpiryStatus(bgExpiryDate, claimExpiryDate),
-                expiryDate: claimExpiryDate,
+                expiryStatus: this.calculateExpiryStatus(effectiveValidityDate, effectiveClaimDate),
+                expiryDate: effectiveClaimDate,
             };
         });
 
@@ -267,7 +275,10 @@ export class BankGuaranteeService {
                 requestType: paymentRequests.type,
                 amount: paymentInstruments.amount,
                 bgExpiryDate: paymentInstruments.expiryDate,
-                claimExpiryDate: paymentInstruments.claimExpiryDate,
+                claimExpiryDate: instrumentBgDetails.claimExpiryDate,
+                validityDate: instrumentBgDetails.validityDate,
+                bgClaim: instrumentBgDetails.bgClaim,
+                bgExpiryDateBg: sql<string | null>`coalesce(${paymentInstruments.expiryDate}, ${instrumentBgDetails.bgExpiryDate})`,
                 stampCharges: instrumentBgDetails.stampCharges,
                 sfmsCharges: instrumentBgDetails.sfmsCharges,
                 stampChargesDeducted: instrumentBgDetails.stampChargesDeducted,
@@ -295,12 +306,15 @@ export class BankGuaranteeService {
             ))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(whereClause)
-            .orderBy(sql`${instrumentBgDetails.validityDate} DESC NULLS LAST, ${paymentInstruments.createdAt} DESC`);
+            .orderBy(sql`coalesce(${instrumentBgDetails.validityDate}, ${instrumentBgDetails.bgExpiryDate}) DESC NULLS LAST, ${paymentInstruments.createdAt} DESC`);
 
         const data = rows.map((row) => {
             const bgDate = row.bgDate ? new Date(row.bgDate) : null;
             const bgExpiryDate = row.bgExpiryDate ? new Date(row.bgExpiryDate) : null;
             const claimExpiryDate = row.claimExpiryDate ? new Date(row.claimExpiryDate) : null;
+            const effectiveClaimDate = claimExpiryDate ?? (row.bgClaim ? new Date(row.bgClaim) : null);
+            const effectiveValidityDate = (row.validityDate ? new Date(row.validityDate) : null)
+                ?? (row.bgExpiryDateBg ? new Date(row.bgExpiryDateBg) : null);
             const amount = row.amount ? Number(row.amount) : null;
 
             return {
@@ -313,7 +327,7 @@ export class BankGuaranteeService {
                 projectNo: row.projectNo,
                 amount,
                 bgExpiryDate,
-                bgClaimPeriod: this.calculateBgClaimPeriod(bgExpiryDate, claimExpiryDate),
+                bgClaimPeriod: this.calculateBgClaimPeriod(effectiveValidityDate, effectiveClaimDate),
                 bgChargesPaid: this.calculateBgChargesPaid(
                     row.bgChargeDeducted ? Number(row.bgChargeDeducted) : null,
                     row.stampChargesDeducted ? Number(row.stampChargesDeducted) : null,
@@ -323,7 +337,7 @@ export class BankGuaranteeService {
                 bgChargesCalculated: this.calculateBgChargesCalculated(
                     amount,
                     bgDate,
-                    claimExpiryDate,
+                    effectiveClaimDate,
                     row.stampCharges ? Number(row.stampCharges) : null,
                     row.sfmsCharges ? Number(row.sfmsCharges) : null
                 ),
@@ -332,8 +346,8 @@ export class BankGuaranteeService {
                 tenderStatus: row.tenderStatusFromTender,
                 bidValidity: row.tenderDueDate || row.requestDueDate,
                 bgStatus: this.statusMap()[row.bgStatus],
-                expiryStatus: this.calculateExpiryStatus(bgExpiryDate, claimExpiryDate),
-                expiryDate: bgExpiryDate,
+                expiryStatus: this.calculateExpiryStatus(effectiveValidityDate, effectiveClaimDate),
+                expiryDate: effectiveValidityDate,
                 bgPurpose: row.bgPurpose,
                 bgNeeds: row.bgNeeds,
                 bankName: row.bankName,
@@ -746,8 +760,6 @@ private parseStringArray(v: unknown): string[] | null {
         if (body.payableAt !== undefined) updateData.payableAt = body.payableAt;
         if (body.issueDate !== undefined) updateData.issueDate = body.issueDate;
         if (body.expiryDate !== undefined) updateData.expiryDate = body.expiryDate;
-        if (body.validityDate !== undefined) updateData.validityDate = body.validityDate;
-        if (body.claimExpiryDate !== undefined) updateData.claimExpiryDate = body.claimExpiryDate;
         if (body.status !== undefined) updateData.status = body.status;
         if (body.action !== undefined) updateData.action = body.action;
         if (body.utr !== undefined) updateData.utr = body.utr;
@@ -775,7 +787,7 @@ private parseStringArray(v: unknown): string[] | null {
 
         // All possible BG details fields
         const directFields = [
-            'bgNo', 'bgDate', 'validityDate', 'claimExpiryDate',
+            'bgNo', 'bgDate', 'bgExpiryDate', 'bgClaim',
             'beneficiaryName', 'beneficiaryAddress', 'bankName',
             'cashMarginPercent', 'fdrMarginPercent',
             'stampCharges', 'sfmsCharges',
@@ -1140,10 +1152,12 @@ private parseStringArray(v: unknown): string[] | null {
                 payableAt: paymentInstruments.payableAt,
                 issueDate: paymentInstruments.issueDate,
                 expiryDate: paymentInstruments.expiryDate,
+                bgExpiryDate: sql<string | null>`coalesce(${paymentInstruments.expiryDate}, ${instrumentBgDetails.bgExpiryDate})`,
                 // Validity / claim expiry are written by Accounts Form 2 to
                 // instrument_bg_details (see updateAction), not to payment_instruments.
                 validityDate: instrumentBgDetails.validityDate,
                 claimExpiryDate: instrumentBgDetails.claimExpiryDate,
+                bgClaim: instrumentBgDetails.bgClaim,
                 utr: paymentInstruments.utr,
                 docketNo: paymentInstruments.docketNo,
                 courierAddress: paymentInstruments.courierAddress,
@@ -1282,10 +1296,10 @@ private parseStringArray(v: unknown): string[] | null {
                 payableAt: paymentInstruments.payableAt,
                 issueDate: paymentInstruments.issueDate,
                 expiryDate: paymentInstruments.expiryDate,
-                // Validity / claim expiry are written by Accounts Form 2 to
-                // instrument_bg_details (see updateAction), not to payment_instruments.
                 validityDate: instrumentBgDetails.validityDate,
                 claimExpiryDate: instrumentBgDetails.claimExpiryDate,
+                bgClaim: instrumentBgDetails.bgClaim,
+                bgExpiryDateBg: sql<string | null>`coalesce(${paymentInstruments.expiryDate}, ${instrumentBgDetails.bgExpiryDate})`,
                 utr: paymentInstruments.utr,
                 docketNo: paymentInstruments.docketNo,
                 courierAddress: paymentInstruments.courierAddress,
@@ -1374,6 +1388,8 @@ private parseStringArray(v: unknown): string[] | null {
             expiryDate: result.expiryDate ? new Date(result.expiryDate) : null,
             validityDate: result.validityDate ? new Date(result.validityDate) : null,
             claimExpiryDate: result.claimExpiryDate ? new Date(result.claimExpiryDate) : null,
+            bgExpiryDate: result.expiryDate ? new Date(result.expiryDate) : null,
+            bgClaim: result.bgClaim ? new Date(result.bgClaim) : null,
             bgNo: result.bgNo,
             bgDate: result.bgDate ? new Date(result.bgDate) : null,
             beneficiaryName: result.beneficiaryName,

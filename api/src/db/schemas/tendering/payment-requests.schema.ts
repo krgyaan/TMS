@@ -203,8 +203,10 @@ export const instrumentBgDetails = pgTable('instrument_bg_details', {
     // Direct mappings from MySQL emd_bgs
     bgNo: varchar('bg_no', { length: 100 }), // emd_bgs.bg_no
     bgDate: date('bg_date'), // emd_bgs.bg_date
-    validityDate: date('validity_date'), // emd_bgs.bg_validity
-    claimExpiryDate: date('claim_expiry_date'), // emd_bgs.claim_expiry
+    validityDate: date('validity_date'), // emd_bgs.bg_validity - written by accounts-form-2 only
+    claimExpiryDate: date('claim_expiry_date'), // emd_bgs.claim_expiry - written by accounts-form-2 only
+    bgClaim: date('bg_claim'), // EMD creation form's BG Claim Period date
+    bgExpiryDate: date('bg_expiry_date'), // EMD creation form's BG Expiry Date
     beneficiaryName: varchar('beneficiary_name', { length: 500 }), // emd_bgs.bg_favour
     beneficiaryAddress: text('beneficiary_address'), // emd_bgs.bg_address
     bankName: varchar('bank_name', { length: 300 }), // emd_bgs.new_bg_bank_name

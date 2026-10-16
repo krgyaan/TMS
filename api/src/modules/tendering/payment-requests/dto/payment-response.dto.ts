@@ -47,6 +47,8 @@ export const BgDetailsResponse = z.object({
   bgDate: nullishDate,
   validityDate: nullishDate,
   claimExpiryDate: nullishDate,
+  bgExpiryDate: nullishDate,
+  bgClaim: nullishDate,
   beneficiaryName: nullishString,
   beneficiaryAddress: nullishString,
   bankName: nullishString,

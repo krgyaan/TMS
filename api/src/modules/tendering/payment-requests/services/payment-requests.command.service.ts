@@ -630,8 +630,8 @@ export class PaymentRequestsCommandService {
                 await tx.insert(instrumentBgDetails).values({
                     instrumentId,
                     bgDate: details.bgDate || null,
-                    validityDate: details.bgExpiryDate || null,
-                    claimExpiryDate: details.bgClaimPeriod || null,
+                    bgExpiryDate: details.bgExpiryDate || null,
+                    bgClaim: details.bgClaimPeriod || null,
                     beneficiaryName: details.bgFavouring || null,
                     beneficiaryAddress: details.bgAddress || null,
                     bankName: details.bgBank || null,
@@ -924,8 +924,8 @@ export class PaymentRequestsCommandService {
                 await tx.update(instrumentBgDetails).set({
                     bgNo: details.bgNo || null,
                     bgDate: details.bgDate || null,
-                    validityDate: details.bgExpiryDate || null,
-                    claimExpiryDate: details.bgClaimPeriod || null,
+                    bgExpiryDate: details.bgExpiryDate || null,
+                    bgClaim: details.bgClaimPeriod || null,
                     beneficiaryName: details.bgFavouring || null,
                     beneficiaryAddress: details.bgAddress || null,
                     bankName: details.bgBank || null,
