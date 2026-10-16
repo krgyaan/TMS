@@ -12,6 +12,7 @@ export const CommonInstrumentFields = z.object({
   amount: z.string(),
   favouring: nullishString,
   payableAt: nullishString,
+  expiryDate: nullishDate,
   courierAddress: nullishString,
   courierDeadline: z.number().nullable().optional(),
   status: z.string(),

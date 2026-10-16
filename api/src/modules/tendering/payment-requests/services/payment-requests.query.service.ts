@@ -1364,6 +1364,7 @@ export class PaymentRequestsQueryService {
             amount: instrument.amount?.toString() || '0',
             favouring: instrument.favouring,
             payableAt: instrument.payableAt,
+            expiryDate: instrument.expiryDate,
             courierAddress: instrument.courierAddress,
             courierDeadline: instrument.courierDeadline != null ? Number(instrument.courierDeadline) : null,
             status: instrument.status,
