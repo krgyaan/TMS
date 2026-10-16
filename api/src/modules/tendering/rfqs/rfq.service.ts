@@ -67,6 +67,7 @@ type RfqDetails = {
     }>;
     createdAt: Date;
     updatedAt: Date;
+    responseCount?: number;
     items: Array<{
         id: number;
         rfqId: number;
@@ -701,6 +702,21 @@ export class RfqsService {
             return [];
         }
 
+        // Count recorded responses per RFQ so callers (e.g. bid submission gate) can
+        // tell whether at least one quotation has been received for this tender.
+        const responseCountRows = await this.db
+            .select({ rfqId: rfqResponses.rfqId, count: sql<number>`count(*)::int` })
+            .from(rfqResponses)
+            .where(
+                inArray(
+                    rfqResponses.rfqId,
+                    rfqRows.map(r => r.id)
+                )
+            )
+            .groupBy(rfqResponses.rfqId);
+
+        const responseCounts = new Map<number, number>(responseCountRows.map(r => [r.rfqId, Number(r.count)]));
+
         const result: RfqDetails[] = await Promise.all(
             rfqRows.map(async rfqRow => {
                 const [rfqItemsData, rfqDocumentsData, vendorOrganizations] = await Promise.all([
@@ -711,6 +727,7 @@ export class RfqsService {
 
                 return {
                     ...rfqRow,
+                    responseCount: responseCounts.get(rfqRow.id) ?? 0,
                     items: rfqItemsData,
                     documents: rfqDocumentsData,
                     vendorOrganizations,

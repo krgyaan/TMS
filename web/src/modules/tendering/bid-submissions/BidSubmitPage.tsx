@@ -47,12 +47,17 @@ export default function BidSubmitPage() {
     const emdNA = infoSheet?.emdRequired === 'NO' || infoSheet?.emdRequired === 'EXEMPT';
     const emdIsSB = infoSheet?.emdMode?.includes('SB');
 
+    // RFQ is considered fulfilled only when it has been sent (>=1 RFQ) AND at least
+    // one quotation/response has actually been recorded against the tender's RFQs.
+    const rfqSent = Array.isArray(rfqs) && rfqs.length > 0;
+    const rfqHasResponse = Array.isArray(rfqs) && rfqs.some(r => (r.responseCount ?? 0) > 0);
+
     const checkpoints: Checkpoint[] = [
         {
             id: 'rfq-quotation',
             label: 'RFQ Quotation',
-            status: rfqRequired ? (rfqs && rfqs.length > 0 ? 'fulfilled' : 'pending') : 'na',
-            description: rfqRequired ? 'Upload quotation in approval' : 'Ensure RFQs are sent and quotations updated'
+            status: rfqRequired ? (rfqSent && rfqHasResponse ? 'fulfilled' : 'pending') : 'na',
+            description: rfqRequired ? 'Send RFQ and record at least one response' : 'Ensure RFQs are sent and quotations updated'
         },
         {
             id: 'emd',
