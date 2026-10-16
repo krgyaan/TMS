@@ -1,5 +1,5 @@
 import { BaseApiService } from './base.service';
-import type { CreateRfqResponseBodyDto, RfqResponseListItem, RfqResponseDetail } from '@/modules/tendering/rfq-response/helpers/rfqResponse.types';
+import type { CreateRfqResponseBodyDto, RfqResponseListItem, RfqResponseDetail, RfqResponsesByRfq } from '@/modules/tendering/rfq-response/helpers/rfqResponse.types';
 
 class RfqResponseApiService extends BaseApiService {
     constructor() {
@@ -14,8 +14,8 @@ class RfqResponseApiService extends BaseApiService {
         return this.get<RfqResponseListItem[]>('/responses');
     }
 
-    async getResponsesByRfqId(rfqId: number): Promise<RfqResponseListItem[]> {
-        return this.get<RfqResponseListItem[]>(`/${rfqId}/responses`);
+    async getResponsesByRfqId(rfqId: number): Promise<RfqResponsesByRfq> {
+        return this.get<RfqResponsesByRfq>(`/${rfqId}/responses`);
     }
 
     async getResponseById(responseId: number): Promise<RfqResponseDetail> {

@@ -64,12 +64,12 @@ const Rfqs = () => {
 
     const rfqsActions = useMemo<ActionItem<RfqDashboardRowWithTimer>[]>(() => [
         {
-            label: 'Record Receipt',
+            label: 'Record Response',
             onClick: (row: RfqDashboardRowWithTimer) => {
                 if (row.rfqId) navigate(paths.tendering.rfqsResponseNew(row.rfqId));
             },
             icon: <ClipboardList className="h-4 w-4" />,
-            //we will only show the rfq record receipt for the sent tab
+            //we will only show the rfq record response for the sent tab
             visible: (row: RfqDashboardRowWithTimer) => (activeTab === 'sent') && row.rfqId != null,
         },
         {
