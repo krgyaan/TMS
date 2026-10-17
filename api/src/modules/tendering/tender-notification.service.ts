@@ -61,7 +61,7 @@ export class TenderNotificationService {
   private formatAllocationMessage(data: TenderAllocatedData): string {
     return [
       `Dear @${data.teName},`,
-      'Congratulations! A new tender has been assigned to you.',
+      'Congrats! A new tender has been assigned to you.',
       `- Tender Name: ${data.tenderName || 'Not specified'}`,
       `- Tender No: ${data.tenderNo || 'Not specified'}`,
       `- Due on: ${data.dueDate}`,

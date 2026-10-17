@@ -645,12 +645,16 @@ export class TenderInfosService {
             newTender.id as number, initialStatus, createdBy, null, 'Tender created'
         );
 
-        // Send email notification
-        await this.sendTenderCreatedEmail(newTender.id as number, data, createdBy);
-
         // Send WhatsApp notification to the allocated team's group
         if (newTender.teamMember) {
             this.notifyTenderAllocatedWhatsapp(newTender, newTender.teamMember);
+        }
+
+        // Send email notification
+        try {
+            await this.sendTenderCreatedEmail(newTender.id as number, data, createdBy);
+        } catch (error) {
+            this.logger.error(`Failed to send tender created email for tender ${newTender.id}: ${error instanceof Error ? error.message : String(error)}`);
         }
 
         // START TIMER: Start the initial tender_info_sheet timer
@@ -754,6 +758,15 @@ export class TenderInfosService {
         if (data.teamMember && currentTender.teamMember !== data.teamMember) {
             // Send WhatsApp notification to the (re)allocated team's group
             this.notifyTenderAllocatedWhatsapp(updatedTender ?? rows[0], data.teamMember);
+
+            // Send email notification for tender update (allocation change)
+            try {
+                if (updatedTender) {
+                    await this.sendTenderUpdateEmail(currentTender, updatedTender, data, updatedBy);
+                }
+            } catch (error) {
+                this.logger.error(`Failed to send tender update email for tender ${id}: ${error instanceof Error ? error.message : String(error)}`);
+            }
 
             try {
                 this.logger.log(`Assigning team member — starting timer for tender ${id}`);
