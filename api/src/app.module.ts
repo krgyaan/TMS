@@ -73,6 +73,7 @@ import { WebsitesModule } from "@/modules/master/websites/websites.module";
 import { WoBasicDetailsModule } from "@/modules/operations/wo-basic-details/wo-basic-details.module";
 import { SchedulerModule } from "@/modules/scheduler/scheduler.module";
 import { ClientDirectoryModule } from "@/modules/shared/client-directory/client-directory.module";
+import { PublicNotificationsModule } from "@/modules/public-notifications/public-notifications.module";
 import { FinanceDocumentsModule } from "@/modules/shared/finance-documents/finance-documents.module";
 import { PqrModule } from "@/modules/shared/pqr/pqr.module";
 import { ProjectsMasterModule as SharedProjectsMasterModule } from "@/modules/shared/projects-master/projects-master.module";
@@ -284,6 +285,7 @@ import { VendorMasterModule } from "./modules/master/vendor-master/vendor-master
         ServiceFeedbackModule,
         OpenwaModule,
         NotificationsModule,
+        PublicNotificationsModule,
     ],
     controllers: [AppController, WebhookController],
     providers: [

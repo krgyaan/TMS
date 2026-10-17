@@ -17,6 +17,9 @@ const Auth_GoogleCallback = lazy(() => import("@/modules/auth/google-callback"))
 // Public customer feedback form (no login / no app layout)
 const Public_CustomerFeedbackForm = lazy(() => import("@/modules/services/service-feedback/ServiceFeedbackFormPage"));
 
+// Public notification detail page (token-gated, no login / no app layout)
+const Public_NotificationDetail = lazy(() => import("@/modules/notifications/public/NotificationPublicPage"));
+
 // Verification demo page
 const ExtractionPreviewDemoPage = lazy(() => import("@/modules/tendering/info-sheet/components/ExtractionPreviewDemoPage"));
 
@@ -64,6 +67,16 @@ export default function AppRoutes() {
                 element={
                     <RouteWrapper>
                         <Public_CustomerFeedbackForm />
+                    </RouteWrapper>
+                }
+            />
+
+            {/* Public notification detail — signed WhatsApp/email link, no login */}
+            <Route
+                path={paths.notify.route}
+                element={
+                    <RouteWrapper>
+                        <Public_NotificationDetail />
                     </RouteWrapper>
                 }
             />

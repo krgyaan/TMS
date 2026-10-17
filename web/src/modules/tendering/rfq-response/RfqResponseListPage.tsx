@@ -52,7 +52,7 @@ export default function RfqResponseListPage() {
     const responsesByRfq = Array.isArray(responsesData) ? responsesData : (responsesData?.currentRfqResponses || []);
 
     // Data for "RFQ Sent" or "Responses Recorded" tab (Dashboard view)
-    const { data: rfqDashboard, isLoading: loadingDashboard } = useRfqsDashboard({
+    const { data: rfqDashboard, isLoading: loadingDashboardFetch, isPlaceholderData: isDashboardPlaceholder } = useRfqsDashboard({
         tab: activeTab === 'sent' ? 'sent' : 'responses',
         page: pagination.pageIndex + 1,
         limit: pagination.pageSize,
@@ -60,6 +60,9 @@ export default function RfqResponseListPage() {
         sortOrder: sortModel[0]?.sort,
         search: debouncedSearch || undefined,
     });
+    // Placeholder data belongs to the previous selection: keep showing a loading state and
+    // disable row actions until results for the current selection arrive.
+    const loadingDashboard = loadingDashboardFetch || isDashboardPlaceholder;
     const { data: rfqCounts } = useRfqsDashboardCounts();
 
     const { data: rfq, isLoading: rfqLoading } = useRfq(rfqIdNum);

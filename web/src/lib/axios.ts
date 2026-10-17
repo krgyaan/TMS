@@ -31,6 +31,7 @@ const PUBLIC_PATHS = [
     '/auth/google',
     '/auth/refresh',
     '/health',
+    '/public-notifications',
 ];
 
 const isPublicPath = (path: string): boolean =>

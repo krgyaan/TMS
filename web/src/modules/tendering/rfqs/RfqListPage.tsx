@@ -46,7 +46,7 @@ const Rfqs = () => {
     });
     const { hasTenderingPermission } = useTenderingPermissions();
 
-    const { data: apiResponse, isLoading: loading, error } = useRfqsDashboard({
+    const { data: apiResponse, isLoading, isPlaceholderData, error } = useRfqsDashboard({
         tab: activeTab,
         page: pagination.pageIndex + 1,
         limit: pagination.pageSize,
@@ -54,6 +54,10 @@ const Rfqs = () => {
         sortOrder: sortModel[0]?.sort,
         search: debouncedSearch || undefined,
     });
+
+    // Treat placeholder (previous selection's data) as loading so the grid shows a fetching
+    // state and row actions/pagination stay disabled until the new results arrive.
+    const loading = isLoading || isPlaceholderData;
 
     const { data: counts } = useRfqsDashboardCounts();
 

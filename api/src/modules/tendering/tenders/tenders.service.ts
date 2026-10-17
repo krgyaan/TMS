@@ -5,6 +5,7 @@ import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
+import { TenderNotificationService } from '@/modules/tendering/tender-notification.service';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import type { PaginatedResult, TenderForApproval, TenderForPayment, TenderForPhysicalDocs, TenderForRfq, TenderInfoWithNames, TenderReference } from '@/modules/tendering/types/shared.types';
 import { TimersService } from '@/modules/timers/timers.service';
@@ -53,6 +54,7 @@ export class TenderInfosService {
         private readonly timersService: TimersService,
         private readonly configService: ConfigService,
         private readonly fileUploadService: FileUploadService,
+        private readonly tenderNotification: TenderNotificationService,
     ) {
         this.logger = this.appLogger.withContext(TenderInfosService.name);
     }
@@ -643,8 +645,17 @@ export class TenderInfosService {
             newTender.id as number, initialStatus, createdBy, null, 'Tender created'
         );
 
+        // Send WhatsApp notification to the allocated team's group
+        if (newTender.teamMember) {
+            this.notifyTenderAllocatedWhatsapp(newTender, newTender.teamMember);
+        }
+
         // Send email notification
-        await this.sendTenderCreatedEmail(newTender.id as number, data, createdBy);
+        try {
+            await this.sendTenderCreatedEmail(newTender.id as number, data, createdBy);
+        } catch (error) {
+            this.logger.error(`Failed to send tender created email for tender ${newTender.id}: ${error instanceof Error ? error.message : String(error)}`);
+        }
 
         // START TIMER: Start the initial tender_info_sheet timer
         try {
@@ -748,6 +759,18 @@ export class TenderInfosService {
 
         // START TIMER: If a team member is being assigned, start the info-sheet timer
         if (data.teamMember && currentTender.teamMember !== data.teamMember) {
+            // Send WhatsApp notification to the (re)allocated team's group
+            this.notifyTenderAllocatedWhatsapp(updatedTender ?? rows[0], data.teamMember);
+
+            // Send email notification for tender update (allocation change)
+            try {
+                if (updatedTender) {
+                    await this.sendTenderUpdateEmail(currentTender, updatedTender, data, updatedBy);
+                }
+            } catch (error) {
+                this.logger.error(`Failed to send tender update email for tender ${id}: ${error instanceof Error ? error.message : String(error)}`);
+            }
+
             try {
                 this.logger.log(`Assigning team member — starting timer for tender ${id}`);
                 await this.timersService.startTimer({
@@ -892,6 +915,40 @@ export class TenderInfosService {
         } catch (error) {
             this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
         }
+    }
+
+    /**
+     * Notify the allocated team's WhatsApp group about a tender allocation.
+     * Fire-and-forget — never blocks or throws into the caller.
+     */
+    private notifyTenderAllocatedWhatsapp(tender: { id: number; team: number; teamMember: number | null; tenderName: string | null; tenderNo: string | null; dueDate: Date | null; gstValues: string | null }, teamMemberId: number): void {
+        if (!tender || !tender.team || !teamMemberId) return;
+
+        const due = tender.dueDate ? new Date(tender.dueDate) : null;
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const dueDate = due
+            ? `${pad(due.getDate())}-${pad(due.getMonth() + 1)}-${due.getFullYear()} ${pad(due.getHours())}:${pad(due.getMinutes())}`
+            : 'Not specified';
+
+        const tenderValue = tender.gstValues ? `₹${Number(tender.gstValues).toLocaleString('en-IN')}` : 'Not specified';
+
+        void this.recipientResolver
+            .getUserById(teamMemberId)
+            .then(async (member) => {
+                if (!member) return;
+                await this.tenderNotification.notifyTenderAllocated({
+                    teamId: tender.team,
+                    teamMemberId,
+                    teName: member.name,
+                    tenderName: tender.tenderName,
+                    tenderNo: tender.tenderNo,
+                    dueDate,
+                    tenderValue,
+                });
+            })
+            .catch((error) => {
+                this.logger.error(`Tender allocation WhatsApp notification failed for tender ${tender.id}: ${error instanceof Error ? error.message : String(error)}`);
+            });
     }
 
     /**
