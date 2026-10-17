@@ -1351,6 +1351,11 @@ private parseStringArray(v: unknown): string[] | null {
                 fdrAmt: instrumentBgDetails.fdrAmt,
                 fdrValidity: instrumentBgDetails.fdrValidity,
                 fdrRoi: instrumentBgDetails.fdrRoi,
+                cancelRemark: instrumentBgDetails.cancelRemark,
+                stampCoveringLetter: instrumentBgDetails.stampCoveringLetter,
+                cancellConfirm: instrumentBgDetails.cancellConfirm,
+                bgFdrCancelDate: instrumentBgDetails.bgFdrCancelDate,
+                bgFdrCancelAmount: instrumentBgDetails.bgFdrCancelAmount,
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
@@ -1366,12 +1371,14 @@ private parseStringArray(v: unknown): string[] | null {
             throw new NotFoundException(`Payment Instrument with ID ${id} not found`);
         }
 
-        const hasAccountsFormData = result.action != null && result.action >= 1;
-        const hasFdrDetails = !!(result.fdrNo || result.fdrAmt);
-        const hasCourierInfo = !!(result.courierAddress || result.courierNo || result.docketNo);
-        const hasExtensionDetails = !!(result.extendedAmount || result.extendedValidityDate);
-        const hasReturnedData = result.action != null && result.action >= 6;
-        const hasSettledData = result.action != null && [8, 9].includes(result.action);
+        const hasAccountsForm1Data = !!(result.approveBg || result.reasonReq || result.bgFormatTe);
+        const hasAccountsForm2Data = !!(result.bgNo || result.bg2Remark);
+        const hasAccountsForm3Data = !!(result.fdrNo || result.fdrAmt);
+        const hasExtensionData = !!(result.extendedAmount || result.extendedValidityDate);
+        const hasReturnedData = !!(result.docketNo || result.docketSlip);
+        const hasRequestCancellationData = !!(result.coveringLetter || result.stampCoveringLetter);
+        const hasBgCancellationData = !!result.cancellConfirm;
+        const hasFdrCancellationData = !!(result.bgFdrCancelDate || result.bgFdrCancelAmount);
 
         return {
             id: result.id,
@@ -1439,12 +1446,14 @@ private parseStringArray(v: unknown): string[] | null {
             fdrAmt: result.fdrAmt ? Number(result.fdrAmt) : null,
             fdrValidity: result.fdrValidity ? new Date(result.fdrValidity) : null,
             fdrRoi: result.fdrRoi ? Number(result.fdrRoi) : null,
-            hasAccountsFormData,
-            hasFdrDetails,
-            hasCourierInfo,
-            hasExtensionDetails,
+            hasAccountsForm1Data,
+            hasAccountsForm2Data,
+            hasAccountsForm3Data,
+            hasExtensionData,
             hasReturnedData,
-            hasSettledData,
+            hasRequestCancellationData,
+            hasBgCancellationData,
+            hasFdrCancellationData,
         };
     }
 

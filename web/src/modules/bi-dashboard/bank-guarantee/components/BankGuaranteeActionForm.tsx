@@ -128,6 +128,19 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
         { id: 'accounts-form-3', label: 'Accounts Form 3', status: currentAction >= 3 ? 'fulfilled' : 'pending' },
     ];
 
+    const FILLED_FLAG: Record<string, string> = {
+        'accounts-form-1': 'hasAccountsForm1Data',
+        'accounts-form-2': 'hasAccountsForm2Data',
+        'accounts-form-3': 'hasAccountsForm3Data',
+        'request-extension': 'hasExtensionData',
+        'returned-courier': 'hasReturnedData',
+        'request-cancellation': 'hasRequestCancellationData',
+        'bg-cancellation-confirmation': 'hasBgCancellationData',
+        'fdr-cancellation-confirmation': 'hasFdrCancellationData',
+    };
+    const filledFlag = action ? FILLED_FLAG[action] : undefined;
+    const isReadOnly = !!(filledFlag && formData?.[filledFlag]);
+
     // Pre-fill the selected step from whatever was saved previously, so revisiting
     // a completed accounts form shows the stored values instead of a blank form.
     useEffect(() => {
@@ -182,6 +195,7 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
     const isSubmitting = form.formState.isSubmitting || updateMutation.isPending;
 
     const handleSubmit = async (values: BankGuaranteeActionFormValues) => {
+        if (isReadOnly) return;
         try {
             const payload: Record<string, unknown> = {};
 
@@ -293,6 +307,9 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
                     />
                 </div>
 
+                
+
+                <fieldset disabled={isReadOnly} className={cn('border-0 p-0 m-0 min-w-0', !action && 'hidden')}>
                 {/* Accounts Form (BG) 1 - Request to Bank */}
                 <ConditionalSection show={action === 'accounts-form-1'}>
                     <div className="space-y-4 border rounded-lg p-4">
@@ -783,14 +800,17 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
                         </div>
                     </div>
                 </ConditionalSection>
+                </fieldset>
 
                 <div className="flex justify-end gap-4 pt-4">
                     <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>
                         Cancel
                     </Button>
-                    <Button type="submit" disabled={isSubmitting}>
-                        {isSubmitting ? 'Submitting...' : 'Submit'}
-                    </Button>
+                    {!isReadOnly && (
+                        <Button type="submit" disabled={isSubmitting}>
+                            {isSubmitting ? 'Submitting...' : 'Submit'}
+                        </Button>
+                    )}
                 </div>
             </form>
         </Form>
