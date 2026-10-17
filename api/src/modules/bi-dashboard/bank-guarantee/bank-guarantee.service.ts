@@ -1347,6 +1347,8 @@ private parseStringArray(v: unknown): string[] | null {
                 extendedValidityDate: instrumentBgDetails.extendedValidityDate,
                 extendedClaimExpiryDate: instrumentBgDetails.extendedClaimExpiryDate,
                 extendedBankName: instrumentBgDetails.extendedBankName,
+                extensionLetterPath: instrumentBgDetails.extensionLetterPath,
+                newStampChargeDeducted: instrumentBgDetails.newStampChargeDeducted,
                 fdrNo: instrumentBgDetails.fdrNo,
                 fdrAmt: instrumentBgDetails.fdrAmt,
                 fdrValidity: instrumentBgDetails.fdrValidity,
@@ -1356,6 +1358,7 @@ private parseStringArray(v: unknown): string[] | null {
                 cancellConfirm: instrumentBgDetails.cancellConfirm,
                 bgFdrCancelDate: instrumentBgDetails.bgFdrCancelDate,
                 bgFdrCancelAmount: instrumentBgDetails.bgFdrCancelAmount,
+                bgFdrCancelRefNo: instrumentBgDetails.bgFdrCancelRefNo,
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
@@ -1374,7 +1377,11 @@ private parseStringArray(v: unknown): string[] | null {
         const hasAccountsForm1Data = !!(result.approveBg || result.reasonReq || result.bgFormatTe);
         const hasAccountsForm2Data = !!(result.bgNo || result.bg2Remark);
         const hasAccountsForm3Data = !!(result.fdrNo || result.fdrAmt);
-        const hasExtensionData = !!(result.extendedAmount || result.extendedValidityDate);
+        const hasExtensionData = !!(result.extendedAmount || result.extendedValidityDate
+            || result.extendedClaimExpiryDate || result.extendedBankName
+            || result.newStampChargeDeducted || result.extensionLetterPath);
+        const hasExtensionModification = !!(result.extendedAmount || result.extendedValidityDate
+            || result.extendedClaimExpiryDate || result.extendedBankName || result.newStampChargeDeducted);
         const hasReturnedData = !!(result.docketNo || result.docketSlip);
         const hasRequestCancellationData = !!(result.coveringLetter || result.stampCoveringLetter);
         const hasBgCancellationData = !!result.cancellConfirm;
@@ -1442,14 +1449,23 @@ private parseStringArray(v: unknown): string[] | null {
             extendedValidityDate: result.extendedValidityDate ? new Date(result.extendedValidityDate) : null,
             extendedClaimExpiryDate: result.extendedClaimExpiryDate ? new Date(result.extendedClaimExpiryDate) : null,
             extendedBankName: result.extendedBankName,
+            extensionLetterPath: result.extensionLetterPath,
+            newStampChargeDeducted: result.newStampChargeDeducted ? Number(result.newStampChargeDeducted) : null,
             fdrNo: result.fdrNo,
             fdrAmt: result.fdrAmt ? Number(result.fdrAmt) : null,
             fdrValidity: result.fdrValidity ? new Date(result.fdrValidity) : null,
             fdrRoi: result.fdrRoi ? Number(result.fdrRoi) : null,
+            cancelRemark: result.cancelRemark,
+            stampCoveringLetter: result.stampCoveringLetter,
+            cancellConfirm: result.cancellConfirm,
+            bgFdrCancelDate: result.bgFdrCancelDate,
+            bgFdrCancelAmount: result.bgFdrCancelAmount ? Number(result.bgFdrCancelAmount) : null,
+            bgFdrCancelRefNo: result.bgFdrCancelRefNo,
             hasAccountsForm1Data,
             hasAccountsForm2Data,
             hasAccountsForm3Data,
             hasExtensionData,
+            hasExtensionModification,
             hasReturnedData,
             hasRequestCancellationData,
             hasBgCancellationData,

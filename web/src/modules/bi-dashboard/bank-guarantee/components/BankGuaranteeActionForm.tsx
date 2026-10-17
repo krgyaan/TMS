@@ -205,6 +205,28 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
             form.setValue('sfms_charge_deducted', formData.sfmsChargesDeducted ?? undefined);
             form.setValue('stamp_charge_deducted', formData.stampChargesDeducted ?? undefined);
             form.setValue('other_charge_deducted', formData.otherChargesDeducted ?? undefined);
+        } else if (action === 'request-extension') {
+            if (formData.hasExtensionModification) {
+                form.setValue('modification_required', 'Yes');
+            }
+            form.setValue('ext_letter', formData.extensionLetterPath ?? undefined);
+            form.setValue('new_stamp_charge_deducted', formData.newStampChargeDeducted ?? undefined);
+            form.setValue('new_bg_bank_name', formData.extendedBankName ?? undefined);
+            form.setValue('new_bg_amt', formData.extendedAmount ?? undefined);
+            form.setValue('new_bg_expiry', toDateString(formData.extendedValidityDate));
+            form.setValue('new_bg_claim', toDateString(formData.extendedClaimExpiryDate));
+        } else if (action === 'returned-courier') {
+            form.setValue('docket_no', formData.courierNo ?? undefined);
+            form.setValue('docket_slip', formData.docketSlip ?? undefined);
+        } else if (action === 'request-cancellation') {
+            form.setValue('stamp_covering_letter', formData.stampCoveringLetter ?? undefined);
+            form.setValue('cancel_remark', formData.cancelRemark ?? undefined);
+        } else if (action === 'bg-cancellation-confirmation') {
+            form.setValue('cancell_confirm', formData.cancellConfirm ?? undefined);
+        } else if (action === 'fdr-cancellation-confirmation') {
+            form.setValue('bg_fdr_cancel_date', toDateString(formData.bgFdrCancelDate));
+            form.setValue('bg_fdr_cancel_amount', formData.bgFdrCancelAmount ?? undefined);
+            form.setValue('bg_fdr_cancel_ref_no', formData.bgFdrCancelRefNo ?? undefined);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [action, formData]);
@@ -397,6 +419,7 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
                                             context="bg-prefilled-signed"
                                             value={field.value || []}
                                             onChange={field.onChange}
+                                            disabled={isReadOnly}
                                         />
                                     )}
                                 </FieldWrapper>
@@ -408,6 +431,7 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
                                             context="bg-format-imran"
                                             value={field.value}
                                             onChange={field.onChange}
+                                            disabled={isReadOnly}
                                         />
                                     )}
                                 </FieldWrapper>
@@ -580,6 +604,7 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
                                         context="bg-fdr-copy"
                                         value={field.value}
                                         onChange={field.onChange}
+                                        disabled={isReadOnly}
                                     />
                                 )}
                             </FieldWrapper>
@@ -589,6 +614,7 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
                                         context="bg-sfms-conf"
                                         value={field.value}
                                         onChange={field.onChange}
+                                        disabled={isReadOnly}
                                     />
                                 )}
                             </FieldWrapper>
@@ -682,6 +708,7 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
                                         context="bg-ext-letter"
                                         value={field.value}
                                         onChange={field.onChange}
+                                        disabled={isReadOnly}
                                     />
                                 )}
                             </FieldWrapper>
@@ -739,6 +766,7 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
                                         context="bg-docket-slip"
                                         value={field.value}
                                         onChange={field.onChange}
+                                        disabled={isReadOnly}
                                     />
                                 )}
                             </FieldWrapper>
@@ -758,6 +786,7 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
                                         context="bg-stamp-covering-letter"
                                         value={field.value}
                                         onChange={field.onChange}
+                                        disabled={isReadOnly}
                                     />
                                 )}
                             </FieldWrapper>
@@ -782,6 +811,7 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
                                         context="bg-cancell-confirm"
                                         value={field.value}
                                         onChange={field.onChange}
+                                        disabled={isReadOnly}
                                     />
                                 )}
                             </FieldWrapper>
