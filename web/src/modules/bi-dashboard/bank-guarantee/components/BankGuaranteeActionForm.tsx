@@ -9,16 +9,18 @@ import { SelectField } from '@/components/form/SelectField';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { CompactFileUploader, FileUploader } from '@/components/file-upload';
+import { parseFileMeta } from '@/components/file-upload/helpers/fileMeta';
+import { fileUploadService } from '@/services/api/file-upload.service';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { ContactPersonFields } from '@/components/form/ContactPersonFields';
-import { FollowUpFrequencySelect } from '@/components/form/FollowUpFrequencySelect';
-import { StopReasonFields } from '@/components/form/StopReasonFields';
+import { FollowUpFrequencySelect, FREQUENCY_LABELS } from '@/components/form/FollowUpFrequencySelect';
+import { StopReasonFields, STOP_REASON_LABELS } from '@/components/form/StopReasonFields';
 import { ConditionalSection } from '@/components/form/ConditionalSection';
 import { NumberInput } from '@/components/form/NumberInput';
 import DateInput from '@/components/form/DateInput';
 import { BankGuaranteeActionFormSchema, type BankGuaranteeActionFormValues } from '../helpers/bankGuaranteeActionForm.schema';
-import { useUpdateBankGuaranteeAction, useBGActionFormData } from '@/hooks/api/useBankGuarantees';
+import { useUpdateBankGuaranteeAction, useBGActionFormData, useBGFollowupData } from '@/hooks/api/useBankGuarantees';
 import type { Checkpoint } from '@/components/tendering/SubmissionChecklist';
 import { useCourierOptions } from '@/modules/shared/courier/courier.hooks';
 import { CheckCircle2, Plus, Trash2, XCircle } from 'lucide-react';
@@ -109,6 +111,7 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
     const updateMutation = useUpdateBankGuaranteeAction();
     const courierOptions = useCourierOptions();
     const { data: formData } = useBGActionFormData(instrumentId);
+    const { data: followupData } = useBGFollowupData(instrumentId);
 
     const form = useForm<BankGuaranteeActionFormValues>({
         resolver: zodResolver(BankGuaranteeActionFormSchema) as Resolver<BankGuaranteeActionFormValues>,
@@ -150,7 +153,10 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
         'fdr-cancellation-confirmation': 'hasFdrCancellationData',
     };
     const filledFlag = action ? FILLED_FLAG[action] : undefined;
-    const isReadOnly = !!(filledFlag && formData?.[filledFlag]);
+    const hasFollowupData = !!followupData;
+    const isReadOnly = action === 'initiate-followup'
+        ? hasFollowupData
+        : !!(filledFlag && formData?.[filledFlag]);
 
     const prevStampCharges = formData?.stampCharges;
     const prevBeneficiaryName = formData?.beneficiaryName ?? formData?.favouring;
@@ -239,21 +245,9 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
             const payload: Record<string, unknown> = {};
 
             Object.entries(values).forEach(([key, value]) => {
-                // Skip follow-up fields - handled by different service
-                if (key === 'contacts' ||
-                    key === 'organisation_name' ||
-                    key === 'followup_start_date' ||
-                    key === 'frequency' ||
-                    key === 'stop_reason' ||
-                    key === 'proof_text' ||
-                    key === 'stop_remarks' ||
-                    key === 'proof_image') {
-                    return;
-                }
-
-                // Repeatable bank mail id rows -- handled explicitly below so the
-                // generic loop doesn't JSON-stringify the raw row objects.
-                if (key === 'bank_mail_ids' || key === 'bank_mail_ids_cc') {
+                // Repeated/multi-value fields are handled explicitly below so the
+                // generic loop doesn't JSON-stringify them into single strings.
+                if (key === 'bank_mail_ids' || key === 'bank_mail_ids_cc' || key === 'contacts' || key === 'attachments') {
                     return;
                 }
 
@@ -283,6 +277,14 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
             payload.bank_mail_ids_cc = JSON.stringify(
                 (values.bank_mail_ids_cc ?? []).map((r) => r.email).filter(Boolean),
             );
+            payload.contacts = JSON.stringify(
+                (values.contacts ?? []).map((c) => ({
+                    name: c.name?.trim() || '',
+                    phone: c.phone || null,
+                    email: c.email || null,
+                })),
+            );
+            payload.attachments = values.attachments ?? [];
 
             await updateMutation.mutateAsync({ id: instrumentId, payload });
             toast.success('Action submitted successfully');
@@ -652,6 +654,86 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
                     <div className="space-y-4 border rounded-lg p-4">
                         <h4 className="font-semibold text-base">Initiate Followup</h4>
 
+                        {hasFollowupData ? (
+                            <>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
+                                    <ReadOnlyValue label="Organisation Name" value={followupData.organisationName} />
+                                    <ReadOnlyValue
+                                        label="Follow-up Start Date"
+                                        type="date"
+                                        value={toDateString(followupData.followupStartDate)}
+                                    />
+                                    <ReadOnlyValue
+                                        label="Follow-up Frequency"
+                                        value={FREQUENCY_LABELS[String(followupData.frequency)] ?? followupData.frequency ?? ''}
+                                    />
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label className="inline-flex items-center flex-wrap">Contact Person(s)</Label>
+                                    <div className="space-y-2">
+                                        {(followupData.contacts ?? []).length === 0 && (
+                                            <p className="text-sm text-muted-foreground">No contacts recorded.</p>
+                                        )}
+                                        {(followupData.contacts ?? []).map((contact: { name?: string; phone?: string | null; email?: string | null }, index: number) => (
+                                            <div
+                                                key={index}
+                                                className="rounded-md border bg-muted px-3 py-2 text-sm"
+                                            >
+                                                <span className="font-medium">{contact.name}</span>
+                                                {contact.phone ? (
+                                                    <span className="text-muted-foreground"> · {contact.phone}</span>
+                                                ) : null}
+                                                {contact.email ? (
+                                                    <span className="text-muted-foreground"> · {contact.email}</span>
+                                                ) : null}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {(followupData.attachments ?? []).length > 0 && (
+                                    <div className="grid gap-2">
+                                        <Label className="inline-flex items-center flex-wrap">Attachments</Label>
+                                        <div className="space-y-2">
+                                            {followupData.attachments.map((path: string) => (
+                                                <div
+                                                    key={path}
+                                                    className="rounded-md border bg-muted px-3 py-2 text-sm"
+                                                >
+                                                    <a
+                                                        href={fileUploadService.getFileUrl(path)}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-primary hover:underline"
+                                                    >
+                                                        {parseFileMeta(path).displayName}
+                                                    </a>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {Number(followupData.frequency) === 6 && (
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start gap-y-4">
+                                        <ReadOnlyValue
+                                            label="Stop Reason"
+                                            value={STOP_REASON_LABELS[String(followupData.stopReason)] ?? ''}
+                                        />
+                                        {Number(followupData.stopReason) === 2 && (
+                                            <ReadOnlyValue label="Proof Details" value={followupData.proofText} />
+                                        )}
+                                        {Number(followupData.stopReason) === 2 && followupData.proofImagePath && (
+                                            <ReadOnlyValue label="Proof Image" value={followupData.proofImagePath} />
+                                        )}
+                                        {Number(followupData.stopReason) === 4 && (
+                                            <ReadOnlyValue label="Remarks" value={followupData.stopRemarks} />
+                                        )}
+                                    </div>
+                                )}
+                            </>
+                        ) : (
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
                             <FieldWrapper control={form.control} name="organisation_name" label="Organisation Name">
                                 {(field) => <Input {...field} placeholder="Enter organisation name" />}
@@ -673,7 +755,20 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
                                     proofImageFieldName="proof_image"
                                 />
                             </div>
+                            <div className="col-span-3">
+                                <FieldWrapper control={form.control} name="attachments" label="Attachments">
+                                    {(field) => (
+                                        <FileUploader
+                                            context="follow-ups"
+                                            value={field.value || []}
+                                            onChange={field.onChange}
+                                            disabled={isReadOnly}
+                                        />
+                                    )}
+                                </FieldWrapper>
+                            </div>
                         </div>
+                        )}
                     </div>
                 </ConditionalSection>
 

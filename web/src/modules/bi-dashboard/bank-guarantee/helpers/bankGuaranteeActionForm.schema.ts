@@ -4,7 +4,7 @@ import { z } from 'zod';
 const ContactPersonSchema = z.object({
     name: z.string().min(1, 'Name is required'),
     phone: z.string().optional().nullable(),
-    email: z.string().email().optional().nullable(),
+    email: z.string().email().optional().nullable().or(z.literal('')),
 });
 
 // Bank mail ids are repeatable rows (useFieldArray). A freshly added row starts
@@ -57,11 +57,12 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     organisation_name: z.string().optional(),
     contacts: z.array(ContactPersonSchema).optional(),
     followup_start_date: z.string().optional(),
-    frequency: z.number().int().min(1).max(6).optional(),
+    frequency: z.coerce.number().int().min(1).max(6).optional(),
     stop_reason: z.number().int().min(1).max(4).optional().nullable(),
     proof_text: z.string().optional().nullable(),
     stop_remarks: z.string().optional().nullable(),
     proof_image: z.any().optional(), // File
+    attachments: z.array(z.string()).optional(),
 
     // Request Extension
     modification_required: z.enum(['Yes', 'No']).optional(),

@@ -1,7 +1,9 @@
 import { followUps } from '@/db/schemas/shared/follow-ups.schema';
+import { followUpPersons } from '@/db/schemas/shared/follow-up-persons.schema';
 import { AppLogger } from '@/logger/app-logger.service';
 import type { BankGuaranteeDashboardCounts, BankGuaranteeDashboardRow } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
+import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
 import { BG_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
@@ -116,7 +118,7 @@ export class BankGuaranteeService {
                 sql`${statuses.name} ILIKE ${searchStr}`,
                 sql`${paymentInstruments.status} ILIKE ${searchStr}`,
                 // Search by BG status display label (table shows "Pending", "Accepted", etc.)
-                sql`(CASE ${paymentInstruments.status} WHEN 'BG_ACCOUNTS_FORM_PENDING' THEN 'Pending' WHEN 'PENDING' THEN 'Pending' WHEN 'BG_ACCOUNTS_FORM_ACCEPTED' THEN 'Accepted' WHEN 'BG_ACCOUNTS_FORM_REJECTED' THEN 'Rejected' WHEN 'BG_CREATED' THEN 'Created' WHEN 'BG_FDR_DETAILS_CAPTURED' THEN 'FDR Details Captured' WHEN 'BG_FOLLOWUP_INITIATED' THEN 'Followup Initiated' WHEN 'BG_EXTENSION_REQUESTED' THEN 'Extension Requested' WHEN 'BG_RETURN_VIA_COURIER' THEN 'Courier Returned' WHEN 'BG_CANCELLATION_REQUESTED' THEN 'Cancellation Request' WHEN 'BG_BG_CANCELLATION_CONFIRMED' THEN 'Cancelled at Branch' WHEN 'BG_FDR_CANCELLED_CONFIRMED' THEN 'FDR Cancellation Confirmed' ELSE ${paymentInstruments.status}::text END)::text ILIKE ${searchStr}`,
+                sql`(CASE ${paymentInstruments.status} WHEN 'PENDING' THEN 'Pending' WHEN 'ACCOUNTS_FORM_ACCEPTED' THEN 'Accepted' WHEN 'ACCOUNTS_FORM_REJECTED' THEN 'Rejected' WHEN 'BG_CREATED' THEN 'Created' WHEN 'FDR_DETAILS_CAPTURED' THEN 'FDR Details Captured' WHEN 'FOLLOWUP_INITIATED' THEN 'Followup Initiated' WHEN 'EXTENSION_REQUESTED' THEN 'Extension Requested' WHEN 'RETURN_VIA_COURIER' THEN 'Courier Returned' WHEN 'CANCELLATION_REQUESTED' THEN 'Cancellation Request' WHEN 'BG_CANCELLATION_CONFIRMED' THEN 'Cancelled at Branch' WHEN 'FDR_CANCELLED_CONFIRMED' THEN 'FDR Cancellation Confirmed' ELSE ${paymentInstruments.status}::text END)::text ILIKE ${searchStr}`,
             ];
             conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
         }
@@ -1130,7 +1132,46 @@ private parseStringArray(v: unknown): string[] | null {
             }
         }
 
-        // Follow-up creation will be handled by a different service class
+        if (body.action === 'initiate-followup') {
+            try {
+                const mappedContacts = contacts
+                    .filter((c: any) => c?.name && String(c.name).trim().length > 0)
+                    .map((c: any) => ({
+                        name: String(c.name).trim(),
+                        email: c.email || null,
+                        phone: c.phone || null,
+                        org: body.organisation_name || null,
+                    }));
+
+                if (mappedContacts.length === 0) {
+                    throw new BadRequestException('At least one contact with a name is required');
+                }
+
+                const followUpDto: CreateFollowUpDto = {
+                    emdId: instrumentId,
+                    area: body.area || 'Accounts',
+                    partyName: body.organisation_name || 'Unknown',
+                    followupFor: 'Bank Guarantee',
+                    amount: instrument.amount ? Number(instrument.amount) : 0,
+                    contacts: mappedContacts,
+                    frequency: body.frequency ? Number(body.frequency) : 1,
+                    startFrom: body.followup_start_date || undefined,
+                    stopReason: body.stop_reason ? Number(body.stop_reason) : null,
+                    proofText: body.proof_text || null,
+                    proofImagePath: body.proof_image || null,
+                    stopRemarks: body.stop_remarks || null,
+                    details: body.emailBody || null,
+                    attachments: this.parseStringArray(body.attachments) ?? [],
+                    assignedToId: null,
+                    createdById: null,
+                    followUpHistory: [],
+                };
+
+                await this.followUpService.create(followUpDto, user?.id || user?.sub);
+            } catch (error) {
+                this.logger.warn(`Follow-up creation failed for BG instrument ${instrumentId}: ${error}`);
+            }
+        }
 
         return {
             success: true,
@@ -1481,7 +1522,6 @@ private parseStringArray(v: unknown): string[] | null {
                 partyName: followUps.partyName,
                 area: followUps.area,
                 amount: followUps.amount,
-                contacts: followUps.contacts,
                 frequency: followUps.frequency,
                 startFrom: followUps.startFrom,
                 nextFollowUpDate: followUps.nextFollowUpDate,
@@ -1489,6 +1529,7 @@ private parseStringArray(v: unknown): string[] | null {
                 proofText: followUps.proofText,
                 stopRemarks: followUps.stopRemarks,
                 proofImagePath: followUps.proofImagePath,
+                attachments: followUps.attachments,
                 assignmentStatus: followUps.assignmentStatus,
                 createdAt: followUps.createdAt,
             })
@@ -1504,12 +1545,28 @@ private parseStringArray(v: unknown): string[] | null {
             return null;
         }
 
+        const contactRows = await this.db
+            .select({
+                name: followUpPersons.name,
+                email: followUpPersons.email,
+                phone: followUpPersons.phone,
+                organisation: followUpPersons.organization,
+            })
+            .from(followUpPersons)
+            .where(eq(followUpPersons.followUpId, result.id))
+            .orderBy(asc(followUpPersons.createdAt));
+
         return {
             id: result.id,
             organisationName: result.partyName,
             area: result.area,
             amount: result.amount ? Number(result.amount) : null,
-            contacts: result.contacts || [],
+            contacts: contactRows.map((contact) => ({
+                name: contact.name,
+                email: contact.email,
+                phone: contact.phone,
+                org: contact.organisation,
+            })),
             frequency: result.frequency,
             followupStartDate: result.startFrom ? new Date(result.startFrom) : null,
             nextFollowUpDate: result.nextFollowUpDate ? new Date(result.nextFollowUpDate) : null,
@@ -1517,6 +1574,7 @@ private parseStringArray(v: unknown): string[] | null {
             proofText: result.proofText,
             stopRemarks: result.stopRemarks,
             proofImagePath: result.proofImagePath,
+            attachments: result.attachments || [],
             assignmentStatus: result.assignmentStatus,
             createdAt: result.createdAt,
         };
