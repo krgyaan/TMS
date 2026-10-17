@@ -1395,7 +1395,7 @@ private parseStringArray(v: unknown): string[] | null {
             expiryDate: result.expiryDate ? new Date(result.expiryDate) : null,
             validityDate: result.validityDate ? new Date(result.validityDate) : null,
             claimExpiryDate: result.claimExpiryDate ? new Date(result.claimExpiryDate) : null,
-            bgExpiryDate: result.expiryDate ? new Date(result.expiryDate) : null,
+            bgExpiryDate: result.bgExpiryDateBg ? new Date(result.bgExpiryDateBg) : null,
             bgClaim: result.bgClaim ? new Date(result.bgClaim) : null,
             bgNo: result.bgNo,
             bgDate: result.bgDate ? new Date(result.bgDate) : null,

@@ -51,6 +51,17 @@ const ACTION_OPTIONS = [
 const toDateString = (v: unknown): string | undefined =>
     v ? new Date(v as string).toISOString().slice(0, 10) : undefined;
 
+const ReadOnlyValue = ({ label, value, type }: {
+    label: string;
+    value?: string | number | null;
+    type?: 'text' | 'number' | 'date';
+}) => (
+    <div className="grid gap-2">
+        <Label className="inline-flex items-center flex-wrap">{label}</Label>
+        <Input type={type ?? 'text'} value={value ?? ''} readOnly tabIndex={-1} className="bg-muted" />
+    </div>
+);
+
 /**
  * `prefilled_signed_bg` is persisted as a JSON-stringified array of paths. Tolerate
  * a bare string too, mirroring the defensive parse in the service's updateAction.
@@ -140,6 +151,12 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
     };
     const filledFlag = action ? FILLED_FLAG[action] : undefined;
     const isReadOnly = !!(filledFlag && formData?.[filledFlag]);
+
+    const prevStampCharges = formData?.stampCharges;
+    const prevBeneficiaryName = formData?.beneficiaryName ?? formData?.favouring;
+    const prevAmount = formData?.amount;
+    const prevExpiryDate = toDateString(formData?.bgExpiryDate);
+    const prevClaimDate = toDateString(formData?.bgClaim);
 
     // Pre-fill the selected step from whatever was saved previously, so revisiting
     // a completed accounts form shows the stored values instead of a blank form.
@@ -674,21 +691,11 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
                                     <div className='space-y-4 border rounded-lg p-4 bg-red-200/10'>
                                         <Label className="text-base font-semibold">Previous Values</Label>
                                         <div className="grid grid-cols-1 gap-4">
-                                            <FieldWrapper control={form.control} name="stamp_charge_deducted" label="Stamp Paper Amount">
-                                                {(field) => <NumberInput {...field} placeholder="Enter amount" />}
-                                            </FieldWrapper>
-                                            <FieldWrapper control={form.control} name="bg_favouring" label="Beneficiary Name">
-                                                {(field) => <Input {...field} placeholder="Enter beneficiary name" />}
-                                            </FieldWrapper>
-                                            <FieldWrapper control={form.control} name="amount" label="Amount">
-                                                {(field) => <NumberInput {...field} placeholder="Enter amount" />}
-                                            </FieldWrapper>
-                                            <FieldWrapper control={form.control} name="bg_validity" label="Expiry Date">
-                                                {(field) => <DateInput value={field.value} onChange={field.onChange} />}
-                                            </FieldWrapper>
-                                            <FieldWrapper control={form.control} name="bg_claim_period" label="Claim Date">
-                                                {(field) => <DateInput value={field.value} onChange={field.onChange} />}
-                                            </FieldWrapper>
+                                            <ReadOnlyValue label="Stamp Paper Amount" type="number" value={prevStampCharges} />
+                                            <ReadOnlyValue label="Beneficiary Name" value={prevBeneficiaryName} />
+                                            <ReadOnlyValue label="Amount" type="number" value={prevAmount} />
+                                            <ReadOnlyValue label="Expiry Date" type="date" value={prevExpiryDate} />
+                                            <ReadOnlyValue label="Claim Date" type="date" value={prevClaimDate} />
                                         </div>
                                     </div>
                                     <div className="space-y-4 border rounded-lg p-4 bg-green-200/10">
