@@ -53,9 +53,29 @@ export class TenderNotificationService {
     try {
       const jid = await this.jidResolver.toJid(data.teamMemberId);
       await this.openwa.sendText(group, text, jid ? [jid] : undefined);
+      if (jid) {
+        try {
+          await this.openwa.sendText(jid, this.formatAllocationDirectMessage(data));
+        } catch (dmError) {
+          this.logger.error(`Failed to send tender allocation direct message to user ${data.teamMemberId}: ${dmError instanceof Error ? dmError.message : String(dmError)}`);
+        }
+      } else {
+        this.logger.warn(`User ${data.teamMemberId} has no mobile number — skipping direct WhatsApp message`);
+      }
     } catch (error) {
-      this.logger.error(`Failed to send tender allocation WhatsApp notification for tender ${data.tenderNo}: ${error}`);
+      this.logger.error(`Failed to send tender allocation WhatsApp notification for tender ${data.tenderNo}: ${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+
+  private formatAllocationDirectMessage(data: TenderAllocatedData): string {
+    return [
+      `Dear ${data.teName},`,
+      'Congratulations! A new tender has been assigned to you.',
+      `- Tender Name: ${data.tenderName || 'Not specified'}`,
+      `- Tender No: ${data.tenderNo || 'Not specified'}`,
+      `- Due on: ${data.dueDate}`,
+      `- Tender Value: ${data.tenderValue}`,
+    ].join('\n');
   }
 
   private formatAllocationMessage(data: TenderAllocatedData): string {

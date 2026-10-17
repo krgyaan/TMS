@@ -48,8 +48,11 @@ describe("TenderNotificationService.notifyTenderAllocated", () => {
     it("sends to the ACTENDERSEARCH group for team 1 with a mention", async () => {
         await service.notifyTenderAllocated(baseData);
 
-        expect(sendText).toHaveBeenCalledTimes(1);
+        expect(sendText).toHaveBeenCalledTimes(2);
         const [group, text, mentions] = sendText.mock.calls[0];
+        const [dmGroup, dmText] = sendText.mock.calls[1];
+        expect(dmGroup).toBe("919876543210@c.us");
+        expect(dmText).toContain("Dear Jane Doe,");
         expect(group).toBe(GROUPS.ACTENDERSEARCH);
         expect(mentions).toEqual(["919876543210@c.us"]);
         expect(text).toContain("Dear @Jane Doe,");
@@ -62,7 +65,7 @@ describe("TenderNotificationService.notifyTenderAllocated", () => {
     it("sends to the DCTENDERSEARCH group for team 2", async () => {
         await service.notifyTenderAllocated({ ...baseData, teamId: 2 });
 
-        expect(sendText).toHaveBeenCalledTimes(1);
+        expect(sendText).toHaveBeenCalledTimes(2);
         expect(sendText.mock.calls[0][0]).toBe(GROUPS.DCTENDERSEARCH);
     });
 
