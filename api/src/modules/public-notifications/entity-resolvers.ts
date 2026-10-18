@@ -1,6 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import type { DbInstance } from "@/db";
-import { users } from "@/db/schemas/";
+import { users, tenderInfos } from "@/db/schemas/";
 import { paymentRequests, vendorWorkOrders, vendorWorkOrderItems } from "@/db/schemas/operations";
 import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
 import { purchaseOrderProducts } from "@/db/schemas/operations/purchase-order-products.schema";
@@ -44,7 +44,19 @@ export interface PublicVendorWorkOrderDto extends PublicOrderDto {
     scopeOfWork: string | null;
 }
 
-export type PublicEntityDto = PublicPaymentRequestDto | PublicOrderDto | PublicVendorWorkOrderDto;
+export interface PublicTenderDto {
+    id: number;
+    referenceNo: string | null;
+    tenderName: string | null;
+    dueDate: Date | null;
+    grandTotal: string | null;
+    allocatedToName: string | null;
+    status: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export type PublicEntityDto = PublicPaymentRequestDto | PublicOrderDto | PublicVendorWorkOrderDto | PublicTenderDto;
 
 export type EntityResolver = (db: DbInstance, id: number) => Promise<PublicEntityDto | null>;
 
@@ -153,6 +165,27 @@ const resolveVendorWorkOrder: EntityResolver = async (db, id) => {
     };
 };
 
+const resolveTender: EntityResolver = async (db, id) => {
+    const [row] = await db
+        .select({
+            id: tenderInfos.id,
+            referenceNo: tenderInfos.tenderNo,
+            tenderName: tenderInfos.tenderName,
+            dueDate: tenderInfos.dueDate,
+            grandTotal: tenderInfos.gstValues,
+            allocatedToName: users.name,
+            status: sql<string | null>`coalesce(${tenderInfos.tlStatus}::text, null)`,
+            createdAt: tenderInfos.createdAt,
+            updatedAt: tenderInfos.updatedAt,
+        })
+        .from(tenderInfos)
+        .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+        .where(eq(tenderInfos.id, id))
+        .limit(1);
+
+    return row ?? null;
+};
+
 /**
  * Registry of entity types a public notification link can point at.
  * To support a new notification type, add its entity type to
@@ -162,4 +195,5 @@ export const ENTITY_RESOLVER_MAP: Record<string, EntityResolver> = {
     pr: resolvePaymentRequest,
     po: resolvePurchaseOrder,
     vwo: resolveVendorWorkOrder,
+    tender: resolveTender,
 };

@@ -73,7 +73,7 @@ const vwoRow: Row = {
 
 describe("ENTITY_RESOLVER_MAP", () => {
     it("registers a resolver for every supported entity type", () => {
-        expect(Object.keys(ENTITY_RESOLVER_MAP).sort()).toEqual(["po", "pr", "vwo"]);
+        expect(Object.keys(ENTITY_RESOLVER_MAP).sort()).toEqual(["po", "pr", "tender", "vwo"]);
     });
 
     describe("pr resolver", () => {

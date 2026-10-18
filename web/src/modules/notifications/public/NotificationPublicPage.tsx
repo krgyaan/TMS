@@ -90,16 +90,20 @@ export default function NotificationPublicPage() {
 function NotificationCard({ data }: { data: PublicNotificationResponse }) {
     const { type, event, entity } = data;
     const isPr = type === "pr";
+    const isTender = type === "tender";
     const pr = entity as PublicPaymentRequestEntity;
     const order = entity as PublicOrderEntity;
     const vwo = entity as PublicVendorWorkOrderEntity;
+    const tender = entity as PublicTenderEntity;
 
-    const chip = isPr
-        ? STATUS_CONFIG[pr.status] ?? { label: pr.status, color: "text-muted-foreground bg-muted" }
-        : APPROVAL_CHIP[order.approvalStatus];
+    const chip = isTender
+        ? { label: "Tender", color: "text-muted-foreground bg-muted" }
+        : isPr
+          ? (STATUS_CONFIG[pr.status] ?? { label: pr.status, color: "text-muted-foreground bg-muted" })
+          : APPROVAL_CHIP[order.approvalStatus];
 
-    const referenceLabel = isPr ? "Request No" : type === "po" ? "PO No" : "WO No";
-    const actorLabel = isPr ? "Requested By" : "Raised By";
+    const referenceLabel = isTender ? "Tender No" : isPr ? "Request No" : type === "po" ? "PO No" : "WO No";
+    const actorLabel = isTender ? "Allocated To" : isPr ? "Requested By" : "Raised By";
 
     return (
         <div className="space-y-4">
@@ -115,21 +119,28 @@ function NotificationCard({ data }: { data: PublicNotificationResponse }) {
             {/* ── Details ────────────────────────────────────────────── */}
             <Card className="p-5 space-y-3">
                 <DetailRow label={referenceLabel} value={entity.referenceNo} />
-                <DetailRow label="Amount" value={formatAmount(isPr ? pr.amount : order.grandTotal)} />
-                {!isPr && order.amountAfterTds && (
+                {isTender && <DetailRow label="Tender Name" value={tender.tenderName} />}
+                <DetailRow
+                    label={isTender ? "Tender Value" : "Amount"}
+                    value={formatAmount(isTender ? tender.grandTotal : isPr ? pr.amount : order.grandTotal)}
+                />
+                {!isPr && !isTender && order.amountAfterTds && (
                     <DetailRow label={`After TDS (${order.tdsPercentage || "0"}%)`} value={formatAmount(order.amountAfterTds)} />
                 )}
-                <DetailRow label={isPr ? "Party" : "Seller"} value={isPr ? pr.partyName : order.sellerName} />
-                {!isPr && <DetailRow label="Project" value={order.projectName} />}
+                {!isTender && <DetailRow label={isPr ? "Party" : "Seller"} value={isPr ? pr.partyName : order.sellerName} />}
+                {!isPr && !isTender && <DetailRow label="Project" value={order.projectName} />}
                 {isPr && pr.category && <DetailRow label="Category" value={PAYMENT_AGAINST_LABELS[pr.category] ?? pr.category} />}
-                {!isPr && order.category && <DetailRow label="Category" value={PAYMENT_AGAINST_LABELS[order.category] ?? order.category} />}
-                <DetailRow label={actorLabel} value={isPr ? pr.requestedByName : order.raisedByName} />
-                {!isPr && order.orderDate && <DetailRow label={type === "po" ? "PO Date" : "WO Date"} value={order.orderDate} />}
+                {!isPr && !isTender && order.category && <DetailRow label="Category" value={PAYMENT_AGAINST_LABELS[order.category] ?? order.category} />}
+                <DetailRow label={actorLabel} value={isTender ? tender.allocatedToName : isPr ? pr.requestedByName : order.raisedByName} />
+                {!isPr && !isTender && order.orderDate && (
+                    <DetailRow label={type === "po" ? "PO Date" : "WO Date"} value={order.orderDate} />
+                )}
+                {isTender && <DetailRow label="Due Date" value={formatDate(tender.dueDate)} />}
                 {isPr && pr.utrNumber && <DetailRow label="UTR" value={pr.utrNumber} />}
                 {isPr && pr.rejectionReason && <DetailRow label="Rejection Reason" value={pr.rejectionReason} />}
                 {isPr && pr.remark && <DetailRow label="Remark" value={pr.remark} />}
-                {!isPr && order.approvalRemark && <DetailRow label="Approval Remark" value={order.approvalRemark} />}
-                {!isPr && type === "vwo" && <DetailRow label="Scope of Work" value={vwo.scopeOfWork} />}
+                {!isPr && !isTender && order.approvalRemark && <DetailRow label="Approval Remark" value={order.approvalRemark} />}
+                {!isPr && !isTender && type === "vwo" && <DetailRow label="Scope of Work" value={vwo.scopeOfWork} />}
             </Card>
 
             {/* ── Timestamps ─────────────────────────────────────────── */}

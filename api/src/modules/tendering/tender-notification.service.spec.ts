@@ -3,12 +3,14 @@ import { GROUPS } from "../../config/groups";
 import { openwaConfig } from "../../config/openwa.config";
 import { OpenwaService } from "../../openwa/openwa.service";
 import { WhatsappJidResolver } from "../notifications/helpers/whatsapp-jid.resolver";
+import { PublicLinkService } from "../public-notifications/public-link.service";
 import { TenderAllocatedData, TenderNotificationService } from "./tender-notification.service";
 
 describe("TenderNotificationService.notifyTenderAllocated", () => {
     let service: TenderNotificationService;
     let sendText: jest.Mock;
     let toJid: jest.Mock;
+    let buildUrl: jest.Mock;
     let dryRun: boolean;
 
     const baseData: TenderAllocatedData = {
@@ -25,6 +27,7 @@ describe("TenderNotificationService.notifyTenderAllocated", () => {
     beforeEach(async () => {
         sendText = jest.fn().mockResolvedValue({ messageId: "m1" });
         toJid = jest.fn().mockResolvedValue("919876543210@c.us");
+        buildUrl = jest.fn().mockResolvedValue("https://example.com/notify/test");
         dryRun = false;
 
         const module: TestingModule = await Test.createTestingModule({
@@ -32,6 +35,7 @@ describe("TenderNotificationService.notifyTenderAllocated", () => {
                 TenderNotificationService,
                 { provide: OpenwaService, useValue: { sendText } },
                 { provide: WhatsappJidResolver, useValue: { toJid } },
+                { provide: PublicLinkService, useValue: { buildUrl } },
                 {
                     provide: openwaConfig.KEY,
                     useFactory: () => ({
@@ -62,6 +66,19 @@ describe("TenderNotificationService.notifyTenderAllocated", () => {
         expect(text).toContain("- Tender No: TND/2026/001");
         expect(text).toContain("- Due on: 12-10-2026 12:23");
         expect(text).toContain("- Tender Value: ₹1,00,000");
+        expect(text).toContain("Details: https://example.com/notify/test");
+        expect(buildUrl).toHaveBeenCalledWith({ type: "tender", id: 1, event: "Tender Allocated" });
+    });
+
+    it("still sends when public link building fails", async () => {
+        buildUrl.mockRejectedValue(new Error("missing stateSecret"));
+
+        await service.notifyTenderAllocated(baseData);
+
+        expect(sendText).toHaveBeenCalledTimes(2);
+        const [, text] = sendText.mock.calls[0];
+        expect(text).toContain("Dear @Jane Doe,");
+        expect(text).not.toContain("Details:");
     });
 
     it("sends to the DCTENDERSEARCH group for team 2", async () => {

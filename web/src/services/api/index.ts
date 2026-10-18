@@ -55,6 +55,7 @@ export {
     type PublicPaymentRequestEntity,
     type PublicOrderEntity,
     type PublicVendorWorkOrderEntity,
+    type PublicTenderEntity,
     type ApprovalStatus,
 } from "./public-notification.service";
 export { healthService } from "./health.service";
