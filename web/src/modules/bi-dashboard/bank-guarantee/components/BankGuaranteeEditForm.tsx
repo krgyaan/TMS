@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import type { ReactNode } from 'react';
 import { useFieldArray, useForm, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -7,24 +8,81 @@ import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { SelectField } from '@/components/form/SelectField';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { CompactFileUploader, FileUploader } from '@/components/file-upload';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { FileUploader } from '@/components/file-upload';
 import { Label } from '@/components/ui/label';
 import { NumberInput } from '@/components/form/NumberInput';
 import DateInput from '@/components/form/DateInput';
 import { BankGuaranteeEditFormSchema, type BankGuaranteeEditFormValues } from '../helpers/bankGuaranteeEditForm.schema';
-import { useUpdateBankGuarantee } from '@/hooks/api/useBankGuarantees';
+import { useUpdateBankGuarantee, useBGFollowupData } from '@/hooks/api/useBankGuarantees';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { BG_PURPOSE_OPTIONS, BG_NEEDED_IN_OPTIONS, BANKS } from '@/modules/tendering/emds-tenderfees/constants';
-import { Plus, Trash2 } from 'lucide-react';
+import { AccountsForm1Fields } from './steps/AccountsForm1Fields';
+import { AccountsForm2Fields } from './steps/AccountsForm2Fields';
+import { AccountsForm3Fields } from './steps/AccountsForm3Fields';
+import { FollowupReadOnlyView } from './steps/InitiateFollowupFields';
+import { RequestExtensionFields } from './steps/RequestExtensionFields';
+import { ReturnedCourierFields } from './steps/ReturnedCourierFields';
+import { RequestCancellationFields } from './steps/RequestCancellationFields';
+import { BgCancellationConfirmationFields } from './steps/BgCancellationConfirmationFields';
+import { FdrCancellationConfirmationFields } from './steps/FdrCancellationConfirmationFields';
 
-const FDR_PERCENTAGE_OPTIONS = [
-    { value: '10', label: '10%' },
-    { value: '15', label: '15%' },
-    { value: '100', label: '100%' },
-];
+const STEP_NAMES = {
+    bgReq: 'bg_req',
+    reasonReq: 'reasonReq',
+    approveBg: 'approveBg',
+    prefilledSignedBg: 'prefilled_signed_bg',
+    bankMailIds: 'bankMailIds',
+    bankMailIdsCc: 'bankMailIdsCc',
+    bgNo: 'bgNo',
+    bgDate: 'bgDate',
+    courierNo: 'courierNo',
+    bg2Remark: 'bg2Remark',
+    utr: 'utr',
+    fdrPer: 'fdrPer',
+    fdrAmt: 'fdrAmt',
+    fdrNo: 'fdrNo',
+    fdrRoi: 'fdrRoi',
+    fdrValidity: 'fdrValidity',
+    fdrCopy: 'fdr_copy',
+    sfmsConf: 'sfms_conf',
+    bgChargeDeducted: 'bgChargeDeducted',
+    sfmsChargeDeducted: 'sfmsChargesDeducted',
+    stampChargeDeducted: 'stampChargesDeducted',
+    otherChargeDeducted: 'otherChargesDeducted',
+    extLetter: 'extension_letter_path',
+    newStampChargeDeducted: 'newStampChargeDeducted',
+    newBgBankName: 'extendedBankName',
+    newBgAmt: 'extendedAmount',
+    newBgExpiry: 'extendedValidityDate',
+    newBgClaim: 'extendedClaimExpiryDate',
+    docketNo: 'docketNo',
+    docketSlip: 'docket_slip',
+    stampCoveringLetter: 'stamp_covering_letter',
+    cancelRemark: 'cancelRemark',
+    cancellationLetterPath: 'cancellation_letter_path',
+    cancellConfirm: 'cancell_confirm',
+    bgFdrCancelDate: 'bgFdrCancelDate',
+    bgFdrCancelAmount: 'bgFdrCancelAmount',
+    bgFdrCancelRefNo: 'bgFdrCancelRefNo',
+} as const;
+
+const SectionCard = ({ title, children }: { title: string; children: ReactNode }) => (
+    <Card>
+        <CardHeader>
+            <CardTitle className="text-lg">{title}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">{children}</CardContent>
+    </Card>
+);
+
+const ReadOnlyField = ({ label, value }: { label: string; value?: string | number | null }) => (
+    <div className="grid gap-2">
+        <Label>{label}</Label>
+        <Input value={value == null ? '' : String(value)} readOnly tabIndex={-1} className="bg-muted" />
+    </div>
+);
 
 interface BankGuaranteeEditFormProps {
     instrumentId: number;
@@ -48,12 +106,16 @@ const parseFileValue = (value: any): string[] => {
 export function BankGuaranteeEditForm({ instrumentId, initialData }: BankGuaranteeEditFormProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdateBankGuarantee();
+    const { data: followupData } = useBGFollowupData(instrumentId);
 
     const form = useForm<BankGuaranteeEditFormValues>({
         resolver: zodResolver(BankGuaranteeEditFormSchema) as Resolver<BankGuaranteeEditFormValues>,
         defaultValues: {
             ...initialData,
             amount: initialData.amount ? Number(initialData.amount) : 0,
+            bg_req: (initialData.approveBg || initialData.reasonReq)
+                ? (initialData.reasonReq ? 'Rejected' : 'Accepted')
+                : undefined,
             cashMarginPercent: initialData.cashMarginPercent ? Number(initialData.cashMarginPercent) : null,
             fdrMarginPercent: initialData.fdrMarginPercent ? Number(initialData.fdrMarginPercent) : null,
             stampCharges: initialData.stampCharges ? Number(initialData.stampCharges) : null,
@@ -137,6 +199,10 @@ export function BankGuaranteeEditForm({ instrumentId, initialData }: BankGuarant
                 finalPayload.beneficiaryName = finalPayload.favouring;
             }
 
+            if (values.bg_req === 'Accepted') {
+                finalPayload.reasonReq = '';
+            }
+
             // Flatten the bank mail rows to plain address lists. Blank rows are
             // dropped; an emptied list serializes to [] so it actually clears.
             finalPayload.bankMailIds = JSON.stringify(
@@ -159,12 +225,8 @@ export function BankGuaranteeEditForm({ instrumentId, initialData }: BankGuarant
         <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
 
-                {/* Section 1: Request Form (Based on EmdSection.tsx) */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-lg">Request Information</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
+                {/* Section 1: EMD request Bank Guarantee form */}
+                <SectionCard title="EMD Request - Bank Guarantee">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             <SelectField
                                 control={form.control}
@@ -236,100 +298,6 @@ export function BankGuaranteeEditForm({ instrumentId, initialData }: BankGuarant
                             </FieldWrapper>
                         </div>
 
-                        {/* Bank Mail Ids / CC -- capture only for now; the
-                            notification service does not read these yet. */}
-                        <div className="space-y-6">
-                            <div className="flex items-center justify-between border-b pb-2">
-                                <h4 className="font-semibold text-base text-primary">Bank Mail Ids</h4>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => bankMailIds.append({ email: '' })}
-                                >
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Add
-                                </Button>
-                            </div>
-                            {bankMailIds.fields.length === 0 && (
-                                <p className="text-sm text-muted-foreground">
-                                    No mail ids stored. Click &quot;Add&quot; to add one.
-                                </p>
-                            )}
-                            <div className="flex flex-wrap items-end gap-2">
-                                {bankMailIds.fields.map((field, index) => (
-                                    <div key={field.id} className="flex items-center gap-1 w-full sm:w-72">
-                                        <FieldWrapper control={form.control} name={`bankMailIds.${index}.email`} label="">
-                                            {(f) => (
-                                                <Input
-                                                    {...f}
-                                                    value={f.value ?? ''}
-                                                    type="email"
-                                                    placeholder="e.g., bank.manager@bank.com"
-                                                />
-                                            )}
-                                        </FieldWrapper>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => bankMailIds.remove(index)}
-                                            className="text-destructive hover:text-destructive shrink-0"
-                                            aria-label="Remove mail id"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="space-y-6">
-                            <div className="flex items-center justify-between border-b pb-2">
-                                <h4 className="font-semibold text-base text-primary">Bank Mail Ids CC</h4>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => bankMailIdsCc.append({ email: '' })}
-                                >
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Add
-                                </Button>
-                            </div>
-                            {bankMailIdsCc.fields.length === 0 && (
-                                <p className="text-sm text-muted-foreground">
-                                    No CC mail ids stored. Click &quot;Add&quot; to add one.
-                                </p>
-                            )}
-                            <div className="flex flex-wrap items-end gap-2">
-                                {bankMailIdsCc.fields.map((field, index) => (
-                                    <div key={field.id} className="flex items-center gap-1 w-full sm:w-72">
-                                        <FieldWrapper control={form.control} name={`bankMailIdsCc.${index}.email`} label="">
-                                            {(f) => (
-                                                <Input
-                                                    {...f}
-                                                    value={f.value ?? ''}
-                                                    type="email"
-                                                    placeholder="e.g., branch@bank.com"
-                                                />
-                                            )}
-                                        </FieldWrapper>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => bankMailIdsCc.remove(index)}
-                                            className="text-destructive hover:text-destructive shrink-0"
-                                            aria-label="Remove CC mail id"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                             <FieldWrapper control={form.control} name="bg_format_te" label="BG Format (Max 5 files)">
                                 {(field) => (
@@ -350,218 +318,98 @@ export function BankGuaranteeEditForm({ instrumentId, initialData }: BankGuarant
                                 )}
                             </FieldWrapper>
                         </div>
-                    </CardContent>
-                </Card>
+                </SectionCard>
 
-                {/* Section 2: Action Forms (Post-Request Info) */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-lg">Action Information (Accounts & Post-Creation)</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-8">
-                        {/* Status Group */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
-                            <FieldWrapper control={form.control} name="bg_req" label="BG Request (Initial Approval)">
-                                {(field) => (
-                                    <RadioGroup
-                                        value={field.value}
-                                        onValueChange={field.onChange}
-                                        className="flex gap-6 pt-2 pb-1"
-                                    >
-                                        <div className="flex items-center space-x-2">
-                                            <RadioGroupItem value="Accepted" id="bg_req_accepted" />
-                                            <Label htmlFor="bg_req_accepted">Accepted</Label>
-                                        </div>
-                                        <div className="flex items-center space-x-2">
-                                            <RadioGroupItem value="Rejected" id="bg_req_rejected" />
-                                            <Label htmlFor="bg_req_rejected">Rejected</Label>
-                                        </div>
-                                    </RadioGroup>
-                                )}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="reasonReq" label="Rejection Reason">
-                                {(field) => <Input {...field} value={field.value || ''} placeholder="If rejected, enter reason" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="status" label="Instrument Status">
-                                {(field) => <Input {...field} value={field.value || ''} placeholder="Current lifecycle status" />}
-                            </FieldWrapper>
-                        </div>
+                {/* Section 2: Accounts Form (BG) 1 - Request to Bank */}
+                <SectionCard title="Accounts Form (BG) 1 - Request to Bank">
+                    <AccountsForm1Fields
+                        control={form.control}
+                        names={STEP_NAMES}
+                        bankMailIds={bankMailIds}
+                        bankMailIdsCc={bankMailIdsCc}
+                        prefilledMode="single"
+                    />
+                </SectionCard>
 
-                        <Separator />
+                {/* Section 3: Accounts Form (BG) 2 - After BG Creation */}
+                <SectionCard title="Accounts Form (BG) 2 - After BG Creation">
+                    <AccountsForm2Fields
+                        control={form.control}
+                        names={STEP_NAMES}
+                    />
 
-                        {/* BG Details after creation */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                            <FieldWrapper control={form.control} name="bgNo" label="BG Number">
-                                {(field) => <Input {...field} value={field.value || ''} placeholder="Post-creation number" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="bgDate" label="BG Creation Date">
-                                {(field) => <DateInput value={field.value || undefined} onChange={field.onChange} />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="utr" label="UTR / Reference No.">
-                                {(field) => <Input {...field} value={field.value || ''} placeholder="Bank transaction ref" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="courierNo" label="Courier Request No.">
-                                {(field) => <Input {...field} value={field.value || ''} placeholder="Internal courier reference" />}
-                            </FieldWrapper>
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <ReadOnlyField label="Validity Date" value={initialData.validityDate} />
+                        <ReadOnlyField label="Claim Expiry Date" value={initialData.claimExpiryDate} />
+                    </div>
+                </SectionCard>
 
-                        <Separator />
+                {/* Section 4: Accounts Form (BG) 3 - Capture FDR Details */}
+                <SectionCard title="Accounts Form (BG) 3 - Capture FDR Details">
+                    <AccountsForm3Fields
+                        control={form.control}
+                        names={STEP_NAMES}
+                    />
+                </SectionCard>
 
-                        {/* FDR & Charges Details */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <SelectField
-                                control={form.control}
-                                name="fdrPer"
-                                label="FDR Percentage"
-                                options={FDR_PERCENTAGE_OPTIONS}
-                                placeholder="Select %"
-                            />
-                            <FieldWrapper control={form.control} name="fdrAmt" label="FDR Amount">
-                                {(field) => <NumberInput {...field} placeholder="0.00" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="fdrNo" label="FDR Number">
-                                {(field) => <Input {...field} value={field.value || ''} placeholder="Enter FDR No" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="fdrRoi" label="FDR ROI %">
-                                {(field) => <NumberInput {...field} placeholder="0.00" />}
-                            </FieldWrapper>
-                        </div>
+                {/* Section 5: Initiate Followup */}
+                <SectionCard title="Initiate Followup">
+                    {followupData ? (
+                        <FollowupReadOnlyView data={followupData} />
+                    ) : (
+                        <p className="text-sm text-muted-foreground">
+                            No follow-up has been initiated for this instrument yet. Use the action form to start one.
+                        </p>
+                    )}
+                </SectionCard>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <FieldWrapper control={form.control} name="bgChargeDeducted" label="BG Charges Deducted">
-                                {(field) => <NumberInput {...field} placeholder="0.00" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="stampChargesDeducted" label="Stamp Paper Deducted">
-                                {(field) => <NumberInput {...field} placeholder="0.00" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="sfmsChargesDeducted" label="SFMS Charges Deducted">
-                                {(field) => <NumberInput {...field} placeholder="0.00" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="otherChargesDeducted" label="Other Charges Deducted">
-                                {(field) => <NumberInput {...field} placeholder="0.00" />}
-                            </FieldWrapper>
-                        </div>
+                {/* Section 6: Request Extension */}
+                <SectionCard title="Request Extension">
+                    <RequestExtensionFields
+                        control={form.control}
+                        names={STEP_NAMES}
+                    />
+                </SectionCard>
 
-                        <Separator />
+                {/* Section 7: Returned via Courier */}
+                <SectionCard title="Returned via Courier">
+                    <ReturnedCourierFields
+                        control={form.control}
+                        names={STEP_NAMES}
+                    />
+                </SectionCard>
 
-                        {/* Extension Info */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            <FieldWrapper control={form.control} name="modification_required" label="Extension Modification Needed">
-                                {(field) => (
-                                    <RadioGroup
-                                        value={field.value}
-                                        onValueChange={field.onChange}
-                                        className="flex gap-6 pt-2 pb-1"
-                                    >
-                                        <div className="flex items-center space-x-2">
-                                            <RadioGroupItem value="Yes" id="mod_yes" />
-                                            <Label htmlFor="mod_yes">Yes</Label>
-                                        </div>
-                                        <div className="flex items-center space-x-2">
-                                            <RadioGroupItem value="No" id="mod_no" />
-                                            <Label htmlFor="mod_no">No</Label>
-                                        </div>
-                                    </RadioGroup>
-                                )}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="extendedAmount" label="New Extended Amount">
-                                {(field) => <NumberInput {...field} placeholder="0.00" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="extendedValidityDate" label="New Expiry Date">
-                                {(field) => <DateInput value={field.value || undefined} onChange={field.onChange} />}
-                            </FieldWrapper>
-                        </div>
+                {/* Section 8: Request Cancellation */}
+                <SectionCard title="Request Cancellation">
+                    <RequestCancellationFields
+                        control={form.control}
+                        names={STEP_NAMES}
+                    />
+                </SectionCard>
 
-                        <Separator />
+                {/* Section 9: BG Cancellation Confirmation */}
+                <SectionCard title="BG Cancellation Confirmation">
+                    <BgCancellationConfirmationFields
+                        control={form.control}
+                        names={STEP_NAMES}
+                    />
+                </SectionCard>
 
-                        {/* Return & Cancellation */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <FieldWrapper control={form.control} name="docketNo" label="Docket No. (Return)">
-                                {(field) => <Input {...field} value={field.value || ''} placeholder="Return tracking number" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="bgFdrCancelDate" label="FDR Cancellation Date">
-                                {(field) => <Input {...field} value={field.value || ''} placeholder="YYYY-MM-DD" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="bgFdrCancelAmount" label="FDR Credited Amount">
-                                {(field) => <NumberInput {...field} value={field.value ?? 0} placeholder="0.00" />}
-                            </FieldWrapper>
-                            <div className="col-span-1 md:col-span-3">
-                                <FieldWrapper control={form.control} name="cancelRemark" label="Cancellation / General Remarks">
-                                    {(field) => <Textarea {...field} value={field.value || ''} placeholder="Any additional notes..." className="min-h-[80px]" />}
-                                </FieldWrapper>
-                            </div>
-                        </div>
+                {/* Section 10: FDR Cancellation Confirmation */}
+                <SectionCard title="FDR Cancellation Confirmation">
+                    <FdrCancellationConfirmationFields
+                        control={form.control}
+                        names={STEP_NAMES}
+                    />
+                </SectionCard>
 
-                        <Separator />
-
-                        {/* Action Documents */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                            <FieldWrapper control={form.control} name="prefilled_signed_bg" label="Signed Bank Formats">
-                                {(field) => (
-                                    <CompactFileUploader
-                                        context="bg-prefilled-signed"
-                                        value={field.value || undefined}
-                                        onChange={field.onChange}
-                                    />
-                                )}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="fdr_copy" label="FDR Copy">
-                                {(field) => (
-                                    <CompactFileUploader
-                                        context="bg-fdr-copy"
-                                        value={field.value || undefined}
-                                        onChange={field.onChange}
-                                    />
-                                )}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="sfms_conf" label="SFMS Confirmation">
-                                {(field) => (
-                                    <CompactFileUploader
-                                        context="bg-sfms-conf"
-                                        value={field.value || undefined}
-                                        onChange={field.onChange}
-                                    />
-                                )}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="docket_slip" label="Docket Slip">
-                                {(field) => (
-                                    <CompactFileUploader
-                                        context="bg-docket-slip"
-                                        value={field.value || undefined}
-                                        onChange={field.onChange}
-                                    />
-                                )}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="extension_letter_path" label="Extension Letter">
-                                {(field) => (
-                                    <CompactFileUploader
-                                        context="bg-ext-letter"
-                                        value={field.value || undefined}
-                                        onChange={field.onChange}
-                                    />
-                                )}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="stamp_covering_letter" label="Cancellation Letter">
-                                {(field) => (
-                                    <CompactFileUploader
-                                        context="bg-stamp-covering-letter"
-                                        value={field.value || undefined}
-                                        onChange={field.onChange}
-                                    />
-                                )}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="cancell_confirm" label="Bank Cancellation Confirmation">
-                                {(field) => (
-                                    <CompactFileUploader
-                                        context="bg-cancell-confirm"
-                                        value={field.value || undefined}
-                                        onChange={field.onChange}
-                                    />
-                                )}
-                            </FieldWrapper>
-                        </div>
-                    </CardContent>
-                </Card>
+                <SectionCard title="Instrument Status">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <FieldWrapper control={form.control} name="status" label="Instrument Status">
+                            {(field) => <Input {...field} value={field.value || ''} placeholder="Current lifecycle status" />}
+                        </FieldWrapper>
+                    </div>
+                </SectionCard>
 
                 <div className="flex justify-end gap-4 pb-10">
                     <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>

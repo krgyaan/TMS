@@ -16,8 +16,7 @@ export const BankGuaranteeEditFormSchema = z.object({
     courierAddress: z.string().optional().nullable(),
     courierDeadline: z.coerce.number().optional().nullable(),
     bg_req: z.string().optional().nullable(),
-    modification_required: z.string().optional().nullable(),
-    approve_bg: z.string().optional().nullable(),
+    approveBg: z.string().optional().nullable(),
 
     // BG Details fields
     bgNo: z.string().optional().nullable(),

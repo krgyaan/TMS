@@ -4,35 +4,77 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useEffect } from 'react';
 import { Form } from '@/components/ui/form';
-import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { SelectField } from '@/components/form/SelectField';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { CompactFileUploader, FileUploader } from '@/components/file-upload';
-import { parseFileMeta } from '@/components/file-upload/helpers/fileMeta';
-import { fileUploadService } from '@/services/api/file-upload.service';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
-import { ContactPersonFields } from '@/components/form/ContactPersonFields';
-import { FollowUpFrequencySelect, FREQUENCY_LABELS } from '@/components/form/FollowUpFrequencySelect';
-import { StopReasonFields, STOP_REASON_LABELS } from '@/components/form/StopReasonFields';
 import { ConditionalSection } from '@/components/form/ConditionalSection';
-import { NumberInput } from '@/components/form/NumberInput';
-import DateInput from '@/components/form/DateInput';
 import { BankGuaranteeActionFormSchema, type BankGuaranteeActionFormValues } from '../helpers/bankGuaranteeActionForm.schema';
 import { useUpdateBankGuaranteeAction, useBGActionFormData, useBGFollowupData } from '@/hooks/api/useBankGuarantees';
 import type { Checkpoint } from '@/components/tendering/SubmissionChecklist';
 import { useCourierOptions } from '@/modules/shared/courier/courier.hooks';
-import { CheckCircle2, Plus, Trash2, XCircle } from 'lucide-react';
+import { CheckCircle2, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useWatch } from 'react-hook-form';
+import { AccountsForm1Fields } from './steps/AccountsForm1Fields';
+import { AccountsForm2Fields } from './steps/AccountsForm2Fields';
+import { AccountsForm3Fields } from './steps/AccountsForm3Fields';
+import { FollowupReadOnlyView, InitiateFollowupFields } from './steps/InitiateFollowupFields';
+import { RequestExtensionFields } from './steps/RequestExtensionFields';
+import { ReturnedCourierFields } from './steps/ReturnedCourierFields';
+import { RequestCancellationFields } from './steps/RequestCancellationFields';
+import { BgCancellationConfirmationFields } from './steps/BgCancellationConfirmationFields';
+import { FdrCancellationConfirmationFields } from './steps/FdrCancellationConfirmationFields';
 
-const FDR_PERCENTAGE_OPTIONS = [
-    { value: '10', label: '10%' },
-    { value: '15', label: '15%' },
-    { value: '100', label: '100%' },
-];
+const STEP_NAMES = {
+    bgReq: 'bg_req',
+    reasonReq: 'reason_req',
+    approveBg: 'approve_bg',
+    prefilledSignedBg: 'prefilled_signed_bg',
+    bankMailIds: 'bank_mail_ids',
+    bankMailIdsCc: 'bank_mail_ids_cc',
+    bgApprovedFdrPer: 'bg_approved_fdr_per',
+    bgFormatImran: 'bg_format_imran',
+    bgNo: 'bg_no',
+    bgDate: 'bg_date',
+    bgValidity: 'bg_validity',
+    bgClaimPeriod: 'bg_claim_period',
+    courierNo: 'courier_no',
+    bg2Remark: 'bg2_remark',
+    fdrPer: 'fdr_per',
+    fdrAmt: 'fdr_amt',
+    fdrNo: 'fdr_no',
+    fdrRoi: 'fdr_roi',
+    fdrValidity: 'fdr_validity',
+    fdrCopy: 'fdr_copy',
+    sfmsConf: 'sfms_conf',
+    bgChargeDeducted: 'bg_charge_deducted',
+    sfmsChargeDeducted: 'sfms_charge_deducted',
+    stampChargeDeducted: 'stamp_charge_deducted',
+    otherChargeDeducted: 'other_charge_deducted',
+    organisationName: 'organisation_name',
+    contacts: 'contacts',
+    followupStartDate: 'followup_start_date',
+    frequency: 'frequency',
+    stopReason: 'stop_reason',
+    proofText: 'proof_text',
+    stopRemarks: 'stop_remarks',
+    proofImage: 'proof_image',
+    attachments: 'attachments',
+    extLetter: 'ext_letter',
+    newStampChargeDeducted: 'new_stamp_charge_deducted',
+    newBgBankName: 'new_bg_bank_name',
+    newBgAmt: 'new_bg_amt',
+    newBgExpiry: 'new_bg_expiry',
+    newBgClaim: 'new_bg_claim',
+    modificationRequired: 'modification_required',
+    docketNo: 'docket_no',
+    docketSlip: 'docket_slip',
+    stampCoveringLetter: 'stamp_covering_letter',
+    cancelRemark: 'cancel_remark',
+    cancellConfirm: 'cancell_confirm',
+    bgFdrCancelDate: 'bg_fdr_cancel_date',
+    bgFdrCancelAmount: 'bg_fdr_cancel_amount',
+    bgFdrCancelRefNo: 'bg_fdr_cancel_ref_no',
+} as const;
 
 const ACTION_OPTIONS = [
     { value: 'accounts-form-1', label: 'Accounts Form (BG) 1 - Request to Bank' },
@@ -52,17 +94,6 @@ const ACTION_OPTIONS = [
  */
 const toDateString = (v: unknown): string | undefined =>
     v ? new Date(v as string).toISOString().slice(0, 10) : undefined;
-
-const ReadOnlyValue = ({ label, value, type }: {
-    label: string;
-    value?: string | number | null;
-    type?: 'text' | 'number' | 'date';
-}) => (
-    <div className="grid gap-2">
-        <Label className="inline-flex items-center flex-wrap">{label}</Label>
-        <Input type={type ?? 'text'} value={value ?? ''} readOnly tabIndex={-1} className="bg-muted" />
-    </div>
-);
 
 /**
  * `prefilled_signed_bg` is persisted as a JSON-stringified array of paths. Tolerate
@@ -126,8 +157,6 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
     });
 
     const action = useWatch({ control: form.control, name: 'action' });
-    const bgReq = useWatch({ control: form.control, name: 'bg_req' });
-    const approveBg = useWatch({ control: form.control, name: 'approve_bg' });
     const modificationRequired = useWatch({ control: form.control, name: 'modification_required' });
 
     const bankMailIds = useFieldArray({ control: form.control, name: 'bank_mail_ids' });
@@ -355,193 +384,14 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
                 <ConditionalSection show={action === 'accounts-form-1'}>
                     <div className="space-y-4 border rounded-lg p-4">
                         <h4 className="font-semibold text-base">BG Request to Bank</h4>
-
-                        <FieldWrapper control={form.control} name="bg_req" label="BG Request">
-                            {(field) => (
-                                <RadioGroup
-                                    value={field.value}
-                                    onValueChange={field.onChange}
-                                    className="flex gap-6"
-                                >
-                                    <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="Accepted" id="bg_req_accepted" />
-                                        <Label htmlFor="bg_req_accepted">Accepted</Label>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="Rejected" id="bg_req_rejected" />
-                                        <Label htmlFor="bg_req_rejected">Rejected</Label>
-                                    </div>
-                                </RadioGroup>
-                            )}
-                        </FieldWrapper>
-
-                        {/* Row 1 — FDR % and Approved BG Format */}
-                        {bgReq === 'Accepted' && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-start pt-3">
-                                <SelectField
-                                    label="FDR %"
-                                    control={form.control}
-                                    name="bg_approved_fdr_per"
-                                    options={FDR_PERCENTAGE_OPTIONS}
-                                    placeholder="Select percentage"
-                                    valueType="string"
-                                />
-                                <SelectField
-                                    label="Approved BG Format"
-                                    control={form.control}
-                                    name="approve_bg"
-                                    options={[{ value: 'Accept the BG given by TE', label: 'Accept the BG given by TE' }, { value: 'Upload by Imran', label: 'Upload by Imran' }]}
-                                    placeholder="Select an option"
-                                />
-                            </div>
-                        )}
-
-                        {/* Row 2 — rejection reason, or the file uploaders */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-start pt-3">
-                            {bgReq === 'Rejected' && (
-                                <FieldWrapper
-                                    control={form.control}
-                                    name="reason_req"
-                                    label="Reason for Rejection *"
-                                    className="md:col-span-2"
-                                >
-                                    {(field) => (
-                                        <Textarea
-                                            {...field}
-                                            placeholder="Enter reason for rejection"
-                                            className="min-h-[80px]"
-                                        />
-                                    )}
-                                </FieldWrapper>
-                            )}
-                            {bgReq === 'Accepted' && (
-                                <FieldWrapper control={form.control} name="prefilled_signed_bg" label="Prefilled Bank Formats">
-                                    {(field) => (
-                                        <FileUploader
-                                            context="bg-prefilled-signed"
-                                            value={field.value || []}
-                                            onChange={field.onChange}
-                                            disabled={isReadOnly}
-                                        />
-                                    )}
-                                </FieldWrapper>
-                            )}
-                            {approveBg === 'Upload by Imran' && (
-                                <FieldWrapper control={form.control} name="bg_format_imran" label="Upload Documents *">
-                                    {(field) => (
-                                        <FileUploader
-                                            context="bg-format-imran"
-                                            value={field.value}
-                                            onChange={field.onChange}
-                                            disabled={isReadOnly}
-                                        />
-                                    )}
-                                </FieldWrapper>
-                            )}
-
-                        </div>
-
-                        {/* Bank Mail Ids / CC -- capture only for now; the
-                            notification service does not read these yet. */}
-                        <div className="space-y-6 pt-4">
-                            <div className="flex items-center justify-between border-b pb-2">
-                                <h4 className="font-semibold text-base text-primary">Bank Mail Ids</h4>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => bankMailIds.append({ email: '' })}
-                                >
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Add
-                                </Button>
-                            </div>
-                            {bankMailIds.fields.length === 0 && (
-                                <p className="text-sm text-muted-foreground">
-                                    No mail ids added. Click &quot;Add&quot; to add one.
-                                </p>
-                            )}
-                            <div className="flex flex-wrap items-end gap-2">
-                                {bankMailIds.fields.map((field, index) => (
-                                    <div key={field.id} className="flex items-center gap-1 w-full sm:w-72">
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name={`bank_mail_ids.${index}.email`}
-                                            label=""
-                                        >
-                                            {(f) => (
-                                                <Input
-                                                    {...f}
-                                                    value={f.value ?? ''}
-                                                    type="email"
-                                                    placeholder="e.g., bank.manager@bank.com"
-                                                />
-                                            )}
-                                        </FieldWrapper>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => bankMailIds.remove(index)}
-                                            className="text-destructive hover:text-destructive shrink-0"
-                                            aria-label="Remove mail id"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="space-y-6 pt-4">
-                            <div className="flex items-center justify-between border-b pb-2">
-                                <h4 className="font-semibold text-base text-primary">Bank Mail Ids CC</h4>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => bankMailIdsCc.append({ email: '' })}
-                                >
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Add
-                                </Button>
-                            </div>
-                            {bankMailIdsCc.fields.length === 0 && (
-                                <p className="text-sm text-muted-foreground">
-                                    No CC mail ids added. Click &quot;Add&quot; to add one.
-                                </p>
-                            )}
-                            <div className="flex flex-wrap items-end gap-2">
-                                {bankMailIdsCc.fields.map((field, index) => (
-                                    <div key={field.id} className="flex items-center gap-1 w-full sm:w-72">
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name={`bank_mail_ids_cc.${index}.email`}
-                                            label=""
-                                        >
-                                            {(f) => (
-                                                <Input
-                                                    {...f}
-                                                    value={f.value ?? ''}
-                                                    type="email"
-                                                    placeholder="e.g., branch@bank.com"
-                                                />
-                                            )}
-                                        </FieldWrapper>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => bankMailIdsCc.remove(index)}
-                                            className="text-destructive hover:text-destructive shrink-0"
-                                            aria-label="Remove CC mail id"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+                        <AccountsForm1Fields
+                            control={form.control}
+                            names={STEP_NAMES}
+                            bankMailIds={bankMailIds}
+                            bankMailIdsCc={bankMailIdsCc}
+                            disabled={isReadOnly}
+                            fdrValueType="string"
+                        />
                     </div>
                 </ConditionalSection>
 
@@ -549,36 +399,11 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
                 <ConditionalSection show={action === 'accounts-form-2'}>
                     <div className="space-y-4 border rounded-lg p-4">
                         <h4 className="font-semibold text-base">Accounts Form (BG) 2 - After BG Creation</h4>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                            <FieldWrapper control={form.control} name="bg_no" label="BG No.">
-                                {(field) => <Input {...field} placeholder="Enter BG number" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="bg_date" label="BG Creation Date">
-                                {(field) => <DateInput value={field.value} onChange={field.onChange} />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="bg_validity" label="BG Validity">
-                                {(field) => <DateInput value={field.value} onChange={field.onChange} />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="bg_claim_period" label="BG Claim Period Expiry">
-                                {(field) => <DateInput value={field.value} onChange={field.onChange} />}
-                            </FieldWrapper>
-                            <SelectField
-                                label="Courier Request No."
-                                control={form.control}
-                                name="courier_no"
-                                options={courierOptions}
-                                placeholder="Select courier request number"
-                                valueType="string"
-                            />
-
-                            <FieldWrapper control={form.control} name="bg2_remark" label="Remarks">
-                                {(field) => (
-                                    <Textarea {...field} placeholder="Enter remarks" className="min-h-[80px]" />
-                                )}
-                            </FieldWrapper>
-                        </div>
-
+                        <AccountsForm2Fields
+                            control={form.control}
+                            names={STEP_NAMES}
+                            courierOptions={courierOptions}
+                        />
                     </div>
                 </ConditionalSection>
 
@@ -586,66 +411,12 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
                 <ConditionalSection show={action === 'accounts-form-3'}>
                     <div className="space-y-4 border rounded-lg p-4">
                         <h4 className="font-semibold text-base">Accounts Form (BG) 3 - Capture FDR Details</h4>
-
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 gap-y-4 items-start">
-                            <SelectField
-                                label="FDR Percentage"
-                                control={form.control}
-                                name="fdr_per"
-                                options={FDR_PERCENTAGE_OPTIONS}
-                                placeholder="Select percentage"
-                                valueType="string"
-                            />
-                            <FieldWrapper control={form.control} name="fdr_amt" label="FDR Amount">
-                                {(field) => <NumberInput {...field} placeholder="Enter amount" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="fdr_copy" label="FDR Copy">
-                                {(field) => (
-                                    <CompactFileUploader
-                                        context="bg-fdr-copy"
-                                        value={field.value}
-                                        onChange={field.onChange}
-                                        disabled={isReadOnly}
-                                    />
-                                )}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="sfms_conf" label="SFMS Confirmation">
-                                {(field) => (
-                                    <CompactFileUploader
-                                        context="bg-sfms-conf"
-                                        value={field.value}
-                                        onChange={field.onChange}
-                                        disabled={isReadOnly}
-                                    />
-                                )}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="fdr_no" label="FDR No.">
-                                {(field) => <Input {...field} placeholder="Enter FDR number" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="fdr_validity" label="FDR Validity">
-                                {(field) => <DateInput value={field.value} onChange={field.onChange} />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="fdr_roi" label="FDR ROI%">
-                                {(field) => <NumberInput {...field} placeholder="Enter ROI" />}
-                            </FieldWrapper>
-                        </div>
-
-                        <h5 className="font-medium text-sm mt-4">Charges</h5>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FieldWrapper control={form.control} name="bg_charge_deducted" label="BG Charges Deducted">
-                                {(field) => <NumberInput {...field} placeholder="Enter charges" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="sfms_charge_deducted" label="SFMS Charges Deducted">
-                                {(field) => <NumberInput {...field} placeholder="Enter charges" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="stamp_charge_deducted" label="Stamp Paper Charges Deducted">
-                                {(field) => <NumberInput {...field} placeholder="Enter charges" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="other_charge_deducted" label="Other Charges Deducted">
-                                {(field) => <NumberInput {...field} placeholder="Enter charges" />}
-                            </FieldWrapper>
-                        </div>
+                        <AccountsForm3Fields
+                            control={form.control}
+                            names={STEP_NAMES}
+                            disabled={isReadOnly}
+                            fdrValueType="string"
+                        />
                     </div>
                 </ConditionalSection>
 
@@ -653,121 +424,14 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
                 <ConditionalSection show={action === 'initiate-followup'}>
                     <div className="space-y-4 border rounded-lg p-4">
                         <h4 className="font-semibold text-base">Initiate Followup</h4>
-
                         {hasFollowupData ? (
-                            <>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
-                                    <ReadOnlyValue label="Organisation Name" value={followupData.organisationName} />
-                                    <ReadOnlyValue
-                                        label="Follow-up Start Date"
-                                        type="date"
-                                        value={toDateString(followupData.followupStartDate)}
-                                    />
-                                    <ReadOnlyValue
-                                        label="Follow-up Frequency"
-                                        value={FREQUENCY_LABELS[String(followupData.frequency)] ?? followupData.frequency ?? ''}
-                                    />
-                                </div>
-
-                                <div className="grid gap-2">
-                                    <Label className="inline-flex items-center flex-wrap">Contact Person(s)</Label>
-                                    <div className="space-y-2">
-                                        {(followupData.contacts ?? []).length === 0 && (
-                                            <p className="text-sm text-muted-foreground">No contacts recorded.</p>
-                                        )}
-                                        {(followupData.contacts ?? []).map((contact: { name?: string; phone?: string | null; email?: string | null }, index: number) => (
-                                            <div
-                                                key={index}
-                                                className="rounded-md border bg-muted px-3 py-2 text-sm"
-                                            >
-                                                <span className="font-medium">{contact.name}</span>
-                                                {contact.phone ? (
-                                                    <span className="text-muted-foreground"> · {contact.phone}</span>
-                                                ) : null}
-                                                {contact.email ? (
-                                                    <span className="text-muted-foreground"> · {contact.email}</span>
-                                                ) : null}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {(followupData.attachments ?? []).length > 0 && (
-                                    <div className="grid gap-2">
-                                        <Label className="inline-flex items-center flex-wrap">Attachments</Label>
-                                        <div className="space-y-2">
-                                            {followupData.attachments.map((path: string) => (
-                                                <div
-                                                    key={path}
-                                                    className="rounded-md border bg-muted px-3 py-2 text-sm"
-                                                >
-                                                    <a
-                                                        href={fileUploadService.getFileUrl(path)}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-primary hover:underline"
-                                                    >
-                                                        {parseFileMeta(path).displayName}
-                                                    </a>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {Number(followupData.frequency) === 6 && (
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start gap-y-4">
-                                        <ReadOnlyValue
-                                            label="Stop Reason"
-                                            value={STOP_REASON_LABELS[String(followupData.stopReason)] ?? ''}
-                                        />
-                                        {Number(followupData.stopReason) === 2 && (
-                                            <ReadOnlyValue label="Proof Details" value={followupData.proofText} />
-                                        )}
-                                        {Number(followupData.stopReason) === 2 && followupData.proofImagePath && (
-                                            <ReadOnlyValue label="Proof Image" value={followupData.proofImagePath} />
-                                        )}
-                                        {Number(followupData.stopReason) === 4 && (
-                                            <ReadOnlyValue label="Remarks" value={followupData.stopRemarks} />
-                                        )}
-                                    </div>
-                                )}
-                            </>
+                            <FollowupReadOnlyView data={followupData} />
                         ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
-                            <FieldWrapper control={form.control} name="organisation_name" label="Organisation Name">
-                                {(field) => <Input {...field} placeholder="Enter organisation name" />}
-                            </FieldWrapper>
-                            <div className="col-span-3">
-                                <ContactPersonFields control={form.control} name="contacts" />
-                            </div>
-                            <FieldWrapper control={form.control} name="followup_start_date" label="Follow-up Start Date">
-                                {(field) => <DateInput value={field.value} onChange={field.onChange} />}
-                            </FieldWrapper>
-                            <FollowUpFrequencySelect control={form.control} name="frequency" />
-                            <div className="col-span-3">
-                                <StopReasonFields
-                                    control={form.control}
-                                    frequencyFieldName="frequency"
-                                    stopReasonFieldName="stop_reason"
-                                    proofTextFieldName="proof_text"
-                                    stopRemarksFieldName="stop_remarks"
-                                    proofImageFieldName="proof_image"
-                                />
-                            </div>
-                            <div className="col-span-3">
-                                <FieldWrapper control={form.control} name="attachments" label="Attachments">
-                                    {(field) => (
-                                        <FileUploader
-                                            context="follow-ups"
-                                            value={field.value || []}
-                                            onChange={field.onChange}
-                                            disabled={isReadOnly}
-                                        />
-                                    )}
-                                </FieldWrapper>
-                            </div>
-                        </div>
+                            <InitiateFollowupFields
+                                control={form.control}
+                                names={STEP_NAMES}
+                                disabled={isReadOnly}
+                            />
                         )}
                     </div>
                 </ConditionalSection>
@@ -776,73 +440,19 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
                 <ConditionalSection show={action === 'request-extension'}>
                     <div className="space-y-4 border rounded-lg p-4">
                         <h4 className="font-semibold text-base">Request Extension</h4>
-
-                        <FieldWrapper control={form.control} name="modification_required" label="Modification Required">
-                            {(field) => (
-                                <RadioGroup
-                                    value={field.value}
-                                    onValueChange={field.onChange}
-                                    className="flex gap-6"
-                                >
-                                    <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="Yes" id="mod_yes" />
-                                        <Label htmlFor="mod_yes">Yes</Label>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="No" id="mod_no" />
-                                        <Label htmlFor="mod_no">No</Label>
-                                    </div>
-                                </RadioGroup>
-                            )}
-                        </FieldWrapper>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
-                            <FieldWrapper control={form.control} name="ext_letter" label="Request Letter/email from Client">
-                                {(field) => (
-                                    <CompactFileUploader
-                                        context="bg-ext-letter"
-                                        value={field.value}
-                                        onChange={field.onChange}
-                                        disabled={isReadOnly}
-                                    />
-                                )}
-                            </FieldWrapper>
-
-                            {modificationRequired === 'Yes' && (
-                                <>
-                                    <div className='space-y-4 border rounded-lg p-4 bg-red-200/10'>
-                                        <Label className="text-base font-semibold">Previous Values</Label>
-                                        <div className="grid grid-cols-1 gap-4">
-                                            <ReadOnlyValue label="Stamp Paper Amount" type="number" value={prevStampCharges} />
-                                            <ReadOnlyValue label="Beneficiary Name" value={prevBeneficiaryName} />
-                                            <ReadOnlyValue label="Amount" type="number" value={prevAmount} />
-                                            <ReadOnlyValue label="Expiry Date" type="date" value={prevExpiryDate} />
-                                            <ReadOnlyValue label="Claim Date" type="date" value={prevClaimDate} />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-4 border rounded-lg p-4 bg-green-200/10">
-                                        <Label className="text-base font-semibold">New Values</Label>
-                                        <div className="grid grid-cols-1 gap-4">
-                                            <FieldWrapper control={form.control} name="new_stamp_charge_deducted" label="Stamp Paper Amount">
-                                                {(field) => <NumberInput {...field} placeholder="Enter amount" />}
-                                            </FieldWrapper>
-                                            <FieldWrapper control={form.control} name="new_bg_bank_name" label="Beneficiary Name">
-                                                {(field) => <Input {...field} placeholder="Enter beneficiary name" />}
-                                            </FieldWrapper>
-                                            <FieldWrapper control={form.control} name="new_bg_amt" label="Amount">
-                                                {(field) => <NumberInput {...field} placeholder="Enter amount" />}
-                                            </FieldWrapper>
-                                            <FieldWrapper control={form.control} name="new_bg_expiry" label="Expiry Date">
-                                                {(field) => <DateInput value={field.value} onChange={field.onChange} />}
-                                            </FieldWrapper>
-                                            <FieldWrapper control={form.control} name="new_bg_claim" label="Claim Date">
-                                                {(field) => <DateInput value={field.value} onChange={field.onChange} />}
-                                            </FieldWrapper>
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-                        </div>
+                        <RequestExtensionFields
+                            control={form.control}
+                            names={STEP_NAMES}
+                            modificationRequired={modificationRequired}
+                            prevValues={{
+                                stampCharges: prevStampCharges,
+                                beneficiaryName: prevBeneficiaryName,
+                                amount: prevAmount,
+                                expiryDate: prevExpiryDate,
+                                claimDate: prevClaimDate,
+                            }}
+                            disabled={isReadOnly}
+                        />
                     </div>
                 </ConditionalSection>
 
@@ -850,22 +460,11 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
                 <ConditionalSection show={action === 'returned-courier'}>
                     <div className="space-y-4 border rounded-lg p-4">
                         <h4 className="font-semibold text-base">Returned via Courier</h4>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
-                            <FieldWrapper control={form.control} name="docket_no" label="Docket No.">
-                                {(field) => <Input {...field} placeholder="Enter docket number" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="docket_slip" label="Upload Docket Slip">
-                                {(field) => (
-                                    <CompactFileUploader
-                                        context="bg-docket-slip"
-                                        value={field.value}
-                                        onChange={field.onChange}
-                                        disabled={isReadOnly}
-                                    />
-                                )}
-                            </FieldWrapper>
-                        </div>
+                        <ReturnedCourierFields
+                            control={form.control}
+                            names={STEP_NAMES}
+                            disabled={isReadOnly}
+                        />
                     </div>
                 </ConditionalSection>
 
@@ -873,24 +472,11 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
                 <ConditionalSection show={action === 'request-cancellation'}>
                     <div className="space-y-4 border rounded-lg p-4">
                         <h4 className="font-semibold text-base">Request Cancellation</h4>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
-                            <FieldWrapper control={form.control} name="stamp_covering_letter" label="Upload a Signed, Stamped Covering Letter">
-                                {(field) => (
-                                    <CompactFileUploader
-                                        context="bg-stamp-covering-letter"
-                                        value={field.value}
-                                        onChange={field.onChange}
-                                        disabled={isReadOnly}
-                                    />
-                                )}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="cancel_remark" label="Remarks">
-                                {(field) => (
-                                    <Textarea {...field} placeholder="Enter remarks" className="min-h-[80px]" />
-                                )}
-                            </FieldWrapper>
-                        </div>
+                        <RequestCancellationFields
+                            control={form.control}
+                            names={STEP_NAMES}
+                            disabled={isReadOnly}
+                        />
                     </div>
                 </ConditionalSection>
 
@@ -898,19 +484,11 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
                 <ConditionalSection show={action === 'bg-cancellation-confirmation'}>
                     <div className="space-y-4 border rounded-lg p-4">
                         <h4 className="font-semibold text-base">BG Cancellation Confirmation</h4>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
-                            <FieldWrapper control={form.control} name="cancell_confirm" label="Upload the Bank BG cancellation request">
-                                {(field) => (
-                                    <CompactFileUploader
-                                        context="bg-cancell-confirm"
-                                        value={field.value}
-                                        onChange={field.onChange}
-                                        disabled={isReadOnly}
-                                    />
-                                )}
-                            </FieldWrapper>
-                        </div>
+                        <BgCancellationConfirmationFields
+                            control={form.control}
+                            names={STEP_NAMES}
+                            disabled={isReadOnly}
+                        />
                     </div>
                 </ConditionalSection>
 
@@ -918,18 +496,10 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
                 <ConditionalSection show={action === 'fdr-cancellation-confirmation'}>
                     <div className="space-y-4 border rounded-lg p-4">
                         <h4 className="font-semibold text-base">FDR Cancellation Confirmation</h4>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
-                            <FieldWrapper control={form.control} name="bg_fdr_cancel_date" label="Date">
-                                {(field) => <DateInput value={field.value} onChange={field.onChange} />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="bg_fdr_cancel_amount" label="Amount credited">
-                                {(field) => <NumberInput {...field} placeholder="Enter amount" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="bg_fdr_cancel_ref_no" label="Bank reference No">
-                                {(field) => <Input {...field} placeholder="Enter reference number" />}
-                            </FieldWrapper>
-                        </div>
+                        <FdrCancellationConfirmationFields
+                            control={form.control}
+                            names={STEP_NAMES}
+                        />
                     </div>
                 </ConditionalSection>
                 </fieldset>
