@@ -46,19 +46,27 @@ export class TenderNotificationService {
       return;
     }
 
-    const text = this.formatAllocationMessage(data);
+    let detailsUrl: string | undefined;
+    try {
+      detailsUrl = await this.publicLink.buildUrl({ type: "tender", id: data.tenderId, event: "Tender Allocated" });
+    } catch (linkError) {
+      this.logger.warn(`Failed to build public tender link for tender ${data.tenderId}: ${linkError instanceof Error ? linkError.message : String(linkError)}`);
+    }
+
+    const groupText = this.formatAllocationMessage(data, detailsUrl);
+    const dmText = this.formatAllocationDirectMessage(data, detailsUrl);
 
     if (this.config.OPENWA_DRY_RUN) {
-      this.logger.log(`[DRY_RUN] Tender allocation WhatsApp notification:\n${text}`);
+      this.logger.log(`[DRY_RUN] Tender allocation WhatsApp notification:\n${groupText}`);
       return;
     }
 
     try {
       const jid = await this.jidResolver.toJid(data.teamMemberId);
-      await this.openwa.sendText(group, text, jid ? [jid] : undefined);
+      await this.openwa.sendText(group, groupText, jid ? [jid] : undefined);
       if (jid) {
         try {
-          await this.openwa.sendText(jid, this.formatAllocationDirectMessage(data));
+          await this.openwa.sendText(jid, dmText);
         } catch (dmError) {
           this.logger.error(`Failed to send tender allocation direct message to user ${data.teamMemberId}: ${dmError instanceof Error ? dmError.message : String(dmError)}`);
         }
