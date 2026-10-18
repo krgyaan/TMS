@@ -11,14 +11,16 @@ import {
     type PublicOrderEntity,
     type PublicPaymentRequestEntity,
     type PublicVendorWorkOrderEntity,
+    type PublicTenderEntity,
 } from "@/services/api";
 import { PAYMENT_AGAINST_LABELS, STATUS_CONFIG } from "@/modules/operations/payment-requests/constants";
 
-const BRAND_LOGO = "https://volksenergie.in/wp-content/uploads/2024/09/VE_Logo-Final-Black_BG_Artboard-1.png";
+const BRAND_LOGO = "https://tmsv2.volksenergie.in/ve_favicon.png";
 
 const TYPE_LABELS: Record<string, string> = {
     pr: "Payment Request",
     po: "Purchase Order",
+    tender: "Tender",
     vwo: "Vendor Work Order",
 };
 
