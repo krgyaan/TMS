@@ -941,6 +941,7 @@ export class TenderInfosService {
                     tenderNo: tender.tenderNo,
                     dueDate,
                     tenderValue,
+                    tenderId: tender.id,
                 });
             })
             .catch((error) => {

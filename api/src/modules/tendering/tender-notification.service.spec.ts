@@ -19,6 +19,7 @@ describe("TenderNotificationService.notifyTenderAllocated", () => {
         tenderNo: "TND/2026/001",
         dueDate: "12-10-2026 12:23",
         tenderValue: "₹1,00,000",
+        tenderId: 1,
     };
 
     beforeEach(async () => {
@@ -53,6 +54,7 @@ describe("TenderNotificationService.notifyTenderAllocated", () => {
         const [dmGroup, dmText] = sendText.mock.calls[1];
         expect(dmGroup).toBe("919876543210@c.us");
         expect(dmText).toContain("Dear Jane Doe,");
+        expect(dmText).toContain("Details: https://example.com/notify/test");
         expect(group).toBe(GROUPS.ACTENDERSEARCH);
         expect(mentions).toEqual(["919876543210@c.us"]);
         expect(text).toContain("Dear @Jane Doe,");

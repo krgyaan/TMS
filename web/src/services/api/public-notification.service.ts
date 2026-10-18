@@ -39,10 +39,22 @@ export interface PublicVendorWorkOrderEntity extends PublicOrderEntity {
     scopeOfWork: string | null;
 }
 
-export type PublicNotificationEntity = PublicPaymentRequestEntity | PublicOrderEntity | PublicVendorWorkOrderEntity;
+export interface PublicTenderEntity {
+    id: number;
+    referenceNo: string | null;
+    tenderName: string | null;
+    dueDate: string | null;
+    grandTotal: string | null;
+    allocatedToName: string | null;
+    status: string | null;
+    createdAt: string | null;
+    updatedAt: string | null;
+}
+
+export type PublicNotificationEntity = PublicPaymentRequestEntity | PublicOrderEntity | PublicVendorWorkOrderEntity | PublicTenderEntity;
 
 export interface PublicNotificationResponse {
-    type: "pr" | "po" | "vwo";
+    type: "pr" | "po" | "tender" | "vwo";
     event: string | null;
     entity: PublicNotificationEntity;
 }

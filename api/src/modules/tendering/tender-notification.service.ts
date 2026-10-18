@@ -4,6 +4,7 @@ import { OpenwaService } from '../../openwa/openwa.service';
 import { GROUPS, TEAM_TENDER_GROUPS } from '../../config/groups';
 import { openwaConfig } from '../../config/openwa.config';
 import { WhatsappJidResolver } from '../notifications/helpers/whatsapp-jid.resolver';
+import { PublicLinkService } from '../public-notifications/public-link.service';
 
 export interface TenderInfo {
   id: string;
@@ -20,6 +21,7 @@ export interface TenderAllocatedData {
   tenderNo: string | null;
   dueDate: string;
   tenderValue: string;
+  tenderId: number;
 }
 
 @Injectable()
@@ -30,6 +32,7 @@ export class TenderNotificationService {
     private readonly openwa: OpenwaService,
     private readonly jidResolver: WhatsappJidResolver,
     @Inject(openwaConfig.KEY) private readonly config: ConfigType<typeof openwaConfig>,
+    private readonly publicLink: PublicLinkService,
   ) {}
 
   /**
@@ -67,26 +70,34 @@ export class TenderNotificationService {
     }
   }
 
-  private formatAllocationDirectMessage(data: TenderAllocatedData): string {
-    return [
+  private formatAllocationDirectMessage(data: TenderAllocatedData, detailsUrl?: string): string {
+    const lines = [
       `Dear ${data.teName},`,
       'Congratulations! A new tender has been assigned to you.',
       `- Tender Name: ${data.tenderName || 'Not specified'}`,
       `- Tender No: ${data.tenderNo || 'Not specified'}`,
       `- Due on: ${data.dueDate}`,
       `- Tender Value: ${data.tenderValue}`,
-    ].join('\n');
+    ];
+    if (detailsUrl) {
+      lines.push(`Details: ${detailsUrl}`);
+    }
+    return lines.join('\n');
   }
 
-  private formatAllocationMessage(data: TenderAllocatedData): string {
-    return [
+  private formatAllocationMessage(data: TenderAllocatedData, detailsUrl?: string): string {
+    const lines = [
       `Dear @${data.teName},`,
-      'Congrats! A new tender has been assigned to you.',
+      'Congratulations! A new tender has been assigned to you.',
       `- Tender Name: ${data.tenderName || 'Not specified'}`,
       `- Tender No: ${data.tenderNo || 'Not specified'}`,
       `- Due on: ${data.dueDate}`,
       `- Tender Value: ${data.tenderValue}`,
-    ].join('\n');
+    ];
+    if (detailsUrl) {
+      lines.push(`Details: ${detailsUrl}`);
+    }
+    return lines.join('\n');
   }
 
   /** Notify Tendering group about a new tender */
