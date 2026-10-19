@@ -58,6 +58,7 @@ export {
     type PublicTenderEntity,
     type ApprovalStatus,
 } from "./public-notification.service";
+export { urlShortenerService } from "./url-shortener.service";
 export { healthService } from "./health.service";
 export { inventoryApi } from "./inventory.api";
 export { customerPerformanceService } from "./customer-performance.service";
