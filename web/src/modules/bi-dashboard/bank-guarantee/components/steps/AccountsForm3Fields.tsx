@@ -60,26 +60,6 @@ export function AccountsForm3Fields<T extends FieldValues>({
                         />
                     )}
                 </FieldWrapper>
-                <FieldWrapper control={control} name={names.fdrCopy} label="FDR Copy">
-                    {(field) => (
-                        <FileUploader
-                            context="bg-fdr-copy"
-                            value={toFileArray(field.value)}
-                            onChange={field.onChange}
-                            disabled={disabled}
-                        />
-                    )}
-                </FieldWrapper>
-                <FieldWrapper control={control} name={names.sfmsConf} label="SFMS Confirmation">
-                    {(field) => (
-                        <FileUploader
-                            context="bg-sfms-conf"
-                            value={toFileArray(field.value)}
-                            onChange={field.onChange}
-                            disabled={disabled}
-                        />
-                    )}
-                </FieldWrapper>
                 <FieldWrapper control={control} name={names.fdrNo} label="FDR No.">
                     {(field) => (
                         <Input {...field} value={(field.value as string | undefined) ?? ''} placeholder="Enter FDR number" />
@@ -99,6 +79,29 @@ export function AccountsForm3Fields<T extends FieldValues>({
                             {...field}
                             value={field.value as number | null | undefined}
                             placeholder="Enter ROI"
+                        />
+                    )}
+                </FieldWrapper>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3">
+                <FieldWrapper control={control} name={names.fdrCopy} label="FDR Copy">
+                    {(field) => (
+                        <FileUploader
+                            context="bg-fdr-copy"
+                            value={toFileArray(field.value)}
+                            onChange={field.onChange}
+                            disabled={disabled}
+                        />
+                    )}
+                </FieldWrapper>
+                <FieldWrapper control={control} name={names.sfmsConf} label="SFMS Confirmation">
+                    {(field) => (
+                        <FileUploader
+                            context="bg-sfms-conf"
+                            value={toFileArray(field.value)}
+                            onChange={field.onChange}
+                            disabled={disabled}
                         />
                     )}
                 </FieldWrapper>
