@@ -506,7 +506,7 @@ export class WoBasicDetailsService {
 
         // Send WhatsApp notification to the WORKORDER group (non-blocking)
         if (row) {
-            this.notifyWoBasicDetailsWhatsapp(row, organizationId);
+            this.notifyWoBasicDetailsWhatsapp(row, 'created', { organizationId });
         }
 
         // Create Project asynchronously (non-blocking)
@@ -515,8 +515,22 @@ export class WoBasicDetailsService {
         return this.mapRowToResponse(row!);
     }
 
-    private notifyWoBasicDetailsWhatsapp(row: WoBasicDetailRow, organizationId: number | null): void {
+    private notifyWoBasicDetailsWhatsapp(
+        row: WoBasicDetailRow,
+        kind: 'created' | 'updated' | 'revised',
+        options?: { organizationId?: number | null; revisionNumber?: number; revisionNotes?: string | null },
+    ): void {
         void (async () => {
+            let organizationId = options?.organizationId ?? null;
+            if (!organizationId && row.tenderId) {
+                const [tender] = await this.db
+                    .select({ organizationId: tenderInfos.organization })
+                    .from(tenderInfos)
+                    .where(eq(tenderInfos.id, row.tenderId))
+                    .limit(1);
+                organizationId = tender?.organizationId ?? null;
+            }
+
             let organizationName: string | null = null;
             if (organizationId) {
                 const [org] = await this.db
@@ -527,13 +541,29 @@ export class WoBasicDetailsService {
                 organizationName = org?.name ?? null;
             }
 
-            await this.operationNotifications.notifyWoBasicDetailsCreated({
+            const payload = {
                 woBasicDetailId: row.id,
                 organizationName,
                 projectName: row.projectName,
                 projectCode: row.projectCode,
                 woValuePreGst: row.woValuePreGst,
-            });
+            };
+
+            switch (kind) {
+                case 'created':
+                    await this.operationNotifications.notifyWoBasicDetailsCreated(payload);
+                    break;
+                case 'updated':
+                    await this.operationNotifications.notifyWoBasicDetailsUpdated(payload);
+                    break;
+                case 'revised':
+                    await this.operationNotifications.notifyWoBasicDetailsRevised({
+                        ...payload,
+                        revisionNumber: options?.revisionNumber ?? 1,
+                        revisionNotes: options?.revisionNotes ?? null,
+                    });
+                    break;
+            }
         })().catch((error: unknown) => {
             this.logger.error(
                 `Failed to send WO basic details WhatsApp notification for WO basic detail ${row.id}: ${error instanceof Error ? error.message : String(error)}`,
@@ -800,6 +830,9 @@ export class WoBasicDetailsService {
             throw new NotFoundException(`WO Basic Detail with ID ${id} not found`);
         }
 
+        // Send WhatsApp notification to the WORKORDER group (non-blocking)
+        this.notifyWoBasicDetailsWhatsapp(row, 'updated');
+
         // Reconcile the auto-created GeM charges project payment request (create / update / reject)
         await this.reconcileGemChargesPaymentRequest(id, data, userId);
 
@@ -967,6 +1000,14 @@ export class WoBasicDetailsService {
             .update(projects)
             .set(projectSync)
             .where(eq(projects.woBasicDetailId, id));
+
+        // Send WhatsApp notification to the WORKORDER group (non-blocking)
+        if (updated) {
+            this.notifyWoBasicDetailsWhatsapp(updated, 'revised', {
+                revisionNumber,
+                revisionNotes: data.revisionNotes ?? null,
+            });
+        }
 
         const revisions = await this.getOrderRevisions(id);
 
