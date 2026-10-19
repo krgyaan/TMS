@@ -1,5 +1,6 @@
 import { followUps } from '@/db/schemas/shared/follow-ups.schema';
 import { followUpPersons } from '@/db/schemas/shared/follow-up-persons.schema';
+import { couriers } from '@/db/schemas/shared/couriers.schema';
 import { AppLogger } from '@/logger/app-logger.service';
 import type { BankGuaranteeDashboardCounts, BankGuaranteeDashboardRow } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
@@ -767,6 +768,18 @@ private parseStringArray(v: unknown): string[] | null {
         if (body.docketNo !== undefined) updateData.docketNo = body.docketNo;
         if (body.courierAddress !== undefined) updateData.courierAddress = body.courierAddress;
         if (body.courierDeadline !== undefined) updateData.courierDeadline = body.courierDeadline;
+        if (body.req_no !== undefined && body.req_no !== null && body.req_no !== '') {
+            updateData.reqNo = String(body.req_no);
+        }
+        if (body.courier_address_json) {
+            try {
+                updateData.courierAddressJson = typeof body.courier_address_json === 'string'
+                    ? JSON.parse(body.courier_address_json)
+                    : body.courier_address_json;
+            } catch {
+                updateData.courierAddressJson = null;
+            }
+        }
 
         // Handle files for payment_instruments (if any were uploaded)
         const docketSlipFile = this.getFileForField('docket_slip', files, body, fileIndexTracker);
@@ -944,6 +957,16 @@ private parseStringArray(v: unknown): string[] | null {
             }
         } else if (body.action === 'accounts-form-2') {
             updateData.status = 'BG_CREATED';
+            if (body.req_no) updateData.reqNo = String(body.req_no);
+            if (body.courier_address_json) {
+                try {
+                    updateData.courierAddressJson = typeof body.courier_address_json === 'string'
+                        ? JSON.parse(body.courier_address_json)
+                        : body.courier_address_json;
+                } catch {
+                    updateData.courierAddressJson = null;
+                }
+            }
         } else if (body.action === 'accounts-form-3') {
             updateData.status = 'FDR_DETAILS_CAPTURED';
         } else if (body.action === 'initiate-followup') {
@@ -1044,7 +1067,6 @@ private parseStringArray(v: unknown): string[] | null {
             if (body.bg_date) bgDetailsUpdate.bgDate = body.bg_date;
             if (body.bg_validity) bgDetailsUpdate.validityDate = body.bg_validity;
             if (body.bg_claim_period) bgDetailsUpdate.claimExpiryDate = body.bg_claim_period;
-            if (body.courier_no) bgDetailsUpdate.courierNo = body.courier_no;
             if (body.bg2_remark) bgDetailsUpdate.bg2Remark = body.bg2_remark;
         } else if (body.action === 'accounts-form-3') {
             if (body.fdr_no) bgDetailsUpdate.fdrNo = body.fdr_no;
@@ -1213,6 +1235,8 @@ private parseStringArray(v: unknown): string[] | null {
                 bgClaim: instrumentBgDetails.bgClaim,
                 docketNo: paymentInstruments.docketNo,
                 courierAddress: paymentInstruments.courierAddress,
+                courierAddressJson: paymentInstruments.courierAddressJson,
+                reqNo: paymentInstruments.reqNo,
                 courierDeadline: paymentInstruments.courierDeadline,
                 action: paymentInstruments.action,
                 status: paymentInstruments.status,
@@ -1354,6 +1378,8 @@ private parseStringArray(v: unknown): string[] | null {
                 bgExpiryDateBg: sql<string | null>`coalesce(${paymentInstruments.expiryDate}, ${instrumentBgDetails.bgExpiryDate})`,
                 docketNo: paymentInstruments.docketNo,
                 courierAddress: paymentInstruments.courierAddress,
+                courierAddressJson: paymentInstruments.courierAddressJson,
+                reqNo: paymentInstruments.reqNo,
                 courierDeadline: paymentInstruments.courierDeadline,
                 generatedPdf: paymentInstruments.generatedPdf,
                 cancelPdf: paymentInstruments.cancelPdf,
@@ -1425,6 +1451,35 @@ private parseStringArray(v: unknown): string[] | null {
             throw new NotFoundException(`Payment Instrument with ID ${id} not found`);
         }
 
+        let courierDetails: any = null;
+        if (result.reqNo) {
+            const courierId = Number(result.reqNo);
+            if (!isNaN(courierId)) {
+                const [courier] = await this.db
+                    .select()
+                    .from(couriers)
+                    .where(eq(couriers.id, courierId))
+                    .limit(1);
+                if (courier) {
+                    courierDetails = {
+                        id: courier.id,
+                        toOrg: courier.toOrg,
+                        toName: courier.toName,
+                        toAddr: courier.toAddr,
+                        toPin: courier.toPin,
+                        toMobile: courier.toMobile,
+                        empFrom: courier.empFrom,
+                        delDate: courier.delDate,
+                        urgency: courier.urgency,
+                        courierDocs: courier.courierDocs,
+                        docketNo: courier.docketNo,
+                        docketSlip: courier.docketSlip,
+                        status: courier.status,
+                    };
+                }
+            }
+        }
+
         const hasAccountsForm1Data = !!(result.approveBg || result.reasonReq || result.bgFormatTe);
         const hasAccountsForm2Data = !!(result.bgNo || result.bg2Remark);
         const hasAccountsForm3Data = !!(result.fdrNo || result.fdrAmt);
@@ -1469,6 +1524,9 @@ private parseStringArray(v: unknown): string[] | null {
             bankMailIdsCc: result.bankMailIdsCc ?? [],
             courierNo: result.courierNo,
             courierAddress: result.courierAddress,
+            courierAddressJson: (result.courierAddressJson ?? null) as Record<string, any> | null,
+            reqNo: result.reqNo,
+            courierDetails,
             courierDeadline: result.courierDeadline ? Number(result.courierDeadline) : null,
             stampCharges: result.stampCharges ? Number(result.stampCharges) : null,
             // Accounts Form 1 (request to bank)

@@ -77,12 +77,41 @@ export const BankGuaranteeEditFormSchema = z.object({
     bgBankIfsc: z.string().optional().nullable(),
     bgBankAccName: z.string().optional().nullable(),
     courierNo: z.string().optional().nullable(),
+
+    // Courier Dispatch (BG) 2
+    courierOrg: z.string().optional().nullable(),
+    courierName: z.string().optional().nullable(),
+    courierPhone: z.string().optional().nullable(),
+    courierAddrLine1: z.string().optional().nullable(),
+    courierAddrLine2: z.string().optional().nullable(),
+    courierCity: z.string().optional().nullable(),
+    courierState: z.string().optional().nullable(),
+    courierPincode: z.string().optional().nullable(),
+    empFrom: z.coerce.number().optional().nullable(),
+    delDate: z.string().optional().nullable(),
+    urgency: z.coerce.number().optional().nullable(),
+    courier_docs: z.any().optional(),
     cancelRemark: z.string().optional().nullable(),
     bgFdrCancelDate: z.string().optional().nullable(),
     bgFdrCancelAmount: z.coerce.number().optional().nullable(),
     bgFdrCancelRefNo: z.string().optional().nullable(),
     bg2Remark: z.string().optional().nullable(),
     reasonReq: z.string().optional().nullable(),
-});
+}).refine(
+    (data) => {
+        if (!data.courierOrg) return true;
+        return !!data.courierName
+            && !!data.courierPhone
+            && !!data.courierAddrLine1
+            && /^\d{6}$/.test(data.courierPincode ?? '')
+            && !!data.empFrom
+            && !!data.delDate
+            && !!data.urgency;
+    },
+    {
+        message: 'Courier recipient, phone, address, pin code, sender, delivery date, and urgency are required',
+        path: ['courierOrg'],
+    }
+);
 
 export type BankGuaranteeEditFormValues = z.infer<typeof BankGuaranteeEditFormSchema>;

@@ -51,8 +51,21 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     bg_date: z.string().optional(),
     bg_validity: z.string().optional(),
     bg_claim_period: z.string().optional(),
-    courier_no: z.string().optional(),
     bg2_remark: z.string().optional(),
+
+    // Courier Dispatch (BG) 2 - creates a couriers row, id stored in req_no
+    courierOrg: z.string().optional(),
+    courierName: z.string().optional(),
+    courierPhone: z.string().optional(),
+    courierAddrLine1: z.string().optional(),
+    courierAddrLine2: z.string().optional(),
+    courierCity: z.string().optional(),
+    courierState: z.string().optional(),
+    courierPincode: z.string().optional(),
+    empFrom: z.coerce.number().optional(),
+    delDate: z.string().optional(),
+    urgency: z.coerce.number().optional(),
+    courier_docs: z.array(z.string()).optional(),
 
     // Accounts Form (BG) 3 - Capture FDR Details
     sfms_conf: z.any().optional(), // File
@@ -288,6 +301,25 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     {
         message: 'BG number, creation date, and validity are required',
         path: ['bg_no'],
+    }
+).refine(
+    (data) => {
+        // Accounts Form (BG) 2: courier dispatch details are required
+        if (data.action === 'accounts-form-2') {
+            return !!data.courierOrg
+                && !!data.courierName
+                && !!data.courierPhone
+                && !!data.courierAddrLine1
+                && /^\d{6}$/.test(data.courierPincode ?? '')
+                && !!data.empFrom
+                && !!data.delDate
+                && !!data.urgency;
+        }
+        return true;
+    },
+    {
+        message: 'Courier organization, recipient, phone, address, pin code, sender, delivery date, and urgency are required',
+        path: ['courierOrg'],
     }
 ).refine(
     (data) => {

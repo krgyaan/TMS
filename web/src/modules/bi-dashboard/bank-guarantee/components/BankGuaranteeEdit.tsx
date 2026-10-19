@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useFieldArray, useForm, useWatch, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,8 @@ import { Separator } from '@/components/ui/separator';
 import { BG_PURPOSE_OPTIONS, BG_NEEDED_IN_OPTIONS, BANKS } from '@/modules/tendering/emds-tenderfees/constants';
 import { BankGuaranteeEditFormSchema, type BankGuaranteeEditFormValues } from '../helpers/bankGuaranteeEditForm.schema';
 import { useUpdateBankGuarantee, useBGFollowupData } from '@/hooks/api/useBankGuarantees';
+import { useCreateCourier, useCourier } from '@/modules/shared/courier/courier.hooks';
+import { useUsers } from '@/hooks/api/useUsers';
 import { toast } from 'sonner';
 import { AccountsForm1Fields } from './steps/AccountsForm1Fields';
 import { AccountsForm2Fields } from './steps/AccountsForm2Fields';
@@ -142,6 +144,20 @@ export function BankGuaranteeEdit({ instrumentId, initialData }: BankGuaranteeEd
         return files;
     })();
 
+    const courierAddrJson = (() => {
+        const v = initialData.courierAddressJson;
+        if (!v) return {} as Record<string, string | null>;
+        if (typeof v === 'string') {
+            try {
+                const parsed = JSON.parse(v);
+                return (parsed && typeof parsed === 'object' ? parsed : {}) as Record<string, string | null>;
+            } catch {
+                return {} as Record<string, string | null>;
+            }
+        }
+        return v as Record<string, string | null>;
+    })();
+
     const form = useForm<BankGuaranteeEditFormValues>({
         resolver: zodResolver(BankGuaranteeEditFormSchema) as Resolver<BankGuaranteeEditFormValues>,
         defaultValues: {
@@ -186,6 +202,18 @@ export function BankGuaranteeEdit({ instrumentId, initialData }: BankGuaranteeEd
             extension_letter_path: parseFileValue(initialData.extensionLetterPath),
             stamp_covering_letter: parseFileValue(initialData.stampCoveringLetter),
             cancell_confirm: parseFileValue(initialData.cancellConfirm),
+            courierName: courierAddrJson.name ?? null,
+            courierPhone: courierAddrJson.phone ?? null,
+            courierAddrLine1: courierAddrJson.line1 ?? null,
+            courierAddrLine2: courierAddrJson.line2 ?? null,
+            courierCity: courierAddrJson.city ?? null,
+            courierState: courierAddrJson.state ?? null,
+            courierPincode: courierAddrJson.pincode ?? null,
+            courierOrg: courierAddrJson.org ?? null,
+            empFrom: courierAddrJson.empFrom != null ? Number(courierAddrJson.empFrom) : null,
+            delDate: courierAddrJson.delDate ?? null,
+            urgency: courierAddrJson.urgency != null ? Number(courierAddrJson.urgency) : null,
+            courier_docs: Array.isArray(courierAddrJson.docs) ? courierAddrJson.docs : [],
             bankMailIds: initialData.bankMailIds?.length
                 ? initialData.bankMailIds.map((email: string) => ({ email }))
                 : [{ email: '' }],
@@ -197,6 +225,24 @@ export function BankGuaranteeEdit({ instrumentId, initialData }: BankGuaranteeEd
 
     const modificationRequired = useWatch({ control: form.control, name: 'modification_required' });
 
+    const courierId = Number(initialData.reqNo) || 0;
+    const { data: courierRow } = useCourier(courierId);
+    const { data: employees = [] } = useUsers();
+    const createCourierMutation = useCreateCourier();
+
+    useEffect(() => {
+        if (!courierRow || Object.keys(courierAddrJson).length > 0) return;
+        form.setValue('courierOrg', courierRow.toOrg ?? undefined, { shouldValidate: false });
+        form.setValue('courierName', courierRow.toName ?? undefined, { shouldValidate: false });
+        form.setValue('courierPhone', courierRow.toMobile ?? undefined, { shouldValidate: false });
+        form.setValue('courierPincode', courierRow.toPin ?? undefined, { shouldValidate: false });
+        form.setValue('empFrom', courierRow.empFrom ? Number(courierRow.empFrom) : undefined, { shouldValidate: false });
+        form.setValue('delDate', toDateString(courierRow.delDate), { shouldValidate: false });
+        form.setValue('urgency', courierRow.urgency ? Number(courierRow.urgency) : undefined, { shouldValidate: false });
+        form.setValue('courier_docs', courierRow.courierDocs ?? [], { shouldValidate: false });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [courierRow]);
+
     const bankMailIds = useFieldArray({ control: form.control, name: 'bankMailIds' });
     const bankMailIdsCc = useFieldArray({ control: form.control, name: 'bankMailIdsCc' });
 
@@ -207,7 +253,7 @@ export function BankGuaranteeEdit({ instrumentId, initialData }: BankGuaranteeEd
         return false;
     };
 
-    const isSubmitting = form.formState.isSubmitting || updateMutation.isPending;
+    const isSubmitting = form.formState.isSubmitting || updateMutation.isPending || createCourierMutation.isPending;
 
     const prevValues = {
         stampCharges: initialData.stampCharges,
@@ -231,6 +277,8 @@ export function BankGuaranteeEdit({ instrumentId, initialData }: BankGuaranteeEd
                 if (key === 'bankMailIds' || key === 'bankMailIdsCc') return;
 
                 if (key === 'status') return;
+
+                if (key === 'reqNo' || key === 'courierAddressJson') return;
 
                 if (value instanceof Date) {
                     payload[key] = value.toISOString();
@@ -258,6 +306,40 @@ export function BankGuaranteeEdit({ instrumentId, initialData }: BankGuaranteeEd
             finalPayload.bankMailIdsCc = JSON.stringify(
                 (values.bankMailIdsCc ?? []).map((r) => r.email).filter(Boolean),
             );
+
+            if (values.courierOrg) {
+                if (!courierRow?.id) {
+                    const createdCourier = await createCourierMutation.mutateAsync({
+                        data: {
+                            toOrg: values.courierOrg,
+                            toName: values.courierName || '',
+                            toAddr: [values.courierAddrLine1, values.courierAddrLine2, values.courierCity, values.courierState]
+                                .filter(Boolean).join(', '),
+                            toPin: values.courierPincode || '',
+                            toMobile: values.courierPhone || '',
+                            empFrom: values.empFrom || 0,
+                            delDate: values.delDate || '',
+                            urgency: values.urgency || 1,
+                        },
+                        filenames: values.courier_docs ?? [],
+                    });
+                    finalPayload.req_no = String(createdCourier.id);
+                }
+                finalPayload.courier_address_json = JSON.stringify({
+                    org: values.courierOrg || null,
+                    name: values.courierName || null,
+                    phone: values.courierPhone || null,
+                    line1: values.courierAddrLine1 || null,
+                    line2: values.courierAddrLine2 || null,
+                    city: values.courierCity || null,
+                    state: values.courierState || null,
+                    pincode: values.courierPincode || null,
+                    empFrom: values.empFrom ?? null,
+                    delDate: values.delDate || null,
+                    urgency: values.urgency ?? null,
+                    docs: values.courier_docs ?? [],
+                });
+            }
 
             await updateMutation.mutateAsync({ id: instrumentId, payload: finalPayload });
             toast.success('Bank Guarantee updated successfully');
@@ -393,6 +475,7 @@ export function BankGuaranteeEdit({ instrumentId, initialData }: BankGuaranteeEd
                                     <AccountsForm2Fields
                                         control={form.control}
                                         names={STEP_NAMES}
+                                        employees={employees}
                                     />
                                 </SectionBlock>
                             )}
