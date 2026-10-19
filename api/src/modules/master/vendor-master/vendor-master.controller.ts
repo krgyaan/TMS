@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus, UseGuards } from "@nestjs/common";
 import { z } from "zod";
-import { CanCreate, CanUpdate, CanDelete, CanRead } from "@/modules/auth/decorators";
+import { CanCreate, CanUpdate, CanDelete, RequireAnyPermission } from "@/modules/auth/decorators";
 import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
 import { PermissionGuard } from "@/modules/auth/guards/permission.guard";
 import { VendorMasterService } from "@/modules/master/vendor-master/vendor-master.service";
@@ -71,10 +71,13 @@ const UpdateVendorFileSchema = CreateVendorFileSchema.partial();
 
 @Controller()
 @UseGuards(JwtAuthGuard, PermissionGuard)
-// `read` is the class-wide floor so every read route is covered without
+// Read access is satisfied by either the admin-side `master.vendors` module or
+// the shared read-only directory module `document-dashboard.vendors` (granted to
+// all roles; powers Document Dashboard > Vendors and the RFQ form's vendor
+// dropdown). This is the class-wide floor so every read route is covered without
 // repeating itself; the mutating handlers below override it, because
 // PermissionGuard resolves handler metadata before class metadata.
-@CanRead("master.vendors")
+@RequireAnyPermission({ module: "master.vendors", action: "read" }, { module: "document-dashboard.vendors", action: "read" })
 export class VendorMasterController {
     constructor(private readonly vendorMasterService: VendorMasterService) {}
 
@@ -284,7 +287,9 @@ export class VendorMasterController {
 
     @Post("vendor-files")
     @HttpCode(HttpStatus.CREATED)
-    @CanCreate("master.vendors")
+    // Upload-only from the shared Document Dashboard directory is enough;
+    // edit/delete stay gated on master.vendors below.
+    @RequireAnyPermission({ module: "master.vendors", action: "create" }, { module: "document-dashboard.vendors", action: "create" })
     async createVendorFile(@Body() body: unknown) {
         const parsed = CreateVendorFileSchema.parse(body);
         return this.vendorMasterService.createVendorFile(parsed);
