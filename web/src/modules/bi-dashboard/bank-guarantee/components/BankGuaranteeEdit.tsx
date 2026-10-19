@@ -81,7 +81,6 @@ const EDIT_SECTIONS: SelectOption[] = [
     { id: 'request-cancellation', name: 'Request Cancellation' },
     { id: 'bg-cancellation-confirmation', name: 'BG Cancellation Confirmation' },
     { id: 'fdr-cancellation-confirmation', name: 'FDR Cancellation Confirmation' },
-    { id: 'instrument-status', name: 'Instrument Status' },
 ];
 
 const SectionCard = ({ title, children }: { title: string; children: ReactNode }) => (
@@ -149,6 +148,7 @@ export function BankGuaranteeEdit({ instrumentId, initialData }: BankGuaranteeEd
         resolver: zodResolver(BankGuaranteeEditFormSchema) as Resolver<BankGuaranteeEditFormValues>,
         defaultValues: {
             ...initialData,
+            status: undefined,
             amount: initialData.amount ? Number(initialData.amount) : 0,
             bg_req: form1Submitted
                 ? (initialData.reasonReq ? 'Rejected' : 'Accepted')
@@ -231,6 +231,8 @@ export function BankGuaranteeEdit({ instrumentId, initialData }: BankGuaranteeEd
                 if (value === undefined || value === null) return;
 
                 if (key === 'bankMailIds' || key === 'bankMailIdsCc') return;
+
+                if (key === 'status') return;
 
                 if (value instanceof Date) {
                     payload[key] = value.toISOString();
@@ -466,16 +468,6 @@ export function BankGuaranteeEdit({ instrumentId, initialData }: BankGuaranteeEd
                                 control={form.control}
                                 names={STEP_NAMES}
                             />
-                        </SectionCard>
-                    )}
-
-                    {activeSection === 'instrument-status' && (
-                        <SectionCard title="Instrument Status">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <FieldWrapper control={form.control} name="status" label="Instrument Status">
-                                    {(field) => <Input {...field} value={field.value || ''} placeholder="Current lifecycle status" />}
-                                </FieldWrapper>
-                            </div>
                         </SectionCard>
                     )}
                 </fieldset>

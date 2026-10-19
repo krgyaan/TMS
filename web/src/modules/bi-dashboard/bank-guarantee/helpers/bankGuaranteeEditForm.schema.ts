@@ -11,7 +11,6 @@ export const BankGuaranteeEditFormSchema = z.object({
     claimExpiryDate: z.string().optional().nullable(),
     bgExpiryDate: z.string().optional().nullable(),
     bgClaim: z.string().optional().nullable(),
-    status: z.string().optional(),
     action: z.coerce.number().optional(),
     courierAddress: z.string().optional().nullable(),
     courierDeadline: z.coerce.number().optional().nullable(),
