@@ -119,7 +119,8 @@ function NotificationCard({ data }: { data: PublicNotificationResponse }) {
                     <DetailRow label="Value (preGST)" value={formatAmount(wobd.value)} />
                     <DetailRow label="Organization" value={wobd.organizationName} />
                     <DetailRow label="Stage" value={wobd.currentStage} />
-                    <DetailRow label="Raised By" value={wobd.raisedByName} />
+                    <DetailRow label="Created By" value={wobd.raisedByName} />
+                    {wobd.teamMemberName && <DetailRow label="Team Member" value={wobd.teamMemberName} />}
                     <DetailRow label="WO Date" value={wobd.woDate} />
                 </Card>
 
