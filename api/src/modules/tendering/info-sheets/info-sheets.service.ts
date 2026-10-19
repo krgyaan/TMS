@@ -1309,10 +1309,10 @@ export class TenderInfoSheetsService {
             value: string | number | null | undefined
         ): string => {
             if (value === null || value === undefined || value === '')
-                return '0';
+                return '—';
             const num = Number(value);
-            if (isNaN(num)) return '0';
-            if (num === 0) return '0';
+            if (isNaN(num)) return '—';
+            if (num === 0) return '—';
             return `₹${num.toLocaleString('en-IN')}`;
         };
 
@@ -1415,7 +1415,7 @@ export class TenderInfoSheetsService {
             processing_fee_required:
                 infoSheet.processingFeeRequired || 'No',
             processing_fee_required_bool:
-                infoSheet.processingFeeRequired == 'YES',
+                String(infoSheet.processingFeeRequired).toUpperCase() === 'YES',
             processing_fee_amount: formatCurrency(
                 infoSheet.processingFeeAmount
             ),
@@ -1426,7 +1426,7 @@ export class TenderInfoSheetsService {
             // ── Tender Fee 
             tender_fee_required: infoSheet.tenderFeeRequired || 'No',
             tender_fee_required_bool:
-                infoSheet.tenderFeeRequired == 'YES',
+                String(infoSheet.tenderFeeRequired).toUpperCase() === 'YES',
             tender_fees: formatCurrency(infoSheet.tenderFeeAmount),
             tender_fees_in_form_of: formatArray(
                 parseModeField(infoSheet.tenderFeeMode)
@@ -1435,16 +1435,15 @@ export class TenderInfoSheetsService {
             // ── EMD 
             emd_required: infoSheet.emdRequired || 'No',
             emd_required_bool:
-                infoSheet.emdRequired == 'YES' ||
-                infoSheet.emdRequired == 'EXEMPT',
+                String(infoSheet.emdRequired).toUpperCase() === 'YES' ||
+                String(infoSheet.emdRequired).toUpperCase() === 'EXEMPT',
             emd: formatCurrency(infoSheet.emdAmount),
             emd_in_form_of: formatArray(
                 parseModeField(infoSheet.emdMode)
             ),
 
             // ── Tender Value / OEM 
-            tender_value:
-                formatCurrency(infoSheet.tenderValue) || 'Not specified',
+            tender_value: formatCurrency(infoSheet.tenderValue),
             oem_experience: infoSheet.oemExperience || 'Not specified',
 
             // ── Bid / Commercial 

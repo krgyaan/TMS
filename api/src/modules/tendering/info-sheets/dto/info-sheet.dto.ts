@@ -264,6 +264,13 @@ export const TenderInfoSheetPayloadSchema = z
         }
 
         if (data.emdRequired === 'YES') {
+            if (data.emdAmount === undefined || data.emdAmount === null || data.emdAmount <= 0) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: 'EMD amount must be a positive number when EMD is required',
+                    path: ['emdAmount'],
+                });
+            }
             if (!data.emdModes?.length) {
                 ctx.addIssue({
                     code: z.ZodIssueCode.custom,

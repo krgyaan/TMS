@@ -81,7 +81,7 @@
             <!-- Tender Value / Bid / OEM -->
             <tr style="background-color: #f9f9f9;">
                 <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Tender Value (GST Incl.)</th>
-                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.tender_value}}</td>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{#if data.tender_value}}{{data.tender_value}}{{else}}—{{/if}}</td>
                 <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">OEM Experience</th>
                 <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.oem_experience}}</td>
                 <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Bid Validity</th>

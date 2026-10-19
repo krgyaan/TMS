@@ -108,5 +108,54 @@ describe('TenderInfoSheetPayloadSchema numeric fields', () => {
         });
         expect(parsedEmpty.clients?.[0].clientEmail).toBeNull();
     });
+
+    describe('emdRequired conditional validation', () => {
+        const payloadBase = {
+            teRecommendation: 'YES' as const,
+            emdRequired: 'YES' as const,
+            emdModes: ['BG'],
+            clients: [{ clientName: 'Vendor Lead', clientMobile: '9876543210' }],
+        };
+
+        it('rejects null, undefined, 0, or negative emdAmount when emdRequired is YES', () => {
+            expect(TenderInfoSheetPayloadSchema.safeParse({ ...payloadBase, emdAmount: null }).success).toBe(false);
+            expect(TenderInfoSheetPayloadSchema.safeParse({ ...payloadBase, emdAmount: undefined }).success).toBe(false);
+            expect(TenderInfoSheetPayloadSchema.safeParse({ ...payloadBase, emdAmount: 0 }).success).toBe(false);
+            expect(TenderInfoSheetPayloadSchema.safeParse({ ...payloadBase, emdAmount: -500 }).success).toBe(false);
+        });
+
+        it('accepts a positive emdAmount when emdRequired is YES', () => {
+            const res = TenderInfoSheetPayloadSchema.safeParse({ ...payloadBase, emdAmount: 75000 });
+            expect(res.success).toBe(true);
+            if (res.success) {
+                expect(res.data.emdAmount).toBe(75000);
+            }
+        });
+
+        it('allows null / undefined emdAmount when emdRequired is NO or EXEMPT', () => {
+            expect(TenderInfoSheetPayloadSchema.safeParse({
+                ...payloadBase,
+                emdRequired: 'NO',
+                emdAmount: null,
+            }).success).toBe(true);
+            expect(TenderInfoSheetPayloadSchema.safeParse({
+                ...payloadBase,
+                emdRequired: 'EXEMPT',
+                emdAmount: null,
+            }).success).toBe(true);
+        });
+
+        it('allows null / undefined emdAmount when teRecommendation is NO (rejection)', () => {
+            expect(TenderInfoSheetPayloadSchema.safeParse({
+                ...payloadBase,
+                teRecommendation: 'NO',
+                teRejectionReason: 1,
+                teRejectionRemarks: 'Client not responding',
+                teRejectionProof: ['proof.pdf'],
+                emdRequired: 'YES',
+                emdAmount: null,
+            }).success).toBe(true);
+        });
+    });
 });
 
