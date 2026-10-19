@@ -71,9 +71,23 @@ const vwoRow: Row = {
     updatedAt: new Date("2025-10-03T09:00:00Z"),
 };
 
+const wobdRow: Row = {
+    id: 41,
+    referenceNo: "WO/2026-27/0011",
+    projectName: "Solar Plant",
+    projectCode: "PRJ-001",
+    value: "1500000.00",
+    organizationName: "Volks Energie",
+    woDate: "2026-10-05",
+    currentStage: "basic_details",
+    raisedByName: "Rahul Sharma",
+    createdAt: new Date("2026-10-05T09:00:00Z"),
+    updatedAt: new Date("2026-10-05T09:00:00Z"),
+};
+
 describe("ENTITY_RESOLVER_MAP", () => {
     it("registers a resolver for every supported entity type", () => {
-        expect(Object.keys(ENTITY_RESOLVER_MAP).sort()).toEqual(["po", "pr", "tender", "vwo"]);
+        expect(Object.keys(ENTITY_RESOLVER_MAP).sort()).toEqual(["po", "pr", "tender", "vwo", "wobd"]);
     });
 
     describe("pr resolver", () => {
@@ -154,6 +168,25 @@ describe("ENTITY_RESOLVER_MAP", () => {
         });
 
         it("returns null when the WO does not exist", async () => {
+            const { db } = createDb([]);
+
+            await expect(resolve(db, 999)).resolves.toBeNull();
+        });
+    });
+
+    describe("wobd resolver", () => {
+        const resolve = ENTITY_RESOLVER_MAP.wobd;
+
+        it("maps the WO basic detail with its organization name", async () => {
+            const { db, select } = createDb([wobdRow]);
+
+            const result = await resolve(db, 41);
+
+            expect(result).toEqual(wobdRow);
+            expect(select).toHaveBeenCalledTimes(1);
+        });
+
+        it("returns null when the record does not exist", async () => {
             const { db } = createDb([]);
 
             await expect(resolve(db, 999)).resolves.toBeNull();

@@ -1,7 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import type { DbInstance } from "@/db";
-import { users, tenderInfos } from "@/db/schemas/";
-import { paymentRequests, vendorWorkOrders, vendorWorkOrderItems } from "@/db/schemas/operations";
+import { users, tenderInfos, organizations } from "@/db/schemas/";
+import { paymentRequests, vendorWorkOrders, vendorWorkOrderItems, woBasicDetails } from "@/db/schemas/operations";
 import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
 import { purchaseOrderProducts } from "@/db/schemas/operations/purchase-order-products.schema";
 
@@ -56,7 +56,26 @@ export interface PublicTenderDto {
     updatedAt: Date;
 }
 
-export type PublicEntityDto = PublicPaymentRequestDto | PublicOrderDto | PublicVendorWorkOrderDto | PublicTenderDto;
+export interface PublicWoBasicDetailDto {
+    id: number;
+    referenceNo: string | null;
+    projectName: string | null;
+    projectCode: string | null;
+    value: string | null;
+    organizationName: string | null;
+    woDate: string | null;
+    currentStage: string | null;
+    raisedByName: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export type PublicEntityDto =
+    | PublicPaymentRequestDto
+    | PublicOrderDto
+    | PublicVendorWorkOrderDto
+    | PublicTenderDto
+    | PublicWoBasicDetailDto;
 
 export type EntityResolver = (db: DbInstance, id: number) => Promise<PublicEntityDto | null>;
 
@@ -186,6 +205,31 @@ const resolveTender: EntityResolver = async (db, id) => {
     return row ?? null;
 };
 
+const resolveWoBasicDetails: EntityResolver = async (db, id) => {
+    const [row] = await db
+        .select({
+            id: woBasicDetails.id,
+            referenceNo: woBasicDetails.woNumber,
+            projectName: woBasicDetails.projectName,
+            projectCode: woBasicDetails.projectCode,
+            value: woBasicDetails.woValuePreGst,
+            organizationName: organizations.name,
+            woDate: woBasicDetails.woDate,
+            currentStage: woBasicDetails.currentStage,
+            raisedByName: users.name,
+            createdAt: woBasicDetails.createdAt,
+            updatedAt: woBasicDetails.updatedAt,
+        })
+        .from(woBasicDetails)
+        .leftJoin(tenderInfos, eq(tenderInfos.id, woBasicDetails.tenderId))
+        .leftJoin(organizations, eq(organizations.id, tenderInfos.organization))
+        .leftJoin(users, eq(users.id, woBasicDetails.createdBy))
+        .where(eq(woBasicDetails.id, id))
+        .limit(1);
+
+    return row ?? null;
+};
+
 /**
  * Registry of entity types a public notification link can point at.
  * To support a new notification type, add its entity type to
@@ -196,4 +240,5 @@ export const ENTITY_RESOLVER_MAP: Record<string, EntityResolver> = {
     po: resolvePurchaseOrder,
     vwo: resolveVendorWorkOrder,
     tender: resolveTender,
+    wobd: resolveWoBasicDetails,
 };
