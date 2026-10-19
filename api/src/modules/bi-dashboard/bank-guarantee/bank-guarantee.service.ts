@@ -1480,9 +1480,10 @@ private parseStringArray(v: unknown): string[] | null {
             }
         }
 
-        const hasAccountsForm1Data = !!(result.approveBg || result.reasonReq || result.bgFormatTe);
-        const hasAccountsForm2Data = !!(result.bgNo || result.bg2Remark);
-        const hasAccountsForm3Data = !!(result.fdrNo || result.fdrAmt);
+        const currentStep = Number(result.action ?? 0);
+        const hasAccountsForm1Data = currentStep >= 1;
+        const hasAccountsForm2Data = currentStep >= 2;
+        const hasAccountsForm3Data = currentStep >= 3;
         const hasExtensionData = !!(result.extendedAmount || result.extendedValidityDate
             || result.extendedClaimExpiryDate || result.extendedBankName
             || result.newStampChargeDeducted || result.extensionLetterPath);

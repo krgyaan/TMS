@@ -290,36 +290,25 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
         message: 'Bank BG cancellation request is required',
         path: ['cancell_confirm'],
     }
-).refine(
-    (data) => {
-        // Accounts Form (BG) 2: core BG details are required
-        if (data.action === 'accounts-form-2') {
-            return !!data.bg_no && !!data.bg_date && !!data.bg_validity;
+).superRefine(
+    (data, ctx) => {
+        // Accounts Form (BG) 2: core BG + courier details are required
+        if (data.action !== 'accounts-form-2') return;
+        if (!data.bg_no) ctx.addIssue({ code: 'custom', message: 'BG number is required', path: ['bg_no'] });
+        if (!data.bg_date) ctx.addIssue({ code: 'custom', message: 'BG creation date is required', path: ['bg_date'] });
+        if (!data.bg_validity) ctx.addIssue({ code: 'custom', message: 'BG validity is required', path: ['bg_validity'] });
+        if (!data.courierOrg) ctx.addIssue({ code: 'custom', message: 'Courier organization is required', path: ['courierOrg'] });
+        if (!data.courierName) ctx.addIssue({ code: 'custom', message: 'Courier recipient name is required', path: ['courierName'] });
+        if (!data.courierPhone) ctx.addIssue({ code: 'custom', message: 'Courier phone is required', path: ['courierPhone'] });
+        if (!data.courierAddrLine1) ctx.addIssue({ code: 'custom', message: 'Courier address is required', path: ['courierAddrLine1'] });
+        if (!data.courierPincode) {
+            ctx.addIssue({ code: 'custom', message: 'Courier pin code is required', path: ['courierPincode'] });
+        } else if (!/^\d{6}$/.test(data.courierPincode)) {
+            ctx.addIssue({ code: 'custom', message: 'Courier pin code must be 6 digits', path: ['courierPincode'] });
         }
-        return true;
-    },
-    {
-        message: 'BG number, creation date, and validity are required',
-        path: ['bg_no'],
-    }
-).refine(
-    (data) => {
-        // Accounts Form (BG) 2: courier dispatch details are required
-        if (data.action === 'accounts-form-2') {
-            return !!data.courierOrg
-                && !!data.courierName
-                && !!data.courierPhone
-                && !!data.courierAddrLine1
-                && /^\d{6}$/.test(data.courierPincode ?? '')
-                && !!data.empFrom
-                && !!data.delDate
-                && !!data.urgency;
-        }
-        return true;
-    },
-    {
-        message: 'Courier organization, recipient, phone, address, pin code, sender, delivery date, and urgency are required',
-        path: ['courierOrg'],
+        if (!data.empFrom) ctx.addIssue({ code: 'custom', message: 'Courier sender is required', path: ['empFrom'] });
+        if (!data.delDate) ctx.addIssue({ code: 'custom', message: 'Delivery date is required', path: ['delDate'] });
+        if (!data.urgency) ctx.addIssue({ code: 'custom', message: 'Dispatch urgency is required', path: ['urgency'] });
     }
 ).refine(
     (data) => {

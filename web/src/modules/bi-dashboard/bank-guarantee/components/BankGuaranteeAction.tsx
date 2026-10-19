@@ -162,25 +162,29 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
     ];
 
     const FILLED_FLAG: Record<string, string> = {
-        'accounts-form-1': 'hasAccountsForm1Data',
-        'accounts-form-2': 'hasAccountsForm2Data',
-        'accounts-form-3': 'hasAccountsForm3Data',
         'request-extension': 'hasExtensionData',
         'returned-courier': 'hasReturnedData',
         'request-cancellation': 'hasRequestCancellationData',
         'bg-cancellation-confirmation': 'hasBgCancellationData',
         'fdr-cancellation-confirmation': 'hasFdrCancellationData',
     };
-    const filledFlag = action ? FILLED_FLAG[action] : undefined;
-    const hasFollowupData = !!followupData;
-    const isReadOnly = action === 'initiate-followup'
-        ? hasFollowupData
-        : !!(filledFlag && formData?.[filledFlag]);
 
-    const isStepLocked = (step: string) =>
-        step === 'initiate-followup'
-            ? hasFollowupData
-            : !!(FILLED_FLAG[step] && formData?.[FILLED_FLAG[step]]);
+    const ACCOUNTS_STEP_ACTION: Record<string, number> = {
+        'accounts-form-1': 1,
+        'accounts-form-2': 2,
+        'accounts-form-3': 3,
+    };
+
+    const hasFollowupData = !!followupData;
+
+    const isStepLocked = (step: string) => {
+        if (step === 'initiate-followup') return hasFollowupData;
+        const minAction = ACCOUNTS_STEP_ACTION[step];
+        if (minAction !== undefined) return currentAction >= minAction;
+        return !!(FILLED_FLAG[step] && formData?.[FILLED_FLAG[step]]);
+    };
+
+    const isReadOnly = isStepLocked(action);
 
     const prevStampCharges = formData?.stampCharges;
     const prevBeneficiaryName = formData?.beneficiaryName ?? formData?.favouring;

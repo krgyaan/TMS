@@ -97,20 +97,20 @@ export const BankGuaranteeEditFormSchema = z.object({
     bgFdrCancelRefNo: z.string().optional().nullable(),
     bg2Remark: z.string().optional().nullable(),
     reasonReq: z.string().optional().nullable(),
-}).refine(
-    (data) => {
-        if (!data.courierOrg) return true;
-        return !!data.courierName
-            && !!data.courierPhone
-            && !!data.courierAddrLine1
-            && /^\d{6}$/.test(data.courierPincode ?? '')
-            && !!data.empFrom
-            && !!data.delDate
-            && !!data.urgency;
-    },
-    {
-        message: 'Courier recipient, phone, address, pin code, sender, delivery date, and urgency are required',
-        path: ['courierOrg'],
+}).superRefine(
+    (data, ctx) => {
+        if (!data.courierOrg) return;
+        if (!data.courierName) ctx.addIssue({ code: 'custom', message: 'Courier recipient name is required', path: ['courierName'] });
+        if (!data.courierPhone) ctx.addIssue({ code: 'custom', message: 'Courier phone is required', path: ['courierPhone'] });
+        if (!data.courierAddrLine1) ctx.addIssue({ code: 'custom', message: 'Courier address is required', path: ['courierAddrLine1'] });
+        if (!data.courierPincode) {
+            ctx.addIssue({ code: 'custom', message: 'Courier pin code is required', path: ['courierPincode'] });
+        } else if (!/^\d{6}$/.test(data.courierPincode)) {
+            ctx.addIssue({ code: 'custom', message: 'Courier pin code must be 6 digits', path: ['courierPincode'] });
+        }
+        if (!data.empFrom) ctx.addIssue({ code: 'custom', message: 'Courier sender is required', path: ['empFrom'] });
+        if (!data.delDate) ctx.addIssue({ code: 'custom', message: 'Delivery date is required', path: ['delDate'] });
+        if (!data.urgency) ctx.addIssue({ code: 'custom', message: 'Dispatch urgency is required', path: ['urgency'] });
     }
 );
 
