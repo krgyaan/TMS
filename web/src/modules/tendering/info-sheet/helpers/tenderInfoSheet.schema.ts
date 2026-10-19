@@ -1,13 +1,21 @@
 import { z } from 'zod';
 
-// Numeric form fields: null / '' (a cleared NumberInput, or an API value that is null)
+// Numeric form fields: null / undefined / '' / unparseable strings (e.g. 'NA', 'N/A')
 // mean "not stated" and must stay undefined. z.coerce.number() on its own turns null and
 // '' into 0, so an unset field used to validate -- and save -- as 0.
 const optionalNumber = <T extends z.ZodTypeAny>(schema: T) =>
-    z.preprocess(
-        (v) => (v === null || (typeof v === 'string' && v.trim() === '') ? undefined : v),
-        schema,
-    );
+    z.preprocess((v) => {
+        if (v === null || v === undefined) return undefined;
+        if (typeof v === 'number') return Number.isNaN(v) ? undefined : v;
+        if (typeof v === 'string') {
+            const trimmed = v.trim();
+            if (trimmed === '') return undefined;
+            const num = Number(trimmed);
+            if (Number.isNaN(num)) return undefined;
+            return num;
+        }
+        return v;
+    }, schema);
 
 export const TenderInformationFormSchema = z.object({
     // TE Recommendation

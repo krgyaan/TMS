@@ -16,8 +16,11 @@ const toNumber = (val: string | number | null | undefined, defaultValue = 0): nu
 // For numeric FORM fields: a null / missing / unparseable value means "not stated" and
 // stays undefined (the input renders empty) -- never 0. A stored 0 is kept as 0.
 export const toOptionalNumber = (val: string | number | null | undefined): number | undefined => {
-    if (val === null || val === undefined || (typeof val === 'string' && val.trim() === '')) return undefined;
-    const num = typeof val === 'number' ? val : parseFloat(String(val));
+    if (val === null || val === undefined) return undefined;
+    if (typeof val === 'number') return isNaN(val) ? undefined : val;
+    const trimmed = String(val).trim();
+    if (trimmed === '') return undefined;
+    const num = Number(trimmed);
     return isNaN(num) ? undefined : num;
 };
 
@@ -475,7 +478,7 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
 
     // ─── When YES: existing full mapping logic (unchanged) ─────────────────────
     const payload: SaveTenderInfoSheetDto = {
-        tenderValue: values.tenderValue ?? null,
+        tenderValue: nullableNumber(values.tenderValue),
         oemExperience: safeYesNoValue(values.oemExperience),
 
         teRecommendation: 'YES',
@@ -498,7 +501,7 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
         })(),
         processingFeeAmount:
             values.processingFeeRequired === 'YES'
-                ? (values.processingFeeAmount ?? null)
+                ? nullableNumber(values.processingFeeAmount)
                 : null,
 
         tenderFeeRequired: safeYesNoValue(values.tenderFeeRequired),
@@ -516,7 +519,7 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
         })(),
         tenderFeeAmount:
             values.tenderFeeRequired === 'YES'
-                ? (values.tenderFeeAmount ?? null)
+                ? nullableNumber(values.tenderFeeAmount)
                 : null,
 
         emdRequired:
@@ -535,7 +538,7 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
             return filtered.length > 0 ? filtered : null;
         })(),
         emdAmount:
-            values.emdRequired === 'YES' ? (values.emdAmount ?? null) : null,
+            values.emdRequired === 'YES' ? nullableNumber(values.emdAmount) : null,
 
         bidValidityDays: safeNumber(values.bidValidityDays),
         commercialEvaluation: values.commercialEvaluation ?? null,
