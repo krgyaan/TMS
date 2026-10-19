@@ -15,8 +15,8 @@ def test_pre_bid_meeting_extraction_with_teams_details():
         "Pre-Bid Conference shall be held on 15.10.2026 at 11:00 HRS through video conferencing.\n"
         "Microsoft Teams meeting:\n"
         "Meeting ID: 293 847 102 991\n"
+        "Passcode: xyZ123\n"
     )
-        "Passcode: xyZ123\n" 
     infosheet = build_infosheet_data([], page_texts=[{"page": 1, "text": text}])
     pre_bid = infosheet.get("pre_bid_meeting_display")
     assert pre_bid is not None

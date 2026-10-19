@@ -17,6 +17,7 @@ describe('TenderInfosService document invalidation (Prompt 2A b)', () => {
     let mockTimersService: any;
     let mockConfigService: any;
     let mockFileUploadService: any;
+    let mockTenderNotificationService: any;
 
     beforeEach(() => {
         mockLogger = {
@@ -40,13 +41,16 @@ describe('TenderInfosService document invalidation (Prompt 2A b)', () => {
             get: jest.fn(),
         };
         mockFileUploadService = {};
+        mockTenderNotificationService = {
+            notifyTenderAllocated: jest.fn().mockResolvedValue(undefined),
+        };
 
         mockDb = {
             select: jest.fn(),
             update: jest.fn(),
         };
 
-        service = new TenderInfosService(
+        service = new (TenderInfosService as any)(
             mockAppLogger as any,
             mockDb as any,
             mockTenderStatusHistoryService as any,
@@ -55,6 +59,7 @@ describe('TenderInfosService document invalidation (Prompt 2A b)', () => {
             mockTimersService as any,
             mockConfigService as any,
             mockFileUploadService as any,
+            mockTenderNotificationService as any,
         );
     });
 
