@@ -39,7 +39,6 @@ const STEP_NAMES = {
     bgDate: 'bgDate',
     courierNo: 'courierNo',
     bg2Remark: 'bg2Remark',
-    utr: 'utr',
     fdrPer: 'fdrPer',
     fdrAmt: 'fdrAmt',
     fdrNo: 'fdrNo',

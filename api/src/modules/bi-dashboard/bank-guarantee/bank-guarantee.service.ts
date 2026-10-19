@@ -764,7 +764,6 @@ private parseStringArray(v: unknown): string[] | null {
         if (body.expiryDate !== undefined) updateData.expiryDate = body.expiryDate;
         if (body.status !== undefined) updateData.status = body.status;
         if (body.action !== undefined) updateData.action = body.action;
-        if (body.utr !== undefined) updateData.utr = body.utr;
         if (body.docketNo !== undefined) updateData.docketNo = body.docketNo;
         if (body.courierAddress !== undefined) updateData.courierAddress = body.courierAddress;
         if (body.courierDeadline !== undefined) updateData.courierDeadline = body.courierDeadline;
@@ -1199,7 +1198,6 @@ private parseStringArray(v: unknown): string[] | null {
                 validityDate: instrumentBgDetails.validityDate,
                 claimExpiryDate: instrumentBgDetails.claimExpiryDate,
                 bgClaim: instrumentBgDetails.bgClaim,
-                utr: paymentInstruments.utr,
                 docketNo: paymentInstruments.docketNo,
                 courierAddress: paymentInstruments.courierAddress,
                 courierDeadline: paymentInstruments.courierDeadline,
@@ -1341,7 +1339,6 @@ private parseStringArray(v: unknown): string[] | null {
                 claimExpiryDate: instrumentBgDetails.claimExpiryDate,
                 bgClaim: instrumentBgDetails.bgClaim,
                 bgExpiryDateBg: sql<string | null>`coalesce(${paymentInstruments.expiryDate}, ${instrumentBgDetails.bgExpiryDate})`,
-                utr: paymentInstruments.utr,
                 docketNo: paymentInstruments.docketNo,
                 courierAddress: paymentInstruments.courierAddress,
                 courierDeadline: paymentInstruments.courierDeadline,
@@ -1478,7 +1475,6 @@ private parseStringArray(v: unknown): string[] | null {
             sfmsChargesDeducted: result.sfmsChargesDeducted ? Number(result.sfmsChargesDeducted) : null,
             stampChargesDeducted: result.stampChargesDeducted ? Number(result.stampChargesDeducted) : null,
             otherChargesDeducted: result.otherChargesDeducted ? Number(result.otherChargesDeducted) : null,
-            utr: result.utr,
             docketNo: result.docketNo,
             generatedPdf: result.generatedPdf,
             cancelPdf: result.cancelPdf,

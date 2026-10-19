@@ -12,7 +12,6 @@ export interface AccountsForm2Names<T extends FieldValues> {
     bg2Remark: FieldPath<T>;
     bgValidity?: FieldPath<T>;
     bgClaimPeriod?: FieldPath<T>;
-    utr?: FieldPath<T>;
 }
 
 interface AccountsForm2FieldsProps<T extends FieldValues> {
@@ -74,13 +73,6 @@ export function AccountsForm2Fields<T extends FieldValues>({
                 <FieldWrapper control={control} name={names.courierNo} label="Courier Request No.">
                     {(field) => (
                         <Input {...field} value={(field.value as string | undefined) ?? ''} placeholder="Enter courier reference" />
-                    )}
-                </FieldWrapper>
-            )}
-            {names.utr && (
-                <FieldWrapper control={control} name={names.utr} label="UTR / Reference No.">
-                    {(field) => (
-                        <Input {...field} value={(field.value as string | undefined) ?? ''} placeholder="Bank transaction ref" />
                     )}
                 </FieldWrapper>
             )}
