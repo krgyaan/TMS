@@ -12,6 +12,7 @@ import {
     type PublicPaymentRequestEntity,
     type PublicVendorWorkOrderEntity,
     type PublicTenderEntity,
+    type PublicWoBasicDetailEntity,
 } from "@/services/api";
 import { PAYMENT_AGAINST_LABELS, STATUS_CONFIG } from "@/modules/operations/payment-requests/constants";
 
@@ -22,6 +23,7 @@ const TYPE_LABELS: Record<string, string> = {
     po: "Purchase Order",
     tender: "Tender",
     vwo: "Vendor Work Order",
+    wobd: "Work Order Basic Details",
 };
 
 const APPROVAL_CHIP: Record<ApprovalStatus, { label: string; color: string }> = {
@@ -91,10 +93,43 @@ function NotificationCard({ data }: { data: PublicNotificationResponse }) {
     const { type, event, entity } = data;
     const isPr = type === "pr";
     const isTender = type === "tender";
+    const isWobd = type === "wobd";
     const pr = entity as PublicPaymentRequestEntity;
     const order = entity as PublicOrderEntity;
     const vwo = entity as PublicVendorWorkOrderEntity;
     const tender = entity as PublicTenderEntity;
+    const wobd = entity as PublicWoBasicDetailEntity;
+
+    if (isWobd) {
+        const chip = { label: "Work Order", color: "text-muted-foreground bg-muted" };
+        return (
+            <div className="space-y-4">
+                <div className="flex flex-col items-center gap-2 text-center">
+                    <span className="inline-block rounded-full bg-[linear-gradient(90deg,#ff6a00,#ff9500)] px-3 py-1 text-xs font-semibold text-white">
+                        {event ?? TYPE_LABELS.wobd}
+                    </span>
+                    <h1 className="text-xl sm:text-2xl font-bold text-foreground">{TYPE_LABELS.wobd}</h1>
+                    <span className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${chip.color}`}>{chip.label}</span>
+                </div>
+
+                <Card className="p-5 space-y-3">
+                    <DetailRow label="WO No" value={wobd.referenceNo} />
+                    <DetailRow label="Project Name" value={wobd.projectName} />
+                    <DetailRow label="Project Code" value={wobd.projectCode} />
+                    <DetailRow label="Value (preGST)" value={formatAmount(wobd.value)} />
+                    <DetailRow label="Organization" value={wobd.organizationName} />
+                    <DetailRow label="Stage" value={wobd.currentStage} />
+                    <DetailRow label="Raised By" value={wobd.raisedByName} />
+                    <DetailRow label="WO Date" value={wobd.woDate} />
+                </Card>
+
+                <Card className="p-5 space-y-3">
+                    <DetailRow label="Created" value={formatDate(wobd.createdAt)} />
+                    <DetailRow label="Last Updated" value={formatDate(wobd.updatedAt)} />
+                </Card>
+            </div>
+        );
+    }
 
     const chip = isTender
         ? { label: "Tender", color: "text-muted-foreground bg-muted" }
