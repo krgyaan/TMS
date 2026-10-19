@@ -118,6 +118,13 @@ export interface WoBasicDetailsCreatedData {
   woValuePreGst: string | null;
 }
 
+export interface WoBasicDetailsUpdatedData extends WoBasicDetailsCreatedData {}
+
+export interface WoBasicDetailsRevisedData extends WoBasicDetailsCreatedData {
+  revisionNumber: number;
+  revisionNotes?: string | null;
+}
+
 @Injectable()
 export class OperationNotificationService {
   private readonly logger = new Logger(OperationNotificationService.name);
@@ -550,12 +557,48 @@ export class OperationNotificationService {
   }
 
   async notifyWoBasicDetailsCreated(data: WoBasicDetailsCreatedData): Promise<void> {
+    await this.sendWoBasicDetailsMessage({
+      data,
+      header: `Congrats!! We got new  Work Order (PO) From ${data.organizationName || 'N/A'}.`,
+      event: 'New Work Order (PO)',
+    });
+  }
+
+  async notifyWoBasicDetailsUpdated(data: WoBasicDetailsUpdatedData): Promise<void> {
+    await this.sendWoBasicDetailsMessage({
+      data,
+      header: `Work Order (PO) has been updated from ${data.organizationName || 'N/A'}.`,
+      event: 'Work Order (PO) Updated',
+    });
+  }
+
+  async notifyWoBasicDetailsRevised(data: WoBasicDetailsRevisedData): Promise<void> {
+    const extraLines = [
+      `- Revision: ${data.revisionNumber}`,
+      `- Notes: ${data.revisionNotes || 'N/A'}`,
+    ];
+    await this.sendWoBasicDetailsMessage({
+      data,
+      header: `Work Order (PO) has been revised (Rev ${data.revisionNumber}) from ${data.organizationName || 'N/A'}.`,
+      event: 'Work Order (PO) Revised',
+      extraLines,
+    });
+  }
+
+  private async sendWoBasicDetailsMessage(options: {
+    data: WoBasicDetailsCreatedData;
+    header: string;
+    event: string;
+    extraLines?: string[];
+  }): Promise<void> {
+    const { data, header, event, extraLines } = options;
+
     let detailsUrl: string | undefined;
     try {
       detailsUrl = await this.publicLink.buildUrl({
         type: 'wobd',
         id: data.woBasicDetailId,
-        event: 'New Work Order (PO)',
+        event,
       });
     } catch (linkError) {
       this.logger.warn(
@@ -569,11 +612,14 @@ export class OperationNotificationService {
         : 'N/A';
 
     const lines: string[] = [
-      `Congrats!! We got new Work Order (PO) From ${data.organizationName || 'N/A'}.`,
+      header,
       `- Project Name: ${data.projectName || 'N/A'}`,
       `- Project Code: ${data.projectCode || 'N/A'}`,
       `- Value (preGST): ${formattedValue}`,
     ];
+    if (extraLines?.length) {
+      lines.push(...extraLines);
+    }
     if (detailsUrl) {
       lines.push(`click here to view full details. ${detailsUrl}`);
     }
