@@ -627,13 +627,13 @@ export class OperationNotificationService {
       lines.push(`- ${actorLabel}: ${data.actorName}`);
     }
     if (data.teamMemberName) {
-      lines.push(`- Team Member: ${data.teamMemberName}`);
+      lines.push(`- TE Name: ${data.teamMemberName}`);
     }
     if (extraLines?.length) {
       lines.push(...extraLines);
     }
     if (detailsUrl) {
-      lines.push(`click here to view full details. ${detailsUrl}`);
+      lines.push(`View full details. ${detailsUrl}`);
     }
 
     const text = lines.join('\n');
