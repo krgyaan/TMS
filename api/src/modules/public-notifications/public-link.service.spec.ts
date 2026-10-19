@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { Test, TestingModule } from "@nestjs/testing";
 import { JwtModule, JwtService } from "@nestjs/jwt";
 import authConfig from "@/config/auth.config";
+import { UrlShortenerService } from "@/modules/url-shortener/url-shortener.service";
 import { PublicLinkService, PUBLIC_NOTIFY_PURPOSE } from "./public-link.service";
 
 describe("PublicLinkService", () => {
@@ -13,6 +14,8 @@ describe("PublicLinkService", () => {
     const PUBLIC_APP_URL = "https://tms.example.com";
 
     let configGet: jest.Mock;
+    let shortenMock: jest.Mock;
+    let storedFullUrl: string | null;
 
     beforeEach(async () => {
         configGet = jest.fn((key: string) => {
@@ -20,12 +23,18 @@ describe("PublicLinkService", () => {
             if (key === "app.publicLinkExpiresIn") return "30d";
             return undefined;
         });
+        storedFullUrl = null;
+        shortenMock = jest.fn(async (url: string) => {
+            storedFullUrl = url;
+            return `${PUBLIC_APP_URL}/n/abc123XYZ789`;
+        });
 
         const module: TestingModule = await Test.createTestingModule({
             imports: [JwtModule.register({})],
             providers: [
                 PublicLinkService,
                 { provide: ConfigService, useValue: { get: configGet } },
+                { provide: UrlShortenerService, useValue: { shorten: shortenMock } },
                 {
                     provide: authConfig.KEY,
                     useValue: { stateSecret: STATE_SECRET },
@@ -53,7 +62,22 @@ describe("PublicLinkService", () => {
         expect(claims.ev).toBeUndefined();
     });
 
-    it("builds a public URL under /notify/", async () => {
+    it("builds a shortened public URL under /n/ and shortens the full /notify/ link", async () => {
+        const url = await service.buildUrl({ type: "vwo", id: 5, event: "New WO Raised" });
+
+        expect(url).toBe(`${PUBLIC_APP_URL}/n/abc123XYZ789`);
+        expect(shortenMock).toHaveBeenCalledTimes(1);
+        expect(shortenMock.mock.calls[0][1]).toMatchObject({ purpose: PUBLIC_NOTIFY_PURPOSE });
+
+        const fullUrl: string = storedFullUrl!;
+        expect(fullUrl.startsWith(`${PUBLIC_APP_URL}/notify/`)).toBe(true);
+        const token = fullUrl.split("/notify/")[1];
+        await expect(service.verify(token)).resolves.toMatchObject({ t: "vwo", id: 5 });
+    });
+
+    it("falls back to the full /notify/ URL when shortening fails", async () => {
+        shortenMock.mockRejectedValue(new Error("db down"));
+
         const url = await service.buildUrl({ type: "vwo", id: 5, event: "New WO Raised" });
 
         expect(url.startsWith(`${PUBLIC_APP_URL}/notify/`)).toBe(true);

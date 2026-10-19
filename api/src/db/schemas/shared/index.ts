@@ -15,3 +15,4 @@ export * from "./finance-doc-type.schema";
 export * from "./financial_year.schema";
 export * from "./pqr.schema";
 export * from "./claude-token-usage.schema";
+export * from "./url-shortener.schema";

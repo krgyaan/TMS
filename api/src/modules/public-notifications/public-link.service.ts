@@ -2,6 +2,7 @@ import { BadRequestException, Inject, Injectable, Logger } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import authConfig, { type AuthConfig } from "@/config/auth.config";
+import { UrlShortenerService } from "@/modules/url-shortener/url-shortener.service";
 
 export const PUBLIC_NOTIFY_PURPOSE = "wa-notify";
 
@@ -32,8 +33,11 @@ export interface PublicNotifyClaims {
  *
  *   const url = await this.publicLink.buildUrl({ type: 'po', id, event: 'PO Approved' });
  *
- * The public page at `<PUBLIC_APP_URL>/notify/<token>` fetches
- * `GET /api/v1/public-notifications/<token>` which verifies the token here.
+ * `buildUrl()` returns the compact `<PUBLIC_APP_URL>/n/<short-token>` URL
+ * (the full `/notify/<jwt>` link is stored server-side by the URL shortener).
+ * The public page at `/n/<token>` is redirected by the web app to
+ * `/notify/<jwt>`, which fetches `GET /api/v1/public-notifications/<jwt>`
+ * and verifies the JWT here.
  */
 @Injectable()
 export class PublicLinkService {
@@ -42,6 +46,7 @@ export class PublicLinkService {
     constructor(
         private readonly jwtService: JwtService,
         private readonly configService: ConfigService,
+        private readonly urlShortener: UrlShortenerService,
         @Inject(authConfig.KEY) private readonly authConfig: AuthConfig
     ) {}
 
@@ -75,7 +80,14 @@ export class PublicLinkService {
 
     async buildUrl(options: BuildPublicLinkOptions): Promise<string> {
         const token = await this.sign(options);
-        return `${this.publicAppUrl}/notify/${token}`;
+        const fullUrl = `${this.publicAppUrl}/notify/${token}`;
+
+        try {
+            return await this.urlShortener.shorten(fullUrl, { purpose: PUBLIC_NOTIFY_PURPOSE });
+        } catch (err) {
+            this.logger.warn(`Failed to shorten public link — sending the full URL instead: ${err}`);
+            return fullUrl;
+        }
     }
 
     async verify(token: string): Promise<PublicNotifyClaims> {

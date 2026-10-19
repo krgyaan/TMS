@@ -11,6 +11,11 @@ export const paths = {
         route: "/notify/:token",
         page: (token: string) => `/notify/${token}`,
     },
+    // Short-link redirect page — resolves /n/<token> then jumps to /notify/<jwt>
+    notifyShort: {
+        route: "/n/:token",
+        page: (token: string) => `/n/${token}`,
+    },
 
     // ==================== INTEGRATIONS ====================
     integrations: {

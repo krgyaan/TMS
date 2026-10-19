@@ -32,6 +32,7 @@ const PUBLIC_PATHS = [
     '/auth/refresh',
     '/health',
     '/public-notifications',
+    '/url-shortener',
 ];
 
 const isPublicPath = (path: string): boolean =>
