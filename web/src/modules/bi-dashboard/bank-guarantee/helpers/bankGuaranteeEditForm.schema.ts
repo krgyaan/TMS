@@ -7,6 +7,8 @@ export const BankGuaranteeEditFormSchema = z.object({
     payableAt: z.string().optional().nullable(),
     issueDate: z.string().optional().nullable(),
     expiryDate: z.string().optional().nullable(),
+    validityDate: z.string().optional().nullable(),
+    claimExpiryDate: z.string().optional().nullable(),
     bgExpiryDate: z.string().optional().nullable(),
     bgClaim: z.string().optional().nullable(),
     status: z.string().optional(),
@@ -44,6 +46,7 @@ export const BankGuaranteeEditFormSchema = z.object({
     bankMailIdsCc: z.array(z.object({ email: z.email().optional().or(z.literal('')) })).optional(),
 
     // Extension Details
+    modification_required: z.enum(['Yes', 'No']).optional(),
     extendedAmount: z.coerce.number().optional().nullable(),
     extendedValidityDate: z.string().optional().nullable(),
     extendedClaimExpiryDate: z.string().optional().nullable(),

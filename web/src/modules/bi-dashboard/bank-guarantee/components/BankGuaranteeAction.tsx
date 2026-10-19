@@ -1,11 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useFieldArray, useForm, type Resolver } from 'react-hook-form';
+import { useFieldArray, useForm, useWatch, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
+import { useEffect, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
-import { useEffect } from 'react';
 import { Form } from '@/components/ui/form';
 import { SelectField } from '@/components/form/SelectField';
-import { ConditionalSection } from '@/components/form/ConditionalSection';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BankGuaranteeActionFormSchema, type BankGuaranteeActionFormValues } from '../helpers/bankGuaranteeActionForm.schema';
 import { useUpdateBankGuaranteeAction, useBGActionFormData, useBGFollowupData } from '@/hooks/api/useBankGuarantees';
 import type { Checkpoint } from '@/components/tendering/SubmissionChecklist';
@@ -13,7 +13,6 @@ import { useCourierOptions } from '@/modules/shared/courier/courier.hooks';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { useWatch } from 'react-hook-form';
 import { AccountsForm1Fields } from './steps/AccountsForm1Fields';
 import { AccountsForm2Fields } from './steps/AccountsForm2Fields';
 import { AccountsForm3Fields } from './steps/AccountsForm3Fields';
@@ -88,17 +87,9 @@ const ACTION_OPTIONS = [
     { value: 'fdr-cancellation-confirmation', label: 'FDR Cancellation Confirmation' },
 ];
 
-/**
- * DateInput is an <input type="date"> that expects a 'yyyy-MM-dd' string, while
- * the API returns ISO timestamps (e.g. 2026-10-17T00:00:00.000Z).
- */
 const toDateString = (v: unknown): string | undefined =>
     v ? new Date(v as string).toISOString().slice(0, 10) : undefined;
 
-/**
- * `prefilled_signed_bg` is persisted as a JSON-stringified array of paths. Tolerate
- * a bare string too, mirroring the defensive parse in the service's updateAction.
- */
 const safeParseArray = (v: string | null | undefined): string[] => {
     if (!v) return [];
     try {
@@ -109,10 +100,8 @@ const safeParseArray = (v: string | null | undefined): string[] => {
     }
 };
 
-/** Bank mail ids are stored as string[]; useFieldArray needs row objects. */
 const toMailRows = (v?: string[] | null) =>
     v && v.length ? v.map((email) => ({ email })) : [{ email: '' }];
-
 
 const toFdrEnum = (v: unknown): '10' | '15' | '100' | undefined => {
     if (v == null) return undefined;
@@ -125,19 +114,23 @@ const toFdrEnum = (v: unknown): '10' | '15' | '100' | undefined => {
 const APPROVE_BG_OPTIONS = ['Accept the BG given by TE', 'Upload by Imran'] as const;
 type ApproveBg = (typeof APPROVE_BG_OPTIONS)[number];
 
-/**
- * Ignore stored values that aren't a known option. Some rows hold a stray file
- * path (e.g. "bg-prefilled-signed/2") in approve_bg; feeding that to SelectField
- * matches no option and leaves the dropdown on its placeholder.
- */
 const toApproveBg = (v: unknown): ApproveBg | undefined =>
     APPROVE_BG_OPTIONS.find((o) => o === v);
+
+const SectionCard = ({ title, children }: { title: string; children: ReactNode }) => (
+    <Card>
+        <CardHeader>
+            <CardTitle className="text-lg">{title}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">{children}</CardContent>
+    </Card>
+);
 
 interface BankGuaranteeActionFormProps {
     instrumentId: number;
 }
 
-export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFormProps) {
+export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdateBankGuaranteeAction();
     const courierOptions = useCourierOptions();
@@ -149,8 +142,6 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
         defaultValues: {
             action: '',
             contacts: [],
-            // One blank row each so the user always has a visible input to type
-            // into. Delete removes the row entirely, so the list can go to zero.
             bank_mail_ids: [{ email: '' }],
             bank_mail_ids_cc: [{ email: '' }],
         },
@@ -162,8 +153,6 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
     const bankMailIds = useFieldArray({ control: form.control, name: 'bank_mail_ids' });
     const bankMailIdsCc = useFieldArray({ control: form.control, name: 'bank_mail_ids_cc' });
 
-    // `payment_instruments.action` advances 0 -> 9 as each step is actioned, so it
-    // tells us how far the accounts forms have progressed.
     const currentAction = formData?.action ?? 0;
     const accountsCheckpoints: Checkpoint[] = [
         { id: 'accounts-form-1', label: 'Accounts Form 1', status: currentAction >= 1 ? 'fulfilled' : 'pending' },
@@ -187,37 +176,33 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
         ? hasFollowupData
         : !!(filledFlag && formData?.[filledFlag]);
 
+    const isStepLocked = (step: string) =>
+        step === 'initiate-followup'
+            ? hasFollowupData
+            : !!(FILLED_FLAG[step] && formData?.[FILLED_FLAG[step]]);
+
     const prevStampCharges = formData?.stampCharges;
     const prevBeneficiaryName = formData?.beneficiaryName ?? formData?.favouring;
     const prevAmount = formData?.amount;
     const prevExpiryDate = toDateString(formData?.bgExpiryDate);
     const prevClaimDate = toDateString(formData?.bgClaim);
 
-    // Pre-fill the selected step from whatever was saved previously, so revisiting
-    // a completed accounts form shows the stored values instead of a blank form.
     useEffect(() => {
         if (!formData || !action) return;
 
         if (action === 'accounts-form-1') {
-            // The API only exposes the mapped status label, which stops
-            // distinguishing accepted/rejected once a later step runs. reasonReq is
-            // written only on rejection, so its presence tells us which it was.
             if (currentAction >= 1) {
                 form.setValue('bg_req', formData.reasonReq ? 'Rejected' : 'Accepted');
             }
             form.setValue('reason_req', formData.reasonReq ?? undefined);
             form.setValue('approve_bg', toApproveBg(formData.approveBg));
-            // Forms 1 and 3 share the single fdr_per column.
             form.setValue('bg_approved_fdr_per', toFdrEnum(formData.fdrPer));
-            // Prefilled Bank Formats normally lives in prefilled_signed_bg, but older rows
-// only have the creation form's bg_soft_copy (a single path, not JSON).
-const prefilledFiles = safeParseArray(formData.prefilledSignedBg);
-if (prefilledFiles.length === 0 && formData.bgSoftCopy) {
-    prefilledFiles.push(formData.bgSoftCopy);
-}
-form.setValue('prefilled_signed_bg', prefilledFiles);
+            const prefilledFiles = safeParseArray(formData.prefilledSignedBg);
+            if (prefilledFiles.length === 0 && formData.bgSoftCopy) {
+                prefilledFiles.push(formData.bgSoftCopy);
+            }
+            form.setValue('prefilled_signed_bg', prefilledFiles);
             form.setValue('bg_format_imran', formData.bgFormatTe ?? undefined);
-            // Field arrays must use replace(), not setValue.
             bankMailIds.replace(toMailRows(formData.bankMailIds));
             bankMailIdsCc.replace(toMailRows(formData.bankMailIdsCc));
         } else if (action === 'accounts-form-2') {
@@ -228,7 +213,6 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
             form.setValue('courier_no', formData.courierNo ?? undefined);
             form.setValue('bg2_remark', formData.bg2Remark ?? undefined);
         } else if (action === 'accounts-form-3') {
-            // API returns fdrPer as a string; the field is a narrow enum.
             form.setValue('fdr_per', toFdrEnum(formData.fdrPer));
             form.setValue('fdr_amt', formData.fdrAmt ?? undefined);
             form.setValue('fdr_copy', formData.fdrCopy ?? undefined);
@@ -274,19 +258,14 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
             const payload: Record<string, unknown> = {};
 
             Object.entries(values).forEach(([key, value]) => {
-                // Repeated/multi-value fields are handled explicitly below so the
-                // generic loop doesn't JSON-stringify them into single strings.
                 if (key === 'bank_mail_ids' || key === 'bank_mail_ids_cc' || key === 'contacts' || key === 'attachments') {
                     return;
                 }
 
-                // Handle File objects (shouldn't happen - FileUploader returns paths)
                 if (value instanceof File) return;
 
-                // Handle arrays of Files
                 if (Array.isArray(value) && value.length > 0 && value[0] instanceof File) return;
 
-                // Handle all other values (strings, numbers, dates, file paths, etc.)
                 if (value === undefined || value === null || value === '') return;
                 if (value instanceof Date) {
                     payload[key] = value.toISOString();
@@ -297,9 +276,6 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
                 }
             });
 
-            // Flatten the repeatable bank mail rows to plain address lists. Blank
-            // rows are dropped, and an emptied list is sent as [] (rather than
-            // being omitted) so clearing the fields actually persists.
             payload.bank_mail_ids = JSON.stringify(
                 (values.bank_mail_ids ?? []).map((r) => r.email).filter(Boolean),
             );
@@ -328,9 +304,6 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                {/* Accounts forms progress. Tiles mirror the shared SubmissionChecklist
-                    markup, rendered bare (no Card/title/"Action Required" pill)
-                    so the shared component stays untouched for its other pages. */}
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {accountsCheckpoints.map((cp) => (
                         <div
@@ -364,9 +337,7 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
                     ))}
                 </div>
 
-                {/* Action Selection */}
                 <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-
                     <SelectField
                         label="Choose What to do"
                         control={form.control}
@@ -377,131 +348,111 @@ form.setValue('prefilled_signed_bg', prefilledFiles);
                     />
                 </div>
 
-                
-
-                <fieldset disabled={isReadOnly} className={cn('border-0 p-0 m-0 min-w-0', !action && 'hidden')}>
-                {/* Accounts Form (BG) 1 - Request to Bank */}
-                <ConditionalSection show={action === 'accounts-form-1'}>
-                    <div className="space-y-4 border rounded-lg p-4">
-                        <h4 className="font-semibold text-base">BG Request to Bank</h4>
-                        <AccountsForm1Fields
-                            control={form.control}
-                            names={STEP_NAMES}
-                            bankMailIds={bankMailIds}
-                            bankMailIdsCc={bankMailIdsCc}
-                            disabled={isReadOnly}
-                            fdrValueType="string"
-                        />
-                    </div>
-                </ConditionalSection>
-
-                {/* Accounts Form (BG) 2 - After BG Creation */}
-                <ConditionalSection show={action === 'accounts-form-2'}>
-                    <div className="space-y-4 border rounded-lg p-4">
-                        <h4 className="font-semibold text-base">Accounts Form (BG) 2 - After BG Creation</h4>
-                        <AccountsForm2Fields
-                            control={form.control}
-                            names={STEP_NAMES}
-                            courierOptions={courierOptions}
-                        />
-                    </div>
-                </ConditionalSection>
-
-                {/* Accounts Form (BG) 3 - Capture FDR Details */}
-                <ConditionalSection show={action === 'accounts-form-3'}>
-                    <div className="space-y-4 border rounded-lg p-4">
-                        <h4 className="font-semibold text-base">Accounts Form (BG) 3 - Capture FDR Details</h4>
-                        <AccountsForm3Fields
-                            control={form.control}
-                            names={STEP_NAMES}
-                            disabled={isReadOnly}
-                            fdrValueType="string"
-                        />
-                    </div>
-                </ConditionalSection>
-
-                {/* Initiate Followup */}
-                <ConditionalSection show={action === 'initiate-followup'}>
-                    <div className="space-y-4 border rounded-lg p-4">
-                        <h4 className="font-semibold text-base">Initiate Followup</h4>
-                        {hasFollowupData ? (
-                            <FollowupReadOnlyView data={followupData} />
-                        ) : (
-                            <InitiateFollowupFields
+                <fieldset disabled={isStepLocked(action)} className="border-0 p-0 m-0 min-w-0">
+                    {action === 'accounts-form-1' && (
+                        <SectionCard title="Accounts Form (BG) 1 - Request to Bank">
+                            <AccountsForm1Fields
                                 control={form.control}
                                 names={STEP_NAMES}
-                                disabled={isReadOnly}
+                                bankMailIds={bankMailIds}
+                                bankMailIdsCc={bankMailIdsCc}
+                                disabled={isStepLocked('accounts-form-1')}
+                                fdrValueType="string"
                             />
-                        )}
-                    </div>
-                </ConditionalSection>
+                        </SectionCard>
+                    )}
 
-                {/* Request Extension */}
-                <ConditionalSection show={action === 'request-extension'}>
-                    <div className="space-y-4 border rounded-lg p-4">
-                        <h4 className="font-semibold text-base">Request Extension</h4>
-                        <RequestExtensionFields
-                            control={form.control}
-                            names={STEP_NAMES}
-                            modificationRequired={modificationRequired}
-                            prevValues={{
-                                stampCharges: prevStampCharges,
-                                beneficiaryName: prevBeneficiaryName,
-                                amount: prevAmount,
-                                expiryDate: prevExpiryDate,
-                                claimDate: prevClaimDate,
-                            }}
-                            disabled={isReadOnly}
-                        />
-                    </div>
-                </ConditionalSection>
+                    {action === 'accounts-form-2' && (
+                        <SectionCard title="Accounts Form (BG) 2 - After BG Creation">
+                            <AccountsForm2Fields
+                                control={form.control}
+                                names={STEP_NAMES}
+                                courierOptions={courierOptions}
+                            />
+                        </SectionCard>
+                    )}
 
-                {/* Returned via courier */}
-                <ConditionalSection show={action === 'returned-courier'}>
-                    <div className="space-y-4 border rounded-lg p-4">
-                        <h4 className="font-semibold text-base">Returned via Courier</h4>
-                        <ReturnedCourierFields
-                            control={form.control}
-                            names={STEP_NAMES}
-                            disabled={isReadOnly}
-                        />
-                    </div>
-                </ConditionalSection>
+                    {action === 'accounts-form-3' && (
+                        <SectionCard title="Accounts Form (BG) 3 - Capture FDR Details">
+                            <AccountsForm3Fields
+                                control={form.control}
+                                names={STEP_NAMES}
+                                disabled={isStepLocked('accounts-form-3')}
+                                fdrValueType="string"
+                            />
+                        </SectionCard>
+                    )}
 
-                {/* Request Cancellation */}
-                <ConditionalSection show={action === 'request-cancellation'}>
-                    <div className="space-y-4 border rounded-lg p-4">
-                        <h4 className="font-semibold text-base">Request Cancellation</h4>
-                        <RequestCancellationFields
-                            control={form.control}
-                            names={STEP_NAMES}
-                            disabled={isReadOnly}
-                        />
-                    </div>
-                </ConditionalSection>
+                    {action === 'initiate-followup' && (
+                        <SectionCard title="Initiate Followup">
+                            {hasFollowupData ? (
+                                <FollowupReadOnlyView data={followupData} />
+                            ) : (
+                                <InitiateFollowupFields
+                                    control={form.control}
+                                    names={STEP_NAMES}
+                                    disabled={isStepLocked('initiate-followup')}
+                                />
+                            )}
+                        </SectionCard>
+                    )}
 
-                {/* BG Cancellation Confirmation */}
-                <ConditionalSection show={action === 'bg-cancellation-confirmation'}>
-                    <div className="space-y-4 border rounded-lg p-4">
-                        <h4 className="font-semibold text-base">BG Cancellation Confirmation</h4>
-                        <BgCancellationConfirmationFields
-                            control={form.control}
-                            names={STEP_NAMES}
-                            disabled={isReadOnly}
-                        />
-                    </div>
-                </ConditionalSection>
+                    {action === 'request-extension' && (
+                        <SectionCard title="Request Extension">
+                            <RequestExtensionFields
+                                control={form.control}
+                                names={STEP_NAMES}
+                                modificationRequired={modificationRequired}
+                                prevValues={{
+                                    stampCharges: prevStampCharges,
+                                    beneficiaryName: prevBeneficiaryName,
+                                    amount: prevAmount,
+                                    expiryDate: prevExpiryDate,
+                                    claimDate: prevClaimDate,
+                                }}
+                                disabled={isStepLocked('request-extension')}
+                            />
+                        </SectionCard>
+                    )}
 
-                {/* FDR Cancellation Confirmation */}
-                <ConditionalSection show={action === 'fdr-cancellation-confirmation'}>
-                    <div className="space-y-4 border rounded-lg p-4">
-                        <h4 className="font-semibold text-base">FDR Cancellation Confirmation</h4>
-                        <FdrCancellationConfirmationFields
-                            control={form.control}
-                            names={STEP_NAMES}
-                        />
-                    </div>
-                </ConditionalSection>
+                    {action === 'returned-courier' && (
+                        <SectionCard title="Returned via Courier">
+                            <ReturnedCourierFields
+                                control={form.control}
+                                names={STEP_NAMES}
+                                disabled={isStepLocked('returned-courier')}
+                            />
+                        </SectionCard>
+                    )}
+
+                    {action === 'request-cancellation' && (
+                        <SectionCard title="Request Cancellation">
+                            <RequestCancellationFields
+                                control={form.control}
+                                names={STEP_NAMES}
+                                disabled={isStepLocked('request-cancellation')}
+                            />
+                        </SectionCard>
+                    )}
+
+                    {action === 'bg-cancellation-confirmation' && (
+                        <SectionCard title="BG Cancellation Confirmation">
+                            <BgCancellationConfirmationFields
+                                control={form.control}
+                                names={STEP_NAMES}
+                                disabled={isStepLocked('bg-cancellation-confirmation')}
+                            />
+                        </SectionCard>
+                    )}
+
+                    {action === 'fdr-cancellation-confirmation' && (
+                        <SectionCard title="FDR Cancellation Confirmation">
+                            <FdrCancellationConfirmationFields
+                                control={form.control}
+                                names={STEP_NAMES}
+                            />
+                        </SectionCard>
+                    )}
                 </fieldset>
 
                 <div className="flex justify-end gap-4 pt-4">

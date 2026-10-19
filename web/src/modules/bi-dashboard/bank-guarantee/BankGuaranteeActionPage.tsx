@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardAction }
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, ArrowLeft } from 'lucide-react';
-import { BankGuaranteeActionForm } from './components/BankGuaranteeActionForm';
+import { BankGuaranteeAction } from './components/BankGuaranteeAction';
 
 export default function BankGuaranteeActionPage() {
     const { id } = useParams<{ id: string }>();
@@ -37,7 +37,7 @@ export default function BankGuaranteeActionPage() {
                 </div>
             </CardHeader>
             <CardContent>
-                <BankGuaranteeActionForm instrumentId={instrumentId} />
+                <BankGuaranteeAction instrumentId={instrumentId} />
             </CardContent>
         </Card>
     );

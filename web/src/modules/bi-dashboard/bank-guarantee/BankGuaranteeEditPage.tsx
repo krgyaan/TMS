@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardAction } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
-import { BankGuaranteeEditForm } from './components/BankGuaranteeEditForm';
+import { BankGuaranteeEdit } from './components/BankGuaranteeEdit';
 import { useBankGuaranteeDetails } from '@/hooks/api/useBankGuarantees';
 
 export default function BankGuaranteeEditPage() {
@@ -51,7 +51,7 @@ export default function BankGuaranteeEditPage() {
                 </div>
             </CardHeader>
             <CardContent className="px-0">
-                <BankGuaranteeEditForm
+                <BankGuaranteeEdit
                     instrumentId={instrument.instrumentId}
                     initialData={instrument}
                 />

@@ -789,6 +789,7 @@ private parseStringArray(v: unknown): string[] | null {
         // All possible BG details fields
         const directFields = [
             'bgNo', 'bgDate', 'bgExpiryDate', 'bgClaim',
+            'validityDate', 'claimExpiryDate',
             'beneficiaryName', 'beneficiaryAddress', 'bankName',
             'cashMarginPercent', 'fdrMarginPercent',
             'stampCharges', 'sfmsCharges',

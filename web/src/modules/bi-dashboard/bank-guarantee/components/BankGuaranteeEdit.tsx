@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { ReactNode } from 'react';
-import { useFieldArray, useForm, type Resolver } from 'react-hook-form';
+import { useFieldArray, useForm, useWatch, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
@@ -9,15 +9,15 @@ import { SelectField } from '@/components/form/SelectField';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { FileUploader } from '@/components/file-upload';
-import { Label } from '@/components/ui/label';
 import { NumberInput } from '@/components/form/NumberInput';
 import DateInput from '@/components/form/DateInput';
-import { BankGuaranteeEditFormSchema, type BankGuaranteeEditFormValues } from '../helpers/bankGuaranteeEditForm.schema';
-import { useUpdateBankGuarantee, useBGFollowupData } from '@/hooks/api/useBankGuarantees';
-import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { BG_PURPOSE_OPTIONS, BG_NEEDED_IN_OPTIONS, BANKS } from '@/modules/tendering/emds-tenderfees/constants';
+import { BankGuaranteeEditFormSchema, type BankGuaranteeEditFormValues } from '../helpers/bankGuaranteeEditForm.schema';
+import { useUpdateBankGuarantee, useBGFollowupData } from '@/hooks/api/useBankGuarantees';
+import { useCourierOptions } from '@/modules/shared/courier/courier.hooks';
+import { toast } from 'sonner';
 import { AccountsForm1Fields } from './steps/AccountsForm1Fields';
 import { AccountsForm2Fields } from './steps/AccountsForm2Fields';
 import { AccountsForm3Fields } from './steps/AccountsForm3Fields';
@@ -35,8 +35,12 @@ const STEP_NAMES = {
     prefilledSignedBg: 'prefilled_signed_bg',
     bankMailIds: 'bankMailIds',
     bankMailIdsCc: 'bankMailIdsCc',
+    bgApprovedFdrPer: 'fdrPer',
+    bgFormatImran: 'bg_format_te',
     bgNo: 'bgNo',
     bgDate: 'bgDate',
+    bgValidity: 'validityDate',
+    bgClaimPeriod: 'claimExpiryDate',
     courierNo: 'courierNo',
     bg2Remark: 'bg2Remark',
     fdrPer: 'fdrPer',
@@ -56,6 +60,7 @@ const STEP_NAMES = {
     newBgAmt: 'extendedAmount',
     newBgExpiry: 'extendedValidityDate',
     newBgClaim: 'extendedClaimExpiryDate',
+    modificationRequired: 'modification_required',
     docketNo: 'docketNo',
     docketSlip: 'docket_slip',
     stampCoveringLetter: 'stamp_covering_letter',
@@ -76,17 +81,18 @@ const SectionCard = ({ title, children }: { title: string; children: ReactNode }
     </Card>
 );
 
-const ReadOnlyField = ({ label, value }: { label: string; value?: string | number | null }) => (
-    <div className="grid gap-2">
-        <Label>{label}</Label>
-        <Input value={value == null ? '' : String(value)} readOnly tabIndex={-1} className="bg-muted" />
-    </div>
-);
+const toDateString = (v: unknown): string | undefined =>
+    v ? new Date(v as string).toISOString().slice(0, 10) : undefined;
 
-interface BankGuaranteeEditFormProps {
-    instrumentId: number;
-    initialData: any;
-}
+const safeParseArray = (v: string | null | undefined): string[] => {
+    if (!v) return [];
+    try {
+        const parsed = JSON.parse(v);
+        return Array.isArray(parsed) ? parsed : [v];
+    } catch {
+        return [v];
+    }
+};
 
 const parseFileValue = (value: any): string[] => {
     if (!value) return [];
@@ -102,10 +108,19 @@ const parseFileValue = (value: any): string[] => {
     return [];
 };
 
-export function BankGuaranteeEditForm({ instrumentId, initialData }: BankGuaranteeEditFormProps) {
+interface BankGuaranteeEditProps {
+    instrumentId: number;
+    initialData: any;
+}
+
+export function BankGuaranteeEdit({ instrumentId, initialData }: BankGuaranteeEditProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdateBankGuarantee();
+    const courierOptions = useCourierOptions();
     const { data: followupData } = useBGFollowupData(instrumentId);
+
+    const hasExtensionModification = !!(initialData.extendedAmount || initialData.extendedValidityDate
+        || initialData.extendedClaimExpiryDate || initialData.extendedBankName || initialData.newStampChargeDeducted);
 
     const form = useForm<BankGuaranteeEditFormValues>({
         resolver: zodResolver(BankGuaranteeEditFormSchema) as Resolver<BankGuaranteeEditFormValues>,
@@ -115,6 +130,7 @@ export function BankGuaranteeEditForm({ instrumentId, initialData }: BankGuarant
             bg_req: (initialData.approveBg || initialData.reasonReq)
                 ? (initialData.reasonReq ? 'Rejected' : 'Accepted')
                 : undefined,
+            modification_required: hasExtensionModification ? 'Yes' : undefined,
             cashMarginPercent: initialData.cashMarginPercent ? Number(initialData.cashMarginPercent) : null,
             fdrMarginPercent: initialData.fdrMarginPercent ? Number(initialData.fdrMarginPercent) : null,
             stampCharges: initialData.stampCharges ? Number(initialData.stampCharges) : null,
@@ -129,19 +145,26 @@ export function BankGuaranteeEditForm({ instrumentId, initialData }: BankGuarant
             extendedAmount: initialData.extendedAmount ? Number(initialData.extendedAmount) : null,
             newStampChargeDeducted: initialData.newStampChargeDeducted ? Number(initialData.newStampChargeDeducted) : null,
             bgFdrCancelAmount: initialData.bgFdrCancelAmount ? Number(initialData.bgFdrCancelAmount) : null,
-            // Normalize multi-file fields to arrays
+            issueDate: toDateString(initialData.issueDate) ?? null,
+            expiryDate: toDateString(initialData.expiryDate) ?? null,
+            bgDate: toDateString(initialData.bgDate) ?? null,
+            validityDate: toDateString(initialData.validityDate) ?? null,
+            claimExpiryDate: toDateString(initialData.claimExpiryDate) ?? null,
+            bgExpiryDate: toDateString(initialData.bgExpiryDate) ?? null,
+            bgClaim: toDateString(initialData.bgClaim) ?? null,
+            fdrValidity: toDateString(initialData.fdrValidity) ?? null,
+            extendedValidityDate: toDateString(initialData.extendedValidityDate) ?? null,
+            extendedClaimExpiryDate: toDateString(initialData.extendedClaimExpiryDate) ?? null,
+            bgFdrCancelDate: toDateString(initialData.bgFdrCancelDate) ?? null,
             bg_format_te: parseFileValue(initialData.bg_format_te),
             bgPo: parseFileValue(initialData.bgPo),
-            // Normalize single-file fields to strings (CompactFileUploader expects string)
-            prefilled_signed_bg: initialData.prefilled_signed_bg || null,
+            prefilled_signed_bg: safeParseArray(initialData.prefilled_signed_bg),
             fdr_copy: initialData.fdr_copy || null,
             sfms_conf: initialData.sfms_conf || null,
             docket_slip: initialData.docket_slip || null,
             extension_letter_path: initialData.extension_letter_path || null,
             stamp_covering_letter: initialData.stamp_covering_letter || null,
             cancell_confirm: initialData.cancell_confirm || null,
-            // Bank mail ids arrive as string[] from the API; useFieldArray needs
-            // row objects. Fall back to one blank row when nothing is stored.
             bankMailIds: initialData.bankMailIds?.length
                 ? initialData.bankMailIds.map((email: string) => ({ email }))
                 : [{ email: '' }],
@@ -151,33 +174,42 @@ export function BankGuaranteeEditForm({ instrumentId, initialData }: BankGuarant
         },
     });
 
+    const modificationRequired = useWatch({ control: form.control, name: 'modification_required' });
+
     const bankMailIds = useFieldArray({ control: form.control, name: 'bankMailIds' });
     const bankMailIdsCc = useFieldArray({ control: form.control, name: 'bankMailIdsCc' });
 
+    const isStepLocked = (step: string) => {
+        void step;
+        return false;
+    };
+
     const isSubmitting = form.formState.isSubmitting || updateMutation.isPending;
+
+    const prevValues = {
+        stampCharges: initialData.stampCharges,
+        beneficiaryName: initialData.beneficiaryName ?? initialData.favouring,
+        amount: initialData.amount,
+        expiryDate: toDateString(initialData.bgExpiryDate),
+        claimDate: toDateString(initialData.bgClaim),
+    };
 
     const handleSubmit = async (values: BankGuaranteeEditFormValues) => {
         try {
             const payload: Record<string, unknown> = {};
 
             Object.entries(values).forEach(([key, value]) => {
-                // Handle File objects (shouldn't happen - FileUploader returns paths)
                 if (value instanceof File) return;
 
-                // Handle arrays of Files
                 if (Array.isArray(value) && value.length > 0 && value[0] instanceof File) return;
 
-                // Handle all other values
                 if (value === undefined || value === null) return;
 
-                // Repeatable bank mail id rows -- serialized explicitly below so
-                // the generic loop doesn't stringify the raw row objects.
                 if (key === 'bankMailIds' || key === 'bankMailIdsCc') return;
 
                 if (value instanceof Date) {
                     payload[key] = value.toISOString();
                 } else if (typeof value === 'object' && !Array.isArray(value)) {
-                    // For single file paths that are already strings, don't stringify
                     payload[key] = String(value);
                 } else if (Array.isArray(value)) {
                     payload[key] = JSON.stringify(value);
@@ -186,13 +218,6 @@ export function BankGuaranteeEditForm({ instrumentId, initialData }: BankGuarant
                 }
             });
 
-            // `payment_instruments.favouring` (the "BG in Favour of" input above) and
-            // `instrument_bg_details.beneficiary_name` are two mirrors of the same
-            // value -- create writes both from bgFavouring (payment-requests
-            // command.service.ts :580 and :635), as does update (:862 / :923).
-            // There is deliberately no separate Beneficiary Name input here, so
-            // mirror the value across to keep the BG dashboard's "Beneficiary
-            // name" column populated from this single field.
             const finalPayload: Record<string, unknown> = { ...payload };
             if (finalPayload.favouring !== undefined) {
                 finalPayload.beneficiaryName = finalPayload.favouring;
@@ -202,8 +227,6 @@ export function BankGuaranteeEditForm({ instrumentId, initialData }: BankGuarant
                 finalPayload.reasonReq = '';
             }
 
-            // Flatten the bank mail rows to plain address lists. Blank rows are
-            // dropped; an emptied list serializes to [] so it actually clears.
             finalPayload.bankMailIds = JSON.stringify(
                 (values.bankMailIds ?? []).map((r) => r.email).filter(Boolean),
             );
@@ -223,135 +246,128 @@ export function BankGuaranteeEditForm({ instrumentId, initialData }: BankGuarant
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
-
-                {/* Section 1: EMD request Bank Guarantee form */}
                 <SectionCard title="EMD Request - Bank Guarantee">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            <SelectField
-                                control={form.control}
-                                name="bgPurpose"
-                                label="Purpose *"
-                                options={BG_PURPOSE_OPTIONS}
-                                placeholder="Select Purpose"
-                            />
-                            <FieldWrapper control={form.control} name="amount" label="Amount *">
-                                {(field) => <NumberInput {...field} placeholder="Enter total amount" />}
-                            </FieldWrapper>
-                            <SelectField
-                                control={form.control}
-                                name="bgNeeds"
-                                label="BG Needed In *"
-                                options={BG_NEEDED_IN_OPTIONS}
-                                placeholder="Select Timeframe"
-                            />
-                            <FieldWrapper control={form.control} name="favouring" label="BG in Favour of *">
-                                {(field) => <Input {...field} value={field.value || ''} placeholder="e.g., Individual or Company Name" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="beneficiaryAddress" label="BG Address *">
-                                {(field) => <Textarea rows={2} {...field} value={field.value || ''} placeholder="e.g., Bank Name or Address" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="bgExpiryDate" label="BG Expiry Date *">
-                                {(field) => <DateInput value={field.value || undefined} onChange={field.onChange} />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="bgClaim" label="BG Claim Period *">
-                                {(field) => <DateInput value={field.value || undefined} onChange={field.onChange} />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="stampCharges" label="Stamp Paper Value">
-                                {(field) => <NumberInput min={0} {...field} value={field.value ?? 0} placeholder="0.00" />}
-                            </FieldWrapper>
-                            <SelectField
-                                control={form.control}
-                                name="bankName"
-                                label="Bank *"
-                                options={BANKS}
-                                placeholder="Select Bank"
-                            />
-                            <FieldWrapper control={form.control} name="courierAddress" label="Courier Address *">
-                                {(field) => <Textarea rows={2} {...field} value={field.value || ''} placeholder="e.g., Bank Name or Address" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="courierDeadline" label="Courier Time (Days)" description="Enter the number of days required for the courier to deliver the BG.">
-                                {(field) => <NumberInput min={1} max={10} {...field} />}
-                            </FieldWrapper>
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <SelectField
+                            control={form.control}
+                            name="bgPurpose"
+                            label="Purpose *"
+                            options={BG_PURPOSE_OPTIONS}
+                            placeholder="Select Purpose"
+                        />
+                        <FieldWrapper control={form.control} name="amount" label="Amount *">
+                            {(field) => <NumberInput {...field} placeholder="Enter total amount" />}
+                        </FieldWrapper>
+                        <SelectField
+                            control={form.control}
+                            name="bgNeeds"
+                            label="BG Needed In *"
+                            options={BG_NEEDED_IN_OPTIONS}
+                            placeholder="Select Timeframe"
+                        />
+                        <FieldWrapper control={form.control} name="favouring" label="BG in Favour of *">
+                            {(field) => <Input {...field} value={field.value || ''} placeholder="e.g., Individual or Company Name" />}
+                        </FieldWrapper>
+                        <FieldWrapper control={form.control} name="beneficiaryAddress" label="BG Address *">
+                            {(field) => <Textarea rows={2} {...field} value={field.value || ''} placeholder="e.g., Bank Name or Address" />}
+                        </FieldWrapper>
+                        <FieldWrapper control={form.control} name="bgExpiryDate" label="BG Expiry Date *">
+                            {(field) => <DateInput value={field.value || undefined} onChange={field.onChange} />}
+                        </FieldWrapper>
+                        <FieldWrapper control={form.control} name="bgClaim" label="BG Claim Period *">
+                            {(field) => <DateInput value={field.value || undefined} onChange={field.onChange} />}
+                        </FieldWrapper>
+                        <FieldWrapper control={form.control} name="stampCharges" label="Stamp Paper Value">
+                            {(field) => <NumberInput min={0} {...field} value={field.value ?? 0} placeholder="0.00" />}
+                        </FieldWrapper>
+                        <SelectField
+                            control={form.control}
+                            name="bankName"
+                            label="Bank *"
+                            options={BANKS}
+                            placeholder="Select Bank"
+                        />
+                        <FieldWrapper control={form.control} name="courierAddress" label="Courier Address *">
+                            {(field) => <Textarea rows={2} {...field} value={field.value || ''} placeholder="e.g., Bank Name or Address" />}
+                        </FieldWrapper>
+                        <FieldWrapper control={form.control} name="courierDeadline" label="Courier Time (Days)" description="Enter the number of days required for the courier to deliver the BG.">
+                            {(field) => <NumberInput min={1} max={10} {...field} />}
+                        </FieldWrapper>
+                    </div>
 
-                        <Separator />
+                    <Separator />
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <FieldWrapper control={form.control} name="bgBankAccName" label="Bank Account Name">
-                                {(field) => <Input {...field} value={field.value || ''} placeholder="e.g., Individual or Company Name" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="bgBankAcc" label="Bank Account Number">
-                                {(field) => <Input {...field} value={field.value || ''} placeholder="e.g., 1234567890" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="bgBankIfsc" label="Bank IFSC Code">
-                                {(field) => <Input {...field} value={field.value || ''} placeholder="e.g., SBIN0001234" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="bgClientUser" label="User Dept. Email">
-                                {(field) => <Input type="email" {...field} value={field.value || ''} placeholder="e.g., user@company.com" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="bgClientCp" label="C&P Dept. Email">
-                                {(field) => <Input type="email" {...field} value={field.value || ''} placeholder="e.g., cp@company.com" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="bgClientFin" label="Finance Dept. Email">
-                                {(field) => <Input type="email" {...field} value={field.value || ''} placeholder="e.g., finance@company.com" />}
-                            </FieldWrapper>
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <FieldWrapper control={form.control} name="bgBankAccName" label="Bank Account Name">
+                            {(field) => <Input {...field} value={field.value || ''} placeholder="e.g., Individual or Company Name" />}
+                        </FieldWrapper>
+                        <FieldWrapper control={form.control} name="bgBankAcc" label="Bank Account Number">
+                            {(field) => <Input {...field} value={field.value || ''} placeholder="e.g., 1234567890" />}
+                        </FieldWrapper>
+                        <FieldWrapper control={form.control} name="bgBankIfsc" label="Bank IFSC Code">
+                            {(field) => <Input {...field} value={field.value || ''} placeholder="e.g., SBIN0001234" />}
+                        </FieldWrapper>
+                        <FieldWrapper control={form.control} name="bgClientUser" label="User Dept. Email">
+                            {(field) => <Input type="email" {...field} value={field.value || ''} placeholder="e.g., user@company.com" />}
+                        </FieldWrapper>
+                        <FieldWrapper control={form.control} name="bgClientCp" label="C&P Dept. Email">
+                            {(field) => <Input type="email" {...field} value={field.value || ''} placeholder="e.g., cp@company.com" />}
+                        </FieldWrapper>
+                        <FieldWrapper control={form.control} name="bgClientFin" label="Finance Dept. Email">
+                            {(field) => <Input type="email" {...field} value={field.value || ''} placeholder="e.g., finance@company.com" />}
+                        </FieldWrapper>
+                    </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                            <FieldWrapper control={form.control} name="bg_format_te" label="BG Format (Max 5 files)">
-                                {(field) => (
-                                    <FileUploader
-                                        context="bg-format-files"
-                                        value={parseFileValue(field.value)}
-                                        onChange={field.onChange}
-                                    />
-                                )}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="bgPo" label="PO/Tender/Request Letter">
-                                {(field) => (
-                                    <FileUploader
-                                        context="bg-po-files"
-                                        value={parseFileValue(field.value)}
-                                        onChange={field.onChange}
-                                    />
-                                )}
-                            </FieldWrapper>
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        <FieldWrapper control={form.control} name="bg_format_te" label="BG Format (Max 5 files)">
+                            {(field) => (
+                                <FileUploader
+                                    context="bg-format-files"
+                                    value={parseFileValue(field.value)}
+                                    onChange={field.onChange}
+                                />
+                            )}
+                        </FieldWrapper>
+                        <FieldWrapper control={form.control} name="bgPo" label="PO/Tender/Request Letter">
+                            {(field) => (
+                                <FileUploader
+                                    context="bg-po-files"
+                                    value={parseFileValue(field.value)}
+                                    onChange={field.onChange}
+                                />
+                            )}
+                        </FieldWrapper>
+                    </div>
                 </SectionCard>
 
-                {/* Section 2: Accounts Form (BG) 1 - Request to Bank */}
                 <SectionCard title="Accounts Form (BG) 1 - Request to Bank">
                     <AccountsForm1Fields
                         control={form.control}
                         names={STEP_NAMES}
                         bankMailIds={bankMailIds}
                         bankMailIdsCc={bankMailIdsCc}
-                        prefilledMode="single"
+                        disabled={isStepLocked('accounts-form-1')}
+                        fdrValueType="string"
                     />
                 </SectionCard>
 
-                {/* Section 3: Accounts Form (BG) 2 - After BG Creation */}
                 <SectionCard title="Accounts Form (BG) 2 - After BG Creation">
                     <AccountsForm2Fields
                         control={form.control}
                         names={STEP_NAMES}
+                        courierOptions={courierOptions}
                     />
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <ReadOnlyField label="Validity Date" value={initialData.validityDate} />
-                        <ReadOnlyField label="Claim Expiry Date" value={initialData.claimExpiryDate} />
-                    </div>
                 </SectionCard>
 
-                {/* Section 4: Accounts Form (BG) 3 - Capture FDR Details */}
                 <SectionCard title="Accounts Form (BG) 3 - Capture FDR Details">
                     <AccountsForm3Fields
                         control={form.control}
                         names={STEP_NAMES}
+                        disabled={isStepLocked('accounts-form-3')}
+                        fdrValueType="string"
                     />
                 </SectionCard>
 
-                {/* Section 5: Initiate Followup */}
                 <SectionCard title="Initiate Followup">
                     {followupData ? (
                         <FollowupReadOnlyView data={followupData} />
@@ -362,39 +378,40 @@ export function BankGuaranteeEditForm({ instrumentId, initialData }: BankGuarant
                     )}
                 </SectionCard>
 
-                {/* Section 6: Request Extension */}
                 <SectionCard title="Request Extension">
                     <RequestExtensionFields
                         control={form.control}
                         names={STEP_NAMES}
+                        modificationRequired={modificationRequired}
+                        prevValues={prevValues}
+                        disabled={isStepLocked('request-extension')}
                     />
                 </SectionCard>
 
-                {/* Section 7: Returned via Courier */}
                 <SectionCard title="Returned via Courier">
                     <ReturnedCourierFields
                         control={form.control}
                         names={STEP_NAMES}
+                        disabled={isStepLocked('returned-courier')}
                     />
                 </SectionCard>
 
-                {/* Section 8: Request Cancellation */}
                 <SectionCard title="Request Cancellation">
                     <RequestCancellationFields
                         control={form.control}
                         names={STEP_NAMES}
+                        disabled={isStepLocked('request-cancellation')}
                     />
                 </SectionCard>
 
-                {/* Section 9: BG Cancellation Confirmation */}
                 <SectionCard title="BG Cancellation Confirmation">
                     <BgCancellationConfirmationFields
                         control={form.control}
                         names={STEP_NAMES}
+                        disabled={isStepLocked('bg-cancellation-confirmation')}
                     />
                 </SectionCard>
 
-                {/* Section 10: FDR Cancellation Confirmation */}
                 <SectionCard title="FDR Cancellation Confirmation">
                     <FdrCancellationConfirmationFields
                         control={form.control}
