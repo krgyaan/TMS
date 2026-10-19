@@ -34,6 +34,9 @@ describe('optionalNumber', () => {
         ['undefined', undefined],
         ['empty string', ''],
         ['whitespace string', '   '],
+        ['NA string', 'NA'],
+        ['N/A string', 'N/A'],
+        ['unparseable string', 'abc'],
     ])('%s -> null (not 0)', (_label, input) => {
         expect(f.parse(input)).toBeNull();
     });
@@ -48,22 +51,28 @@ describe('optionalNumber', () => {
         expect(f.parse(7)).toBe(7);
     });
 
-    it('still rejects invalid values', () => {
-        expect(f.safeParse('abc').success).toBe(false);
+    it('still rejects invalid numbers (e.g. negative when nonnegative required)', () => {
         expect(f.safeParse(-5).success).toBe(false);
     });
 });
 
 describe('TenderInfoSheetPayloadSchema numeric fields', () => {
-    it.each(NUMERIC_FIELDS)('%s: null / "" / undefined are stored as null', (name) => {
+    it.each(NUMERIC_FIELDS)('%s: null / "" / undefined / "NA" are stored as null', (name) => {
         const s = fieldSchema(name);
         expect(s.parse(null)).toBeNull();
         expect(s.parse('')).toBeNull();
         expect(s.parse(undefined)).toBeNull();
+        expect(s.parse('NA')).toBeNull();
     });
 
-    it.each(NUMERIC_FIELDS.filter((n) => !POSITIVE_ONLY.has(n)))('%s: a real 0 is kept as 0', (name) => {
+    it.each(NUMERIC_FIELDS.filter((n) => !POSITIVE_ONLY.has(n)))('%s: a real 0 (number or "0") is kept as 0', (name) => {
         expect(fieldSchema(name).parse(0)).toBe(0);
+        expect(fieldSchema(name).parse('0')).toBe(0);
+    });
+
+    it.each(NUMERIC_FIELDS)('%s: a valid positive number is parsed correctly', (name) => {
+        expect(fieldSchema(name).parse(5)).toBe(5);
+        expect(fieldSchema(name).parse('5')).toBe(5);
     });
 
     it('payment terms 100 / 0 survive validation (0% installation is a real term)', () => {
