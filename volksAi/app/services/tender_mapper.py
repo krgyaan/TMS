@@ -1809,7 +1809,7 @@ def build_infosheet_data(
     def _extract_consignee_schedule_delivery_days(text: str) -> List[int]:
         gem_hdr = re.search(
             r"(?:डिलीवरी\s*के\s*दिन|1डलीवर\s*के\s*1दन|Delivery\s*Days?)",
-            text, re.IGNORECASE
+            text, re.IGNORECASE        
         )
         if not gem_hdr:
             gem_hdr = re.search(
