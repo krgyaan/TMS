@@ -61,6 +61,26 @@ describe("OperationNotificationService.notifyWoBasicDetailsCreated", () => {
         expect(text).toContain("click here to view full details. https://example.com/n/abc123");
     });
 
+    it("includes creator and team member names when provided", async () => {
+        await service.notifyWoBasicDetailsCreated({
+            ...baseData,
+            actorName: "Rahul Sharma",
+            teamMemberName: "Anurag",
+        });
+
+        const [, text] = sendText.mock.calls[0];
+        expect(text).toContain("- Created by: Rahul Sharma");
+        expect(text).toContain("- Team Member: Anurag");
+    });
+
+    it("omits creator and team member lines when not provided", async () => {
+        await service.notifyWoBasicDetailsCreated(baseData);
+
+        const [, text] = sendText.mock.calls[0];
+        expect(text).not.toContain("Created by");
+        expect(text).not.toContain("Team Member");
+    });
+
     it("still sends when public link building fails", async () => {
         buildUrl.mockRejectedValue(new Error("missing stateSecret"));
 
@@ -138,7 +158,7 @@ describe("OperationNotificationService.notifyWoBasicDetailsUpdated", () => {
     });
 
     it("sends the update message to the WORKORDER group with a short URL", async () => {
-        await service.notifyWoBasicDetailsUpdated(baseData);
+        await service.notifyWoBasicDetailsUpdated({ ...baseData, actorName: "Priya Nair" });
 
         expect(buildUrl).toHaveBeenCalledWith({ type: "wobd", id: 7, event: "Work Order (PO) Updated" });
         expect(sendText).toHaveBeenCalledTimes(1);
@@ -148,6 +168,7 @@ describe("OperationNotificationService.notifyWoBasicDetailsUpdated", () => {
         expect(text).toContain("- Project Name: Solar Plant");
         expect(text).toContain("- Project Code: PRJ-001");
         expect(text).toContain("- Value (preGST): ₹15,00,000");
+        expect(text).toContain("- Updated by: Priya Nair");
         expect(text).toContain("click here to view full details. https://example.com/n/abc123");
     });
 
@@ -214,7 +235,7 @@ describe("OperationNotificationService.notifyWoBasicDetailsRevised", () => {
     });
 
     it("sends the revise message with revision number and notes", async () => {
-        await service.notifyWoBasicDetailsRevised(baseData);
+        await service.notifyWoBasicDetailsRevised({ ...baseData, actorName: "Amit Verma" });
 
         expect(buildUrl).toHaveBeenCalledWith({ type: "wobd", id: 7, event: "Work Order (PO) Revised" });
         expect(sendText).toHaveBeenCalledTimes(1);
@@ -223,6 +244,7 @@ describe("OperationNotificationService.notifyWoBasicDetailsRevised", () => {
         expect(text).toContain("Work Order (PO) has been revised (Rev 2) from Volks Energie.");
         expect(text).toContain("- Project Name: Solar Plant");
         expect(text).toContain("- Value (preGST): ₹18,00,000");
+        expect(text).toContain("- Revised by: Amit Verma");
         expect(text).toContain("- Revision: 2");
         expect(text).toContain("- Notes: Revised PO value");
         expect(text).toContain("click here to view full details. https://example.com/n/abc123");

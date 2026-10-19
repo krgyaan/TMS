@@ -61,6 +61,7 @@ export interface PublicWoBasicDetailEntity {
     woDate: string | null;
     currentStage: string | null;
     raisedByName: string | null;
+    teamMemberName: string | null;
     createdAt: string;
     updatedAt: string;
 }

@@ -1,4 +1,5 @@
 import { eq, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type { DbInstance } from "@/db";
 import { users, tenderInfos, organizations } from "@/db/schemas/";
 import { paymentRequests, vendorWorkOrders, vendorWorkOrderItems, woBasicDetails } from "@/db/schemas/operations";
@@ -66,6 +67,7 @@ export interface PublicWoBasicDetailDto {
     woDate: string | null;
     currentStage: string | null;
     raisedByName: string | null;
+    teamMemberName: string | null;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -205,6 +207,8 @@ const resolveTender: EntityResolver = async (db, id) => {
     return row ?? null;
 };
 
+const teamMemberUser = alias(users, "wobd_team_member_user");
+
 const resolveWoBasicDetails: EntityResolver = async (db, id) => {
     const [row] = await db
         .select({
@@ -213,10 +217,11 @@ const resolveWoBasicDetails: EntityResolver = async (db, id) => {
             projectName: woBasicDetails.projectName,
             projectCode: woBasicDetails.projectCode,
             value: woBasicDetails.woValuePreGst,
-            organizationName: organizations.name,
+            organizationName: sql<string | null>`coalesce(nullif(${organizations.name}, ''), ${organizations.acronym})`,
             woDate: woBasicDetails.woDate,
             currentStage: woBasicDetails.currentStage,
             raisedByName: users.name,
+            teamMemberName: teamMemberUser.name,
             createdAt: woBasicDetails.createdAt,
             updatedAt: woBasicDetails.updatedAt,
         })
@@ -224,6 +229,7 @@ const resolveWoBasicDetails: EntityResolver = async (db, id) => {
         .leftJoin(tenderInfos, eq(tenderInfos.id, woBasicDetails.tenderId))
         .leftJoin(organizations, eq(organizations.id, tenderInfos.organization))
         .leftJoin(users, eq(users.id, woBasicDetails.createdBy))
+        .leftJoin(teamMemberUser, eq(teamMemberUser.id, tenderInfos.teamMember))
         .where(eq(woBasicDetails.id, id))
         .limit(1);
 
