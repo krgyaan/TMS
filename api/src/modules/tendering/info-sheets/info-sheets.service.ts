@@ -51,6 +51,17 @@ export interface ResolvedTenderDocuments {
     otherDocumentsPaths: string[];
 }
 
+export const formatCurrency = (
+    value: string | number | null | undefined
+): string => {
+    if (value === null || value === undefined) return '—';
+    if (typeof value === 'string' && value.trim() === '') return '—';
+    const num = Number(value);
+    if (isNaN(num)) return '—';
+    if (num === 0) return '0';
+    return `₹${num.toLocaleString('en-IN')}`;
+};
+
 @Injectable()
 export class TenderInfoSheetsService {
     private readonly logger;
@@ -1304,17 +1315,6 @@ export class TenderInfoSheetsService {
             : 'Not specified';
 
         // ── Helpers 
-
-        const formatCurrency = (
-            value: string | number | null | undefined
-        ): string => {
-            if (value === null || value === undefined || value === '')
-                return '—';
-            const num = Number(value);
-            if (isNaN(num)) return '—';
-            if (num === 0) return '—';
-            return `₹${num.toLocaleString('en-IN')}`;
-        };
 
         const formatArray = (
             arr: string[] | null | undefined
