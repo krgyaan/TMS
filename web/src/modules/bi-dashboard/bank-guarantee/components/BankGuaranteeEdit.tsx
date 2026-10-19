@@ -1,13 +1,14 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useFieldArray, useForm, useWatch, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
-import { SelectField } from '@/components/form/SelectField';
+import { SelectField, Combobox, type SelectOption } from '@/components/form/SelectField';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { FileUploader } from '@/components/file-upload';
 import { NumberInput } from '@/components/form/NumberInput';
 import DateInput from '@/components/form/DateInput';
@@ -69,6 +70,19 @@ const STEP_NAMES = {
     bgFdrCancelAmount: 'bgFdrCancelAmount',
     bgFdrCancelRefNo: 'bgFdrCancelRefNo',
 } as const;
+
+const EDIT_SECTIONS: SelectOption[] = [
+    { id: 'accounts-form-1', name: 'Accounts Form (BG) 1 - Request to Bank' },
+    { id: 'accounts-form-2', name: 'Accounts Form (BG) 2 - After BG Creation' },
+    { id: 'accounts-form-3', name: 'Accounts Form (BG) 3 - Capture FDR Details' },
+    { id: 'initiate-followup', name: 'Initiate Followup' },
+    { id: 'request-extension', name: 'Request Extension' },
+    { id: 'returned-courier', name: 'Returned via Courier' },
+    { id: 'request-cancellation', name: 'Request Cancellation' },
+    { id: 'bg-cancellation-confirmation', name: 'BG Cancellation Confirmation' },
+    { id: 'fdr-cancellation-confirmation', name: 'FDR Cancellation Confirmation' },
+    { id: 'instrument-status', name: 'Instrument Status' },
+];
 
 const SectionCard = ({ title, children }: { title: string; children: ReactNode }) => (
     <Card>
@@ -187,6 +201,8 @@ export function BankGuaranteeEdit({ instrumentId, initialData }: BankGuaranteeEd
 
     const bankMailIds = useFieldArray({ control: form.control, name: 'bankMailIds' });
     const bankMailIdsCc = useFieldArray({ control: form.control, name: 'bankMailIdsCc' });
+
+    const [activeSection, setActiveSection] = useState('');
 
     const isStepLocked = (step: string) => {
         void step;
@@ -340,91 +356,129 @@ export function BankGuaranteeEdit({ instrumentId, initialData }: BankGuaranteeEd
                     </div>
                 </SectionCard>
 
-                <SectionCard title="Accounts Form (BG) 1 - Request to Bank">
-                    <AccountsForm1Fields
-                        control={form.control}
-                        names={STEP_NAMES}
-                        bankMailIds={bankMailIds}
-                        bankMailIdsCc={bankMailIdsCc}
-                        disabled={isStepLocked('accounts-form-1')}
-                        fdrValueType="string"
-                    />
-                </SectionCard>
-
-                <SectionCard title="Accounts Form (BG) 2 - After BG Creation">
-                    <AccountsForm2Fields
-                        control={form.control}
-                        names={STEP_NAMES}
-                    />
-                </SectionCard>
-
-                <SectionCard title="Accounts Form (BG) 3 - Capture FDR Details">
-                    <AccountsForm3Fields
-                        control={form.control}
-                        names={STEP_NAMES}
-                        disabled={isStepLocked('accounts-form-3')}
-                        fdrValueType="string"
-                    />
-                </SectionCard>
-
-                <SectionCard title="Initiate Followup">
-                    {followupData ? (
-                        <FollowupReadOnlyView data={followupData} />
-                    ) : (
-                        <p className="text-sm text-muted-foreground">
-                            No follow-up has been initiated for this instrument yet. Use the action form to start one.
-                        </p>
-                    )}
-                </SectionCard>
-
-                <SectionCard title="Request Extension">
-                    <RequestExtensionFields
-                        control={form.control}
-                        names={STEP_NAMES}
-                        modificationRequired={modificationRequired}
-                        prevValues={prevValues}
-                        disabled={isStepLocked('request-extension')}
-                    />
-                </SectionCard>
-
-                <SectionCard title="Returned via Courier">
-                    <ReturnedCourierFields
-                        control={form.control}
-                        names={STEP_NAMES}
-                        disabled={isStepLocked('returned-courier')}
-                    />
-                </SectionCard>
-
-                <SectionCard title="Request Cancellation">
-                    <RequestCancellationFields
-                        control={form.control}
-                        names={STEP_NAMES}
-                        disabled={isStepLocked('request-cancellation')}
-                    />
-                </SectionCard>
-
-                <SectionCard title="BG Cancellation Confirmation">
-                    <BgCancellationConfirmationFields
-                        control={form.control}
-                        names={STEP_NAMES}
-                        disabled={isStepLocked('bg-cancellation-confirmation')}
-                    />
-                </SectionCard>
-
-                <SectionCard title="FDR Cancellation Confirmation">
-                    <FdrCancellationConfirmationFields
-                        control={form.control}
-                        names={STEP_NAMES}
-                    />
-                </SectionCard>
-
-                <SectionCard title="Instrument Status">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <FieldWrapper control={form.control} name="status" label="Instrument Status">
-                            {(field) => <Input {...field} value={field.value || ''} placeholder="Current lifecycle status" />}
-                        </FieldWrapper>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid gap-2">
+                        <Label className="inline-flex items-center flex-wrap">Choose What to Edit</Label>
+                        <Combobox
+                            value={activeSection}
+                            onChange={(v) => setActiveSection(v)}
+                            options={EDIT_SECTIONS}
+                            placeholder="Select a section to edit"
+                        />
                     </div>
-                </SectionCard>
+                </div>
+
+                <fieldset disabled={isStepLocked(activeSection)} className="border-0 p-0 m-0 min-w-0">
+                    {activeSection === '' && (
+                        <p className="text-sm text-muted-foreground">Select a section above to edit it.</p>
+                    )}
+
+                    {activeSection === 'accounts-form-1' && (
+                        <SectionCard title="Accounts Form (BG) 1 - Request to Bank">
+                            <AccountsForm1Fields
+                                control={form.control}
+                                names={STEP_NAMES}
+                                bankMailIds={bankMailIds}
+                                bankMailIdsCc={bankMailIdsCc}
+                                disabled={isStepLocked('accounts-form-1')}
+                                fdrValueType="string"
+                            />
+                        </SectionCard>
+                    )}
+
+                    {activeSection === 'accounts-form-2' && (
+                        <SectionCard title="Accounts Form (BG) 2 - After BG Creation">
+                            <AccountsForm2Fields
+                                control={form.control}
+                                names={STEP_NAMES}
+                            />
+                        </SectionCard>
+                    )}
+
+                    {activeSection === 'accounts-form-3' && (
+                        <SectionCard title="Accounts Form (BG) 3 - Capture FDR Details">
+                            <AccountsForm3Fields
+                                control={form.control}
+                                names={STEP_NAMES}
+                                disabled={isStepLocked('accounts-form-3')}
+                                fdrValueType="string"
+                            />
+                        </SectionCard>
+                    )}
+
+                    {activeSection === 'initiate-followup' && (
+                        <SectionCard title="Initiate Followup">
+                            {followupData ? (
+                                <FollowupReadOnlyView data={followupData} />
+                            ) : (
+                                <p className="text-sm text-muted-foreground">
+                                    No follow-up has been initiated for this instrument yet. Use the action form to start one.
+                                </p>
+                            )}
+                        </SectionCard>
+                    )}
+
+                    {activeSection === 'request-extension' && (
+                        <SectionCard title="Request Extension">
+                            <RequestExtensionFields
+                                control={form.control}
+                                names={STEP_NAMES}
+                                modificationRequired={modificationRequired}
+                                prevValues={prevValues}
+                                disabled={isStepLocked('request-extension')}
+                            />
+                        </SectionCard>
+                    )}
+
+                    {activeSection === 'returned-courier' && (
+                        <SectionCard title="Returned via Courier">
+                            <ReturnedCourierFields
+                                control={form.control}
+                                names={STEP_NAMES}
+                                disabled={isStepLocked('returned-courier')}
+                            />
+                        </SectionCard>
+                    )}
+
+                    {activeSection === 'request-cancellation' && (
+                        <SectionCard title="Request Cancellation">
+                            <RequestCancellationFields
+                                control={form.control}
+                                names={STEP_NAMES}
+                                disabled={isStepLocked('request-cancellation')}
+                            />
+                        </SectionCard>
+                    )}
+
+                    {activeSection === 'bg-cancellation-confirmation' && (
+                        <SectionCard title="BG Cancellation Confirmation">
+                            <BgCancellationConfirmationFields
+                                control={form.control}
+                                names={STEP_NAMES}
+                                disabled={isStepLocked('bg-cancellation-confirmation')}
+                            />
+                        </SectionCard>
+                    )}
+
+                    {activeSection === 'fdr-cancellation-confirmation' && (
+                        <SectionCard title="FDR Cancellation Confirmation">
+                            <FdrCancellationConfirmationFields
+                                control={form.control}
+                                names={STEP_NAMES}
+                            />
+                        </SectionCard>
+                    )}
+
+                    {activeSection === 'instrument-status' && (
+                        <SectionCard title="Instrument Status">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <FieldWrapper control={form.control} name="status" label="Instrument Status">
+                                    {(field) => <Input {...field} value={field.value || ''} placeholder="Current lifecycle status" />}
+                                </FieldWrapper>
+                            </div>
+                        </SectionCard>
+                    )}
+                </fieldset>
 
                 <div className="flex justify-end gap-4 pb-10">
                     <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>
