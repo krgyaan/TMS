@@ -116,6 +116,8 @@ export interface WoBasicDetailsCreatedData {
   projectName: string | null;
   projectCode: string | null;
   woValuePreGst: string | null;
+  actorName?: string | null;
+  teamMemberName?: string | null;
 }
 
 export interface WoBasicDetailsUpdatedData extends WoBasicDetailsCreatedData {}
@@ -561,6 +563,7 @@ export class OperationNotificationService {
       data,
       header: `Congrats!! We got new  Work Order (PO) From ${data.organizationName || 'N/A'}.`,
       event: 'New Work Order (PO)',
+      actorLabel: 'Created by',
     });
   }
 
@@ -569,6 +572,7 @@ export class OperationNotificationService {
       data,
       header: `Work Order (PO) has been updated from ${data.organizationName || 'N/A'}.`,
       event: 'Work Order (PO) Updated',
+      actorLabel: 'Updated by',
     });
   }
 
@@ -582,6 +586,7 @@ export class OperationNotificationService {
       header: `Work Order (PO) has been revised (Rev ${data.revisionNumber}) from ${data.organizationName || 'N/A'}.`,
       event: 'Work Order (PO) Revised',
       extraLines,
+      actorLabel: 'Revised by',
     });
   }
 
@@ -589,9 +594,10 @@ export class OperationNotificationService {
     data: WoBasicDetailsCreatedData;
     header: string;
     event: string;
+    actorLabel: string;
     extraLines?: string[];
   }): Promise<void> {
-    const { data, header, event, extraLines } = options;
+    const { data, header, event, actorLabel, extraLines } = options;
 
     let detailsUrl: string | undefined;
     try {
@@ -617,6 +623,12 @@ export class OperationNotificationService {
       `- Project Code: ${data.projectCode || 'N/A'}`,
       `- Value (preGST): ${formattedValue}`,
     ];
+    if (data.actorName) {
+      lines.push(`- ${actorLabel}: ${data.actorName}`);
+    }
+    if (data.teamMemberName) {
+      lines.push(`- Team Member: ${data.teamMemberName}`);
+    }
     if (extraLines?.length) {
       lines.push(...extraLines);
     }

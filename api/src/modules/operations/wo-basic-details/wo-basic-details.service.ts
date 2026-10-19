@@ -11,7 +11,7 @@ import { DRIZZLE } from '@db/database.module';
 import { users } from '@db/schemas/auth/users.schema';
 import { woBasicDetails, woContacts, woDetails, woOrderRevisions } from '@db/schemas/operations';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, desc, eq, ilike, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { AssignOeDto, BulkAssignOeDto, CreateWoBasicDetailDto, RemoveOeAssignmentDto, ReviseOrderDto, UpdateWoBasicDetailDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
 const oeFirstUser = alias(users, 'oeFirstUser');
@@ -522,23 +522,42 @@ export class WoBasicDetailsService {
     ): void {
         void (async () => {
             let organizationId = options?.organizationId ?? null;
-            if (!organizationId && row.tenderId) {
+            let teamMemberId: number | null = null;
+            if (row.tenderId) {
                 const [tender] = await this.db
-                    .select({ organizationId: tenderInfos.organization })
+                    .select({
+                        organizationId: tenderInfos.organization,
+                        teamMemberId: tenderInfos.teamMember,
+                    })
                     .from(tenderInfos)
                     .where(eq(tenderInfos.id, row.tenderId))
                     .limit(1);
-                organizationId = tender?.organizationId ?? null;
+                organizationId = organizationId ?? tender?.organizationId ?? null;
+                teamMemberId = tender?.teamMemberId ?? null;
             }
 
             let organizationName: string | null = null;
             if (organizationId) {
                 const [org] = await this.db
-                    .select({ name: organizations.name })
+                    .select({ name: organizations.name, acronym: organizations.acronym })
                     .from(organizations)
                     .where(eq(organizations.id, organizationId))
                     .limit(1);
-                organizationName = org?.name ?? null;
+                organizationName = org?.name?.trim() || org?.acronym?.trim() || null;
+            }
+
+            const actorId = kind === 'created' ? row.createdBy : row.updatedBy;
+            let actorName: string | null = null;
+            let teamMemberName: string | null = null;
+            const userIds = [actorId, teamMemberId].filter((v): v is number => v != null);
+            if (userIds.length > 0) {
+                const userRows = await this.db
+                    .select({ id: users.id, name: users.name })
+                    .from(users)
+                    .where(inArray(users.id, userIds));
+                const nameById = new Map(userRows.map((u) => [u.id, u.name]));
+                actorName = actorId != null ? nameById.get(actorId) ?? null : null;
+                teamMemberName = teamMemberId != null ? nameById.get(teamMemberId) ?? null : null;
             }
 
             const payload = {
@@ -547,6 +566,8 @@ export class WoBasicDetailsService {
                 projectName: row.projectName,
                 projectCode: row.projectCode,
                 woValuePreGst: row.woValuePreGst,
+                actorName,
+                teamMemberName,
             };
 
             switch (kind) {
