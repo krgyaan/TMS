@@ -51,10 +51,29 @@ export interface PublicTenderEntity {
     updatedAt: string | null;
 }
 
-export type PublicNotificationEntity = PublicPaymentRequestEntity | PublicOrderEntity | PublicVendorWorkOrderEntity | PublicTenderEntity;
+export interface PublicWoBasicDetailEntity {
+    id: number;
+    referenceNo: string | null;
+    projectName: string | null;
+    projectCode: string | null;
+    value: string | null;
+    organizationName: string | null;
+    woDate: string | null;
+    currentStage: string | null;
+    raisedByName: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export type PublicNotificationEntity =
+    | PublicPaymentRequestEntity
+    | PublicOrderEntity
+    | PublicVendorWorkOrderEntity
+    | PublicTenderEntity
+    | PublicWoBasicDetailEntity;
 
 export interface PublicNotificationResponse {
-    type: "pr" | "po" | "tender" | "vwo";
+    type: "pr" | "po" | "tender" | "vwo" | "wobd";
     event: string | null;
     entity: PublicNotificationEntity;
 }

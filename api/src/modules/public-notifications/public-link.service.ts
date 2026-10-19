@@ -10,7 +10,7 @@ const DEFAULT_PUBLIC_LINK_EXPIRES_IN = "30d";
 const DEFAULT_PUBLIC_LINK_EXPIRES_SECONDS = 30 * 24 * 60 * 60;
 const UNIT_SECONDS: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400, w: 604800 };
 
-export type PublicNotifyEntityType = "pr" | "po" | "vwo" | "tender";
+export type PublicNotifyEntityType = "pr" | "po" | "vwo" | "tender" | "wobd";
 
 export interface BuildPublicLinkOptions {
     type: PublicNotifyEntityType;

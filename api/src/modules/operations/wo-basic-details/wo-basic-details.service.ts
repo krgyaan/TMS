@@ -2,6 +2,7 @@ import { items, locations, organizations, projects, teams, tenderClients, tender
 import { AppLogger } from '@/logger/app-logger.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { CashFlowService } from '@/modules/operations/cash-flows/cash-flow.service';
+import { OperationNotificationService } from '@/modules/operations/operation-notification.service';
 import { PaymentRequestService } from '@/modules/operations/payment-requests/payment-request.service';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
@@ -29,6 +30,7 @@ export class WoBasicDetailsService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly paymentRequestService: PaymentRequestService,
         private readonly cashFlowService: CashFlowService,
+        private readonly operationNotifications: OperationNotificationService,
     ) {
         this.logger = this.appLogger.withContext(WoBasicDetailsService.name);
     }
@@ -422,12 +424,14 @@ export class WoBasicDetailsService {
 
         let teamId: number | null = null;
         let prevStatus: number | null = null;
+        let organizationId: number | null = data.organizationId ?? null;
 
         if (data.tenderId) {
             const [tender] = await this.db
                 .select({
                     teamId: tenderInfos.team,
-                    status: tenderInfos.status
+                    status: tenderInfos.status,
+                    organizationId: tenderInfos.organization,
                 })
                 .from(tenderInfos)
                 .where(eq(tenderInfos.id, data.tenderId))
@@ -440,6 +444,7 @@ export class WoBasicDetailsService {
 
             teamId = tender.teamId;
             prevStatus = tender.status;
+            organizationId = tender.organizationId ?? organizationId;
         } else if (data.teamId) {
             // For non-tender WOs, use the provided teamId directly
             teamId = data.teamId;
@@ -499,10 +504,41 @@ export class WoBasicDetailsService {
             );
         }
 
+        // Send WhatsApp notification to the WORKORDER group (non-blocking)
+        if (row) {
+            this.notifyWoBasicDetailsWhatsapp(row, organizationId);
+        }
+
         // Create Project asynchronously (non-blocking)
         this.safeCreateProject(data, row?.id, userId, insertValues.projectName ?? null);
 
         return this.mapRowToResponse(row!);
+    }
+
+    private notifyWoBasicDetailsWhatsapp(row: WoBasicDetailRow, organizationId: number | null): void {
+        void (async () => {
+            let organizationName: string | null = null;
+            if (organizationId) {
+                const [org] = await this.db
+                    .select({ name: organizations.name })
+                    .from(organizations)
+                    .where(eq(organizations.id, organizationId))
+                    .limit(1);
+                organizationName = org?.name ?? null;
+            }
+
+            await this.operationNotifications.notifyWoBasicDetailsCreated({
+                woBasicDetailId: row.id,
+                organizationName,
+                projectName: row.projectName,
+                projectCode: row.projectCode,
+                woValuePreGst: row.woValuePreGst,
+            });
+        })().catch((error: unknown) => {
+            this.logger.error(
+                `Failed to send WO basic details WhatsApp notification for WO basic detail ${row.id}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        });
     }
 
     private async safeCreateProject(data: CreateWoBasicDetailDto, woBasicDetailId?: number, currentUserId?: number, actualProjectName?: string | null): Promise<void> {

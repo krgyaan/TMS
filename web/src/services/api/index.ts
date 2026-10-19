@@ -56,6 +56,7 @@ export {
     type PublicOrderEntity,
     type PublicVendorWorkOrderEntity,
     type PublicTenderEntity,
+    type PublicWoBasicDetailEntity,
     type ApprovalStatus,
 } from "./public-notification.service";
 export { urlShortenerService } from "./url-shortener.service";

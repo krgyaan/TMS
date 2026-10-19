@@ -8,6 +8,7 @@ import { GROUPS } from '../../config/groups';
 import { openwaConfig } from '../../config/openwa.config';
 import type { ConfigType } from '@nestjs/config';
 import { WhatsappJidResolver } from '../notifications/helpers/whatsapp-jid.resolver';
+import { PublicLinkService } from '../public-notifications/public-link.service';
 
 export interface PaymentRequestNotificationData {
   requestNo: string;
@@ -109,6 +110,14 @@ export interface VwoUpdatedNotificationData {
   updatedBy: number;
 }
 
+export interface WoBasicDetailsCreatedData {
+  woBasicDetailId: number;
+  organizationName: string | null;
+  projectName: string | null;
+  projectCode: string | null;
+  woValuePreGst: string | null;
+}
+
 @Injectable()
 export class OperationNotificationService {
   private readonly logger = new Logger(OperationNotificationService.name);
@@ -137,6 +146,7 @@ export class OperationNotificationService {
     @Inject(DRIZZLE) private readonly db: DbInstance,
     @Inject(openwaConfig.KEY) private readonly config: ConfigType<typeof openwaConfig>,
     private readonly jidResolver: WhatsappJidResolver,
+    private readonly publicLink: PublicLinkService,
   ) {}
 
   private resolveTargets(category: string): { type: 'group'; group: string } | { type: 'users'; userIds: number[] } | { type: 'accounts_group' } | null {
@@ -537,5 +547,38 @@ export class OperationNotificationService {
     } catch (err) {
       this.logger.warn(`Failed to send VWO updated notification: ${err}`);
     }
+  }
+
+  async notifyWoBasicDetailsCreated(data: WoBasicDetailsCreatedData): Promise<void> {
+    let detailsUrl: string | undefined;
+    try {
+      detailsUrl = await this.publicLink.buildUrl({
+        type: 'wobd',
+        id: data.woBasicDetailId,
+        event: 'New Work Order (PO)',
+      });
+    } catch (linkError) {
+      this.logger.warn(
+        `Failed to build public WO basic details link for WO basic detail ${data.woBasicDetailId}: ${linkError instanceof Error ? linkError.message : String(linkError)}`,
+      );
+    }
+
+    const formattedValue =
+      data.woValuePreGst != null && data.woValuePreGst !== ''
+        ? `₹${Number(data.woValuePreGst).toLocaleString('en-IN')}`
+        : 'N/A';
+
+    const lines: string[] = [
+      `Congrats!! We got new Work Order (PO) From ${data.organizationName || 'N/A'}.`,
+      `- Project Name: ${data.projectName || 'N/A'}`,
+      `- Project Code: ${data.projectCode || 'N/A'}`,
+      `- Value (preGST): ${formattedValue}`,
+    ];
+    if (detailsUrl) {
+      lines.push(`click here to view full details. ${detailsUrl}`);
+    }
+
+    const text = lines.join('\n');
+    await this.sendToTargets(text, { type: 'group', group: GROUPS.WORKORDER });
   }
 }
