@@ -116,6 +116,7 @@ export const navMain: NavGroup[] = [
             { title: "PQR Documents", url: paths.documentDashboard.pqr, permission: "document-dashboard.pqr" },
             { title: "Finance Document", url: paths.documentDashboard.financeDocument, permission: "document-dashboard.finance-document" },
             { title: "Client Directory", url: paths.documentDashboard.clientDirectory, permission: "shared.client-directory" },
+            { title: "Vendors", url: paths.documentDashboard.vendors, permission: "document-dashboard.vendors" },
         ],
     },
     {

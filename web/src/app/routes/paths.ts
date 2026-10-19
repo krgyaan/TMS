@@ -475,6 +475,8 @@ export const paths = {
         projectsEdit: (id: number | string) => `/document-dashboard/projects/${id}/edit`,
         projectsView: (id: number | string) => `/document-dashboard/projects/${id}`,
         clientDirectory: "/document-dashboard/client-directory",
+        vendors: "/document-dashboard/vendors",
+        vendorsView: (id: number | string) => `/document-dashboard/vendors/${id}`,
     },
 
     // ==================== HRMS ====================
