@@ -770,13 +770,25 @@ private parseStringArray(v: unknown): string[] | null {
 
         // Handle files for payment_instruments (if any were uploaded)
         const docketSlipFile = this.getFileForField('docket_slip', files, body, fileIndexTracker);
-        if (docketSlipFile) updateData.docketSlip = `bi-dashboard/${docketSlipFile.filename}`;
+        if (docketSlipFile) {
+            updateData.docketSlip = `bi-dashboard/${docketSlipFile.filename}`;
+        } else if (body.docket_slip && typeof body.docket_slip === 'string' && !body.docket_slip.includes('[object File]')) {
+            updateData.docketSlip = body.docket_slip;
+        }
 
         const coveringLetterFile = this.getFileForField('covering_letter', files, body, fileIndexTracker);
-        if (coveringLetterFile) updateData.coveringLetter = `bi-dashboard/${coveringLetterFile.filename}`;
+        if (coveringLetterFile) {
+            updateData.coveringLetter = `bi-dashboard/${coveringLetterFile.filename}`;
+        } else if (body.covering_letter && typeof body.covering_letter === 'string' && !body.covering_letter.includes('[object File]')) {
+            updateData.coveringLetter = body.covering_letter;
+        }
 
         const cancelPdfFile = this.getFileForField('cancel_pdf', files, body, fileIndexTracker);
-        if (cancelPdfFile) updateData.cancelPdf = `bi-dashboard/${cancelPdfFile.filename}`;
+        if (cancelPdfFile) {
+            updateData.cancelPdf = `bi-dashboard/${cancelPdfFile.filename}`;
+        } else if (body.cancel_pdf && typeof body.cancel_pdf === 'string' && !body.cancel_pdf.includes('[object File]')) {
+            updateData.cancelPdf = body.cancel_pdf;
+        }
 
         await this.db
             .update(paymentInstruments)

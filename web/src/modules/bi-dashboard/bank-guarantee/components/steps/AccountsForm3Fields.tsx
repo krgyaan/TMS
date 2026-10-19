@@ -3,7 +3,8 @@ import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { SelectField } from '@/components/form/SelectField';
 import { Input } from '@/components/ui/input';
 import { NumberInput } from '@/components/form/NumberInput';
-import { CompactFileUploader } from '@/components/file-upload';
+import { FileUploader } from '@/components/file-upload';
+import { toFileArray } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
 import DateInput from '@/components/form/DateInput';
 
 const FDR_PERCENTAGE_OPTIONS = [
@@ -61,9 +62,9 @@ export function AccountsForm3Fields<T extends FieldValues>({
                 </FieldWrapper>
                 <FieldWrapper control={control} name={names.fdrCopy} label="FDR Copy">
                     {(field) => (
-                        <CompactFileUploader
+                        <FileUploader
                             context="bg-fdr-copy"
-                            value={field.value as string | undefined}
+                            value={toFileArray(field.value)}
                             onChange={field.onChange}
                             disabled={disabled}
                         />
@@ -71,9 +72,9 @@ export function AccountsForm3Fields<T extends FieldValues>({
                 </FieldWrapper>
                 <FieldWrapper control={control} name={names.sfmsConf} label="SFMS Confirmation">
                     {(field) => (
-                        <CompactFileUploader
+                        <FileUploader
                             context="bg-sfms-conf"
-                            value={field.value as string | undefined}
+                            value={toFileArray(field.value)}
                             onChange={field.onChange}
                             disabled={disabled}
                         />

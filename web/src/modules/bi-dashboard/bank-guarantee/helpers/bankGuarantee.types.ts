@@ -1,6 +1,20 @@
 export type BankGuaranteeDashboardTab = 'new-requests' | 'live-bgs' | 'cancelled' | 'rejected';
 export type BankGuaranteeExportTab = BankGuaranteeDashboardTab | 'all';
 
+export const toFileArray = (value: unknown): string[] => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value as string[];
+    if (typeof value === 'string') {
+        try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? (parsed as string[]) : [value];
+        } catch {
+            return [value];
+        }
+    }
+    return [];
+};
+
 export type BankGuaranteeDashboardFilters = {
     tab?: BankGuaranteeDashboardTab;
     page?: number;

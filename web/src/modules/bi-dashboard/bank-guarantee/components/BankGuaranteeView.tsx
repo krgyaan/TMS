@@ -7,8 +7,22 @@ import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDate, formatDateTime } from '@/hooks/useFormatedDate';
 import { fileUploadService } from '@/services/api/file-upload.service';
 
+const parseFilePaths = (file?: string | null): string[] => {
+    if (!file) return [];
+    try {
+        const parsed: unknown = JSON.parse(file);
+        if (Array.isArray(parsed)) {
+            return parsed.filter((p): p is string => typeof p === 'string');
+        }
+    } catch {
+        return [file];
+    }
+    return [file];
+};
+
 const FileLink = ({ file }: { file?: string }) => {
-    if (!file) return <span className="text-muted-foreground">Not Uploaded</span>;
+    const paths = parseFilePaths(file);
+    if (paths.length === 0) return <span className="text-muted-foreground">Not Uploaded</span>;
 
     const getFileUrl = (filePath: string) => {
         const fileName = filePath.split('/').pop() || '';
@@ -29,15 +43,18 @@ const FileLink = ({ file }: { file?: string }) => {
     };
 
     return (
-        <div className="flex gap-3 items-center">
-            <a
-                href={getFileUrl(file)}
-                target="_blank"
-                className="flex items-center gap-1 text-blue-600 hover:underline"
-            >
-                <Eye className="h-4 w-4" />
-                {file?.split('_').slice(1).join('_')}
-            </a>
+        <div className="flex gap-3 items-center flex-wrap">
+            {paths.map((filePath) => (
+                <a
+                    key={filePath}
+                    href={getFileUrl(filePath)}
+                    target="_blank"
+                    className="flex items-center gap-1 text-blue-600 hover:underline"
+                >
+                    <Eye className="h-4 w-4" />
+                    {filePath.split('_').slice(1).join('_')}
+                </a>
+            ))}
         </div>
     );
 };
@@ -129,7 +146,7 @@ export function BankGuaranteeView({
             : null;
 
     // Check if sections have data
-    const hasFdrDetails = data.fdrNo || data.fdrAmt || data.fdrCopy || data.bgFdrCancelDate;
+    const hasFdrDetails = data.fdrNo || data.fdrAmt || parseFilePaths(data.fdrCopy).length > 0 || data.bgFdrCancelDate;
     const hasBankInfo = data.bankName || data.bgBankAcc || data.bgBankIfsc;
     const hasExtensionDetails = data.extendedAmount || data.extendedValidityDate;
     const hasCourierInfo =
@@ -139,8 +156,8 @@ export function BankGuaranteeView({
         data.courierAddress;
     const hasReturnInfo =
         data.docketNo ||
-        data.docketSlip ||
-        data.cancellConfirm ||
+        parseFilePaths(data.docketSlip).length > 0 ||
+        parseFilePaths(data.cancellConfirm).length > 0 ||
         data.bgFdrCancelRefNo;
 
     return (

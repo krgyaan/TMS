@@ -202,7 +202,7 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
                 prefilledFiles.push(formData.bgSoftCopy);
             }
             form.setValue('prefilled_signed_bg', prefilledFiles);
-            form.setValue('bg_format_imran', formData.bgFormatTe ?? undefined);
+            form.setValue('bg_format_imran', safeParseArray(formData.bgFormatTe));
             bankMailIds.replace(toMailRows(formData.bankMailIds));
             bankMailIdsCc.replace(toMailRows(formData.bankMailIdsCc));
         } else if (action === 'accounts-form-2') {
@@ -215,8 +215,8 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
         } else if (action === 'accounts-form-3') {
             form.setValue('fdr_per', toFdrEnum(formData.fdrPer));
             form.setValue('fdr_amt', formData.fdrAmt ?? undefined);
-            form.setValue('fdr_copy', formData.fdrCopy ?? undefined);
-            form.setValue('sfms_conf', formData.sfmsConf ?? undefined);
+            form.setValue('fdr_copy', safeParseArray(formData.fdrCopy));
+            form.setValue('sfms_conf', safeParseArray(formData.sfmsConf));
             form.setValue('fdr_no', formData.fdrNo ?? undefined);
             form.setValue('fdr_validity', toDateString(formData.fdrValidity));
             form.setValue('fdr_roi', formData.fdrRoi ?? undefined);
@@ -228,7 +228,7 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
             if (formData.hasExtensionModification) {
                 form.setValue('modification_required', 'Yes');
             }
-            form.setValue('ext_letter', formData.extensionLetterPath ?? undefined);
+            form.setValue('ext_letter', safeParseArray(formData.extensionLetterPath));
             form.setValue('new_stamp_charge_deducted', formData.newStampChargeDeducted ?? undefined);
             form.setValue('new_bg_bank_name', formData.extendedBankName ?? undefined);
             form.setValue('new_bg_amt', formData.extendedAmount ?? undefined);
@@ -236,12 +236,12 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
             form.setValue('new_bg_claim', toDateString(formData.extendedClaimExpiryDate));
         } else if (action === 'returned-courier') {
             form.setValue('docket_no', formData.courierNo ?? undefined);
-            form.setValue('docket_slip', formData.docketSlip ?? undefined);
+            form.setValue('docket_slip', safeParseArray(formData.docketSlip));
         } else if (action === 'request-cancellation') {
-            form.setValue('stamp_covering_letter', formData.stampCoveringLetter ?? undefined);
+            form.setValue('stamp_covering_letter', safeParseArray(formData.stampCoveringLetter));
             form.setValue('cancel_remark', formData.cancelRemark ?? undefined);
         } else if (action === 'bg-cancellation-confirmation') {
-            form.setValue('cancell_confirm', formData.cancellConfirm ?? undefined);
+            form.setValue('cancell_confirm', safeParseArray(formData.cancellConfirm));
         } else if (action === 'fdr-cancellation-confirmation') {
             form.setValue('bg_fdr_cancel_date', toDateString(formData.bgFdrCancelDate));
             form.setValue('bg_fdr_cancel_amount', formData.bgFdrCancelAmount ?? undefined);

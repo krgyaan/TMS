@@ -13,7 +13,6 @@ export const BankGuaranteeEditFormSchema = z.object({
     bgClaim: z.string().optional().nullable(),
     status: z.string().optional(),
     action: z.coerce.number().optional(),
-    docketNo: z.string().optional().nullable(),
     courierAddress: z.string().optional().nullable(),
     courierDeadline: z.coerce.number().optional().nullable(),
     bg_req: z.string().optional().nullable(),

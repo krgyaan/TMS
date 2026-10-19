@@ -3,7 +3,8 @@ import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NumberInput } from '@/components/form/NumberInput';
-import { CompactFileUploader } from '@/components/file-upload';
+import { FileUploader } from '@/components/file-upload';
+import { toFileArray } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import DateInput from '@/components/form/DateInput';
 
@@ -123,9 +124,9 @@ export function RequestExtensionFields<T extends FieldValues>({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
                 <FieldWrapper control={control} name={names.extLetter} label="Request Letter/email from Client">
                     {(field) => (
-                        <CompactFileUploader
+                        <FileUploader
                             context="bg-ext-letter"
-                            value={field.value as string | undefined}
+                            value={toFileArray(field.value)}
                             onChange={field.onChange}
                             disabled={disabled}
                         />

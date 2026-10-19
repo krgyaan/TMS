@@ -1,7 +1,8 @@
 import type { Control, FieldPath, FieldValues } from 'react-hook-form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
-import { CompactFileUploader } from '@/components/file-upload';
+import { FileUploader } from '@/components/file-upload';
+import { toFileArray } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
 
 export interface ReturnedCourierNames<T extends FieldValues> {
     docketNo: FieldPath<T>;
@@ -28,9 +29,9 @@ export function ReturnedCourierFields<T extends FieldValues>({
             </FieldWrapper>
             <FieldWrapper control={control} name={names.docketSlip} label="Upload Docket Slip">
                 {(field) => (
-                    <CompactFileUploader
+                    <FileUploader
                         context="bg-docket-slip"
-                        value={field.value as string | undefined}
+                        value={toFileArray(field.value)}
                         onChange={field.onChange}
                         disabled={disabled}
                     />

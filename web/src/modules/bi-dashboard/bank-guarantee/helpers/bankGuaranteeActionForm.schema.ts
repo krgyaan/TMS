@@ -19,6 +19,20 @@ const BaseActionFormSchema = z.object({
     action: z.string().min(1, 'Action is required'),
 });
 
+const hasFile = (value: unknown): boolean => {
+    if (!value) return false;
+    if (Array.isArray(value)) return value.length > 0;
+    if (typeof value === 'string') {
+        try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? parsed.length > 0 : true;
+        } catch {
+            return true;
+        }
+    }
+    return true;
+};
+
 // Bank Guarantee Action Form Schema
 export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     // Accounts Form (BG) 1 - Request to Bank
@@ -133,7 +147,7 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     (data) => {
         // Conditional validation: bg_format_imran required when Upload by Imran
         if (data.action === 'accounts-form-1' && data.approve_bg === 'Upload by Imran') {
-            return !!data.bg_format_imran;
+            return hasFile(data.bg_format_imran);
         }
         return true;
     },
@@ -219,7 +233,7 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     (data) => {
         // Action 5: ext_letter is required
         if (data.action === 'request-extension') {
-            return !!data.ext_letter;
+            return hasFile(data.ext_letter);
         }
         return true;
     },
@@ -231,7 +245,7 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     (data) => {
         // Action 6: docket_no, docket_slip are required
         if (data.action === 'returned-courier') {
-            return !!data.docket_no && !!data.docket_slip;
+            return !!data.docket_no && hasFile(data.docket_slip);
         }
         return true;
     },
@@ -243,7 +257,7 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     (data) => {
         // Action 7: stamp_covering_letter is required
         if (data.action === 'request-cancellation') {
-            return !!data.stamp_covering_letter;
+            return hasFile(data.stamp_covering_letter);
         }
         return true;
     },
@@ -255,7 +269,7 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     (data) => {
         // Action 8: cancell_confirm is required
         if (data.action === 'bg-cancellation-confirmation') {
-            return !!data.cancell_confirm;
+            return hasFile(data.cancell_confirm);
         }
         return true;
     },

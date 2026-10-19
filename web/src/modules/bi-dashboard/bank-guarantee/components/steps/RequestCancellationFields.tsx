@@ -1,7 +1,8 @@
 import type { Control, FieldPath, FieldValues } from 'react-hook-form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Textarea } from '@/components/ui/textarea';
-import { CompactFileUploader } from '@/components/file-upload';
+import { FileUploader } from '@/components/file-upload';
+import { toFileArray } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
 
 export interface RequestCancellationNames<T extends FieldValues> {
     stampCoveringLetter: FieldPath<T>;
@@ -27,14 +28,14 @@ export function RequestCancellationFields<T extends FieldValues>({
                 name={names.stampCoveringLetter}
                 label="Upload a Signed, Stamped Covering Letter"
             >
-                {(field) => (
-                    <CompactFileUploader
-                        context="bg-stamp-covering-letter"
-                        value={field.value as string | undefined}
-                        onChange={field.onChange}
-                        disabled={disabled}
-                    />
-                )}
+                    {(field) => (
+                        <FileUploader
+                            context="bg-stamp-covering-letter"
+                            value={toFileArray(field.value)}
+                            onChange={field.onChange}
+                            disabled={disabled}
+                        />
+                    )}
             </FieldWrapper>
             <FieldWrapper control={control} name={names.cancelRemark} label="Remarks">
                 {(field) => (
@@ -53,12 +54,12 @@ export function RequestCancellationFields<T extends FieldValues>({
                     label="Bank Cancellation Letter"
                 >
                     {(field) => (
-                        <CompactFileUploader
-                            context="bg-stamp-covering-letter"
-                            value={field.value as string | undefined}
-                            onChange={field.onChange}
-                            disabled={disabled}
-                        />
+                    <FileUploader
+                        context="bg-stamp-covering-letter"
+                        value={toFileArray(field.value)}
+                        onChange={field.onChange}
+                        disabled={disabled}
+                    />
                     )}
                 </FieldWrapper>
             )}

@@ -16,7 +16,6 @@ import { Separator } from '@/components/ui/separator';
 import { BG_PURPOSE_OPTIONS, BG_NEEDED_IN_OPTIONS, BANKS } from '@/modules/tendering/emds-tenderfees/constants';
 import { BankGuaranteeEditFormSchema, type BankGuaranteeEditFormValues } from '../helpers/bankGuaranteeEditForm.schema';
 import { useUpdateBankGuarantee, useBGFollowupData } from '@/hooks/api/useBankGuarantees';
-import { useCourierOptions } from '@/modules/shared/courier/courier.hooks';
 import { toast } from 'sonner';
 import { AccountsForm1Fields } from './steps/AccountsForm1Fields';
 import { AccountsForm2Fields } from './steps/AccountsForm2Fields';
@@ -61,11 +60,10 @@ const STEP_NAMES = {
     newBgExpiry: 'extendedValidityDate',
     newBgClaim: 'extendedClaimExpiryDate',
     modificationRequired: 'modification_required',
-    docketNo: 'docketNo',
+    docketNo: 'courierNo',
     docketSlip: 'docket_slip',
     stampCoveringLetter: 'stamp_covering_letter',
     cancelRemark: 'cancelRemark',
-    cancellationLetterPath: 'cancellation_letter_path',
     cancellConfirm: 'cancell_confirm',
     bgFdrCancelDate: 'bgFdrCancelDate',
     bgFdrCancelAmount: 'bgFdrCancelAmount',
@@ -116,18 +114,29 @@ interface BankGuaranteeEditProps {
 export function BankGuaranteeEdit({ instrumentId, initialData }: BankGuaranteeEditProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdateBankGuarantee();
-    const courierOptions = useCourierOptions();
     const { data: followupData } = useBGFollowupData(instrumentId);
 
     const hasExtensionModification = !!(initialData.extendedAmount || initialData.extendedValidityDate
         || initialData.extendedClaimExpiryDate || initialData.extendedBankName || initialData.newStampChargeDeducted);
+
+    const form1Submitted = Number(initialData.action ?? 0) >= 1
+        || !!initialData.approveBg
+        || !!initialData.reasonReq
+        || initialData.status === 'ACCOUNTS_FORM_ACCEPTED'
+        || initialData.status === 'ACCOUNTS_FORM_REJECTED';
+
+    const prefilledFiles = (() => {
+        const files = safeParseArray(initialData.prefilledSignedBg);
+        if (files.length === 0 && initialData.bgSoftCopy) files.push(initialData.bgSoftCopy);
+        return files;
+    })();
 
     const form = useForm<BankGuaranteeEditFormValues>({
         resolver: zodResolver(BankGuaranteeEditFormSchema) as Resolver<BankGuaranteeEditFormValues>,
         defaultValues: {
             ...initialData,
             amount: initialData.amount ? Number(initialData.amount) : 0,
-            bg_req: (initialData.approveBg || initialData.reasonReq)
+            bg_req: form1Submitted
                 ? (initialData.reasonReq ? 'Rejected' : 'Accepted')
                 : undefined,
             modification_required: hasExtensionModification ? 'Yes' : undefined,
@@ -156,15 +165,15 @@ export function BankGuaranteeEdit({ instrumentId, initialData }: BankGuaranteeEd
             extendedValidityDate: toDateString(initialData.extendedValidityDate) ?? null,
             extendedClaimExpiryDate: toDateString(initialData.extendedClaimExpiryDate) ?? null,
             bgFdrCancelDate: toDateString(initialData.bgFdrCancelDate) ?? null,
-            bg_format_te: parseFileValue(initialData.bg_format_te),
+            bg_format_te: parseFileValue(initialData.bgFormatTe),
             bgPo: parseFileValue(initialData.bgPo),
-            prefilled_signed_bg: safeParseArray(initialData.prefilled_signed_bg),
-            fdr_copy: initialData.fdr_copy || null,
-            sfms_conf: initialData.sfms_conf || null,
-            docket_slip: initialData.docket_slip || null,
-            extension_letter_path: initialData.extension_letter_path || null,
-            stamp_covering_letter: initialData.stamp_covering_letter || null,
-            cancell_confirm: initialData.cancell_confirm || null,
+            prefilled_signed_bg: prefilledFiles,
+            fdr_copy: parseFileValue(initialData.fdrCopy),
+            sfms_conf: parseFileValue(initialData.sfmsConf),
+            docket_slip: parseFileValue(initialData.docketSlip),
+            extension_letter_path: parseFileValue(initialData.extensionLetterPath),
+            stamp_covering_letter: parseFileValue(initialData.stampCoveringLetter),
+            cancell_confirm: parseFileValue(initialData.cancellConfirm),
             bankMailIds: initialData.bankMailIds?.length
                 ? initialData.bankMailIds.map((email: string) => ({ email }))
                 : [{ email: '' }],
@@ -318,16 +327,7 @@ export function BankGuaranteeEdit({ instrumentId, initialData }: BankGuaranteeEd
                         </FieldWrapper>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        <FieldWrapper control={form.control} name="bg_format_te" label="BG Format (Max 5 files)">
-                            {(field) => (
-                                <FileUploader
-                                    context="bg-format-files"
-                                    value={parseFileValue(field.value)}
-                                    onChange={field.onChange}
-                                />
-                            )}
-                        </FieldWrapper>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <FieldWrapper control={form.control} name="bgPo" label="PO/Tender/Request Letter">
                             {(field) => (
                                 <FileUploader
@@ -355,7 +355,6 @@ export function BankGuaranteeEdit({ instrumentId, initialData }: BankGuaranteeEd
                     <AccountsForm2Fields
                         control={form.control}
                         names={STEP_NAMES}
-                        courierOptions={courierOptions}
                     />
                 </SectionCard>
 

@@ -1,6 +1,7 @@
 import type { Control, FieldPath, FieldValues } from 'react-hook-form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
-import { CompactFileUploader } from '@/components/file-upload';
+import { FileUploader } from '@/components/file-upload';
+import { toFileArray } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
 
 export interface BgCancellationConfirmationNames<T extends FieldValues> {
     cancellConfirm: FieldPath<T>;
@@ -25,9 +26,9 @@ export function BgCancellationConfirmationFields<T extends FieldValues>({
                 label="Upload the Bank BG cancellation request"
             >
                 {(field) => (
-                    <CompactFileUploader
+                    <FileUploader
                         context="bg-cancell-confirm"
-                        value={field.value as string | undefined}
+                        value={toFileArray(field.value)}
                         onChange={field.onChange}
                         disabled={disabled}
                     />
