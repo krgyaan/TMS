@@ -193,3 +193,39 @@ test('round trip: API null -> form -> save payload stays null (never becomes 0)'
         assert.equal(payload[apiField], null, `${apiField} saved as ${payload[apiField]}`);
     }
 });
+
+test('form schema: requires positive emdAmount when emdRequired is YES', () => {
+    const baseForm = {
+        ...buildDefaultValues(null),
+        teRecommendation: 'YES',
+        emdRequired: 'YES',
+        emdModes: ['BG'],
+        clients: [{ clientName: 'Lead Client', clientMobile: '9876543210' }],
+    };
+
+    // Fails on null, undefined, 0, or negative emdAmount
+    assert.equal(TenderInformationFormSchema.safeParse({ ...baseForm, emdAmount: null }).success, false);
+    assert.equal(TenderInformationFormSchema.safeParse({ ...baseForm, emdAmount: undefined }).success, false);
+    assert.equal(TenderInformationFormSchema.safeParse({ ...baseForm, emdAmount: 0 }).success, false);
+    assert.equal(TenderInformationFormSchema.safeParse({ ...baseForm, emdAmount: -100 }).success, false);
+
+    // Passes on positive emdAmount
+    const valid = TenderInformationFormSchema.safeParse({ ...baseForm, emdAmount: 50000 });
+    assert.equal(valid.success, true);
+
+    // Allows null/undefined when emdRequired is NO or EXEMPT
+    assert.equal(TenderInformationFormSchema.safeParse({ ...baseForm, emdRequired: 'NO', emdAmount: undefined }).success, true);
+    assert.equal(TenderInformationFormSchema.safeParse({ ...baseForm, emdRequired: 'EXEMPT', emdAmount: undefined }).success, true);
+
+    // Allows null/undefined when teRecommendation is NO (rejection)
+    const rejection = TenderInformationFormSchema.safeParse({
+        ...baseForm,
+        teRecommendation: 'NO',
+        teRejectionReason: 1,
+        teRejectionRemarks: 'Not viable',
+        teRejectionProof: ['proof.pdf'],
+        emdRequired: 'YES',
+        emdAmount: undefined,
+    });
+    assert.equal(rejection.success, true);
+});
