@@ -7,8 +7,11 @@ import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDate, formatDateTime } from '@/hooks/useFormatedDate';
 import { fileUploadService } from '@/services/api/file-upload.service';
 
-const parseFilePaths = (file?: string | null): string[] => {
+const parseFilePaths = (file?: string | string[] | null): string[] => {
     if (!file) return [];
+    if (Array.isArray(file)) {
+        return file.filter((p): p is string => typeof p === 'string');
+    }
     try {
         const parsed: unknown = JSON.parse(file);
         if (Array.isArray(parsed)) {
@@ -20,7 +23,7 @@ const parseFilePaths = (file?: string | null): string[] => {
     return [file];
 };
 
-const FileLink = ({ file }: { file?: string }) => {
+const FileLink = ({ file }: { file?: string | string[] | null }) => {
     const paths = parseFilePaths(file);
     if (paths.length === 0) return <span className="text-muted-foreground">Not Uploaded</span>;
 
@@ -52,7 +55,7 @@ const FileLink = ({ file }: { file?: string }) => {
                     className="flex items-center gap-1 text-blue-600 hover:underline"
                 >
                     <Eye className="h-4 w-4" />
-                    {filePath.split('_').slice(1).join('_')}
+                    {filePath.split('/').pop()}
                 </a>
             ))}
         </div>
@@ -127,38 +130,58 @@ export function BankGuaranteeView({
         return null;
     }
 
-    const calculateBgClaimPeriod = (
-        expiryDate: Date | null,
-        claimExpiryDate: Date | null
-    ): number | null => {
-        if (!expiryDate || !claimExpiryDate) return null;
-        const diffTime = claimExpiryDate.getTime() - expiryDate.getTime();
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        return diffDays;
-    };
+    const bgExpiry = data.bgExpiryDate ?? data.expiryDate ?? null;
+    const claimExpiry = data.claimExpiryDateBg ?? data.claimExpiryDate ?? null;
 
-    const bgClaimPeriod =
-        data.expiryDate && data.claimExpiryDateBg
-            ? calculateBgClaimPeriod(
-                new Date(data.expiryDate),
-                new Date(data.claimExpiryDateBg)
-            )
-            : null;
+    const courierJson = (data.courierAddressJson ?? null) as {
+        org?: string | null;
+        name?: string | null;
+        phone?: string | null;
+        line1?: string | null;
+        line2?: string | null;
+        city?: string | null;
+        state?: string | null;
+        pincode?: string | null;
+        empFrom?: number | null;
+        empFromName?: string | null;
+        delDate?: string | null;
+        urgency?: number | null;
+        docs?: string[];
+    } | null;
+    const courierDetails = data.courierDetails ?? null;
+    const courierDocs: string[] = parseFilePaths(
+        data.courierDocs ?? courierJson?.docs ?? courierDetails?.courierDocs ?? null
+    );
 
     // Check if sections have data
     const hasFdrDetails = data.fdrNo || data.fdrAmt || parseFilePaths(data.fdrCopy).length > 0 || data.bgFdrCancelDate;
     const hasBankInfo = data.bankName || data.bgBankAcc || data.bgBankIfsc;
     const hasExtensionDetails = data.extendedAmount || data.extendedValidityDate;
     const hasCourierInfo =
-        data.courierAddress ||
+        courierJson ||
+        courierDetails ||
+        courierDocs.length > 0 ||
         data.reqNo ||
         data.courierNo ||
         data.courierAddress;
-    const hasReturnInfo =
-        data.docketNo ||
-        parseFilePaths(data.docketSlip).length > 0 ||
-        parseFilePaths(data.cancellConfirm).length > 0 ||
-        data.bgFdrCancelRefNo;
+    const hasCancellationInfo =
+        !!(data.stampCoveringLetter ||
+        data.cancellationLetterPath ||
+        data.cancelRemark ||
+        data.cancellConfirm ||
+        data.bgFdrCancelRefNo ||
+        data.hasRequestCancellationData ||
+        data.hasBgCancellationData ||
+        data.hasFdrCancellationData);
+
+    const courierSender = courierJson?.empFromName || courierDetails?.empFromName || courierJson?.empFrom || courierDetails?.empFrom;
+    const courierOrg = courierJson?.org || courierDetails?.toOrg || data.courierAddress;
+    const courierRecipient = [courierJson?.name || courierDetails?.toName, (courierJson?.phone || courierDetails?.toMobile) ? `(${courierJson?.phone || courierDetails?.toMobile})` : ''].filter(Boolean).join(' ');
+    const courierAddrLine = [courierJson?.line1, courierJson?.line2].filter(Boolean).join(', ') || courierDetails?.toAddr;
+    const courierCityLine = [courierJson?.city, courierJson?.state].filter(Boolean).join(', ');
+    const courierPin = courierJson?.pincode || courierDetails?.toPin;
+    const courierDelDate = courierJson?.delDate || courierDetails?.delDate;
+    const courierUrgency = courierJson?.urgency || courierDetails?.urgency;
 
     return (
         <Card className={className}>
@@ -187,13 +210,19 @@ export function BankGuaranteeView({
                                     </span>
                                 }
                                 label2="Status"
-                                value2={<Badge variant="outline">{data.status || '—'}</Badge>}
+                                value2={<Badge variant="outline">{data.bgStatus || data.status || '—'}</Badge>}
                             />
                             <DataRow
                                 label1="Purpose"
                                 value1={data.bgPurpose || data.purpose || '—'}
                                 label2="Beneficiary Name"
                                 value2={data.beneficiaryName || '—'}
+                            />
+                            <DataRow
+                                label1="BG Needed In (Hours)"
+                                value1={data.bgNeeds || '—'}
+                                label2="Accounts Form 2 Remarks"
+                                value2={data.bg2Remark || '—'}
                             />
 
                             {/* Section 2: Request Information */}
@@ -216,20 +245,16 @@ export function BankGuaranteeView({
                             />
 
                             <DataRow
-                                label1="Prefilled Forms (Unsigned)"
-                                value1={<FileLink file={data.bgFormatTe} />}
-                                label2="Prefilled Forms (Signed)"
-                                value2={<FileLink file={data.prefilledSignedBg} />}
-                            />
-                            <DataRow
-                                label1="BG Format by TE"
-                                value1={<FileLink file={data.bgFormatTe} />}
+                                label1="Prefilled Forms (Signed)"
+                                value1={<FileLink file={data.prefilledSignedBg} />}
                                 label2="BG Format by Accounts"
                                 value2={<FileLink file={data.bgFormatTl} />}
                             />
                             <DataRow
-                                label1="PO / Request Letter / Tender Name"
-                                value1={<FileLink file={data.bgPo} />}
+                                label1="BG Format by TE"
+                                value1={<FileLink file={data.bgFormatTe} />}
+                                label2="PO / Request Letter / Tender Name"
+                                value2={<FileLink file={data.bgPo} />}
                             />
 
                             {/* Section 3: Tender/Project Information */}
@@ -294,17 +319,17 @@ export function BankGuaranteeView({
                                 label1="Validity Date"
                                 value1={data.validityDate ? formatDate(data.validityDate) : '—'}
                                 label2="Expiry Date"
-                                value2={data.expiryDate ? formatDate(data.expiryDate) : '—'}
+                                value2={bgExpiry ? formatDate(bgExpiry) : '—'}
                             />
                             <DataRow
                                 label1="Claim Expiry Date"
-                                value1={data.claimExpiryDateBg ? formatDate(data.claimExpiryDateBg) : '—'}
+                                value1={claimExpiry ? formatDate(claimExpiry) : '—'}
                                 label2="BG Claim Period"
-                                value2={bgClaimPeriod !== null ? `${bgClaimPeriod} days` : '—'}
+                                value2={data.bgClaim ? formatDate(data.bgClaim) : '—'}
                             />
                             <DataRow
                                 label1="Soft Copy of BG"
-                                value1={<FileLink file={data.bgSoftCopy} />}
+                                value1={<FileLink file={courierDocs.length > 0 ? courierDocs : data.bgSoftCopy} />}
                                 label2="SFMS File"
                                 value2={<FileLink file={data.sfmsConf} />}
                             />
@@ -339,16 +364,16 @@ export function BankGuaranteeView({
                                 }
                                 label2="Stamp Charges"
                                 value2={
-                                    data.stampChargesDeducted
-                                        ? formatINR(Number(data.stampChargesDeducted))
+                                    data.stampChargesDeducted || data.stampCharges
+                                        ? formatINR(Number(data.stampChargesDeducted || data.stampCharges))
                                         : '—'
                                 }
                             />
                             <DataRow
                                 label1="SFMS Charges"
                                 value1={
-                                    data.sfmsChargesDeducted
-                                        ? formatINR(Number(data.sfmsChargesDeducted))
+                                    data.sfmsChargesDeducted || data.sfmsCharges
+                                        ? formatINR(Number(data.sfmsChargesDeducted || data.sfmsCharges))
                                         : '—'
                                 }
                                 label2="Other Charges"
@@ -391,22 +416,13 @@ export function BankGuaranteeView({
                                     />
                                     <DataRow
                                         label1="Cancelled FDR Amount"
-                                        value1={data.bgFdrCancelAmount
-                                            ? formatINR(Number(data.bgFdrCancelAmount))
-                                            : '—'}
-                                        value2={
+                                        value1={
                                             data.bgFdrCancelAmount
                                                 ? formatINR(Number(data.bgFdrCancelAmount))
                                                 : '—'
                                         }
-                                    />
-                                    <DataRow
-                                        label1="Cancelled FDR Amount"
-                                        value1={
-                                            data.cancelledFdrAmount
-                                                ? formatINR(Number(data.cancelledFdrAmount))
-                                                : '—'
-                                        }
+                                        label2="Bank Reference No"
+                                        value2={data.bgFdrCancelRefNo || '—'}
                                     />
                                 </>
                             )}
@@ -416,41 +432,59 @@ export function BankGuaranteeView({
                                 <>
                                     <SectionHeader title="Courier & Dispatch Information" />
                                     <DataRow
-                                        label1="BG Courier Address"
-                                        value1={data.courierAddress || '—'}
+                                        label1="Organization"
+                                        value1={courierOrg || '—'}
+                                        label2="Recipient"
+                                        value2={courierRecipient || '—'}
+                                    />
+                                    <DataRow
+                                        label1="Address"
+                                        value1={[courierAddrLine, courierCityLine, courierPin ? `- ${courierPin}` : ''].filter(Boolean).join(', ') || '—'}
                                         label2="Courier Request No"
                                         value2={data.reqNo || '—'}
                                     />
                                     <DataRow
-                                        label1="Courier Docket No"
-                                        value1={data.courierNo || '—'}
-                                        label2="Courier Docket Slip"
-                                        value2={<FileLink file={data.docketSlip} />}
+                                        label1="Sent By"
+                                        value1={courierSender || '—'}
+                                        label2="Delivery Date"
+                                        value2={courierDelDate ? formatDate(courierDelDate) : '—'}
+                                    />
+                                    <DataRow
+                                        label1="Dispatch Urgency"
+                                        value1={
+                                            courierUrgency
+                                                ? (Number(courierUrgency) === 1 ? 'Same Day (Urgent)' : 'Next Day')
+                                                : '—'
+                                        }
+                                        label2="Docket No"
+                                        value2={courierDetails?.docketNo || data.docketNo || '—'}
+                                    />
+                                    <DataRow
+                                        label1="Courier Documents"
+                                        value1={courierDocs.length > 0 ? <FileLink file={courierDocs} /> : 'Not Uploaded'}
                                     />
                                 </>
                             )}
 
                             {/* Section 10: BG Return & Cancellation */}
-                            {hasReturnInfo && (
+                            {hasCancellationInfo && (
                                 <>
                                     <SectionHeader title="BG Return & Cancellation" />
                                     <DataRow
                                         label1="Return Courier Docket No"
-                                        value1={data.returnCourierDocketNo || '—'}
+                                        value1={data.courierNo || '—'}
                                         label2="Return Courier Slip"
-                                        value2={<FileLink file={data.returnCourierSlip} />}
+                                        value2={<FileLink file={data.docketSlip} />}
                                     />
                                     <DataRow
-                                        label1="BG Cancellation Confirmation"
-                                        value1={<FileLink file={data.cancellConfirm} />}
-                                        label2="Bank Reference No"
-                                        value2={data.bgFdrCancelRefNo || '—'}
+                                        label1="Cancellation Request Letter"
+                                        value1={<FileLink file={data.stampCoveringLetter || data.cancellationLetterPath} />}
+                                        label2="BG Cancellation Confirmation"
+                                        value2={<FileLink file={data.cancellConfirm} />}
                                     />
                                     <DataRow
-                                        label1="Followup Proof"
-                                        value1={<FileLink file={data.followupProof} />}
-                                        label2="Followup Proof Image"
-                                        value2={<FileLink file={data.followupProofImage} />}
+                                        label1="Bank Reference No"
+                                        value1={data.bgFdrCancelRefNo || '—'}
                                     />
                                 </>
                             )}

@@ -46,6 +46,10 @@ export class BankGuaranteeService {
             [BG_STATUSES.CANCELLATION_REQUESTED]: 'Cancellation Request',
             [BG_STATUSES.BG_CANCELLATION_CONFIRMED]: 'Cancelled at Branch',
             [BG_STATUSES.FDR_CANCELLED_CONFIRMED]: 'FDR Cancellation Confirmed',
+            // Legacy rows written with pre-migration status strings.
+            RETURNED_VIA_COURIER: 'Courier Returned',
+            BG_CANCELLED: 'Cancelled at Branch',
+            FDR_CANCELLED: 'FDR Cancellation Confirmed',
         };
     }
 
@@ -974,7 +978,7 @@ private parseStringArray(v: unknown): string[] | null {
         } else if (body.action === 'request-extension') {
             updateData.status = 'EXTENSION_REQUESTED';
         } else if (body.action === 'returned-courier') {
-            updateData.status = 'RETURNED_VIA_COURIER';
+            updateData.status = BG_STATUSES.RETURN_VIA_COURIER;
             const docketSlipFile = this.getFileForField('docket_slip', files, body, fileIndexTracker);
             const docketSlipPath = this.getFilePathFromBody('docket_slip', body);
             if (docketSlipFile) {
@@ -992,7 +996,7 @@ private parseStringArray(v: unknown): string[] | null {
                 updateData.coveringLetter = coveringLetterPath;
             }
         } else if (body.action === 'bg-cancellation-confirmation') {
-            updateData.status = 'BG_CANCELLED';
+            updateData.status = BG_STATUSES.BG_CANCELLATION_CONFIRMED;
             const cancellConfirmFile = this.getFileForField('cancell_confirm', files, body, fileIndexTracker);
             const cancellConfirmPath = this.getFilePathFromBody('cancell_confirm', body);
             if (cancellConfirmFile) {
@@ -1001,7 +1005,7 @@ private parseStringArray(v: unknown): string[] | null {
                 updateData.cancelPdf = cancellConfirmPath;
             }
         } else if (body.action === 'fdr-cancellation-confirmation') {
-            updateData.status = 'FDR_CANCELLED';
+            updateData.status = BG_STATUSES.FDR_CANCELLED_CONFIRMED;
         }
 
         await this.db
@@ -1372,8 +1376,8 @@ private parseStringArray(v: unknown): string[] | null {
                 payableAt: paymentInstruments.payableAt,
                 issueDate: paymentInstruments.issueDate,
                 expiryDate: paymentInstruments.expiryDate,
-                validityDate: instrumentBgDetails.validityDate,
-                claimExpiryDate: instrumentBgDetails.claimExpiryDate,
+                validityDate: sql<Date | null>`coalesce(${instrumentBgDetails.validityDate}, ${paymentInstruments.validityDate})`,
+                claimExpiryDate: sql<Date | null>`coalesce(${instrumentBgDetails.claimExpiryDate}, ${paymentInstruments.claimExpiryDate})`,
                 bgClaim: instrumentBgDetails.bgClaim,
                 bgExpiryDateBg: sql<string | null>`coalesce(${paymentInstruments.expiryDate}, ${instrumentBgDetails.bgExpiryDate})`,
                 docketNo: paymentInstruments.docketNo,
@@ -1390,7 +1394,13 @@ private parseStringArray(v: unknown): string[] | null {
                 tenderNo: paymentRequests.tenderNo,
                 tenderName: paymentRequests.projectName,
                 tenderId: paymentRequests.tenderId,
+                requestId: paymentRequests.id,
+                requestType: paymentRequests.type,
+                requestDueDate: paymentRequests.dueDate,
+                requestedByName: users.name,
                 requestCreatedAt: paymentRequests.createdAt,
+                tenderDueDate: tenderInfos.dueDate,
+                tenderStatusName: statuses.name,
                 bgNo: instrumentBgDetails.bgNo,
                 bgDate: instrumentBgDetails.bgDate,
                 beneficiaryName: instrumentBgDetails.beneficiaryName,
@@ -1400,6 +1410,11 @@ private parseStringArray(v: unknown): string[] | null {
                 bgPurpose: instrumentBgDetails.bgPurpose,
                 bgSoftCopy: instrumentBgDetails.bgSoftCopy,
                 bgPo: instrumentBgDetails.bgPo,
+                bgClientUser: instrumentBgDetails.bgClientUser,
+                bgClientCp: instrumentBgDetails.bgClientCp,
+                bgClientFin: instrumentBgDetails.bgClientFin,
+                bgBankAcc: instrumentBgDetails.bgBankAcc,
+                bgBankIfsc: instrumentBgDetails.bgBankIfsc,
                 bgBankAccName: instrumentBgDetails.bgBankAccName,
                 bankMailIds: instrumentBgDetails.bankMailIds,
                 bankMailIdsCc: instrumentBgDetails.bankMailIdsCc,
@@ -1410,12 +1425,14 @@ private parseStringArray(v: unknown): string[] | null {
                 reasonReq: instrumentBgDetails.reasonReq,
                 prefilledSignedBg: instrumentBgDetails.prefilledSignedBg,
                 bgFormatTe: instrumentBgDetails.bgFormatTe,
+                bgFormatTl: instrumentBgDetails.bgFormatTl,
                 // Accounts Form 2 (after BG creation)
                 bg2Remark: instrumentBgDetails.bg2Remark,
                 // Accounts Form 3 (capture FDR details)
                 fdrPer: instrumentBgDetails.fdrPer,
                 fdrCopy: instrumentBgDetails.fdrCopy,
                 sfmsConf: instrumentBgDetails.sfmsConf,
+                sfmsCharges: instrumentBgDetails.sfmsCharges,
                 bgChargeDeducted: instrumentBgDetails.bgChargeDeducted,
                 sfmsChargesDeducted: instrumentBgDetails.sfmsChargesDeducted,
                 stampChargesDeducted: instrumentBgDetails.stampChargesDeducted,
@@ -1425,6 +1442,7 @@ private parseStringArray(v: unknown): string[] | null {
                 extendedClaimExpiryDate: instrumentBgDetails.extendedClaimExpiryDate,
                 extendedBankName: instrumentBgDetails.extendedBankName,
                 extensionLetterPath: instrumentBgDetails.extensionLetterPath,
+                cancellationLetterPath: instrumentBgDetails.cancellationLetterPath,
                 newStampChargeDeducted: instrumentBgDetails.newStampChargeDeducted,
                 fdrNo: instrumentBgDetails.fdrNo,
                 fdrAmt: instrumentBgDetails.fdrAmt,
@@ -1440,6 +1458,12 @@ private parseStringArray(v: unknown): string[] | null {
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(tenderInfos, and(
+                eq(tenderInfos.id, paymentRequests.tenderId),
+                ne(paymentRequests.tenderId, 0)
+            ))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
             .where(and(
                 eq(paymentInstruments.id, id),
                 eq(paymentInstruments.instrumentType, 'BG'),
@@ -1451,7 +1475,23 @@ private parseStringArray(v: unknown): string[] | null {
             throw new NotFoundException(`Payment Instrument with ID ${id} not found`);
         }
 
-        let courierDetails: any = null;
+        let courierDetails: {
+            id: number;
+            toOrg: string;
+            toName: string;
+            toAddr: string;
+            toPin: string;
+            toMobile: string;
+            empFrom: number;
+            empFromName: string | null;
+            delDate: unknown;
+            urgency: number;
+            courierDocs: unknown;
+            docketNo: string | null;
+            docketSlip: string | null;
+            status: number | null;
+        } | null = null;
+        let courierDocs: string[] = [];
         if (result.reqNo) {
             const courierId = Number(result.reqNo);
             if (!isNaN(courierId)) {
@@ -1461,6 +1501,15 @@ private parseStringArray(v: unknown): string[] | null {
                     .where(eq(couriers.id, courierId))
                     .limit(1);
                 if (courier) {
+                    let empFromName: string | null = null;
+                    if (courier.empFrom) {
+                        const [sender] = await this.db
+                            .select({ name: users.name })
+                            .from(users)
+                            .where(eq(users.id, courier.empFrom))
+                            .limit(1);
+                        empFromName = sender?.name ?? null;
+                    }
                     courierDetails = {
                         id: courier.id,
                         toOrg: courier.toOrg,
@@ -1469,6 +1518,7 @@ private parseStringArray(v: unknown): string[] | null {
                         toPin: courier.toPin,
                         toMobile: courier.toMobile,
                         empFrom: courier.empFrom,
+                        empFromName,
                         delDate: courier.delDate,
                         urgency: courier.urgency,
                         courierDocs: courier.courierDocs,
@@ -1479,6 +1529,20 @@ private parseStringArray(v: unknown): string[] | null {
                 }
             }
         }
+
+        // Documents uploaded with the Accounts Form 2 courier dispatch live in
+        // payment_instruments.courier_address_json; the shared couriers row is
+        // only a fallback for older records.
+        const rawJson = result.courierAddressJson;
+        const jsonDocs = rawJson !== null && typeof rawJson === 'object' && 'docs' in rawJson
+            ? (rawJson as { docs?: unknown }).docs
+            : undefined;
+        const fallbackDocs = this.parseStringArray(
+            courierDetails?.courierDocs ?? null
+        );
+        courierDocs = Array.isArray(jsonDocs) && jsonDocs.length > 0
+            ? jsonDocs.filter((d): d is string => typeof d === 'string')
+            : (fallbackDocs ?? []);
 
         const currentStep = Number(result.action ?? 0);
         const hasAccountsForm1Data = currentStep >= 1;
@@ -1497,10 +1561,17 @@ private parseStringArray(v: unknown): string[] | null {
         return {
             id: result.id,
             action: result.action,
+            status: result.status,
             bgStatus: this.statusMap()[result.status] || result.status,
             tenderNo: result.tenderNo,
             tenderName: result.tenderName,
             tenderId: result.tenderId,
+            requestId: result.requestId,
+            requestType: result.requestType,
+            requestDueDate: result.requestDueDate ? new Date(result.requestDueDate) : null,
+            requestedByName: result.requestedByName,
+            tenderDueDate: result.tenderDueDate ? new Date(result.tenderDueDate) : null,
+            tenderStatusName: result.tenderStatusName,
             requestCreatedAt: result.requestCreatedAt ? result.requestCreatedAt.toISOString() : null,
             amount: result.amount ? Number(result.amount) : null,
             favouring: result.favouring,
@@ -1509,6 +1580,7 @@ private parseStringArray(v: unknown): string[] | null {
             expiryDate: result.expiryDate ? new Date(result.expiryDate) : null,
             validityDate: result.validityDate ? new Date(result.validityDate) : null,
             claimExpiryDate: result.claimExpiryDate ? new Date(result.claimExpiryDate) : null,
+            claimExpiryDateBg: result.claimExpiryDate ? new Date(result.claimExpiryDate) : null,
             bgExpiryDate: result.bgExpiryDateBg ? new Date(result.bgExpiryDateBg) : null,
             bgClaim: result.bgClaim ? new Date(result.bgClaim) : null,
             bgNo: result.bgNo,
@@ -1520,21 +1592,29 @@ private parseStringArray(v: unknown): string[] | null {
             bgPurpose: result.bgPurpose,
             bgSoftCopy: result.bgSoftCopy,
             bgPo: result.bgPo,
+            bgClientUser: result.bgClientUser,
+            bgClientCp: result.bgClientCp,
+            bgClientFin: result.bgClientFin,
+            bgBankAcc: result.bgBankAcc,
+            bgBankIfsc: result.bgBankIfsc,
             bgBankAccName: result.bgBankAccName,
             bankMailIds: result.bankMailIds ?? [],
             bankMailIdsCc: result.bankMailIdsCc ?? [],
             courierNo: result.courierNo,
             courierAddress: result.courierAddress,
             courierAddressJson: (result.courierAddressJson ?? null) as Record<string, any> | null,
+            courierDocs,
             reqNo: result.reqNo,
             courierDetails,
             courierDeadline: result.courierDeadline ? Number(result.courierDeadline) : null,
             stampCharges: result.stampCharges ? Number(result.stampCharges) : null,
+            sfmsCharges: result.sfmsCharges ? Number(result.sfmsCharges) : null,
             // Accounts Form 1 (request to bank)
             approveBg: result.approveBg,
             reasonReq: result.reasonReq,
             prefilledSignedBg: result.prefilledSignedBg,
             bgFormatTe: result.bgFormatTe,
+            bgFormatTl: result.bgFormatTl,
             // Accounts Form 2 (after BG creation)
             bg2Remark: result.bg2Remark,
             // Accounts Form 3 (capture FDR details). fdrPer is returned as a
@@ -1559,6 +1639,7 @@ private parseStringArray(v: unknown): string[] | null {
             extendedClaimExpiryDate: result.extendedClaimExpiryDate ? new Date(result.extendedClaimExpiryDate) : null,
             extendedBankName: result.extendedBankName,
             extensionLetterPath: result.extensionLetterPath,
+            cancellationLetterPath: result.cancellationLetterPath,
             newStampChargeDeducted: result.newStampChargeDeducted ? Number(result.newStampChargeDeducted) : null,
             fdrNo: result.fdrNo,
             fdrAmt: result.fdrAmt ? Number(result.fdrAmt) : null,
