@@ -1,8 +1,9 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus, UseGuards, BadRequestException } from "@nestjs/common";
 import { z } from "zod";
-import { CanCreate, CanUpdate, CanDelete, CanRead } from "@/modules/auth/decorators";
+import { CanCreate, CanUpdate, CanDelete, RequireAnyPermission } from "@/modules/auth/decorators";
 import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
 import { PermissionGuard } from "@/modules/auth/guards/permission.guard";
+import { MergeVendorsGuard } from "@/modules/master/vendor-master/merge-vendors.guard";
 import { VendorMasterService } from "@/modules/master/vendor-master/vendor-master.service";
 
 const VendorOrganizationFields = z.object({
@@ -69,12 +70,25 @@ const CreateVendorFileSchema = z.object({
 
 const UpdateVendorFileSchema = CreateVendorFileSchema.partial();
 
+const MergeVendorsSchema = z
+    .object({
+        keepId: z.coerce.number().int().positive(),
+        dropId: z.coerce.number().int().positive(),
+    })
+    .refine(v => v.keepId !== v.dropId, {
+        message: "Keep and drop vendor organizations must be different",
+        path: ["dropId"],
+    });
+
 @Controller()
 @UseGuards(JwtAuthGuard, PermissionGuard)
-// `read` is the class-wide floor so every read route is covered without
+// Read access is satisfied by either the admin-side `master.vendors` module or
+// the shared read-only directory module `document-dashboard.vendors` (granted to
+// all roles; powers Document Dashboard > Vendors and the RFQ form's vendor
+// dropdown). This is the class-wide floor so every read route is covered without
 // repeating itself; the mutating handlers below override it, because
 // PermissionGuard resolves handler metadata before class metadata.
-@CanRead("master.vendors")
+@RequireAnyPermission({ module: "master.vendors", action: "read" }, { module: "document-dashboard.vendors", action: "read" })
 export class VendorMasterController {
     constructor(private readonly vendorMasterService: VendorMasterService) {}
 
@@ -110,6 +124,28 @@ export class VendorMasterController {
             sortBy,
             sortOrder: sortOrder === "asc" || sortOrder === "desc" ? sortOrder : undefined,
         });
+    }
+
+    // Merge endpoints — declared before vendor-organizations/:id so "merge-preview"
+    // is not parsed as an id. Restricted to MERGE_ALLOWED_USER_IDS via the guard
+    // (the class-wide read floor does not apply to the POST).
+    @Get("vendor-organizations/merge-preview")
+    @UseGuards(MergeVendorsGuard)
+    async getMergePreview(@Query("keepId") keepId?: string, @Query("dropId") dropId?: string) {
+        const keep = parseInt(keepId ?? "", 10);
+        const drop = parseInt(dropId ?? "", 10);
+        if (!Number.isInteger(keep) || keep <= 0 || !Number.isInteger(drop) || drop <= 0) {
+            throw new BadRequestException("keepId and dropId must be positive integers");
+        }
+        return this.vendorMasterService.getMergePreview(keep, drop);
+    }
+
+    @Post("vendor-organizations/merge")
+    @HttpCode(HttpStatus.OK)
+    @UseGuards(MergeVendorsGuard)
+    async mergeVendors(@Body() body: unknown) {
+        const parsed = MergeVendorsSchema.parse(body);
+        return this.vendorMasterService.mergeVendors(parsed.keepId, parsed.dropId);
     }
 
     @Get("vendor-organizations/:id")
@@ -284,7 +320,9 @@ export class VendorMasterController {
 
     @Post("vendor-files")
     @HttpCode(HttpStatus.CREATED)
-    @CanCreate("master.vendors")
+    // Upload-only from the shared Document Dashboard directory is enough;
+    // edit/delete stay gated on master.vendors below.
+    @RequireAnyPermission({ module: "master.vendors", action: "create" }, { module: "document-dashboard.vendors", action: "create" })
     async createVendorFile(@Body() body: unknown) {
         const parsed = CreateVendorFileSchema.parse(body);
         return this.vendorMasterService.createVendorFile(parsed);

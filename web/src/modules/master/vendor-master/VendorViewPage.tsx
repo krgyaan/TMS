@@ -1,38 +1,35 @@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
-import { useSetVendorOrganizationStatus, useVendorOrganizationWithRelations } from "@/hooks/api/useVendorOrganizations";
+import { useDeleteVendorAccount } from "@/hooks/api/useVendorAccounts";
+import { useDeleteVendorFile, useVendorFilesByOrg, vendorFilesKey } from "@/hooks/api/useVendorFiles";
+import { useDeleteVendorGst } from "@/hooks/api/useVendorGsts";
+import { useDeleteVendor } from "@/hooks/api/useVendors";
+import { useSetVendorOrganizationStatus, useVendorOrganizationWithRelations, vendorOrganizationsKey } from "@/hooks/api/useVendorOrganizations";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, ArrowLeft, Pencil, Power, PowerOff, ShieldAlert } from "lucide-react";
-import { useLayoutEffect } from "react";
-import { useForm } from "react-hook-form";
+import { AlertCircle, ArrowLeft, Edit, Pencil, Plus, Power, PowerOff, ShieldAlert, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { AccountSection } from "./components/AccountSection";
-import { FileSection } from "./components/FileSection";
-import { GstSection } from "./components/GstSection";
-import { PersonSection } from "./components/PersonSection";
+import { AccountFormDialog } from "./components/AccountFormDialog";
+import { FileFormDialog } from "./components/FileFormDialog";
+import { GstFormDialog } from "./components/GstFormDialog";
+import { PersonFormDialog } from "./components/PersonFormDialog";
 import { MsmeBadge } from "./helpers/MsmeBadge";
-import { vendorOrgToFormValues } from "./helpers/vendorForm.mappers";
-import { VendorFormSchema, type VendorFormValues } from "./helpers/vendorForm.schema";
+import {
+    accountApiToForm,
+    fileApiToForm,
+    gstApiToForm,
+    personApiToForm,
+} from "./helpers/vendorForm.mappers";
+import type { AccountFormValues, FileFormValues, GstFormValues, PersonFormValues } from "./helpers/vendorForm.schema";
 import { vendorAreaBase } from "./vendorAreaPath";
+import { VendorRelationTables, type VendorRelationTab } from "@/modules/shared/vendor-directory/VendorRelationTables";
 
 const PERMISSION_MODULE = "master.vendors";
-
-type VendorViewTab = "gsts" | "accounts" | "persons" | "files";
-
-const emptyVendorForm: VendorFormValues = {
-    organization: { name: "", alias: "", msme: "", pan: "", address: "", status: true },
-    gsts: [],
-    accounts: [],
-    persons: [],
-    files: [],
-};
 
 const VendorViewPage = () => {
     const navigate = useNavigate();
@@ -41,27 +38,32 @@ const VendorViewPage = () => {
     const { id } = useParams<{ id: string }>();
     const orgId = id ? parseInt(id) : null;
 
-    const { canRead, canUpdate } = useAuth();
+    const { canRead, canCreate, canUpdate, canDelete } = useAuth();
+    const queryClient = useQueryClient();
+
     const { data: organization, isLoading, error } = useVendorOrganizationWithRelations(orgId);
+    const { data: files } = useVendorFilesByOrg(orgId);
     const setVendorStatus = useSetVendorOrganizationStatus();
 
-    const { activeTab, setActiveTab } = usePersistentTableState<VendorViewTab>({
+    const deleteGst = useDeleteVendorGst();
+    const deleteAccount = useDeleteVendorAccount();
+    const deletePerson = useDeleteVendor();
+    const deleteFile = useDeleteVendorFile();
+
+    const [gstDialog, setGstDialog] = useState<{ open: boolean; initial: GstFormValues | null }>({ open: false, initial: null });
+    const [accountDialog, setAccountDialog] = useState<{ open: boolean; initial: AccountFormValues | null }>({ open: false, initial: null });
+    const [personDialog, setPersonDialog] = useState<{ open: boolean; initial: PersonFormValues | null }>({ open: false, initial: null });
+    const [fileDialog, setFileDialog] = useState<{ open: boolean; initial: FileFormValues | null }>({ open: false, initial: null });
+
+    const { activeTab, setActiveTab } = usePersistentTableState<VendorRelationTab>({
         storageKey: "vendor-master-view",
         defaultTab: "gsts",
     });
 
-    const form = useForm<VendorFormValues>({
-        resolver: zodResolver(VendorFormSchema),
-        defaultValues: emptyVendorForm,
-    });
-
-    // Layout effect so the form (and the tab counts derived from it) is seeded
-    // before paint — avoids a one-frame "0" flash while the record loads.
-    useLayoutEffect(() => {
-        if (organization) {
-            form.reset(vendorOrgToFormValues(organization));
-        }
-    }, [organization, form]);
+    const invalidateOrg = () => {
+        if (!orgId) return;
+        queryClient.invalidateQueries({ queryKey: vendorOrganizationsKey.detail(orgId) });
+    };
 
     if (!canRead(PERMISSION_MODULE)) {
         return (
@@ -99,12 +101,10 @@ const VendorViewPage = () => {
         );
     }
 
-    const counts = {
-        gsts: form.watch("gsts").length,
-        accounts: form.watch("accounts").length,
-        persons: form.watch("persons").length,
-        files: form.watch("files").length,
-    };
+    const gsts = organization.gsts ?? [];
+    const accounts = organization.accounts ?? [];
+    const persons = organization.persons ?? [];
+    const orgFiles = files ?? organization.files ?? [];
 
     const handleToggleStatus = async () => {
         const next = !organization.status;
@@ -188,46 +188,180 @@ const VendorViewPage = () => {
                 </CardContent>
             </Card>
 
-            {/* Related entities — one tab per section, persisted across reload */}
             <Card>
                 <CardHeader>
                     <CardTitle>Related Entities</CardTitle>
                     <CardDescription>GST numbers, bank accounts, persons and files</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {/* Sections call useFormContext, so the tabbed content must sit inside a FormProvider. */}
-                    <Form {...form}>
-                        <Tabs
-                            value={activeTab}
-                            onValueChange={value => setActiveTab(value as VendorViewTab)}
-                            className="w-full"
-                        >
-                            <TabsList>
-                                <TabsTrigger value="gsts">GST Numbers ({counts.gsts})</TabsTrigger>
-                                <TabsTrigger value="accounts">Bank Accounts ({counts.accounts})</TabsTrigger>
-                                <TabsTrigger value="persons">Persons ({counts.persons})</TabsTrigger>
-                                <TabsTrigger value="files">Files ({counts.files})</TabsTrigger>
-                            </TabsList>
-
-                            <TabsContent value="gsts" className="mt-4">
-                                <GstSection orgId={orgId} />
-                            </TabsContent>
-
-                            <TabsContent value="accounts" className="mt-4">
-                                <AccountSection orgId={orgId} />
-                            </TabsContent>
-
-                            <TabsContent value="persons" className="mt-4">
-                                <PersonSection orgId={orgId} />
-                            </TabsContent>
-
-                            <TabsContent value="files" className="mt-4">
-                                <FileSection orgId={orgId} />
-                            </TabsContent>
-                        </Tabs>
-                    </Form>
+                    <VendorRelationTables
+                        gsts={gsts}
+                        accounts={accounts}
+                        persons={persons}
+                        files={orgFiles}
+                        activeTab={activeTab}
+                        onTabChange={setActiveTab}
+                        gstHeaderAction={
+                            canCreate(PERMISSION_MODULE) ? (
+                                <Button type="button" variant="outline" size="sm" onClick={() => setGstDialog({ open: true, initial: null })}>
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Add GST
+                                </Button>
+                            ) : undefined
+                        }
+                        gstRowActions={gst =>
+                            canUpdate(PERMISSION_MODULE) || canDelete(PERMISSION_MODULE) ? (
+                                <div className="flex justify-end gap-1">
+                                    {canUpdate(PERMISSION_MODULE) && (
+                                        <Button type="button" variant="ghost" size="icon" onClick={() => setGstDialog({ open: true, initial: gstApiToForm(gst) })}>
+                                            <Edit className="h-4 w-4" />
+                                        </Button>
+                                    )}
+                                    {canDelete(PERMISSION_MODULE) && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => deleteGst.mutate(gst.id, { onSuccess: invalidateOrg })}
+                                        >
+                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                    )}
+                                </div>
+                            ) : null
+                        }
+                        accountHeaderAction={
+                            canCreate(PERMISSION_MODULE) ? (
+                                <Button type="button" variant="outline" size="sm" onClick={() => setAccountDialog({ open: true, initial: null })}>
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Add Account
+                                </Button>
+                            ) : undefined
+                        }
+                        accountRowActions={account =>
+                            canUpdate(PERMISSION_MODULE) || canDelete(PERMISSION_MODULE) ? (
+                                <div className="flex justify-end gap-1">
+                                    {canUpdate(PERMISSION_MODULE) && (
+                                        <Button type="button" variant="ghost" size="icon" onClick={() => setAccountDialog({ open: true, initial: accountApiToForm(account) })}>
+                                            <Edit className="h-4 w-4" />
+                                        </Button>
+                                    )}
+                                    {canDelete(PERMISSION_MODULE) && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => deleteAccount.mutate(account.id, { onSuccess: invalidateOrg })}
+                                        >
+                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                    )}
+                                </div>
+                            ) : null
+                        }
+                        personHeaderAction={
+                            canCreate(PERMISSION_MODULE) ? (
+                                <Button type="button" variant="outline" size="sm" onClick={() => setPersonDialog({ open: true, initial: null })}>
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Add Person
+                                </Button>
+                            ) : undefined
+                        }
+                        personRowActions={person =>
+                            canUpdate(PERMISSION_MODULE) || canDelete(PERMISSION_MODULE) ? (
+                                <div className="flex justify-end gap-1">
+                                    {canUpdate(PERMISSION_MODULE) && (
+                                        <Button type="button" variant="ghost" size="icon" onClick={() => setPersonDialog({ open: true, initial: personApiToForm(person) })}>
+                                            <Edit className="h-4 w-4" />
+                                        </Button>
+                                    )}
+                                    {canDelete(PERMISSION_MODULE) && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => deletePerson.mutate(person.id, { onSuccess: invalidateOrg })}
+                                        >
+                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                    )}
+                                </div>
+                            ) : null
+                        }
+                        filesHeaderAction={
+                            canCreate(PERMISSION_MODULE) ? (
+                                <Button type="button" variant="outline" size="sm" onClick={() => setFileDialog({ open: true, initial: null })}>
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Add File
+                                </Button>
+                            ) : undefined
+                        }
+                        fileRowActions={file =>
+                            canUpdate(PERMISSION_MODULE) || canDelete(PERMISSION_MODULE) ? (
+                                <div className="flex justify-end gap-1">
+                                    {canUpdate(PERMISSION_MODULE) && (
+                                        <Button type="button" variant="ghost" size="icon" onClick={() => setFileDialog({ open: true, initial: fileApiToForm(file) })}>
+                                            <Edit className="h-4 w-4" />
+                                        </Button>
+                                    )}
+                                    {canDelete(PERMISSION_MODULE) && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() =>
+                                                deleteFile.mutate(file.id, {
+                                                    onSuccess: () => {
+                                                        invalidateOrg();
+                                                        queryClient.invalidateQueries({ queryKey: vendorFilesKey.byOrg(orgId) });
+                                                    },
+                                                })
+                                            }
+                                        >
+                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                    )}
+                                </div>
+                            ) : null
+                        }
+                    />
                 </CardContent>
             </Card>
+
+            <GstFormDialog
+                orgId={orgId}
+                open={gstDialog.open}
+                onOpenChange={open => setGstDialog(prev => ({ ...prev, open }))}
+                initial={gstDialog.initial}
+                siblings={gsts.map(gstApiToForm)}
+                onSaved={invalidateOrg}
+            />
+            <AccountFormDialog
+                orgId={orgId}
+                open={accountDialog.open}
+                onOpenChange={open => setAccountDialog(prev => ({ ...prev, open }))}
+                initial={accountDialog.initial}
+                siblings={accounts.map(accountApiToForm)}
+                onSaved={invalidateOrg}
+            />
+            <PersonFormDialog
+                orgId={orgId}
+                open={personDialog.open}
+                onOpenChange={open => setPersonDialog(prev => ({ ...prev, open }))}
+                initial={personDialog.initial}
+                siblings={persons.map(personApiToForm)}
+                onSaved={invalidateOrg}
+            />
+            <FileFormDialog
+                orgId={orgId}
+                open={fileDialog.open}
+                onOpenChange={open => setFileDialog(prev => ({ ...prev, open }))}
+                initial={fileDialog.initial}
+                onSaved={() => {
+                    invalidateOrg();
+                    queryClient.invalidateQueries({ queryKey: vendorFilesKey.byOrg(orgId) });
+                }}
+            />
         </div>
     );
 };

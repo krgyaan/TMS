@@ -107,6 +107,7 @@ const Master_LeadType_Edit = lazy(() => import("@/modules/master/lead-type/edit"
 // Vendors (Unified)
 const Master_Vendors = lazy(() => import("@/modules/master/vendor-master/VendorListPage"));
 const Master_Vendors_Create = lazy(() => import("@/modules/master/vendor-master/VendorCreatePage"));
+const Master_Vendors_Merge = lazy(() => import("@/modules/master/vendor-master/VendorMergePage"));
 const Master_Vendors_Edit = lazy(() => import("@/modules/master/vendor-master/VendorEditPage"));
 const Master_Vendors_View = lazy(() => import("@/modules/master/vendor-master/VendorViewPage"));
 
@@ -684,6 +685,15 @@ export default function MasterRoutes() {
                     element={
                         <RouteWrapper>
                             <Master_Vendors_Create />
+                        </RouteWrapper>
+                    }
+                />
+                {/* Static path — declared before :id so "merge" is not parsed as an id */}
+                <Route
+                    path="merge"
+                    element={
+                        <RouteWrapper>
+                            <Master_Vendors_Merge />
                         </RouteWrapper>
                     }
                 />

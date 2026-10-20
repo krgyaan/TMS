@@ -358,6 +358,7 @@ export const paths = {
 
         vendors: "/master/vendors",
         vendors_create: "/master/vendors/create",
+        vendors_merge: "/master/vendors/merge",
         vendors_edit: (id: number | string) => `/master/vendors/${id}/edit`,
         vendors_view: (id: number | string) => `/master/vendors/${id}`,
 
@@ -475,6 +476,8 @@ export const paths = {
         projectsEdit: (id: number | string) => `/document-dashboard/projects/${id}/edit`,
         projectsView: (id: number | string) => `/document-dashboard/projects/${id}`,
         clientDirectory: "/document-dashboard/client-directory",
+        vendors: "/document-dashboard/vendors",
+        vendorsView: (id: number | string) => `/document-dashboard/vendors/${id}`,
     },
 
     // ==================== HRMS ====================
