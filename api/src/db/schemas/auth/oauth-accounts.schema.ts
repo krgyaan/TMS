@@ -6,6 +6,8 @@ import {
   text,
   timestamp,
   json,
+  boolean,
+  integer,
 } from 'drizzle-orm/pg-core';
 import { users } from '@db/schemas/auth/users.schema';
 
@@ -21,6 +23,9 @@ export const oauthAccounts = pgTable('oauth_accounts', {
   expiresAt: timestamp('expires_at', { withTimezone: true }),
   scopes: text('scopes'),
   rawPayload: json('raw_payload'),
+  lastRefreshedAt: timestamp('last_refreshed_at', { withTimezone: true }),
+  refreshFailureCount: integer('refresh_failure_count').default(0),
+  isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
