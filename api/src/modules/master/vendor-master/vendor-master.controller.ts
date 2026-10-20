@@ -1,8 +1,9 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus, UseGuards, BadRequestException } from "@nestjs/common";
 import { z } from "zod";
 import { CanCreate, CanUpdate, CanDelete, RequireAnyPermission } from "@/modules/auth/decorators";
 import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
 import { PermissionGuard } from "@/modules/auth/guards/permission.guard";
+import { MergeVendorsGuard } from "@/modules/master/vendor-master/merge-vendors.guard";
 import { VendorMasterService } from "@/modules/master/vendor-master/vendor-master.service";
 
 const VendorOrganizationFields = z.object({
@@ -69,6 +70,16 @@ const CreateVendorFileSchema = z.object({
 
 const UpdateVendorFileSchema = CreateVendorFileSchema.partial();
 
+const MergeVendorsSchema = z
+    .object({
+        keepId: z.coerce.number().int().positive(),
+        dropId: z.coerce.number().int().positive(),
+    })
+    .refine(v => v.keepId !== v.dropId, {
+        message: "Keep and drop vendor organizations must be different",
+        path: ["dropId"],
+    });
+
 @Controller()
 @UseGuards(JwtAuthGuard, PermissionGuard)
 // Read access is satisfied by either the admin-side `master.vendors` module or
@@ -113,6 +124,28 @@ export class VendorMasterController {
             sortBy,
             sortOrder: sortOrder === "asc" || sortOrder === "desc" ? sortOrder : undefined,
         });
+    }
+
+    // Merge endpoints — declared before vendor-organizations/:id so "merge-preview"
+    // is not parsed as an id. Restricted to MERGE_ALLOWED_USER_IDS via the guard
+    // (the class-wide read floor does not apply to the POST).
+    @Get("vendor-organizations/merge-preview")
+    @UseGuards(MergeVendorsGuard)
+    async getMergePreview(@Query("keepId") keepId?: string, @Query("dropId") dropId?: string) {
+        const keep = parseInt(keepId ?? "", 10);
+        const drop = parseInt(dropId ?? "", 10);
+        if (!Number.isInteger(keep) || keep <= 0 || !Number.isInteger(drop) || drop <= 0) {
+            throw new BadRequestException("keepId and dropId must be positive integers");
+        }
+        return this.vendorMasterService.getMergePreview(keep, drop);
+    }
+
+    @Post("vendor-organizations/merge")
+    @HttpCode(HttpStatus.OK)
+    @UseGuards(MergeVendorsGuard)
+    async mergeVendors(@Body() body: unknown) {
+        const parsed = MergeVendorsSchema.parse(body);
+        return this.vendorMasterService.mergeVendors(parsed.keepId, parsed.dropId);
     }
 
     @Get("vendor-organizations/:id")

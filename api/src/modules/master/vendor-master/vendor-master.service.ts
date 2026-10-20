@@ -1,5 +1,5 @@
-import { Inject, Injectable, NotFoundException, ConflictException } from "@nestjs/common";
-import { eq, asc, desc, and, ne, sql, getTableColumns, type SQL } from "drizzle-orm";
+import { Inject, Injectable, NotFoundException, ConflictException, BadRequestException } from "@nestjs/common";
+import { eq, asc, desc, and, ne, sql, getTableColumns, isNotNull, count, type SQL } from "drizzle-orm";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
@@ -10,10 +10,47 @@ import { vendors, type Vendor, type NewVendor } from "@db/schemas/vendors/vendor
 import { vendorGsts, type VendorGst, type NewVendorGst } from "@db/schemas/vendors/vendor-gsts.schema";
 import { vendorAccs, type VendorAcc, type NewVendorAcc } from "@db/schemas/vendors/vendor-banks.schema";
 import { vendorFiles, type VendorFile, type NewVendorFile } from "@db/schemas/vendors/vendor-files.schema";
+import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
+import { rfqs, rfqResponses } from "@db/schemas/tendering/rfqs.schema";
+import { tenderCostingSheets } from "@db/schemas/tendering/tender-costing-sheets.schema";
+import { purchaseOrders } from "@db/schemas/operations/purchase-orders.schema";
+import { vendorWorkOrders } from "@db/schemas/operations/vendor-work-orders.schema";
+import { projects } from "@db/schemas/master/projects.schema";
 import type { BaseFilters } from "@/modules/tendering/types/shared.types";
 import { normalizeVendorName } from "./vendor-name.util";
+import { repointCsvIdList, repointIdArray, csvIdListContains, idArrayContains, looseIdListContains, repointLooseIdList, NO_CSV_SENTINELS } from "./vendor-merge.util";
 
 export type VendorOrganizationListFilters = BaseFilters & { search?: string };
+
+export type VendorMergeChildCounts = { persons: number; gsts: number; accounts: number; files: number };
+
+export type VendorMergeOrgSummary = VendorOrganization & { _counts: VendorMergeChildCounts };
+
+export type VendorMergeRefGroup = { count: number; ids: number[] };
+
+export type VendorMergePreview = {
+    keep: VendorMergeOrgSummary;
+    drop: VendorMergeOrgSummary;
+    references: {
+        purchaseOrders: VendorMergeRefGroup;
+        vendorWorkOrders: VendorMergeRefGroup;
+        rfqResponses: VendorMergeRefGroup;
+        projects: VendorMergeRefGroup;
+        tendersRfqTo: VendorMergeRefGroup;
+        tendersOemNotAllowed: VendorMergeRefGroup;
+        rfqsRequestedOrganization: VendorMergeRefGroup;
+        costingSheetsOemVendorIds: VendorMergeRefGroup;
+        partiesArchiveResolved: VendorMergeRefGroup;
+        partiesArchiveVendorOrg: VendorMergeRefGroup;
+    };
+};
+
+export type VendorMergeResult = {
+    keptId: number;
+    dropId: number;
+    movedRefs: Record<string, number[]>;
+    filled: Record<string, string>;
+};
 
 // Email is optional on vendors; an explicit blank must not be stored as "" and an
 // omitted field must not be rewritten (so PATCH leaves the column untouched).
@@ -39,7 +76,11 @@ export class VendorMasterService {
             conds.push(ne(vendorGsts.id, excludeId));
         }
 
-        const rows = await this.db.select({ id: vendorGsts.id }).from(vendorGsts).where(and(...conds)).limit(1);
+        const rows = await this.db
+            .select({ id: vendorGsts.id })
+            .from(vendorGsts)
+            .where(and(...conds))
+            .limit(1);
         if (rows[0]) {
             throw new ConflictException(`GST number "${trimmed}" already exists for this organization`);
         }
@@ -55,17 +96,17 @@ export class VendorMasterService {
             conds.push(ne(vendorAccs.id, excludeId));
         }
 
-        const rows = await this.db.select({ id: vendorAccs.id }).from(vendorAccs).where(and(...conds)).limit(1);
+        const rows = await this.db
+            .select({ id: vendorAccs.id })
+            .from(vendorAccs)
+            .where(and(...conds))
+            .limit(1);
         if (rows[0]) {
             throw new ConflictException(`Account number "${trimmed}" already exists for this organization`);
         }
     }
 
-    private async assertUniquePersonContact(
-        orgId: number,
-        data: { mobile?: string | null; email?: string | null },
-        excludeId?: number
-    ): Promise<void> {
+    private async assertUniquePersonContact(orgId: number, data: { mobile?: string | null; email?: string | null }, excludeId?: number): Promise<void> {
         const mobile = data.mobile?.trim();
         if (mobile) {
             const conds = [eq(vendors.orgId, orgId), sql`trim(${vendors.mobile}) = ${mobile}`];
@@ -73,7 +114,11 @@ export class VendorMasterService {
                 conds.push(ne(vendors.id, excludeId));
             }
 
-            const rows = await this.db.select({ id: vendors.id }).from(vendors).where(and(...conds)).limit(1);
+            const rows = await this.db
+                .select({ id: vendors.id })
+                .from(vendors)
+                .where(and(...conds))
+                .limit(1);
             if (rows[0]) {
                 throw new ConflictException(`Mobile number "${mobile}" already exists for this organization`);
             }
@@ -87,7 +132,11 @@ export class VendorMasterService {
                 conds.push(ne(vendors.id, excludeId));
             }
 
-            const rows = await this.db.select({ id: vendors.id }).from(vendors).where(and(...conds)).limit(1);
+            const rows = await this.db
+                .select({ id: vendors.id })
+                .from(vendors)
+                .where(and(...conds))
+                .limit(1);
             if (rows[0]) {
                 throw new ConflictException(`Email "${emailTrimmed}" already exists for this organization`);
             }
@@ -921,4 +970,287 @@ export class VendorMasterService {
             throw new NotFoundException(`Vendor File with ID ${id} not found`);
         }
     }
+
+    // ==================== Vendor organization merge ====================
+    // Implements scripts/merge-vendor-orgs-runbook.md §2/§3 in code:
+    // re-point every reference from the drop org to the keeper, archive the
+    // dropped row, and deactivate it — never delete.
+
+    async getMergePreview(keepId: number, dropId: number): Promise<VendorMergePreview> {
+        if (keepId === dropId) {
+            throw new BadRequestException("Keep and drop vendor organizations must be different");
+        }
+
+        const [keep, drop] = await Promise.all([this.findOrganizationById(keepId), this.findOrganizationById(dropId)]);
+
+        const buildSummary = async (org: VendorOrganization): Promise<VendorMergeOrgSummary> => {
+            const [gsts, persons, accounts, files] = await Promise.all([
+                this.db.select({ c: count() }).from(vendorGsts).where(eq(vendorGsts.orgId, org.id)),
+                this.db.select({ c: count() }).from(vendors).where(eq(vendors.orgId, org.id)),
+                this.db.select({ c: count() }).from(vendorAccs).where(eq(vendorAccs.orgId, org.id)),
+                this.db.select({ c: count() }).from(vendorFiles).where(eq(vendorFiles.orgId, org.id)),
+            ]);
+            return {
+                ...org,
+                _counts: {
+                    gsts: gsts[0]?.c ?? 0,
+                    persons: persons[0]?.c ?? 0,
+                    accounts: accounts[0]?.c ?? 0,
+                    files: files[0]?.c ?? 0,
+                },
+            };
+        };
+
+        const refGroup = (ids: number[]): VendorMergeRefGroup => ({ count: ids.length, ids });
+        const toNumbers = (rows: Array<{ id: string | number }>): number[] => rows.map(r => Number(r.id));
+
+        const [poRows, vwoRows, responseRows, projectRows, tenderRfqToRows, tenderOemRows, rfqRows, costingRows, archiveResolved, archiveVendorOrg] = await Promise.all([
+            this.db.select({ id: purchaseOrders.id }).from(purchaseOrders).where(eq(purchaseOrders.sellerOrganizationId, dropId)),
+            this.db.select({ id: vendorWorkOrders.id }).from(vendorWorkOrders).where(eq(vendorWorkOrders.sellerOrganizationId, dropId)),
+            this.db.select({ id: rfqResponses.id }).from(rfqResponses).where(eq(rfqResponses.organizationId, dropId)),
+            this.db.select({ id: projects.id }).from(projects).where(eq(projects.organisationId, dropId)),
+            this.db.select({ id: tenderInfos.id, rfqTo: tenderInfos.rfqTo }).from(tenderInfos).where(isNotNull(tenderInfos.rfqTo)),
+            // oem_not_allowed is varchar in the DB while the Drizzle schema says text[] —
+            // selecting it raw avoids Drizzle's parsePgArray mangling of bare/CSV values.
+            this.db
+                .select({ id: tenderInfos.id, oemNotAllowed: sql<string>`${tenderInfos.oemNotAllowed}` })
+                .from(tenderInfos)
+                .where(isNotNull(tenderInfos.oemNotAllowed)),
+            this.db.select({ id: rfqs.id, requestedOrganization: rfqs.requestedOrganization }).from(rfqs).where(isNotNull(rfqs.requestedOrganization)),
+            this.db
+                .select({ id: tenderCostingSheets.id, oemVendorIds: tenderCostingSheets.oemVendorIds })
+                .from(tenderCostingSheets)
+                .where(isNotNull(tenderCostingSheets.oemVendorIds)),
+            this.db.execute(sql`SELECT id FROM project_parties_sellers_archive WHERE resolved_org_id = ${dropId}`),
+            this.db.execute(sql`SELECT id FROM project_parties_sellers_archive WHERE vendor_organization_id = ${dropId}`),
+        ]);
+
+        return {
+            keep: await buildSummary(keep),
+            drop: await buildSummary(drop),
+            references: {
+                purchaseOrders: refGroup(toNumbers(poRows)),
+                vendorWorkOrders: refGroup(toNumbers(vwoRows)),
+                rfqResponses: refGroup(toNumbers(responseRows)),
+                projects: refGroup(toNumbers(projectRows)),
+                tendersRfqTo: refGroup(tenderRfqToRows.filter(r => csvIdListContains(r.rfqTo, dropId)).map(r => r.id)),
+                tendersOemNotAllowed: refGroup(tenderOemRows.filter(r => looseIdListContains(r.oemNotAllowed, dropId)).map(r => r.id)),
+                rfqsRequestedOrganization: refGroup(rfqRows.filter(r => csvIdListContains(r.requestedOrganization, dropId, NO_CSV_SENTINELS)).map(r => r.id)),
+                costingSheetsOemVendorIds: refGroup(costingRows.filter(r => idArrayContains(r.oemVendorIds, dropId)).map(r => r.id)),
+                partiesArchiveResolved: refGroup(toNumbers(archiveResolved.rows as Array<{ id: string | number }>)),
+                partiesArchiveVendorOrg: refGroup(toNumbers(archiveVendorOrg.rows as Array<{ id: string | number }>)),
+            },
+        };
+    }
+
+    async mergeVendors(keepId: number, dropId: number): Promise<VendorMergeResult> {
+        if (keepId === dropId) {
+            throw new BadRequestException("Keep and drop vendor organizations must be different");
+        }
+
+        return this.db.transaction(async tx => {
+            const [keep] = await tx.select().from(vendorOrganizations).where(eq(vendorOrganizations.id, keepId)).limit(1);
+            const [drop] = await tx.select().from(vendorOrganizations).where(eq(vendorOrganizations.id, dropId)).limit(1);
+
+            if (!keep) throw new NotFoundException(`Vendor organization with ID ${keepId} not found`);
+            if (!drop) throw new NotFoundException(`Vendor organization with ID ${dropId} not found`);
+            if (!drop.status) throw new BadRequestException(`Vendor "${drop.name}" is already inactive`);
+
+            const movedRefs: Record<string, number[]> = {};
+
+            const movedVendors = await tx.update(vendors).set({ orgId: keepId }).where(eq(vendors.orgId, dropId)).returning({ id: vendors.id });
+            movedRefs["vendors.org_id"] = movedVendors.map(r => r.id);
+
+            const movedGsts = await tx.update(vendorGsts).set({ orgId: keepId }).where(eq(vendorGsts.orgId, dropId)).returning({ id: vendorGsts.id });
+            movedRefs["vendor_gsts.org_id"] = movedGsts.map(r => r.id);
+
+            const movedAccs = await tx.update(vendorAccs).set({ orgId: keepId }).where(eq(vendorAccs.orgId, dropId)).returning({ id: vendorAccs.id });
+            movedRefs["vendor_accs.org_id"] = movedAccs.map(r => r.id);
+
+            const movedFiles = await tx.update(vendorFiles).set({ orgId: keepId }).where(eq(vendorFiles.orgId, dropId)).returning({ id: vendorFiles.id });
+            movedRefs["vendor_files.org_id"] = movedFiles.map(r => r.id);
+
+            const movedProjects = await tx.update(projects).set({ organisationId: keepId }).where(eq(projects.organisationId, dropId)).returning({ id: projects.id });
+            movedRefs["projects.org_id"] = movedProjects.map(r => r.id);
+
+            const movedPos = await tx
+                .update(purchaseOrders)
+                .set({ sellerOrganizationId: keepId })
+                .where(eq(purchaseOrders.sellerOrganizationId, dropId))
+                .returning({ id: purchaseOrders.id });
+            movedRefs["purchase_orders.seller_organization_id"] = movedPos.map(r => r.id);
+
+            const movedVwos = await tx
+                .update(vendorWorkOrders)
+                .set({ sellerOrganizationId: keepId })
+                .where(eq(vendorWorkOrders.sellerOrganizationId, dropId))
+                .returning({ id: vendorWorkOrders.id });
+            movedRefs["vendor_work_orders.seller_organization_id"] = movedVwos.map(r => r.id);
+
+            const movedResponses = await tx.update(rfqResponses).set({ organizationId: keepId }).where(eq(rfqResponses.organizationId, dropId)).returning({ id: rfqResponses.id });
+            movedRefs["rfq_responses.organization_id"] = movedResponses.map(r => r.id);
+
+            // Archive table has no drizzle schema — raw SQL.
+            const movedArchiveResolved = await tx.execute(
+                sql`UPDATE project_parties_sellers_archive SET resolved_org_id = ${keepId} WHERE resolved_org_id = ${dropId} RETURNING id`
+            );
+            movedRefs["project_parties_sellers_archive.resolved_org_id"] = toNumberIds(movedArchiveResolved.rows);
+            const movedArchiveVendorOrg = await tx.execute(
+                sql`UPDATE project_parties_sellers_archive SET vendor_organization_id = ${keepId} WHERE vendor_organization_id = ${dropId} RETURNING id`
+            );
+            movedRefs["project_parties_sellers_archive.vendor_organization_id"] = toNumberIds(movedArchiveVendorOrg.rows);
+
+            // CSV id lists — token-wise rewrite with de-duplication.
+            const tenderCsvRows = await tx.select({ id: tenderInfos.id, rfqTo: tenderInfos.rfqTo }).from(tenderInfos).where(isNotNull(tenderInfos.rfqTo));
+            const tendersMoved: number[] = [];
+            for (const row of tenderCsvRows) {
+                const next = repointCsvIdList(row.rfqTo, dropId, keepId);
+                if (next !== row.rfqTo) {
+                    await tx
+                        .update(tenderInfos)
+                        .set({ rfqTo: next ?? null, updatedAt: new Date() })
+                        .where(eq(tenderInfos.id, row.id));
+                    tendersMoved.push(row.id);
+                }
+            }
+            movedRefs["tender_infos.rfq_to"] = tendersMoved;
+
+            const rfqCsvRows = await tx.select({ id: rfqs.id, requestedOrganization: rfqs.requestedOrganization }).from(rfqs).where(isNotNull(rfqs.requestedOrganization));
+            const rfqsMoved: number[] = [];
+            for (const row of rfqCsvRows) {
+                // requested_organization has no {0,1} sentinels — tokens are real org ids.
+                const next = repointCsvIdList(row.requestedOrganization, dropId, keepId, NO_CSV_SENTINELS);
+                if (next !== row.requestedOrganization) {
+                    await tx
+                        .update(rfqs)
+                        .set({ requestedOrganization: next ?? null, updatedAt: new Date() })
+                        .where(eq(rfqs.id, row.id));
+                    rfqsMoved.push(row.id);
+                }
+            }
+            movedRefs["rfqs.requested_organization"] = rfqsMoved;
+
+            // oem_not_allowed — varchar in the DB (Drizzle schema says text[]), mixed
+            // bare/CSV/pg-array encodings: read raw, rewrite format-preservingly, update
+            // via raw SQL (Drizzle's text[] mapper/serializer would mangle it).
+            const oemRows = await tx
+                .select({ id: tenderInfos.id, oemNotAllowed: sql<string>`${tenderInfos.oemNotAllowed}` })
+                .from(tenderInfos)
+                .where(isNotNull(tenderInfos.oemNotAllowed));
+            const oemMoved: number[] = [];
+            for (const row of oemRows) {
+                const next = repointLooseIdList(row.oemNotAllowed, dropId, keepId) ?? row.oemNotAllowed;
+                if (next !== row.oemNotAllowed) {
+                    await tx.execute(sql`UPDATE tender_infos SET oem_not_allowed = ${next}, updated_at = now() WHERE id = ${row.id}`);
+                    oemMoved.push(row.id);
+                }
+            }
+            movedRefs["tender_infos.oem_not_allowed"] = oemMoved;
+
+            const costingRows = await tx
+                .select({ id: tenderCostingSheets.id, oemVendorIds: tenderCostingSheets.oemVendorIds })
+                .from(tenderCostingSheets)
+                .where(isNotNull(tenderCostingSheets.oemVendorIds));
+            const costingMoved: number[] = [];
+            for (const row of costingRows) {
+                const next = repointIdArray(row.oemVendorIds, dropId, keepId);
+                if (next !== row.oemVendorIds) {
+                    await tx
+                        .update(tenderCostingSheets)
+                        .set({ oemVendorIds: next ?? null, updatedAt: new Date() })
+                        .where(eq(tenderCostingSheets.id, row.id));
+                    costingMoved.push(row.id);
+                }
+            }
+            movedRefs["tender_costing_sheets.oem_vendor_ids"] = costingMoved;
+
+            // Fill the keeper's EMPTY identifying fields from the drop (runbook §3b).
+            const filled: Record<string, string> = {};
+            const keeperPatch: Partial<NewVendorOrganization> = {};
+            const blank = (value: string | null | undefined) => !value?.trim();
+            if (blank(keep.alias) && drop.alias?.trim()) {
+                keeperPatch.alias = drop.alias;
+                filled.alias = drop.alias;
+            }
+            if (blank(keep.pan) && drop.pan?.trim()) {
+                keeperPatch.pan = drop.pan;
+                filled.pan = drop.pan;
+            }
+            if (blank(keep.msme) && drop.msme?.trim()) {
+                keeperPatch.msme = drop.msme;
+                filled.msme = drop.msme;
+            }
+            if (blank(keep.msmeType) && drop.msmeType?.trim()) {
+                keeperPatch.msmeType = drop.msmeType;
+                filled.msmeType = drop.msmeType;
+            }
+            if (blank(keep.address) && drop.address?.trim()) {
+                keeperPatch.address = drop.address;
+                filled.address = drop.address;
+            }
+            if (Object.keys(keeperPatch).length > 0) {
+                await tx
+                    .update(vendorOrganizations)
+                    .set({ ...keeperPatch, updatedAt: new Date() })
+                    .where(eq(vendorOrganizations.id, keepId));
+            }
+
+            // Archive the dropped row for manual rollback (runbook §3a).
+            await tx.execute(sql`
+                INSERT INTO vendor_organizations_dups_archive
+                    (id, kept_id, name, alias, address, pan, msme, msme_type, status,
+                     created_at, updated_at, reason, moved_refs, filled)
+                VALUES
+                    (${drop.id}, ${keep.id}, ${drop.name}, ${drop.alias}, ${drop.address}, ${drop.pan},
+                     ${drop.msme}, ${drop.msmeType}, ${drop.status}, ${drop.createdAt}, ${drop.updatedAt},
+                     ${"app merge (VendorMergePage)"},
+                     CAST(${JSON.stringify(movedRefs)} AS jsonb), CAST(${JSON.stringify(filled)} AS jsonb))
+                ON CONFLICT (id) DO UPDATE SET
+                    kept_id = EXCLUDED.kept_id,
+                    reason = EXCLUDED.reason,
+                    moved_refs = EXCLUDED.moved_refs,
+                    filled = EXCLUDED.filled
+            `);
+
+            // Safety net — any leftover reference aborts the whole transaction.
+            const remaining = await tx.execute(sql`
+                SELECT (
+                      (SELECT count(*) FROM vendors                         WHERE org_id = ${dropId})
+                    + (SELECT count(*) FROM vendor_gsts                     WHERE org_id = ${dropId})
+                    + (SELECT count(*) FROM vendor_accs                     WHERE org_id = ${dropId})
+                    + (SELECT count(*) FROM vendor_files                    WHERE org_id = ${dropId})
+                    + (SELECT count(*) FROM projects                        WHERE org_id = ${dropId})
+                    + (SELECT count(*) FROM purchase_orders                 WHERE seller_organization_id = ${dropId})
+                    + (SELECT count(*) FROM vendor_work_orders              WHERE seller_organization_id = ${dropId})
+                    + (SELECT count(*) FROM rfq_responses                  WHERE organization_id = ${dropId})
+                    + (SELECT count(*) FROM project_parties_sellers_archive
+                         WHERE resolved_org_id = ${dropId} OR vendor_organization_id = ${dropId})
+                    + (SELECT count(*) FROM tender_infos
+                         WHERE rfq_to IS NOT NULL AND rfq_to <> '0' AND rfq_to <> '1'
+                           AND (',' || replace(rfq_to, ' ', '') || ',') LIKE ('%,' || ${dropId} || ',%'))
+                    + (SELECT count(*) FROM rfqs
+                         WHERE requested_organization IS NOT NULL
+                           AND (',' || replace(requested_organization, ' ', '') || ',') LIKE ('%,' || ${dropId} || ',%'))
+                    + (SELECT count(*) FROM tender_infos
+                         WHERE oem_not_allowed IS NOT NULL
+                           AND btrim(oem_not_allowed) <> ''
+                           AND (',' || replace(replace(replace(replace(oem_not_allowed, '{', ''), '}', ''), '"', ''), ' ', '') || ',')
+                               LIKE ('%,' || ${dropId} || ',%'))
+                    + (SELECT count(*) FROM tender_costing_sheets
+                         WHERE oem_vendor_ids @> CAST(${JSON.stringify([dropId])} AS jsonb))
+                ) AS remaining
+            `);
+            const remainingCount = Number((remaining.rows as Array<{ remaining: string | number }>)[0]?.remaining ?? 0);
+            if (remainingCount > 0) {
+                throw new ConflictException(`Merge aborted: ${remainingCount} reference(s) to vendor ${dropId} remain`);
+            }
+
+            // Never delete — deactivate the duplicate (runbook rule).
+            await tx.update(vendorOrganizations).set({ status: false, updatedAt: new Date() }).where(eq(vendorOrganizations.id, dropId));
+
+            return { keptId: keepId, dropId, movedRefs, filled };
+        });
+    }
 }
+
+const toNumberIds = (rows: unknown[]): number[] => rows.map(row => Number((row as { id: string | number }).id)).filter(Number.isInteger);
