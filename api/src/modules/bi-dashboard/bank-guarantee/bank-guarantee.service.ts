@@ -709,6 +709,20 @@ private parseStringArray(v: unknown): string[] | null {
     return arr.map((x) => String(x).trim()).filter(Boolean);
 }
 
+private hasFileValue(v: unknown): boolean {
+    return (this.parseStringArray(v)?.length ?? 0) > 0;
+}
+
+private isEmptyFileValue(v: unknown): boolean {
+    if (Array.isArray(v)) return v.length === 0;
+    return typeof v === 'string' && v.trim() === '[]';
+}
+
+private readBodyFileValue(body: unknown, field: string): unknown {
+    if (body === null || typeof body !== 'object') return undefined;
+    return (body as Record<string, unknown>)[field];
+}
+
 /**
  * Get file path from body if it's a string (from FileUploader)
  */
@@ -789,6 +803,8 @@ private parseStringArray(v: unknown): string[] | null {
         const docketSlipFile = this.getFileForField('docket_slip', files, body, fileIndexTracker);
         if (docketSlipFile) {
             updateData.docketSlip = `bi-dashboard/${docketSlipFile.filename}`;
+        } else if (this.isEmptyFileValue(this.readBodyFileValue(body, 'docket_slip'))) {
+            updateData.docketSlip = null;
         } else if (body.docket_slip && typeof body.docket_slip === 'string' && !body.docket_slip.includes('[object File]')) {
             updateData.docketSlip = body.docket_slip;
         }
@@ -857,6 +873,8 @@ private parseStringArray(v: unknown): string[] | null {
             const uploadedFile = this.getFileForField(f.body, files, body, fileIndexTracker);
             if (uploadedFile) {
                 bgDetailsUpdate[f.db] = `bi-dashboard/${uploadedFile.filename}`;
+            } else if (this.isEmptyFileValue(this.readBodyFileValue(body, f.body))) {
+                bgDetailsUpdate[f.db] = null;
             } else if (body[f.body] && typeof body[f.body] === 'string') {
                 // If it's a string path, keep it if it's not a dummy marker
                 if (!body[f.body].includes('[object File]')) {
@@ -1550,12 +1568,15 @@ private parseStringArray(v: unknown): string[] | null {
         const hasAccountsForm3Data = currentStep >= 3;
         const hasExtensionData = !!(result.extendedAmount || result.extendedValidityDate
             || result.extendedClaimExpiryDate || result.extendedBankName
-            || result.newStampChargeDeducted || result.extensionLetterPath);
+            || result.newStampChargeDeducted) || this.hasFileValue(result.extensionLetterPath);
         const hasExtensionModification = !!(result.extendedAmount || result.extendedValidityDate
             || result.extendedClaimExpiryDate || result.extendedBankName || result.newStampChargeDeducted);
-        const hasReturnedData = !!(result.docketNo || result.docketSlip);
-        const hasRequestCancellationData = !!(result.coveringLetter || result.stampCoveringLetter);
-        const hasBgCancellationData = !!result.cancellConfirm;
+        const hasReturnedData = !!(result.docketNo || result.courierNo)
+            || this.hasFileValue(result.docketSlip);
+        const hasRequestCancellationData = !!(result.coveringLetter || result.cancelRemark)
+            || this.hasFileValue(result.stampCoveringLetter)
+            || this.hasFileValue(result.cancellationLetterPath);
+        const hasBgCancellationData = this.hasFileValue(result.cancellConfirm);
         const hasFdrCancellationData = !!(result.bgFdrCancelDate || result.bgFdrCancelAmount);
 
         return {

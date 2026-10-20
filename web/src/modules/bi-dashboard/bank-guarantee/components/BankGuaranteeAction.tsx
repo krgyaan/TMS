@@ -293,6 +293,8 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
 
                 if (Array.isArray(value) && value.length > 0 && value[0] instanceof File) return;
 
+                if (Array.isArray(value) && value.length === 0) return;
+
                 if (value === undefined || value === null || value === '') return;
                 if (value instanceof Date) {
                     payload[key] = value.toISOString();

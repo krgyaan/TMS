@@ -165,14 +165,14 @@ export function BankGuaranteeView({
         data.courierNo ||
         data.courierAddress;
     const hasCancellationInfo =
-        !!(data.stampCoveringLetter ||
-        data.cancellationLetterPath ||
-        data.cancelRemark ||
-        data.cancellConfirm ||
+        !!(data.cancelRemark ||
         data.bgFdrCancelRefNo ||
         data.hasRequestCancellationData ||
         data.hasBgCancellationData ||
-        data.hasFdrCancellationData);
+        data.hasFdrCancellationData ||
+        parseFilePaths(data.cancellationLetterPath).length > 0 ||
+        parseFilePaths(data.stampCoveringLetter).length > 0 ||
+        parseFilePaths(data.cancellConfirm).length > 0);
 
     const courierSender = courierJson?.empFromName || courierDetails?.empFromName || courierJson?.empFrom || courierDetails?.empFrom;
     const courierOrg = courierJson?.org || courierDetails?.toOrg || data.courierAddress;
