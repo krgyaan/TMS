@@ -14,6 +14,7 @@ import { users } from '@db/schemas/auth/users.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
 import {
     instrumentBgDetails,
+    instrumentStatusHistory,
     paymentInstruments,
     paymentRequests,
 } from '@db/schemas/tendering/payment-requests.schema';
@@ -949,6 +950,9 @@ private readBodyFileValue(body: unknown, field: string): unknown {
 
         // Map action string to number
         const actionNumber = this.mapActionToNumber(body.action);
+        const fromStatus = instrument.status;
+        const fromAction = instrument.action ?? 0;
+        const toAction = actionNumber;
 
         // Parse contacts if provided
         let contacts: any[] = [];
@@ -970,15 +974,16 @@ private readBodyFileValue(body: unknown, field: string): unknown {
         };
 
         // Update status based on action
+        let nextStatus: string | undefined;
         if (body.action === 'accounts-form-1') {
             if (body.bg_req === 'Accepted') {
-                updateData.status = 'ACCOUNTS_FORM_ACCEPTED';
+                nextStatus = 'ACCOUNTS_FORM_ACCEPTED';
             } else if (body.bg_req === 'Rejected') {
-                updateData.status = 'ACCOUNTS_FORM_REJECTED';
+                nextStatus = 'ACCOUNTS_FORM_REJECTED';
                 updateData.rejectionReason = body.reason_req || null;
             }
         } else if (body.action === 'accounts-form-2') {
-            updateData.status = 'BG_CREATED';
+            nextStatus = 'BG_CREATED';
             if (body.req_no) updateData.reqNo = String(body.req_no);
             if (body.courier_address_json) {
                 try {
@@ -990,13 +995,13 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 }
             }
         } else if (body.action === 'accounts-form-3') {
-            updateData.status = 'FDR_DETAILS_CAPTURED';
+            nextStatus = 'FDR_DETAILS_CAPTURED';
         } else if (body.action === 'initiate-followup') {
-            updateData.status = 'FOLLOWUP_INITIATED';
+            nextStatus = 'FOLLOWUP_INITIATED';
         } else if (body.action === 'request-extension') {
-            updateData.status = 'EXTENSION_REQUESTED';
+            nextStatus = 'EXTENSION_REQUESTED';
         } else if (body.action === 'returned-courier') {
-            updateData.status = BG_STATUSES.RETURN_VIA_COURIER;
+            nextStatus = BG_STATUSES.RETURN_VIA_COURIER;
             const docketSlipFile = this.getFileForField('docket_slip', files, body, fileIndexTracker);
             const docketSlipPath = this.getFilePathFromBody('docket_slip', body);
             if (docketSlipFile) {
@@ -1005,7 +1010,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 updateData.docketSlip = docketSlipPath;
             }
         } else if (body.action === 'request-cancellation') {
-            updateData.status = 'CANCELLATION_REQUESTED';
+            nextStatus = 'CANCELLATION_REQUESTED';
             const coveringLetterFile = this.getFileForField('stamp_covering_letter', files, body, fileIndexTracker);
             const coveringLetterPath = this.getFilePathFromBody('stamp_covering_letter', body);
             if (coveringLetterFile) {
@@ -1014,7 +1019,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 updateData.coveringLetter = coveringLetterPath;
             }
         } else if (body.action === 'bg-cancellation-confirmation') {
-            updateData.status = BG_STATUSES.BG_CANCELLATION_CONFIRMED;
+            nextStatus = BG_STATUSES.BG_CANCELLATION_CONFIRMED;
             const cancellConfirmFile = this.getFileForField('cancell_confirm', files, body, fileIndexTracker);
             const cancellConfirmPath = this.getFilePathFromBody('cancell_confirm', body);
             if (cancellConfirmFile) {
@@ -1023,8 +1028,11 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 updateData.cancelPdf = cancellConfirmPath;
             }
         } else if (body.action === 'fdr-cancellation-confirmation') {
-            updateData.status = BG_STATUSES.FDR_CANCELLED_CONFIRMED;
+            nextStatus = BG_STATUSES.FDR_CANCELLED_CONFIRMED;
         }
+
+        const toStatus = nextStatus ?? fromStatus;
+        if (nextStatus) updateData.status = nextStatus;
 
         await this.db
             .update(paymentInstruments)
@@ -1186,6 +1194,32 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                     createdAt: new Date(),
                 });
             }
+        }
+
+        try {
+            await this.db.insert(instrumentStatusHistory).values({
+                instrumentId,
+                fromStatus,
+                toStatus,
+                fromAction,
+                toAction,
+                fromStage: 0,
+                toStage: 0,
+                formData: body,
+                remarks: null,
+                rejectionReason: body.action === 'accounts-form-1' && body.bg_req === 'Rejected'
+                    ? body.reason_req || null
+                    : null,
+                isResubmission: false,
+                previousInstrumentId: null,
+                changedBy: user?.id ?? user?.sub ?? 0,
+                changedByName: user?.name ?? '',
+                changedByRole: String(user?.roleId ?? 0),
+                ipAddress: '',
+                userAgent: '',
+            });
+        } catch (error) {
+            this.logger.warn(`Status history write failed for BG instrument ${instrumentId}: ${error}`);
         }
 
         if (body.action === 'initiate-followup') {
