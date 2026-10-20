@@ -278,6 +278,38 @@ export interface VendorOrganizationListParams {
     sortOrder?: "asc" | "desc";
 }
 
+// ==================== Vendor merge ====================
+
+export type VendorMergeChildCounts = { persons: number; gsts: number; accounts: number; files: number };
+
+export type VendorMergeOrgSummary = VendorOrganization & { _counts: VendorMergeChildCounts };
+
+export type VendorMergeRefGroup = { count: number; ids: number[] };
+
+export type VendorMergePreview = {
+    keep: VendorMergeOrgSummary;
+    drop: VendorMergeOrgSummary;
+    references: {
+        purchaseOrders: VendorMergeRefGroup;
+        vendorWorkOrders: VendorMergeRefGroup;
+        rfqResponses: VendorMergeRefGroup;
+        projects: VendorMergeRefGroup;
+        tendersRfqTo: VendorMergeRefGroup;
+        tendersOemNotAllowed: VendorMergeRefGroup;
+        rfqsRequestedOrganization: VendorMergeRefGroup;
+        costingSheetsOemVendorIds: VendorMergeRefGroup;
+        partiesArchiveResolved: VendorMergeRefGroup;
+        partiesArchiveVendorOrg: VendorMergeRefGroup;
+    };
+};
+
+export type VendorMergeResult = {
+    keptId: number;
+    dropId: number;
+    movedRefs: Record<string, number[]>;
+    filled: Record<string, string>;
+};
+
 // DTOs for creating/updating vendor organizations with relations
 export interface CreateVendorGstDto {
     orgId: number;

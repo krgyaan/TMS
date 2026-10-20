@@ -358,6 +358,7 @@ export const paths = {
 
         vendors: "/master/vendors",
         vendors_create: "/master/vendors/create",
+        vendors_merge: "/master/vendors/merge",
         vendors_edit: (id: number | string) => `/master/vendors/${id}/edit`,
         vendors_view: (id: number | string) => `/master/vendors/${id}`,
 
