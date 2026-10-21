@@ -19,6 +19,19 @@ export interface FileConfig {
      * still override it here if needed.
      */
     storageDir?: string;
+    /**
+     * Module-level storage directory recorded at merge time (config/index.ts).
+     * Differs from storageDir only for contexts that nest into a feature folder
+     * (e.g. Bank Guarantee); used to keep resolving legacy flat paths from
+     * before the nesting to their original on-disk location.
+     */
+    moduleStorageDir?: string;
+    /**
+     * When true the path returned to the caller (and stored by forms) includes
+     * the storage directory: `<storageDir>/<context>/<fileName>` instead of
+     * `<context>/<fileName>`. On-disk layout is unchanged either way.
+     */
+    includeStorageDirInPath?: boolean;
 }
 
 /**

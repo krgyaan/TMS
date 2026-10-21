@@ -696,6 +696,15 @@ export class BankGuaranteeService {
         return [];
     }
 
+    /**
+     * Stored path for a raw multer file, mirroring the FileUploader layout
+     * `bi-dashboard/bank-guarantee/<context>/<fileName>` (the web UI uploads
+     * through /files/upload, which already returns this shape).
+     */
+    private bgFileStoredPath(context: string, filename: string): string {
+        return `bi-dashboard/bank-guarantee/${context}/${filename}`;
+    }
+
 /**
  * Parse a repeatable string field sent from a form as a JSON string.
  * Tolerates a bare string too, and returns null when absent so an omitted field
@@ -803,7 +812,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
         // Handle files for payment_instruments (if any were uploaded)
         const docketSlipFile = this.getFileForField('docket_slip', files, body, fileIndexTracker);
         if (docketSlipFile) {
-            updateData.docketSlip = `bi-dashboard/${docketSlipFile.filename}`;
+            updateData.docketSlip = this.bgFileStoredPath('bg-docket-slip', docketSlipFile.filename);
         } else if (this.isEmptyFileValue(this.readBodyFileValue(body, 'docket_slip'))) {
             updateData.docketSlip = null;
         } else if (body.docket_slip && typeof body.docket_slip === 'string' && !body.docket_slip.includes('[object File]')) {
@@ -812,14 +821,14 @@ private readBodyFileValue(body: unknown, field: string): unknown {
 
         const coveringLetterFile = this.getFileForField('covering_letter', files, body, fileIndexTracker);
         if (coveringLetterFile) {
-            updateData.coveringLetter = `bi-dashboard/${coveringLetterFile.filename}`;
+            updateData.coveringLetter = this.bgFileStoredPath('bg-stamp-covering-letter', coveringLetterFile.filename);
         } else if (body.covering_letter && typeof body.covering_letter === 'string' && !body.covering_letter.includes('[object File]')) {
             updateData.coveringLetter = body.covering_letter;
         }
 
         const cancelPdfFile = this.getFileForField('cancel_pdf', files, body, fileIndexTracker);
         if (cancelPdfFile) {
-            updateData.cancelPdf = `bi-dashboard/${cancelPdfFile.filename}`;
+            updateData.cancelPdf = this.bgFileStoredPath('bg-cancell-confirm', cancelPdfFile.filename);
         } else if (body.cancel_pdf && typeof body.cancel_pdf === 'string' && !body.cancel_pdf.includes('[object File]')) {
             updateData.cancelPdf = body.cancel_pdf;
         }
@@ -860,20 +869,20 @@ private readBodyFileValue(body: unknown, field: string): unknown {
 
         // Handle file fields for BG details
         const fileFields = [
-            { body: 'extension_letter_path', db: 'extensionLetterPath' },
-            { body: 'cancellation_letter_path', db: 'cancellationLetterPath' },
-            { body: 'bg_format_te', db: 'bgFormatTe' },
-            { body: 'bg_format_tl', db: 'bgFormatTl' },
-            { body: 'sfms_conf', db: 'sfmsConf' },
-            { body: 'fdr_copy', db: 'fdrCopy' },
-            { body: 'stamp_covering_letter', db: 'stampCoveringLetter' },
-            { body: 'cancell_confirm', db: 'cancellConfirm' },
+            { body: 'extension_letter_path', db: 'extensionLetterPath', ctx: 'bg-ext-letter' },
+            { body: 'cancellation_letter_path', db: 'cancellationLetterPath', ctx: 'bg-stamp-covering-letter' },
+            { body: 'bg_format_te', db: 'bgFormatTe', ctx: 'bg-format-imran' },
+            { body: 'bg_format_tl', db: 'bgFormatTl', ctx: 'bg-format-imran' },
+            { body: 'sfms_conf', db: 'sfmsConf', ctx: 'bg-sfms-conf' },
+            { body: 'fdr_copy', db: 'fdrCopy', ctx: 'bg-fdr-copy' },
+            { body: 'stamp_covering_letter', db: 'stampCoveringLetter', ctx: 'bg-stamp-covering-letter' },
+            { body: 'cancell_confirm', db: 'cancellConfirm', ctx: 'bg-cancell-confirm' },
         ];
 
         fileFields.forEach(f => {
             const uploadedFile = this.getFileForField(f.body, files, body, fileIndexTracker);
             if (uploadedFile) {
-                bgDetailsUpdate[f.db] = `bi-dashboard/${uploadedFile.filename}`;
+                bgDetailsUpdate[f.db] = this.bgFileStoredPath(f.ctx, uploadedFile.filename);
             } else if (this.isEmptyFileValue(this.readBodyFileValue(body, f.body))) {
                 bgDetailsUpdate[f.db] = null;
             } else if (body[f.body] && typeof body[f.body] === 'string') {
@@ -887,7 +896,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
         // Handle prefilledSignedBg separately (it's often JSON or multiple files)
         const prefilledFiles = this.getMultipleFilesForField('prefilled_signed_bg', files, body, fileIndexTracker);
         if (prefilledFiles.length > 0) {
-            const filePaths = prefilledFiles.map(f => `bi-dashboard/${f.filename}`);
+            const filePaths = prefilledFiles.map(f => this.bgFileStoredPath('bg-prefilled-signed', f.filename));
             bgDetailsUpdate.prefilledSignedBg = JSON.stringify(filePaths);
         } else if (body.prefilled_signed_bg && typeof body.prefilled_signed_bg === 'string') {
             if (!body.prefilled_signed_bg.includes('[object File]')) {
@@ -1005,7 +1014,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             const docketSlipFile = this.getFileForField('docket_slip', files, body, fileIndexTracker);
             const docketSlipPath = this.getFilePathFromBody('docket_slip', body);
             if (docketSlipFile) {
-                updateData.docketSlip = `bi-dashboard/${docketSlipFile.filename}`;
+                updateData.docketSlip = this.bgFileStoredPath('bg-docket-slip', docketSlipFile.filename);
             } else if (docketSlipPath) {
                 updateData.docketSlip = docketSlipPath;
             }
@@ -1014,7 +1023,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             const coveringLetterFile = this.getFileForField('stamp_covering_letter', files, body, fileIndexTracker);
             const coveringLetterPath = this.getFilePathFromBody('stamp_covering_letter', body);
             if (coveringLetterFile) {
-                updateData.coveringLetter = `bi-dashboard/${coveringLetterFile.filename}`;
+                updateData.coveringLetter = this.bgFileStoredPath('bg-stamp-covering-letter', coveringLetterFile.filename);
             } else if (coveringLetterPath) {
                 updateData.coveringLetter = coveringLetterPath;
             }
@@ -1023,7 +1032,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             const cancellConfirmFile = this.getFileForField('cancell_confirm', files, body, fileIndexTracker);
             const cancellConfirmPath = this.getFilePathFromBody('cancell_confirm', body);
             if (cancellConfirmFile) {
-                updateData.cancelPdf = `bi-dashboard/${cancellConfirmFile.filename}`;
+                updateData.cancelPdf = this.bgFileStoredPath('bg-cancell-confirm', cancellConfirmFile.filename);
             } else if (cancellConfirmPath) {
                 updateData.cancelPdf = cancellConfirmPath;
             }
@@ -1068,7 +1077,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             const bgFormatImranFile = this.getFileForField('bg_format_imran', files, body, fileIndexTracker);
             const bgFormatImranPath = this.getFilePathFromBody('bg_format_imran', body);
             if (bgFormatImranFile) {
-                bgDetailsUpdate.bgFormatTe = `bi-dashboard/${bgFormatImranFile.filename}`;
+                bgDetailsUpdate.bgFormatTe = this.bgFileStoredPath('bg-format-imran', bgFormatImranFile.filename);
             } else if (bgFormatImranPath) {
                 bgDetailsUpdate.bgFormatTe = bgFormatImranPath;
             }
@@ -1077,7 +1086,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             const prefilledFiles = this.getMultipleFilesForField('prefilled_signed_bg', files, body, fileIndexTracker);
             const prefilledPath = this.getFilePathFromBody('prefilled_signed_bg', body);
             if (prefilledFiles.length > 0) {
-                const filePaths = prefilledFiles.map(f => `bi-dashboard/${f.filename}`);
+                const filePaths = prefilledFiles.map(f => this.bgFileStoredPath('bg-prefilled-signed', f.filename));
                 bgDetailsUpdate.prefilledSignedBg = JSON.stringify(filePaths);
             } else if (prefilledPath) {
                 // If it's a string path (from FileUploader), parse it if it's JSON array or use as single path
@@ -1113,7 +1122,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             const sfmsConfFile = this.getFileForField('sfms_conf', files, body, fileIndexTracker);
             const sfmsConfPath = this.getFilePathFromBody('sfms_conf', body);
             if (sfmsConfFile) {
-                bgDetailsUpdate.sfmsConf = `bi-dashboard/${sfmsConfFile.filename}`;
+                bgDetailsUpdate.sfmsConf = this.bgFileStoredPath('bg-sfms-conf', sfmsConfFile.filename);
             } else if (sfmsConfPath) {
                 bgDetailsUpdate.sfmsConf = sfmsConfPath;
             }
@@ -1122,7 +1131,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             const fdrCopyFile = this.getFileForField('fdr_copy', files, body, fileIndexTracker);
             const fdrCopyPath = this.getFilePathFromBody('fdr_copy', body);
             if (fdrCopyFile) {
-                bgDetailsUpdate.fdrCopy = `bi-dashboard/${fdrCopyFile.filename}`;
+                bgDetailsUpdate.fdrCopy = this.bgFileStoredPath('bg-fdr-copy', fdrCopyFile.filename);
             } else if (fdrCopyPath) {
                 bgDetailsUpdate.fdrCopy = fdrCopyPath;
             }
@@ -1140,7 +1149,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             const extLetterFile = this.getFileForField('ext_letter', files, body, fileIndexTracker);
             const extLetterPath = this.getFilePathFromBody('ext_letter', body);
             if (extLetterFile) {
-                bgDetailsUpdate.extensionLetterPath = `bi-dashboard/${extLetterFile.filename}`;
+                bgDetailsUpdate.extensionLetterPath = this.bgFileStoredPath('bg-ext-letter', extLetterFile.filename);
             } else if (extLetterPath) {
                 bgDetailsUpdate.extensionLetterPath = extLetterPath;
             }
@@ -1152,7 +1161,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             const coveringLetterFile = this.getFileForField('stamp_covering_letter', files, body, fileIndexTracker);
             const coveringLetterPath = this.getFilePathFromBody('stamp_covering_letter', body);
             if (coveringLetterFile) {
-                bgDetailsUpdate.stampCoveringLetter = `bi-dashboard/${coveringLetterFile.filename}`;
+                bgDetailsUpdate.stampCoveringLetter = this.bgFileStoredPath('bg-stamp-covering-letter', coveringLetterFile.filename);
             } else if (coveringLetterPath) {
                 bgDetailsUpdate.stampCoveringLetter = coveringLetterPath;
             }
@@ -1160,7 +1169,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             const cancellConfirmFile = this.getFileForField('cancell_confirm', files, body, fileIndexTracker);
             const cancellConfirmPath = this.getFilePathFromBody('cancell_confirm', body);
             if (cancellConfirmFile) {
-                bgDetailsUpdate.cancellConfirm = `bi-dashboard/${cancellConfirmFile.filename}`;
+                bgDetailsUpdate.cancellConfirm = this.bgFileStoredPath('bg-cancell-confirm', cancellConfirmFile.filename);
             } else if (cancellConfirmPath) {
                 bgDetailsUpdate.cancellConfirm = cancellConfirmPath;
             }

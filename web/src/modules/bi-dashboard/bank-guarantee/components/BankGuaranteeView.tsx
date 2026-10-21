@@ -29,16 +29,19 @@ const FileLink = ({ file }: { file?: string | string[] | null }) => {
 
     const getFileUrl = (filePath: string) => {
         const fileName = filePath.split('/').pop() || '';
+        // New uploads store module-prefixed paths (bi-dashboard/bank-guarantee/…);
+        // the filename-based fallbacks below only apply to legacy flat paths.
+        const isLegacyPath = !filePath.startsWith('bi-dashboard/');
 
         // If file ends with _soft_copy.pdf
-        if (filePath.endsWith('_soft_copy.pdf')) {
+        if (isLegacyPath && filePath.endsWith('_soft_copy.pdf')) {
             return `/uploads/courier/${fileName}`;
         }
 
         // If file name (without extension) ends with _te_
         const nameParts = fileName.split('.');
         const nameWithoutExt = nameParts.length > 1 ? nameParts.slice(0, -1).join('.') : fileName;
-        if (nameWithoutExt.endsWith('_te_')) {
+        if (isLegacyPath && nameWithoutExt.endsWith('_te_')) {
             return `/uploads/bi-dashboard/bg-po-files/${fileName}`;
         }
 

@@ -26,6 +26,9 @@ export interface UploadResult {
     errors: Array<{ fileName: string; error: string }>;
 }
 
+/** Module storage directories (bi-dashboard, accounts, …) used to resolve nested paths. */
+const BG_PATH_PREFIX = 'bi-dashboard/bank-guarantee/';
+
 @Injectable()
 export class FileUploadService implements OnModuleInit {
     private readonly logger;
@@ -61,15 +64,67 @@ export class FileUploadService implements OnModuleInit {
     }
 
     /**
-     * Derive the context from a stored relative path (`{context}/{fileName}`)
+     * Path returned to callers (and stored by forms). Contexts that opt into
+     * includeStorageDirInPath get `<storageDir>/<context>/<fileName>` — e.g.
+     * bi-dashboard/bank-guarantee/bg-ext-letter/x.pdf — everything else keeps
+     * the historical `<context>/<fileName>`.
      */
-    private getContextFromPath(filePath: string): FileContext {
-        const normalized = filePath.replace(/\\/g, '/');
-        const context = normalized.split('/')[0];
-        if (!(context in FILE_CONFIGS)) {
-            throw new BadRequestException(`Unknown file context: ${context}`);
+    private buildStoredPath(context: FileContext, fileName: string): string {
+        const config = getFileConfig(context);
+        const dir = getStorageDir(context);
+        return config.includeStorageDirInPath && dir
+            ? path.posix.join(dir, context, fileName)
+            : path.posix.join(context, fileName);
+    }
+
+    /**
+     * On-disk location: always `uploads/<storageDir>/<context>/<fileName>`,
+     * regardless of whether the stored path includes the storage directory.
+     */
+    private buildAbsolutePath(context: FileContext, fileName: string): string {
+        return path.join(this.uploadsRoot, getStorageDir(context), context, fileName);
+    }
+
+    /**
+     * Resolve a stored relative path to an absolute location under uploads/.
+     * Supports every layout that exists in the data:
+     *   - `bi-dashboard/bank-guarantee/<context>/<fileName>` (new BG layout)
+     *   - `<context>/<fileName>` (flat, e.g. bg-ext-letter/x.pdf, courier/x.jpg)
+     * Non-BG contexts resolve exactly as before; legacy flat BG paths keep
+     * resolving to their original on-disk location (module dir).
+     */
+    private resolveAbsolutePath(filePath: string): string {
+        const normalized = filePath.replace(/\\/g, '/').replace(/^\/+/, '');
+        const segments = normalized.split('/');
+        if (!normalized || segments.includes('..')) {
+            throw new BadRequestException('Invalid file path');
         }
-        return context as FileContext;
+
+        let resolved: string;
+        if (normalized.startsWith(BG_PATH_PREFIX)) {
+            resolved = path.join(this.uploadsRoot, normalized);
+        } else {
+            // Legacy flat `<context>/<file>`: resolve against the module-level
+            // directory the file was written to at the time (a context may have
+            // been moved into a nested storageDir since).
+            const context = segments[0];
+            if (!(context in FILE_CONFIGS)) {
+                throw new BadRequestException(`Unknown file context: ${context}`);
+            }
+            const config = getFileConfig(context);
+            resolved = path.join(
+                this.uploadsRoot,
+                config.moduleStorageDir ?? getStorageDir(context),
+                normalized,
+            );
+        }
+
+        const root = path.resolve(this.uploadsRoot);
+        const finalPath = path.resolve(resolved);
+        if (finalPath !== root && !finalPath.startsWith(root + path.sep)) {
+            throw new BadRequestException('Invalid file path');
+        }
+        return finalPath;
     }
 
     /**
@@ -226,8 +281,8 @@ export class FileUploadService implements OnModuleInit {
               })()
             : `${timestamp}_${baseName}${ext}`;
 
-        const relativePath = path.join(context, fileName).replace(/\\/g, '/');
-        const absolutePath = path.join(this.getBasePath(context), relativePath);
+        const relativePath = this.buildStoredPath(context, fileName);
+        const absolutePath = this.buildAbsolutePath(context, fileName);
 
         let buffer = file.buffer;
         let finalSize = file.size;
@@ -340,8 +395,7 @@ export class FileUploadService implements OnModuleInit {
      * Delete a file by path
      */
     async delete(filePath: string): Promise<void> {
-        const normalized = filePath.replace(/\\/g, '/');
-        const absolutePath = path.join(this.getBasePath(this.getContextFromPath(normalized)), normalized);
+        const absolutePath = this.resolveAbsolutePath(filePath);
         try {
             await fs.unlink(absolutePath);
         } catch (err) {
@@ -356,8 +410,7 @@ export class FileUploadService implements OnModuleInit {
      * Check if file exists
      */
     async exists(filePath: string): Promise<boolean> {
-        const normalized = filePath.replace(/\\/g, '/');
-        const absolutePath = path.join(this.getBasePath(this.getContextFromPath(normalized)), normalized);
+        const absolutePath = this.resolveAbsolutePath(filePath);
         try {
             await fs.access(absolutePath);
             return true;
@@ -368,8 +421,8 @@ export class FileUploadService implements OnModuleInit {
 
     /**
      * Save a server-generated file (not a multer upload) into a context's directory,
-     * using the same `{epochMs}_{sanitizedName}.ext` naming and `{context}/{fileName}`
-     * relative path as processAndSave, so it is served by GET /files/serve/:context/:fileName.
+     * using the same `{epochMs}_{sanitizedName}.ext` naming and stored relative
+     * path as processAndSave, so it is served by GET /files/serve/*path.
      * No compression or type validation -- the caller produced the buffer itself.
      */
     async saveBuffer(buffer: Buffer, context: FileContext, originalName: string, mimeType: string): Promise<UploadedFile> {
@@ -380,8 +433,8 @@ export class FileUploadService implements OnModuleInit {
             .substring(0, 50);
         const fileName = `${Date.now()}_${baseName}${ext}`;
 
-        const relativePath = path.join(context, fileName).replace(/\\/g, '/');
-        const absolutePath = path.join(this.getBasePath(context), relativePath);
+        const relativePath = this.buildStoredPath(context, fileName);
+        const absolutePath = this.buildAbsolutePath(context, fileName);
 
         await fs.mkdir(path.dirname(absolutePath), { recursive: true });
         await fs.writeFile(absolutePath, buffer);
@@ -401,7 +454,6 @@ export class FileUploadService implements OnModuleInit {
      * Get absolute path for serving
      */
     getAbsolutePath(filePath: string): string {
-        const normalized = filePath.replace(/\\/g, '/');
-        return path.join(this.getBasePath(this.getContextFromPath(normalized)), normalized);
+        return this.resolveAbsolutePath(filePath);
     }
 }
