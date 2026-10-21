@@ -24,7 +24,9 @@ export interface BankGuaranteeDashboardRow {
 
 export interface BankGuaranteeDashboardCounts {
     'new-requests': number;
-    'live-bgs': number;
+    'live-pnb': number;
+    'live-bg-limit': number;
+    'live-sbi': number;
     cancelled: number;
     rejected: number;
     total: number;

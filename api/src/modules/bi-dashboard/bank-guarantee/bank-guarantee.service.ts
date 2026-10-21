@@ -67,8 +67,21 @@ export class BankGuaranteeService {
                     inArray(paymentInstruments.status, [BG_STATUSES.PENDING, BG_STATUSES.ACCOUNTS_FORM_ACCEPTED]),
                 )
             );
-        } else if (tab === 'live-bgs') {
-            conditions.push(inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]));
+        } else if (tab === 'live-pnb') {
+            conditions.push(
+                inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
+                eq(instrumentBgDetails.bankName, 'PNB_6011')
+            );
+        } else if (tab === 'live-bg-limit') {
+            conditions.push(
+                inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
+                eq(instrumentBgDetails.bankName, 'BGLIMIT_0771')
+            );
+        } else if (tab === 'live-sbi') {
+            conditions.push(
+                inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
+                eq(instrumentBgDetails.bankName, 'SBI')
+            );
         } else if (tab === 'cancelled') {
             conditions.push(
                 inArray(paymentInstruments.action, [8, 9])
@@ -397,7 +410,20 @@ export class BankGuaranteeService {
             inArray(paymentInstruments.status, [BG_STATUSES.PENDING, BG_STATUSES.ACCOUNTS_FORM_ACCEPTED]),
         );
 
-        const liveBgsFilter = inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]);
+        const livePnbFilter = and(
+            inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
+            eq(instrumentBgDetails.bankName, 'PNB_6011'),
+        );
+
+        const liveBgLimitFilter = and(
+            inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
+            eq(instrumentBgDetails.bankName, 'BGLIMIT_0771'),
+        );
+
+        const liveSbiFilter = and(
+            inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
+            eq(instrumentBgDetails.bankName, 'SBI'),
+        );
 
         const cancelledFilter = inArray(paymentInstruments.action, [8, 9]);
 
@@ -408,7 +434,9 @@ export class BankGuaranteeService {
 
         const [counts] = await this.db.select({
             newRequests: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${newRequestsFilter})`,
-            liveBgs: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${liveBgsFilter})`,
+            livePnb: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${livePnbFilter})`,
+            liveBgLimit: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${liveBgLimitFilter})`,
+            liveSbi: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${liveSbiFilter})`,
             cancelled: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${cancelledFilter})`,
             rejected: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${rejectedFilter})`,
         })
@@ -421,16 +449,20 @@ export class BankGuaranteeService {
             .where(baseWhere);
 
         const newRequests = Number(counts?.newRequests ?? 0);
-        const liveBgs = Number(counts?.liveBgs ?? 0);
+        const livePnb = Number(counts?.livePnb ?? 0);
+        const liveBgLimit = Number(counts?.liveBgLimit ?? 0);
+        const liveSbi = Number(counts?.liveSbi ?? 0);
         const cancelled = Number(counts?.cancelled ?? 0);
         const rejected = Number(counts?.rejected ?? 0);
 
         return {
             'new-requests': newRequests,
-            'live-bgs': liveBgs,
+            'live-pnb': livePnb,
+            'live-bg-limit': liveBgLimit,
+            'live-sbi': liveSbi,
             cancelled,
             rejected,
-            total: newRequests + liveBgs + cancelled + rejected,
+            total: newRequests + livePnb + liveBgLimit + liveSbi + cancelled + rejected,
         };
     }
 
