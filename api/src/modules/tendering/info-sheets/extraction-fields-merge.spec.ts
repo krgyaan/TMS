@@ -88,7 +88,7 @@ describeDb('tender_extractions writers keep the cached analysis (real Postgres)'
         );
 
     const makeTendersService = () =>
-        new TenderInfosService(
+        new (TenderInfosService as any)(
             appLogger,
             db as any,
             {} as any,
@@ -97,6 +97,7 @@ describeDb('tender_extractions writers keep the cached analysis (real Postgres)'
             { stopTimer: jest.fn(), startTimer: jest.fn() } as any,
             { get: jest.fn() } as any,
             {} as any,
+            { notifyTenderAllocated: jest.fn().mockResolvedValue(undefined) } as any,
         );
 
     const seed = async (fields: Record<string, unknown>) => {

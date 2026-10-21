@@ -271,7 +271,13 @@ describe('PDF Extraction Queue Integration (Phase 8)', () => {
                                 {
                                     id: 1,
                                     tenderId: 101,
-                                    fields: { tenderValue: { value: 500 } },
+                                    fields: {
+                                        tenderValue: { value: 500 },
+                                        metadata: {
+                                            llm_status: 'ok',
+                                            failed_categories: [],
+                                        },
+                                    },
                                     extractionVersion: matchingVersion,
                                     missingFields: [],
                                 },
@@ -289,9 +295,11 @@ describe('PDF Extraction Queue Integration (Phase 8)', () => {
                 mockDb,
             );
 
-            const result = await producerWithDb.enqueueExtraction(data);
+            const result: EnqueueExtractionResult = await producerWithDb.enqueueExtraction(data);
 
             expect(result.status).toBe('existing_completed');
+            expect(result.llm_status).toBe('ok');
+            expect(result.failed_categories).toEqual([]);
             expect(mockQueue.add).not.toHaveBeenCalled();
         });
 
@@ -998,24 +1006,24 @@ describe('PDF Extraction Queue Integration (Phase 8)', () => {
         it('should persist extended keys (requiredDocuments, doc1-doc9, miiPreference, gemBidEndDate, etc.) in tender_extractions.fields', async () => {
             const mockExtendedResult: PdfExtractionJobResult = {
                 fields: {
-                    tenderValue: { value: 5000000, confidence: 'high' },
-                    requiredDocuments: { value: ['PAN Card', 'GST Registration'], confidence: 'high' },
-                    doc1: { value: 'PAN Card', confidence: 'high' },
-                    doc2: { value: 'GST Registration', confidence: 'high' },
-                    doc3: { value: 'Experience Certificate', confidence: 'high' },
-                    doc4: { value: null, confidence: 'missing' },
-                    doc5: { value: null, confidence: 'missing' },
-                    doc6: { value: null, confidence: 'missing' },
-                    doc7: { value: null, confidence: 'missing' },
-                    doc8: { value: null, confidence: 'missing' },
-                    doc9: { value: null, confidence: 'missing' },
-                    miiPreference: { value: 'YES', confidence: 'high' },
-                    miiRequired: { value: 'YES', confidence: 'high' },
-                    gemBidEndDate: { value: '2026-03-31 15:00:00', confidence: 'high' },
-                    gemBidOpeningDate: { value: '2026-03-31 15:30:00', confidence: 'high' },
-                    grievanceContact: { value: 'Nodal Officer', confidence: 'high' },
-                    grievanceEmail: { value: 'grievance@dept.gov.in', confidence: 'high' },
-                    ldType: { value: 'PRS', confidence: 'high' },
+                    tenderValue: { value: 5000000, confidence: 'high', source: 'gem_parent' },
+                    requiredDocuments: { value: ['PAN Card', 'GST Registration'], confidence: 'high', source: 'gem_parent' },
+                    doc1: { value: 'PAN Card', confidence: 'high', source: 'gem_parent' },
+                    doc2: { value: 'GST Registration', confidence: 'high', source: 'gem_parent' },
+                    doc3: { value: 'Experience Certificate', confidence: 'high', source: 'gem_parent' },
+                    doc4: { value: null, confidence: 'missing', source: null },
+                    doc5: { value: null, confidence: 'missing', source: null },
+                    doc6: { value: null, confidence: 'missing', source: null },
+                    doc7: { value: null, confidence: 'missing', source: null },
+                    doc8: { value: null, confidence: 'missing', source: null },
+                    doc9: { value: null, confidence: 'missing', source: null },
+                    miiPreference: { value: 'YES', confidence: 'high', source: 'gem_parent' },
+                    miiRequired: { value: 'YES', confidence: 'high', source: 'gem_parent' },
+                    gemBidEndDate: { value: '2026-03-31 15:00:00', confidence: 'high', source: 'gem_parent' },
+                    gemBidOpeningDate: { value: '2026-03-31 15:30:00', confidence: 'high', source: 'gem_parent' },
+                    grievanceContact: { value: 'Nodal Officer', confidence: 'high', source: 'gem_parent' },
+                    grievanceEmail: { value: 'grievance@dept.gov.in', confidence: 'high', source: 'gem_parent' },
+                    ldType: { value: 'PRS', confidence: 'high', source: 'gem_parent' },
                 },
                 missing_fields: [],
                 extraction_version: '1.1.0',

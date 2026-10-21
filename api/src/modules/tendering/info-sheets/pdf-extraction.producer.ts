@@ -29,6 +29,8 @@ export interface EnqueueExtractionResult {
     ambiguous_field_conflicts?: Record<string, any>;
     documentIdentityCheck?: DocumentIdentityCheck | null;
     processing_time_ms?: number;
+    llm_status?: string;
+    failed_categories?: string[];
 }
 
 interface InMemoryJobRecord {
