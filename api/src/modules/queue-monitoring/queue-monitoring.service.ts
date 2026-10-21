@@ -208,7 +208,7 @@ export class QueueMonitoringService {
                 bullmqJobs = bullmqJobs.slice(offset, offset + limit);
             }
 
-            const jobs = bullmqJobs.map(job => this.mapBullMQJobToDto(job));
+            const jobs = await Promise.all(bullmqJobs.map(job => this.mapBullMQJobToDto(job)));
 
             return {
                 total: totalCount,
@@ -329,11 +329,13 @@ export class QueueMonitoringService {
      * Map BullMQ Job object to JobDetailDto
      */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private mapBullMQJobToDto(job: any): JobDetailDto {
+    private async mapBullMQJobToDto(job: any): Promise<JobDetailDto> {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
-        const jobState = (typeof job.getState === "function" ? job.getState() : job.state) || "unknown";
+        const jobState = (typeof job.getState === "function" ? await job.getState() : job.state) || "unknown";
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
-        const jobProgress = (typeof job.progress === "function" ? job.progress() : job._progress) || 0;
+        const rawProgress = typeof job.progress === "function" ? await job.progress() : job.progress;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        const jobProgress = typeof rawProgress === "number" ? rawProgress : 0;
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         const jobData = (job.data as Record<string, unknown>) || {};
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
