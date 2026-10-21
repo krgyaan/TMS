@@ -57,6 +57,7 @@ export interface Rfq {
     statusName: string;
     dueDate: Date;
     rfqId: number | null;
+    responseCount?: number;
     requestedOrganizationNames: string[];
     requestedVendorNames: string[];
     requestedGroups: Array<{

@@ -6,6 +6,7 @@ import { paymentRequests } from "@/db/schemas/operations/payment-requests.schema
 import { users } from "@/db/schemas/";
 import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
 import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.schema";
+
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 import { InsurancePolicyService } from "@/modules/insurance/insurance-policy.service";
@@ -85,16 +86,18 @@ export class MakerRequestService {
         });
 
         this.logger.info(`Maker Request created: ${requestNo}`);
-        
+
         // Fire-and-forget WhatsApp notification
-        this.notifications.notifyNewPaymentRequest({
-          requestNo: mr.requestNo ?? '',
-          amount: mr.amount ?? 0,
-          partyName: mr.partyName ?? null,
-          portalLink: mr.portalLink ?? null,
-          requestedBy: userId,
-          category: mr.paymentAgainst ?? '',
-        }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+        this.notifications
+            .notifyNewPaymentRequest({
+                requestNo: mr.requestNo ?? "",
+                amount: mr.amount ?? 0,
+                partyName: mr.partyName ?? null,
+                portalLink: mr.portalLink ?? null,
+                requestedBy: userId,
+                category: mr.paymentAgainst ?? "",
+            })
+            .catch(err => this.logger.warn(`WhatsApp notification failed: ${err}`));
 
         return mr;
     }
@@ -145,39 +148,45 @@ export class MakerRequestService {
 
         this.logger.info(`Maker Request #${id} status updated to "${body.status}"`);
 
-        if (body.status === 'payment_done') {
-          this.notifications.notifyPaymentDone({
-            requestNo: existing.requestNo ?? undefined,
-            amount: updated.amount ?? 0,
-            partyName: updated.partyName ?? null,
-            portalLink: updated.portalLink ?? null,
-            utrNumber: updated.utrNumber ?? null,
-            requestedBy: existing.requestedBy ?? 0,
-            category: existing.paymentAgainst ?? '',
-          }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+        if (body.status === "payment_done") {
+            this.notifications
+                .notifyPaymentDone({
+                    requestNo: existing.requestNo ?? undefined,
+                    amount: updated.amount ?? 0,
+                    partyName: updated.partyName ?? null,
+                    portalLink: updated.portalLink ?? null,
+                    utrNumber: updated.utrNumber ?? null,
+                    requestedBy: existing.requestedBy ?? 0,
+                    category: existing.paymentAgainst ?? "",
+                })
+                .catch(err => this.logger.warn(`WhatsApp notification failed: ${err}`));
         }
 
-        if (body.status === 'rejected') {
-          this.notifications.notifyRejection({
-            requestNo: existing.requestNo ?? undefined,
-            amount: updated.amount ?? 0,
-            partyName: updated.partyName ?? null,
-            portalLink: updated.portalLink ?? null,
-            rejectionReason: body.rejectionReason ?? null,
-            requestedBy: existing.requestedBy ?? 0,
-            category: existing.paymentAgainst ?? '',
-          }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+        if (body.status === "rejected") {
+            this.notifications
+                .notifyRejection({
+                    requestNo: existing.requestNo ?? undefined,
+                    amount: updated.amount ?? 0,
+                    partyName: updated.partyName ?? null,
+                    portalLink: updated.portalLink ?? null,
+                    rejectionReason: body.rejectionReason ?? null,
+                    requestedBy: existing.requestedBy ?? 0,
+                    category: existing.paymentAgainst ?? "",
+                })
+                .catch(err => this.logger.warn(`WhatsApp notification failed: ${err}`));
         }
 
-        if (body.status === 'maker_done') {
-          this.notifications.notifyMakerDone({
-            requestNo: existing.requestNo ?? undefined,
-            amount: updated.amount ?? 0,
-            partyName: updated.partyName ?? null,
-            portalLink: updated.portalLink ?? null,
-            requestedBy: existing.requestedBy ?? 0,
-            category: existing.paymentAgainst ?? '',
-          }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+        if (body.status === "maker_done") {
+            this.notifications
+                .notifyMakerDone({
+                    requestNo: existing.requestNo ?? undefined,
+                    amount: updated.amount ?? 0,
+                    partyName: updated.partyName ?? null,
+                    portalLink: updated.portalLink ?? null,
+                    requestedBy: existing.requestedBy ?? 0,
+                    category: existing.paymentAgainst ?? "",
+                })
+                .catch(err => this.logger.warn(`WhatsApp notification failed: ${err}`));
         }
 
         return updated;
@@ -241,18 +250,18 @@ export class MakerRequestService {
                 requestedByName: users.name,
                 poNumber: purchaseOrders.poNumber,
                 vwoNumber: vendorWorkOrders.woNumber,
-                poGrandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
-                poTotalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
-                poTotalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                poGrandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0) + COALESCE((SELECT SUM(total_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                poTotalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0) + COALESCE((SELECT SUM(taxable_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                poTotalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0) + COALESCE((SELECT SUM(gst_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                 poTdsPercentage: purchaseOrders.tdsPercentage,
                 poTdsAmount: purchaseOrders.tdsAmount,
                 poAmountAfterTds: purchaseOrders.amountAfterTds,
                 poTotalPaymentRequested: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status != 'rejected'), 0)`,
                 poTotalMakerDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'maker_done'), 0)`,
                 poTotalPaymentDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'payment_done'), 0)`,
-                vwoGrandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
-                vwoTotalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
-                vwoTotalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
+                vwoGrandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0) + COALESCE((SELECT SUM(total_amount::numeric) FROM order_extra_charges WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
+                vwoTotalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0) + COALESCE((SELECT SUM(taxable_amount::numeric) FROM order_extra_charges WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
+                vwoTotalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0) + COALESCE((SELECT SUM(gst_amount::numeric) FROM order_extra_charges WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
                 vwoTdsPercentage: vendorWorkOrders.tdsPercentage,
                 vwoTdsAmount: vendorWorkOrders.tdsAmount,
                 vwoAmountAfterTds: vendorWorkOrders.amountAfterTds,

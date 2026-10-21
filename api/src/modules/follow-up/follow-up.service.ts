@@ -1051,7 +1051,7 @@ export class FollowUpService {
             amount: followUps.amount,
             partyName: followUps.partyName,
             party_name: followUps.partyName,
-            status: followUps.status,
+            status: followUps.assignmentStatus,
             assignmentStatus: followUps.assignmentStatus,
             assignment_status: followUps.assignmentStatus,
             frequency: followUps.frequency,

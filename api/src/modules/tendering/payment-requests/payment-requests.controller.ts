@@ -78,7 +78,6 @@ export class PaymentRequestsController {
         @CurrentUser() user: ValidatedUser,
     ) {
         const payload = CreatePaymentRequestSchema.parse(body);
-        console.log("payload accepted in api call: ", payload)
         return this.commandService.create(tenderId, payload, user.sub);
     }
 

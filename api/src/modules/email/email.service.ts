@@ -26,6 +26,8 @@ export class EmailService {
     private readonly maxRetries: number;
     private readonly isProd: boolean;
 
+    private readonly isSandbox: boolean;
+
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly gmail: GmailClient,
@@ -33,6 +35,7 @@ export class EmailService {
         private readonly config: ConfigService,
         private readonly fileUploadService: FileUploadService,
     ) {
+        this.isSandbox = process.env.MAIL_MODE === 'sandbox' || this.config.get('MAIL_MODE') === 'sandbox';
         this.isProd = this.config.get('NODE_ENV') === 'production';
         const rootDir = this.isProd ? 'dist' : 'src';
         this.templatesDir = path.join(process.cwd(), rootDir, 'modules', 'email', 'templates');
@@ -154,10 +157,14 @@ export class EmailService {
     async send(options: SendEmailOptions): Promise<{ success: boolean; emailLogId?: number; error?: string }> {
         try {
             // 1. Check sender OAuth
-            const hasOAuth = await this.gmail.hasValidOAuth(options.fromUserId);
-            if (!hasOAuth) {
-                this.logger.warn(`Email send aborted: sender ${options.fromUserId} has no valid OAuth for event ${options.eventType}`);
-                return { success: false, error: 'Sender needs to authenticate with Google.' };
+            if (!this.isSandbox) {
+                const hasOAuth = await this.gmail.hasValidOAuth(options.fromUserId);
+                if (!hasOAuth) {
+                    this.logger.warn(`Email send aborted: sender ${options.fromUserId} has no valid OAuth for event ${options.eventType}`);
+                    return { success: false, error: 'Sender needs to authenticate with Google.' };
+                }
+            } else {
+                this.logger.warn(`[SANDBOX] Skipping OAuth check for event ${options.eventType}`);
             }
 
             // 2. Get sender info
@@ -247,6 +254,20 @@ export class EmailService {
 
             const emailLogId = log.id;
 
+            if (this.isSandbox) {
+                await this.db
+                    .update(emailLogs)
+                    .set({
+                        status: 'failed',
+                        errorMessage: 'SANDBOX: suppressed (MAIL_MODE=sandbox)',
+                        attempts: 0,
+                        lastAttemptAt: new Date(),
+                    })
+                    .where(eq(emailLogs.id, emailLogId));
+                this.logger.warn(`[SANDBOX] Email suppressed: ${options.subject} → ${toEmails.join(', ')}`);
+                return { success: true, emailLogId };
+            }
+
             // 9. Send email (async - fire and forget)
             // Use filtered CC emails (empty in non-prod)
             this.sendEmailAsync({
@@ -288,6 +309,23 @@ export class EmailService {
         referenceId: number;
         isNewThread: boolean;
     }): Promise<void> {
+        if (this.isSandbox) {
+            try {
+                await this.db
+                    .update(emailLogs)
+                    .set({
+                        status: 'failed',
+                        errorMessage: 'SANDBOX: suppressed (async)',
+                        attempts: 0,
+                        lastAttemptAt: new Date(),
+                    })
+                    .where(eq(emailLogs.id, params.emailLogId));
+            } catch (error) {
+                this.logger.error(`Failed to mark sandbox email log: ${error instanceof Error ? error.message : String(error)}`);
+            }
+            return;
+        }
+
         const { emailLogId, fromUserId, resolved, referenceType, referenceId, isNewThread } = params as { emailLogId: number; fromUserId: number; resolved: ResolvedEmail; referenceType: string; referenceId: number; isNewThread: boolean };
 
         try {

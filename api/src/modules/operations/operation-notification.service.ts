@@ -8,6 +8,7 @@ import { GROUPS } from '../../config/groups';
 import { openwaConfig } from '../../config/openwa.config';
 import type { ConfigType } from '@nestjs/config';
 import { WhatsappJidResolver } from '../notifications/helpers/whatsapp-jid.resolver';
+import { PublicLinkService } from '../public-notifications/public-link.service';
 
 export interface PaymentRequestNotificationData {
   requestNo: string;
@@ -109,6 +110,23 @@ export interface VwoUpdatedNotificationData {
   updatedBy: number;
 }
 
+export interface WoBasicDetailsCreatedData {
+  woBasicDetailId: number;
+  organizationName: string | null;
+  projectName: string | null;
+  projectCode: string | null;
+  woValuePreGst: string | null;
+  actorName?: string | null;
+  teamMemberName?: string | null;
+}
+
+export interface WoBasicDetailsUpdatedData extends WoBasicDetailsCreatedData {}
+
+export interface WoBasicDetailsRevisedData extends WoBasicDetailsCreatedData {
+  revisionNumber: number;
+  revisionNotes?: string | null;
+}
+
 @Injectable()
 export class OperationNotificationService {
   private readonly logger = new Logger(OperationNotificationService.name);
@@ -137,6 +155,7 @@ export class OperationNotificationService {
     @Inject(DRIZZLE) private readonly db: DbInstance,
     @Inject(openwaConfig.KEY) private readonly config: ConfigType<typeof openwaConfig>,
     private readonly jidResolver: WhatsappJidResolver,
+    private readonly publicLink: PublicLinkService,
   ) {}
 
   private resolveTargets(category: string): { type: 'group'; group: string } | { type: 'users'; userIds: number[] } | { type: 'accounts_group' } | null {
@@ -537,5 +556,87 @@ export class OperationNotificationService {
     } catch (err) {
       this.logger.warn(`Failed to send VWO updated notification: ${err}`);
     }
+  }
+
+  async notifyWoBasicDetailsCreated(data: WoBasicDetailsCreatedData): Promise<void> {
+    await this.sendWoBasicDetailsMessage({
+      data,
+      header: `Congrats!! We got new  Work Order (PO) From ${data.organizationName || 'N/A'}.`,
+      event: 'New Work Order (PO)',
+      actorLabel: 'Created by',
+    });
+  }
+
+  async notifyWoBasicDetailsUpdated(data: WoBasicDetailsUpdatedData): Promise<void> {
+    await this.sendWoBasicDetailsMessage({
+      data,
+      header: `Work Order (PO) has been updated from ${data.organizationName || 'N/A'}.`,
+      event: 'Work Order (PO) Updated',
+      actorLabel: 'Updated by',
+    });
+  }
+
+  async notifyWoBasicDetailsRevised(data: WoBasicDetailsRevisedData): Promise<void> {
+    const extraLines = [
+      `- Revision: ${data.revisionNumber}`,
+      `- Notes: ${data.revisionNotes || 'N/A'}`,
+    ];
+    await this.sendWoBasicDetailsMessage({
+      data,
+      header: `Work Order (PO) has been revised (Rev ${data.revisionNumber}) from ${data.organizationName || 'N/A'}.`,
+      event: 'Work Order (PO) Revised',
+      extraLines,
+      actorLabel: 'Revised by',
+    });
+  }
+
+  private async sendWoBasicDetailsMessage(options: {
+    data: WoBasicDetailsCreatedData;
+    header: string;
+    event: string;
+    actorLabel: string;
+    extraLines?: string[];
+  }): Promise<void> {
+    const { data, header, event, actorLabel, extraLines } = options;
+
+    let detailsUrl: string | undefined;
+    try {
+      detailsUrl = await this.publicLink.buildUrl({
+        type: 'wobd',
+        id: data.woBasicDetailId,
+        event,
+      });
+    } catch (linkError) {
+      this.logger.warn(
+        `Failed to build public WO basic details link for WO basic detail ${data.woBasicDetailId}: ${linkError instanceof Error ? linkError.message : String(linkError)}`,
+      );
+    }
+
+    const formattedValue =
+      data.woValuePreGst != null && data.woValuePreGst !== ''
+        ? `₹${Number(data.woValuePreGst).toLocaleString('en-IN')}`
+        : 'N/A';
+
+    const lines: string[] = [
+      header,
+      `- Project Name: ${data.projectName || 'N/A'}`,
+      `- Project Code: ${data.projectCode || 'N/A'}`,
+      `- Value (preGST): ${formattedValue}`,
+    ];
+    if (data.actorName) {
+      lines.push(`- ${actorLabel}: ${data.actorName}`);
+    }
+    if (data.teamMemberName) {
+      lines.push(`- TE Name: ${data.teamMemberName}`);
+    }
+    if (extraLines?.length) {
+      lines.push(...extraLines);
+    }
+    if (detailsUrl) {
+      lines.push(`View full details. ${detailsUrl}`);
+    }
+
+    const text = lines.join('\n');
+    await this.sendToTargets(text, { type: 'group', group: GROUPS.WORKORDER });
   }
 }

@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { getFollowUps, createFollowUp, updateFollowUp, updateFollowUpStatus, deleteFollowUp, getFollowUpDetail } from "./follow-up.api";
+import { getFollowUps, createFollowUp, updateFollowUp, updateFollowUpStatus, deleteFollowUp, getFollowUpDetail, getEmdMailPreview } from "./follow-up.api";
 
-import type { CreateFollowUpDto, UpdateFollowUpDto, UpdateFollowUpStatusDto, FollowUpQueryDto, FollowUpRow, FollowUpDetailsDto } from "./follow-up.types";
+import type { CreateFollowUpDto, UpdateFollowUpStatusDto, FollowUpQueryDto, FollowUpRow, FollowUpDetailsDto } from "./follow-up.types";
 import { toast } from "sonner";
 
 // =====================================
@@ -35,7 +35,7 @@ export const useFollowUp = (id: number) => {
 export const useEmdMailPreview = (emdId: number | null) => {
     return useQuery({
         queryKey: ["emdMailPreview", emdId],
-        queryFn: () => import("./follow-up.api").then(m => m.getEmdMailPreview(emdId!)),
+        queryFn: () => getEmdMailPreview(emdId!),
         enabled: !!emdId,
         staleTime: 1000 * 60 * 5, // 5 mins
     });

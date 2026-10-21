@@ -13,6 +13,7 @@ export type HappyCallingListFilters = {
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
     search?: string;
+    priority?: string;
 };
 
 @Injectable()
@@ -53,15 +54,17 @@ export class HappyCallingService {
                       ? happyCalling.email
                       : sortBy === 'phone'
                           ? happyCalling.phone
-                        : sortBy === 'status'
-                          ? happyCalling.status
-                          : sortBy === 'broadcast'
-                            ? happyCalling.broadcast
-                            : sortBy === 'nextFollowupDate'
-                              ? latestFollowupSubquery.nextFollowupDate
-                              : sortBy === 'lastFollowupDate'
-                                ? latestFollowupSubquery.lastFollowupDate
-                                : happyCalling.createdAt;
+: sortBy === 'status'
+                  ? happyCalling.status
+                  : sortBy === 'leadPriority'
+                    ? happyCalling.leadPriority
+                    : sortBy === 'broadcast'
+                        ? happyCalling.broadcast
+                        : sortBy === 'nextFollowupDate'
+                          ? latestFollowupSubquery.nextFollowupDate
+                          : sortBy === 'lastFollowupDate'
+                            ? latestFollowupSubquery.lastFollowupDate
+                            : happyCalling.createdAt;
         const orderFn = sortOrder === 'desc' ? desc : asc;
 
         const conditions: (SQL | undefined)[] = [];
@@ -75,6 +78,9 @@ export class HappyCallingService {
                     ilike(happyCalling.phone, `%${search}%`),
                 ),
             );
+        }
+        if (filters?.priority) {
+            conditions.push(eq(happyCalling.leadPriority, filters.priority));
         }
         const whereClause = conditions.length > 0 ? and(...conditions.filter(Boolean)) : undefined;
 
@@ -146,6 +152,7 @@ export class HappyCallingService {
                 email: data.email ?? null,
                 phone: data.phone ?? null,
                 status: data.status ?? null,
+                leadPriority: data.leadPriority ?? 'Cold',
                 broadcast: data.broadcast,
                 details: data.details ?? null,
                 createdBy: userId ?? null,
@@ -175,6 +182,7 @@ export class HappyCallingService {
         if (data.email !== undefined) updateValues.email = data.email;
         if (data.phone !== undefined) updateValues.phone = data.phone;
         if (data.status !== undefined) updateValues.status = data.status ?? null;
+        if (data.leadPriority !== undefined) updateValues.leadPriority = data.leadPriority ?? null;
         if (data.broadcast !== undefined) updateValues.broadcast = data.broadcast;
         if (data.details !== undefined) updateValues.details = data.details;
 

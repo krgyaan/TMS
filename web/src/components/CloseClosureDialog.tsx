@@ -21,14 +21,17 @@ interface CloseClosureDialogProps {
     /** PO / VWO number shown in the header */
     referenceNo: string;
     amountAfterTds: number;
+    grandTotal?: number;
     totalPaymentDone: number;
+    totalTdsDeducted?: number;
+    totalPaidAfterTds?: number;
     totalPiAmount: number;
 }
 
 /**
- * Confirmation dialog for closing a PO/VWO: shows the reconciliation summary
- * (including any sub-₹10 round-off difference) and collects the mandatory
- * closure note that gets stored alongside `closed_at` / `closed_by`.
+ * Confirmation dialog for closing a PO/VWO: shows the gross-vs-invoice-vs-net
+ * reconciliation (including any sub-₹10 round-off difference) and collects the
+ * mandatory closure note that gets stored alongside `closed_at` / `closed_by`.
  */
 export const CloseClosureDialog: React.FC<CloseClosureDialogProps> = ({
     open,
@@ -39,7 +42,10 @@ export const CloseClosureDialog: React.FC<CloseClosureDialogProps> = ({
     title,
     referenceNo,
     amountAfterTds,
+    grandTotal,
     totalPaymentDone,
+    totalTdsDeducted = 0,
+    totalPaidAfterTds,
     totalPiAmount,
 }) => {
     const [note, setNote] = useState("");
@@ -48,12 +54,15 @@ export const CloseClosureDialog: React.FC<CloseClosureDialogProps> = ({
         if (!open) setNote("");
     }, [open]);
 
-    const effective = round2(amountAfterTds);
+    const eff = round2(amountAfterTds);
+    const tds = round2(totalTdsDeducted);
+    const gross = round2(grandTotal ?? (eff + tds));
     const paid = round2(totalPaymentDone);
+    const net = round2(totalPaidAfterTds ?? (paid - tds));
     const invoiced = round2(totalPiAmount);
-    const remainingToPay = round2(effective - paid);
-    const remainingInvoice = round2(effective - invoiced);
-    const isWithinTolerance = (r: number) => r > 0 && r < CLOSURE_TOLERANCE;
+    const paymentsRemaining = round2(gross - paid);
+    const invoicesRemaining = round2(gross - invoiced);
+    const isWithinTolerance = (r: number) => Math.abs(r) > 0 && Math.abs(r) < CLOSURE_TOLERANCE;
 
     const trimmed = note.trim();
     const canConfirm = trimmed.length > 0 && !pending;
@@ -78,13 +87,9 @@ export const CloseClosureDialog: React.FC<CloseClosureDialogProps> = ({
 
                 <div className="space-y-4 py-2">
                     <div className="space-y-2 rounded-lg border p-3 text-sm">
-                        <div className="flex justify-between">
-                            <span className="text-muted-foreground">Amount after TDS</span>
-                            <span className="font-medium">{formatINR(effective)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="text-muted-foreground">Payment done</span>
-                            <span>{formatINR(paid)}</span>
+                        <div className="flex justify-between font-medium">
+                            <span className="text-muted-foreground">PO/VWO value (gross)</span>
+                            <span>{formatINR(gross)}</span>
                         </div>
                         <div className="flex justify-between">
                             <span className="text-muted-foreground">Invoice received</span>
@@ -92,22 +97,53 @@ export const CloseClosureDialog: React.FC<CloseClosureDialogProps> = ({
                         </div>
                         <Separator />
                         <div className="flex justify-between">
-                            <span className="text-muted-foreground">Remaining to pay</span>
-                            <span>{remainingToPay > 0 ? formatINR(remainingToPay) : "—"}</span>
+                            <span className="text-muted-foreground">Payment done (gross)</span>
+                            <span>{formatINR(paid)}</span>
                         </div>
+                        {tds > 0 && (
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">TDS deducted</span>
+                                <span>− {formatINR(tds)}</span>
+                            </div>
+                        )}
                         <div className="flex justify-between">
-                            <span className="text-muted-foreground">Remaining invoice</span>
-                            <span>{remainingInvoice > 0 ? formatINR(remainingInvoice) : "—"}</span>
+                            <span className="text-muted-foreground">Net paid (after TDS)</span>
+                            <span>{formatINR(net)}</span>
                         </div>
+                        <Separator />
+                        {paymentsRemaining > 0 && (
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Remaining to pay</span>
+                                <span>{formatINR(paymentsRemaining)}</span>
+                            </div>
+                        )}
+                        {paymentsRemaining < 0 && (
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Over-paid against value</span>
+                                <span>{formatINR(-paymentsRemaining)}</span>
+                            </div>
+                        )}
+                        {invoicesRemaining > 0 && (
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Remaining invoice</span>
+                                <span>{formatINR(invoicesRemaining)}</span>
+                            </div>
+                        )}
+                        {invoicesRemaining < 0 && (
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Over-invoiced against value</span>
+                                <span>{formatINR(-invoicesRemaining)}</span>
+                            </div>
+                        )}
                     </div>
 
-                    {(isWithinTolerance(remainingToPay) || isWithinTolerance(remainingInvoice)) && (
+                    {(isWithinTolerance(paymentsRemaining) || isWithinTolerance(invoicesRemaining)) && (
                         <p className="flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">
                             <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                             A small difference
-                            {isWithinTolerance(remainingToPay) && ` — ${formatINR(remainingToPay)} payable`}
-                            {isWithinTolerance(remainingToPay) && isWithinTolerance(remainingInvoice) && " and"}
-                            {isWithinTolerance(remainingInvoice) && ` — ${formatINR(remainingInvoice)} uninvoiced`}
+                            {isWithinTolerance(paymentsRemaining) && ` — ${formatINR(paymentsRemaining)} payable`}
+                            {isWithinTolerance(paymentsRemaining) && isWithinTolerance(invoicesRemaining) && " and"}
+                            {isWithinTolerance(invoicesRemaining) && ` — ${formatINR(invoicesRemaining)} uninvoiced`}
                             {" "}will be absorbed as round-off (within the ₹{CLOSURE_TOLERANCE} closure tolerance).
                         </p>
                     )}

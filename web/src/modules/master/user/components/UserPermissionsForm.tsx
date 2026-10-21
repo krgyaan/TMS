@@ -8,9 +8,10 @@ interface UserPermissionsFormProps {
     userId: number;
     allPermissions: Permission[];
     userPermissionsData?: UserPermission[];
+    rolePermissions?: Permission[];
 }
 
-export default function UserPermissionsForm({ userId, allPermissions, userPermissionsData }: UserPermissionsFormProps) {
+export default function UserPermissionsForm({ userId, allPermissions, userPermissionsData, rolePermissions }: UserPermissionsFormProps) {
     const assignPermissions = useAssignUserPermissions();
 
     const [selectedPermissions, setSelectedPermissions] = useState<Map<number, boolean>>(new Map());
@@ -28,11 +29,8 @@ export default function UserPermissionsForm({ userId, allPermissions, userPermis
     const handlePermissionChange = (permissionId: number, granted: boolean) => {
         setSelectedPermissions(prev => {
             const next = new Map(prev);
-            if (granted) {
-                next.set(permissionId, true);
-            } else {
-                next.delete(permissionId);
-            }
+            // Keep explicit denies (granted: false) so they survive the full-replace save.
+            next.set(permissionId, granted);
             return next;
         });
     };
@@ -74,6 +72,7 @@ export default function UserPermissionsForm({ userId, allPermissions, userPermis
                         } as UserPermission;
                     })
                     .filter((p): p is UserPermission => p !== null)}
+                rolePermissions={rolePermissions}
                 onChange={handlePermissionChange}
             />
             <div className="flex justify-end">

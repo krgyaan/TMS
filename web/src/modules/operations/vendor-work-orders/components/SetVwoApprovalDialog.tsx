@@ -58,25 +58,23 @@ export const SetVwoApprovalDialog: React.FC<SetVwoApprovalDialogProps> = ({ vwo,
     const isReject = action === "reject";
 
     const tdsPercentage = selectedRate ? parsePercentage(selectedRate) : 0;
-    const subtotal = Number(vwo.totalAmount) || 0;
+    const totalAmount = Number(vwo.totalAmount) || 0;
+    const extraChargesTaxable = Number(vwo.extraChargesTaxable) || 0;
+    const extraChargesGst = Number(vwo.extraChargesGst) || 0;
+    const itemSubtotal = totalAmount - extraChargesTaxable;
+    const itemGst = (Number(vwo.totalGstAmt) || 0) - extraChargesGst;
     const grandTotal = Number(vwo.grandTotal) || 0;
-    const tdsAmount = (subtotal * tdsPercentage) / 100;
+    const tdsAmount = (itemSubtotal * tdsPercentage) / 100;
     const amountAfterTds = grandTotal - tdsAmount;
 
     const { mutate: saveApproval, isPending } = useSetVwoApproval();
 
     const handleSave = () => {
         if (isReject) {
-            saveApproval(
-                { id: vwo.id, data: { approve: false, remark } },
-                { onSuccess: () => onClose() }
-            );
+            saveApproval({ id: vwo.id, data: { approve: false, remark } }, { onSuccess: () => onClose() });
         } else {
             if (!selectedRate) return;
-            saveApproval(
-                { id: vwo.id, data: { approve: true, tdsPercentage, remark } },
-                { onSuccess: () => onClose() }
-            );
+            saveApproval({ id: vwo.id, data: { approve: true, tdsPercentage, remark } }, { onSuccess: () => onClose() });
         }
     };
 
@@ -86,21 +84,15 @@ export const SetVwoApprovalDialog: React.FC<SetVwoApprovalDialogProps> = ({ vwo,
     const selectOptions = useMemo(() => TDS_RATES.map(r => ({ value: r.value, label: r.label })), []);
 
     return (
-        <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
+        <Dialog open={open} onOpenChange={open => !open && onClose()}>
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Approve / Reject VWO {vwo.woNumber}</DialogTitle>
-                    <DialogDescription>
-                        Select whether to approve TDS deduction or reject it with a remark.
-                    </DialogDescription>
+                    <DialogDescription>Select whether to approve TDS deduction or reject it with a remark.</DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
                     <div className="space-y-4 py-2">
-                        <RadioGroup
-                            value={action}
-                            onValueChange={(v) => setAction(v as "approve" | "reject")}
-                            className="flex gap-6"
-                        >
+                        <RadioGroup value={action} onValueChange={v => setAction(v as "approve" | "reject")} className="flex gap-6">
                             <div className="flex items-center gap-2">
                                 <RadioGroupItem value="approve" id="approve" />
                                 <Label htmlFor="approve">Approve</Label>
@@ -113,25 +105,27 @@ export const SetVwoApprovalDialog: React.FC<SetVwoApprovalDialogProps> = ({ vwo,
 
                         {!isReject && (
                             <>
-                                <SelectField
-                                    control={form.control}
-                                    name="tdsRate"
-                                    label="TDS Section"
-                                    options={selectOptions}
-                                    placeholder="Select TDS rate"
-                                />
+                                <SelectField control={form.control} name="tdsRate" label="TDS Section" options={selectOptions} placeholder="Select TDS rate" />
 
                                 <Separator />
 
                                 <div className="space-y-2 text-sm">
                                     <h4 className="font-medium text-base">Summary</h4>
                                     <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Total (Pre-GST)</span>
-                                        <span>{formatINR(vwo.totalAmount)}</span>
+                                        <span className="text-muted-foreground">Items Total (Pre-GST)</span>
+                                        <span>{formatINR(itemSubtotal)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Other Charges (Pre-GST)</span>
+                                        <span>{formatINR(extraChargesTaxable)}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">GST Amount</span>
-                                        <span>{formatINR(vwo.totalGstAmt)}</span>
+                                        <span>{formatINR(itemGst)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Other Charges GST</span>
+                                        <span>{formatINR(extraChargesGst)}</span>
                                     </div>
                                     <div className="flex justify-between font-medium">
                                         <span>Grand Total</span>
@@ -148,9 +142,7 @@ export const SetVwoApprovalDialog: React.FC<SetVwoApprovalDialogProps> = ({ vwo,
                                         <span>Amount After TDS</span>
                                         <span>{formatINR(amountAfterTds)}</span>
                                     </div>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        This amount will be the maximum limit for raising payment requests against this VWO.
-                                    </p>
+                                    <p className="text-xs text-muted-foreground mt-1">This amount will be the maximum limit for raising payment requests against this VWO.</p>
                                 </div>
                             </>
                         )}
@@ -160,7 +152,7 @@ export const SetVwoApprovalDialog: React.FC<SetVwoApprovalDialogProps> = ({ vwo,
                             <Textarea
                                 id="remark"
                                 value={remark}
-                                onChange={(e) => setRemark(e.target.value)}
+                                onChange={e => setRemark(e.target.value)}
                                 placeholder={isReject ? "Reason for rejection" : "Additional notes"}
                                 rows={3}
                                 className="mt-1"
@@ -169,7 +161,9 @@ export const SetVwoApprovalDialog: React.FC<SetVwoApprovalDialogProps> = ({ vwo,
                     </div>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={onClose}>Cancel</Button>
+                        <Button variant="outline" onClick={onClose}>
+                            Cancel
+                        </Button>
                         <Button onClick={handleSave} disabled={!canSave || isPending}>
                             {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                             {isReject ? "Reject & Save" : "Approve & Save"}

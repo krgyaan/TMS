@@ -23,6 +23,7 @@ export interface PaymentRequestRow {
     remark?: string;
     status: string;
     tdsPercentage?: number | string;
+    actualTdsDeducted?: number | string;
     requestedBy: string;
     requestedByName?: string;
     utrNumber?: string;

@@ -73,6 +73,7 @@ import { WebsitesModule } from "@/modules/master/websites/websites.module";
 import { WoBasicDetailsModule } from "@/modules/operations/wo-basic-details/wo-basic-details.module";
 import { SchedulerModule } from "@/modules/scheduler/scheduler.module";
 import { ClientDirectoryModule } from "@/modules/shared/client-directory/client-directory.module";
+import { PublicNotificationsModule } from "@/modules/public-notifications/public-notifications.module";
 import { FinanceDocumentsModule } from "@/modules/shared/finance-documents/finance-documents.module";
 import { PqrModule } from "@/modules/shared/pqr/pqr.module";
 import { ProjectsMasterModule as SharedProjectsMasterModule } from "@/modules/shared/projects-master/projects-master.module";
@@ -102,6 +103,7 @@ import { join } from "path";
 import { AllExceptionsFilter } from "./logger/all-exception.filter";
 import { AccountChecklistModule } from "./modules/accounts/account-checklist/account-checklist.module";
 import { LoanAdvanceModule } from "./modules/accounts/loan-advance/loan-advance.module";
+import { TdsGstChecklistsModule } from "./modules/accounts/tds-gst-checklists/tds-gst-checklists.module";
 import { EmployeeOnboardingModule } from "./modules/hrms/employee-onboarding/employee-onboarding.module";
 import { OnboardingModule } from "./modules/hrms/onboarding/onboarding.module";
 import { TrainingModule } from "./modules/hrms/training/training.module";
@@ -252,6 +254,7 @@ import { VendorMasterModule } from "./modules/master/vendor-master/vendor-master
         RequestExtensionsModule,
         SubmitQueriesModule,
         LoanAdvanceModule,
+        TdsGstChecklistsModule,
         CustomerPerformanceModule,
         LocationPerformanceModule,
         ContractAgreementModule,
@@ -282,6 +285,7 @@ import { VendorMasterModule } from "./modules/master/vendor-master/vendor-master
         ServiceFeedbackModule,
         OpenwaModule,
         NotificationsModule,
+        PublicNotificationsModule,
     ],
     controllers: [AppController, WebhookController],
     providers: [

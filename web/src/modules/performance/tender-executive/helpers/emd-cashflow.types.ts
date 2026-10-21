@@ -29,6 +29,11 @@ export interface OtherThanTmsEntry {
     action: number | null;
 }
 
+export interface EmdLifetimeTotals {
+    paid: EmdMetricBucket;
+    received: EmdMetricBucket;
+}
+
 export interface EmdCashFlowResponse {
     from: string;
     to: string;
@@ -38,4 +43,5 @@ export interface EmdCashFlowResponse {
     receivedForDuring: EmdMetricBucket;
     pendingAtEnd: EmdMetricBucket;
     otherThanTms: OtherThanTmsEntry[] | null;
+    lifetime: EmdLifetimeTotals;
 }

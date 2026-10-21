@@ -6,6 +6,17 @@ export const paths = {
         forgotPassword: "/forgot-password",
     },
 
+    // ==================== PUBLIC NOTIFICATIONS ====================
+    notify: {
+        route: "/notify/:token",
+        page: (token: string) => `/notify/${token}`,
+    },
+    // Short-link redirect page — resolves /n/<token> then jumps to /notify/<jwt>
+    notifyShort: {
+        route: "/n/:token",
+        page: (token: string) => `/n/${token}`,
+    },
+
     // ==================== INTEGRATIONS ====================
     integrations: {
         google: "/integrations/google",
@@ -331,6 +342,7 @@ export const paths = {
         users_create: "/master/users/create",
         users_edit: (id: number | string) => `/master/users/${id}/edit`,
         users_permissions: (id: number | string) => `/master/users/${id}/permissions`,
+        users_view: (id: number | string) => `/master/users/${id}`,
 
         statuses: "/master/statuses",
         statuses_create: "/master/statuses/create",
@@ -346,6 +358,7 @@ export const paths = {
 
         vendors: "/master/vendors",
         vendors_create: "/master/vendors/create",
+        vendors_merge: "/master/vendors/merge",
         vendors_edit: (id: number | string) => `/master/vendors/${id}/edit`,
         vendors_view: (id: number | string) => `/master/vendors/${id}`,
 
@@ -463,6 +476,8 @@ export const paths = {
         projectsEdit: (id: number | string) => `/document-dashboard/projects/${id}/edit`,
         projectsView: (id: number | string) => `/document-dashboard/projects/${id}`,
         clientDirectory: "/document-dashboard/client-directory",
+        vendors: "/document-dashboard/vendors",
+        vendorsView: (id: number | string) => `/document-dashboard/vendors/${id}`,
     },
 
     // ==================== HRMS ====================

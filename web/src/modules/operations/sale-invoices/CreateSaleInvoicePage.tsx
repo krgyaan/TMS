@@ -202,7 +202,6 @@ export default function CreateSaleInvoicePage() {
         form.setValue("billingCustomerName", party.name || "");
         form.setValue("billingAddress", party.address || "");
         form.setValue("billingGst", party.gstNo || "");
-        form.setValue("billingEmail", party.email || "");
         form.setValue("billingPanNo", party.pan || "");
         form.setValue("billingMsmeNo", party.msme || "");
     }, [selectedSellerId, sellerRows, form]);
@@ -232,8 +231,8 @@ export default function CreateSaleInvoicePage() {
             return;
         }
         try {
-            await createPartyMutation.mutateAsync({
-                name: partyData.name,
+            const created = await createPartyMutation.mutateAsync({
+                name: partyData.name.trim(),
                 alias: partyData.alias || undefined,
                 email: partyData.email || undefined,
                 address: partyData.address || undefined,
@@ -244,6 +243,11 @@ export default function CreateSaleInvoicePage() {
                 contact_person: partyData.contact_person || undefined,
                 mobile_number: partyData.mobile_number || undefined,
             });
+            // Select the just-created (or de-duplicated) party so the user does
+            // not add the same seller again from the picker.
+            if (created?.id != null) {
+                form.setValue(partyCreationType === "seller" ? "sellerId" : "partyId", String(created.id));
+            }
             toast.success(`Party "${partyData.name}" has been added successfully.`);
             setIsAddPartyOpen(false);
             setIsShipToPartyOpen(false);

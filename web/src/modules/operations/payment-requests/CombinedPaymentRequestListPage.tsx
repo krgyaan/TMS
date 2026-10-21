@@ -21,7 +21,7 @@ import { formatINR } from "@/hooks/useINRFormatter";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { useTeamFilter } from "@/hooks/useTeamFilter";
 import { referenceName } from "@/lib/id-utils";
-import { PaymentRequestViewModal } from "@/modules/operations/payment-requests/components/PaymentRequestViewModal";
+import { PaymentRequestDetailDialog } from "@/modules/operations/payment-requests/components/PaymentRequestDetailDialog";
 import type { PaymentRequestRow } from "@/modules/operations/payment-requests/helpers/paymentRequest.types";
 import { calculateTds } from "@/modules/operations/payment-requests/helpers/tds-calculator";
 import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
@@ -297,6 +297,9 @@ const CombinedPaymentRequestListPage: React.FC = () => {
             sortable: false,
             valueGetter: (p) => {
                 const amount = Number(p.data?.amount || 0);
+                if (p.data?.status === "payment_done") {
+                    return amount - Number(p.data?.actualTdsDeducted ?? 0);
+                }
                 const tdsPct = Number(p.data?.tdsPercentage || 0);
                 return tdsPct > 0 ? calculateTds(amount, tdsPct).netPayable : amount;
             },
@@ -402,7 +405,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                 </CardContent>
             </Card>
             {/* View Modal */}
-            <PaymentRequestViewModal
+            <PaymentRequestDetailDialog
                 viewingId={viewingId}
                 onClose={() => setViewingId(null)}
             />

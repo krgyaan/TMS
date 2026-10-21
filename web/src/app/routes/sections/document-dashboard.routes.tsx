@@ -16,6 +16,8 @@ const DocumentDashboard_Projects_Create = lazy(() => import('@/modules/shared/ma
 const DocumentDashboard_Projects_Edit = lazy(() => import('@/modules/shared/master-project/ProjectsEditPage'));
 const DocumentDashboard_Projects_Show = lazy(() => import('@/modules/shared/master-project/ProjectsShowPage'));
 const DocumentDashboard_ClientDirectory = lazy(() => import('@/modules/shared/client-directory/ClientDirectoryListPage'));
+const DocumentDashboard_VendorDirectory = lazy(() => import('@/modules/shared/vendor-directory/VendorDirectoryListPage'));
+const DocumentDashboard_VendorDirectory_Show = lazy(() => import('@/modules/shared/vendor-directory/VendorDirectoryShowPage'));
 
 export default function DocumentDashboardRoutes() {
     return (
@@ -33,6 +35,8 @@ export default function DocumentDashboardRoutes() {
             <Route path="projects/:id/edit" element={<RouteWrapper><DocumentDashboard_Projects_Edit /></RouteWrapper>} />
             <Route path="projects/:id" element={<RouteWrapper><DocumentDashboard_Projects_Show /></RouteWrapper>} />
             <Route path="client-directory" element={<RouteWrapper><DocumentDashboard_ClientDirectory /></RouteWrapper>} />
+            <Route path="vendors" element={<RouteWrapper><DocumentDashboard_VendorDirectory /></RouteWrapper>} />
+            <Route path="vendors/:id" element={<RouteWrapper><DocumentDashboard_VendorDirectory_Show /></RouteWrapper>} />
         </Routes>
     );
 }

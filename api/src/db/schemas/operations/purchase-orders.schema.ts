@@ -1,4 +1,5 @@
 import { pgTable, bigserial, bigint, varchar, text, date, timestamp, jsonb, index, numeric, boolean } from "drizzle-orm/pg-core";
+import { vendorOrganizations } from "@/db/schemas/vendors/vendor-organizations.schema";
 
 export const purchaseOrders = pgTable(
     "purchase_orders",
@@ -17,7 +18,7 @@ export const purchaseOrders = pgTable(
         vendorContactPersonName: varchar("vendor_contact_person_name", { length: 255 }),
         vendorContactPersonPhone: varchar("vendor_contact_person_phone", { length: 20 }),
         vendorContactPersonEmail: varchar("vendor_contact_person_email", { length: 255 }),
-        sellerOrganizationId: bigint("seller_organization_id", { mode: "number" }),
+        sellerOrganizationId: bigint("seller_organization_id", { mode: "number" }).references(() => vendorOrganizations.id),
         sellerName: varchar("seller_name", { length: 255 }),
         sellerAddress: text("seller_address"),
         sellerEmail: varchar("seller_email", { length: 255 }),
@@ -59,6 +60,7 @@ export const purchaseOrders = pgTable(
         index("idx_po_tender_id").on(table.tenderId),
         index("idx_po_date").on(table.poDate),
         index("idx_po_seller_name").on(table.sellerName),
+        index("idx_po_seller_organization_id").on(table.sellerOrganizationId),
     ]
 );
 

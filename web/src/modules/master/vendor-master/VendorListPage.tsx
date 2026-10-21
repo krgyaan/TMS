@@ -8,18 +8,23 @@ import DataTable from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCurrentUser } from "@/hooks/api/useAuth";
 import { useSetVendorOrganizationStatus, useVendorOrganizationsPaginated } from "@/hooks/api/useVendorOrganizations";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import type { VendorOrganizationListItem } from "@/types/api.types";
 import type { ColDef } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
-import { AlertCircle, Eye, FileText, Pencil, Plus, Power, PowerOff, Search } from "lucide-react";
+import { AlertCircle, Combine, Eye, FileText, Pencil, Plus, Power, PowerOff, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { vendorAreaBase } from "./vendorAreaPath";
 import { MsmeBadge } from "./helpers/MsmeBadge";
+import { paths } from "@/app/routes/paths";
 
 const PERMISSION_MODULE = "master.vendors";
+
+// Mirrors MERGE_ALLOWED_USER_IDS in api/src/modules/master/vendor-master/merge-vendors.guard.ts
+const MERGE_ALLOWED_USER_IDS: readonly number[] = [13];
 
 type VendorRow = VendorOrganizationListItem & {
     gstCount: number;
@@ -42,6 +47,8 @@ const VendorsPage = () => {
     const basePath = vendorAreaBase(location.pathname);
     const setVendorStatus = useSetVendorOrganizationStatus();
     const { canCreate, canUpdate } = useAuth();
+    const { data: currentUser } = useCurrentUser();
+    const canMerge = !!currentUser && MERGE_ALLOWED_USER_IDS.includes(currentUser.id);
 
     const {
         search,
@@ -228,6 +235,15 @@ const VendorsPage = () => {
                                 className="pl-8"
                             />
                         </div>
+
+                        {canMerge && (
+                            <Button variant="outline" asChild>
+                                <Link to={paths.master.vendors_merge}>
+                                    <Combine className="h-4 w-4 mr-2" />
+                                    Merge Vendors
+                                </Link>
+                            </Button>
+                        )}
 
                         {canCreate(PERMISSION_MODULE) && (
                             <Button variant="default" asChild>

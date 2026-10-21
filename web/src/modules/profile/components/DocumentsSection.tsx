@@ -1,54 +1,20 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { FileUploader } from "@/components/file-upload";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  FileText,
-  FileCheck,
-  FileClock,
-  FileX,
-  Upload,
-  Eye,
-  Download,
-  CheckCircle2,
-  AlertCircle,
-  Shield,
-  Lock,
-  GraduationCap,
-  Briefcase,
-  FolderOpen,
-  ImageIcon,
-  File,
-  FileArchive,
-  Trash2,
-  RotateCcw,
-  Info,
-  Search,
-  Plus,
-  CloudUpload,
-} from "lucide-react";
+import api from "@/lib/axios";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { FileUploader } from "@/components/file-upload";
-import api from "@/lib/axios";
+import { 
+  AlertCircle, Briefcase, CheckCircle2, CloudUpload, Download, Eye, File, FileArchive, FileCheck, FileClock, 
+  FileText, FileX, FolderOpen, GraduationCap, ImageIcon, Info, Lock, RotateCcw, Search, Shield, Trash2, Upload, UploadCloud
+} from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
 import { useProfileContext } from "../contexts/ProfileContext";
-import { useOnboardingContext } from "./onboarding/contexts/OnboardingContext";
-import type { ProfileResponse, DocumentData } from "../types";
+import type { DocumentData, ProfileResponse } from "../types";
 import { formatDate } from "../utils";
+import { useOnboardingContext } from "./onboarding/contexts/OnboardingContext";
 
 const getStatusConfig = (status: string) => {
   switch (status) {
@@ -56,30 +22,28 @@ const getStatusConfig = (status: string) => {
       return {
         label: "Approved",
         icon: FileCheck,
-        className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+        className: "text-emerald-600",
       };
     case "pending":
       return {
         label: "Pending",
         icon: FileClock,
-        className: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+        className: "text-amber-600",
       };
     case "rejected":
       return {
         label: "Rejected",
         icon: FileX,
-        className: "bg-destructive/10 text-destructive border-destructive/20",
+        className: "text-destructive",
       };
     default:
       return {
         label: status,
         icon: Info,
-        className: "bg-muted text-muted-foreground border-border",
+        className: "text-muted-foreground",
       };
   }
 };
-
-// ─── TYPES ────────────────────────────────────────────────────────────────────
 
 interface DocumentType {
   id: string;
@@ -92,21 +56,14 @@ interface UploadedDocument extends DocumentData {
   fileSize?: string;
 }
 
-// ─── REQUIRED DOCUMENT DEFINITIONS ───────────────────────────────────────────
-
 const AVAILABLE_DOCUMENTS: DocumentType[] = [
   // Identity Documents
   { id: "aadhar", docType: "Aadhar Card", docCategory: "Identity Documents", uploaded: false },
   { id: "pan", docType: "PAN Card", docCategory: "Identity Documents", uploaded: false },
-  { id: "passport", docType: "Passport", docCategory: "Identity Documents", uploaded: false },
-  { id: "driving-license", docType: "Driving License", docCategory: "Identity Documents", uploaded: false },
-  { id: "voter-id", docType: "Voter ID", docCategory: "Identity Documents", uploaded: false },
   // Educational Documents
   { id: "10th-cert", docType: "10th Certificate", docCategory: "Educational Documents", uploaded: false },
   { id: "12th-cert", docType: "12th Certificate", docCategory: "Educational Documents", uploaded: false },
   { id: "graduation-cert", docType: "Graduation Certificate", docCategory: "Educational Documents", uploaded: false },
-  { id: "pg-cert", docType: "Post Graduation Certificate", docCategory: "Educational Documents", uploaded: false },
-  { id: "prof-cert", docType: "Professional Certifications", docCategory: "Educational Documents", uploaded: false },
   // Employment Documents
   // { id: "offer-letter", docType: "Offer Letter", docCategory: "Employment Documents", uploaded: false },
   // { id: "appointment-letter", docType: "Appointment Letter", docCategory: "Employment Documents", uploaded: false },
@@ -128,8 +85,6 @@ const CATEGORY_CONFIG: Record<string, { icon: React.ElementType; color: string; 
   "Other Documents": { icon: FolderOpen, color: "text-emerald-600", bg: "bg-emerald-500/10", borderColor: "border-emerald-500/20" },
 };
 
-// ─── FILE ICON HELPER ────────────────────────────────────────────────────────
-
 function getFileIcon(fileName?: string) {
   if (!fileName) return File;
   const ext = fileName.split(".").pop()?.toLowerCase();
@@ -137,8 +92,6 @@ function getFileIcon(fileName?: string) {
   if (["zip", "rar", "7z", "tar"].includes(ext || "")) return FileArchive;
   return FileText;
 }
-
-// ─── UPLOAD DIALOG ──────────────────────────────────────────────────────────
 
 interface UploadDialogProps {
   open: boolean;
@@ -353,8 +306,8 @@ const PendingUploadCard: React.FC<PendingUploadCardProps> = ({ doc, onUpload, ca
         )}
         onClick={() => canUpload && onUpload(doc)}
       >
-        <CardContent className="p-5">
-          <div className="flex items-start justify-between mb-4">
+        <CardContent className="flex items-start justify-between gap-4">
+          <div className="flex items-start justify-start gap-4 mb-4">
             <div
               className={cn(
                 "h-12 w-12 rounded-2xl flex items-center justify-center transition-all duration-300",
@@ -364,30 +317,23 @@ const PendingUploadCard: React.FC<PendingUploadCardProps> = ({ doc, onUpload, ca
             >
               <CatIcon className={cn("h-6 w-6", catConfig.color)} />
             </div>
-          </div>
-
-          <h4 className="font-bold text-sm mb-1 group-hover:text-primary transition-colors">
-            {doc.docType}
-          </h4>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
-            {doc.docCategory}
-          </p>
-
-          {canUpload && (
-            <div className="mt-5 pt-4 border-t border-dashed border-border/30">
-              <Button
-                size="sm"
-                variant="outline"
-                className={cn(
-                  "w-full rounded-xl h-9 text-xs font-bold gap-2 transition-all duration-300",
-                  "group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary group-hover:shadow-lg group-hover:shadow-primary/20"
-                )}
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Upload Document
-              </Button>
+            <div>
+              <h4 className="font-bold text-sm mb-1 group-hover:text-primary transition-colors">
+                {doc.docType}
+              </h4>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+                {doc.docCategory}
+              </p>
             </div>
-          )}
+          </div>
+          <div>
+            {canUpload && (
+              <Button size="sm" variant="outline">
+                <UploadCloud className="h-3.5 w-3.5" />
+                Upload
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>
@@ -405,130 +351,92 @@ interface UploadedDocCardProps {
 
 const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, onView, onReupload, onDelete }) => {
   const status = getStatusConfig(doc.verificationStatus);
-  const StatusIcon = status.icon;
   const FileIcon = getFileIcon(doc.fileName ?? undefined);
   const canModify = doc.verificationStatus !== "approved";
 
   return (
-    <div>
-      <Card className="border-border/40 shadow-lg shadow-black/[0.03] hover:shadow-xl hover:shadow-primary/[0.06] hover:border-primary/15 hover:bg-muted/30 transition-all duration-400 group bg-muted/20 backdrop-blur-sm overflow-hidden">
-        <CardContent className="p-5">
-          <div className="flex items-start justify-between mb-4">
-            <div
-              className={cn(
-                "h-12 w-12 rounded-2xl flex items-center justify-center transition-all duration-300",
-                "bg-primary/5 text-primary/60",
-                "group-hover:bg-primary group-hover:text-primary-foreground group-hover:shadow-lg group-hover:shadow-primary/20"
+    <Card className="border-border/40 hover:border-primary/15 hover:bg-muted/30 transition-all duration-400 group bg-muted/20">
+      <CardContent>
+        <div className="flex items-start justify-start gap-4">
+          <div
+            className={cn(
+              "h-12 w-12 rounded-2xl flex items-center justify-center transition-all duration-300",
+              "bg-primary/5 text-primary/60",
+              "group-hover:bg-primary group-hover:text-primary-foreground group-hover:shadow-lg group-hover:shadow-primary/20"
+            )}
+          >
+            <FileIcon className="h-6 w-6" />
+          </div>
+          <div>
+            <h4 className="font-bold text-sm mb-1 group-hover:text-primary transition-colors">
+              {doc.docType}
+            </h4>
+            <div className="flex items-center gap-2 text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+              <span>{doc.docCategory}</span>
+              {doc.docNumber && (
+                <>
+                  <span className="text-primary/20">•</span>
+                  <span className="font-mono normal-case">{doc.docNumber}</span>
+                </>
               )}
-            >
-              <FileIcon className="h-6 w-6" />
             </div>
-            <Badge variant="outline" className={cn("text-[10px] h-6 font-bold rounded-lg", status.className)}>
-              <StatusIcon className="h-3 w-3 mr-1" />
-              {status.label}
-            </Badge>
-          </div>
-
-          <h4 className="font-bold text-sm mb-1 group-hover:text-primary transition-colors">
-            {doc.docType}
-          </h4>
-          <div className="flex items-center gap-2 text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
-            <span>{doc.docCategory}</span>
-            {doc.docNumber && (
-              <>
-                <span className="text-primary/20">•</span>
-                <span className="font-mono normal-case">{doc.docNumber}</span>
-              </>
+            {doc.uploadedAt && (
+              <p className="text-[10px] text-muted-foreground/40 mt-1">
+                Uploaded {formatDate(doc.uploadedAt)}
+              </p>
             )}
+
+            <p className={cn("text-sm", status.className)}>
+              {status.label} {" "}
+              {doc.remarks && doc.verificationStatus === "rejected" && (
+                <span className="text-destructive/80 leading-relaxed">{doc.remarks}</span>
+              )}
+            </p>
           </div>
-
-          {doc.issueDate && (
-            <p className="text-[10px] text-muted-foreground/60 mt-2">
-              Issued {formatDate(doc.issueDate)}
-              {doc.expiryDate && <> • Expires {formatDate(doc.expiryDate)}</>}
-            </p>
-          )}
-
-          {doc.uploadedAt && (
-            <p className="text-[10px] text-muted-foreground/40 mt-1">
-              Uploaded {formatDate(doc.uploadedAt)}
-            </p>
-          )}
-
-          {doc.remarks && doc.verificationStatus === "rejected" && (
-            <div className="mt-3 p-2.5 rounded-xl bg-destructive/5 border border-destructive/10">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="h-3 w-3 text-destructive mt-0.5 shrink-0" />
-                <p className="text-[10px] text-destructive/80 leading-relaxed">{doc.remarks}</p>
-              </div>
-            </div>
-          )}
-
-          <div className="flex items-center gap-2 mt-5 pt-4 border-t border-border/30">
+        </div>
+        <div className="flex items-end gap-5 mt-4">
+          <Button
+            variant="secondary"
+            className="shrink-0 rounded-xl h-9 w-9"
+            onClick={() => downloadDocument(doc)}
+            disabled={!doc.fileUrl}
+          >
+            <Download className="h-3 w-3" />
+          </Button>
+          <Button
+            variant="destructive"
+            size="icon"
+            className="shrink-0 rounded-xl h-9 w-9 hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => onDelete(doc)}
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="shrink-0 rounded-xl h-9 w-9"
+            onClick={() => onView(doc)}
+          >
+            <Eye className="h-3 w-3" />
+          </Button>
+          {canModify && (
             <Button
-              variant="secondary"
               size="sm"
-              className="flex-1 rounded-xl h-9 text-xs font-bold"
-              onClick={() => onView(doc)}
+              className="rounded-xl h-9 text-xs font-bold gap-1"
+              onClick={() => onReupload(doc)}
             >
-              <Eye className="h-3.5 w-3.5 mr-2" /> View
+              <Upload className="h-3 w-3" />
+              Re-upload
             </Button>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="shrink-0 rounded-xl h-9 w-9"
-                    onClick={() => downloadDocument(doc)}
-                    disabled={!doc.fileUrl}
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="text-xs">Download</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            {canModify && (
-              <>
-                <Button
-                  size="sm"
-                  className="rounded-xl h-9 text-xs font-bold gap-1.5 shadow-md shadow-primary/20"
-                  onClick={() => onReupload(doc)}
-                >
-                  <Upload className="h-3 w-3" />
-                  Re-upload
-                </Button>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="shrink-0 rounded-xl h-9 w-9 hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() => onDelete(doc)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="text-xs">Delete</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </>
-            )}
-            {!canModify && (
-              <div className="h-9 w-9 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 bg-emerald-100/40 dark:bg-emerald-950/20 shrink-0" title="Approved by HR">
-                <Lock className="h-3.5 w-3.5" />
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+          )}
+          {!canModify && (
+            <div className="h-9 w-9 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 bg-emerald-100/40 dark:bg-emerald-950/20 shrink-0" title="Approved by HR">
+              <Lock className="h-3.5 w-3.5" />
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
@@ -671,7 +579,7 @@ export const DocumentsSection: React.FC = () => {
                 )}
               >
                 <CloudUpload className="h-3.5 w-3.5" />
-                 Available to upload ({pendingDocuments.length})
+                Available to upload ({pendingDocuments.length})
               </Button>
             </div>
 
@@ -720,71 +628,71 @@ export const DocumentsSection: React.FC = () => {
         {/* ── Document Grid ──────────────────────────────────────────── */}
         <div>
           {activeView === "uploaded" ? (
-              <div>
-                {filteredUploaded.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredUploaded.map((doc) => (
-                      <UploadedDocCard
-                        key={doc.id}
-                        doc={doc}
-                        onView={handleView}
-                        onReupload={handleReupload}
-                        onDelete={handleDelete}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <Card className="border-dashed border-2 border-border/30 bg-muted/10">
-                    <CardContent className="p-12 text-center">
-                      <div className="h-16 w-16 rounded-2xl bg-muted/30 flex items-center justify-center mx-auto mb-4">
-                        <FileText className="h-8 w-8 text-muted-foreground/30" />
-                      </div>
-                      <h3 className="text-sm font-bold mb-1">No documents found</h3>
-                      <p className="text-xs text-muted-foreground mb-4">
-                        {searchQuery
-                          ? "Try adjusting your search or filter"
-                          : "You haven't uploaded any documents yet"}
-                      </p>
-                      <Button
-                        size="sm"
-                        className="rounded-xl font-semibold gap-2"
-                        onClick={() => setActiveView("pending")}
-                      >
-                        <CloudUpload className="h-4 w-4" />
-                        Upload Documents
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
+            <div>
+              {filteredUploaded.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredUploaded.map((doc) => (
+                    <UploadedDocCard
+                      key={doc.id}
+                      doc={doc}
+                      onView={handleView}
+                      onReupload={handleReupload}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <Card className="border-dashed border-2 border-border/30 bg-muted/10">
+                  <CardContent className="p-12 text-center">
+                    <div className="h-16 w-16 rounded-2xl bg-muted/30 flex items-center justify-center mx-auto mb-4">
+                      <FileText className="h-8 w-8 text-muted-foreground/30" />
+                    </div>
+                    <h3 className="text-sm font-bold mb-1">No documents found</h3>
+                    <p className="text-xs text-muted-foreground mb-4">
+                      {searchQuery
+                        ? "Try adjusting your search or filter"
+                        : "You haven't uploaded any documents yet"}
+                    </p>
+                    <Button
+                      size="sm"
+                      className="rounded-xl font-semibold gap-2"
+                      onClick={() => setActiveView("pending")}
+                    >
+                      <CloudUpload className="h-4 w-4" />
+                      Upload Documents
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           ) : (
-              <div>
-                {filteredPending.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredPending.map((doc) => (
-                      <PendingUploadCard
-                        key={doc.id}
-                        doc={doc}
-                        onUpload={handleUploadClick}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <Card className="bg-emerald-500/5 border-emerald-500/15">
-                    <CardContent className="p-12 text-center">
-                      <div className="h-16 w-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
-                        <CheckCircle2 className="h-8 w-8 text-emerald-500" />
-                      </div>
-                       <h3 className="text-sm font-bold mb-1 text-emerald-700">No more upload options</h3>
-                       <p className="text-xs text-emerald-600/70">
-                         {searchQuery || activeCategory !== "all"
-                           ? "No upload options match your filter"
-                           : "You have uploaded all available document types"}
-                       </p>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
+            <div>
+              {filteredPending.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredPending.map((doc) => (
+                    <PendingUploadCard
+                      key={doc.id}
+                      doc={doc}
+                      onUpload={handleUploadClick}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <Card className="bg-emerald-500/5 border-emerald-500/15">
+                  <CardContent className="p-12 text-center">
+                    <div className="h-16 w-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
+                      <CheckCircle2 className="h-8 w-8 text-emerald-500" />
+                    </div>
+                    <h3 className="text-sm font-bold mb-1 text-emerald-700">No more upload options</h3>
+                    <p className="text-xs text-emerald-600/70">
+                      {searchQuery || activeCategory !== "all"
+                        ? "No upload options match your filter"
+                        : "You have uploaded all available document types"}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           )}
         </div>
       </div>

@@ -701,6 +701,7 @@ export class DemandDraftService {
                 ddRemarks: instrumentDdDetails.ddRemarks,
                 tenderStatusName: statuses.name,
                 requestedByName: users.name,
+                requestCreatedAt: paymentRequests.createdAt,
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
@@ -791,6 +792,7 @@ export class DemandDraftService {
             ddDate: result.ddDate ? new Date(result.ddDate) : null,
             tenderStatusName: result.tenderStatusName,
             requestedByName: result.requestedByName || null,
+            requestCreatedAt: result.requestCreatedAt ? result.requestCreatedAt.toISOString() : null,
             reqNo: result.reqNo,
             ddNeeds: result.ddNeeds,
             ddPurpose: result.ddPurpose,

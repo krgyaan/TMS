@@ -1,6 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import type { ConfigType } from '@nestjs/config';
 import { OpenwaService } from '../../openwa/openwa.service';
-import { GROUPS } from '../../config/groups';
+import { GROUPS, TEAM_TENDER_GROUPS } from '../../config/groups';
+import { openwaConfig } from '../../config/openwa.config';
+import { WhatsappJidResolver } from '../notifications/helpers/whatsapp-jid.resolver';
+import { PublicLinkService } from '../public-notifications/public-link.service';
 
 export interface TenderInfo {
   id: string;
@@ -9,9 +13,100 @@ export interface TenderInfo {
   description?: string;
 }
 
+export interface TenderAllocatedData {
+  teamId: number;
+  teamMemberId: number;
+  teName: string;
+  tenderName: string | null;
+  tenderNo: string | null;
+  dueDate: string;
+  tenderValue: string;
+  tenderId: number;
+}
+
 @Injectable()
 export class TenderNotificationService {
-  constructor(private readonly openwa: OpenwaService) {}
+  private readonly logger = new Logger(TenderNotificationService.name);
+
+  constructor(
+    private readonly openwa: OpenwaService,
+    private readonly jidResolver: WhatsappJidResolver,
+    @Inject(openwaConfig.KEY) private readonly config: ConfigType<typeof openwaConfig>,
+    private readonly publicLink: PublicLinkService,
+  ) {}
+
+  /**
+   * Notify the allocated team's WhatsApp group when a tender is assigned to a
+   * Tender Executive. Only teams mapped in TEAM_TENDER_GROUPS are notified.
+   */
+  async notifyTenderAllocated(data: TenderAllocatedData): Promise<void> {
+    const group = TEAM_TENDER_GROUPS[data.teamId];
+    if (!group) {
+      this.logger.debug(`No WhatsApp group mapped for team ${data.teamId} — skipping tender allocation notification`);
+      return;
+    }
+
+    let detailsUrl: string | undefined;
+    try {
+      detailsUrl = await this.publicLink.buildUrl({ type: "tender", id: data.tenderId, event: "Tender Allocated" });
+    } catch (linkError) {
+      this.logger.warn(`Failed to build public tender link for tender ${data.tenderId}: ${linkError instanceof Error ? linkError.message : String(linkError)}`);
+    }
+
+    const groupText = this.formatAllocationMessage(data, detailsUrl);
+    const dmText = this.formatAllocationDirectMessage(data, detailsUrl);
+
+    if (this.config.OPENWA_DRY_RUN) {
+      this.logger.log(`[DRY_RUN] Tender allocation WhatsApp notification:\n${groupText}`);
+      return;
+    }
+
+    try {
+      const jid = await this.jidResolver.toJid(data.teamMemberId);
+      await this.openwa.sendText(group, groupText, jid ? [jid] : undefined);
+      if (jid) {
+        try {
+          await this.openwa.sendText(jid, dmText);
+        } catch (dmError) {
+          this.logger.error(`Failed to send tender allocation direct message to user ${data.teamMemberId}: ${dmError instanceof Error ? dmError.message : String(dmError)}`);
+        }
+      } else {
+        this.logger.warn(`User ${data.teamMemberId} has no mobile number — skipping direct WhatsApp message`);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to send tender allocation WhatsApp notification for tender ${data.tenderNo}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private formatAllocationDirectMessage(data: TenderAllocatedData, detailsUrl?: string): string {
+    const lines = [
+      `Dear ${data.teName},`,
+      'Congratulations! A new tender has been assigned to you.',
+      `- Tender Name: ${data.tenderName || 'Not specified'}`,
+      `- Tender No: ${data.tenderNo || 'Not specified'}`,
+      `- Due on: ${data.dueDate}`,
+      `- Tender Value: ${data.tenderValue}`,
+    ];
+    if (detailsUrl) {
+      lines.push(`Details: ${detailsUrl}`);
+    }
+    return lines.join('\n');
+  }
+
+  private formatAllocationMessage(data: TenderAllocatedData, detailsUrl?: string): string {
+    const lines = [
+      `Dear @${data.teName},`,
+      'Congratulations! A new tender has been assigned to you.',
+      `- Tender Name: ${data.tenderName || 'Not specified'}`,
+      `- Tender No: ${data.tenderNo || 'Not specified'}`,
+      `- Due on: ${data.dueDate}`,
+      `- Tender Value: ${data.tenderValue}`,
+    ];
+    if (detailsUrl) {
+      lines.push(`Details: ${detailsUrl}`);
+    }
+    return lines.join('\n');
+  }
 
   /** Notify Tendering group about a new tender */
   async notifyNewTender(tender: TenderInfo): Promise<void> {

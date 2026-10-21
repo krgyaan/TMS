@@ -24,14 +24,6 @@ class PurchaseInvoiceApiService extends BaseApiService {
     async update(id: number, data: any) {
         return this.put<any>(`/${id}`, data);
     }
-
-    async getNextNumber(projectName?: string, type?: "po" | "vwo") {
-        const params = new URLSearchParams();
-        if (projectName) params.set("projectName", projectName);
-        if (type) params.set("type", type);
-        const qs = params.toString();
-        return this.get<string>(`/next-number${qs ? `?${qs}` : ""}`);
-    }
 }
 
 export const purchaseInvoiceApi = new PurchaseInvoiceApiService();

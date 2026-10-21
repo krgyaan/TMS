@@ -22,6 +22,8 @@ import type {
     VendorFile,
     CreateVendorFileDto,
     UpdateVendorFileDto,
+    VendorMergePreview,
+    VendorMergeResult,
 } from "@/types/api.types";
 
 class VendorsApiService extends BaseApiService {
@@ -175,6 +177,14 @@ class VendorsApiService extends BaseApiService {
 
     async deleteVendorFile(id: number): Promise<void> {
         return this.delete<void>(`/vendor-files/${id}`);
+    }
+
+    async getMergePreview(keepId: number, dropId: number): Promise<VendorMergePreview> {
+        return this.get<VendorMergePreview>(`/vendor-organizations/merge-preview?keepId=${keepId}&dropId=${dropId}`);
+    }
+
+    async mergeVendors(data: { keepId: number; dropId: number }): Promise<VendorMergeResult> {
+        return this.post<VendorMergeResult>("/vendor-organizations/merge", data);
     }
 }
 

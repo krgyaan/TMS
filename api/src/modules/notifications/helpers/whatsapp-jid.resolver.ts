@@ -12,8 +12,22 @@ export class WhatsappJidResolver {
 
     /** Normalize an E.164-capable phone number into a WhatsApp JID suffix. */
     private normalizePhone(phone: string): string {
-        const digits = phone.replace(/\D/g, "");
-        return digits.replace(/^0+/, "").replace(/^91/, "");
+        let d = phone.replace(/\D/g, "");
+        // Remove leading 0s
+        d = d.replace(/^0+/, "");
+        // If it's a 10-digit Indian mobile starting with 6-9, prefix 91
+        if (d.length === 10 && /^[6-9]/.test(d)) {
+            return `91${d}`;
+        }
+        // If it's 12 digits starting with 91, keep as-is
+        if (d.length === 12 && d.startsWith("91")) {
+            return d;
+        }
+        // If already has country code (13+ digits starting with 91), keep as-is
+        if (d.length >= 13 && d.startsWith("91")) {
+            return d;
+        }
+        return d;
     }
 
     /**

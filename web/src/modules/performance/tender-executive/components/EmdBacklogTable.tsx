@@ -20,7 +20,7 @@ export function EmdBacklogTable(props: { view: "user" | "team" | "all"; userId?:
                             <TableHead />
 
                             <TableHead className="text-center">
-                                <ColumnHeader title="Opening" description="EMD paid before the start of the period but not received back" />
+                                <ColumnHeader title="Emd Paid (Prior)" description="EMD paid before the start of the period but not received back" />
                             </TableHead>
 
                             <TableHead className="text-center">

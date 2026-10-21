@@ -1,7 +1,11 @@
+import { useEffect, useState } from "react";
+
+import { AppBreadcrumb } from "@/components/app-breadcrumb";
 import { AppSidebar } from "@/components/app-sidebar";
+import { CommandPalette } from "@/components/command-palette";
 import { ModeToggle } from "@/components/mode-toggle";
+import { SearchBar } from "@/components/search-bar";
 import { DocumentTitle } from "@/components/document-title";
-import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
@@ -9,17 +13,24 @@ import { useProfileContext } from "@/modules/profile/contexts/ProfileContext";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, CheckCircle2, XCircle, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default function DashboardLayout() {
     const { data } = useProfileContext();
     const navigate = useNavigate();
     const location = useLocation();
+    const [searchOpen, setSearchOpen] = useState(false);
+
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+                event.preventDefault();
+                setSearchOpen(open => !open);
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, []);
 
     const isOnboarding = data?.isOnboarding;
     const onboardingStatus = data?.onboardingStatus;
@@ -33,26 +44,22 @@ export default function DashboardLayout() {
         <TooltipProvider>
             <SidebarProvider>
                 <AppSidebar />
+                <CommandPalette open={searchOpen} onOpenChange={setSearchOpen} />
 
                 {/* MAIN LAYOUT FIXED → flex, h-full, min-h-0 */}
                 <SidebarInset className="flex flex-col h-full min-h-0">
                     <DocumentTitle title={"Dashboard - TMS"} />
 
                     {/* HEADER (fixed height) */}
-                    <header className="flex h-16 shrink-0 items-center justify-between gap-2 bg-accent px-4">
+                    <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between gap-2 bg-accent px-4">
                         <div className="flex items-center gap-2">
                             <SidebarTrigger className="-ml-1 cursor-pointer" />
                             <Separator orientation="vertical" className="h-4" />
-                            <Breadcrumb>
-                                <BreadcrumbList>
-                                    <BreadcrumbItem>
-                                        <BreadcrumbPage>Dashboard</BreadcrumbPage>
-                                    </BreadcrumbItem>
-                                </BreadcrumbList>
-                            </Breadcrumb>
+                            <AppBreadcrumb />
                         </div>
-                        
+
                         <div className="flex items-center gap-4">
+                            <SearchBar onClick={() => setSearchOpen(true)} />
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button 

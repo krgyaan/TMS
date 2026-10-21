@@ -26,6 +26,9 @@ export interface VendorWorkOrderRow {
     totalAmount: number;
     totalGstAmt: number;
     grandTotal: number;
+    extraChargesTaxable?: number;
+    extraChargesGst?: number;
+    extraChargesTotal?: number;
     tdsPercentage?: number | string;
     tdsAmount?: number | string;
     amountAfterTds?: number | string;

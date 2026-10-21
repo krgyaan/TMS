@@ -17,6 +17,12 @@ const Auth_GoogleCallback = lazy(() => import("@/modules/auth/google-callback"))
 // Public customer feedback form (no login / no app layout)
 const Public_CustomerFeedbackForm = lazy(() => import("@/modules/services/service-feedback/ServiceFeedbackFormPage"));
 
+// Public notification detail page (token-gated, no login / no app layout)
+const Public_NotificationDetail = lazy(() => import("@/modules/notifications/public/NotificationPublicPage"));
+
+// Short-link redirect page (/n/:token → /notify/:token, no login / no app layout)
+const Public_UrlRedirect = lazy(() => import("@/modules/notifications/public/UrlRedirectPage"));
+
 // Verification demo page
 const ExtractionPreviewDemoPage = lazy(() => import("@/modules/tendering/info-sheet/components/ExtractionPreviewDemoPage"));
 
@@ -64,6 +70,26 @@ export default function AppRoutes() {
                 element={
                     <RouteWrapper>
                         <Public_CustomerFeedbackForm />
+                    </RouteWrapper>
+                }
+            />
+
+            {/* Public notification detail — signed WhatsApp/email link, no login */}
+            <Route
+                path={paths.notify.route}
+                element={
+                    <RouteWrapper>
+                        <Public_NotificationDetail />
+                    </RouteWrapper>
+                }
+            />
+
+            {/* Short-link redirect — /n/:token resolves via API then jumps to /notify/:token */}
+            <Route
+                path={paths.notifyShort.route}
+                element={
+                    <RouteWrapper>
+                        <Public_UrlRedirect />
                     </RouteWrapper>
                 }
             />

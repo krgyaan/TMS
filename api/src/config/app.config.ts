@@ -20,6 +20,7 @@ const appEnvSchema = z.object({
         .optional()
         .default("development"),
     LOG_DIR: z.string().optional().default("logs"),
+    PUBLIC_LINK_EXPIRES_IN: z.string().optional().default("30d"),
 });
 
 export type AppConfig = z.infer<typeof appEnvSchema>;
@@ -39,5 +40,6 @@ export default registerAs('app', () => {
         logLevel: parsed.LOG_LEVEL,
         nodeEnv: parsed.NODE_ENV,
         logDir: parsed.LOG_DIR,
+        publicLinkExpiresIn: parsed.PUBLIC_LINK_EXPIRES_IN,
     } as { port: number; apiPrefix: string; publicAppUrl: string; apiUrl: string; logLevel: string; nodeEnv: string; logDir: string };
 });

@@ -24,6 +24,7 @@ export interface PurchaseOrderView {
     poRaisedBy: number;
     raisedByName?: string;
     products: PoProduct[];
+    extraCharges?: PoExtraCharge[];
     total: PoTotal;
     paymentRequests: PoPaymentRequest[];
     purchaseInvoices: PoPurchaseInvoice[];
@@ -60,12 +61,22 @@ export interface PoProduct {
     itemTotalWithGst: number;
 }
 
+export interface PoExtraCharge {
+    id: number;
+    label: string;
+    gstRate: number | string;
+    taxableAmount: number | string;
+    gstAmount: number | string;
+    totalAmount: number | string;
+}
+
 export interface PoPaymentRequest {
     id: number;
     requestNo: string;
     partyName: string;
     amount: string;
     status: string;
+    actualTdsDeducted?: number | string;
     requestedByName: string;
     createdAt: string;
 }

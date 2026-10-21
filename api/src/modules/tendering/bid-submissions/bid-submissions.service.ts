@@ -16,6 +16,7 @@ import { items } from '@db/schemas/master/items.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
 import { teams } from '@db/schemas/master/teams.schema';
 import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
+import { rfqs, rfqResponses } from "@db/schemas/tendering/rfqs.schema";
 import { tenderCostingDetails } from '@db/schemas/tendering/tender-costing-details.schema';
 import { tenderCostingSheets } from '@db/schemas/tendering/tender-costing-sheets.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -433,6 +434,23 @@ export class BidSubmissionsService {
             }
             if (!data.finalPriceSs) {
                 throw new BadRequestException('Final price screenshot is required');
+            }
+        }
+
+        // RFQ gate: when an RFQ is required for this tender, the bid cannot be submitted
+        // until at least one RFQ has been sent and at least one response recorded against
+        // it (mirrors the RFQ Quotation checkpoint on the bid submission form).
+        const rfqRequired = ["yes", "Yes", "YES"].includes(currentTender?.rfqRequired ?? "") && currentTender?.rfqTo !== "0" && currentTender?.rfqTo !== "1";
+
+        if (rfqRequired) {
+            const [rfqResponseCount] = await this.db
+                .select({ count: sql<number>`count(${rfqResponses.id})::int` })
+                .from(rfqResponses)
+                .innerJoin(rfqs, eq(rfqs.id, rfqResponses.rfqId))
+                .where(eq(rfqs.tenderId, data.tenderId));
+
+            if (!rfqResponseCount || Number(rfqResponseCount.count) === 0) {
+                throw new BadRequestException("RFQ response is required before submitting the bid. Send an RFQ and record at least one response.");
             }
         }
 

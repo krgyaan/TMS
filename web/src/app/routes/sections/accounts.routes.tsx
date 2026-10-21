@@ -20,7 +20,8 @@ const Accounts_Insurance = lazy(() => import("@/modules/insurance/pages/Insuranc
 const Accounts_Insurance_Create = lazy(() => import("@/modules/insurance/pages/InsuranceCreatePage"));
 const Accounts_Insurance_Edit = lazy(() => import("@/modules/insurance/pages/InsuranceEditPage"));
 const Accounts_Insurance_View = lazy(() => import("@/modules/insurance/pages/InsuranceViewPage"));
-const Accounts_GSTChecklists = lazy(() => import("@/modules/accounts/gst-checklists"));
+const Accounts_GSTChecklists = lazy(() => import("@/modules/accounts/gst-checklists/GstChecklistListPage"));
+const Accounts_TDSChecklists = lazy(() => import("@/modules/accounts/tds-checklists/TdsChecklistListPage"));
 const Accounts_FixedExpenses = lazy(() => import("@/modules/accounts/fixed-expenses"));
 
 const TaskChecklistDashboard = lazy(() => import("@/modules/accounts/task-checklist/ChecklistDashboard"));
@@ -73,6 +74,7 @@ export default function AccountsRoutes() {
             <Route path="insurance/:id" element={<RouteWrapper><Accounts_Insurance_View /></RouteWrapper>} />
             <Route path="account-checklists" element={<RouteWrapper><TaskChecklistDashboard /></RouteWrapper>} />
             <Route path="gst-checklists" element={<RouteWrapper><Accounts_GSTChecklists /></RouteWrapper>} />
+            <Route path="tds-checklists" element={<RouteWrapper><Accounts_TDSChecklists /></RouteWrapper>} />
             <Route path="fixed-expenses" element={<RouteWrapper><Accounts_FixedExpenses /></RouteWrapper>} />
 
             <Route path="task-checklists" element={<RouteWrapper><TaskChecklistDashboard /></RouteWrapper>} />

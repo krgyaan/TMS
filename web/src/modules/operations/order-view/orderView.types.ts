@@ -17,12 +17,22 @@ export interface OrderProductRow {
     totalAmount: number | string;
 }
 
+export interface OrderExtraChargeRow {
+    id: number;
+    label: string;
+    gstRate: number | string;
+    taxableAmount: number | string;
+    gstAmount: number | string;
+    totalAmount: number | string;
+}
+
 export interface OrderPaymentRequestRow {
     id: number;
     requestNo: string;
     partyName: string;
     amount: string;
     status: string;
+    actualTdsDeducted?: number | string;
     requestedByName: string;
     createdAt: string;
 }
@@ -61,6 +71,7 @@ export interface OrderViewData {
     shipToGst?: string;
     shipToPan?: string;
     products: OrderProductRow[];
+    extraCharges: OrderExtraChargeRow[];
     paymentRequests: OrderPaymentRequestRow[];
     purchaseInvoices: OrderPurchaseInvoiceRow[];
     total: { total: number; totalGst: number; totalWithGst: number };

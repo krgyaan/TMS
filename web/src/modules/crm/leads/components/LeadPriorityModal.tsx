@@ -82,9 +82,9 @@ export function LeadPriorityModal({
         <Dialog open={open} onOpenChange={handleClose}>
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                    <DialogTitle>Update Lead Priority</DialogTitle>
+                    <DialogTitle>Update Priority</DialogTitle>
                     <DialogDescription>
-                        Set the priority level for: <strong>{leadName || "this lead"}</strong>
+                        Set the priority level for: <strong>{leadName || "this entry"}</strong>
                     </DialogDescription>
                 </DialogHeader>
 

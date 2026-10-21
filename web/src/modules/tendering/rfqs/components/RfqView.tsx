@@ -3,9 +3,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { FileText, ExternalLink, Download } from 'lucide-react';
+import { FileText, ExternalLink, Download, Plus } from 'lucide-react';
 import type { Rfq } from '../helpers/rfq.types';
-import { formatDateTime } from '@/hooks/useFormatedDate';
+import { formatDateTime, formatDate } from '@/hooks/useFormatedDate';
+import { useNavigate } from 'react-router-dom';
+import { paths } from '@/app/routes/paths';
 
 interface RfqViewProps {
     rfq: Rfq | null;
@@ -199,15 +201,15 @@ import { RfqResponseDetailAccordion } from '@/modules/tendering/rfq-response/com
 import { useMemo } from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
+import { compareRfqBatchOrder } from '@/modules/tendering/rfqs/helpers/rfqBatch';
 
 /** Local component for RFQ item with its responses (from RfqShowPage) */
 function RfqItemWithResponses({ rfq, index }: { rfq: Rfq; index: number }) {
+    const navigate = useNavigate();
     const { data: rfqResponsesData, isLoading: rfqResponsesLoading } = useRfqResponses(rfq.id);
     if (!rfq) return null;
 
-    const rfqResponses = Array.isArray(rfqResponsesData) 
-        ? rfqResponsesData 
-        : (rfqResponsesData?.currentRfqResponses || []);
+    const rfqResponses = rfqResponsesData?.currentRfqResponses ?? [];
 
     const groupedResponses = useMemo(() => {
         const groups: Record<string, typeof rfqResponses> = {};
@@ -223,13 +225,23 @@ function RfqItemWithResponses({ rfq, index }: { rfq: Rfq; index: number }) {
         <Accordion type="single" collapsible defaultValue="request" className="w-full border rounded-lg bg-card overflow-hidden shadow-sm">
             <AccordionItem value="request" className="border-b-0">
                 <AccordionTrigger className="px-4 py-2 hover:no-underline hover:bg-muted/30 transition-colors">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         <Badge variant="outline" className="rounded-sm font-bold text-[10px]">
-                            RFQ REQUEST #{index}
+                            RFQ BATCH #{index}
                         </Badge>
                         <span className="text-xs font-semibold">
                            {rfq.itemName || 'RFQ Details'}
                         </span>
+                        {rfq.createdAt && (
+                            <span className="text-[10px] text-muted-foreground">
+                                sent {formatDate(rfq.createdAt)}
+                            </span>
+                        )}
+                        {rfq.dueDate && (
+                            <span className="text-[10px] text-muted-foreground">
+                                · due {formatDate(rfq.dueDate)}
+                            </span>
+                        )}
                         <span className="text-[10px] text-muted-foreground italic">
                             (ID: #{rfq.id})
                         </span>
@@ -245,6 +257,15 @@ function RfqItemWithResponses({ rfq, index }: { rfq: Rfq; index: number }) {
                         <RfqView rfq={rfq} />
                         <div className="flex items-center justify-between mt-4">
                             <h3 className="text-[11px] font-bold uppercase tracking-tight text-muted-foreground">Responses</h3>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-[11px]"
+                                onClick={() => navigate(paths.tendering.rfqsResponseNew(rfq.id))}
+                            >
+                                <Plus className="mr-1 h-3.5 w-3.5" />
+                                Record Response
+                            </Button>
                         </div>
 
                         <div className="space-y-2">
@@ -289,6 +310,9 @@ export function RfqSection({ tenderId }: { tenderId: number | null }) {
     const { data: approvalData } = useTenderApproval(tenderId);
     const { data: rfqData, isLoading } = useRfqByTenderId(tenderId);
 
+    // Keep batch numbering consistent with buildRfqBatches (earliest createdAt, then ID).
+    const orderedRfqs = useMemo(() => [...(rfqData ?? [])].sort(compareRfqBatchOrder), [rfqData]);
+
     if (!approvalData?.rfqRequired) {
         return (
             <Card>
@@ -331,7 +355,7 @@ export function RfqSection({ tenderId }: { tenderId: number | null }) {
 
     return (
         <div className="space-y-4">
-            {rfqData.map((rfq, index) => (
+            {orderedRfqs.map((rfq, index) => (
                 <RfqItemWithResponses
                     key={rfq.id}
                     rfq={rfq}

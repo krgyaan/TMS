@@ -8,7 +8,7 @@ import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { instrumentBgDetails, instrumentChequeDetails, instrumentDdDetails, instrumentFdrDetails, instrumentStatusHistory, instrumentTransferDetails, paymentInstruments, paymentRequestMom, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
 import { paymentRequests as opsPaymentRequests } from '@db/schemas/operations/payment-requests.schema';
-import { ConflictException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
 import { PaymentRequestService } from '@/modules/operations/payment-requests/payment-request.service';
 import { and, desc, eq, like } from 'drizzle-orm';
 import type { CreateMomRemarkDto } from '../dto/payment-mom.dto';
@@ -87,7 +87,9 @@ export class PaymentRequestsCommandService {
                     ? `${payload.EMD.mode} Details`
                     : `${payload.EMD.mode} Details`;
 
-                if (emdAmount >= 0) {
+                const isBlankNonTmsCheque = isNonTmsRequest && payload.EMD.mode === 'CHEQUE';
+
+                if (emdAmount > 0 || isBlankNonTmsCheque) {
                     const request = await this.createPaymentRequest(
                         tx,
                         tenderId,
@@ -152,7 +154,7 @@ export class PaymentRequestsCommandService {
                     ? `${payload.TENDER_FEES.mode} Details`
                     : `${payload.TENDER_FEES.mode} Details`;
 
-                if (tfAmount >= 0) {
+                if (tfAmount > 0) {
                     const request = await this.createPaymentRequest(
                         tx,
                         tenderId,
@@ -216,12 +218,12 @@ export class PaymentRequestsCommandService {
             if (payload.PROCESSING_FEES?.mode && payload.PROCESSING_FEES?.details) {
                 const pfAmount = isNonTmsRequest
                     ? extractAmountFromDetails(payload.PROCESSING_FEES.mode, payload.PROCESSING_FEES.details)
-                    : 0;
+                    : (Number(infoSheet?.processingFeeAmount) || 0);
                 const pfRemarks = isNonTmsRequest
                     ? `${payload.PROCESSING_FEES.mode} Details`
                     : `${payload.PROCESSING_FEES.mode} Details`;
 
-                if (pfAmount >= 0) {
+                if (pfAmount > 0) {
                     const request = await this.createPaymentRequest(
                         tx,
                         tenderId,
@@ -281,6 +283,12 @@ export class PaymentRequestsCommandService {
                 }
             }
         });
+
+        if (createdRequests.length === 0) {
+            throw new BadRequestException(
+                'No payment request could be created. Please provide valid payment details.'
+            );
+        }
 
         // Background operations
         this.handleBackgroundOperations(results, tenderId, tender, userId, emdRequested, isNonTmsRequest)
@@ -754,6 +762,12 @@ export class PaymentRequestsCommandService {
         mode: string,
         userId?: number
     ): Promise<any> {
+        const amount = Number(paymentRequest.amountRequired ?? 0);
+        if (!(amount > 0)) {
+            this.logger.warn(`Skipping auto-created project payment request for payment request ${paymentRequest.id}: amount is ${paymentRequest.amountRequired ?? '0'}`);
+            return null;
+        }
+
         this.logger.log(`Auto-creating project payment request from ${mode} payment request: ${paymentRequest.id}`);
 
         const [transferDetail] = await tx

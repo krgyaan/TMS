@@ -36,6 +36,10 @@ export const useRfqsDashboard = (filters?: RfqDashboardFilters) => {
     return useQuery({
         queryKey: [...rfqsKey.all, 'dashboard', queryKeyFilters],
         queryFn: () => rfqsService.getDashboard(effectiveFilters),
+        // Reuses the last page while the new selection loads to avoid flashing. Consumers must
+        // treat `isPlaceholderData` as loading (show a fetching state and disable row actions)
+        // until data for the current filter/tab/page has arrived.
+        placeholderData: (previousData) => previousData,
     });
 };
 

@@ -17,803 +17,895 @@ import { useAuth } from "@/contexts/AuthContext";
 import { round2, CLOSURE_TOLERANCE } from "@/utils/money";
 import { CloseClosureDialog } from "@/components/CloseClosureDialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
 const BUDGET_CATEGORIES = ["Service", "Freight", "Warranty"];
 
 interface VwoClosureData {
-  id: number;
-  projectId: number;
-  woNumber: string;
-  sellerName?: string;
-  projectName?: string;
-  woDate?: string;
-  woApproved?: boolean;
-  amountAfterTds?: number | string;
-  grandTotal: number;
-  totalGst: number;
-  totalPaymentDone: number;
-  totalPiAmount: number;
-  closedAt?: string | null;
-  closedBy?: number | null;
-  closedByName?: string | null;
-  closureNote?: string | null;
-  paymentRequests: Array<{
     id: number;
-    requestNo?: string;
-    partyName?: string;
-    amount?: number | string;
-    status: string;
-    paymentMode?: string;
-    paymentAgainst?: string;
-    utrNumber?: string;
-    createdAt?: string;
-  }>;
-  purchaseInvoices: Array<{
-    id: number;
-    invoiceNo?: string;
-    category?: string;
-    partyName?: string;
-    valuePreGst?: number | string;
-    gstAmount?: number | string;
-    invoiceDate?: string;
-    invoiceFile?: string;
-  }>;
+    projectId: number;
+    woNumber: string;
+    sellerName?: string;
+    projectName?: string;
+    woDate?: string;
+    woApproved?: boolean;
+    amountAfterTds?: number | string;
+    tdsAmount?: number | string;
+    tdsPercentage?: number | string;
+    grandTotal: number;
+    totalGst: number;
+    totalPaymentDone: number;
+    totalTdsDeducted: number;
+    totalPaidAfterTds: number;
+    totalPiAmount: number;
+    closedAt?: string | null;
+    closedBy?: number | null;
+    closedByName?: string | null;
+    closureNote?: string | null;
+    paymentRequests: Array<{
+        id: number;
+        requestNo?: string;
+        partyName?: string;
+        amount?: number | string;
+        status: string;
+        paymentMode?: string;
+        paymentAgainst?: string;
+        utrNumber?: string;
+        actualTdsDeducted?: number | string | null;
+        createdAt?: string;
+    }>;
+    purchaseInvoices: Array<{
+        id: number;
+        invoiceNo?: string;
+        category?: string;
+        partyName?: string;
+        valuePreGst?: number | string;
+        gstAmount?: number | string;
+        invoiceDate?: string;
+        invoiceFile?: string;
+    }>;
 }
 
 interface PaymentRow {
-  paymentDate: string;
-  amount: string;
-  accountName: string;
-  accountNumber: string;
-  ifsc: string;
-  utr: string;
+    paymentDate: string;
+    amount: string;
+    accountName: string;
+    accountNumber: string;
+    ifsc: string;
+    utr: string;
 }
 
 interface InvoiceRow {
-  category: string;
-  invoiceDate: string;
-  partyName: string;
-  valuePreGst: string;
-  gstAmount: string;
-  invoiceFile: string[];
+    invoiceNo: string;
+    category: string;
+    invoiceDate: string;
+    partyName: string;
+    valuePreGst: string;
+    gstAmount: string;
+    invoiceFile: string[];
 }
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
 const emptyPaymentRow = (): PaymentRow => ({
-  paymentDate: todayISO(),
-  amount: "",
-  accountName: "",
-  accountNumber: "",
-  ifsc: "",
-  utr: "",
+    paymentDate: todayISO(),
+    amount: "",
+    accountName: "",
+    accountNumber: "",
+    ifsc: "",
+    utr: "",
 });
 
 const emptyInvoiceRow = (): InvoiceRow => ({
-  category: "",
-  invoiceDate: todayISO(),
-  partyName: "",
-  valuePreGst: "",
-  gstAmount: "",
-  invoiceFile: [],
+    invoiceNo: "",
+    category: "",
+    invoiceDate: todayISO(),
+    partyName: "",
+    valuePreGst: "",
+    gstAmount: "",
+    invoiceFile: [],
 });
 
 const VwoClosurePage = () => {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const woId = Number(id);
+    const { id } = useParams<{ id: string }>();
+    const navigate = useNavigate();
+    const woId = Number(id);
 
-  const [wo, setWo] = useState<VwoClosureData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+    const [wo, setWo] = useState<VwoClosureData | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-  const [paymentRows, setPaymentRows] = useState<PaymentRow[]>([]);
-  const [invoiceRows, setInvoiceRows] = useState<InvoiceRow[]>([]);
-  const [savingPayments, setSavingPayments] = useState(false);
-  const [savingInvoices, setSavingInvoices] = useState(false);
-  const [saveMsg, setSaveMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+    const [paymentRows, setPaymentRows] = useState<PaymentRow[]>([]);
+    const [invoiceRows, setInvoiceRows] = useState<InvoiceRow[]>([]);
+    const [savingPayments, setSavingPayments] = useState(false);
+    const [savingInvoices, setSavingInvoices] = useState(false);
+    const [saveMsg, setSaveMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Delete confirmation state
-  const [deletePaymentRequest, setDeletePaymentRequest] = useState<{ id: number; requestNo: string } | null>(null);
-  const [deletePurchaseInvoice, setDeletePurchaseInvoice] = useState<{ id: number; invoiceNo: string } | null>(null);
+    // Delete confirmation state
+    const [deletePaymentRequest, setDeletePaymentRequest] = useState<{ id: number; requestNo: string } | null>(null);
+    const [deletePurchaseInvoice, setDeletePurchaseInvoice] = useState<{ id: number; invoiceNo: string } | null>(null);
 
-  const handleDeletePaymentRequest = async () => {
-    if (!deletePaymentRequest || !wo) return;
-    try {
-      await vendorWorkOrderApi.deletePaymentRequest(woId, deletePaymentRequest.id);
-      setSaveMsg({ type: "success", text: `Payment request ${deletePaymentRequest.requestNo} deleted.` });
-      await fetchData();
-    } catch (err) {
-      console.error(err);
-      setSaveMsg({ type: "error", text: "Failed to delete payment request." });
-    } finally {
-      setDeletePaymentRequest(null);
-    }
-  };
-
-  const handleDeletePurchaseInvoice = async () => {
-    if (!deletePurchaseInvoice || !wo) return;
-    try {
-      await vendorWorkOrderApi.deletePurchaseInvoice(woId, deletePurchaseInvoice.id);
-      setSaveMsg({ type: "success", text: `Purchase invoice ${deletePurchaseInvoice.invoiceNo} deleted.` });
-      await fetchData();
-    } catch (err) {
-      console.error(err);
-      setSaveMsg({ type: "error", text: "Failed to delete purchase invoice." });
-    } finally {
-      setDeletePurchaseInvoice(null);
-    }
-  };
-
-  const fetchData = async () => {
-    const res = await vendorWorkOrderApi.getClosureData(woId);
-    setWo(res);
-  };
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true);
-        await fetchData();
-      } catch (err) {
-        setError("Failed to load vendor work order closure data");
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
+    const handleDeletePaymentRequest = async () => {
+        if (!deletePaymentRequest || !wo) return;
+        try {
+            await vendorWorkOrderApi.deletePaymentRequest(woId, deletePaymentRequest.id);
+            setSaveMsg({ type: "success", text: `Payment request ${deletePaymentRequest.requestNo} deleted.` });
+            await fetchData();
+        } catch (err) {
+            console.error(err);
+            setSaveMsg({ type: "error", text: "Failed to delete payment request." });
+        } finally {
+            setDeletePaymentRequest(null);
+        }
     };
 
-    if (woId) load();
-  }, [woId]);
+    const handleDeletePurchaseInvoice = async () => {
+        if (!deletePurchaseInvoice || !wo) return;
+        try {
+            await vendorWorkOrderApi.deletePurchaseInvoice(woId, deletePurchaseInvoice.id);
+            setSaveMsg({ type: "success", text: `Purchase invoice ${deletePurchaseInvoice.invoiceNo} deleted.` });
+            await fetchData();
+        } catch (err) {
+            console.error(err);
+            setSaveMsg({ type: "error", text: "Failed to delete purchase invoice." });
+        } finally {
+            setDeletePurchaseInvoice(null);
+        }
+    };
 
-  const amountAfterTds = round2(Number(wo?.amountAfterTds || wo?.grandTotal || 0));
-  const totalPaymentDone = round2(Number(wo?.totalPaymentDone || 0));
-  const totalPiAmount = round2(Number(wo?.totalPiAmount || 0));
-  const remainingToPay = round2(amountAfterTds - totalPaymentDone);
-  const remainingInvoice = round2(amountAfterTds - totalPiAmount);
-  // A difference strictly below CLOSURE_TOLERANCE rupees is absorbed as
-  // round-off; anything at or above it keeps the VWO open.
-  const paySettled = remainingToPay < CLOSURE_TOLERANCE;
-  const invoiceSettled = remainingInvoice < CLOSURE_TOLERANCE;
-  const withinRoundOff = (r: number) => r > 0 && r < CLOSURE_TOLERANCE;
-  const canClose = paySettled && invoiceSettled && !wo?.closedAt;
+    const fetchData = async () => {
+        const res = await vendorWorkOrderApi.getClosureData(woId);
+        setWo(res);
+    };
 
-  // `canClose` above is the derived "everything settled" state, so the
-  // permission check needs its own name to avoid shadowing it.
-  const { canClose: hasClosePermission, canCreate } = useAuth();
-  const [closingWo, setClosingWo] = useState(false);
-  const [showCloseDialog, setShowCloseDialog] = useState(false);
-  const [closeError, setCloseError] = useState<string | null>(null);
+    useEffect(() => {
+        const load = async () => {
+            try {
+                setLoading(true);
+                await fetchData();
+            } catch (err) {
+                setError("Failed to load vendor work order closure data");
+                console.error(err);
+            } finally {
+                setLoading(false);
+            }
+        };
 
-  const handleCloseWo = async (closureNote: string) => {
-    setClosingWo(true);
-    setCloseError(null);
-    try {
-      await vendorWorkOrderApi.close(woId, closureNote);
-      setShowCloseDialog(false);
-      setSaveMsg({ type: "success", text: "Vendor Work Order closed successfully." });
-      await fetchData();
-    } catch (err) {
-      console.error(err);
-      const apiMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setCloseError(typeof apiMessage === "string" ? apiMessage : "Failed to close Vendor Work Order.");
-    } finally {
-      setClosingWo(false);
+        if (woId) load();
+    }, [woId]);
+
+    const amountAfterTds = round2(Number(wo?.amountAfterTds || 0));
+    const grandTotal = round2(Number(wo?.grandTotal || 0));
+    const totalPaymentDone = round2(Number(wo?.totalPaymentDone || 0));
+    const totalTdsDeducted = round2(Number(wo?.totalTdsDeducted || 0));
+    const totalPaidAfterTds = round2(Number(wo?.totalPaidAfterTds || 0));
+    const totalPiAmount = round2(Number(wo?.totalPiAmount || 0));
+    const showTdsColumn = totalTdsDeducted > 0;
+    // Settlement reconciles against the GROSS VWO value: invoices must cover the
+    // VWO value and payments must match the invoices, each within ₹CLOSURE_TOLERANCE
+    // (symmetric — over- and under-side both block closure). This matches the
+    // API gate in checkClosure.
+    const paymentsRemaining = round2(grandTotal - totalPaymentDone);
+    const invoicesRemaining = round2(grandTotal - totalPiAmount);
+    const paySettled = Math.abs(paymentsRemaining) < CLOSURE_TOLERANCE;
+    const invoiceSettled = Math.abs(invoicesRemaining) < CLOSURE_TOLERANCE;
+    const withinRoundOff = (r: number) => Math.abs(r) > 0 && Math.abs(r) < CLOSURE_TOLERANCE;
+    // The API gate also requires every payment request to be payment_done, so the
+    // page mirrors that instead of silently showing "Ready to close".
+    const openPrs = (wo?.paymentRequests ?? []).filter(pr => pr.status !== "payment_done").length;
+    const canClose = paySettled && invoiceSettled && openPrs === 0 && !wo?.closedAt;
+
+    // `canClose` above is the derived "everything settled" state, so the
+    // permission check needs its own name to avoid shadowing it.
+    const { canClose: hasClosePermission, canCreate } = useAuth();
+    const [closingWo, setClosingWo] = useState(false);
+    const [showCloseDialog, setShowCloseDialog] = useState(false);
+    const [closeError, setCloseError] = useState<string | null>(null);
+
+    const handleCloseWo = async (closureNote: string) => {
+        setClosingWo(true);
+        setCloseError(null);
+        try {
+            await vendorWorkOrderApi.close(woId, closureNote);
+            setShowCloseDialog(false);
+            setSaveMsg({ type: "success", text: "Vendor Work Order closed successfully." });
+            await fetchData();
+        } catch (err) {
+            console.error(err);
+            const apiMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+            setCloseError(typeof apiMessage === "string" ? apiMessage : "Failed to close Vendor Work Order.");
+        } finally {
+            setClosingWo(false);
+        }
+    };
+
+    const updatePaymentRow = (index: number, field: keyof PaymentRow, value: string) => {
+        setPaymentRows(rows => rows.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
+    };
+
+    const updateInvoiceRow = (index: number, field: keyof InvoiceRow, value: string | string[]) => {
+        setInvoiceRows(rows => rows.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
+    };
+
+    const savePayments = async () => {
+        const valid = paymentRows.filter(r => r.amount && r.accountNumber && r.ifsc);
+        if (valid.length === 0) {
+            setSaveMsg({ type: "error", text: "Fill amount, account no. and IFSC in at least one payment row." });
+            return;
+        }
+
+        setSavingPayments(true);
+        setSaveMsg(null);
+        try {
+            await vendorWorkOrderApi.bulkCreatePaymentRequests(woId, valid);
+            setPaymentRows([]);
+            setSaveMsg({ type: "success", text: `${valid.length} payment request(s) created.` });
+            await fetchData();
+        } catch (err) {
+            console.error(err);
+            setSaveMsg({ type: "error", text: "Failed to save payment requests." });
+        } finally {
+            setSavingPayments(false);
+        }
+    };
+
+    const saveInvoices = async () => {
+        const valid = invoiceRows.filter(r => r.invoiceNo.trim() && r.category && r.partyName && r.valuePreGst);
+        if (valid.length === 0) {
+            setSaveMsg({ type: "error", text: "Fill invoice number, category, party name and pre-GST in at least one invoice row." });
+            return;
+        }
+
+        setSavingInvoices(true);
+        setSaveMsg(null);
+        try {
+            await vendorWorkOrderApi.bulkCreatePurchaseInvoices(woId, valid);
+            setInvoiceRows([]);
+            setSaveMsg({ type: "success", text: `${valid.length} purchase invoice(s) created.` });
+            await fetchData();
+        } catch (err) {
+            console.error(err);
+            setSaveMsg({ type: "error", text: "Failed to save purchase invoices." });
+        } finally {
+            setSavingInvoices(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="flex justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+        );
     }
-  };
 
-  const updatePaymentRow = (index: number, field: keyof PaymentRow, value: string) => {
-    setPaymentRows((rows) => rows.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
-  };
-
-  const updateInvoiceRow = (index: number, field: keyof InvoiceRow, value: string | string[]) => {
-    setInvoiceRows((rows) => rows.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
-  };
-
-  const savePayments = async () => {
-    const valid = paymentRows.filter((r) => r.amount && r.accountNumber && r.ifsc);
-    if (valid.length === 0) {
-      setSaveMsg({ type: "error", text: "Fill amount, account no. and IFSC in at least one payment row." });
-      return;
+    if (error || !wo) {
+        return (
+            <div className="flex justify-center py-12">
+                <p className="text-destructive">{error || "Vendor Work Order not found"}</p>
+            </div>
+        );
     }
 
-    setSavingPayments(true);
-    setSaveMsg(null);
-    try {
-      await vendorWorkOrderApi.bulkCreatePaymentRequests(woId, valid);
-      setPaymentRows([]);
-      setSaveMsg({ type: "success", text: `${valid.length} payment request(s) created.` });
-      await fetchData();
-    } catch (err) {
-      console.error(err);
-      setSaveMsg({ type: "error", text: "Failed to save payment requests." });
-    } finally {
-      setSavingPayments(false);
-    }
-  };
-
-  const saveInvoices = async () => {
-    const valid = invoiceRows.filter((r) => r.category && r.partyName && r.valuePreGst);
-    if (valid.length === 0) {
-      setSaveMsg({ type: "error", text: "Fill category, party name and pre-GST in at least one invoice row." });
-      return;
-    }
-
-    setSavingInvoices(true);
-    setSaveMsg(null);
-    try {
-      await vendorWorkOrderApi.bulkCreatePurchaseInvoices(woId, valid);
-      setInvoiceRows([]);
-      setSaveMsg({ type: "success", text: `${valid.length} purchase invoice(s) created.` });
-      await fetchData();
-    } catch (err) {
-      console.error(err);
-      setSaveMsg({ type: "error", text: "Failed to save purchase invoices." });
-    } finally {
-      setSavingInvoices(false);
-    }
-  };
-
-  if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
-
-  if (error || !wo) {
-    return (
-      <div className="flex justify-center py-12">
-        <p className="text-destructive">{error || "Vendor Work Order not found"}</p>
-      </div>
-    );
-  }
-
-  return (
-    <Card>
-      <CardHeader className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">VWO Closure — {wo.woNumber}</h1>
-        <Button variant="outline" onClick={() => navigate(paths.accounts.vendorWorkOrders)}>
-          Back to VWOs
-        </Button>
-      </CardHeader>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Reconciliation Summary</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-              <div>
-                <p className="text-sm font-medium">Payment Done (Paid Out)</p>
-                <p className="text-xs text-muted-foreground">Amount we have paid</p>
-              </div>
-              <div className="text-right">
-                <p className="text-lg font-semibold">{formatINR(totalPaymentDone)}</p>
-                {remainingToPay <= 0 ? (
-                  <Badge variant="default" className="mt-1">Settled</Badge>
-                ) : paySettled ? (
-                  <Badge variant="secondary" className="mt-1">Within tolerance</Badge>
-                ) : (
-                  <Badge variant="outline" className="mt-1">Pending</Badge>
-                )}
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-              <div>
-                <p className="text-sm font-medium">Invoice Received</p>
-                <p className="text-xs text-muted-foreground">Invoices received against payment</p>
-              </div>
-              <div className="text-right">
-                <p className="text-lg font-semibold">{formatINR(totalPiAmount)}</p>
-                {remainingInvoice <= 0 ? (
-                  <Badge variant="default" className="mt-1">Settled</Badge>
-                ) : invoiceSettled ? (
-                  <Badge variant="secondary" className="mt-1">Within tolerance</Badge>
-                ) : (
-                  <Badge variant="outline" className="mt-1">Pending</Badge>
-                )}
-              </div>
-            </div>
-
-            <div className="border-t pt-3 space-y-2">
-              {remainingToPay > 0 && (
-                <div className="flex items-center justify-between text-amber-600">
-                  <span className="flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4" />
-                    Remaining to Pay
-                  </span>
-                  <span className="font-semibold">{formatINR(remainingToPay)}</span>
-                </div>
-              )}
-              {remainingInvoice > 0 && (
-                <div className="flex items-center justify-between text-amber-600">
-                  <span className="flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4" />
-                    Remaining Invoice
-                  </span>
-                  <span className="font-semibold">{formatINR(remainingInvoice)}</span>
-                </div>
-              )}
-              {(withinRoundOff(remainingToPay) || withinRoundOff(remainingInvoice)) && (
-                <p className="text-xs text-amber-600">
-                  Difference under ₹{CLOSURE_TOLERANCE} — will be absorbed as round-off on closure.
-                </p>
-              )}
-              {canClose && (
-                <div className="flex items-center justify-between text-green-600 pt-2">
-                  <span className="flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5" />
-                    All settled — Ready to close
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {saveMsg && (
-        <div className={`mx-6 mt-4 px-3 py-2 rounded-md text-sm ${saveMsg.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
-          {saveMsg.text}
-        </div>
-      )}
-
-      {remainingToPay > 0 && (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Record Payments</CardTitle>
-            <Button variant="outline" size="sm" onClick={() => setPaymentRows((rows) => [...rows, emptyPaymentRow()])}>
-              <Plus className="h-4 w-4 mr-1" />
-              Add Row
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {paymentRows.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic">No rows yet. Add a row to record a payment.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="text-xs uppercase">Payment Date</TableHead>
-                      <TableHead className="text-xs uppercase text-right">Amount</TableHead>
-                      <TableHead className="text-xs uppercase">Account Name</TableHead>
-                      <TableHead className="text-xs uppercase">Account No.</TableHead>
-                      <TableHead className="text-xs uppercase">IFSC</TableHead>
-                      <TableHead className="text-xs uppercase">UTR</TableHead>
-                      <TableHead />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paymentRows.map((row, i) => (
-                      <TableRow key={i} className="hover:bg-muted/30">
-                        <TableCell>
-                          <Input
-                            type="date"
-                            className="h-8"
-                            value={row.paymentDate}
-                            onChange={(e) => updatePaymentRow(i, "paymentDate", e.target.value)}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            min="0"
-                            className="h-8 text-right"
-                            placeholder="0.00"
-                            value={row.amount}
-                            onChange={(e) => updatePaymentRow(i, "amount", e.target.value)}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            className="h-8"
-                            placeholder={wo.sellerName || "Account name"}
-                            value={row.accountName}
-                            onChange={(e) => updatePaymentRow(i, "accountName", e.target.value)}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            className="h-8"
-                            placeholder="Account no."
-                            value={row.accountNumber}
-                            onChange={(e) => updatePaymentRow(i, "accountNumber", e.target.value)}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            className="h-8 font-mono uppercase"
-                            placeholder="IFSC"
-                            value={row.ifsc}
-                            onChange={(e) => updatePaymentRow(i, "ifsc", e.target.value)}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            className="h-8 font-mono"
-                            placeholder="UTR"
-                            value={row.utr}
-                            onChange={(e) => updatePaymentRow(i, "utr", e.target.value)}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 p-0 text-destructive"
-                            onClick={() => setPaymentRows((rows) => rows.filter((_, idx) => idx !== i))}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-            <div className="flex justify-end mt-4">
-              {canCreate("accounts.payment-requests") && (
-                <Button onClick={savePayments} disabled={savingPayments || paymentRows.length === 0}>
-                  {savingPayments ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                  Bulk Save Payments
+            <CardHeader className="flex items-center justify-between">
+                <h1 className="text-2xl font-bold">VWO Closure — {wo.woNumber}</h1>
+                <Button variant="outline" onClick={() => navigate(paths.accounts.vendorWorkOrders)}>
+                    Back to VWOs
                 </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            </CardHeader>
 
-      {remainingInvoice > 0 && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Record Invoices</CardTitle>
-            <Button variant="outline" size="sm" onClick={() => setInvoiceRows((rows) => [...rows, emptyInvoiceRow()])}>
-              <Plus className="h-4 w-4 mr-1" />
-              Add Row
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {invoiceRows.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic">No rows yet. Add a row to record an invoice.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="text-xs uppercase">Category</TableHead>
-                      <TableHead className="text-xs uppercase">Invoice Date</TableHead>
-                      <TableHead className="text-xs uppercase">Party Name</TableHead>
-                      <TableHead className="text-xs uppercase text-right">Pre GST</TableHead>
-                      <TableHead className="text-xs uppercase text-right">GST</TableHead>
-                      <TableHead className="text-xs uppercase">Upload File</TableHead>
-                      <TableHead />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {invoiceRows.map((row, i) => (
-                      <TableRow key={i} className="hover:bg-muted/30">
-                        <TableCell>
-                          <Select value={row.category} onValueChange={(v) => updateInvoiceRow(i, "category", v)}>
-                            <SelectTrigger size="sm" className="w-36">
-                              <SelectValue placeholder="Category" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {BUDGET_CATEGORIES.map((c) => (
-                                <SelectItem key={c} value={c}>{c}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="date"
-                            className="h-8 w-36"
-                            value={row.invoiceDate}
-                            onChange={(e) => updateInvoiceRow(i, "invoiceDate", e.target.value)}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            className="h-8 w-44"
-                            placeholder={wo.sellerName || "Party name"}
-                            value={row.partyName}
-                            onChange={(e) => updateInvoiceRow(i, "partyName", e.target.value)}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            min="0"
-                            className="h-8 w-32 text-right"
-                            placeholder="0.00"
-                            value={row.valuePreGst}
-                            onChange={(e) => updateInvoiceRow(i, "valuePreGst", e.target.value)}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            min="0"
-                            className="h-8 w-32 text-right"
-                            placeholder="0.00"
-                            value={row.gstAmount}
-                            onChange={(e) => updateInvoiceRow(i, "gstAmount", e.target.value)}
-                          />
-                        </TableCell>
-                        <TableCell className="min-w-[180px]">
-                          <FileUploader
-                            context="tender-documents"
-                            value={row.invoiceFile}
-                            onChange={(paths) => updateInvoiceRow(i, "invoiceFile", paths)}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-destructive"
-                            onClick={() => setInvoiceRows((rows) => rows.filter((_, idx) => idx !== i))}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Reconciliation Summary</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                            <div>
+                                <p className="text-sm font-medium">Invoice Received</p>
+                                <p className="text-xs text-muted-foreground">Invoices received against the VWO value ({formatINR(grandTotal)})</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-lg font-semibold">{formatINR(totalPiAmount)}</p>
+                                {invoiceSettled ? (
+                                    <Badge variant="default" className="mt-1">
+                                        Settled
+                                    </Badge>
+                                ) : invoicesRemaining < 0 ? (
+                                    <Badge variant="outline" className="mt-1">
+                                        Over
+                                    </Badge>
+                                ) : (
+                                    <Badge variant="outline" className="mt-1">
+                                        Pending
+                                    </Badge>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                            <div>
+                                <p className="text-sm font-medium">Payment Done (Gross)</p>
+                                <p className="text-xs text-muted-foreground">Gross paid incl. TDS</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-lg font-semibold">{formatINR(totalPaymentDone)}</p>
+                                {paySettled ? (
+                                    <Badge variant="default" className="mt-1">
+                                        Settled
+                                    </Badge>
+                                ) : paymentsRemaining < 0 ? (
+                                    <Badge variant="outline" className="mt-1">
+                                        Over
+                                    </Badge>
+                                ) : (
+                                    <Badge variant="outline" className="mt-1">
+                                        Pending
+                                    </Badge>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                            <div>
+                                <p className="text-sm font-medium">Payment Done (After TDS)</p>
+                                <p className="text-xs text-muted-foreground">Net paid to vendor (gross minus TDS)</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-lg font-semibold">{formatINR(totalPaidAfterTds)}</p>
+                            </div>
+                        </div>
+
+                        {totalTdsDeducted > 0 && (
+                            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                                <div>
+                                    <p className="text-sm font-medium">TDS Deducted</p>
+                                    <p className="text-xs text-muted-foreground">Withheld from payments (pending TDS returns)</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-lg font-semibold">{formatINR(totalTdsDeducted)}</p>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="border-t pt-3 space-y-2">
+                            {paymentsRemaining > 0 && (
+                                <div className="flex items-center justify-between text-amber-600">
+                                    <span className="flex items-center gap-2">
+                                        <AlertCircle className="h-4 w-4" />
+                                        Remaining to Pay
+                                    </span>
+                                    <span className="font-semibold">{formatINR(paymentsRemaining)}</span>
+                                </div>
+                            )}
+                            {invoicesRemaining > 0 && (
+                                <div className="flex items-center justify-between text-amber-600">
+                                    <span className="flex items-center gap-2">
+                                        <AlertCircle className="h-4 w-4" />
+                                        Remaining Invoice
+                                    </span>
+                                    <span className="font-semibold">{formatINR(invoicesRemaining)}</span>
+                                </div>
+                            )}
+                            {paymentsRemaining < 0 && (
+                                <div className="flex items-center justify-between text-amber-600">
+                                    <span className="flex items-center gap-2">
+                                        <AlertCircle className="h-4 w-4" />
+                                        Over-paid against VWO value
+                                    </span>
+                                    <span className="font-semibold">{formatINR(-paymentsRemaining)}</span>
+                                </div>
+                            )}
+                            {invoicesRemaining < 0 && (
+                                <div className="flex items-center justify-between text-amber-600">
+                                    <span className="flex items-center gap-2">
+                                        <AlertCircle className="h-4 w-4" />
+                                        Over-invoiced against VWO value
+                                    </span>
+                                    <span className="font-semibold">{formatINR(-invoicesRemaining)}</span>
+                                </div>
+                            )}
+                            {(withinRoundOff(paymentsRemaining) || withinRoundOff(invoicesRemaining)) && (
+                                <p className="text-xs text-amber-600">Difference under ₹{CLOSURE_TOLERANCE} — absorbed as round-off on closure.</p>
+                            )}
+                            {openPrs > 0 && (
+                                <div className="flex items-center justify-between text-amber-600">
+                                    <span className="flex items-center gap-2">
+                                        <AlertCircle className="h-4 w-4" />
+                                        {openPrs} payment request(s) not yet payment_done
+                                    </span>
+                                </div>
+                            )}
+                            {canClose && (
+                                <div className="flex items-center justify-between text-green-600 pt-2">
+                                    <span className="flex items-center gap-2">
+                                        <CheckCircle2 className="h-5 w-5" />
+                                        All settled — Ready to close
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {saveMsg && (
+                <div className={`mx-6 mt-4 px-3 py-2 rounded-md text-sm ${saveMsg.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                    {saveMsg.text}
+                </div>
             )}
-            <div className="flex justify-end mt-4">
-              {canCreate("accounts.purchase-invoices") && (
-                <Button onClick={saveInvoices} disabled={savingInvoices || invoiceRows.length === 0}>
-                  {savingInvoices ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                  Bulk Save Invoices
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Payment Requests</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {wo.paymentRequests.length === 0 ? (
-            <p className="text-sm text-muted-foreground italic">No payment requests yet.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead className="text-xs uppercase">Request No</TableHead>
-                    <TableHead className="text-xs uppercase">Date</TableHead>
-                    <TableHead className="text-xs uppercase">Party</TableHead>
-                    <TableHead className="text-xs uppercase text-right">Amount</TableHead>
-                    <TableHead className="text-xs uppercase">Status</TableHead>
-                    <TableHead className="text-xs uppercase">Mode</TableHead>
-                    <TableHead className="text-xs uppercase">UTR</TableHead>
-                    <TableHead className="text-xs uppercase">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {wo.paymentRequests.map((pr) => {
-                    const cfg = { label: pr.status, variant: "outline" as const };
-                    return (
-                      <TableRow key={pr.id} className="hover:bg-muted/30">
-                        <TableCell className="text-sm font-mono">{pr.requestNo || "—"}</TableCell>
-                        <TableCell className="text-sm">{formatDate(pr.createdAt)}</TableCell>
-                        <TableCell className="text-sm">{pr.partyName || "—"}</TableCell>
-                        <TableCell className="text-sm text-right font-medium">{formatINR(Number(pr.amount || 0))}</TableCell>
-                        <TableCell><Badge variant={cfg.variant}>{cfg.label}</Badge></TableCell>
-                        <TableCell className="text-sm">{pr.paymentMode || "—"}</TableCell>
-                        <TableCell className="text-sm font-mono">{pr.utrNumber || "—"}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <CanUpdate module="accounts.payment-requests">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0"
-                                onClick={() => navigate(paths.operations.editProjectPaymentRequestPage(pr.id, wo.projectId))}
-                                title="Edit Payment Request"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </CanUpdate>
-                            <CanDelete module="accounts.payment-requests">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 text-destructive"
-                                onClick={() => setDeletePaymentRequest({ id: pr.id, requestNo: pr.requestNo || `#${pr.id}` })}
-                                title="Delete Payment Request"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </CanDelete>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Purchase Invoices</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {wo.purchaseInvoices.length === 0 ? (
-            <p className="text-sm text-muted-foreground italic">No purchase invoices yet.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead className="text-xs uppercase">Invoice No</TableHead>
-                    <TableHead className="text-xs uppercase">Date</TableHead>
-                    <TableHead className="text-xs uppercase">Category</TableHead>
-                    <TableHead className="text-xs uppercase">Party</TableHead>
-                    <TableHead className="text-xs uppercase text-right">Pre-GST</TableHead>
-                    <TableHead className="text-xs uppercase text-right">GST</TableHead>
-                    <TableHead className="text-xs uppercase text-right">Total</TableHead>
-                    <TableHead className="text-xs uppercase">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {wo.purchaseInvoices.map((inv) => {
-                    const piTotal = Number(inv.valuePreGst || 0) + Number(inv.gstAmount || 0);
-                    return (
-                      <TableRow key={inv.id} className="hover:bg-muted/30">
-                        <TableCell className="text-sm font-mono">{inv.invoiceNo || "—"}</TableCell>
-                        <TableCell className="text-sm">{formatDate(inv.invoiceDate)}</TableCell>
-                        <TableCell className="text-sm">{inv.category || "—"}</TableCell>
-                        <TableCell className="text-sm">{inv.partyName || "—"}</TableCell>
-                        <TableCell className="text-sm text-right">{formatINR(Number(inv.valuePreGst || 0))}</TableCell>
-                        <TableCell className="text-sm text-right">{formatINR(Number(inv.gstAmount || 0))}</TableCell>
-                        <TableCell className="text-sm text-right font-medium">{formatINR(piTotal)}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <CanUpdate module="accounts.purchase-invoices">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0"
-                                onClick={() => navigate(paths.operations.editProjectPurchaseInvoicePage(inv.id, wo.projectId))}
-                                title="Edit Purchase Invoice"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </CanUpdate>
-                            <CanDelete module="accounts.purchase-invoices">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 text-destructive"
-                                onClick={() => setDeletePurchaseInvoice({ id: inv.id, invoiceNo: inv.invoiceNo || `#${inv.id}` })}
-                                title="Delete Purchase Invoice"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </CanDelete>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <CardFooter className="flex gap-3">
-        {wo.closedAt ? (
-          <div className="flex flex-col gap-1 text-sm">
-            <span className="flex items-center gap-2 font-medium text-green-700">
-              <CheckCircle2 className="h-5 w-5" />
-              Closed on {formatDate(wo.closedAt)}
-              {wo.closedByName ? ` by ${wo.closedByName}` : ""}
-            </span>
-            {wo.closureNote && (
-              <span className="text-muted-foreground">Closure note: {wo.closureNote}</span>
+            {paymentsRemaining > 0 && (
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                        <CardTitle>Record Payments</CardTitle>
+                        <Button variant="outline" size="sm" onClick={() => setPaymentRows(rows => [...rows, emptyPaymentRow()])}>
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add Row
+                        </Button>
+                    </CardHeader>
+                    <CardContent>
+                        {paymentRows.length === 0 ? (
+                            <p className="text-sm text-muted-foreground italic">No rows yet. Add a row to record a payment.</p>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="bg-muted/50">
+                                            <TableHead className="text-xs uppercase">Payment Date</TableHead>
+                                            <TableHead className="text-xs uppercase text-right">Amount</TableHead>
+                                            <TableHead className="text-xs uppercase">Account Name</TableHead>
+                                            <TableHead className="text-xs uppercase">Account No.</TableHead>
+                                            <TableHead className="text-xs uppercase">IFSC</TableHead>
+                                            <TableHead className="text-xs uppercase">UTR</TableHead>
+                                            <TableHead />
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {paymentRows.map((row, i) => (
+                                            <TableRow key={i} className="hover:bg-muted/30">
+                                                <TableCell>
+                                                    <Input type="date" className="h-8" value={row.paymentDate} onChange={e => updatePaymentRow(i, "paymentDate", e.target.value)} />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Input
+                                                        type="number"
+                                                        min="0"
+                                                        className="h-8 text-right"
+                                                        placeholder="0.00"
+                                                        value={row.amount}
+                                                        onChange={e => updatePaymentRow(i, "amount", e.target.value)}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Input
+                                                        className="h-8"
+                                                        placeholder={wo.sellerName || "Account name"}
+                                                        value={row.accountName}
+                                                        onChange={e => updatePaymentRow(i, "accountName", e.target.value)}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Input
+                                                        className="h-8"
+                                                        placeholder="Account no."
+                                                        value={row.accountNumber}
+                                                        onChange={e => updatePaymentRow(i, "accountNumber", e.target.value)}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Input
+                                                        className="h-8 font-mono uppercase"
+                                                        placeholder="IFSC"
+                                                        value={row.ifsc}
+                                                        onChange={e => updatePaymentRow(i, "ifsc", e.target.value)}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Input className="h-8 font-mono" placeholder="UTR" value={row.utr} onChange={e => updatePaymentRow(i, "utr", e.target.value)} />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-8 p-0 text-destructive"
+                                                        onClick={() => setPaymentRows(rows => rows.filter((_, idx) => idx !== i))}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        )}
+                        <div className="flex justify-end mt-4">
+                            {canCreate("accounts.payment-requests") && (
+                                <Button onClick={savePayments} disabled={savingPayments || paymentRows.length === 0}>
+                                    {savingPayments ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                                    Bulk Save Payments
+                                </Button>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
             )}
-          </div>
-        ) : (
-          canClose &&
-          hasClosePermission("accounts.vendor-work-orders") && (
-            <Button
-              className="bg-green-600 hover:bg-green-700"
-              onClick={() => {
-                setCloseError(null);
-                setShowCloseDialog(true);
-              }}
-            >
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              Close VWO
-            </Button>
-          )
-        )}
-      </CardFooter>
 
-      <CloseClosureDialog
-        open={showCloseDialog}
-        onClose={() => setShowCloseDialog(false)}
-        onConfirm={handleCloseWo}
-        pending={closingWo}
-        error={closeError}
-        title="Close Vendor Work Order"
-        referenceNo={wo.woNumber}
-        amountAfterTds={amountAfterTds}
-        totalPaymentDone={totalPaymentDone}
-        totalPiAmount={totalPiAmount}
-      />
+            {invoicesRemaining > 0 && (
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                        <CardTitle>Record Invoices</CardTitle>
+                        <Button variant="outline" size="sm" onClick={() => setInvoiceRows(rows => [...rows, emptyInvoiceRow()])}>
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add Row
+                        </Button>
+                    </CardHeader>
+                    <CardContent>
+                        {invoiceRows.length === 0 ? (
+                            <p className="text-sm text-muted-foreground italic">No rows yet. Add a row to record an invoice.</p>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="bg-muted/50">
+                                            <TableHead className="text-xs uppercase">Invoice No</TableHead>
+                                            <TableHead className="text-xs uppercase">Category</TableHead>
+                                            <TableHead className="text-xs uppercase">Invoice Date</TableHead>
+                                            <TableHead className="text-xs uppercase">Party Name</TableHead>
+                                            <TableHead className="text-xs uppercase text-right">Pre GST</TableHead>
+                                            <TableHead className="text-xs uppercase text-right">GST</TableHead>
+                                            <TableHead className="text-xs uppercase">Upload File</TableHead>
+                                            <TableHead />
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {invoiceRows.map((row, i) => (
+                                            <TableRow key={i} className="hover:bg-muted/30">
+                                                <TableCell>
+                                                    <Input
+                                                        className="h-8 w-32 font-mono"
+                                                        placeholder="Invoice no."
+                                                        value={row.invoiceNo}
+                                                        onChange={e => updateInvoiceRow(i, "invoiceNo", e.target.value)}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Select value={row.category} onValueChange={v => updateInvoiceRow(i, "category", v)}>
+                                                        <SelectTrigger size="sm" className="w-36">
+                                                            <SelectValue placeholder="Category" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {BUDGET_CATEGORIES.map(c => (
+                                                                <SelectItem key={c} value={c}>
+                                                                    {c}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Input
+                                                        type="date"
+                                                        className="h-8 w-36"
+                                                        value={row.invoiceDate}
+                                                        onChange={e => updateInvoiceRow(i, "invoiceDate", e.target.value)}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Input
+                                                        className="h-8 w-44"
+                                                        placeholder={wo.sellerName || "Party name"}
+                                                        value={row.partyName}
+                                                        onChange={e => updateInvoiceRow(i, "partyName", e.target.value)}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Input
+                                                        type="number"
+                                                        min="0"
+                                                        className="h-8 w-32 text-right"
+                                                        placeholder="0.00"
+                                                        value={row.valuePreGst}
+                                                        onChange={e => updateInvoiceRow(i, "valuePreGst", e.target.value)}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Input
+                                                        type="number"
+                                                        min="0"
+                                                        className="h-8 w-32 text-right"
+                                                        placeholder="0.00"
+                                                        value={row.gstAmount}
+                                                        onChange={e => updateInvoiceRow(i, "gstAmount", e.target.value)}
+                                                    />
+                                                </TableCell>
+                                                <TableCell className="min-w-[180px]">
+                                                    <FileUploader
+                                                        context="tender-documents"
+                                                        value={row.invoiceFile}
+                                                        onChange={paths => updateInvoiceRow(i, "invoiceFile", paths)}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-8 w-8 p-0 text-destructive"
+                                                        onClick={() => setInvoiceRows(rows => rows.filter((_, idx) => idx !== i))}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        )}
+                        <div className="flex justify-end mt-4">
+                            {canCreate("accounts.purchase-invoices") && (
+                                <Button onClick={saveInvoices} disabled={savingInvoices || invoiceRows.length === 0}>
+                                    {savingInvoices ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                                    Bulk Save Invoices
+                                </Button>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
-      {/* Delete Payment Request Confirmation Dialog */}
-      <AlertDialog open={!!deletePaymentRequest} onOpenChange={(open) => !open && setDeletePaymentRequest(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Payment Request</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete payment request <strong>{deletePaymentRequest?.requestNo}</strong>? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeletePaymentRequest(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeletePaymentRequest} className="bg-destructive hover:bg-destructive/90">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Payment Requests</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {wo.paymentRequests.length === 0 ? (
+                        <p className="text-sm text-muted-foreground italic">No payment requests yet.</p>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="bg-muted/50">
+                                        <TableHead className="text-xs uppercase">Request No</TableHead>
+                                        <TableHead className="text-xs uppercase">Date</TableHead>
+                                        <TableHead className="text-xs uppercase">Party</TableHead>
+                                        <TableHead className="text-xs uppercase text-right">Amount</TableHead>
+                                        {showTdsColumn && <TableHead className="text-xs uppercase text-right">TDS</TableHead>}
+                                        <TableHead className="text-xs uppercase">Status</TableHead>
+                                        <TableHead className="text-xs uppercase">Mode</TableHead>
+                                        <TableHead className="text-xs uppercase">UTR</TableHead>
+                                        <TableHead className="text-xs uppercase">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {wo.paymentRequests.map(pr => {
+                                        const cfg = { label: pr.status, variant: "outline" as const };
+                                        return (
+                                            <TableRow key={pr.id} className="hover:bg-muted/30">
+                                                <TableCell className="text-sm font-mono">{pr.requestNo || "—"}</TableCell>
+                                                <TableCell className="text-sm">{formatDate(pr.createdAt)}</TableCell>
+                                                <TableCell className="text-sm">{pr.partyName || "—"}</TableCell>
+                                                <TableCell className="text-sm text-right font-medium">{formatINR(Number(pr.amount || 0))}</TableCell>
+                                                {showTdsColumn && (
+                                                    <TableCell className="text-sm text-right">{pr.actualTdsDeducted ? formatINR(Number(pr.actualTdsDeducted)) : "—"}</TableCell>
+                                                )}
+                                                <TableCell>
+                                                    <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                                                </TableCell>
+                                                <TableCell className="text-sm">{pr.paymentMode || "—"}</TableCell>
+                                                <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">{pr.utrNumber || "—"}</TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-2">
+                                                        <CanUpdate module="accounts.payment-requests">
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="h-8 w-8 p-0"
+                                                                onClick={() => navigate(paths.operations.editProjectPaymentRequestPage(pr.id, wo.projectId))}
+                                                                title="Edit Payment Request"
+                                                            >
+                                                                <Edit className="h-4 w-4" />
+                                                            </Button>
+                                                        </CanUpdate>
+                                                        <CanDelete module="accounts.payment-requests">
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="h-8 w-8 p-0 text-destructive"
+                                                                onClick={() => setDeletePaymentRequest({ id: pr.id, requestNo: pr.requestNo || `#${pr.id}` })}
+                                                                title="Delete Payment Request"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </CanDelete>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                            {showTdsColumn && (
+                                <div className="flex justify-end gap-6 px-4 py-2 bg-muted/30 text-sm">
+                                    <span className="text-muted-foreground">Total Paid (Gross)</span>
+                                    <span className="font-semibold">{formatINR(totalPaymentDone)}</span>
+                                    <span className="text-muted-foreground">TDS Deducted</span>
+                                    <span className="font-semibold">{formatINR(totalTdsDeducted)}</span>
+                                    <span className="text-muted-foreground">After TDS</span>
+                                    <span className="font-semibold">{formatINR(totalPaidAfterTds)}</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
 
-      {/* Delete Purchase Invoice Confirmation Dialog */}
-      <AlertDialog open={!!deletePurchaseInvoice} onOpenChange={(open) => !open && setDeletePurchaseInvoice(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Purchase Invoice</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete purchase invoice <strong>{deletePurchaseInvoice?.invoiceNo}</strong>? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeletePurchaseInvoice(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeletePurchaseInvoice} className="bg-destructive hover:bg-destructive/90">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </Card>
-  );
+            <Card>
+                <CardHeader>
+                    <CardTitle>Purchase Invoices</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {wo.purchaseInvoices.length === 0 ? (
+                        <p className="text-sm text-muted-foreground italic">No purchase invoices yet.</p>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="bg-muted/50">
+                                        <TableHead className="text-xs uppercase">Invoice No</TableHead>
+                                        <TableHead className="text-xs uppercase">Date</TableHead>
+                                        <TableHead className="text-xs uppercase">Category</TableHead>
+                                        <TableHead className="text-xs uppercase">Party</TableHead>
+                                        <TableHead className="text-xs uppercase text-right">Pre-GST</TableHead>
+                                        <TableHead className="text-xs uppercase text-right">GST</TableHead>
+                                        <TableHead className="text-xs uppercase text-right">Total</TableHead>
+                                        <TableHead className="text-xs uppercase">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {wo.purchaseInvoices.map(inv => {
+                                        const piTotal = Number(inv.valuePreGst || 0) + Number(inv.gstAmount || 0);
+                                        return (
+                                            <TableRow key={inv.id} className="hover:bg-muted/30">
+                                                <TableCell className="text-sm font-mono">{inv.invoiceNo || "—"}</TableCell>
+                                                <TableCell className="text-sm">{formatDate(inv.invoiceDate)}</TableCell>
+                                                <TableCell className="text-sm">{inv.category || "—"}</TableCell>
+                                                <TableCell className="text-sm">{inv.partyName || "—"}</TableCell>
+                                                <TableCell className="text-sm text-right">{formatINR(Number(inv.valuePreGst || 0))}</TableCell>
+                                                <TableCell className="text-sm text-right">{formatINR(Number(inv.gstAmount || 0))}</TableCell>
+                                                <TableCell className="text-sm text-right font-medium">{formatINR(piTotal)}</TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-2">
+                                                        <CanUpdate module="accounts.purchase-invoices">
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="h-8 w-8 p-0"
+                                                                onClick={() => navigate(paths.operations.editProjectPurchaseInvoicePage(inv.id, wo.projectId))}
+                                                                title="Edit Purchase Invoice"
+                                                            >
+                                                                <Edit className="h-4 w-4" />
+                                                            </Button>
+                                                        </CanUpdate>
+                                                        <CanDelete module="accounts.purchase-invoices">
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="h-8 w-8 p-0 text-destructive"
+                                                                onClick={() => setDeletePurchaseInvoice({ id: inv.id, invoiceNo: inv.invoiceNo || `#${inv.id}` })}
+                                                                title="Delete Purchase Invoice"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </CanDelete>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            <CardFooter className="flex gap-3">
+                {wo.closedAt ? (
+                    <div className="flex flex-col gap-1 text-sm">
+                        <span className="flex items-center gap-2 font-medium text-green-700">
+                            <CheckCircle2 className="h-5 w-5" />
+                            Closed on {formatDate(wo.closedAt)}
+                            {wo.closedByName ? ` by ${wo.closedByName}` : ""}
+                        </span>
+                        {wo.closureNote && <span className="text-muted-foreground">Closure note: {wo.closureNote}</span>}
+                    </div>
+                ) : (
+                    canClose &&
+                    hasClosePermission("accounts.vendor-work-orders") && (
+                        <Button
+                            className="bg-green-600 hover:bg-green-700"
+                            onClick={() => {
+                                setCloseError(null);
+                                setShowCloseDialog(true);
+                            }}
+                        >
+                            <CheckCircle2 className="h-4 w-4 mr-2" />
+                            Close VWO
+                        </Button>
+                    )
+                )}
+            </CardFooter>
+
+            <CloseClosureDialog
+                open={showCloseDialog}
+                onClose={() => setShowCloseDialog(false)}
+                onConfirm={handleCloseWo}
+                pending={closingWo}
+                error={closeError}
+                title="Close Vendor Work Order"
+                referenceNo={wo.woNumber}
+                amountAfterTds={amountAfterTds}
+                grandTotal={grandTotal}
+                totalPaymentDone={totalPaymentDone}
+                totalTdsDeducted={totalTdsDeducted}
+                totalPaidAfterTds={totalPaidAfterTds}
+                totalPiAmount={totalPiAmount}
+            />
+
+            {/* Delete Payment Request Confirmation Dialog */}
+            <AlertDialog open={!!deletePaymentRequest} onOpenChange={open => !open && setDeletePaymentRequest(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Payment Request</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete payment request <strong>{deletePaymentRequest?.requestNo}</strong>? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setDeletePaymentRequest(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeletePaymentRequest} className="bg-destructive hover:bg-destructive/90">
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Delete Purchase Invoice Confirmation Dialog */}
+            <AlertDialog open={!!deletePurchaseInvoice} onOpenChange={open => !open && setDeletePurchaseInvoice(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Purchase Invoice</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete purchase invoice <strong>{deletePurchaseInvoice?.invoiceNo}</strong>? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setDeletePurchaseInvoice(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeletePurchaseInvoice} className="bg-destructive hover:bg-destructive/90">
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </Card>
+    );
 };
 export default VwoClosurePage;

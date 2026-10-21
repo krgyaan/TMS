@@ -2,6 +2,7 @@ import { items, locations, organizations, projects, teams, tenderClients, tender
 import { AppLogger } from '@/logger/app-logger.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { CashFlowService } from '@/modules/operations/cash-flows/cash-flow.service';
+import { OperationNotificationService } from '@/modules/operations/operation-notification.service';
 import { PaymentRequestService } from '@/modules/operations/payment-requests/payment-request.service';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
@@ -10,7 +11,7 @@ import { DRIZZLE } from '@db/database.module';
 import { users } from '@db/schemas/auth/users.schema';
 import { woBasicDetails, woContacts, woDetails, woOrderRevisions } from '@db/schemas/operations';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, desc, eq, ilike, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { AssignOeDto, BulkAssignOeDto, CreateWoBasicDetailDto, RemoveOeAssignmentDto, ReviseOrderDto, UpdateWoBasicDetailDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
 const oeFirstUser = alias(users, 'oeFirstUser');
@@ -29,6 +30,7 @@ export class WoBasicDetailsService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly paymentRequestService: PaymentRequestService,
         private readonly cashFlowService: CashFlowService,
+        private readonly operationNotifications: OperationNotificationService,
     ) {
         this.logger = this.appLogger.withContext(WoBasicDetailsService.name);
     }
@@ -351,7 +353,33 @@ export class WoBasicDetailsService {
         }
 
         const response = this.mapRowToResponse(row);
-        return response;
+        const gemCharges = await this.getGemCharges(id);
+        return { ...response, ...gemCharges };
+    }
+
+    /**
+     * Loads the auto-created GeM charges project payment request for a WO Basic Detail
+     * so it can be preloaded into the edit form and reconciled on update.
+     */
+    private async getGemCharges(woBasicDetailId: number) {
+        const [project] = await this.db
+            .select({ id: projects.id })
+            .from(projects)
+            .where(eq(projects.woBasicDetailId, woBasicDetailId))
+            .limit(1);
+
+        if (!project) {
+            return { gemChargesAmount: null, gemChargesPortalLink: null, gemChargesInvoice: null };
+        }
+
+        const requests = await this.paymentRequestService.getByProject(project.id);
+        const gemRequest: any = requests.find((r: any) => r.paymentAgainst === 'gem_charges') ?? null;
+
+        return {
+            gemChargesAmount: gemRequest?.amount != null ? Number(gemRequest.amount) : null,
+            gemChargesPortalLink: gemRequest?.portalLink ?? null,
+            gemChargesInvoice: gemRequest?.billFiles ? JSON.stringify(gemRequest.billFiles) : null,
+        };
     }
 
     async findByIdWithRelations(id: number) {
@@ -396,12 +424,14 @@ export class WoBasicDetailsService {
 
         let teamId: number | null = null;
         let prevStatus: number | null = null;
+        let organizationId: number | null = data.organizationId ?? null;
 
         if (data.tenderId) {
             const [tender] = await this.db
                 .select({
                     teamId: tenderInfos.team,
-                    status: tenderInfos.status
+                    status: tenderInfos.status,
+                    organizationId: tenderInfos.organization,
                 })
                 .from(tenderInfos)
                 .where(eq(tenderInfos.id, data.tenderId))
@@ -414,6 +444,7 @@ export class WoBasicDetailsService {
 
             teamId = tender.teamId;
             prevStatus = tender.status;
+            organizationId = tender.organizationId ?? organizationId;
         } else if (data.teamId) {
             // For non-tender WOs, use the provided teamId directly
             teamId = data.teamId;
@@ -473,10 +504,92 @@ export class WoBasicDetailsService {
             );
         }
 
+        // Send WhatsApp notification to the WORKORDER group (non-blocking)
+        if (row) {
+            this.notifyWoBasicDetailsWhatsapp(row, 'created', { organizationId });
+        }
+
         // Create Project asynchronously (non-blocking)
         this.safeCreateProject(data, row?.id, userId, insertValues.projectName ?? null);
 
         return this.mapRowToResponse(row!);
+    }
+
+    private notifyWoBasicDetailsWhatsapp(
+        row: WoBasicDetailRow,
+        kind: 'created' | 'updated' | 'revised',
+        options?: { organizationId?: number | null; revisionNumber?: number; revisionNotes?: string | null },
+    ): void {
+        void (async () => {
+            let organizationId = options?.organizationId ?? null;
+            let teamMemberId: number | null = null;
+            if (row.tenderId) {
+                const [tender] = await this.db
+                    .select({
+                        organizationId: tenderInfos.organization,
+                        teamMemberId: tenderInfos.teamMember,
+                    })
+                    .from(tenderInfos)
+                    .where(eq(tenderInfos.id, row.tenderId))
+                    .limit(1);
+                organizationId = organizationId ?? tender?.organizationId ?? null;
+                teamMemberId = tender?.teamMemberId ?? null;
+            }
+
+            let organizationName: string | null = null;
+            if (organizationId) {
+                const [org] = await this.db
+                    .select({ name: organizations.name, acronym: organizations.acronym })
+                    .from(organizations)
+                    .where(eq(organizations.id, organizationId))
+                    .limit(1);
+                organizationName = org?.name?.trim() || org?.acronym?.trim() || null;
+            }
+
+            const actorId = kind === 'created' ? row.createdBy : row.updatedBy;
+            let actorName: string | null = null;
+            let teamMemberName: string | null = null;
+            const userIds = [actorId, teamMemberId].filter((v): v is number => v != null);
+            if (userIds.length > 0) {
+                const userRows = await this.db
+                    .select({ id: users.id, name: users.name })
+                    .from(users)
+                    .where(inArray(users.id, userIds));
+                const nameById = new Map(userRows.map((u) => [u.id, u.name]));
+                actorName = actorId != null ? nameById.get(actorId) ?? null : null;
+                teamMemberName = teamMemberId != null ? nameById.get(teamMemberId) ?? null : null;
+            }
+
+            const payload = {
+                woBasicDetailId: row.id,
+                organizationName,
+                projectName: row.projectName,
+                projectCode: row.projectCode,
+                woValuePreGst: row.woValuePreGst,
+                actorName,
+                teamMemberName,
+            };
+
+            switch (kind) {
+                case 'created':
+                    await this.operationNotifications.notifyWoBasicDetailsCreated(payload);
+                    break;
+                case 'updated':
+                    await this.operationNotifications.notifyWoBasicDetailsUpdated(payload);
+                    break;
+                case 'revised':
+                    await this.operationNotifications.notifyWoBasicDetailsRevised({
+                        ...payload,
+                        revisionNumber: options?.revisionNumber ?? 1,
+                        revisionNotes: options?.revisionNotes ?? null,
+                    });
+                    break;
+            }
+        })().catch((error: unknown) => {
+            this.logger.error(
+                `Failed to send WO basic details WhatsApp notification for WO basic detail ${row.id}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        });
     }
 
     private async safeCreateProject(data: CreateWoBasicDetailDto, woBasicDetailId?: number, currentUserId?: number, actualProjectName?: string | null): Promise<void> {
@@ -652,17 +765,23 @@ export class WoBasicDetailsService {
      */
     private async createProjectPaymentRequest(
         projectId: number,
-        data: CreateWoBasicDetailDto,
+        data: Pick<CreateWoBasicDetailDto, 'projectName' | 'gemChargesAmount' | 'gemChargesPortalLink' | 'gemChargesInvoice'>,
         woBasicDetailId?: number,
         currentUserId?: number
     ): Promise<void> {
         try {
+            const amount = Number(data.gemChargesAmount) || 0;
+            if (!(amount > 0)) {
+                this.logger.log(`Skipping project payment request for WO Basic Detail ${woBasicDetailId}: GeM charges amount is 0`);
+                return;
+            }
+
             const gemInvoiceFiles = data.gemChargesInvoice ? JSON.parse(data.gemChargesInvoice) as string[] : [];
 
             const makerRequestBody: any = {
                 projectId,
                 projectName: data.projectName ?? null,
-                amount: data.gemChargesAmount || 0,
+                amount,
                 paymentAgainst: 'gem_charges',
                 paymentMode: 'PORTAL',
                 portalLink: data.gemChargesPortalLink || null,
@@ -732,7 +851,95 @@ export class WoBasicDetailsService {
             throw new NotFoundException(`WO Basic Detail with ID ${id} not found`);
         }
 
+        // Send WhatsApp notification to the WORKORDER group (non-blocking)
+        this.notifyWoBasicDetailsWhatsapp(row, 'updated');
+
+        // Reconcile the auto-created GeM charges project payment request (create / update / reject)
+        await this.reconcileGemChargesPaymentRequest(id, data, userId);
+
         return this.mapRowToResponse(row);
+    }
+
+    /**
+     * Keeps the auto-created GeM charges project payment request in sync when a
+     * WO Basic Detail is edited:
+     * - amount > 0 and no request          -> create it
+     * - amount > 0 and a pending request   -> update it in place
+     * - amount > 0 and a processed request -> leave it untouched (warn)
+     * - amount = 0 and a pending request   -> reject it
+     * - amount = 0 and a processed request -> leave it untouched (warn)
+     * - amount undefined                   -> no-op
+     */
+    private async reconcileGemChargesPaymentRequest(
+        woBasicDetailId: number,
+        data: UpdateWoBasicDetailDto,
+        currentUserId?: number,
+    ): Promise<void> {
+        if (data.gemChargesAmount === undefined) return;
+
+        const PENDING_STATUSES = ['pending', 'po_approval_pending'];
+
+        try {
+            const [project] = await this.db
+                .select({ id: projects.id, projectName: projects.projectName })
+                .from(projects)
+                .where(eq(projects.woBasicDetailId, woBasicDetailId))
+                .limit(1);
+
+            if (!project) {
+                this.logger.warn(`Skipping GeM charges reconciliation for WO Basic Detail ${woBasicDetailId}: no linked project found`);
+                return;
+            }
+
+            const requests = await this.paymentRequestService.getByProject(project.id);
+            const existing: any = requests.find((r: any) => r.paymentAgainst === 'gem_charges') ?? null;
+
+            const amount = Number(data.gemChargesAmount) || 0;
+
+            if (amount > 0) {
+                if (!existing) {
+                    await this.createProjectPaymentRequest(project.id, data, woBasicDetailId, currentUserId);
+                    return;
+                }
+
+                if (!PENDING_STATUSES.includes(existing.status)) {
+                    this.logger.warn(`Skipping GeM charges update for WO Basic Detail ${woBasicDetailId}: request ${existing.id} is "${existing.status}"`);
+                    return;
+                }
+
+                const gemInvoiceFiles = data.gemChargesInvoice ? JSON.parse(data.gemChargesInvoice) as string[] : [];
+                await this.paymentRequestService.update(existing.id, {
+                    amount,
+                    paymentAgainst: 'gem_charges',
+                    paymentMode: 'PORTAL',
+                    portalLink: data.gemChargesPortalLink || null,
+                    uploadedInvoiceFile: gemInvoiceFiles[0] ?? null,
+                    billFiles: gemInvoiceFiles,
+                    remark: `Auto-created from Basic Detail: ${woBasicDetailId}, for ${data.projectName ?? project.projectName ?? ''}`,
+                });
+                this.logger.log(`Updated project payment request ${existing.id} for WO Basic Detail ${woBasicDetailId}`);
+                return;
+            }
+
+            // amount === 0 -> clear
+            if (!existing) return;
+
+            if (!PENDING_STATUSES.includes(existing.status)) {
+                this.logger.warn(`Skipping GeM charges removal for WO Basic Detail ${woBasicDetailId}: request ${existing.id} is "${existing.status}"`);
+                return;
+            }
+
+            await this.paymentRequestService.updateStatus(existing.id, {
+                status: 'rejected',
+                rejectionReason: 'GeM charges removed from WO Basic Details',
+            });
+            this.logger.log(`Rejected project payment request ${existing.id} for WO Basic Detail ${woBasicDetailId}`);
+        } catch (error) {
+            this.logger.warn(
+                `Failed to reconcile GeM charges payment request for WO Basic Detail: ${woBasicDetailId}`,
+                error instanceof Error ? error.stack : String(error),
+            );
+        }
     }
 
     async delete(id: number): Promise<void> {
@@ -814,6 +1021,14 @@ export class WoBasicDetailsService {
             .update(projects)
             .set(projectSync)
             .where(eq(projects.woBasicDetailId, id));
+
+        // Send WhatsApp notification to the WORKORDER group (non-blocking)
+        if (updated) {
+            this.notifyWoBasicDetailsWhatsapp(updated, 'revised', {
+                revisionNumber,
+                revisionNotes: data.revisionNotes ?? null,
+            });
+        }
 
         const revisions = await this.getOrderRevisions(id);
 

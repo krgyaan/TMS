@@ -251,7 +251,10 @@ export class TenderExecutiveService {
         const toLocal = `(DATE '${toDay}' + TIME '23:59:59.999')`;
 
         const tenders = (await this.db.execute(sql.raw(`
-            SELECT DISTINCT ti.*
+            SELECT DISTINCT ti.*,
+                ti.tender_no   AS "tenderNo",
+                ti.tender_name AS "tenderName",
+                ti.due_date    AS "dueDate"
             FROM tender_infos ti
             WHERE ti.team_member = ${userId}
               AND ti.delete_status = 0
@@ -2060,17 +2063,15 @@ export class TenderExecutiveService {
                     itd.transaction_date,
                     pr.created_at
                 ) AS paid_at,
-                COALESCE(itd.return_transfer_date, pi.updated_at) AS returned_at,
+                COALESCE(itd.return_transfer_date, pi.transfer_date, pi.updated_at) AS returned_at,
                 (
                        (pi.instrument_type IN ('DD','FDR')                      AND pi.action IN (3,4,7))
                     OR (pi.instrument_type IN ('Bank Transfer','Portal Payment') AND pi.action IN (3,4))
-                    OR (pi.instrument_type = 'Cheque'                           AND pi.action IN (3,4,5,6))
                     OR (pi.instrument_type = 'BG'                               AND pi.action IN (6,8,9))
                 ) AS has_return,
                 CASE
                     WHEN (pi.instrument_type IN ('DD','FDR')                      AND pi.action IN (3,4,7))
                       OR (pi.instrument_type IN ('Bank Transfer','Portal Payment') AND pi.action IN (3))
-                      OR (pi.instrument_type = 'Cheque'                           AND pi.action IN (3,6))
                       OR (pi.instrument_type = 'BG'                               AND pi.action IN (6,8,9)) THEN 'RETURNED'
                     WHEN (pi.instrument_type IN ('DD','FDR')                      AND pi.action IN (5))
                       OR (pi.instrument_type IN ('Bank Transfer','Portal Payment') AND pi.action IN (4))
@@ -2112,7 +2113,7 @@ export class TenderExecutiveService {
             emd_state AS "emdState"
         FROM emd
         WHERE paid_at < '${from}'
-        AND (NOT has_return OR returned_at >= '${from}')
+        AND (NOT has_return OR returned_at > '${to}')
         `);
 
         const paidDuring = await exec(`${emdCte}
@@ -2135,6 +2136,7 @@ export class TenderExecutiveService {
             emd_state AS "emdState"
         FROM emd
         WHERE paid_at BETWEEN '${from}' AND '${to}'
+        AND (NOT has_return OR returned_at > '${to}')
         `);
 
         const receivedForPrior = await exec(`${emdCte}
@@ -2208,6 +2210,60 @@ export class TenderExecutiveService {
         AND (NOT has_return OR returned_at >= '${to}')
         `);
 
+        type EmdLifetimeRow = {
+            instrumentId: number;
+            tenderId: number | null;
+            value: number | null;
+            status: string | null;
+            instrumentType: string | null;
+            tenderNo: string | null;
+            tenderName: string | null;
+            transferDate: string | null;
+            date: string | null;
+            paidDate: string | null;
+            returnedAt: string | null;
+            returnDate: string | null;
+            returnUtr: string | null;
+            returnReason: string | null;
+            returnDateDerived: boolean | null;
+            emdState: string | null;
+        };
+
+        const lifetime = (await exec(`${emdCte}
+        SELECT
+            instrument_id AS "instrumentId",
+            tender_id AS "tenderId",
+            value,
+            status,
+            instrument_type AS "instrumentType",
+            tender_no AS "tenderNo",
+            tender_name AS "tenderName",
+            transfer_date AS "transferDate",
+            paid_at AS "date",
+            paid_at AS "paidDate",
+            returned_at AS "returnedAt",
+            return_date AS "returnDate",
+            return_utr AS "returnUtr",
+            return_reason AS "returnReason",
+            return_date_derived AS "returnDateDerived",
+            emd_state AS "emdState"
+        FROM emd
+        `)) as EmdLifetimeRow[];
+
+        const lifetimePaid = {
+            count: lifetime.length,
+            value: Number(sumValue(lifetime)),
+            drilldown: lifetime,
+        };
+
+        const lifetimeReceivedRows = lifetime.filter(r => r.emdState === "RETURNED").map(r => ({ ...r, date: r.returnedAt ?? r.date }));
+
+        const lifetimeReceived = {
+            count: lifetimeReceivedRows.length,
+            value: Number(sumValue(lifetimeReceivedRows)),
+            drilldown: lifetimeReceivedRows,
+        };
+
         let otherThanTms: any[] | null = null;
 
         if (query.view === "team" && query.teamId === 1) {
@@ -2265,6 +2321,11 @@ export class TenderExecutiveService {
             },
 
             otherThanTms,
+
+            lifetime: {
+                paid: lifetimePaid,
+                received: lifetimeReceived,
+            },
         };
     }
 }

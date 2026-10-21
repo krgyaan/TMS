@@ -1,7 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
-    AlertCircle, ArrowLeft, CheckCircle2, Clock, 
+    AlertCircle, ArrowLeft, CheckCircle2, Layers,
     Building2, User, Paperclip, ExternalLink, 
     FileText, FileWarning, Calendar, List 
 } from 'lucide-react';
@@ -10,11 +10,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardAction, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { paths } from '@/app/routes/paths';
-import { useRfq, useResponseStatus } from '@/hooks/api/useRfqs';
+import { useRfq, useRfqByTenderId, useResponseStatus } from '@/hooks/api/useRfqs';
 import { useRfqResponses } from '@/hooks/api/useRfqResponses';
 import { RfqResponseForm } from './components/RfqResponseForm';
-import { formatDateTime } from '@/hooks/useFormatedDate';
+import { buildRfqBatches } from '@/modules/tendering/rfqs/helpers/rfqBatch';
+import { formatDateTime, formatDate } from '@/hooks/useFormatedDate';
 
 export default function RfqResponseCreatePage() {
     const navigate = useNavigate();
@@ -30,6 +32,12 @@ export default function RfqResponseCreatePage() {
 
     const receivedResponses = responsesData?.currentRfqResponses || [];
     const pendingResponses = responsesData?.pendingTenderResponses || [];
+
+    // All RFQ send batches for this tender, so a response can be recorded against any of them
+    const { data: allBatches } = useRfqByTenderId(rfq?.tenderId ?? null);
+    const allTenderResponses = responsesData?.allTenderResponses ?? [];
+    const batches = buildRfqBatches(allBatches, allTenderResponses);
+    const currentBatch = batches.find((batch) => batch.id === rfqId) ?? null;
 
     if (!rfqIdParam || Number.isNaN(rfqId!)) {
         return (
@@ -125,6 +133,38 @@ export default function RfqResponseCreatePage() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-6">
+                    {batches.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-3 mb-6 pb-4 border-b border-muted">
+                            <span className="text-xs font-bold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
+                                <Layers className="h-4 w-4 text-primary" />
+                                RFQ Batch
+                            </span>
+                            <Select
+                                value={String(rfqId)}
+                                onValueChange={(value) => navigate(paths.tendering.rfqsResponseNew(value), { replace: true })}
+                            >
+                                <SelectTrigger className="w-full sm:w-[440px] h-9 text-xs">
+                                    <SelectValue placeholder="Select batch" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {batches.map((batch) => (
+                                        <SelectItem key={batch.id} value={String(batch.id)} className="text-xs">
+                                            Batch #{batch.batchNo}
+                                            {batch.createdAt ? ` · sent ${formatDate(batch.createdAt)}` : ''}
+                                            {batch.dueDate ? ` · due ${formatDate(batch.dueDate)}` : ''}
+                                            {` · ${batch.responseCount} response${batch.responseCount === 1 ? '' : 's'}`}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {currentBatch && (
+                                <span className="text-[11px] text-muted-foreground">
+                                    Recording against <span className="font-semibold text-foreground">Batch #{currentBatch.batchNo}</span>
+                                    {currentBatch.createdAt ? ` (sent ${formatDate(currentBatch.createdAt)})` : ''}
+                                </span>
+                            )}
+                        </div>
+                    )}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                         {/* Left Column: RFQ & Tender Details + Requested Items */}
                         <div className="space-y-6 pr-0 lg:pr-6 lg:border-r border-muted">
@@ -363,6 +403,7 @@ export default function RfqResponseCreatePage() {
             </Card>
 
             <RfqResponseForm
+                key={rfqId}
                 rfqId={rfqId!}
                 rfqData={rfqData}
                 orgs={orgs}

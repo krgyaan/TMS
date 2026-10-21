@@ -9,7 +9,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import DataTable from '@/components/ui/data-table';
 import { Input } from '@/components/ui/input';
 import { QuickFilter } from '@/components/ui/quick-filter';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useDeleteRfq, useRfqsDashboard, useRfqsDashboardCounts } from '@/hooks/api/useRfqs';
@@ -47,7 +46,7 @@ const Rfqs = () => {
     });
     const { hasTenderingPermission } = useTenderingPermissions();
 
-    const { data: apiResponse, isLoading: loading, error } = useRfqsDashboard({
+    const { data: apiResponse, isLoading, isPlaceholderData, error } = useRfqsDashboard({
         tab: activeTab,
         page: pagination.pageIndex + 1,
         limit: pagination.pageSize,
@@ -55,6 +54,10 @@ const Rfqs = () => {
         sortOrder: sortModel[0]?.sort,
         search: debouncedSearch || undefined,
     });
+
+    // Treat placeholder (previous selection's data) as loading so the grid shows a fetching
+    // state and row actions/pagination stay disabled until the new results arrive.
+    const loading = isLoading || isPlaceholderData;
 
     const { data: counts } = useRfqsDashboardCounts();
 
@@ -65,12 +68,12 @@ const Rfqs = () => {
 
     const rfqsActions = useMemo<ActionItem<RfqDashboardRowWithTimer>[]>(() => [
         {
-            label: 'Record Receipt',
+            label: 'Record Response',
             onClick: (row: RfqDashboardRowWithTimer) => {
                 if (row.rfqId) navigate(paths.tendering.rfqsResponseNew(row.rfqId));
             },
             icon: <ClipboardList className="h-4 w-4" />,
-            //we will only show the rfq record receipt for the sent tab
+            //we will only show the rfq record response for the sent tab
             visible: (row: RfqDashboardRowWithTimer) => (activeTab === 'sent') && row.rfqId != null,
         },
         {
@@ -191,14 +194,14 @@ const Rfqs = () => {
                     </Badge>
                 );
             },
-            hide: activeTab == 'pending' || activeTab ==  'responses' || activeTab == 'rfq-rejected',
+            hide: activeTab == 'tender-dnb',
             sortable: true,
             filter: true,
         },
         {
             field: 'vendorOrganizationNames',
             headerName: 'Vendor',
-            width: 150,
+            width: 250,
             colId: 'vendorOrganizationNames',
             cellRenderer: (params: any) => {
                 const orgs = params.data?.vendorOrganizations || [];
@@ -231,25 +234,6 @@ const Rfqs = () => {
             filter: true,
             hide: activeTab == "rfq-rejected",
         },
-        // {
-        //     field: 'rfqStatus',
-        //     headerName: 'RFQ Status',
-        //     width: 200,
-        //     colId: 'rfqStatus',
-        //     valueGetter: (params: any) => params.data?.responseStatus ? params.data.responseStatus : '—',
-        //     cellRenderer: (params: any) => {
-        //         const status = params.value;
-        //         if (!status) return '—';
-        //         return (
-        //             <Badge variant="default">
-        //                 {status}
-        //             </Badge>
-        //         );
-        //     },
-        //     sortable: true,
-        //     filter: true,
-        //     hide: activeTab !== 'responses',
-        // },
         {
             field: 'statusName',
             headerName: 'Tender Status',
@@ -301,27 +285,6 @@ const Rfqs = () => {
             width: 57,
         },
     ], [rfqsActions, activeTab]);
-
-    if (loading) {
-        return (
-            <Card>
-                <CardHeader>
-                    <Skeleton className="h-8 w-64" />
-                    <Skeleton className="h-4 w-48 mt-2" />
-                </CardHeader>
-                <CardContent className="p-6">
-                    <div className="space-y-4">
-                        <div className="flex gap-2">
-                            {Array.from({ length: 4 }).map((_, i) => (
-                                <Skeleton key={i} className="h-10 w-24 flex-1" />
-                            ))}
-                        </div>
-                        <Skeleton className="h-[500px] w-full" />
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
 
     if (error) {
         return (
@@ -409,7 +372,7 @@ const Rfqs = () => {
                         >
                             {activeTab === tab.key && (
                                 <>
-                                    {(!rfqsData || rfqsData.length === 0) ? (
+                                    {!loading && (!rfqsData || rfqsData.length === 0) ? (
                                         <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
                                             <FileX2 className="h-12 w-12 mb-4" />
                                             <p className="text-lg font-medium">No {tab.name.toLowerCase()} RFQs</p>

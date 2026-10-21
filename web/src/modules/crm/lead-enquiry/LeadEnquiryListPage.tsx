@@ -6,7 +6,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { ColDef } from "ag-grid-community";
+import type { ColDef, ValueFormatterParams } from "ag-grid-community";
 import DataTable from "@/components/ui/data-table";
 import { Plus, Search, Pencil, Eye, XCircle, MapPin, FileText, MessageCircle } from "lucide-react";
 import { paths } from "@/app/routes/paths";
@@ -253,7 +253,18 @@ const EnquiryListPage = () => {
             width: 160,
             cellRenderer: (params: any) => params.value ? params.value : <span className="text-muted-foreground">-</span>,
         },
-        { field: "approxValue", headerName: "Approx Value", width: 130 },
+        {
+            field: "approxValue",
+            headerName: "Approx Value",
+            width: 130,
+            valueFormatter: (params: ValueFormatterParams) =>
+                params.value == null || Number.isNaN(Number(params.value))
+                    ? "-"
+                    : `₹${Number(params.value).toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                      })}`,
+        },
         {
             headerName: "Site Visit",
             width: 110,

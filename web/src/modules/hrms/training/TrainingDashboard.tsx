@@ -1,6 +1,6 @@
 import { paths } from "@/app/routes/paths";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDeleteTrainingVideo, useLearnersProgress, useTogglePublishTrainingVideo, useTrainingVideos } from "@/hooks/api/useTraining";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
@@ -125,19 +125,13 @@ const TrainingDashboard = () => {
         <Card>
             {/* Header */}
             <CardHeader className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-                <div>
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="h-10 w-10 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
-                            <GraduationCap className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-                                Training Center
-                            </h1>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                                Manage courses, track progress, and empower your team
-                            </p>
-                        </div>
+                <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+                        <GraduationCap className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                        <CardTitle>Training Center</CardTitle>
+                        <CardDescription>Manage courses, track progress, and empower your team</CardDescription>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">

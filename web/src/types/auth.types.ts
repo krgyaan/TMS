@@ -51,6 +51,10 @@ export interface UserProfile {
     currentAddress: any;
     permanentAddress: any;
     emergencyContact: any;
+    bloodGroup: string | null;
+    linkedinProfile: string | null;
+    pfNumber: string | null;
+    profileCompleted: boolean;
     profilePhoto: string | null;
     googlePhoto : string | null;
     createdAt: string | null;
