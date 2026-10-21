@@ -33,10 +33,22 @@ const TABS_CONFIG: Array<{ key: BankGuaranteeDashboardTab; name: string; icon: R
         description: 'New bank guarantee requests',
     },
     {
-        key: 'live-bgs',
-        name: 'Live BGs',
+        key: 'live-pnb',
+        name: 'Live PNB',
         icon: <Shield className="h-4 w-4" />,
-        description: 'Active bank guarantees across all banks',
+        description: 'Live bank guarantees from PNB',
+    },
+    {
+        key: 'live-bg-limit',
+        name: 'Live BG Limit',
+        icon: <Shield className="h-4 w-4" />,
+        description: 'Live bank guarantees within limit',
+    },
+    {
+        key: 'live-sbi',
+        name: 'Live SBI',
+        icon: <Shield className="h-4 w-4" />,
+        description: 'Live bank guarantees from SBI',
     },
     {
         key: 'cancelled',
@@ -81,7 +93,7 @@ const BankGuaranteeListPage = () => {
         handleSortChanged,
         handlePageSizeChange,
     } = usePersistentTableState({
-        storageKey: 'bank-guarantees-v2',
+        storageKey: 'bank-guarantees-v3',
         defaultTab: 'new-requests' as BankGuaranteeDashboardTab,
     });
     const navigate = useNavigate();
@@ -106,7 +118,7 @@ const BankGuaranteeListPage = () => {
         getExportDataFn: (params) => bankGuaranteesService.getExportData(params),
         tabsConfig: TABS_CONFIG,
         pendingTabKey: 'new-requests',
-        tabsWithForm: ['live-bgs', 'cancelled', 'rejected'],
+        tabsWithForm: ['live-pnb', 'live-bg-limit', 'live-sbi', 'cancelled', 'rejected'],
         filenamePrefix: 'bank-guarantees',
         flattenFormData,
         mapPendingRow: (r: any) => ({
