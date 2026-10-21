@@ -1,35 +1,33 @@
 import React from 'react'
-import { MoreVertical, TrendingUp } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import type { QueueStats } from '../types/queue.types'
 import { QueueHealthIndicator } from './QueueHealthIndicator'
 
 interface QueueCardProps {
     queue: QueueStats
     onViewDetails?: () => void
-    onPauseResume?: () => void
 }
 
 export const QueueCard: React.FC<QueueCardProps> = ({
     queue,
     onViewDetails,
-    onPauseResume,
 }) => {
     const totalJobs = queue.counts.waiting + queue.counts.active + queue.counts.completed + queue.counts.failed + queue.counts.delayed
 
     return (
-        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-card rounded-lg border border-border p-6 shadow-sm hover:shadow-md transition-shadow">
             {/* Header */}
             <div className="flex items-start justify-between mb-4">
                 <div>
-                    <h3 className="text-lg font-semibold text-gray-900">
+                    <h3 className="text-lg font-semibold text-foreground">
                         {queue.displayName}
                     </h3>
-                    <p className="text-xs text-gray-500 mt-1">{queue.name}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{queue.name}</p>
                 </div>
                 <div className="flex gap-2">
                     <QueueHealthIndicator health={queue.health} size="sm" />
                     {queue.isPaused && (
-                        <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded">
+                        <span className="px-2 py-1 bg-muted text-muted-foreground text-xs font-medium rounded">
                             Paused
                         </span>
                     )}
@@ -38,7 +36,7 @@ export const QueueCard: React.FC<QueueCardProps> = ({
 
             {/* Job Status Bar */}
             <div className="mb-4">
-                <div className="flex gap-1 h-2 rounded-full overflow-hidden bg-gray-100">
+                <div className="flex gap-1 h-2 rounded-full overflow-hidden bg-muted">
                     {totalJobs > 0 ? (
                         <>
                             <div
@@ -49,14 +47,14 @@ export const QueueCard: React.FC<QueueCardProps> = ({
                                 title={`Waiting: ${queue.counts.waiting}`}
                             />
                             <div
-                                className="bg-green-500"
+                                className="bg-emerald-500"
                                 style={{
                                     width: `${(queue.counts.active / totalJobs) * 100}%`,
                                 }}
                                 title={`Active: ${queue.counts.active}`}
                             />
                             <div
-                                className="bg-gray-400"
+                                className="bg-muted-foreground/40"
                                 style={{
                                     width: `${(queue.counts.completed / totalJobs) * 100}%`,
                                 }}
@@ -71,7 +69,7 @@ export const QueueCard: React.FC<QueueCardProps> = ({
                             />
                         </>
                     ) : (
-                        <div className="w-full bg-gray-300" />
+                        <div className="w-full bg-muted-foreground/30" />
                     )}
                 </div>
             </div>
@@ -79,62 +77,58 @@ export const QueueCard: React.FC<QueueCardProps> = ({
             {/* Primary Metrics */}
             <div className="grid grid-cols-4 gap-3 mb-4">
                 <div className="text-center">
-                    <p className="text-2xl font-bold text-blue-600">
+                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                         {queue.counts.waiting}
                     </p>
-                    <p className="text-xs text-gray-600">Waiting</p>
+                    <p className="text-xs text-muted-foreground">Waiting</p>
                 </div>
                 <div className="text-center">
-                    <p className="text-2xl font-bold text-green-600">
+                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                         {queue.counts.active}
                     </p>
-                    <p className="text-xs text-gray-600">Active</p>
+                    <p className="text-xs text-muted-foreground">Active</p>
                 </div>
                 <div className="text-center">
-                    <p className="text-2xl font-bold text-gray-600">
+                    <p className="text-2xl font-bold text-foreground">
                         {queue.counts.completed}
                     </p>
-                    <p className="text-xs text-gray-600">Done</p>
+                    <p className="text-xs text-muted-foreground">Done</p>
                 </div>
                 <div className="text-center">
-                    <p className="text-2xl font-bold text-red-600">
+                    <p className="text-2xl font-bold text-red-600 dark:text-red-400">
                         {queue.counts.failed}
                     </p>
-                    <p className="text-xs text-gray-600">Failed</p>
+                    <p className="text-xs text-muted-foreground">Failed</p>
                 </div>
             </div>
 
             {/* Rates */}
-            <div className="mb-4 pb-4 border-b border-gray-200">
+            <div className="mb-4 pb-4 border-b border-border">
                 <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-600">
-                        Completion: <span className="font-semibold">{queue.rates.completionRate.toFixed(1)}%</span>
+                    <span className="text-muted-foreground">
+                        Completion: <span className="font-semibold text-foreground">{queue.rates.completionRate.toFixed(1)}%</span>
                     </span>
-                    <span className="text-gray-600">
-                        Avg: <span className="font-semibold">{(queue.rates.averageProcessingTime / 1000).toFixed(1)}s</span>
+                    <span className="text-muted-foreground">
+                        Avg: <span className="font-semibold text-foreground">{(queue.rates.averageProcessingTime / 1000).toFixed(1)}s</span>
                     </span>
                 </div>
             </div>
 
             {/* Last Activity */}
-            <div className="text-xs text-gray-500 mb-4">
-                Last activity: {queue.lastActivity.toLocaleTimeString()}
+            <div className="text-xs text-muted-foreground mb-4">
+                Last activity: {new Date(queue.lastActivity).toLocaleTimeString()}
             </div>
 
             {/* Actions */}
             <div className="flex gap-2">
-                <button
+                <Button
+                    variant="outline"
+                    size="sm"
                     onClick={onViewDetails}
-                    className="flex-1 px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded border border-blue-200 transition-colors"
+                    className="flex-1"
                 >
                     View Details
-                </button>
-                <button
-                    className="px-3 py-2 text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                    title="More options"
-                >
-                    <MoreVertical className="w-4 h-4" />
-                </button>
+                </Button>
             </div>
         </div>
     )

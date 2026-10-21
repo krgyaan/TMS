@@ -18,21 +18,15 @@ export const QueueHealthIndicator: React.FC<QueueHealthIndicatorProps> = ({
     }
 
     const colorMap = {
-        healthy: 'text-green-500',
-        degraded: 'text-yellow-500',
-        critical: 'text-red-500',
+        healthy: 'text-emerald-600 dark:text-emerald-400',
+        degraded: 'text-amber-600 dark:text-amber-400',
+        critical: 'text-red-600 dark:text-red-400',
     }
 
     const bgColorMap = {
-        healthy: 'bg-green-50',
-        degraded: 'bg-yellow-50',
-        critical: 'bg-red-50',
-    }
-
-    const textColorMap = {
-        healthy: 'text-green-700',
-        degraded: 'text-yellow-700',
-        critical: 'text-red-700',
+        healthy: 'bg-emerald-500/10 border-emerald-500/20',
+        degraded: 'bg-amber-500/10 border-amber-500/20',
+        critical: 'bg-red-500/10 border-red-500/20',
     }
 
     const labelMap = {
@@ -48,9 +42,9 @@ export const QueueHealthIndicator: React.FC<QueueHealthIndicatorProps> = ({
     }[health]
 
     return (
-        <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${bgColorMap[health]}`}>
+        <div className={`flex items-center gap-2 px-3 py-1 rounded-full border ${bgColorMap[health]}`}>
             <IconComponent className={`${sizeMap[size]} ${colorMap[health]}`} />
-            <span className={`text-xs font-semibold ${textColorMap[health]}`}>
+            <span className={`text-xs font-semibold ${colorMap[health]}`}>
                 {labelMap[health]}
             </span>
         </div>

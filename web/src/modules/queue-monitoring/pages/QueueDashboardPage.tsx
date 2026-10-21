@@ -1,12 +1,18 @@
 import { AlertCircle, RefreshCw } from 'lucide-react'
 import React from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Button } from '@/components/ui/button'
 import { QueueCard } from '../components/QueueCard'
 import { useQueueStats } from '@/hooks/api/useQueueStats'
 
 export const QueueDashboardPage: React.FC = () => {
-    const { data: statsData, isLoading, isFetching, error, refetch } = useQueueStats()
+    const navigate = useNavigate()
     const [autoRefresh, setAutoRefresh] = React.useState(true)
     const [refreshInterval, setRefreshInterval] = React.useState(10000)
+
+    const { data: statsData, isLoading, isFetching, error, refetch } = useQueueStats({
+        refetchInterval: autoRefresh ? refreshInterval : false,
+    })
 
     const formatLastUpdated = (date: Date) => {
         const now = new Date()
@@ -20,19 +26,16 @@ export const QueueDashboardPage: React.FC = () => {
     if (error) {
         return (
             <div className="p-6">
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                <div className="border border-destructive/20 bg-destructive/10 rounded-lg p-4 flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-destructive mt-0.5 flex-shrink-0" />
                     <div>
-                        <h3 className="font-semibold text-red-900">Failed to load queue stats</h3>
-                        <p className="text-sm text-red-700 mt-1">
+                        <h3 className="font-semibold text-destructive">Failed to load queue stats</h3>
+                        <p className="text-sm text-destructive/90 mt-1">
                             {error instanceof Error ? error.message : 'An error occurred while fetching queue data'}
                         </p>
-                        <button
-                            onClick={() => refetch()}
-                            className="mt-3 px-3 py-1 text-sm font-medium text-red-600 hover:bg-red-100 rounded transition-colors"
-                        >
+                        <Button variant="outline" size="sm" onClick={() => refetch()} className="mt-3">
                             Try Again
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </div>
@@ -40,56 +43,58 @@ export const QueueDashboardPage: React.FC = () => {
     }
 
     return (
-        <div className="p-6 bg-gray-50 min-h-screen">
+        <div className="p-6">
             {/* Header */}
             <div className="mb-8">
                 <div className="flex items-center justify-between mb-4">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900">Queue Monitoring</h1>
-                        <p className="text-gray-600 mt-1">Monitor and manage BullMQ job queues</p>
+                        <h1 className="text-3xl font-bold text-foreground">Queue Monitoring</h1>
+                        <p className="text-muted-foreground mt-1">Monitor and manage BullMQ job queues</p>
                     </div>
                     <div className="flex items-center gap-3">
-                        <button
+                        <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => refetch()}
                             disabled={isFetching}
-                            className="p-2 text-gray-600 hover:bg-white rounded-lg transition-colors disabled:opacity-50"
                         >
-                            <RefreshCw className={`w-5 h-5 ${isFetching ? 'animate-spin' : ''}`} />
-                        </button>
+                            <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+                            Refresh
+                        </Button>
                     </div>
                 </div>
 
                 {/* Status Bar */}
-                <div className="bg-white rounded-lg border border-gray-200 p-4 flex items-center justify-between">
+                <div className="rounded-lg border border-border p-4 flex items-center justify-between">
                     <div className="flex items-center gap-6">
                         <div>
-                            <p className="text-xs text-gray-600">Last updated</p>
-                            <p className="text-sm font-semibold text-gray-900">
+                            <p className="text-xs text-muted-foreground">Last updated</p>
+                            <p className="text-sm font-semibold text-foreground">
                                 {statsData ? formatLastUpdated(statsData.timestamp) : '-'}
                             </p>
                         </div>
                         {statsData && (
                             <div className="flex items-center gap-2">
-                                <div className="w-16 h-16 rounded-full border-4 border-gray-200 flex items-center justify-center bg-blue-50">
+                                <div className="w-16 h-16 rounded-full border-4 border-border flex items-center justify-center bg-blue-500/10">
                                     <div className="text-center">
-                                        <p className="text-xl font-bold text-blue-600">
+                                        <p className="text-xl font-bold text-blue-600 dark:text-blue-400">
                                             {statsData.summary.healthScore}
                                         </p>
-                                        <p className="text-xs text-gray-600">Health</p>
+                                        <p className="text-xs text-muted-foreground">Health</p>
                                     </div>
                                 </div>
                                 {statsData.summary.criticalQueues > 0 && (
-                                    <div className="flex items-center gap-2 px-3 py-2 bg-red-50 rounded-lg">
-                                        <AlertCircle className="w-4 h-4 text-red-600" />
-                                        <span className="text-sm font-semibold text-red-700">
+                                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20">
+                                        <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                                        <span className="text-sm font-semibold text-red-600 dark:text-red-400">
                                             {statsData.summary.criticalQueues} Critical
                                         </span>
                                     </div>
                                 )}
                                 {statsData.summary.degradedQueues > 0 && (
-                                    <div className="flex items-center gap-2 px-3 py-2 bg-yellow-50 rounded-lg">
-                                        <AlertCircle className="w-4 h-4 text-yellow-600" />
-                                        <span className="text-sm font-semibold text-yellow-700">
+                                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                                        <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                                        <span className="text-sm font-semibold text-amber-600 dark:text-amber-400">
                                             {statsData.summary.degradedQueues} Degraded
                                         </span>
                                     </div>
@@ -98,7 +103,7 @@ export const QueueDashboardPage: React.FC = () => {
                         )}
                     </div>
                     <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-600">Auto-refresh:</span>
+                        <span className="text-sm text-muted-foreground">Auto-refresh:</span>
                         <select
                             value={autoRefresh ? refreshInterval : 'manual'}
                             onChange={(e) => {
@@ -109,7 +114,7 @@ export const QueueDashboardPage: React.FC = () => {
                                     setAutoRefresh(true)
                                 }
                             }}
-                            className="px-3 py-1 text-sm border border-gray-300 rounded bg-white hover:border-gray-400 transition-colors"
+                            className="px-3 py-1 text-sm border border-border rounded bg-card text-foreground hover:border-muted-foreground transition-colors"
                         >
                             <option value="5000">Every 5s</option>
                             <option value="10000">Every 10s</option>
@@ -123,28 +128,28 @@ export const QueueDashboardPage: React.FC = () => {
             {/* Summary Metrics */}
             {statsData && (
                 <div className="grid grid-cols-4 gap-4 mb-8">
-                    <div className="bg-white rounded-lg border border-gray-200 p-4">
-                        <p className="text-xs text-gray-600 mb-2">Total Waiting</p>
-                        <p className="text-3xl font-bold text-blue-600">
+                    <div className="rounded-lg border border-border p-4">
+                        <p className="text-xs text-muted-foreground mb-2">Total Waiting</p>
+                        <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
                             {statsData.summary.totalWaiting}
                         </p>
                     </div>
-                    <div className="bg-white rounded-lg border border-gray-200 p-4">
-                        <p className="text-xs text-gray-600 mb-2">Total Active</p>
-                        <p className="text-3xl font-bold text-green-600">
+                    <div className="rounded-lg border border-border p-4">
+                        <p className="text-xs text-muted-foreground mb-2">Total Active</p>
+                        <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">
                             {statsData.summary.totalActive}
                         </p>
                     </div>
-                    <div className="bg-white rounded-lg border border-gray-200 p-4">
-                        <p className="text-xs text-gray-600 mb-2">Total Failed</p>
-                        <p className="text-3xl font-bold text-red-600">
+                    <div className="rounded-lg border border-border p-4">
+                        <p className="text-xs text-muted-foreground mb-2">Total Failed</p>
+                        <p className="text-3xl font-bold text-red-600 dark:text-red-400">
                             {statsData.summary.totalFailed}
                         </p>
                     </div>
-                    <div className="bg-white rounded-lg border border-gray-200 p-4">
-                        <p className="text-xs text-gray-600 mb-2">Total Completed</p>
-                        <p className="text-3xl font-bold text-gray-600">
-                            {statsData.summary.totalWaiting + statsData.summary.totalActive + statsData.summary.totalFailed + 1024}
+                    <div className="rounded-lg border border-border p-4">
+                        <p className="text-xs text-muted-foreground mb-2">Total Completed</p>
+                        <p className="text-3xl font-bold text-foreground">
+                            {statsData.queues.reduce((sum, queue) => sum + queue.counts.completed, 0)}
                         </p>
                     </div>
                 </div>
@@ -154,8 +159,8 @@ export const QueueDashboardPage: React.FC = () => {
             {isLoading ? (
                 <div className="flex items-center justify-center h-64">
                     <div className="text-center">
-                        <RefreshCw className="w-8 h-8 animate-spin text-gray-400 mx-auto mb-2" />
-                        <p className="text-gray-600">Loading queue statistics...</p>
+                        <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground mx-auto mb-2" />
+                        <p className="text-muted-foreground">Loading queue statistics...</p>
                     </div>
                 </div>
             ) : statsData ? (
@@ -164,15 +169,12 @@ export const QueueDashboardPage: React.FC = () => {
                         <QueueCard
                             key={queue.name}
                             queue={queue}
-                            onViewDetails={() => {
-                                // TODO: Navigate to queue detail page
-                                console.log('View details for queue:', queue.name)
-                            }}
+                            onViewDetails={() => navigate(`/queue-monitoring/queues/${queue.name}`)}
                         />
                     ))}
                 </div>
             ) : (
-                <div className="text-center text-gray-600">No queue data available</div>
+                <div className="text-center text-muted-foreground">No queue data available</div>
             )}
         </div>
     )

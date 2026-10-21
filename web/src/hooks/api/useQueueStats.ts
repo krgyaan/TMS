@@ -14,11 +14,11 @@ export const queueMonitoringKeys = {
  * Hook to fetch queue statistics (for dashboard polling)
  * Polls every 10 seconds with React Query
  */
-export const useQueueStats = (options?: { refetchInterval?: number; enabled?: boolean }) => {
+export const useQueueStats = (options?: { refetchInterval?: number | false; enabled?: boolean }) => {
     return useQuery({
         queryKey: queueMonitoringKeys.stats(),
         queryFn: () => queueMonitoringService.getQueueStats(),
-        refetchInterval: options?.refetchInterval ?? 10000, // Poll every 10 seconds
+        refetchInterval: options?.refetchInterval ?? 10000, // Poll every 10 seconds (false disables polling)
         staleTime: 5000, // Consider stale after 5 seconds
         gcTime: 60000, // Cache for 1 minute
         retry: 1,
