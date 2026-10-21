@@ -32,6 +32,7 @@ import { ComplaintsModule } from "@/modules/hrms/complaints/complaints.module";
 import { EmployeeProfilesModule } from "@/modules/hrms/employee-profiles/employee-profiles.module";
 import { ImprestAdminModule } from "@/modules/imprest-admin/imprest-admin.module";
 import { GoogleIntegrationModule } from "@/modules/integrations/google/google.module";
+import { IntegrationsModule } from "@/modules/integrations/integrations.module";
 import { AmcModule } from "@/modules/services/amc/amc.module";
 import { AmcBillingModule } from "@/modules/services/amc-billing/amc-billing.module";
 import { AmcServicesModule } from "@/modules/services/amc-services/amc-services.module";
@@ -138,6 +139,7 @@ import { NotificationsModule } from "./modules/notifications/notifications.modul
 import { CashFlowModule } from "./modules/operations/cash-flows/cash-flow.module";
 import { WebhookController } from "./webhook/webhook.controller";
 import { VendorMasterModule } from "./modules/master/vendor-master/vendor-master.module";
+import { QueueMonitoringModule } from "./modules/queue-monitoring/queue-monitoring.module";
 
 @Module({
     imports: [
@@ -188,6 +190,7 @@ import { VendorMasterModule } from "./modules/master/vendor-master/vendor-master
         TqTypesModule,
         VendorMasterModule,
         GoogleIntegrationModule,
+        IntegrationsModule,
         CashFlowModule,
         AuthModule,
         WebsitesModule,
@@ -286,6 +289,7 @@ import { VendorMasterModule } from "./modules/master/vendor-master/vendor-master
         OpenwaModule,
         NotificationsModule,
         PublicNotificationsModule,
+        QueueMonitoringModule
     ],
     controllers: [AppController, WebhookController],
     providers: [

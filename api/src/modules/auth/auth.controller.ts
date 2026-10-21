@@ -244,9 +244,11 @@ export class AuthController {
 
     private setAuthCookie(res: Response, token: string) {
         const authCfg = this.configService.get<AuthConfig>(authConfig.KEY);
-        res.cookie("access_token", token, {
-            ...AUTH_COOKIE_OPTIONS,
-            maxAge: authCfg?.cookie.maxAge ?? 7 * 24 * 60 * 60 * 1000, // Use config value, default to 7 days
-        });
+        const cookieConfig = authCfg?.accessTokenCookie;
+        if (cookieConfig) {
+            res.cookie(cookieConfig.name, token, cookieConfig);
+        } else {
+            res.cookie("access_token", token, AUTH_COOKIE_OPTIONS);
+        }
     }
 }

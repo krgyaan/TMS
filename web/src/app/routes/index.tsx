@@ -42,6 +42,7 @@ const HrmsRoutes = lazy(() => import("./sections/hrms.routes"));
 const ProfileRoutes = lazy(() => import("./sections/profile.routes"));
 const TrainingRoutes = lazy(() => import("./sections/training.routes"));
 const SystemRoutes = lazy(() => import("./sections/system.routes"));
+const QueueMonitoringRoutes = lazy(() => import("./sections/queue-monitoring.routes"));
 
 import { ProfileProvider } from "@/modules/profile/contexts/ProfileContext";
 
@@ -250,6 +251,16 @@ export default function AppRoutes() {
                         element={
                             <RouteWrapper>
                                 <SystemRoutes />
+                            </RouteWrapper>
+                        }
+                    />
+
+                    {/* Queue Monitoring */}
+                    <Route
+                        path="queue-monitoring/*"
+                        element={
+                            <RouteWrapper>
+                                <QueueMonitoringRoutes />
                             </RouteWrapper>
                         }
                     />
