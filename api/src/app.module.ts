@@ -139,6 +139,7 @@ import { NotificationsModule } from "./modules/notifications/notifications.modul
 import { CashFlowModule } from "./modules/operations/cash-flows/cash-flow.module";
 import { WebhookController } from "./webhook/webhook.controller";
 import { VendorMasterModule } from "./modules/master/vendor-master/vendor-master.module";
+import { QueueMonitoringModule } from "./modules/queue-monitoring/queue-monitoring.module";
 
 @Module({
     imports: [
@@ -288,6 +289,7 @@ import { VendorMasterModule } from "./modules/master/vendor-master/vendor-master
         OpenwaModule,
         NotificationsModule,
         PublicNotificationsModule,
+        QueueMonitoringModule
     ],
     controllers: [AppController, WebhookController],
     providers: [
