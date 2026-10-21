@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
+import { TenderStepsPageLayout } from "@/modules/tendering/components/TenderStepsPageLayout";
 import { useEnquiryTenderSteps, type EnquiryTenderSourceType } from "@/hooks/api/useEnquiryTenderSteps";
 import { LeadDetailsSection } from "@/modules/crm/leads/components/LeadView";
 import { HappyCallingView } from "@/modules/crm/happy-calling/components/HappyCallingView";
@@ -136,7 +136,7 @@ export function EnquiryTenderFlow({
     );
 
     return (
-        <ShowPageLayout
+        <TenderStepsPageLayout tenderId={tenderId}
             steps={steps}
             expandedSections={expandedSections}
             onToggleSection={toggleSection}

@@ -10,7 +10,7 @@ import { BidSubmissionSection } from "@/modules/tendering/bid-submissions/compon
 import { RaSection } from "@/modules/tendering/ras/components/RaShow";
 import { TqTenderSection } from "@/modules/tendering/tq-management/components/TqView";
 import { TenderResultSection } from "@/modules/tendering/results/components/TenderResultView";
-import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
+import { TenderStepsPageLayout } from "@/modules/tendering/components/TenderStepsPageLayout";
 
 interface TenderViewPageProps {
     tenderId: number;
@@ -51,7 +51,7 @@ export function TenderViewPage({ tenderId, onBack, backLabel }: TenderViewPagePr
     }, [tenderId]);
 
     return (
-        <ShowPageLayout
+        <TenderStepsPageLayout tenderId={tenderId}
             steps={steps}
             expandedSections={expandedSections}
             onToggleSection={toggleSection}

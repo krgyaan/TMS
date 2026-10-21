@@ -12,7 +12,7 @@ import { RaSection } from "@/modules/tendering/ras/components/RaShow";
 import { TqTenderSection } from "@/modules/tendering/tq-management/components/TqView";
 import { TenderResultSection } from "@/modules/tendering/results/components/TenderResultView";
 import { paths } from "@/app/routes/paths";
-import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
+import { TenderStepsPageLayout } from "@/modules/tendering/components/TenderStepsPageLayout";
 import { EnquiryTenderFlow } from "@/modules/tendering/tenders/components/EnquiryTenderFlow";
 
 // BidSubmission page shows all relevant steps
@@ -67,7 +67,7 @@ export default function BidSubmissionShowPage() {
     }
 
     return (
-        <ShowPageLayout
+        <TenderStepsPageLayout tenderId={tenderId}
             steps={steps}
             expandedSections={expandedSections}
             onToggleSection={toggleSection}
