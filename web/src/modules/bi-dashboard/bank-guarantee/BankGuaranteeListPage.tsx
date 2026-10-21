@@ -128,6 +128,7 @@ const BankGuaranteeListPage = () => {
             'BG No': r.bgNo || '',
             'Beneficiary Name': r.beneficiaryName || r.favouring || '',
             'Amount': r.amount || '',
+            'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
             'Expiry Date': r.bgExpiryDateCoalesced ? new Date(r.bgExpiryDateCoalesced).toLocaleDateString('en-GB') : '',
             'Claim Expiry Date': r.bgClaimExpiryDate ? new Date(r.bgClaimExpiryDate).toLocaleDateString('en-GB') : '',
             'Charges Paid': r.bgChargesPaid || '',
@@ -243,6 +244,14 @@ const BankGuaranteeListPage = () => {
                 colId: 'amount',
                 sortable: true,
                 valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
+            },
+            {
+                field: 'bidValidity',
+                headerName: 'Bid Validity',
+                width: 130,
+                colId: 'bidValidity',
+                sortable: false,
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
             },
             {
                 field: 'bgExpiryDateCoalesced',
