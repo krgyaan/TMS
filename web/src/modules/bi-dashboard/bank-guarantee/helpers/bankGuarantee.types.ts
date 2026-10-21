@@ -1,5 +1,19 @@
-export type BankGuaranteeDashboardTab = 'new-requests' | 'live-yes' | 'live-pnb' | 'live-bg-limit' | 'cancelled' | 'rejected';
+export type BankGuaranteeDashboardTab = 'new-requests' | 'live-bgs' | 'cancelled' | 'rejected';
 export type BankGuaranteeExportTab = BankGuaranteeDashboardTab | 'all';
+
+export const toFileArray = (value: unknown): string[] => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value as string[];
+    if (typeof value === 'string') {
+        try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? (parsed as string[]) : [value];
+        } catch {
+            return [value];
+        }
+    }
+    return [];
+};
 
 export type BankGuaranteeDashboardFilters = {
     tab?: BankGuaranteeDashboardTab;
@@ -21,6 +35,8 @@ export interface BankGuaranteeDashboardRow {
     bidValidity: Date | null;
     amount: number | null;
     bgExpiryDate: Date | null;
+    bgExpiryDateCoalesced: Date | null;
+    bgClaimExpiryDate: Date | null;
     bgClaimPeriod: number | null;
     expiryDate: Date | null;
     bgChargesPaid: number | null;
@@ -35,9 +51,7 @@ export interface BankGuaranteeDashboardRow {
 
 export interface BankGuaranteeDashboardCounts {
     'new-requests': number;
-    'live-yes': number;
-    'live-pnb': number;
-    'live-bg-limit': number;
+    'live-bgs': number;
     cancelled: number;
     rejected: number;
     total: number;

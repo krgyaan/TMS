@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardAction } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
-import { BankGuaranteeEditForm } from './components/BankGuaranteeEditForm';
+import { BankGuaranteeEdit } from './components/BankGuaranteeEdit';
 import { useBankGuaranteeDetails } from '@/hooks/api/useBankGuarantees';
 
 export default function BankGuaranteeEditPage() {
@@ -38,7 +38,7 @@ export default function BankGuaranteeEditPage() {
             <CardHeader className="px-0 pt-0 pb-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <CardTitle className="text-2xl font-bold">Edit Bank Guarantee</CardTitle>
+                        <CardTitle className="text-lg font-semibold">Edit Bank Guarantee</CardTitle>
                         <p className="text-muted-foreground mt-1">
                             {instrument.tenderNo} - {instrument.tenderName || instrument.projectName}
                         </p>
@@ -51,7 +51,7 @@ export default function BankGuaranteeEditPage() {
                 </div>
             </CardHeader>
             <CardContent className="px-0">
-                <BankGuaranteeEditForm
+                <BankGuaranteeEdit
                     instrumentId={instrument.instrumentId}
                     initialData={instrument}
                 />

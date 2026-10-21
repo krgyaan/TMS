@@ -24,7 +24,7 @@ const applyModuleDefaults = (
     Object.fromEntries(
         Object.entries(configs).map(([context, config]) => [
             context,
-            { storageDir, ...DEFAULT_COMPRESSION, ...config },
+            { storageDir, moduleStorageDir: storageDir, ...DEFAULT_COMPRESSION, ...config },
         ]),
     ) as Record<string, ResolvedFileConfig>;
 

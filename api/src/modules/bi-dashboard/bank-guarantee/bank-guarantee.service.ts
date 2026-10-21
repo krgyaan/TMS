@@ -1,7 +1,10 @@
 import { followUps } from '@/db/schemas/shared/follow-ups.schema';
+import { followUpPersons } from '@/db/schemas/shared/follow-up-persons.schema';
+import { couriers } from '@/db/schemas/shared/couriers.schema';
 import { AppLogger } from '@/logger/app-logger.service';
 import type { BankGuaranteeDashboardCounts, BankGuaranteeDashboardRow } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
+import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
 import { BG_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
@@ -11,6 +14,7 @@ import { users } from '@db/schemas/auth/users.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
 import {
     instrumentBgDetails,
+    instrumentStatusHistory,
     paymentInstruments,
     paymentRequests,
 } from '@db/schemas/tendering/payment-requests.schema';
@@ -43,6 +47,10 @@ export class BankGuaranteeService {
             [BG_STATUSES.CANCELLATION_REQUESTED]: 'Cancellation Request',
             [BG_STATUSES.BG_CANCELLATION_CONFIRMED]: 'Cancelled at Branch',
             [BG_STATUSES.FDR_CANCELLED_CONFIRMED]: 'FDR Cancellation Confirmed',
+            // Legacy rows written with pre-migration status strings.
+            RETURNED_VIA_COURIER: 'Courier Returned',
+            BG_CANCELLED: 'Cancelled at Branch',
+            FDR_CANCELLED: 'FDR Cancellation Confirmed',
         };
     }
 
@@ -59,21 +67,8 @@ export class BankGuaranteeService {
                     inArray(paymentInstruments.status, [BG_STATUSES.PENDING, BG_STATUSES.ACCOUNTS_FORM_ACCEPTED]),
                 )
             );
-        } else if (tab === 'live-yes') {
-            conditions.push(
-                inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
-                inArray(instrumentBgDetails.bankName, ['YESBANK_2011', 'YESBANK_0771'])
-            );
-        } else if (tab === 'live-pnb') {
-            conditions.push(
-                inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
-                eq(instrumentBgDetails.bankName, 'PNB_6011')
-            );
-        } else if (tab === 'live-bg-limit') {
-            conditions.push(
-                inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
-                eq(instrumentBgDetails.bankName, 'BGLIMIT_0771')
-            );
+        } else if (tab === 'live-bgs') {
+            conditions.push(inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]));
         } else if (tab === 'cancelled') {
             conditions.push(
                 inArray(paymentInstruments.action, [8, 9])
@@ -121,21 +116,25 @@ export class BankGuaranteeService {
                 sql`${paymentInstruments.amount}::text ILIKE ${searchStr}`,
                 sql`${instrumentBgDetails.bgDate}::text ILIKE ${searchStr}`,
                 sql`${instrumentBgDetails.validityDate}::text ILIKE ${searchStr}`,
+                sql`${paymentInstruments.expiryDate}::text ILIKE ${searchStr}`,
+                sql`${instrumentBgDetails.bgExpiryDate}::text ILIKE ${searchStr}`,
                 sql`${instrumentBgDetails.claimExpiryDate}::text ILIKE ${searchStr}`,
+                sql`${instrumentBgDetails.bgClaim}::text ILIKE ${searchStr}`,
                 sql`${instrumentBgDetails.fdrNo} ILIKE ${searchStr}`,
                 sql`${instrumentBgDetails.fdrAmt}::text ILIKE ${searchStr}`,
                 sql`${statuses.name} ILIKE ${searchStr}`,
                 sql`${paymentInstruments.status} ILIKE ${searchStr}`,
                 // Search by BG status display label (table shows "Pending", "Accepted", etc.)
-                sql`(CASE ${paymentInstruments.status} WHEN 'BG_ACCOUNTS_FORM_PENDING' THEN 'Pending' WHEN 'PENDING' THEN 'Pending' WHEN 'BG_ACCOUNTS_FORM_ACCEPTED' THEN 'Accepted' WHEN 'BG_ACCOUNTS_FORM_REJECTED' THEN 'Rejected' WHEN 'BG_CREATED' THEN 'Created' WHEN 'BG_FDR_DETAILS_CAPTURED' THEN 'FDR Details Captured' WHEN 'BG_FOLLOWUP_INITIATED' THEN 'Followup Initiated' WHEN 'BG_EXTENSION_REQUESTED' THEN 'Extension Requested' WHEN 'BG_RETURN_VIA_COURIER' THEN 'Courier Returned' WHEN 'BG_CANCELLATION_REQUESTED' THEN 'Cancellation Request' WHEN 'BG_BG_CANCELLATION_CONFIRMED' THEN 'Cancelled at Branch' WHEN 'BG_FDR_CANCELLED_CONFIRMED' THEN 'FDR Cancellation Confirmed' ELSE ${paymentInstruments.status}::text END)::text ILIKE ${searchStr}`,
+                sql`(CASE ${paymentInstruments.status} WHEN 'PENDING' THEN 'Pending' WHEN 'ACCOUNTS_FORM_ACCEPTED' THEN 'Accepted' WHEN 'ACCOUNTS_FORM_REJECTED' THEN 'Rejected' WHEN 'BG_CREATED' THEN 'Created' WHEN 'FDR_DETAILS_CAPTURED' THEN 'FDR Details Captured' WHEN 'FOLLOWUP_INITIATED' THEN 'Followup Initiated' WHEN 'EXTENSION_REQUESTED' THEN 'Extension Requested' WHEN 'RETURN_VIA_COURIER' THEN 'Courier Returned' WHEN 'CANCELLATION_REQUESTED' THEN 'Cancellation Request' WHEN 'BG_CANCELLATION_CONFIRMED' THEN 'Cancelled at Branch' WHEN 'FDR_CANCELLED_CONFIRMED' THEN 'FDR Cancellation Confirmed' ELSE ${paymentInstruments.status}::text END)::text ILIKE ${searchStr}`,
             ];
             conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
         }
 
         const whereClause = and(...conditions);
 
-        // Build order clause - default to validityDate desc, fallback to createdAt
-        let orderClause: any = sql`${instrumentBgDetails.validityDate} DESC NULLS LAST, ${paymentInstruments.createdAt} DESC`;
+        // Build order clause - default to coalesced BG expiry date desc, fallback to createdAt
+        const defaultOrder = sql`coalesce(${paymentInstruments.expiryDate}, ${instrumentBgDetails.bgExpiryDate}) DESC NULLS LAST, ${paymentInstruments.createdAt} DESC`;
+        let orderClause: any = defaultOrder;
         if (options?.sortBy) {
             const direction = options.sortOrder === 'desc' ? desc : asc;
             switch (options.sortBy) {
@@ -151,8 +150,14 @@ export class BankGuaranteeService {
                 case 'amount':
                     orderClause = direction(paymentInstruments.amount);
                     break;
+                case 'bgExpiryDateCoalesced':
+                    orderClause = direction(sql`coalesce(${paymentInstruments.expiryDate}, ${instrumentBgDetails.bgExpiryDate})`);
+                    break;
+                case 'bgClaimExpiryDate':
+                    orderClause = direction(instrumentBgDetails.claimExpiryDate);
+                    break;
                 default:
-                    orderClause = sql`${instrumentBgDetails.validityDate} DESC NULLS LAST, ${paymentInstruments.createdAt} DESC`;
+                    orderClause = defaultOrder;
             }
         }
 
@@ -173,7 +178,10 @@ export class BankGuaranteeService {
                 requestType: paymentRequests.type,
                 amount: paymentInstruments.amount,
                 bgExpiryDate: paymentInstruments.expiryDate,
-                claimExpiryDate: paymentInstruments.claimExpiryDate,
+                claimExpiryDate: instrumentBgDetails.claimExpiryDate,
+                validityDate: instrumentBgDetails.validityDate,
+                bgClaim: instrumentBgDetails.bgClaim,
+                bgExpiryDateBg: sql<string | null>`coalesce(${paymentInstruments.expiryDate}, ${instrumentBgDetails.bgExpiryDate})`,
                 stampCharges: instrumentBgDetails.stampCharges,
                 sfmsCharges: instrumentBgDetails.sfmsCharges,
                 stampChargesDeducted: instrumentBgDetails.stampChargesDeducted,
@@ -221,6 +229,9 @@ export class BankGuaranteeService {
             const bgDate = row.bgDate ? new Date(row.bgDate) : null;
             const bgExpiryDate = row.bgExpiryDate ? new Date(row.bgExpiryDate) : null;
             const claimExpiryDate = row.claimExpiryDate ? new Date(row.claimExpiryDate) : null;
+            const effectiveClaimDate = claimExpiryDate ?? (row.bgClaim ? new Date(row.bgClaim) : null);
+            const effectiveValidityDate = (row.validityDate ? new Date(row.validityDate) : null)
+                ?? (row.bgExpiryDateBg ? new Date(row.bgExpiryDateBg) : null);
             const amount = row.amount ? Number(row.amount) : null;
 
             return {
@@ -233,7 +244,9 @@ export class BankGuaranteeService {
                 tenderNo: row.tenderNo || row.projectNo,
                 amount,
                 bgExpiryDate,
-                bgClaimPeriod: this.calculateBgClaimPeriod(bgExpiryDate, claimExpiryDate),
+                bgExpiryDateCoalesced: row.bgExpiryDateBg ? new Date(row.bgExpiryDateBg) : null,
+                bgClaimExpiryDate: claimExpiryDate,
+                bgClaimPeriod: this.calculateBgClaimPeriod(effectiveValidityDate, effectiveClaimDate),
                 bgChargesPaid: this.calculateBgChargesPaid(
                     row.bgChargeDeducted ? Number(row.bgChargeDeducted) : null,
                     row.stampChargesDeducted ? Number(row.stampChargesDeducted) : null,
@@ -243,7 +256,7 @@ export class BankGuaranteeService {
                 bgChargesCalculated: this.calculateBgChargesCalculated(
                     amount,
                     bgDate,
-                    claimExpiryDate,
+                    effectiveClaimDate,
                     row.stampCharges ? Number(row.stampCharges) : null,
                     row.sfmsCharges ? Number(row.sfmsCharges) : null
                 ),
@@ -252,8 +265,11 @@ export class BankGuaranteeService {
                 tenderStatus: row.tenderStatusFromTender,
                 bidValidity: row.tenderDueDate || row.requestDueDate,
                 bgStatus: this.statusMap()[row.bgStatus],
-                expiryStatus: this.calculateExpiryStatus(bgExpiryDate, claimExpiryDate),
-                expiryDate: claimExpiryDate,
+                expiryStatus: this.calculateExpiryStatus(
+                    row.bgExpiryDateBg ? new Date(row.bgExpiryDateBg) : null,
+                    claimExpiryDate,
+                ),
+                expiryDate: effectiveClaimDate,
             };
         });
 
@@ -280,7 +296,10 @@ export class BankGuaranteeService {
                 requestType: paymentRequests.type,
                 amount: paymentInstruments.amount,
                 bgExpiryDate: paymentInstruments.expiryDate,
-                claimExpiryDate: paymentInstruments.claimExpiryDate,
+                claimExpiryDate: instrumentBgDetails.claimExpiryDate,
+                validityDate: instrumentBgDetails.validityDate,
+                bgClaim: instrumentBgDetails.bgClaim,
+                bgExpiryDateBg: sql<string | null>`coalesce(${paymentInstruments.expiryDate}, ${instrumentBgDetails.bgExpiryDate})`,
                 stampCharges: instrumentBgDetails.stampCharges,
                 sfmsCharges: instrumentBgDetails.sfmsCharges,
                 stampChargesDeducted: instrumentBgDetails.stampChargesDeducted,
@@ -308,12 +327,15 @@ export class BankGuaranteeService {
             ))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(whereClause)
-            .orderBy(sql`${instrumentBgDetails.validityDate} DESC NULLS LAST, ${paymentInstruments.createdAt} DESC`);
+            .orderBy(sql`coalesce(${paymentInstruments.expiryDate}, ${instrumentBgDetails.bgExpiryDate}) DESC NULLS LAST, ${paymentInstruments.createdAt} DESC`);
 
         const data = rows.map((row) => {
             const bgDate = row.bgDate ? new Date(row.bgDate) : null;
             const bgExpiryDate = row.bgExpiryDate ? new Date(row.bgExpiryDate) : null;
             const claimExpiryDate = row.claimExpiryDate ? new Date(row.claimExpiryDate) : null;
+            const effectiveClaimDate = claimExpiryDate ?? (row.bgClaim ? new Date(row.bgClaim) : null);
+            const effectiveValidityDate = (row.validityDate ? new Date(row.validityDate) : null)
+                ?? (row.bgExpiryDateBg ? new Date(row.bgExpiryDateBg) : null);
             const amount = row.amount ? Number(row.amount) : null;
 
             return {
@@ -326,7 +348,9 @@ export class BankGuaranteeService {
                 projectNo: row.projectNo,
                 amount,
                 bgExpiryDate,
-                bgClaimPeriod: this.calculateBgClaimPeriod(bgExpiryDate, claimExpiryDate),
+                bgExpiryDateCoalesced: row.bgExpiryDateBg ? new Date(row.bgExpiryDateBg) : null,
+                bgClaimExpiryDate: claimExpiryDate,
+                bgClaimPeriod: this.calculateBgClaimPeriod(effectiveValidityDate, effectiveClaimDate),
                 bgChargesPaid: this.calculateBgChargesPaid(
                     row.bgChargeDeducted ? Number(row.bgChargeDeducted) : null,
                     row.stampChargesDeducted ? Number(row.stampChargesDeducted) : null,
@@ -336,7 +360,7 @@ export class BankGuaranteeService {
                 bgChargesCalculated: this.calculateBgChargesCalculated(
                     amount,
                     bgDate,
-                    claimExpiryDate,
+                    effectiveClaimDate,
                     row.stampCharges ? Number(row.stampCharges) : null,
                     row.sfmsCharges ? Number(row.sfmsCharges) : null
                 ),
@@ -345,8 +369,11 @@ export class BankGuaranteeService {
                 tenderStatus: row.tenderStatusFromTender,
                 bidValidity: row.tenderDueDate || row.requestDueDate,
                 bgStatus: this.statusMap()[row.bgStatus],
-                expiryStatus: this.calculateExpiryStatus(bgExpiryDate, claimExpiryDate),
-                expiryDate: bgExpiryDate,
+                expiryStatus: this.calculateExpiryStatus(
+                    row.bgExpiryDateBg ? new Date(row.bgExpiryDateBg) : null,
+                    claimExpiryDate,
+                ),
+                expiryDate: effectiveValidityDate,
                 bgPurpose: row.bgPurpose,
                 bgNeeds: row.bgNeeds,
                 bankName: row.bankName,
@@ -370,20 +397,7 @@ export class BankGuaranteeService {
             inArray(paymentInstruments.status, [BG_STATUSES.PENDING, BG_STATUSES.ACCOUNTS_FORM_ACCEPTED]),
         );
 
-        const liveYesFilter = and(
-            inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
-            inArray(instrumentBgDetails.bankName, ['YESBANK_2011', 'YESBANK_0771']),
-        );
-
-        const livePnbFilter = and(
-            inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
-            eq(instrumentBgDetails.bankName, 'PNB_6011'),
-        );
-
-        const liveBgLimitFilter = and(
-            inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
-            eq(instrumentBgDetails.bankName, 'BGLIMIT_0771'),
-        );
+        const liveBgsFilter = inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]);
 
         const cancelledFilter = inArray(paymentInstruments.action, [8, 9]);
 
@@ -394,9 +408,7 @@ export class BankGuaranteeService {
 
         const [counts] = await this.db.select({
             newRequests: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${newRequestsFilter})`,
-            liveYes: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${liveYesFilter})`,
-            livePnb: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${livePnbFilter})`,
-            liveBgLimit: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${liveBgLimitFilter})`,
+            liveBgs: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${liveBgsFilter})`,
             cancelled: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${cancelledFilter})`,
             rejected: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${rejectedFilter})`,
         })
@@ -409,20 +421,16 @@ export class BankGuaranteeService {
             .where(baseWhere);
 
         const newRequests = Number(counts?.newRequests ?? 0);
-        const liveYes = Number(counts?.liveYes ?? 0);
-        const livePnb = Number(counts?.livePnb ?? 0);
-        const liveBgLimit = Number(counts?.liveBgLimit ?? 0);
+        const liveBgs = Number(counts?.liveBgs ?? 0);
         const cancelled = Number(counts?.cancelled ?? 0);
         const rejected = Number(counts?.rejected ?? 0);
 
         return {
             'new-requests': newRequests,
-            'live-yes': liveYes,
-            'live-pnb': livePnb,
-            'live-bg-limit': liveBgLimit,
+            'live-bgs': liveBgs,
             cancelled,
             rejected,
-            total: newRequests + liveYes + livePnb + liveBgLimit + cancelled + rejected,
+            total: newRequests + liveBgs + cancelled + rejected,
         };
     }
 
@@ -707,8 +715,45 @@ export class BankGuaranteeService {
     }
 
     /**
-     * Get file path from body if it's a string (from FileUploader)
+     * Stored path for a raw multer file, mirroring the FileUploader layout
+     * `bi-dashboard/bank-guarantee/<context>/<fileName>` (the web UI uploads
+     * through /files/upload, which already returns this shape).
      */
+    private bgFileStoredPath(context: string, filename: string): string {
+        return `bi-dashboard/bank-guarantee/${context}/${filename}`;
+    }
+
+/**
+ * Parse a repeatable string field sent from a form as a JSON string.
+ * Tolerates a bare string too, and returns null when absent so an omitted field
+ * leaves the column alone (an emptied list arrives as "[]" and clears it).
+ */
+private parseStringArray(v: unknown): string[] | null {
+    if (v === undefined || v === null) return null;
+    const arr = typeof v === 'string'
+        ? (() => { try { return JSON.parse(v); } catch { return [v]; } })()
+        : v;
+    if (!Array.isArray(arr)) return null;
+    return arr.map((x) => String(x).trim()).filter(Boolean);
+}
+
+private hasFileValue(v: unknown): boolean {
+    return (this.parseStringArray(v)?.length ?? 0) > 0;
+}
+
+private isEmptyFileValue(v: unknown): boolean {
+    if (Array.isArray(v)) return v.length === 0;
+    return typeof v === 'string' && v.trim() === '[]';
+}
+
+private readBodyFileValue(body: unknown, field: string): unknown {
+    if (body === null || typeof body !== 'object') return undefined;
+    return (body as Record<string, unknown>)[field];
+}
+
+/**
+ * Get file path from body if it's a string (from FileUploader)
+ */
     private getFilePathFromBody(fieldname: string, body: any): string | null {
         if (body[fieldname] && typeof body[fieldname] === 'string') {
             return body[fieldname];
@@ -764,24 +809,47 @@ export class BankGuaranteeService {
         if (body.payableAt !== undefined) updateData.payableAt = body.payableAt;
         if (body.issueDate !== undefined) updateData.issueDate = body.issueDate;
         if (body.expiryDate !== undefined) updateData.expiryDate = body.expiryDate;
-        if (body.validityDate !== undefined) updateData.validityDate = body.validityDate;
-        if (body.claimExpiryDate !== undefined) updateData.claimExpiryDate = body.claimExpiryDate;
         if (body.status !== undefined) updateData.status = body.status;
         if (body.action !== undefined) updateData.action = body.action;
-        if (body.utr !== undefined) updateData.utr = body.utr;
         if (body.docketNo !== undefined) updateData.docketNo = body.docketNo;
         if (body.courierAddress !== undefined) updateData.courierAddress = body.courierAddress;
         if (body.courierDeadline !== undefined) updateData.courierDeadline = body.courierDeadline;
+        if (body.req_no !== undefined && body.req_no !== null && body.req_no !== '') {
+            updateData.reqNo = String(body.req_no);
+        }
+        if (body.courier_address_json) {
+            try {
+                updateData.courierAddressJson = typeof body.courier_address_json === 'string'
+                    ? JSON.parse(body.courier_address_json)
+                    : body.courier_address_json;
+            } catch {
+                updateData.courierAddressJson = null;
+            }
+        }
 
         // Handle files for payment_instruments (if any were uploaded)
         const docketSlipFile = this.getFileForField('docket_slip', files, body, fileIndexTracker);
-        if (docketSlipFile) updateData.docketSlip = `bi-dashboard/${docketSlipFile.filename}`;
+        if (docketSlipFile) {
+            updateData.docketSlip = this.bgFileStoredPath('bg-docket-slip', docketSlipFile.filename);
+        } else if (this.isEmptyFileValue(this.readBodyFileValue(body, 'docket_slip'))) {
+            updateData.docketSlip = null;
+        } else if (body.docket_slip && typeof body.docket_slip === 'string' && !body.docket_slip.includes('[object File]')) {
+            updateData.docketSlip = body.docket_slip;
+        }
 
         const coveringLetterFile = this.getFileForField('covering_letter', files, body, fileIndexTracker);
-        if (coveringLetterFile) updateData.coveringLetter = `bi-dashboard/${coveringLetterFile.filename}`;
+        if (coveringLetterFile) {
+            updateData.coveringLetter = this.bgFileStoredPath('bg-stamp-covering-letter', coveringLetterFile.filename);
+        } else if (body.covering_letter && typeof body.covering_letter === 'string' && !body.covering_letter.includes('[object File]')) {
+            updateData.coveringLetter = body.covering_letter;
+        }
 
         const cancelPdfFile = this.getFileForField('cancel_pdf', files, body, fileIndexTracker);
-        if (cancelPdfFile) updateData.cancelPdf = `bi-dashboard/${cancelPdfFile.filename}`;
+        if (cancelPdfFile) {
+            updateData.cancelPdf = this.bgFileStoredPath('bg-cancell-confirm', cancelPdfFile.filename);
+        } else if (body.cancel_pdf && typeof body.cancel_pdf === 'string' && !body.cancel_pdf.includes('[object File]')) {
+            updateData.cancelPdf = body.cancel_pdf;
+        }
 
         await this.db
             .update(paymentInstruments)
@@ -793,7 +861,8 @@ export class BankGuaranteeService {
 
         // All possible BG details fields
         const directFields = [
-            'bgNo', 'bgDate', 'validityDate', 'claimExpiryDate',
+            'bgNo', 'bgDate', 'bgExpiryDate', 'bgClaim',
+            'validityDate', 'claimExpiryDate',
             'beneficiaryName', 'beneficiaryAddress', 'bankName',
             'cashMarginPercent', 'fdrMarginPercent',
             'stampCharges', 'sfmsCharges',
@@ -801,9 +870,10 @@ export class BankGuaranteeService {
             'extendedAmount', 'extendedValidityDate', 'extendedClaimExpiryDate',
             'extendedBankName', 'bgNeeds', 'bgPurpose', 'bgSoftCopy',
             'bgPo', 'bgClientUser', 'bgClientCp', 'bgClientFin',
-            'bgBankAcc', 'bgBankIfsc', 'courierNo', 'stampCharge',
+            'bgBankAcc', 'bgBankIfsc', 'bgBankAccName', 'courierNo',
             'extensionLetter', 'newBgClaim', 'approveBg',
             'fdrAmt', 'fdrPer', 'fdrNo', 'fdrValidity', 'fdrRoi',
+            'bankMailIds', 'bankMailIdsCc',
             'bgChargeDeducted', 'newStampChargeDeducted', 'cancelRemark',
             'bgFdrCancelDate', 'bgFdrCancelAmount', 'bgFdrCancelRefNo',
             'bg2Remark', 'reasonReq'
@@ -817,20 +887,22 @@ export class BankGuaranteeService {
 
         // Handle file fields for BG details
         const fileFields = [
-            { body: 'extension_letter_path', db: 'extensionLetterPath' },
-            { body: 'cancellation_letter_path', db: 'cancellationLetterPath' },
-            { body: 'bg_format_te', db: 'bgFormatTe' },
-            { body: 'bg_format_tl', db: 'bgFormatTl' },
-            { body: 'sfms_conf', db: 'sfmsConf' },
-            { body: 'fdr_copy', db: 'fdrCopy' },
-            { body: 'stamp_covering_letter', db: 'stampCoveringLetter' },
-            { body: 'cancell_confirm', db: 'cancellConfirm' },
+            { body: 'extension_letter_path', db: 'extensionLetterPath', ctx: 'bg-ext-letter' },
+            { body: 'cancellation_letter_path', db: 'cancellationLetterPath', ctx: 'bg-stamp-covering-letter' },
+            { body: 'bg_format_te', db: 'bgFormatTe', ctx: 'bg-format-imran' },
+            { body: 'bg_format_tl', db: 'bgFormatTl', ctx: 'bg-format-imran' },
+            { body: 'sfms_conf', db: 'sfmsConf', ctx: 'bg-sfms-conf' },
+            { body: 'fdr_copy', db: 'fdrCopy', ctx: 'bg-fdr-copy' },
+            { body: 'stamp_covering_letter', db: 'stampCoveringLetter', ctx: 'bg-stamp-covering-letter' },
+            { body: 'cancell_confirm', db: 'cancellConfirm', ctx: 'bg-cancell-confirm' },
         ];
 
         fileFields.forEach(f => {
             const uploadedFile = this.getFileForField(f.body, files, body, fileIndexTracker);
             if (uploadedFile) {
-                bgDetailsUpdate[f.db] = `bi-dashboard/${uploadedFile.filename}`;
+                bgDetailsUpdate[f.db] = this.bgFileStoredPath(f.ctx, uploadedFile.filename);
+            } else if (this.isEmptyFileValue(this.readBodyFileValue(body, f.body))) {
+                bgDetailsUpdate[f.db] = null;
             } else if (body[f.body] && typeof body[f.body] === 'string') {
                 // If it's a string path, keep it if it's not a dummy marker
                 if (!body[f.body].includes('[object File]')) {
@@ -842,7 +914,7 @@ export class BankGuaranteeService {
         // Handle prefilledSignedBg separately (it's often JSON or multiple files)
         const prefilledFiles = this.getMultipleFilesForField('prefilled_signed_bg', files, body, fileIndexTracker);
         if (prefilledFiles.length > 0) {
-            const filePaths = prefilledFiles.map(f => `bi-dashboard/${f.filename}`);
+            const filePaths = prefilledFiles.map(f => this.bgFileStoredPath('bg-prefilled-signed', f.filename));
             bgDetailsUpdate.prefilledSignedBg = JSON.stringify(filePaths);
         } else if (body.prefilled_signed_bg && typeof body.prefilled_signed_bg === 'string') {
             if (!body.prefilled_signed_bg.includes('[object File]')) {
@@ -905,6 +977,9 @@ export class BankGuaranteeService {
 
         // Map action string to number
         const actionNumber = this.mapActionToNumber(body.action);
+        const fromStatus = instrument.status;
+        const fromAction = instrument.action ?? 0;
+        const toAction = actionNumber;
 
         // Parse contacts if provided
         let contacts: any[] = [];
@@ -926,51 +1001,65 @@ export class BankGuaranteeService {
         };
 
         // Update status based on action
+        let nextStatus: string | undefined;
         if (body.action === 'accounts-form-1') {
             if (body.bg_req === 'Accepted') {
-                updateData.status = 'ACCOUNTS_FORM_ACCEPTED';
+                nextStatus = 'ACCOUNTS_FORM_ACCEPTED';
             } else if (body.bg_req === 'Rejected') {
-                updateData.status = 'ACCOUNTS_FORM_REJECTED';
+                nextStatus = 'ACCOUNTS_FORM_REJECTED';
                 updateData.rejectionReason = body.reason_req || null;
             }
         } else if (body.action === 'accounts-form-2') {
-            updateData.status = 'BG_CREATED';
+            nextStatus = 'BG_CREATED';
+            if (body.req_no) updateData.reqNo = String(body.req_no);
+            if (body.courier_address_json) {
+                try {
+                    updateData.courierAddressJson = typeof body.courier_address_json === 'string'
+                        ? JSON.parse(body.courier_address_json)
+                        : body.courier_address_json;
+                } catch {
+                    updateData.courierAddressJson = null;
+                }
+            }
         } else if (body.action === 'accounts-form-3') {
-            updateData.status = 'FDR_DETAILS_CAPTURED';
+            nextStatus = 'FDR_DETAILS_CAPTURED';
         } else if (body.action === 'initiate-followup') {
-            updateData.status = 'FOLLOWUP_INITIATED';
+            nextStatus = 'FOLLOWUP_INITIATED';
         } else if (body.action === 'request-extension') {
-            updateData.status = 'EXTENSION_REQUESTED';
+            nextStatus = 'EXTENSION_REQUESTED';
         } else if (body.action === 'returned-courier') {
-            updateData.status = 'RETURNED_VIA_COURIER';
+            nextStatus = BG_STATUSES.RETURN_VIA_COURIER;
             const docketSlipFile = this.getFileForField('docket_slip', files, body, fileIndexTracker);
             const docketSlipPath = this.getFilePathFromBody('docket_slip', body);
             if (docketSlipFile) {
-                updateData.docketSlip = `bi-dashboard/${docketSlipFile.filename}`;
+                updateData.docketSlip = this.bgFileStoredPath('bg-docket-slip', docketSlipFile.filename);
             } else if (docketSlipPath) {
                 updateData.docketSlip = docketSlipPath;
             }
         } else if (body.action === 'request-cancellation') {
-            updateData.status = 'CANCELLATION_REQUESTED';
+            nextStatus = 'CANCELLATION_REQUESTED';
             const coveringLetterFile = this.getFileForField('stamp_covering_letter', files, body, fileIndexTracker);
             const coveringLetterPath = this.getFilePathFromBody('stamp_covering_letter', body);
             if (coveringLetterFile) {
-                updateData.coveringLetter = `bi-dashboard/${coveringLetterFile.filename}`;
+                updateData.coveringLetter = this.bgFileStoredPath('bg-stamp-covering-letter', coveringLetterFile.filename);
             } else if (coveringLetterPath) {
                 updateData.coveringLetter = coveringLetterPath;
             }
         } else if (body.action === 'bg-cancellation-confirmation') {
-            updateData.status = 'BG_CANCELLED';
+            nextStatus = BG_STATUSES.BG_CANCELLATION_CONFIRMED;
             const cancellConfirmFile = this.getFileForField('cancell_confirm', files, body, fileIndexTracker);
             const cancellConfirmPath = this.getFilePathFromBody('cancell_confirm', body);
             if (cancellConfirmFile) {
-                updateData.cancelPdf = `bi-dashboard/${cancellConfirmFile.filename}`;
+                updateData.cancelPdf = this.bgFileStoredPath('bg-cancell-confirm', cancellConfirmFile.filename);
             } else if (cancellConfirmPath) {
                 updateData.cancelPdf = cancellConfirmPath;
             }
         } else if (body.action === 'fdr-cancellation-confirmation') {
-            updateData.status = 'FDR_CANCELLED';
+            nextStatus = BG_STATUSES.FDR_CANCELLED_CONFIRMED;
         }
+
+        const toStatus = nextStatus ?? fromStatus;
+        if (nextStatus) updateData.status = nextStatus;
 
         await this.db
             .update(paymentInstruments)
@@ -989,11 +1078,24 @@ export class BankGuaranteeService {
                 bgDetailsUpdate.reasonReq = body.reason_req;
             }
 
+            // FDR % agreed at approval time. Accounts Form 1 and Form 3 share the
+            // single `fdr_per` column, so a later Form 3 submission overwrites
+            // the value captured here.
+            if (body.bg_approved_fdr_per) {
+                bgDetailsUpdate.fdrPer = Number(body.bg_approved_fdr_per);
+            }
+
+            // Bank mail ids / CC -- capture only for now; nothing reads these yet.
+            const mailIds = this.parseStringArray(body.bank_mail_ids);
+            if (mailIds !== null) bgDetailsUpdate.bankMailIds = mailIds;
+            const mailIdsCc = this.parseStringArray(body.bank_mail_ids_cc);
+            if (mailIdsCc !== null) bgDetailsUpdate.bankMailIdsCc = mailIdsCc;
+
             // Handle bg_format_imran file (single file)
             const bgFormatImranFile = this.getFileForField('bg_format_imran', files, body, fileIndexTracker);
             const bgFormatImranPath = this.getFilePathFromBody('bg_format_imran', body);
             if (bgFormatImranFile) {
-                bgDetailsUpdate.bgFormatTe = `bi-dashboard/${bgFormatImranFile.filename}`;
+                bgDetailsUpdate.bgFormatTe = this.bgFileStoredPath('bg-format-imran', bgFormatImranFile.filename);
             } else if (bgFormatImranPath) {
                 bgDetailsUpdate.bgFormatTe = bgFormatImranPath;
             }
@@ -1002,7 +1104,7 @@ export class BankGuaranteeService {
             const prefilledFiles = this.getMultipleFilesForField('prefilled_signed_bg', files, body, fileIndexTracker);
             const prefilledPath = this.getFilePathFromBody('prefilled_signed_bg', body);
             if (prefilledFiles.length > 0) {
-                const filePaths = prefilledFiles.map(f => `bi-dashboard/${f.filename}`);
+                const filePaths = prefilledFiles.map(f => this.bgFileStoredPath('bg-prefilled-signed', f.filename));
                 bgDetailsUpdate.prefilledSignedBg = JSON.stringify(filePaths);
             } else if (prefilledPath) {
                 // If it's a string path (from FileUploader), parse it if it's JSON array or use as single path
@@ -1022,7 +1124,6 @@ export class BankGuaranteeService {
             if (body.bg_date) bgDetailsUpdate.bgDate = body.bg_date;
             if (body.bg_validity) bgDetailsUpdate.validityDate = body.bg_validity;
             if (body.bg_claim_period) bgDetailsUpdate.claimExpiryDate = body.bg_claim_period;
-            if (body.courier_no) bgDetailsUpdate.courierNo = body.courier_no;
             if (body.bg2_remark) bgDetailsUpdate.bg2Remark = body.bg2_remark;
         } else if (body.action === 'accounts-form-3') {
             if (body.fdr_no) bgDetailsUpdate.fdrNo = body.fdr_no;
@@ -1039,7 +1140,7 @@ export class BankGuaranteeService {
             const sfmsConfFile = this.getFileForField('sfms_conf', files, body, fileIndexTracker);
             const sfmsConfPath = this.getFilePathFromBody('sfms_conf', body);
             if (sfmsConfFile) {
-                bgDetailsUpdate.sfmsConf = `bi-dashboard/${sfmsConfFile.filename}`;
+                bgDetailsUpdate.sfmsConf = this.bgFileStoredPath('bg-sfms-conf', sfmsConfFile.filename);
             } else if (sfmsConfPath) {
                 bgDetailsUpdate.sfmsConf = sfmsConfPath;
             }
@@ -1048,7 +1149,7 @@ export class BankGuaranteeService {
             const fdrCopyFile = this.getFileForField('fdr_copy', files, body, fileIndexTracker);
             const fdrCopyPath = this.getFilePathFromBody('fdr_copy', body);
             if (fdrCopyFile) {
-                bgDetailsUpdate.fdrCopy = `bi-dashboard/${fdrCopyFile.filename}`;
+                bgDetailsUpdate.fdrCopy = this.bgFileStoredPath('bg-fdr-copy', fdrCopyFile.filename);
             } else if (fdrCopyPath) {
                 bgDetailsUpdate.fdrCopy = fdrCopyPath;
             }
@@ -1066,7 +1167,7 @@ export class BankGuaranteeService {
             const extLetterFile = this.getFileForField('ext_letter', files, body, fileIndexTracker);
             const extLetterPath = this.getFilePathFromBody('ext_letter', body);
             if (extLetterFile) {
-                bgDetailsUpdate.extensionLetterPath = `bi-dashboard/${extLetterFile.filename}`;
+                bgDetailsUpdate.extensionLetterPath = this.bgFileStoredPath('bg-ext-letter', extLetterFile.filename);
             } else if (extLetterPath) {
                 bgDetailsUpdate.extensionLetterPath = extLetterPath;
             }
@@ -1078,7 +1179,7 @@ export class BankGuaranteeService {
             const coveringLetterFile = this.getFileForField('stamp_covering_letter', files, body, fileIndexTracker);
             const coveringLetterPath = this.getFilePathFromBody('stamp_covering_letter', body);
             if (coveringLetterFile) {
-                bgDetailsUpdate.stampCoveringLetter = `bi-dashboard/${coveringLetterFile.filename}`;
+                bgDetailsUpdate.stampCoveringLetter = this.bgFileStoredPath('bg-stamp-covering-letter', coveringLetterFile.filename);
             } else if (coveringLetterPath) {
                 bgDetailsUpdate.stampCoveringLetter = coveringLetterPath;
             }
@@ -1086,7 +1187,7 @@ export class BankGuaranteeService {
             const cancellConfirmFile = this.getFileForField('cancell_confirm', files, body, fileIndexTracker);
             const cancellConfirmPath = this.getFilePathFromBody('cancell_confirm', body);
             if (cancellConfirmFile) {
-                bgDetailsUpdate.cancellConfirm = `bi-dashboard/${cancellConfirmFile.filename}`;
+                bgDetailsUpdate.cancellConfirm = this.bgFileStoredPath('bg-cancell-confirm', cancellConfirmFile.filename);
             } else if (cancellConfirmPath) {
                 bgDetailsUpdate.cancellConfirm = cancellConfirmPath;
             }
@@ -1122,7 +1223,72 @@ export class BankGuaranteeService {
             }
         }
 
-        // Follow-up creation will be handled by a different service class
+        try {
+            await this.db.insert(instrumentStatusHistory).values({
+                instrumentId,
+                fromStatus,
+                toStatus,
+                fromAction,
+                toAction,
+                fromStage: 0,
+                toStage: 0,
+                formData: body,
+                remarks: null,
+                rejectionReason: body.action === 'accounts-form-1' && body.bg_req === 'Rejected'
+                    ? body.reason_req || null
+                    : null,
+                isResubmission: false,
+                previousInstrumentId: null,
+                changedBy: user?.id ?? user?.sub ?? 0,
+                changedByName: user?.name ?? '',
+                changedByRole: String(user?.roleId ?? 0),
+                ipAddress: '',
+                userAgent: '',
+            });
+        } catch (error) {
+            this.logger.warn(`Status history write failed for BG instrument ${instrumentId}: ${error}`);
+        }
+
+        if (body.action === 'initiate-followup') {
+            try {
+                const mappedContacts = contacts
+                    .filter((c: any) => c?.name && String(c.name).trim().length > 0)
+                    .map((c: any) => ({
+                        name: String(c.name).trim(),
+                        email: c.email || null,
+                        phone: c.phone || null,
+                        org: body.organisation_name || null,
+                    }));
+
+                if (mappedContacts.length === 0) {
+                    throw new BadRequestException('At least one contact with a name is required');
+                }
+
+                const followUpDto: CreateFollowUpDto = {
+                    emdId: instrumentId,
+                    area: body.area || 'Accounts',
+                    partyName: body.organisation_name || 'Unknown',
+                    followupFor: 'Bank Guarantee',
+                    amount: instrument.amount ? Number(instrument.amount) : 0,
+                    contacts: mappedContacts,
+                    frequency: body.frequency ? Number(body.frequency) : 1,
+                    startFrom: body.followup_start_date || undefined,
+                    stopReason: body.stop_reason ? Number(body.stop_reason) : null,
+                    proofText: body.proof_text || null,
+                    proofImagePath: body.proof_image || null,
+                    stopRemarks: body.stop_remarks || null,
+                    details: body.emailBody || null,
+                    attachments: this.parseStringArray(body.attachments) ?? [],
+                    assignedToId: null,
+                    createdById: null,
+                    followUpHistory: [],
+                };
+
+                await this.followUpService.create(followUpDto, user?.id || user?.sub);
+            } catch (error) {
+                this.logger.warn(`Follow-up creation failed for BG instrument ${instrumentId}: ${error}`);
+            }
+        }
 
         return {
             success: true,
@@ -1144,11 +1310,16 @@ export class BankGuaranteeService {
                 payableAt: paymentInstruments.payableAt,
                 issueDate: paymentInstruments.issueDate,
                 expiryDate: paymentInstruments.expiryDate,
-                validityDate: paymentInstruments.validityDate,
-                claimExpiryDate: paymentInstruments.claimExpiryDate,
-                utr: paymentInstruments.utr,
+                bgExpiryDate: sql<string | null>`coalesce(${paymentInstruments.expiryDate}, ${instrumentBgDetails.bgExpiryDate})`,
+                // Validity / claim expiry are written by Accounts Form 2 to
+                // instrument_bg_details (see updateAction), not to payment_instruments.
+                validityDate: instrumentBgDetails.validityDate,
+                claimExpiryDate: instrumentBgDetails.claimExpiryDate,
+                bgClaim: instrumentBgDetails.bgClaim,
                 docketNo: paymentInstruments.docketNo,
                 courierAddress: paymentInstruments.courierAddress,
+                courierAddressJson: paymentInstruments.courierAddressJson,
+                reqNo: paymentInstruments.reqNo,
                 courierDeadline: paymentInstruments.courierDeadline,
                 action: paymentInstruments.action,
                 status: paymentInstruments.status,
@@ -1202,13 +1373,15 @@ export class BankGuaranteeService {
                 bgPurpose: instrumentBgDetails.bgPurpose,
                 bgSoftCopy: instrumentBgDetails.bgSoftCopy,
                 bgPo: instrumentBgDetails.bgPo,
-                bgClientUser: instrumentBgDetails.bgClientUser,
+                bankMailIds: instrumentBgDetails.bankMailIds,
+                bankMailIdsCc: instrumentBgDetails.bankMailIdsCc,
+                bankClientUser: instrumentBgDetails.bgClientUser,
                 bgClientCp: instrumentBgDetails.bgClientCp,
                 bgClientFin: instrumentBgDetails.bgClientFin,
                 bgBankAcc: instrumentBgDetails.bgBankAcc,
                 bgBankIfsc: instrumentBgDetails.bgBankIfsc,
+                bgBankAccName: instrumentBgDetails.bgBankAccName,
                 courierNo: instrumentBgDetails.courierNo,
-                stampCharge: instrumentBgDetails.stampCharge,
                 extensionLetter: instrumentBgDetails.extensionLetter,
                 newBgClaim: instrumentBgDetails.newBgClaim,
                 approveBg: instrumentBgDetails.approveBg,
@@ -1282,11 +1455,14 @@ export class BankGuaranteeService {
                 payableAt: paymentInstruments.payableAt,
                 issueDate: paymentInstruments.issueDate,
                 expiryDate: paymentInstruments.expiryDate,
-                validityDate: paymentInstruments.validityDate,
-                claimExpiryDate: paymentInstruments.claimExpiryDate,
-                utr: paymentInstruments.utr,
+                validityDate: sql<Date | null>`coalesce(${instrumentBgDetails.validityDate}, ${paymentInstruments.validityDate})`,
+                claimExpiryDate: sql<Date | null>`coalesce(${instrumentBgDetails.claimExpiryDate}, ${paymentInstruments.claimExpiryDate})`,
+                bgClaim: instrumentBgDetails.bgClaim,
+                bgExpiryDateBg: sql<string | null>`coalesce(${paymentInstruments.expiryDate}, ${instrumentBgDetails.bgExpiryDate})`,
                 docketNo: paymentInstruments.docketNo,
                 courierAddress: paymentInstruments.courierAddress,
+                courierAddressJson: paymentInstruments.courierAddressJson,
+                reqNo: paymentInstruments.reqNo,
                 courierDeadline: paymentInstruments.courierDeadline,
                 generatedPdf: paymentInstruments.generatedPdf,
                 cancelPdf: paymentInstruments.cancelPdf,
@@ -1297,7 +1473,13 @@ export class BankGuaranteeService {
                 tenderNo: paymentRequests.tenderNo,
                 tenderName: paymentRequests.projectName,
                 tenderId: paymentRequests.tenderId,
+                requestId: paymentRequests.id,
+                requestType: paymentRequests.type,
+                requestDueDate: paymentRequests.dueDate,
+                requestedByName: users.name,
                 requestCreatedAt: paymentRequests.createdAt,
+                tenderDueDate: tenderInfos.dueDate,
+                tenderStatusName: statuses.name,
                 bgNo: instrumentBgDetails.bgNo,
                 bgDate: instrumentBgDetails.bgDate,
                 beneficiaryName: instrumentBgDetails.beneficiaryName,
@@ -1307,20 +1489,60 @@ export class BankGuaranteeService {
                 bgPurpose: instrumentBgDetails.bgPurpose,
                 bgSoftCopy: instrumentBgDetails.bgSoftCopy,
                 bgPo: instrumentBgDetails.bgPo,
+                bgClientUser: instrumentBgDetails.bgClientUser,
+                bgClientCp: instrumentBgDetails.bgClientCp,
+                bgClientFin: instrumentBgDetails.bgClientFin,
+                bgBankAcc: instrumentBgDetails.bgBankAcc,
+                bgBankIfsc: instrumentBgDetails.bgBankIfsc,
+                bgBankAccName: instrumentBgDetails.bgBankAccName,
+                bankMailIds: instrumentBgDetails.bankMailIds,
+                bankMailIdsCc: instrumentBgDetails.bankMailIdsCc,
                 courierNo: instrumentBgDetails.courierNo,
-                stampCharge: instrumentBgDetails.stampCharge,
+                stampCharges: instrumentBgDetails.stampCharges,
+                // Accounts Form 1 (request to bank)
+                approveBg: instrumentBgDetails.approveBg,
+                reasonReq: instrumentBgDetails.reasonReq,
+                prefilledSignedBg: instrumentBgDetails.prefilledSignedBg,
+                bgFormatTe: instrumentBgDetails.bgFormatTe,
+                bgFormatTl: instrumentBgDetails.bgFormatTl,
+                // Accounts Form 2 (after BG creation)
+                bg2Remark: instrumentBgDetails.bg2Remark,
+                // Accounts Form 3 (capture FDR details)
+                fdrPer: instrumentBgDetails.fdrPer,
+                fdrCopy: instrumentBgDetails.fdrCopy,
+                sfmsConf: instrumentBgDetails.sfmsConf,
+                sfmsCharges: instrumentBgDetails.sfmsCharges,
+                bgChargeDeducted: instrumentBgDetails.bgChargeDeducted,
+                sfmsChargesDeducted: instrumentBgDetails.sfmsChargesDeducted,
+                stampChargesDeducted: instrumentBgDetails.stampChargesDeducted,
+                otherChargesDeducted: instrumentBgDetails.otherChargesDeducted,
                 extendedAmount: instrumentBgDetails.extendedAmount,
                 extendedValidityDate: instrumentBgDetails.extendedValidityDate,
                 extendedClaimExpiryDate: instrumentBgDetails.extendedClaimExpiryDate,
                 extendedBankName: instrumentBgDetails.extendedBankName,
+                extensionLetterPath: instrumentBgDetails.extensionLetterPath,
+                cancellationLetterPath: instrumentBgDetails.cancellationLetterPath,
+                newStampChargeDeducted: instrumentBgDetails.newStampChargeDeducted,
                 fdrNo: instrumentBgDetails.fdrNo,
                 fdrAmt: instrumentBgDetails.fdrAmt,
                 fdrValidity: instrumentBgDetails.fdrValidity,
                 fdrRoi: instrumentBgDetails.fdrRoi,
+                cancelRemark: instrumentBgDetails.cancelRemark,
+                stampCoveringLetter: instrumentBgDetails.stampCoveringLetter,
+                cancellConfirm: instrumentBgDetails.cancellConfirm,
+                bgFdrCancelDate: instrumentBgDetails.bgFdrCancelDate,
+                bgFdrCancelAmount: instrumentBgDetails.bgFdrCancelAmount,
+                bgFdrCancelRefNo: instrumentBgDetails.bgFdrCancelRefNo,
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(tenderInfos, and(
+                eq(tenderInfos.id, paymentRequests.tenderId),
+                ne(paymentRequests.tenderId, 0)
+            ))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
             .where(and(
                 eq(paymentInstruments.id, id),
                 eq(paymentInstruments.instrumentType, 'BG'),
@@ -1332,20 +1554,106 @@ export class BankGuaranteeService {
             throw new NotFoundException(`Payment Instrument with ID ${id} not found`);
         }
 
-        const hasAccountsFormData = result.action != null && result.action >= 1;
-        const hasFdrDetails = !!(result.fdrNo || result.fdrAmt);
-        const hasCourierInfo = !!(result.courierAddress || result.courierNo || result.docketNo);
-        const hasExtensionDetails = !!(result.extendedAmount || result.extendedValidityDate);
-        const hasReturnedData = result.action != null && result.action >= 6;
-        const hasSettledData = result.action != null && [8, 9].includes(result.action);
+        let courierDetails: {
+            id: number;
+            toOrg: string;
+            toName: string;
+            toAddr: string;
+            toPin: string;
+            toMobile: string;
+            empFrom: number;
+            empFromName: string | null;
+            delDate: unknown;
+            urgency: number;
+            courierDocs: unknown;
+            docketNo: string | null;
+            docketSlip: string | null;
+            status: number | null;
+        } | null = null;
+        let courierDocs: string[] = [];
+        if (result.reqNo) {
+            const courierId = Number(result.reqNo);
+            if (!isNaN(courierId)) {
+                const [courier] = await this.db
+                    .select()
+                    .from(couriers)
+                    .where(eq(couriers.id, courierId))
+                    .limit(1);
+                if (courier) {
+                    let empFromName: string | null = null;
+                    if (courier.empFrom) {
+                        const [sender] = await this.db
+                            .select({ name: users.name })
+                            .from(users)
+                            .where(eq(users.id, courier.empFrom))
+                            .limit(1);
+                        empFromName = sender?.name ?? null;
+                    }
+                    courierDetails = {
+                        id: courier.id,
+                        toOrg: courier.toOrg,
+                        toName: courier.toName,
+                        toAddr: courier.toAddr,
+                        toPin: courier.toPin,
+                        toMobile: courier.toMobile,
+                        empFrom: courier.empFrom,
+                        empFromName,
+                        delDate: courier.delDate,
+                        urgency: courier.urgency,
+                        courierDocs: courier.courierDocs,
+                        docketNo: courier.docketNo,
+                        docketSlip: courier.docketSlip,
+                        status: courier.status,
+                    };
+                }
+            }
+        }
+
+        // Documents uploaded with the Accounts Form 2 courier dispatch live in
+        // payment_instruments.courier_address_json; the shared couriers row is
+        // only a fallback for older records.
+        const rawJson = result.courierAddressJson;
+        const jsonDocs = rawJson !== null && typeof rawJson === 'object' && 'docs' in rawJson
+            ? (rawJson as { docs?: unknown }).docs
+            : undefined;
+        const fallbackDocs = this.parseStringArray(
+            courierDetails?.courierDocs ?? null
+        );
+        courierDocs = Array.isArray(jsonDocs) && jsonDocs.length > 0
+            ? jsonDocs.filter((d): d is string => typeof d === 'string')
+            : (fallbackDocs ?? []);
+
+        const currentStep = Number(result.action ?? 0);
+        const hasAccountsForm1Data = currentStep >= 1;
+        const hasAccountsForm2Data = currentStep >= 2;
+        const hasAccountsForm3Data = currentStep >= 3;
+        const hasExtensionData = !!(result.extendedAmount || result.extendedValidityDate
+            || result.extendedClaimExpiryDate || result.extendedBankName
+            || result.newStampChargeDeducted) || this.hasFileValue(result.extensionLetterPath);
+        const hasExtensionModification = !!(result.extendedAmount || result.extendedValidityDate
+            || result.extendedClaimExpiryDate || result.extendedBankName || result.newStampChargeDeducted);
+        const hasReturnedData = !!(result.docketNo || result.courierNo)
+            || this.hasFileValue(result.docketSlip);
+        const hasRequestCancellationData = !!(result.coveringLetter || result.cancelRemark)
+            || this.hasFileValue(result.stampCoveringLetter)
+            || this.hasFileValue(result.cancellationLetterPath);
+        const hasBgCancellationData = this.hasFileValue(result.cancellConfirm);
+        const hasFdrCancellationData = !!(result.bgFdrCancelDate || result.bgFdrCancelAmount);
 
         return {
             id: result.id,
             action: result.action,
+            status: result.status,
             bgStatus: this.statusMap()[result.status] || result.status,
             tenderNo: result.tenderNo,
             tenderName: result.tenderName,
             tenderId: result.tenderId,
+            requestId: result.requestId,
+            requestType: result.requestType,
+            requestDueDate: result.requestDueDate ? new Date(result.requestDueDate) : null,
+            requestedByName: result.requestedByName,
+            tenderDueDate: result.tenderDueDate ? new Date(result.tenderDueDate) : null,
+            tenderStatusName: result.tenderStatusName,
             requestCreatedAt: result.requestCreatedAt ? result.requestCreatedAt.toISOString() : null,
             amount: result.amount ? Number(result.amount) : null,
             favouring: result.favouring,
@@ -1354,6 +1662,9 @@ export class BankGuaranteeService {
             expiryDate: result.expiryDate ? new Date(result.expiryDate) : null,
             validityDate: result.validityDate ? new Date(result.validityDate) : null,
             claimExpiryDate: result.claimExpiryDate ? new Date(result.claimExpiryDate) : null,
+            claimExpiryDateBg: result.claimExpiryDate ? new Date(result.claimExpiryDate) : null,
+            bgExpiryDate: result.bgExpiryDateBg ? new Date(result.bgExpiryDateBg) : null,
+            bgClaim: result.bgClaim ? new Date(result.bgClaim) : null,
             bgNo: result.bgNo,
             bgDate: result.bgDate ? new Date(result.bgDate) : null,
             beneficiaryName: result.beneficiaryName,
@@ -1363,11 +1674,41 @@ export class BankGuaranteeService {
             bgPurpose: result.bgPurpose,
             bgSoftCopy: result.bgSoftCopy,
             bgPo: result.bgPo,
+            bgClientUser: result.bgClientUser,
+            bgClientCp: result.bgClientCp,
+            bgClientFin: result.bgClientFin,
+            bgBankAcc: result.bgBankAcc,
+            bgBankIfsc: result.bgBankIfsc,
+            bgBankAccName: result.bgBankAccName,
+            bankMailIds: result.bankMailIds ?? [],
+            bankMailIdsCc: result.bankMailIdsCc ?? [],
             courierNo: result.courierNo,
             courierAddress: result.courierAddress,
+            courierAddressJson: (result.courierAddressJson ?? null) as Record<string, any> | null,
+            courierDocs,
+            reqNo: result.reqNo,
+            courierDetails,
             courierDeadline: result.courierDeadline ? Number(result.courierDeadline) : null,
-            stampCharge: result.stampCharge ? Number(result.stampCharge) : null,
-            utr: result.utr,
+            stampCharges: result.stampCharges ? Number(result.stampCharges) : null,
+            sfmsCharges: result.sfmsCharges ? Number(result.sfmsCharges) : null,
+            // Accounts Form 1 (request to bank)
+            approveBg: result.approveBg,
+            reasonReq: result.reasonReq,
+            prefilledSignedBg: result.prefilledSignedBg,
+            bgFormatTe: result.bgFormatTe,
+            bgFormatTl: result.bgFormatTl,
+            // Accounts Form 2 (after BG creation)
+            bg2Remark: result.bg2Remark,
+            // Accounts Form 3 (capture FDR details). fdrPer is returned as a
+            // string because the form field is z.enum(['10','15','100']) and the
+            // SelectField emits strings for it.
+            fdrPer: result.fdrPer != null ? String(result.fdrPer) : null,
+            fdrCopy: result.fdrCopy,
+            sfmsConf: result.sfmsConf,
+            bgChargeDeducted: result.bgChargeDeducted ? Number(result.bgChargeDeducted) : null,
+            sfmsChargesDeducted: result.sfmsChargesDeducted ? Number(result.sfmsChargesDeducted) : null,
+            stampChargesDeducted: result.stampChargesDeducted ? Number(result.stampChargesDeducted) : null,
+            otherChargesDeducted: result.otherChargesDeducted ? Number(result.otherChargesDeducted) : null,
             docketNo: result.docketNo,
             generatedPdf: result.generatedPdf,
             cancelPdf: result.cancelPdf,
@@ -1379,16 +1720,28 @@ export class BankGuaranteeService {
             extendedValidityDate: result.extendedValidityDate ? new Date(result.extendedValidityDate) : null,
             extendedClaimExpiryDate: result.extendedClaimExpiryDate ? new Date(result.extendedClaimExpiryDate) : null,
             extendedBankName: result.extendedBankName,
+            extensionLetterPath: result.extensionLetterPath,
+            cancellationLetterPath: result.cancellationLetterPath,
+            newStampChargeDeducted: result.newStampChargeDeducted ? Number(result.newStampChargeDeducted) : null,
             fdrNo: result.fdrNo,
             fdrAmt: result.fdrAmt ? Number(result.fdrAmt) : null,
             fdrValidity: result.fdrValidity ? new Date(result.fdrValidity) : null,
             fdrRoi: result.fdrRoi ? Number(result.fdrRoi) : null,
-            hasAccountsFormData,
-            hasFdrDetails,
-            hasCourierInfo,
-            hasExtensionDetails,
+            cancelRemark: result.cancelRemark,
+            stampCoveringLetter: result.stampCoveringLetter,
+            cancellConfirm: result.cancellConfirm,
+            bgFdrCancelDate: result.bgFdrCancelDate,
+            bgFdrCancelAmount: result.bgFdrCancelAmount ? Number(result.bgFdrCancelAmount) : null,
+            bgFdrCancelRefNo: result.bgFdrCancelRefNo,
+            hasAccountsForm1Data,
+            hasAccountsForm2Data,
+            hasAccountsForm3Data,
+            hasExtensionData,
+            hasExtensionModification,
             hasReturnedData,
-            hasSettledData,
+            hasRequestCancellationData,
+            hasBgCancellationData,
+            hasFdrCancellationData,
         };
     }
 
@@ -1400,7 +1753,6 @@ export class BankGuaranteeService {
                 partyName: followUps.partyName,
                 area: followUps.area,
                 amount: followUps.amount,
-                contacts: followUps.contacts,
                 frequency: followUps.frequency,
                 startFrom: followUps.startFrom,
                 nextFollowUpDate: followUps.nextFollowUpDate,
@@ -1408,6 +1760,7 @@ export class BankGuaranteeService {
                 proofText: followUps.proofText,
                 stopRemarks: followUps.stopRemarks,
                 proofImagePath: followUps.proofImagePath,
+                attachments: followUps.attachments,
                 assignmentStatus: followUps.assignmentStatus,
                 createdAt: followUps.createdAt,
             })
@@ -1423,12 +1776,28 @@ export class BankGuaranteeService {
             return null;
         }
 
+        const contactRows = await this.db
+            .select({
+                name: followUpPersons.name,
+                email: followUpPersons.email,
+                phone: followUpPersons.phone,
+                organisation: followUpPersons.organization,
+            })
+            .from(followUpPersons)
+            .where(eq(followUpPersons.followUpId, result.id))
+            .orderBy(asc(followUpPersons.createdAt));
+
         return {
             id: result.id,
             organisationName: result.partyName,
             area: result.area,
             amount: result.amount ? Number(result.amount) : null,
-            contacts: result.contacts || [],
+            contacts: contactRows.map((contact) => ({
+                name: contact.name,
+                email: contact.email,
+                phone: contact.phone,
+                org: contact.organisation,
+            })),
             frequency: result.frequency,
             followupStartDate: result.startFrom ? new Date(result.startFrom) : null,
             nextFollowUpDate: result.nextFollowUpDate ? new Date(result.nextFollowUpDate) : null,
@@ -1436,6 +1805,7 @@ export class BankGuaranteeService {
             proofText: result.proofText,
             stopRemarks: result.stopRemarks,
             proofImagePath: result.proofImagePath,
+            attachments: result.attachments || [],
             assignmentStatus: result.assignmentStatus,
             createdAt: result.createdAt,
         };

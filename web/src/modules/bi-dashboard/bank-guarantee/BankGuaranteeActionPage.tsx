@@ -1,19 +1,14 @@
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardAction } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, ArrowLeft } from 'lucide-react';
-import { BankGuaranteeActionForm } from './components/BankGuaranteeActionForm';
-import type { BankGuaranteeDashboardRow } from './helpers/bankGuarantee.types';
+import { BankGuaranteeAction } from './components/BankGuaranteeAction';
 
 export default function BankGuaranteeActionPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const location = useLocation();
     const instrumentId = id ? Number(id) : 0;
-
-    // Get instrument data from navigation state if available
-    const instrumentData = location.state as BankGuaranteeDashboardRow | undefined;
 
     if (!id || !instrumentId) {
         return (
@@ -31,9 +26,7 @@ export default function BankGuaranteeActionPage() {
                     <div>
                         <CardTitle>Bank Guarantee Action Form</CardTitle>
                         <CardDescription>
-                            {instrumentData?.tenderNo && instrumentData?.tenderName
-                                ? `${instrumentData.tenderNo} - ${instrumentData.tenderName}`
-                                : `Instrument ID: ${instrumentId}`}
+                            Instrument ID: {instrumentId}
                         </CardDescription>
                     </div>
                     <CardAction>
@@ -44,16 +37,7 @@ export default function BankGuaranteeActionPage() {
                 </div>
             </CardHeader>
             <CardContent>
-                <BankGuaranteeActionForm
-                    instrumentId={instrumentId}
-                    instrumentData={instrumentData ? {
-                        bgNo: instrumentData.bgNo || undefined,
-                        bgDate: instrumentData.bgDate || undefined,
-                        amount: instrumentData.amount || undefined,
-                        tenderName: instrumentData.tenderName || undefined,
-                        tenderNo: instrumentData.tenderNo || undefined,
-                    } : undefined}
-                />
+                <BankGuaranteeAction instrumentId={instrumentId} />
             </CardContent>
         </Card>
     );

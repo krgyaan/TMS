@@ -203,8 +203,10 @@ export const instrumentBgDetails = pgTable('instrument_bg_details', {
     // Direct mappings from MySQL emd_bgs
     bgNo: varchar('bg_no', { length: 100 }), // emd_bgs.bg_no
     bgDate: date('bg_date'), // emd_bgs.bg_date
-    validityDate: date('validity_date'), // emd_bgs.bg_validity
-    claimExpiryDate: date('claim_expiry_date'), // emd_bgs.claim_expiry
+    validityDate: date('validity_date'), // emd_bgs.bg_validity - written by accounts-form-2 only
+    claimExpiryDate: date('claim_expiry_date'), // emd_bgs.claim_expiry - written by accounts-form-2 only
+    bgClaim: date('bg_claim'), // EMD creation form's BG Claim Period date
+    bgExpiryDate: date('bg_expiry_date'), // EMD creation form's BG Expiry Date
     beneficiaryName: varchar('beneficiary_name', { length: 500 }), // emd_bgs.bg_favour
     beneficiaryAddress: text('beneficiary_address'), // emd_bgs.bg_address
     bankName: varchar('bank_name', { length: 300 }), // emd_bgs.new_bg_bank_name
@@ -244,15 +246,21 @@ export const instrumentBgDetails = pgTable('instrument_bg_details', {
     bgClientCp: varchar('bg_client_cp', { length: 255 }), // emd_bgs.bg_client_cp
     bgClientFin: varchar('bg_client_fin', { length: 255 }), // emd_bgs.bg_client_fin
 
+    // Bank Mail Ids - captured in Accounts Form (BG) 1. Capture only; not yet
+    // consumed by the notification service (sendPaymentInstrumentEmail resolves
+    // recipients via getResponsibleUserEmailByMode, not from here).
+    bankMailIds: jsonb('bank_mail_ids').$type<string[]>(),
+    bankMailIdsCc: jsonb('bank_mail_ids_cc').$type<string[]>(),
+
     // Bank Account Details
     bgBankAcc: varchar('bg_bank_acc', { length: 255 }), // emd_bgs.bg_bank_acc
     bgBankIfsc: varchar('bg_bank_ifsc', { length: 255 }), // emd_bgs.bg_bank_ifsc
+    bgBankAccName: varchar('bg_bank_acc_name', { length: 255 }),
 
     // Courier
     courierNo: varchar('courier_no', { length: 255 }), // emd_bgs.courier_no
 
     // New fields
-    stampCharge: decimal('stamp_charge', { precision: 15, scale: 2 }), // Maps to emd_bgs.bg_stamp
     extensionLetter: varchar('extension_letter', { length: 500 }), // Maps to emd_bgs.ext_letter
     newBgClaim: decimal('new_bg_claim', { precision: 15, scale: 2 }), // Maps to emd_bgs.new_bg_claim
 

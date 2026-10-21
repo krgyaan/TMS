@@ -638,19 +638,22 @@ export class PaymentRequestsCommandService {
                 await tx.insert(instrumentBgDetails).values({
                     instrumentId,
                     bgDate: details.bgDate || null,
-                    validityDate: details.bgExpiryDate || null,
-                    claimExpiryDate: details.bgClaimPeriod || null,
+                    bgExpiryDate: details.bgExpiryDate || null,
+                    bgClaim: details.bgClaimPeriod || null,
                     beneficiaryName: details.bgFavouring || null,
                     beneficiaryAddress: details.bgAddress || null,
                     bankName: details.bgBank || null,
                     bgBankAcc: details.bgBankAccountNo || null,
                     bgBankIfsc: details.bgBankIfsc || null,
+                    bgBankAccName: details.bgBankAccountName || null,
                     bgPurpose: details.bgPurpose || null,
                     bgNeeds: details.bgNeededIn || null,
                     bgClientUser: details.bgClientUserEmail || null,
                     bgClientCp: details.bgClientCpEmail || null,
                     bgClientFin: details.bgClientFinanceEmail || null,
-                    stampCharge: details.bgStampValue || null,
+                    stampCharges: details.bgStampValue || null,
+                    bgSoftCopy: details.bgFormatFiles?.[0] || null,
+                    bgPo: details.bgPoFiles?.[0] || null,
                 }).execute();
                 break;
 
@@ -929,17 +932,22 @@ export class PaymentRequestsCommandService {
                 await tx.update(instrumentBgDetails).set({
                     bgNo: details.bgNo || null,
                     bgDate: details.bgDate || null,
-                    validityDate: details.bgExpiryDate || null,
-                    claimExpiryDate: details.bgClaimPeriod || null,
+                    bgExpiryDate: details.bgExpiryDate || null,
+                    bgClaim: details.bgClaimPeriod || null,
                     beneficiaryName: details.bgFavouring || null,
                     beneficiaryAddress: details.bgAddress || null,
                     bankName: details.bgBank || null,
+                    bgBankAcc: details.bgBankAccountNo || null,
+                    bgBankIfsc: details.bgBankIfsc || null,
+                    bgBankAccName: details.bgBankAccountName || null,
                     bgPurpose: details.bgPurpose || null,
                     bgNeeds: details.bgNeededIn || null,
                     bgClientUser: details.bgClientUserEmail || null,
                     bgClientCp: details.bgClientCpEmail || null,
                     bgClientFin: details.bgClientFinanceEmail || null,
-                    stampCharge: details.bgStampValue || null,
+                    stampCharges: details.bgStampValue || null,
+                    bgSoftCopy: details.bgFormatFiles?.[0] || null,
+                    bgPo: details.bgPoFiles?.[0] || null,
                 }).where(eq(instrumentBgDetails.instrumentId, instrumentId));
                 break;
 
