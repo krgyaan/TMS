@@ -953,6 +953,10 @@ def ingest_parent_tender_pdf(
                         
                         if getattr(resolver, "llm_status", "ok") == "llm_unavailable" or llm_resolved.get("_llm_status") == "llm_unavailable":
                             infosheet_data["_llm_status"] = "llm_unavailable"
+                        if getattr(resolver, "failed_categories", None):
+                            infosheet_data["_failed_categories"] = list(resolver.failed_categories)
+                        elif llm_resolved.get("_failed_categories"):
+                            infosheet_data["_failed_categories"] = list(llm_resolved["_failed_categories"])
 
                         field_statuses = cast(Dict[str, str], infosheet_data.get("_info_sheet_statuses", {}))
                         missing_fields = cast(List[str], infosheet_data.get("missing_fields", []))
@@ -1123,6 +1127,8 @@ def ingest_parent_tender_pdf(
 
                         if getattr(resolver, "llm_status", "ok") == "llm_unavailable" or ambig_decisions.get("_llm_status"):
                             infosheet_data["_llm_status"] = "llm_unavailable"
+                        if getattr(resolver, "failed_categories", None):
+                            infosheet_data["_failed_categories"] = list(resolver.failed_categories)
 
                         field_statuses = cast(Dict[str, str], infosheet_data.get("_info_sheet_statuses", {}))
 
@@ -1185,6 +1191,7 @@ def ingest_parent_tender_pdf(
                     logger.info("[LLM_FALLBACK] Skipping LLM — no ATC text available (ATC not downloaded)")
             except Exception as llm_err:
                 logger.warning("[LLM_FALLBACK] Non-fatal LLM resolution error: %s", llm_err)
+                infosheet_data["_llm_status"] = "llm_unavailable"
 
         # Stripped: RegulatoryComplianceService / compliance evaluation logic (PQC/PQR recommendation engine is out of scope for pure extraction)
         # Stripped: generate_info_sheet_csv disk write (pure in-memory extraction pipeline, no disk writes outside temp-file cleanup)

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Logger, Param, ParseIntPipe, Patch, Post } from '@nestjs/common';
 import { TenderInfoSheetsService } from '@/modules/tendering/info-sheets/info-sheets.service';
 import { TenderInfoSheetPayloadSchema } from '@/modules/tendering/info-sheets/dto/info-sheet.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
@@ -6,6 +6,8 @@ import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 @Controller('tender-info-sheets')
 export class TenderInfoSheetsController {
+    private readonly logger = new Logger(TenderInfoSheetsController.name);
+
     constructor(private readonly infoSheetsService: TenderInfoSheetsService) { }
 
     @Get('auto-extract/:jobId')
@@ -31,6 +33,11 @@ export class TenderInfoSheetsController {
         return this.infoSheetsService.getSavedExtraction(tenderId);
     }
 
+    /**
+     * @deprecated POST /:tenderId/extraction/save is deprecated. The background extraction
+     * worker is now the single writer that persists extraction results to PostgreSQL in
+     * a single atomic transaction. Do not remove yet; retained for backwards compatibility.
+     */
     @Post(':tenderId/extraction/save')
     @HttpCode(HttpStatus.OK)
     async saveExtraction(
@@ -38,6 +45,9 @@ export class TenderInfoSheetsController {
         @Body() body: any,
         @CurrentUser() user: ValidatedUser,
     ) {
+        this.logger.warn(
+            `[DEPRECATED] POST /tender-info-sheets/${tenderId}/extraction/save was called by user ${user?.sub}. Worker persistence is the authoritative write path.`,
+        );
         return this.infoSheetsService.saveExtractionResult(tenderId, body, user.sub);
     }
 

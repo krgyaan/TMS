@@ -46,9 +46,12 @@ class InfoSheetsService extends BaseApiService {
         processing_time_ms: number;
         updatedAt: string;
         llm_status?: string;
+        failed_categories?: string[];
         self_classified_atc?: boolean;
         has_atc?: boolean;
         ambiguous_field_conflicts?: Record<string, any>;
+        stale?: boolean;
+        isStale?: boolean;
     } | null> {
         try {
             return await this.get(`/${tenderId}/extraction`)
@@ -65,6 +68,7 @@ class InfoSheetsService extends BaseApiService {
             extraction_version?: string;
             processing_time_ms?: number;
             llm_status?: string;
+            failed_categories?: string[];
             self_classified_atc?: boolean;
             has_atc?: boolean;
             ambiguous_field_conflicts?: Record<string, any>;
@@ -83,6 +87,7 @@ class InfoSheetsService extends BaseApiService {
         extraction_version?: string;
         processing_time_ms?: number;
         llm_status?: string;
+        failed_categories?: string[];
         self_classified_atc?: boolean;
         has_atc?: boolean;
         ambiguous_field_conflicts?: Record<string, any>;

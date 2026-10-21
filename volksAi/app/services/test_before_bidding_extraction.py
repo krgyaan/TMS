@@ -252,7 +252,7 @@ def test_extract_api_field_object_formatting_for_new_fields():
     )
     assert obj_sv["value"] == "Yes (Mandatory site inspection)"
     assert obj_sv["confidence"] == "high"
-    assert obj_sv["source"] == "regex"
+    assert obj_sv["source"] == "rule"
 
     # Format sampleSubmission when not applicable
     obj_sample = _format_field_object(

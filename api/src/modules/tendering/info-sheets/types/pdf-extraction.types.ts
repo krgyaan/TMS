@@ -6,6 +6,9 @@ export interface VolksAiExtractionPayload {
     boqPath: string | null;
     userId: number;
     force?: boolean;
+    documentHash?: string;
+    extractionVersion?: string;
+    isNonCacheable?: boolean;
 }
 
 export interface PdfExtractionJobData {
@@ -16,6 +19,9 @@ export interface PdfExtractionJobData {
     boqPath?: string | null;
     userId: number;
     force?: boolean;
+    documentHash?: string;
+    extractionVersion?: string;
+    isNonCacheable?: boolean;
 }
 
 export interface FieldSourceCitation {
@@ -40,11 +46,18 @@ export interface FieldSources {
     unlocated?: FieldSourceCitation | null;
 }
 
+export interface ExtractionFieldFlag {
+    code: string;
+    message: string;
+    rawValue: string | null;
+}
+
 export interface PdfExtractionFieldValue<T = unknown> {
     value: T;
     confidence: 'high' | 'medium' | 'low' | 'not_applicable' | string;
     source: string | null;
     sources?: FieldSources;
+    flags?: ExtractionFieldFlag[];
 }
 
 export interface PdfExtractionJobResult {
@@ -54,6 +67,7 @@ export interface PdfExtractionJobResult {
     processing_time_ms: number;
     llm_usage?: Record<string, any>;
     llm_status?: string;
+    failed_categories?: string[];
     self_classified_atc?: boolean;
     has_atc?: boolean;
     ambiguous_field_conflicts?: Record<string, any>;

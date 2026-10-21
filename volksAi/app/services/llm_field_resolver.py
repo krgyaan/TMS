@@ -19,6 +19,7 @@ import json
 import logging
 import os
 import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple, Set, Union
@@ -1102,6 +1103,7 @@ class LLMFieldResolver:
         role2_model: Optional[str] = None,
         api_key: Optional[str] = None,
         timeout: float = 25.0,
+        time_budget_sec: Optional[float] = None,
     ):
         anthropic_key = (
             api_key
@@ -1122,11 +1124,14 @@ class LLMFieldResolver:
         self.role2_model = role2_model or os.getenv("ANTHROPIC_ROLE2_MODEL") or model or ROLE_2_MODEL_DEFAULT
         self.model_name = self.role1_model  # Backwards compatibility attribute
         self.timeout = float(timeout)
+        self.time_budget_sec = float(time_budget_sec) if time_budget_sec is not None else float(os.getenv("LLM_TOTAL_TIME_BUDGET_SEC", "60.0"))
+        self.start_time = time.time()
         self.enabled = os.getenv("LLM_FALLBACK_ENABLED", "true").lower() == "true"
 
         import anthropic
         self.client = anthropic.Anthropic(api_key=self.api_key, timeout=self.timeout)
         self.llm_status: str = "ok"
+        self.failed_categories: List[str] = []
         self.last_error: Optional[Dict[str, Any]] = None
 
         # Token and cost tracking (Multi-metric tracking)
@@ -1172,6 +1177,42 @@ class LLMFieldResolver:
                 "calls_count": 0,
             },
         }
+
+    def elapsed_time(self) -> float:
+        """Returns seconds elapsed since resolver initialized."""
+        return time.time() - self.start_time
+
+    def remaining_time_budget(self) -> float:
+        """Returns remaining seconds in the global LLM time budget."""
+        return max(0.0, self.time_budget_sec - self.elapsed_time())
+
+    def is_time_budget_exceeded(self) -> bool:
+        """Checks if the global LLM time budget has been exhausted."""
+        return self.elapsed_time() >= self.time_budget_sec
+
+    def _is_non_retryable_error(self, exc: Exception) -> bool:
+        """HTTP 400, 401, 403, 404 or auth/permission errors are non-retryable."""
+        status_code = getattr(exc, "status_code", None)
+        if status_code in (400, 401, 403, 404):
+            return True
+        exc_name = type(exc).__name__
+        if any(err in exc_name for err in ("AuthenticationError", "PermissionDeniedError", "BadRequestError", "NotFoundError")):
+            return True
+        return False
+
+    def _is_retryable_error(self, exc: Exception) -> bool:
+        """HTTP 429, 5xx, or timeouts are retryable with backoff."""
+        status_code = getattr(exc, "status_code", None)
+        if status_code == 429:
+            return True
+        if status_code is not None and (status_code >= 500 or status_code == 408):
+            return True
+        exc_name = type(exc).__name__
+        if any(err in exc_name for err in ("RateLimitError", "InternalServerError", "APITimeoutError", "TimeoutError", "APIConnectionError")):
+            return True
+        if isinstance(exc, (TimeoutError, ConnectionError)):
+            return True
+        return False
 
     def record_usage(
         self,
@@ -1316,6 +1357,7 @@ class LLMFieldResolver:
 
         prompt_to_display = {entry[0]: disp_key for disp_key, entry in FIELD_PROMPT_MAP.items()}
         results: Dict[str, Any] = {}
+        self.failed_categories = []
 
         # Sort category batches by business criticality so highest-impact fields are resolved first
         category_order = [
@@ -1335,6 +1377,13 @@ class LLMFieldResolver:
 
         for cat in sorted_categories:
             cat_fields = category_batches[cat]
+            if self.llm_status == "llm_unavailable":
+                cat_idx = sorted_categories.index(cat)
+                for remaining_cat in sorted_categories[cat_idx:]:
+                    if remaining_cat not in self.failed_categories:
+                        self.failed_categories.append(remaining_cat)
+                break
+
             # STEP 4 (option b): gate on cost-weighted tokens, not raw count --
             # a cached re-read of the static system+tools prefix is ~90%
             # cheaper than a fresh read and shouldn't consume budget as if it
@@ -1349,7 +1398,27 @@ class LLMFieldResolver:
                     len(cat_fields),
                     cat_fields
                 )
+                cat_idx = sorted_categories.index(cat)
+                for remaining_cat in sorted_categories[cat_idx:]:
+                    if remaining_cat not in self.failed_categories:
+                        self.failed_categories.append(remaining_cat)
                 break
+
+            if self.is_time_budget_exceeded():
+                logger.error(
+                    "[LLM_FALLBACK][Role 1] Global LLM time budget (%.1fs) exceeded before category '%s'. Stopping all LLM calls.",
+                    self.time_budget_sec, cat
+                )
+                self.llm_status = "llm_unavailable"
+                self.last_error = {"class": "TimeoutError", "status": 408, "detail": "Global time budget exceeded"}
+                results["_llm_status"] = "llm_unavailable"
+
+                cat_idx = sorted_categories.index(cat)
+                for remaining_cat in sorted_categories[cat_idx:]:
+                    if remaining_cat not in self.failed_categories:
+                        self.failed_categories.append(remaining_cat)
+                results["_failed_categories"] = list(self.failed_categories)
+                return results
 
             scoped_text = extract_scoped_context(atc_full_text, cat)
             logger.info(
@@ -1387,73 +1456,162 @@ class LLMFieldResolver:
                 f"Scoped Tender Clauses:\n--- START OF RELEVANT CLAUSES ---\n{scoped_text}\n--- END OF RELEVANT CLAUSES ---"
             )
 
-            # Execution with truncation recovery
-            max_tokens_to_use = ROLE_1_MAX_TOKENS
-            for attempt in range(2):
+            # Execution with retry/backoff for 429/5xx/timeout and truncation recovery
+            max_retries = 3
+            backoff_base = 0.5
+
+            for retry_count in range(max_retries):
+                max_tokens_to_use = ROLE_1_MAX_TOKENS
                 try:
-                    response = self.client.messages.create(
-                        model=self.role1_model,
-                        max_tokens=max_tokens_to_use,
-                        system=system_blocks,
-                        messages=[{"role": "user", "content": user_prompt}],
-                        tools=[tool_spec],
-                        tool_choice={"type": "tool", "name": "extract_missing_fields"},
-                    )
-
-                    if hasattr(response, "usage") and response.usage:
-                        self.record_usage(response.usage, role="role1")
-                        logger.info(
-                            "[LLM_FALLBACK][Role 1] Category '%s' token usage: %d in / %d out (Est. total cost: $%.5f USD)",
-                            cat, response.usage.input_tokens, response.usage.output_tokens, self.total_cost_usd
+                    for attempt in range(2):
+                        response = self.client.messages.create(
+                            model=self.role1_model,
+                            max_tokens=max_tokens_to_use,
+                            system=system_blocks,
+                            messages=[{"role": "user", "content": user_prompt}],
+                            tools=[tool_spec],
+                            tool_choice={"type": "tool", "name": "extract_missing_fields"},
                         )
 
-                    stop_reason = getattr(response, "stop_reason", None)
-                    if stop_reason == "max_tokens" and attempt == 0:
-                        self.role1_retries += 1
-                        max_tokens_to_use = ROLE_1_MAX_TOKENS_RETRY
-                        logger.warning(
-                            "[LLM_FALLBACK][Role 1] Output truncated (stop_reason='max_tokens') for category '%s'! Retrying once with max_tokens=%d...",
-                            cat, max_tokens_to_use
-                        )
-                        continue
+                        if hasattr(response, "usage") and response.usage:
+                            self.record_usage(response.usage, role="role1")
+                            logger.info(
+                                "[LLM_FALLBACK][Role 1] Category '%s' token usage: %d in / %d out (Est. total cost: $%.5f USD)",
+                                cat, response.usage.input_tokens, response.usage.output_tokens, self.total_cost_usd
+                            )
 
-                    extracted_dict: Dict[str, Any] = {}
-                    for block in response.content:
-                        if getattr(block, "type", "") == "tool_use" and getattr(block, "name", "") == "extract_missing_fields":
-                            extracted_dict = getattr(block, "input", {}) or {}
-                            break
-
-                    for prompt_field, raw_val in extracted_dict.items():
-                        if raw_val is None:
-                            continue
-                        display_key = prompt_to_display.get(prompt_field)
-                        if not display_key or display_key not in cat_fields:
+                        stop_reason = getattr(response, "stop_reason", None)
+                        if stop_reason == "max_tokens" and attempt == 0:
+                            self.role1_retries += 1
+                            max_tokens_to_use = ROLE_1_MAX_TOKENS_RETRY
+                            logger.warning(
+                                "[LLM_FALLBACK][Role 1] Output truncated (stop_reason='max_tokens') for category '%s'! Retrying once with max_tokens=%d...",
+                                cat, max_tokens_to_use
+                            )
                             continue
 
-                        formatter = FIELD_PROMPT_MAP[display_key][3]
-                        formatted_val = formatter(raw_val) if callable(formatter) else str(raw_val)
+                        extracted_dict: Dict[str, Any] = {}
+                        for block in response.content:
+                            if getattr(block, "type", "") == "tool_use" and getattr(block, "name", "") == "extract_missing_fields":
+                                extracted_dict = getattr(block, "input", {}) or {}
+                                break
 
-                        if formatted_val is not None and str(formatted_val).strip():
-                            results[display_key] = {
-                                "value": formatted_val,
-                                "raw_value": raw_val,
-                                "confidence": 0.85,
-                                "source": "llm",
-                            }
-                            _save_memory(display_key, str(raw_val), formatted_val, detected_type, confidence=0.85)
+                        for prompt_field, raw_val in extracted_dict.items():
+                            if raw_val is None:
+                                continue
+                            display_key = prompt_to_display.get(prompt_field)
+                            if not display_key or display_key not in cat_fields:
+                                continue
 
-                    break  # Successful attempt, exit attempt loop
+                            formatter = FIELD_PROMPT_MAP[display_key][3]
+                            formatted_val = formatter(raw_val) if callable(formatter) else str(raw_val)
+
+                            if formatted_val is not None and str(formatted_val).strip():
+                                results[display_key] = {
+                                    "value": formatted_val,
+                                    "raw_value": raw_val,
+                                    "confidence": 0.85,
+                                    "source": "llm",
+                                }
+                                _save_memory(display_key, str(raw_val), formatted_val, detected_type, confidence=0.85)
+
+                        break  # Successful attempt, exit truncation loop
+
+                    break  # Successful category call, exit retry loop
 
                 except Exception as exc:
                     status_code = getattr(exc, "status_code", None)
-                    logger.error(
-                        "[LLM_FALLBACK][Role 1] Claude extraction failed for category '%s': class=%s, status=%s, detail=%s",
-                        cat, type(exc).__name__, status_code, exc
-                    )
-                    self.llm_status = "llm_unavailable"
-                    self.last_error = {"class": type(exc).__name__, "status": status_code, "detail": str(exc)}
-                    results["_llm_status"] = "llm_unavailable"
-                    break
+                    if self._is_non_retryable_error(exc):
+                        logger.error(
+                            "[LLM_FALLBACK][Role 1] Non-retryable error for category '%s': class=%s, status=%s, detail=%s. Stopping all LLM calls.",
+                            cat, type(exc).__name__, status_code, exc
+                        )
+                        self.llm_status = "llm_unavailable"
+                        self.last_error = {"class": type(exc).__name__, "status": status_code, "detail": "Non-retryable error"}
+                        results["_llm_status"] = "llm_unavailable"
+
+                        cat_idx = sorted_categories.index(cat)
+                        for remaining_cat in sorted_categories[cat_idx:]:
+                            if remaining_cat not in self.failed_categories:
+                                self.failed_categories.append(remaining_cat)
+                        results["_failed_categories"] = list(self.failed_categories)
+                        return results
+
+                    elif self._is_retryable_error(exc):
+                        if self.is_time_budget_exceeded():
+                            logger.error(
+                                "[LLM_FALLBACK][Role 1] Global LLM time budget (%.1fs) exceeded during retry for category '%s'. Giving up.",
+                                self.time_budget_sec, cat
+                            )
+                            self.llm_status = "llm_unavailable"
+                            self.last_error = {"class": "TimeoutError", "status": 408, "detail": "Global time budget exceeded during retry"}
+                            results["_llm_status"] = "llm_unavailable"
+
+                            cat_idx = sorted_categories.index(cat)
+                            for remaining_cat in sorted_categories[cat_idx:]:
+                                if remaining_cat not in self.failed_categories:
+                                    self.failed_categories.append(remaining_cat)
+                            results["_failed_categories"] = list(self.failed_categories)
+                            return results
+
+                        if retry_count < max_retries - 1:
+                            sleep_sec = backoff_base * (2 ** retry_count)
+                            remaining = self.remaining_time_budget()
+                            if sleep_sec > remaining:
+                                logger.warning(
+                                    "[LLM_FALLBACK][Role 1] Backoff sleep (%.2fs) exceeds remaining budget (%.2fs) for category '%s'. Aborting retries.",
+                                    sleep_sec, remaining, cat
+                                )
+                                self.llm_status = "llm_unavailable"
+                                self.last_error = {"class": "TimeoutError", "status": 408, "detail": "Global time budget exceeded"}
+                                results["_llm_status"] = "llm_unavailable"
+
+                                cat_idx = sorted_categories.index(cat)
+                                for remaining_cat in sorted_categories[cat_idx:]:
+                                    if remaining_cat not in self.failed_categories:
+                                        self.failed_categories.append(remaining_cat)
+                                results["_failed_categories"] = list(self.failed_categories)
+                                return results
+
+                            logger.warning(
+                                "[LLM_FALLBACK][Role 1] Retryable error for category '%s' (attempt %d/%d): class=%s, status=%s. Backing off for %.2fs...",
+                                cat, retry_count + 1, max_retries, type(exc).__name__, status_code, sleep_sec
+                            )
+                            time.sleep(sleep_sec)
+                            continue
+                        else:
+                            logger.error(
+                                "[LLM_FALLBACK][Role 1] Retries exhausted for category '%s' after %d attempts: class=%s, status=%s. Giving up.",
+                                cat, max_retries, type(exc).__name__, status_code
+                            )
+                            self.llm_status = "llm_unavailable"
+                            self.last_error = {"class": type(exc).__name__, "status": status_code, "detail": "Retries exhausted"}
+                            results["_llm_status"] = "llm_unavailable"
+
+                            cat_idx = sorted_categories.index(cat)
+                            for remaining_cat in sorted_categories[cat_idx:]:
+                                if remaining_cat not in self.failed_categories:
+                                    self.failed_categories.append(remaining_cat)
+                            results["_failed_categories"] = list(self.failed_categories)
+                            return results
+                    else:
+                        logger.error(
+                            "[LLM_FALLBACK][Role 1] Unexpected error for category '%s': class=%s, status=%s, detail=%s. Stopping.",
+                            cat, type(exc).__name__, status_code, exc
+                        )
+                        self.llm_status = "llm_unavailable"
+                        self.last_error = {"class": type(exc).__name__, "status": status_code, "detail": "Unexpected error"}
+                        results["_llm_status"] = "llm_unavailable"
+
+                        cat_idx = sorted_categories.index(cat)
+                        for remaining_cat in sorted_categories[cat_idx:]:
+                            if remaining_cat not in self.failed_categories:
+                                self.failed_categories.append(remaining_cat)
+                        results["_failed_categories"] = list(self.failed_categories)
+                        return results
+
+        if self.failed_categories:
+            results["_failed_categories"] = list(self.failed_categories)
 
         logger.info("[LLM_FALLBACK][Role 1] Successfully resolved %d/%d fields via Claude", len(results), len(known_missing))
         return results
@@ -1472,7 +1630,11 @@ class LLMFieldResolver:
         Either confirms the regex candidate or overrides it with a corrected value and reasoning.
         Enforces ROLE_2_MAX_TOKENS (800) and prompt caching.
         """
-        if not self.enabled:
+        if not self.enabled or self.llm_status == "llm_unavailable" or self.is_time_budget_exceeded():
+            if self.is_time_budget_exceeded():
+                self.llm_status = "llm_unavailable"
+                if "ambiguity_resolution" not in self.failed_categories:
+                    self.failed_categories.append("ambiguity_resolution")
             return {}
 
         fields_to_check = [f for f in AMBIGUITY_PRONE_FIELDS if f in candidates]
@@ -1587,7 +1749,9 @@ class LLMFieldResolver:
                 type(exc).__name__, status_code, exc
             )
             self.llm_status = "llm_unavailable"
-            self.last_error = {"class": type(exc).__name__, "status": status_code, "detail": str(exc)}
+            self.last_error = {"class": type(exc).__name__, "status": status_code, "detail": "Ambiguity resolution error"}
+            if "ambiguity_resolution" not in self.failed_categories:
+                self.failed_categories.append("ambiguity_resolution")
             return {"_llm_status": {"action": "error", "reasoning": "llm_unavailable"}}
 
     # Backward compatibility alias

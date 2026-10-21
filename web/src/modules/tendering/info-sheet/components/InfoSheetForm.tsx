@@ -81,6 +81,9 @@ export function TenderInformationForm({
         processing_time_ms?: number;
         documentIdentityCheck?: DocumentIdentityCheck | null;
         llm_status?: string;
+        failed_categories?: string[];
+        stale?: boolean;
+        isStale?: boolean;
     } | null>(null);
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -171,6 +174,7 @@ export function TenderInformationForm({
                     processing_time_ms: res.processing_time_ms,
                     documentIdentityCheck: res.documentIdentityCheck,
                     llm_status: res.llm_status,
+                    failed_categories: res.failed_categories,
                 });
                 const populateResult = populateFormFromExtraction(form, res.fields as any);
                 const indicators = extractFieldIndicators(res.fields as any, res.missing_fields);
@@ -219,53 +223,30 @@ export function TenderInformationForm({
                             processing_time_ms: statusRes.processing_time_ms,
                             documentIdentityCheck: statusRes.documentIdentityCheck,
                             llm_status: statusRes.llm_status,
+                            failed_categories: statusRes.failed_categories,
                         });
 
                         const populateResult = populateFormFromExtraction(form, statusRes.fields as any);
                         const indicators = extractFieldIndicators(statusRes.fields as any, statusRes.missing_fields);
                         setFieldIndicators(indicators);
 
-                        // Save extraction permanently to backend
-                        try {
-                            console.log('[AutoExtract] Saving extraction result to backend', {
-                                event_type: 'autoextract_save',
-                                action: 'save_request_sent',
-                                tender_id: tenderId,
-                            });
-                            if (statusRes.fields) {
-                                await infoSheetsService.saveExtraction(tenderId, {
-                                    fields: statusRes.fields as unknown as Record<string, unknown>,
-                                    missing_fields: statusRes.missing_fields,
-                                    self_classified_atc: statusRes.self_classified_atc,
-                                    has_atc: statusRes.has_atc,
-                                    ambiguous_field_conflicts: statusRes.ambiguous_field_conflicts,
-                                    processing_time_ms: statusRes.processing_time_ms,
-                                });
-                                setIsExtractionSaved(true);
-                            }
-                            console.log('[AutoExtract] Extraction result saved successfully', {
-                                event_type: 'autoextract_save',
-                                action: 'save_success',
-                                tender_id: tenderId,
-                            });
-                        } catch (saveErr) {
-                            console.error('[AutoExtract] Failed to persist extraction to backend', {
-                                event_type: 'autoextract_save',
-                                action: 'save_failure',
-                                tender_id: tenderId,
-                                error: saveErr,
-                            });
-                        }
-
+                        setIsExtractionSaved(true);
                         const missingCount = statusRes.missing_fields?.length || 0;
                         const fallbackCount = Object.values(indicators).filter((i) => i.type === 'fallback').length;
 
-                        toast.success(
-                            `AI Extraction complete & saved! ${populateResult.populatedCount} fields auto-populated.${
-                                fallbackCount > 0 ? ` (${fallbackCount} fallback values)` : ''
-                            }${missingCount > 0 ? ` (${missingCount} missing)` : ''}`,
-                            { id: 'auto-extract', duration: 6000 },
-                        );
+                        if (statusRes.llm_status === 'llm_unavailable') {
+                            toast.warning(
+                                `AI step failed, some fields were not extracted. Partial extraction completed (${populateResult.populatedCount} fields auto-populated).`,
+                                { id: 'auto-extract', duration: 7000 },
+                            );
+                        } else {
+                            toast.success(
+                                `AI Extraction complete! ${populateResult.populatedCount} fields auto-populated.${
+                                    fallbackCount > 0 ? ` (${fallbackCount} fallback values)` : ''
+                                }${missingCount > 0 ? ` (${missingCount} missing)` : ''}`,
+                                { id: 'auto-extract', duration: 6000 },
+                            );
+                        }
                     } else if (statusRes.status === 'failed') {
                         if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
                         setIsExtracting(false);
@@ -481,10 +462,34 @@ export function TenderInformationForm({
                     </div>
                     <CardAction className="flex items-center gap-2">
                         {isExtractionSaved && (
-                            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800 flex items-center gap-1 py-1 px-2.5">
-                                <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                                <span>AI Extracted</span>
-                            </Badge>
+                            (extractionData?.stale || extractionData?.isStale) ? (
+                                <Badge
+                                    variant="outline"
+                                    data-testid="ai-extracted-outdated-badge"
+                                    className="bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800 flex items-center gap-1 py-1 px-2.5"
+                                >
+                                    <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                                    <span>AI Extracted (Outdated)</span>
+                                </Badge>
+                            ) : extractionData?.llm_status === 'llm_unavailable' ? (
+                                <Badge
+                                    variant="outline"
+                                    data-testid="ai-extracted-partial-badge"
+                                    className="bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800 flex items-center gap-1 py-1 px-2.5"
+                                >
+                                    <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                                    <span>AI Extracted (Partial)</span>
+                                </Badge>
+                            ) : (
+                                <Badge
+                                    variant="outline"
+                                    data-testid="ai-extracted-badge"
+                                    className="bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800 flex items-center gap-1 py-1 px-2.5"
+                                >
+                                    <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                                    <span>AI Extracted</span>
+                                </Badge>
+                            )
                         )}
                         {extractionData?.fields && Object.keys(extractionData.fields).length > 0 && (
                             <Button
@@ -519,7 +524,9 @@ export function TenderInformationForm({
                             ) : isExtractionSaved ? (
                                 <>
                                     <Sparkles className="mr-2 h-4 w-4" />
-                                    Re-Extract with AI
+                                    {(extractionData?.stale || extractionData?.isStale)
+                                        ? 'Analyze with AI again'
+                                        : 'Re-Extract with AI'}
                                 </>
                             ) : (
                                 <>
@@ -536,6 +543,25 @@ export function TenderInformationForm({
             </CardHeader>
 
             <CardContent>
+                {(extractionData?.stale || extractionData?.isStale) && (
+                    <Alert
+                        role="alert"
+                        data-testid="ai-extraction-stale"
+                        className="mb-6 border-amber-500 bg-amber-50 dark:bg-amber-950/60"
+                    >
+                        <AlertCircle className="h-4 w-4 text-amber-600" />
+                        <AlertDescription className="text-amber-800 dark:text-amber-200">
+                            <div className="space-y-1.5">
+                                <p className="font-semibold text-base">
+                                    Tender documents changed since the last analysis; run Analyze with AI again
+                                </p>
+                                <p className="text-sm">
+                                    Previously extracted values are displayed below for reference labelled as outdated. Run Analyze with AI again to update them against the latest uploaded documents.
+                                </p>
+                            </div>
+                        </AlertDescription>
+                    </Alert>
+                )}
                 {extractionData?.llm_status === 'llm_unavailable' && (
                     <Alert
                         role="alert"
@@ -545,11 +571,16 @@ export function TenderInformationForm({
                         <AlertCircle className="h-4 w-4 text-amber-600" />
                         <AlertDescription className="text-amber-800 dark:text-amber-200">
                             <div className="space-y-1.5">
-                                <p className="font-semibold">
-                                    AI extraction unavailable
+                                <p className="font-semibold text-base">
+                                    AI step failed, some fields were not extracted
                                 </p>
                                 <p className="text-sm">
                                     The AI service could not be reached or encountered an error. Document parsing completed using rule-based pattern matching only. Some complex fields may require manual review.
+                                    {extractionData.failed_categories && extractionData.failed_categories.length > 0 && (
+                                        <span className="block mt-1 text-xs opacity-90 font-medium">
+                                            Skipped categories: {extractionData.failed_categories.join(', ')}
+                                        </span>
+                                    )}
                                 </p>
                             </div>
                         </AlertDescription>
@@ -587,6 +618,7 @@ export function TenderInformationForm({
                         missingFields={extractionData.missing_fields}
                         processingTimeMs={extractionData.processing_time_ms}
                         tenderDocuments={tender?.documents}
+                        isStale={Boolean(extractionData?.stale || extractionData?.isStale)}
                         onClose={() => setShowPreview(false)}
                     />
                 )}
