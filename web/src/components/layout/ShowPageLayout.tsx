@@ -218,6 +218,9 @@ export function ShowPageLayout({
     const panelHeightRef = useRef(0);
     const viewportRef = useRef(0);
     const scrollRef = useRef(0);
+    const gridRef = useRef<HTMLDivElement>(null);
+    const spacerRef = useRef<HTMLDivElement>(null);
+    const [spacerHeight, setSpacerHeight] = useState(0);
     const hasRightPanel = Boolean(rightPanel);
 
     // Slide-up pinned panel: stays fixed at the top when it fits the viewport,
@@ -240,17 +243,35 @@ export function ShowPageLayout({
             el.style.top = `${top}px`;
         };
 
+        // The slide-up only travels as far as the page can scroll. When every
+        // section is collapsed the page is short, so extend it with an empty
+        // spacer until the full panel becomes reachable.
+        const updateSpacer = () => {
+            const available = viewportRef.current - PANEL_TOP - BOTTOM_GAP;
+            const overflow = Math.max(0, panelHeightRef.current - available);
+            const current = spacerRef.current?.offsetHeight ?? 0;
+            const naturalMaxScroll = Math.max(
+                0,
+                document.documentElement.scrollHeight - window.innerHeight - current
+            );
+            const desired = Math.max(0, overflow - naturalMaxScroll);
+            if (Math.abs(desired - current) > 1) setSpacerHeight(desired);
+        };
+
         const measure = () => {
             const content = el.firstElementChild as HTMLElement | null;
             panelHeightRef.current = content?.offsetHeight ?? el.scrollHeight;
             viewportRef.current = window.innerHeight;
             apply();
+            updateSpacer();
         };
 
         measure();
         const ro = new ResizeObserver(measure);
         const observed = el.firstElementChild;
         if (observed) ro.observe(observed);
+        const gridEl = gridRef.current;
+        if (gridEl) ro.observe(gridEl);
         window.addEventListener("resize", measure);
 
         let raf = 0;
@@ -357,16 +378,24 @@ export function ShowPageLayout({
 
     if (rightPanel) {
         return (
-            <div className="space-y-8 xl:grid xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start xl:gap-6">
-                <div className="min-w-0 space-y-8">{content}</div>
-                <aside
-                    ref={panelRef}
-                    className="xl:fixed xl:right-4 xl:z-0 xl:w-[280px]"
-                    style={{ top: PANEL_TOP }}
-                >
-                    {rightPanel}
-                </aside>
-            </div>
+            <>
+                <div ref={gridRef} className="space-y-8 xl:grid xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start xl:gap-6">
+                    <div className="min-w-0 space-y-8">{content}</div>
+                    <aside
+                        ref={panelRef}
+                        className="xl:fixed xl:right-4 xl:z-0 xl:w-[280px]"
+                        style={{ top: PANEL_TOP }}
+                    >
+                        {rightPanel}
+                    </aside>
+                </div>
+                <div
+                    ref={spacerRef}
+                    className="hidden xl:block"
+                    style={{ height: spacerHeight }}
+                    aria-hidden
+                />
+            </>
         );
     }
 
