@@ -9,6 +9,8 @@ export interface BankGuaranteeDashboardRow {
     bidValidity: Date | null;
     amount: number | null;
     bgExpiryDate: Date | null;
+    bgExpiryDateCoalesced: Date | null;
+    bgClaimExpiryDate: Date | null;
     bgClaimPeriod: number | null;
     expiryDate: Date | null;
     bgChargesPaid: number | null;

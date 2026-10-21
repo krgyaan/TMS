@@ -116,6 +116,7 @@ export class BankGuaranteeService {
                 sql`${paymentInstruments.amount}::text ILIKE ${searchStr}`,
                 sql`${instrumentBgDetails.bgDate}::text ILIKE ${searchStr}`,
                 sql`${instrumentBgDetails.validityDate}::text ILIKE ${searchStr}`,
+                sql`${paymentInstruments.expiryDate}::text ILIKE ${searchStr}`,
                 sql`${instrumentBgDetails.bgExpiryDate}::text ILIKE ${searchStr}`,
                 sql`${instrumentBgDetails.claimExpiryDate}::text ILIKE ${searchStr}`,
                 sql`${instrumentBgDetails.bgClaim}::text ILIKE ${searchStr}`,
@@ -131,8 +132,9 @@ export class BankGuaranteeService {
 
         const whereClause = and(...conditions);
 
-        // Build order clause - default to validityDate desc, fallback to createdAt
-        let orderClause: any = sql`coalesce(${instrumentBgDetails.validityDate}, ${instrumentBgDetails.bgExpiryDate}) DESC NULLS LAST, ${paymentInstruments.createdAt} DESC`;
+        // Build order clause - default to coalesced BG expiry date desc, fallback to createdAt
+        const defaultOrder = sql`coalesce(${paymentInstruments.expiryDate}, ${instrumentBgDetails.bgExpiryDate}) DESC NULLS LAST, ${paymentInstruments.createdAt} DESC`;
+        let orderClause: any = defaultOrder;
         if (options?.sortBy) {
             const direction = options.sortOrder === 'desc' ? desc : asc;
             switch (options.sortBy) {
@@ -148,8 +150,14 @@ export class BankGuaranteeService {
                 case 'amount':
                     orderClause = direction(paymentInstruments.amount);
                     break;
+                case 'bgExpiryDateCoalesced':
+                    orderClause = direction(sql`coalesce(${paymentInstruments.expiryDate}, ${instrumentBgDetails.bgExpiryDate})`);
+                    break;
+                case 'bgClaimExpiryDate':
+                    orderClause = direction(instrumentBgDetails.claimExpiryDate);
+                    break;
                 default:
-                    orderClause = sql`coalesce(${instrumentBgDetails.validityDate}, ${instrumentBgDetails.bgExpiryDate}) DESC NULLS LAST, ${paymentInstruments.createdAt} DESC`;
+                    orderClause = defaultOrder;
             }
         }
 
@@ -236,6 +244,8 @@ export class BankGuaranteeService {
                 tenderNo: row.tenderNo || row.projectNo,
                 amount,
                 bgExpiryDate,
+                bgExpiryDateCoalesced: row.bgExpiryDateBg ? new Date(row.bgExpiryDateBg) : null,
+                bgClaimExpiryDate: claimExpiryDate,
                 bgClaimPeriod: this.calculateBgClaimPeriod(effectiveValidityDate, effectiveClaimDate),
                 bgChargesPaid: this.calculateBgChargesPaid(
                     row.bgChargeDeducted ? Number(row.bgChargeDeducted) : null,
@@ -255,7 +265,10 @@ export class BankGuaranteeService {
                 tenderStatus: row.tenderStatusFromTender,
                 bidValidity: row.tenderDueDate || row.requestDueDate,
                 bgStatus: this.statusMap()[row.bgStatus],
-                expiryStatus: this.calculateExpiryStatus(effectiveValidityDate, effectiveClaimDate),
+                expiryStatus: this.calculateExpiryStatus(
+                    row.bgExpiryDateBg ? new Date(row.bgExpiryDateBg) : null,
+                    claimExpiryDate,
+                ),
                 expiryDate: effectiveClaimDate,
             };
         });
@@ -314,7 +327,7 @@ export class BankGuaranteeService {
             ))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(whereClause)
-            .orderBy(sql`coalesce(${instrumentBgDetails.validityDate}, ${instrumentBgDetails.bgExpiryDate}) DESC NULLS LAST, ${paymentInstruments.createdAt} DESC`);
+            .orderBy(sql`coalesce(${paymentInstruments.expiryDate}, ${instrumentBgDetails.bgExpiryDate}) DESC NULLS LAST, ${paymentInstruments.createdAt} DESC`);
 
         const data = rows.map((row) => {
             const bgDate = row.bgDate ? new Date(row.bgDate) : null;
@@ -335,6 +348,8 @@ export class BankGuaranteeService {
                 projectNo: row.projectNo,
                 amount,
                 bgExpiryDate,
+                bgExpiryDateCoalesced: row.bgExpiryDateBg ? new Date(row.bgExpiryDateBg) : null,
+                bgClaimExpiryDate: claimExpiryDate,
                 bgClaimPeriod: this.calculateBgClaimPeriod(effectiveValidityDate, effectiveClaimDate),
                 bgChargesPaid: this.calculateBgChargesPaid(
                     row.bgChargeDeducted ? Number(row.bgChargeDeducted) : null,
@@ -354,7 +369,10 @@ export class BankGuaranteeService {
                 tenderStatus: row.tenderStatusFromTender,
                 bidValidity: row.tenderDueDate || row.requestDueDate,
                 bgStatus: this.statusMap()[row.bgStatus],
-                expiryStatus: this.calculateExpiryStatus(effectiveValidityDate, effectiveClaimDate),
+                expiryStatus: this.calculateExpiryStatus(
+                    row.bgExpiryDateBg ? new Date(row.bgExpiryDateBg) : null,
+                    claimExpiryDate,
+                ),
                 expiryDate: effectiveValidityDate,
                 bgPurpose: row.bgPurpose,
                 bgNeeds: row.bgNeeds,
