@@ -27,6 +27,7 @@
         "migrate:vendor-master": "tsx scripts/migrate-vendor-master.ts",
         "backfill:po-seller-org": "tsx scripts/backfill-po-seller-org.ts",
         "db:seed": "tsx src/db/seed.ts",
+        "cleanup:uninvoiced-inventory": "tsx src/db/cleanup-uninvoiced-inventory.ts",
         "postinstall": "npx puppeteer browsers install chrome",
         "type-check": "tsc --noEmit",
         "type-check:watch": "tsc --noEmit --watch"

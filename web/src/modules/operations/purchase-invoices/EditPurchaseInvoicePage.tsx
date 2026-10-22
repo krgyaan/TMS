@@ -78,8 +78,9 @@ export default function EditPurchaseInvoicePage() {
             await updateMutation.mutateAsync({ id: piId, data });
             toast.success("Purchase Invoice updated successfully.");
             navigate(paths.operations.projectDashboard(projectId));
-        } catch {
-            toast.error("Failed to update purchase invoice.");
+        } catch (err) {
+            const apiMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+            toast.error(typeof apiMessage === "string" ? apiMessage : "Failed to update purchase invoice.");
         }
     };
 
