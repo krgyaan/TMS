@@ -1407,7 +1407,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 bgPo: instrumentBgDetails.bgPo,
                 bankMailIds: instrumentBgDetails.bankMailIds,
                 bankMailIdsCc: instrumentBgDetails.bankMailIdsCc,
-                bankClientUser: instrumentBgDetails.bgClientUser,
+                bgClientUser: instrumentBgDetails.bgClientUser,
                 bgClientCp: instrumentBgDetails.bgClientCp,
                 bgClientFin: instrumentBgDetails.bgClientFin,
                 bgBankAcc: instrumentBgDetails.bgBankAcc,
