@@ -322,8 +322,8 @@ export function ShowPageLayout({
 
     const content = (
         <>
-            {/* Sticky Header */}
-            <div className="sticky top-[-1rem] z-30 bg-background py-4 -mt-4 border rounded-2xl border-primary transition-all">
+            {/* Header — scrolls with the page, passes under the app header */}
+            <div className="relative z-[5] bg-background py-4 -mt-4 border rounded-2xl border-primary">
                 <div className="flex items-center justify-between px-4">
                     {onBack && (
                         <Button
