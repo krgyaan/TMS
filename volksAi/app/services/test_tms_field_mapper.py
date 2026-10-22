@@ -380,3 +380,59 @@ def test_batch_1_pbg_sd_emd_mapping():
     # EMD unmapped novel value: must return None
     assert map_to_tms_dto({"emd_mode_display": "Gold Bullion"})["emdModes"] is None
     assert map_to_tms_dto({"emd_mode_display": "Demand Draft / Gold Bullion"})["emdModes"] == ["DD"]
+
+
+def test_explicit_yes_no_or_none_matcher_table():
+    """
+    Item 2: Explicit matcher tests for phrases across _map_yes_no_or_none fields:
+    - siteVisitRequired
+    - sampleSubmissionRequired
+    - miiRequired
+    Ensures 'Not mandatory' returns None (missing), NOT 'NO'.
+    """
+    # 1. siteVisit / siteVisitRequired table
+    cases = [
+        ("Not mandatory", None, None),
+        ("Not required", "Not required", "NO"),
+        ("Required", "Required", "YES"),
+        ("Mandatory", "Mandatory", "YES"),
+        ("Optional", None, None),
+        ("Self-acquaintance", None, None),
+        ("No", "No", "NO"),
+        ("Yes", "Yes", "YES"),
+        ("Not specified", None, None),
+        ("NA", None, None),
+    ]
+    for phrase, exp_visit, exp_req in cases:
+        dto = map_to_tms_dto({"site_visit_display": phrase})
+        assert dto["siteVisitRequired"] == exp_req, f"siteVisitRequired failed for '{phrase}': expected {exp_req}, got {dto['siteVisitRequired']}"
+        assert dto["siteVisit"] == exp_visit, f"siteVisit failed for '{phrase}': expected {exp_visit}, got {dto['siteVisit']}"
+
+    # 2. sampleSubmissionRequired (also uses _map_yes_no_or_none)
+    sample_cases = [
+        ("Not mandatory", None),
+        ("Not required", "NO"),
+        ("Required", "YES"),
+        ("Mandatory", "YES"),
+        ("Optional", None),
+        ("No", "NO"),
+        ("Yes", "YES"),
+    ]
+    for phrase, exp_req in sample_cases:
+        dto = map_to_tms_dto({"sample_submission_display": phrase})
+        assert dto["sampleSubmissionRequired"] == exp_req, f"sampleSubmissionRequired failed for '{phrase}': expected {exp_req}, got {dto['sampleSubmissionRequired']}"
+
+    # 3. miiRequired (also uses _map_yes_no_or_none)
+    mii_cases = [
+        ("Not mandatory", None),
+        ("Not required", "NO"),
+        ("Required", "YES"),
+        ("Mandatory", "YES"),
+        ("Optional", None),
+        ("No", "NO"),
+        ("Yes", "YES"),
+    ]
+    for phrase, exp_req in mii_cases:
+        dto = map_to_tms_dto({"mii_preference_display": phrase})
+        assert dto["miiRequired"] == exp_req, f"miiRequired failed for '{phrase}': expected {exp_req}, got {dto['miiRequired']}"
+

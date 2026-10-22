@@ -42,17 +42,22 @@ const NUMERIC_FIELDS: Record<string, string> = {
     netWorthValue: 'netWorthValue',
 };
 
-test('toOptionalNumber: null / undefined / "" / garbage -> undefined; real values (incl. 0) kept', () => {
-    for (const v of [null, undefined, '', '   ', 'abc']) assert.equal(toOptionalNumber(v as any), undefined);
+test('toOptionalNumber: null / undefined / "" / garbage / NA -> undefined; real values (incl. 0) kept', () => {
+    for (const v of [null, undefined, '', '   ', 'abc', 'NA', 'N/A', 'None']) assert.equal(toOptionalNumber(v as any), undefined);
     assert.equal(toOptionalNumber('0.00'), 0);
+    assert.equal(toOptionalNumber('0'), 0);
     assert.equal(toOptionalNumber(0), 0);
     assert.equal(toOptionalNumber('80144.00'), 80144);
+    assert.equal(toOptionalNumber(80144), 80144);
 });
 
 test('toSeedAmount: tender-record 0 default means "never entered"', () => {
     assert.equal(toSeedAmount('0.00'), undefined);
     assert.equal(toSeedAmount('0'), undefined);
+    assert.equal(toSeedAmount(0), undefined);
     assert.equal(toSeedAmount(null), undefined);
+    assert.equal(toSeedAmount(undefined), undefined);
+    assert.equal(toSeedAmount('NA'), undefined);
     assert.equal(toSeedAmount('80144.00'), 80144);
 });
 
@@ -93,16 +98,81 @@ test('saved sheet with real values: numeric strings and a real 0 are kept', () =
     assert.equal(form.paymentTermsInstallation, 0);
 });
 
-test('form schema: a cleared input (null) or "" validates as empty, not 0', () => {
+test('form schema: cleared input (null), undefined, "", "   ", "NA", "N/A" validate as empty, not 0', () => {
     const shape = (TenderInformationFormSchema as any).shape;
     for (const field of Object.keys(NUMERIC_FIELDS)) {
         if (field === 'deliveryTimeSupply') continue; // own preprocess (0 -> null), unchanged
         const s = shape[field];
         assert.ok(s, `schema field ${field} missing`);
         assert.equal(s.parse(null), undefined, `${field}: null -> ${s.parse(null)}`);
+        assert.equal(s.parse(undefined), undefined, `${field}: undefined -> ${s.parse(undefined)}`);
         assert.equal(s.parse(''), undefined, `${field}: '' -> ${s.parse('')}`);
+        assert.equal(s.parse('   '), undefined, `${field}: '   ' -> ${s.parse('   ')}`);
+        assert.equal(s.parse('NA'), undefined, `${field}: 'NA' -> ${s.parse('NA')}`);
+        assert.equal(s.parse('N/A'), undefined, `${field}: 'N/A' -> ${s.parse('N/A')}`);
         assert.equal(s.parse(0), 0, `${field}: 0 must stay 0`);
+        assert.equal(s.parse('0'), 0, `${field}: '0' must stay 0`);
+        assert.equal(s.parse(5), 5, `${field}: 5 -> 5`);
         assert.equal(s.parse('5'), 5, `${field}: '5' -> 5`);
+    }
+});
+
+test('save payload: emdAmount and fee amounts cover null, undefined, empty string, "NA", "0", 0, and valid positive number', () => {
+    // When unset / undefined / null / '' / 'NA' / 'N/A'
+    for (const emptyVal of [null, undefined, '', '   ', 'NA', 'N/A']) {
+        const parsed = (TenderInformationFormSchema as any).shape.emdAmount.parse(emptyVal);
+        assert.equal(parsed, undefined);
+        const payload = mapFormToPayload({
+            ...buildDefaultValues(null),
+            teRecommendation: 'YES',
+            emdRequired: 'YES',
+            emdAmount: parsed,
+            tenderFeeRequired: 'YES',
+            tenderFeeAmount: (TenderInformationFormSchema as any).shape.tenderFeeAmount.parse(emptyVal),
+            processingFeeRequired: 'YES',
+            processingFeeAmount: (TenderInformationFormSchema as any).shape.processingFeeAmount.parse(emptyVal),
+        } as any);
+        assert.equal(payload.emdAmount, null);
+        assert.equal(payload.tenderFeeAmount, null);
+        assert.equal(payload.processingFeeAmount, null);
+    }
+
+    // When real 0 (number 0 or string '0')
+    for (const zeroVal of [0, '0']) {
+        const parsed = (TenderInformationFormSchema as any).shape.emdAmount.parse(zeroVal);
+        assert.equal(parsed, 0);
+        const payload = mapFormToPayload({
+            ...buildDefaultValues(null),
+            teRecommendation: 'YES',
+            emdRequired: 'YES',
+            emdAmount: parsed,
+            tenderFeeRequired: 'YES',
+            tenderFeeAmount: (TenderInformationFormSchema as any).shape.tenderFeeAmount.parse(zeroVal),
+            processingFeeRequired: 'YES',
+            processingFeeAmount: (TenderInformationFormSchema as any).shape.processingFeeAmount.parse(zeroVal),
+        } as any);
+        assert.equal(payload.emdAmount, 0);
+        assert.equal(payload.tenderFeeAmount, 0);
+        assert.equal(payload.processingFeeAmount, 0);
+    }
+
+    // When valid positive number
+    for (const posVal of [80144, '80144']) {
+        const parsed = (TenderInformationFormSchema as any).shape.emdAmount.parse(posVal);
+        assert.equal(parsed, 80144);
+        const payload = mapFormToPayload({
+            ...buildDefaultValues(null),
+            teRecommendation: 'YES',
+            emdRequired: 'YES',
+            emdAmount: parsed,
+            tenderFeeRequired: 'YES',
+            tenderFeeAmount: (TenderInformationFormSchema as any).shape.tenderFeeAmount.parse(posVal),
+            processingFeeRequired: 'YES',
+            processingFeeAmount: (TenderInformationFormSchema as any).shape.processingFeeAmount.parse(posVal),
+        } as any);
+        assert.equal(payload.emdAmount, 80144);
+        assert.equal(payload.tenderFeeAmount, 80144);
+        assert.equal(payload.processingFeeAmount, 80144);
     }
 });
 
@@ -122,4 +192,40 @@ test('round trip: API null -> form -> save payload stays null (never becomes 0)'
         if (!(apiField in payload)) continue;
         assert.equal(payload[apiField], null, `${apiField} saved as ${payload[apiField]}`);
     }
+});
+
+test('form schema: requires positive emdAmount when emdRequired is YES', () => {
+    const baseForm = {
+        ...buildDefaultValues(null),
+        teRecommendation: 'YES',
+        emdRequired: 'YES',
+        emdModes: ['BG'],
+        clients: [{ clientName: 'Lead Client', clientMobile: '9876543210' }],
+    };
+
+    // Fails on null, undefined, 0, or negative emdAmount
+    assert.equal(TenderInformationFormSchema.safeParse({ ...baseForm, emdAmount: null }).success, false);
+    assert.equal(TenderInformationFormSchema.safeParse({ ...baseForm, emdAmount: undefined }).success, false);
+    assert.equal(TenderInformationFormSchema.safeParse({ ...baseForm, emdAmount: 0 }).success, false);
+    assert.equal(TenderInformationFormSchema.safeParse({ ...baseForm, emdAmount: -100 }).success, false);
+
+    // Passes on positive emdAmount
+    const valid = TenderInformationFormSchema.safeParse({ ...baseForm, emdAmount: 50000 });
+    assert.equal(valid.success, true);
+
+    // Allows null/undefined when emdRequired is NO or EXEMPT
+    assert.equal(TenderInformationFormSchema.safeParse({ ...baseForm, emdRequired: 'NO', emdAmount: undefined }).success, true);
+    assert.equal(TenderInformationFormSchema.safeParse({ ...baseForm, emdRequired: 'EXEMPT', emdAmount: undefined }).success, true);
+
+    // Allows null/undefined when teRecommendation is NO (rejection)
+    const rejection = TenderInformationFormSchema.safeParse({
+        ...baseForm,
+        teRecommendation: 'NO',
+        teRejectionReason: 1,
+        teRejectionRemarks: 'Not viable',
+        teRejectionProof: ['proof.pdf'],
+        emdRequired: 'YES',
+        emdAmount: undefined,
+    });
+    assert.equal(rejection.success, true);
 });

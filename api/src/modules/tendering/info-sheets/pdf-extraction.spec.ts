@@ -51,6 +51,18 @@ describe('PDF Extraction Queue Integration (Phase 8)', () => {
 
     describe('PdfExtractionProducer', () => {
         let producer: PdfExtractionProducer;
+        const tempProducerPdf = path.join(__dirname, 'temp_producer_test.pdf');
+        const tempProducerAtc = path.join(__dirname, 'temp_producer_atc.pdf');
+
+        beforeAll(() => {
+            fs.writeFileSync(tempProducerPdf, '%PDF-1.4 producer test');
+            fs.writeFileSync(tempProducerAtc, '%PDF-1.4 producer atc');
+        });
+
+        afterAll(() => {
+            if (fs.existsSync(tempProducerPdf)) fs.unlinkSync(tempProducerPdf);
+            if (fs.existsSync(tempProducerAtc)) fs.unlinkSync(tempProducerAtc);
+        });
 
         beforeEach(() => {
             producer = new PdfExtractionProducer(mockQueue, mockLogger);
@@ -128,7 +140,7 @@ describe('PDF Extraction Queue Integration (Phase 8)', () => {
 
             const jobData: PdfExtractionJobData = {
                 tenderId: 101,
-                pdfPath: 'tenders/gem_101.pdf',
+                pdfPath: tempProducerPdf,
                 userId: 42,
             };
 
@@ -176,6 +188,238 @@ describe('PDF Extraction Queue Integration (Phase 8)', () => {
             );
         });
 
+        it('should re-enqueue a new job when ATC file changes because document hash no longer matches stale cache', async () => {
+            const initialData: PdfExtractionJobData = {
+                tenderId: 101,
+                pdfPath: 'tenders/gem_101.pdf',
+                mainTenderPath: 'tenders/gem_101.pdf',
+                atcPaths: ['tenders/old_atc.pdf'],
+                userId: 42,
+            };
+
+            const oldHash = await producer.computeDocumentHash(initialData);
+            const oldVersion = `1.1.0:${oldHash.slice(0, 32)}`;
+
+            const mockDb: any = {
+                select: jest.fn().mockReturnValue({
+                    from: jest.fn().mockReturnValue({
+                        where: jest.fn().mockReturnValue({
+                            limit: jest.fn().mockResolvedValue([
+                                {
+                                    id: 1,
+                                    tenderId: 101,
+                                    fields: { tenderValue: { value: 500 } },
+                                    extractionVersion: oldVersion,
+                                    missingFields: [],
+                                },
+                            ]),
+                        }),
+                    }),
+                }),
+            };
+
+            const producerWithDb = new PdfExtractionProducer(
+                mockQueue,
+                mockLogger,
+                undefined,
+                undefined,
+                mockDb,
+            );
+
+            mockQueue.getJob.mockResolvedValue(null);
+            mockQueue.add.mockResolvedValue({ id: 'extract-tender-101' });
+
+            // Call with changed ATC file
+            const changedData: PdfExtractionJobData = {
+                tenderId: 101,
+                pdfPath: 'tenders/gem_101.pdf',
+                mainTenderPath: 'tenders/gem_101.pdf',
+                atcPaths: ['tenders/new_atc.pdf'],
+                userId: 42,
+            };
+
+            const result = await producerWithDb.enqueueExtraction(changedData);
+
+            expect(result).toEqual({
+                jobId: 'extract-tender-101',
+                status: 'enqueued',
+            });
+            expect(mockQueue.add).toHaveBeenCalledWith(
+                'extract-pdf',
+                changedData,
+                expect.any(Object),
+            );
+        });
+
+        it('should return existing_completed from DB cache when ATC file and hash match', async () => {
+            const data: PdfExtractionJobData = {
+                tenderId: 101,
+                pdfPath: tempProducerPdf,
+                mainTenderPath: tempProducerPdf,
+                atcPaths: [tempProducerAtc],
+                userId: 42,
+            };
+
+            const hash = await producer.computeDocumentHash(data);
+            const matchingVersion = `1.1.0:${hash.slice(0, 32)}`;
+
+            const mockDb: any = {
+                select: jest.fn().mockReturnValue({
+                    from: jest.fn().mockReturnValue({
+                        where: jest.fn().mockReturnValue({
+                            limit: jest.fn().mockResolvedValue([
+                                {
+                                    id: 1,
+                                    tenderId: 101,
+                                    fields: {
+                                        tenderValue: { value: 500 },
+                                        metadata: {
+                                            llm_status: 'ok',
+                                            failed_categories: [],
+                                        },
+                                    },
+                                    extractionVersion: matchingVersion,
+                                    missingFields: [],
+                                },
+                            ]),
+                        }),
+                    }),
+                }),
+            };
+
+            const producerWithDb = new PdfExtractionProducer(
+                mockQueue,
+                mockLogger,
+                undefined,
+                undefined,
+                mockDb,
+            );
+
+            const result: EnqueueExtractionResult = await producerWithDb.enqueueExtraction(data);
+
+            expect(result.status).toBe('existing_completed');
+            expect(result.llm_status).toBe('ok');
+            expect(result.failed_categories).toEqual([]);
+            expect(mockQueue.add).not.toHaveBeenCalled();
+        });
+
+        it('should log warning with file name only when file is missing/unreadable, mark non-cacheable, and always enqueue', async () => {
+            const data: PdfExtractionJobData = {
+                tenderId: 202,
+                pdfPath: 'nonexistent/secret_tender_doc.pdf',
+                userId: 42,
+            };
+
+            const hash = await producer.computeDocumentHash(data);
+            expect(typeof hash).toBe('string');
+            expect(data.isNonCacheable).toBe(true);
+
+            // Log warning must contain file name only, no directory path, no content
+            expect(mockLogger.warn).toHaveBeenCalledWith(
+                expect.stringContaining('secret_tender_doc.pdf'),
+            );
+            expect(mockLogger.warn).not.toHaveBeenCalledWith(
+                expect.stringContaining('nonexistent/secret_tender_doc.pdf'),
+            );
+
+            // Even if DB has a matching extractionVersion, because isNonCacheable=true, it MUST NOT return existing_completed
+            const matchingVersion = `1.1.0:${hash.slice(0, 32)}`;
+            const mockDb: any = {
+                select: jest.fn().mockReturnValue({
+                    from: jest.fn().mockReturnValue({
+                        where: jest.fn().mockReturnValue({
+                            limit: jest.fn().mockResolvedValue([
+                                {
+                                    id: 1,
+                                    tenderId: 202,
+                                    fields: { tenderValue: { value: 500 } },
+                                    extractionVersion: matchingVersion,
+                                },
+                            ]),
+                        }),
+                    }),
+                }),
+            };
+
+            mockQueue.getJob.mockResolvedValue(null);
+            mockQueue.add.mockResolvedValue({ id: 'extract-tender-202' });
+
+            const producerWithDb = new PdfExtractionProducer(
+                mockQueue,
+                mockLogger,
+                undefined,
+                undefined,
+                mockDb,
+            );
+
+            const result = await producerWithDb.enqueueExtraction(data);
+
+            // Must NOT return existing_completed, must enqueue fresh job
+            expect(result.status).toBe('enqueued');
+            expect(mockQueue.add).toHaveBeenCalled();
+        });
+
+        it('should bypass DB, in-memory, and Redis caches when extractionVersion is "stale"', async () => {
+            const data: PdfExtractionJobData = {
+                tenderId: 101,
+                pdfPath: tempProducerPdf,
+                mainTenderPath: tempProducerPdf,
+                userId: 42,
+            };
+
+            // 1. DB has row with extractionVersion: 'stale'
+            const mockDb: any = {
+                select: jest.fn().mockReturnValue({
+                    from: jest.fn().mockReturnValue({
+                        where: jest.fn().mockReturnValue({
+                            limit: jest.fn().mockResolvedValue([
+                                {
+                                    id: 1,
+                                    tenderId: 101,
+                                    fields: { tenderValue: { value: 500 } },
+                                    extractionVersion: 'stale',
+                                },
+                            ]),
+                        }),
+                    }),
+                }),
+            };
+
+            // 2. Redis queue has completed job with stale extractionVersion in returnvalue
+            mockQueue.getJob.mockResolvedValue({
+                id: 'extract-tender-101',
+                getState: jest.fn().mockResolvedValue('completed'),
+                data: { tenderId: 101, extractionVersion: 'stale' },
+                returnvalue: { extraction_version: 'stale' },
+                remove: jest.fn().mockResolvedValue(undefined),
+            });
+            mockQueue.add.mockResolvedValue({ id: 'extract-tender-101-new' });
+
+            const producerWithDb = new PdfExtractionProducer(
+                mockQueue,
+                mockLogger,
+                undefined,
+                undefined,
+                mockDb,
+            );
+
+            // Also seed in-memory cache with stale extractionVersion
+            (producerWithDb as any).inMemoryJobs.set('extract-tender-101', {
+                state: 'completed',
+                jobId: 'extract-tender-101',
+                data: { extractionVersion: 'stale' },
+                result: { extraction_version: 'stale' },
+                progress: 100,
+                failedReason: null,
+            });
+
+            const result = await producerWithDb.enqueueExtraction(data);
+
+            // Must NOT return existing_completed from DB, memory, or Redis! Must remove old job and enqueue a fresh job
+            expect(result.status).toBe('enqueued');
+            expect(mockQueue.add).toHaveBeenCalled();
+        });
+
         it('should return job status, returnvalue result, and failed reason', async () => {
             mockQueue.getJob.mockResolvedValue({
                 id: 'extract-tender-101',
@@ -183,7 +427,7 @@ describe('PDF Extraction Queue Integration (Phase 8)', () => {
                 progress: 100,
                 data: { tenderId: 101 },
                 returnvalue: {
-                    extraction_version: '1.0.0',
+                    extraction_version: '1.1.0',
                     fields: { emdAmount: { value: 50000, confidence: 'high', source: 'regex' } },
                     missing_fields: [],
                     processing_time_ms: 1250,
@@ -199,7 +443,7 @@ describe('PDF Extraction Queue Integration (Phase 8)', () => {
                 progress: 100,
                 data: { tenderId: 101 },
                 result: expect.objectContaining({
-                    extraction_version: '1.0.0',
+                    extraction_version: '1.1.0',
                     processing_time_ms: 1250,
                 }),
                 failedReason: null,
@@ -279,7 +523,7 @@ describe('PDF Extraction Queue Integration (Phase 8)', () => {
 
         it('should post multipart/form-data to /extract and return result without database persistence', async () => {
             const mockExtractionResult: PdfExtractionJobResult = {
-                extraction_version: '1.0.0',
+                extraction_version: '1.1.0',
                 fields: {
                     emdAmount: { value: 100000, confidence: 'high', source: 'regex' },
                     processingFeeAmount: { value: null, confidence: 'not_applicable', source: null },
@@ -442,6 +686,413 @@ describe('PDF Extraction Queue Integration (Phase 8)', () => {
                         }),
                     }),
                 );
+            } finally {
+                global.fetch = originalFetch;
+            }
+        });
+
+        it('should persist metadata (llm_status and failed_categories) into tender_extractions.fields on LLM failure', async () => {
+            const mockLlmFailureResult: PdfExtractionJobResult = {
+                fields: {
+                    tenderValue: { value: 2000000, confidence: 'high', source: 'regex' },
+                },
+                missing_fields: ['pbgPercentage', 'ldPercentage'],
+                extraction_version: '1.0.0',
+                processing_time_ms: 3200,
+                llm_status: 'llm_unavailable',
+                failed_categories: ['pbg_sd', 'prs_ld'],
+            };
+
+            const originalFetch = global.fetch;
+            global.fetch = jest.fn().mockResolvedValue({
+                ok: true,
+                status: 200,
+                json: async () => mockLlmFailureResult,
+            } as any);
+
+            let persistedValues: any = null;
+            const mockDb: any = {
+                insert: jest.fn().mockReturnValue({
+                    values: jest.fn().mockImplementation((val) => {
+                        persistedValues = val;
+                        return {
+                            onConflictDoUpdate: jest.fn().mockResolvedValue({}),
+                        };
+                    }),
+                }),
+                select: jest.fn().mockReturnValue({
+                    from: jest.fn().mockReturnValue({
+                        where: jest.fn().mockReturnValue({
+                            limit: jest.fn().mockImplementation(() =>
+                                Promise.resolve([{
+                                    id: 1,
+                                    tenderId: 101,
+                                    fields: persistedValues?.fields,
+                                }])
+                            ),
+                        }),
+                    }),
+                }),
+            };
+
+            const processorWithDb = new PdfExtractionProcessor(
+                mockConfigService,
+                mockFileUploadService,
+                { recordUsage: jest.fn(), recordTpmEntry: jest.fn(), getCurrentTpm: jest.fn() } as any,
+                mockLogger,
+                mockDb,
+            );
+
+            try {
+                const mockJob: any = {
+                    id: 'extract-tender-101',
+                    data: { tenderId: 101, pdfPath: tempPdfFile, userId: 1 },
+                };
+
+                const result = await processorWithDb.processJob(mockJob, 'http://localhost:8001', 120000);
+
+                expect(result.llm_status).toBe('llm_unavailable');
+                expect(result.failed_categories).toEqual(['pbg_sd', 'prs_ld']);
+
+                expect(mockDb.insert).toHaveBeenCalled();
+                expect(persistedValues).not.toBeNull();
+                expect(persistedValues.fields.metadata).toEqual({
+                    llm_status: 'llm_unavailable',
+                    failed_categories: ['pbg_sd', 'prs_ld'],
+                });
+                expect(persistedValues.fields.tenderValue).toEqual({
+                    value: 2000000,
+                    confidence: 'high',
+                    source: 'regex',
+                    reviewed: false,
+                });
+            } finally {
+                global.fetch = originalFetch;
+            }
+        });
+
+        it('should execute DB write inside a single transaction and flag AI values with reviewed: false', async () => {
+            const mockResult: PdfExtractionJobResult = {
+                fields: {
+                    tenderValue: { value: 100000, confidence: 'high', source: 'regex' },
+                    emdAmount: { value: 2000, confidence: 'medium', source: 'regex' },
+                },
+                missing_fields: [],
+                extraction_version: '1.1.0',
+                processing_time_ms: 1000,
+                llm_status: 'ok',
+                failed_categories: [],
+            };
+
+            const originalFetch = global.fetch;
+            global.fetch = jest.fn().mockResolvedValue({
+                ok: true,
+                status: 200,
+                json: async () => mockResult,
+            } as any);
+
+            let transactionExecuted = false;
+            let persistedValues: any = null;
+
+            const mockTx: any = {
+                insert: jest.fn().mockReturnValue({
+                    values: jest.fn().mockImplementation((val) => {
+                        persistedValues = val;
+                        return {
+                            onConflictDoUpdate: jest.fn().mockResolvedValue({}),
+                        };
+                    }),
+                }),
+            };
+
+            const mockDb: any = {
+                transaction: jest.fn().mockImplementation(async (callback) => {
+                    transactionExecuted = true;
+                    return callback(mockTx);
+                }),
+                select: jest.fn().mockReturnValue({
+                    from: jest.fn().mockReturnValue({
+                        where: jest.fn().mockReturnValue({
+                            limit: jest.fn().mockImplementation(() =>
+                                Promise.resolve([{
+                                    id: 1,
+                                    tenderId: 505,
+                                    fields: persistedValues?.fields,
+                                }])
+                            ),
+                        }),
+                    }),
+                }),
+            };
+
+            const processor = new PdfExtractionProcessor(
+                mockConfigService,
+                mockFileUploadService,
+                { recordUsage: jest.fn(), recordTpmEntry: jest.fn(), getCurrentTpm: jest.fn() } as any,
+                mockLogger,
+                mockDb,
+            );
+
+            try {
+                const mockJob: any = {
+                    id: 'extract-tender-505',
+                    data: { tenderId: 505, pdfPath: tempPdfFile, userId: 1 },
+                };
+
+                await processor.processJob(mockJob, 'http://localhost:8001', 120000);
+
+                expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+                expect(transactionExecuted).toBe(true);
+                expect(persistedValues.fields.tenderValue.reviewed).toBe(false);
+                expect(persistedValues.fields.emdAmount.reviewed).toBe(false);
+            } finally {
+                global.fetch = originalFetch;
+            }
+        });
+
+        it('should persist metadata with llm_status: ok and empty failed_categories on successful extraction', async () => {
+            const mockSuccessResult: PdfExtractionJobResult = {
+                fields: {
+                    tenderValue: { value: 5000000, confidence: 'high', source: 'regex' },
+                    pbgPercentage: { value: 5, confidence: 'high', source: 'claude' },
+                },
+                missing_fields: [],
+                extraction_version: '1.1.0',
+                processing_time_ms: 2100,
+                llm_status: 'ok',
+                failed_categories: [],
+            };
+
+            const originalFetch = global.fetch;
+            global.fetch = jest.fn().mockResolvedValue({
+                ok: true,
+                status: 200,
+                json: async () => mockSuccessResult,
+            } as any);
+
+            let persistedValues: any = null;
+            const mockDb: any = {
+                insert: jest.fn().mockReturnValue({
+                    values: jest.fn().mockImplementation((val) => {
+                        persistedValues = val;
+                        return {
+                            onConflictDoUpdate: jest.fn().mockResolvedValue({}),
+                        };
+                    }),
+                }),
+                select: jest.fn().mockReturnValue({
+                    from: jest.fn().mockReturnValue({
+                        where: jest.fn().mockReturnValue({
+                            limit: jest.fn().mockImplementation(() =>
+                                Promise.resolve([{
+                                    id: 2,
+                                    tenderId: 102,
+                                    fields: persistedValues?.fields,
+                                }])
+                            ),
+                        }),
+                    }),
+                }),
+            };
+
+            const processorWithDb = new PdfExtractionProcessor(
+                mockConfigService,
+                mockFileUploadService,
+                { recordUsage: jest.fn(), recordTpmEntry: jest.fn(), getCurrentTpm: jest.fn() } as any,
+                mockLogger,
+                mockDb,
+            );
+
+            try {
+                const mockJob: any = {
+                    id: 'extract-tender-102',
+                    data: { tenderId: 102, pdfPath: tempPdfFile, userId: 1 },
+                };
+
+                const result = await processorWithDb.processJob(mockJob, 'http://localhost:8001', 120000);
+
+                expect(result.llm_status).toBe('ok');
+                expect(result.failed_categories).toEqual([]);
+
+                expect(persistedValues.fields.metadata).toEqual({
+                    llm_status: 'ok',
+                    failed_categories: [],
+                });
+            } finally {
+                global.fetch = originalFetch;
+            }
+        });
+
+        it('should clear the stale marker in DB when a successful re-extraction completes', async () => {
+            const mockSuccessResult: PdfExtractionJobResult = {
+                fields: {
+                    tenderValue: { value: 6000000, confidence: 'high', source: 'regex' },
+                },
+                missing_fields: [],
+                extraction_version: '1.1.0',
+                processing_time_ms: 1200,
+                llm_status: 'ok',
+                failed_categories: [],
+            };
+
+            const originalFetch = global.fetch;
+            global.fetch = jest.fn().mockResolvedValue({
+                ok: true,
+                status: 200,
+                json: async () => mockSuccessResult,
+            } as any);
+
+            let persistedValues: any = null;
+            let updatedValues: any = null;
+            const mockDb: any = {
+                insert: jest.fn().mockReturnValue({
+                    values: jest.fn().mockImplementation((val) => {
+                        persistedValues = val;
+                        return {
+                            onConflictDoUpdate: jest.fn().mockImplementation((conflictConfig) => {
+                                updatedValues = conflictConfig.set;
+                                return Promise.resolve({});
+                            }),
+                        };
+                    }),
+                }),
+                select: jest.fn().mockReturnValue({
+                    from: jest.fn().mockReturnValue({
+                        where: jest.fn().mockReturnValue({
+                            limit: jest.fn().mockImplementation(() =>
+                                Promise.resolve([{
+                                    id: 104,
+                                    tenderId: 104,
+                                    fields: persistedValues?.fields,
+                                    extractionVersion: updatedValues?.extractionVersion || persistedValues?.extractionVersion,
+                                }])
+                            ),
+                        }),
+                    }),
+                }),
+            };
+
+            const processorWithDb = new PdfExtractionProcessor(
+                mockConfigService,
+                mockFileUploadService,
+                { recordUsage: jest.fn(), recordTpmEntry: jest.fn(), getCurrentTpm: jest.fn() } as any,
+                mockLogger,
+                mockDb,
+            );
+
+            try {
+                // Job payload carries the fresh extractionVersion (e.g. 1.1.0:hash) after previously being 'stale'
+                const mockJob: any = {
+                    id: 'extract-tender-104',
+                    data: {
+                        tenderId: 104,
+                        pdfPath: tempPdfFile,
+                        userId: 1,
+                        extractionVersion: '1.1.0:fresh_hash_abc123',
+                    },
+                };
+
+                await processorWithDb.processJob(mockJob, 'http://localhost:8001', 120000);
+
+                expect(mockDb.insert).toHaveBeenCalled();
+                expect(persistedValues.extractionVersion).toBe('1.1.0:fresh_hash_abc123');
+                expect(updatedValues.extractionVersion).toBe('1.1.0:fresh_hash_abc123');
+                expect(updatedValues.extractionVersion).not.toBe('stale');
+            } finally {
+                global.fetch = originalFetch;
+            }
+        });
+
+        it('should persist extended keys (requiredDocuments, doc1-doc9, miiPreference, gemBidEndDate, etc.) in tender_extractions.fields', async () => {
+            const mockExtendedResult: PdfExtractionJobResult = {
+                fields: {
+                    tenderValue: { value: 5000000, confidence: 'high', source: 'gem_parent' },
+                    requiredDocuments: { value: ['PAN Card', 'GST Registration'], confidence: 'high', source: 'gem_parent' },
+                    doc1: { value: 'PAN Card', confidence: 'high', source: 'gem_parent' },
+                    doc2: { value: 'GST Registration', confidence: 'high', source: 'gem_parent' },
+                    doc3: { value: 'Experience Certificate', confidence: 'high', source: 'gem_parent' },
+                    doc4: { value: null, confidence: 'missing', source: null },
+                    doc5: { value: null, confidence: 'missing', source: null },
+                    doc6: { value: null, confidence: 'missing', source: null },
+                    doc7: { value: null, confidence: 'missing', source: null },
+                    doc8: { value: null, confidence: 'missing', source: null },
+                    doc9: { value: null, confidence: 'missing', source: null },
+                    miiPreference: { value: 'YES', confidence: 'high', source: 'gem_parent' },
+                    miiRequired: { value: 'YES', confidence: 'high', source: 'gem_parent' },
+                    gemBidEndDate: { value: '2026-03-31 15:00:00', confidence: 'high', source: 'gem_parent' },
+                    gemBidOpeningDate: { value: '2026-03-31 15:30:00', confidence: 'high', source: 'gem_parent' },
+                    grievanceContact: { value: 'Nodal Officer', confidence: 'high', source: 'gem_parent' },
+                    grievanceEmail: { value: 'grievance@dept.gov.in', confidence: 'high', source: 'gem_parent' },
+                    ldType: { value: 'PRS', confidence: 'high', source: 'gem_parent' },
+                },
+                missing_fields: [],
+                extraction_version: '1.1.0',
+                processing_time_ms: 1800,
+                llm_status: 'ok',
+                failed_categories: [],
+            };
+
+            const originalFetch = global.fetch;
+            global.fetch = jest.fn().mockResolvedValue({
+                ok: true,
+                status: 200,
+                json: async () => mockExtendedResult,
+            } as any);
+
+            let persistedValues: any = null;
+            const mockDb: any = {
+                insert: jest.fn().mockReturnValue({
+                    values: jest.fn().mockImplementation((val) => {
+                        persistedValues = val;
+                        return {
+                            onConflictDoUpdate: jest.fn().mockResolvedValue({}),
+                        };
+                    }),
+                }),
+                select: jest.fn().mockReturnValue({
+                    from: jest.fn().mockReturnValue({
+                        where: jest.fn().mockReturnValue({
+                            limit: jest.fn().mockImplementation(() =>
+                                Promise.resolve([{
+                                    id: 3,
+                                    tenderId: 103,
+                                    fields: persistedValues?.fields,
+                                }])
+                            ),
+                        }),
+                    }),
+                }),
+            };
+
+            const processorWithDb = new PdfExtractionProcessor(
+                mockConfigService,
+                mockFileUploadService,
+                { recordUsage: jest.fn(), recordTpmEntry: jest.fn(), getCurrentTpm: jest.fn() } as any,
+                mockLogger,
+                mockDb,
+            );
+
+            try {
+                const mockJob: any = {
+                    id: 'extract-tender-103',
+                    data: { tenderId: 103, pdfPath: tempPdfFile, userId: 1 },
+                };
+
+                await processorWithDb.processJob(mockJob, 'http://localhost:8001', 120000);
+
+                expect(persistedValues.fields.metadata.llm_status).toBe('ok');
+                expect(persistedValues.fields.requiredDocuments.value).toEqual(['PAN Card', 'GST Registration']);
+                expect(persistedValues.fields.doc1.value).toBe('PAN Card');
+                expect(persistedValues.fields.doc2.value).toBe('GST Registration');
+                expect(persistedValues.fields.doc3.value).toBe('Experience Certificate');
+                expect(persistedValues.fields.miiPreference.value).toBe('YES');
+                expect(persistedValues.fields.miiRequired.value).toBe('YES');
+                expect(persistedValues.fields.gemBidEndDate.value).toBe('2026-03-31 15:00:00');
+                expect(persistedValues.fields.gemBidOpeningDate.value).toBe('2026-03-31 15:30:00');
+                expect(persistedValues.fields.grievanceContact.value).toBe('Nodal Officer');
+                expect(persistedValues.fields.grievanceEmail.value).toBe('grievance@dept.gov.in');
+                expect(persistedValues.fields.ldType.value).toBe('PRS');
+                expect(persistedValues.fields.requiredDocuments.reviewed).toBe(false);
             } finally {
                 global.fetch = originalFetch;
             }

@@ -334,6 +334,8 @@ describe('TenderInfoSheetsService Auto-Extract & Path Resolution', () => {
                 missing_fields: ['tenderValue'],
                 extraction_version: '1.0.0',
                 processing_time_ms: 2150,
+                llm_status: 'ok',
+                failed_categories: [],
             });
         });
 
@@ -379,6 +381,25 @@ describe('TenderInfoSheetsService Auto-Extract & Path Resolution', () => {
             const result = await controller.getAutoExtractStatus('extract-tender-200', mockUser as any);
             expect(spy).toHaveBeenCalledWith('extract-tender-200');
             expect(result.status).toBe('processing');
+        });
+
+        it('POST /:tenderId/extraction/save should log deprecated warning and call service.saveExtractionResult', async () => {
+            const mockUser = { sub: 42, username: 'testuser' };
+            const spy = jest.spyOn(service, 'saveExtractionResult').mockResolvedValue({
+                success: true,
+                tenderId: 200,
+                extractionVersion: '1.0.0',
+            } as any);
+            const loggerWarnSpy = jest.spyOn((controller as any).logger, 'warn').mockImplementation(() => {});
+
+            const body = { fields: { tenderValue: { value: 100 } } };
+            const result = await controller.saveExtraction(200, body, mockUser as any);
+
+            expect(loggerWarnSpy).toHaveBeenCalledWith(
+                expect.stringContaining('[DEPRECATED] POST /tender-info-sheets/200/extraction/save was called'),
+            );
+            expect(spy).toHaveBeenCalledWith(200, body, 42);
+            expect(result.success).toBe(true);
         });
     });
 
@@ -436,6 +457,296 @@ describe('TenderInfoSheetsService Auto-Extract & Path Resolution', () => {
                     }),
                 }),
             );
+        });
+
+        it('should reset llm_status to ok and empty failed_categories on successful re-extraction save', async () => {
+            let insertedFields: any = null;
+            const mockDb: any = {
+                insert: jest.fn().mockReturnValue({
+                    values: jest.fn().mockImplementation((val) => {
+                        insertedFields = val.fields;
+                        return {
+                            onConflictDoUpdate: jest.fn().mockResolvedValue({}),
+                        };
+                    }),
+                }),
+                select: jest.fn().mockReturnValue({
+                    from: jest.fn().mockReturnValue({
+                        where: jest.fn().mockReturnValue({
+                            limit: jest.fn().mockImplementation(() =>
+                                Promise.resolve([{
+                                    id: 10,
+                                    tenderId: 3665,
+                                    fields: insertedFields,
+                                }])
+                            ),
+                        }),
+                    }),
+                }),
+            };
+            const mockAppLogger = {
+                withContext: jest.fn().mockReturnValue(mockLogger),
+            };
+            const testService = new TenderInfoSheetsService(
+                mockAppLogger as any,
+                mockDb,
+                {} as any,
+                mockTenderInfosService,
+                {} as any,
+                {} as any,
+                {} as any,
+                {} as any,
+                {} as any,
+                mockProducer,
+            );
+
+            mockTenderInfosService.validateExists.mockResolvedValue({ id: 3665 });
+
+            // Re-extraction payload where prior fields had an old llm_unavailable metadata,
+            // but the new extraction succeeded (llm_status: 'ok', failed_categories: [])
+            const payload = {
+                fields: {
+                    emdAmount: { value: 50000, confidence: 'high' },
+                    metadata: {
+                        llm_status: 'llm_unavailable',
+                        failed_categories: ['pbg_sd', 'prs_ld'],
+                    },
+                },
+                missing_fields: [],
+                extraction_version: '1.0.0',
+                processing_time_ms: 1500,
+                llm_status: 'ok',
+                failed_categories: [],
+            };
+
+            const saveResult = await testService.saveExtractionResult(3665, payload, 10);
+
+            expect(saveResult.success).toBe(true);
+            expect(mockDb.insert).toHaveBeenCalled();
+            expect(insertedFields).not.toBeNull();
+            // Confirms metadata is reset to ok and failed_categories is cleared
+            expect(insertedFields.metadata).toEqual({
+                llm_status: 'ok',
+                failed_categories: [],
+            });
+            expect(insertedFields.emdAmount).toEqual({
+                value: 50000,
+                confidence: 'high',
+            });
+        });
+
+        it('should keep stored llm_status and failed_categories when caller sends none (never default to ok)', async () => {
+            let insertedFields: any = null;
+            const storedRowFields = {
+                emdAmount: { value: 20000 },
+                metadata: {
+                    llm_status: 'llm_unavailable',
+                    failed_categories: ['pbg_sd', 'experience'],
+                },
+            };
+
+            const mockDb: any = {
+                select: jest.fn().mockReturnValue({
+                    from: jest.fn().mockReturnValue({
+                        where: jest.fn().mockReturnValue({
+                            limit: jest.fn().mockResolvedValue([
+                                {
+                                    id: 10,
+                                    tenderId: 3665,
+                                    fields: storedRowFields,
+                                },
+                            ]),
+                        }),
+                    }),
+                }),
+                insert: jest.fn().mockReturnValue({
+                    values: jest.fn().mockImplementation((val) => {
+                        insertedFields = val.fields;
+                        return {
+                            onConflictDoUpdate: jest.fn().mockResolvedValue({}),
+                        };
+                    }),
+                }),
+            };
+
+            const mockAppLogger = {
+                withContext: jest.fn().mockReturnValue(mockLogger),
+            };
+            const testService = new TenderInfoSheetsService(
+                mockAppLogger as any,
+                mockDb,
+                {} as any,
+                mockTenderInfosService,
+                {} as any,
+                {} as any,
+                {} as any,
+                {} as any,
+                {} as any,
+                mockProducer,
+            );
+
+            mockTenderInfosService.validateExists.mockResolvedValue({ id: 3665 });
+
+            // Caller payload has NO llm_status and NO failed_categories
+            const payload = {
+                fields: {
+                    tenderValue: { value: 1000000, confidence: 'high' },
+                },
+                missing_fields: [],
+                extraction_version: '1.0.0',
+                processing_time_ms: 800,
+            };
+
+            const saveResult = await testService.saveExtractionResult(3665, payload, 10);
+
+            expect(saveResult.success).toBe(true);
+            expect(mockDb.insert).toHaveBeenCalled();
+            expect(insertedFields).not.toBeNull();
+            // Stored non-ok metadata must be strictly preserved, never defaulted to 'ok'
+            expect(insertedFields.metadata).toEqual({
+                llm_status: 'llm_unavailable',
+                failed_categories: ['pbg_sd', 'experience'],
+            });
+        });
+
+        it('should set null and never default to ok when caller sends none and no stored metadata exists', async () => {
+            let insertedFields: any = null;
+
+            const mockDb: any = {
+                select: jest.fn().mockReturnValue({
+                    from: jest.fn().mockReturnValue({
+                        where: jest.fn().mockReturnValue({
+                            limit: jest.fn().mockResolvedValue([]), // No stored row
+                        }),
+                    }),
+                }),
+                insert: jest.fn().mockReturnValue({
+                    values: jest.fn().mockImplementation((val) => {
+                        insertedFields = val.fields;
+                        return {
+                            onConflictDoUpdate: jest.fn().mockResolvedValue({}),
+                        };
+                    }),
+                }),
+            };
+
+            const mockAppLogger = {
+                withContext: jest.fn().mockReturnValue(mockLogger),
+            };
+            const testService = new TenderInfoSheetsService(
+                mockAppLogger as any,
+                mockDb,
+                {} as any,
+                mockTenderInfosService,
+                {} as any,
+                {} as any,
+                {} as any,
+                {} as any,
+                {} as any,
+                mockProducer,
+            );
+
+            mockTenderInfosService.validateExists.mockResolvedValue({ id: 3665 });
+
+            const payload = {
+                fields: {
+                    tenderValue: { value: 1000000, confidence: 'high' },
+                },
+                missing_fields: [],
+            };
+
+            const saveResult = await testService.saveExtractionResult(3665, payload, 10);
+
+            expect(saveResult.success).toBe(true);
+            expect(insertedFields.metadata.llm_status).toBeNull();
+            expect(insertedFields.metadata.failed_categories).toEqual([]);
+        });
+    });
+
+    describe('getSavedExtraction stale flag', () => {
+        it('should return stale: true and isStale: true when extractionVersion is "stale"', async () => {
+            const mockDb: any = {
+                select: jest.fn().mockReturnValue({
+                    from: jest.fn().mockReturnValue({
+                        where: jest.fn().mockReturnValue({
+                            limit: jest.fn().mockResolvedValue([
+                                {
+                                    tenderId: 3665,
+                                    fields: { tenderValue: { value: 500 } },
+                                    missingFields: [],
+                                    extractionVersion: 'stale',
+                                    processingTimeMs: 1200,
+                                    updatedAt: new Date().toISOString(),
+                                },
+                            ]),
+                        }),
+                    }),
+                }),
+            };
+
+            const mockAppLogger = {
+                withContext: jest.fn().mockReturnValue(mockLogger),
+            };
+            const testService = new TenderInfoSheetsService(
+                mockAppLogger as any,
+                mockDb,
+                {} as any,
+                mockTenderInfosService,
+                {} as any,
+                {} as any,
+                {} as any,
+                {} as any,
+                {} as any,
+                mockProducer,
+            );
+
+            const result = await testService.getSavedExtraction(3665);
+            expect(result).not.toBeNull();
+            expect(result?.stale).toBe(true);
+            expect(result?.isStale).toBe(true);
+            expect(result?.fields).toEqual({ tenderValue: { value: 500 } });
+        });
+
+        it('should return stale: false and isStale: false when extractionVersion is not stale', async () => {
+            const mockDb: any = {
+                select: jest.fn().mockReturnValue({
+                    from: jest.fn().mockReturnValue({
+                        where: jest.fn().mockReturnValue({
+                            limit: jest.fn().mockResolvedValue([
+                                {
+                                    tenderId: 3665,
+                                    fields: { tenderValue: { value: 500 } },
+                                    missingFields: [],
+                                    extractionVersion: '1.1.0:hash123',
+                                    processingTimeMs: 1200,
+                                    updatedAt: new Date().toISOString(),
+                                },
+                            ]),
+                        }),
+                    }),
+                }),
+            };
+
+            const mockAppLogger = {
+                withContext: jest.fn().mockReturnValue(mockLogger),
+            };
+            const testService = new TenderInfoSheetsService(
+                mockAppLogger as any,
+                mockDb,
+                {} as any,
+                mockTenderInfosService,
+                {} as any,
+                {} as any,
+                {} as any,
+                {} as any,
+                {} as any,
+                mockProducer,
+            );
+
+            const result = await testService.getSavedExtraction(3665);
+            expect(result).not.toBeNull();
+            expect(result?.stale).toBe(false);
+            expect(result?.isStale).toBe(false);
         });
     });
 });

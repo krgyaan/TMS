@@ -23,6 +23,7 @@ export { leadTypesService } from "./lead-type.service";
 export { loanPartiesService } from "./loan-party.service";
 export { timerDashboardService } from "./timer-dashboard.service";
 export { tenderInfosService } from "./tenders.service";
+export { tenderStatusHistoryService } from "./tender-status-history.service";
 export { infoSheetsService } from "./info-sheet.service";
 export { paymentRequestsService } from "./payment-requests.service";
 export { rfqsService } from "./rfqs.service";

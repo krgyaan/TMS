@@ -8,6 +8,12 @@ import { UNLOCATED_REASON_TEXT, resolveCitationView, type FieldSources } from '.
 export { isCitationLocated } from './citationView';
 export type { FieldSourceCitation, FieldSources, UnlocatedReason } from './citationView';
 
+export interface FieldFlag {
+    code: string;
+    message: string;
+    rawValue: string | null;
+}
+
 export interface FieldIndicator {
     type: 'high' | 'fallback' | 'low' | 'missing';
     label: string;
@@ -17,6 +23,7 @@ export interface FieldIndicator {
     source?: string | null;
     sources?: FieldSources;
     rawKey?: string;
+    flags?: FieldFlag[];
 }
 
 export const AiIndicatorsContext = React.createContext<Record<string, FieldIndicator>>({});

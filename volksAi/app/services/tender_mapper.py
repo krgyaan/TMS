@@ -1161,8 +1161,6 @@ def generate_bidder_readiness_summary(
             summary["readiness_site_visit_display"] = "Yes (Mandatory site inspection and certificate required prior to bidding)"
         elif site_visit_deemed:
             summary["readiness_site_visit_display"] = "No / Self-Certification (Deemed site visit acknowledgment in SCC; no mandatory scheduled visit)"
-        elif "site visit" in full_text.lower():
-            summary["readiness_site_visit_display"] = "Not mandatory / Self-acquaintance (Bidder advised to inspect site before bidding)"
         else:
             summary["readiness_site_visit_display"] = "Not specified"
 
@@ -1307,6 +1305,7 @@ def build_infosheet_data(
         sections_list = []
 
     field_lookup = {}
+    field_flags: Dict[str, List[Dict[str, Any]]] = {}
     ambiguous_field_conflicts = {}
     for sec in sections_list:
         for f in sec.get("fields", []):
@@ -1554,6 +1553,7 @@ def build_infosheet_data(
     emd_amount_raw = resolve_field(["EMD Amount", "emd_amount", "EMD Detail"], default=None)
     emd_amount_display = "NA"
     emd_total = 0.0
+    per_schedule_breakdown = []
     
     # 12. EMD Amount Anchor: BDS Tag (E) primary, IFB summary row fallback
     tag_e_match = re.search(
@@ -1582,9 +1582,9 @@ def build_infosheet_data(
                 emd_amount_display = format_currency(emd_total)
                 logger.info(f"[MAIN_TENDER_SCHEDULE_SUM] Resolved field 'emd_amount' via GeM EMD schedule sum ({emd_total})")
 
-                # Locate page number and schedule context lines from page_texts
                 emd_page = 1
                 schedule_lines = []
+                per_schedule_breakdown = []
                 if page_texts:
                     for idx, p in enumerate(page_texts):
                         p_num = p.get("page", p.get("page_number", idx + 1)) if isinstance(p, dict) else (idx + 1)
@@ -1595,24 +1595,36 @@ def build_infosheet_data(
                             for l_idx, line_val in enumerate(lines_p):
                                 if "emd amount" in line_val.lower() and l_idx + 1 < len(lines_p):
                                     nxt_val = lines_p[l_idx + 1]
-                                    if re.match(r"^[\d,]+(?:\.\d+)?$", nxt_val.strip()) and parse_money(nxt_val) is not None:
+                                    parsed_val = parse_money(nxt_val)
+                                    if re.match(r"^[\d,]+(?:\.\d+)?$", nxt_val.strip()) and parsed_val is not None:
                                         part_label = " ".join(lines_p[max(0, l_idx - 2):l_idx])
                                         part_prefix = ""
+                                        sch_name = f"Schedule {len(per_schedule_breakdown)+1}"
                                         if "part a" in part_label.lower():
                                             part_prefix = "Part A: "
+                                            sch_name = "Part A"
                                         elif "part b" in part_label.lower():
                                             part_prefix = "Part B: "
+                                            sch_name = "Part B"
                                         schedule_lines.append(f"{part_prefix}EMD Amount {nxt_val}")
+                                        per_schedule_breakdown.append({"schedule": sch_name, "amount": parsed_val})
 
                 if schedule_lines:
                     emd_snip = "GeM Schedule Sum: " + ", ".join(schedule_lines)
                 else:
                     emd_snip = f"GeM Schedule Sum: total {emd_total} (line-item breakdown unavailable)"
 
+                raw_breakdown_str = ", ".join(schedule_lines) if schedule_lines else ", ".join(f"Schedule: {m}" for m in gem_emd_matches)
+                field_flags.setdefault("emdAmount", []).append({
+                    "code": "PER_SCHEDULE_EMD",
+                    "message": f"EMD is assessed per schedule ({raw_breakdown_str}); total of {format_currency(emd_total)} reflects the sum of schedules, not a single global tender EMD",
+                    "rawValue": raw_breakdown_str,
+                })
+
                 if dual_sources is not None:
                     main_entry = {
                         "value": total_gem_emd,
-                        "raw_value": str(total_gem_emd),
+                        "raw_value": None,
                         "page": emd_page,
                         "snippet": emd_snip,
                         "confidence": 0.95,
@@ -1794,52 +1806,57 @@ def build_infosheet_data(
     # 20. Delivery Time (Supply/Total)
     # NOTE: Do NOT include 'contract_period' or 'Period of Work' here — those are ATC service-period
     # fields (e.g. AMC duration in months) and must not be conflated with goods supply delivery days.
-    delivery_time_supply_display = resolve_field(["Delivery Time Supply (Days)", "delivery_time_supply", "Delivery Period (In Days)", "Delivery Schedules", "Delivery Period", "Delivery Days"], r"(?:Delivery Time Supply \(Days\)|Delivery Period \(In Days\)|Delivery Period)[:\-\s]+([^\n]+)")
-    # Fallback: scan Hindi/bilingual GeM consignee delivery table.
-    # OCR table layout (column-wise per row):
-    #   Delivery/Days header → S.N.(1) → Officer Name → Address → Quantity(N) → Delivery Days(NNN)
-    # The Quantity column comes BEFORE Delivery Days; its value is typically <30.
-    # Delivery days for GeM goods tenders are always >=30. Use findall to skip small numbers.
-    if _is_missing(delivery_time_supply_display) or delivery_time_supply_display in ("NA", "Not Found") or not any(c.isdigit() for c in str(delivery_time_supply_display)):
-        m_consignee_del_row = re.search(
-            r"(?:Quantity[^\n]*\n[^\n]*Delivery\s*Days|मात्रा[^\n]*\n[^\n]*दिन)[\s\S]{0,500}?\b\d{6}\b[^\n]*\n\s*(\d{1,5})\s*\n\s*(\d{1,3})\s*(?:\n|\Z)",
-            full_text, re.IGNORECASE
+    def _extract_consignee_schedule_delivery_days(text: str) -> List[int]:
+        gem_hdr = re.search(
+            r"(?:डिलीवरी\s*के\s*दिन|1डलीवर\s*के\s*1दन|Delivery\s*Days?)",
+            text, re.IGNORECASE        
         )
-        if m_consignee_del_row:
-            qty_cand = int(m_consignee_del_row.group(1))
-            days_cand = int(m_consignee_del_row.group(2))
-            if 15 <= days_cand <= 730:
-                delivery_time_supply_display = f"{days_cand} Days"
-                logger.info(f"[ATC_ANCHOR] Resolved field 'delivery_time_supply' via GeM consignee table row: Qty={qty_cand}, Days={days_cand} ({delivery_time_supply_display})")
-        else:
-            gem_table_header_m = re.search(
-                r"(?:डिलीवरी\s+के\s+दिन|Delivery\s*\n\s*Days?)",
-                full_text, re.IGNORECASE
+        if not gem_hdr:
+            gem_hdr = re.search(
+                r"(?:Delivery\s*Days?|Delivery\s*Period\s*(?:\(In\s*Days\)|\(Days\))?|डिलीवरी\s*के\s*दिन)",
+                text, re.IGNORECASE
             )
-            if gem_table_header_m:
-                # Scan the next 1500 chars after header for standalone delivery integers
-                window = full_text[gem_table_header_m.start():gem_table_header_m.start() + 1500]
-                # Strip address noise: Plot No. 549/1, Khasra, Survey, GIDC, NH, Phone numbers, STD codes, 6-digit postal pincodes
-                clean_window = re.sub(r"(?:Plot\s*No\.?|Plot|Khasra|Survey|Gate|NH|GIDC|Sector|Ward|Post|P\.O\.)[\s\:\.\#\-\/]*\d+(?:\/\d+)?", "", window, flags=re.IGNORECASE)
-                clean_window = re.sub(r"\b\d+\s*\/\s*\d+\b", "", clean_window)  # slashed numbers like 549/1
-                clean_window = re.sub(r"(?:PNo\.?|Phone|Tel|Extn|Mobile)[:\.\s]*[\d\-]+", "", clean_window, flags=re.IGNORECASE)
-                clean_window = re.sub(r"\b0\d{2,5}\b", "", clean_window)  # leading-zero STD codes
-                clean_window = re.sub(r"\b\d{6}\b", "", clean_window)  # postal pincodes
+        if not gem_hdr:
+            return []
 
-                delivery_candidates = []
-                for m in re.finditer(r"\b([1-9]\d{0,3})\b", clean_window):
-                    num_val = int(m.group(1))
-                    # Check preceding 25 chars for address keywords
-                    pre_ctx = clean_window[max(0, m.start() - 25):m.start()].lower()
-                    if any(kw in pre_ctx for kw in ["plot", "complex", "sector", "road", "at &", "post", "gidc", "nh-"]):
-                        continue
-                    if 30 <= num_val <= 730:  # Sanity bound: 1 month to 24 months
-                        delivery_candidates.append(num_val)
+        days_list: List[int] = []
+        gem_pincode_pattern = re.compile(
+            r'\b\d{6}\b[^\n]*\n(?:[^\n]*\n){0,4}?\s*(\d{1,7})\s*\n\s*(\d{1,4})\s*(?:\n|\Z)',
+            re.MULTILINE
+        )
+        for m in gem_pincode_pattern.finditer(text):
+            days = int(m.group(2))
+            if 7 <= days <= 730:
+                days_list.append(days)
 
-                if delivery_candidates:
-                    cand_val = delivery_candidates[1] if len(delivery_candidates) >= 2 and 15 <= delivery_candidates[1] <= 365 else delivery_candidates[0]
-                    delivery_time_supply_display = f"{cand_val} Days"
-                    logger.info(f"[ATC_ANCHOR] Resolved field 'delivery_time_supply' via GeM consignee table ({delivery_time_supply_display})")
+        if not days_list:
+            row_pattern = re.compile(
+                r'(?:Quantity[^\n]*\n[^\n]*Delivery\s*Days|1डलीवर\s*के\s*1दन|Delivery\s*Days?)[\s\S]{0,300}?\n\s*(\d{1,5})\s*\n\s*(\d{1,3})\s*(?:\n|\Z)',
+                re.IGNORECASE
+            )
+            for m in row_pattern.finditer(text):
+                days = int(m.group(2))
+                if 7 <= days <= 730:
+                    days_list.append(days)
+
+        return days_list
+
+    sched_delivery_days = _extract_consignee_schedule_delivery_days(full_text)
+    if sched_delivery_days:
+        max_del_days = max(sched_delivery_days)
+        delivery_time_supply_display = f"{max_del_days} Days"
+        if len(set(sched_delivery_days)) > 1:
+            field_flags.setdefault("deliveryTimeSupply", []).append({
+                "code": "DELIVERY_DAYS_DIFFER",
+                "message": f"Line items specify different delivery days ({', '.join(str(d) for d in sorted(set(sched_delivery_days)))}); maximum value applied",
+                "rawValue": ", ".join(f"{d} Days" for d in sched_delivery_days),
+            })
+        logger.info(f"[ATC_ANCHOR] Resolved field 'delivery_time_supply' via schedule Delivery Days column: max={max_del_days} (all: {sched_delivery_days})")
+    else:
+        delivery_time_supply_display = resolve_field(
+            ["Delivery Time Supply (Days)", "delivery_time_supply", "Delivery Period (In Days)", "Delivery Schedules", "Delivery Period", "Delivery Days"],
+            r"(?:Delivery Time Supply \(Days\)|Delivery Period \(In Days\)|Delivery Period)[:\-\s]+([^\n]+)"
+        )
 
     # Check for multi-scope Part A and Part B supply clauses in SCC
     part_a_m = re.search(
@@ -3377,9 +3394,9 @@ def build_infosheet_data(
         full_text, re.IGNORECASE
     )
     site_visit_no = (
-        (m_sv_direct and m_sv_direct.group(1).lower() in ("no", "not applicable", "na"))
+        (m_sv_direct and m_sv_direct.group(1).lower() in ("no", "not required", "not applicable", "na"))
         or (site_visit_val and str(site_visit_val).strip().lower() in ("no", "not required", "not applicable", "false", "na"))
-        or bool(re.search(r"site\s+visit\s+(?:is\s+)?(?:not\s+required|not\s+applicable|not\s+mandatory)", full_text, re.IGNORECASE))
+        or bool(re.search(r"site\s+visit\s+(?:is\s+)?(?:not\s+required|not\s+applicable)", full_text, re.IGNORECASE))
     )
 
     if site_visit_mandatory or (site_visit_val and any(kw in str(site_visit_val).lower() for kw in ["mandatory", "must visit", "required"])) or (m_sv_direct and m_sv_direct.group(1).lower() in ("yes", "mandatory")):
@@ -3390,8 +3407,8 @@ def build_infosheet_data(
         site_visit_display = "No"
     elif site_visit_deemed:
         site_visit_display = "No / Self-Certification (Deemed site visit acknowledgment in SCC; no mandatory scheduled visit)"
-    elif "site visit" in full_text.lower() or "site inspection" in full_text.lower():
-        site_visit_display = "Not mandatory / Self-acquaintance (Bidder advised to inspect site before bidding)"
+    elif bool(re.search(r"site\s+visit\s+(?:is\s+)?(?:not\s+mandatory|optional)", full_text, re.IGNORECASE)):
+        site_visit_display = "Not mandatory"
     else:
         site_visit_display = "Not specified"
 
@@ -4091,6 +4108,8 @@ def build_infosheet_data(
                         "atc_snippet": a.get("snippet"),
                     }
 
+    res_dict["_field_flags"] = field_flags
+    res_dict["per_schedule_emd"] = per_schedule_breakdown
     res_dict["_dual_sources"] = dual_sources or {}
     res_dict["_self_classified_atc"] = is_self_classified_atc
     res_dict["_has_atc"] = has_atc

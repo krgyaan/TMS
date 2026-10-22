@@ -61,28 +61,7 @@ export class FileUploadController {
         return this.service.upload(files, context, user.id);
     }
 
-    /**
-     * Serve/Download file
-     * GET /files/serve/:context/:fileName
-     */
-    @Public()
-    @Get('serve/:context/:fileName')
-    async serve(
-        @Param('context') context: string,
-        @Param('fileName') fileName: string,
-        @Res({ passthrough: true }) res: Response,
-    ): Promise<StreamableFile> {
-        const parsedContext = ContextSchema.parse(context);
-        const filePath = path.join(parsedContext, fileName);
-
-        const exists = await this.service.exists(filePath);
-        if (!exists) {
-            throw new NotFoundException('File not found');
-        }
-
-        const absolutePath = this.service.getAbsolutePath(filePath);
-        const ext = path.extname(fileName).toLowerCase();
-
+    private streamFile(res: Response, fileName: string, absolutePath: string, ext: string): StreamableFile {
         // Set content type
         const mimeTypes: Record<string, string> = {
             '.pdf': 'application/pdf',
@@ -108,6 +87,56 @@ export class FileUploadController {
         return new StreamableFile(stream);
     }
 
+   
+    /**
+     * Serve/Download file
+     * GET /files/serve/:context/:fileName
+     */
+    @Public()
+    @Get('serve/:context/:fileName')
+    async serve(
+        @Param('context') context: string,
+        @Param('fileName') fileName: string,
+        @Res({ passthrough: true }) res: Response,
+    ): Promise<StreamableFile> {
+        const parsedContext = ContextSchema.parse(context);
+        const filePath = path.join(parsedContext, fileName);
+
+        const exists = await this.service.exists(filePath);
+        if (!exists) {
+            throw new NotFoundException('File not found');
+        }
+
+        const absolutePath = this.service.getAbsolutePath(filePath);
+        const ext = path.extname(fileName).toLowerCase();
+        return this.streamFile(res, fileName, absolutePath, ext);
+    }
+
+    /**
+     * Serve/Download a Bank Guarantee file (stored as
+     * bi-dashboard/bank-guarantee/<context>/<fileName>).
+     * GET /files/serve/bi-dashboard/bank-guarantee/:context/:fileName
+     */
+    @Public()
+    @Get('serve/bi-dashboard/bank-guarantee/:context/:fileName')
+    async serveBg(
+        @Param('context') context: string,
+        @Param('fileName') fileName: string,
+        @Res({ passthrough: true }) res: Response,
+    ): Promise<StreamableFile> {
+        const parsedContext = ContextSchema.parse(context);
+        const filePath = `bi-dashboard/bank-guarantee/${parsedContext}/${fileName}`;
+
+        const exists = await this.service.exists(filePath);
+        if (!exists) {
+            throw new NotFoundException('File not found');
+        }
+
+        const absolutePath = this.service.getAbsolutePath(filePath);
+        const ext = path.extname(fileName).toLowerCase();
+        return this.streamFile(res, fileName, absolutePath, ext);
+    }
+
     /**
      * Delete file
      * DELETE /files/:context/:fileName
@@ -121,6 +150,21 @@ export class FileUploadController {
         const parsedContext = ContextSchema.parse(context);
         const filePath = path.join(parsedContext, fileName);
         await this.service.delete(filePath);
+        return { success: true, message: 'File deleted' };
+    }
+
+    /**
+     * Delete a Bank Guarantee file
+     * DELETE /files/bi-dashboard/bank-guarantee/:context/:fileName
+     */
+    @Delete('bi-dashboard/bank-guarantee/:context/:fileName')
+    @HttpCode(HttpStatus.OK)
+    async deleteBg(
+        @Param('context') context: string,
+        @Param('fileName') fileName: string,
+    ) {
+        const parsedContext = ContextSchema.parse(context);
+        await this.service.delete(`bi-dashboard/bank-guarantee/${parsedContext}/${fileName}`);
         return { success: true, message: 'File deleted' };
     }
 }

@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 const nullishString = z.string().nullable().optional();
 const nullishDate = z.string().nullable().optional();
+const nullishNumber = z.number().nullable().optional();
 
 export const CommonInstrumentFields = z.object({
   id: z.number(),
@@ -11,6 +12,7 @@ export const CommonInstrumentFields = z.object({
   amount: z.string(),
   favouring: nullishString,
   payableAt: nullishString,
+  expiryDate: nullishDate,
   courierAddress: nullishString,
   courierDeadline: z.number().nullable().optional(),
   status: z.string(),
@@ -46,11 +48,22 @@ export const BgDetailsResponse = z.object({
   bgDate: nullishDate,
   validityDate: nullishDate,
   claimExpiryDate: nullishDate,
+  bgExpiryDate: nullishDate,
+  bgClaim: nullishDate,
   beneficiaryName: nullishString,
   beneficiaryAddress: nullishString,
   bankName: nullishString,
   bgNeeds: nullishString,
   bgPurpose: nullishString,
+  bgSoftCopy: nullishString,
+  bgPo: nullishString,
+  bgBankAcc: nullishString,
+  bgBankIfsc: nullishString,
+  bgBankAccName: nullishString,
+  bgClientUser: nullishString,
+  bgClientCp: nullishString,
+  bgClientFin: nullishString,
+  stampCharges: nullishNumber,
 }).nullable();
 
 export const ChequeDetailsResponse = z.object({

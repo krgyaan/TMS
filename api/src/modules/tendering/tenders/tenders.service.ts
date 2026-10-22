@@ -1,4 +1,4 @@
-import { bidSubmissions, emailLogs, tenderResultDetails, tenderResults, timerTrackers } from '@/db/schemas';
+import { bidSubmissions, emailLogs, tenderResultDetails, tenderResults, timerTrackers, tenderExtractions, biddingRequirementsJobs } from '@/db/schemas';
 import { tenderInformation } from '@/db/schemas/tendering/tender-info-sheet.schema';
 import { AppLogger } from '@/logger/app-logger.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
@@ -703,6 +703,31 @@ export class TenderInfosService {
 
         if (!rows[0]) {
             throw new NotFoundException(`Tender with ID ${id} not found`);
+        }
+
+        // Invalidate extractions and bidding requirements if documents changed without deleting user-edited values
+        const documentsChanged = data.documents !== undefined && data.documents !== currentTender.documents;
+        if (documentsChanged) {
+            this.logger.log(`Tender ${id} documents updated. Invalidating extractions and bidding requirements.`);
+            try {
+                await this.db
+                    .update(tenderExtractions)
+                    .set({
+                        extractionVersion: 'stale',
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(tenderExtractions.tenderId, id));
+
+                await this.db
+                    .update(biddingRequirementsJobs)
+                    .set({
+                        status: 'stale',
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(biddingRequirementsJobs.tenderId, id));
+            } catch (invalErr: any) {
+                this.logger.error(`Failed to mark extractions/jobs stale for tender ${id}: ${invalErr?.message}`);
+            }
         }
 
         // Keep the linked enquiry's connected fields in sync

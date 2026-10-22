@@ -1,5 +1,5 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { google } from 'googleapis';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
@@ -55,10 +55,7 @@ export class OAuthTokenService {
         const [account] = await this.db
             .select()
             .from(oauthAccounts)
-            .where(
-                eq(oauthAccounts.userId, userId) &&
-                eq(oauthAccounts.provider, provider)
-            )
+            .where(and(eq(oauthAccounts.userId, userId), eq(oauthAccounts.provider, provider)))
             .limit(1);
 
         if (!account) {
@@ -228,10 +225,7 @@ export class OAuthTokenService {
         const existing = await this.db
             .select()
             .from(oauthAccounts)
-            .where(
-                eq(oauthAccounts.userId, userId) &&
-                eq(oauthAccounts.provider, provider)
-            )
+            .where(and(eq(oauthAccounts.userId, userId), eq(oauthAccounts.provider, provider)))
             .limit(1);
 
         if (existing.length > 0) {
@@ -250,10 +244,7 @@ export class OAuthTokenService {
                     isActive: true,
                     updatedAt: new Date(),
                 })
-                .where(
-                    eq(oauthAccounts.userId, userId) &&
-                    eq(oauthAccounts.provider, provider)
-                );
+                .where(and(eq(oauthAccounts.userId, userId), eq(oauthAccounts.provider, provider)));
         } else {
             // Insert new
             await this.db.insert(oauthAccounts).values({

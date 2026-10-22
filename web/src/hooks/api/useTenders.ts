@@ -1,8 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { tenderInfosService } from '@/services/api';
+import { tenderInfosService, tenderStatusHistoryService } from '@/services/api';
 import { toast } from 'sonner';
 import { useTeamFilter } from '@/hooks/useTeamFilter';
 import type { CreateTenderRequest, TenderListParams, UpdateTenderRequest, PaginatedResult, TenderInfoWithNames } from '@/types/api.types';
+import type { TenderStatusHistoryEntry } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 import { showErrorToast } from '@/utils/errorToast';
 
 export const tendersKey = {
@@ -13,6 +14,7 @@ export const tendersKey = {
     detail: (id: number) => [...tendersKey.details(), id] as const,
     list: (filters?: Record<string, unknown>) => [...tendersKey.lists(), { filters }] as const,
     dashboardCounts: () => [...tendersKey.all, 'dashboard-counts'] as const,
+    statusHistory: (id: number) => [...tendersKey.all, 'status-history', id] as const,
 };
 
 export const useTenders = (
@@ -148,6 +150,14 @@ export const useTendersDashboardCounts = () => {
     });
 };
 
+export const useTenderStatusHistory = (tenderId: number | null) => {
+    return useQuery<TenderStatusHistoryEntry[]>({
+        queryKey: tendersKey.statusHistory(tenderId ?? 0),
+        queryFn: () => tenderStatusHistoryService.getByTender(tenderId!),
+        enabled: !!tenderId,
+    });
+};
+
 export const useUpdateTenderStatus = () => {
     const queryClient = useQueryClient();
 
@@ -158,6 +168,7 @@ export const useUpdateTenderStatus = () => {
             queryClient.invalidateQueries({ queryKey: tendersKey.lists() });
             queryClient.invalidateQueries({ queryKey: tendersKey.detail(variables.id) });
             queryClient.invalidateQueries({ queryKey: tendersKey.dashboardCounts() });
+            queryClient.invalidateQueries({ queryKey: tendersKey.statusHistory(variables.id) });
             toast.success("Tender status updated successfully");
         },
         onError: showErrorToast,

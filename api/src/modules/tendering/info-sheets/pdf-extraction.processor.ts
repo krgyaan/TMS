@@ -254,44 +254,100 @@ export class PdfExtractionProcessor implements OnModuleInit {
 
         // Durable Database Persistence: Save extraction result to tender_extractions table (if db is provided)
         if (this.db) {
+            let existingMetadata: any = null;
+            const callerLlmStatus = extractionResult.llm_status ?? (extractionResult.fields as any)?.metadata?.llm_status;
+            const callerFailedCats = extractionResult.failed_categories ?? (extractionResult.fields as any)?.metadata?.failed_categories;
+
+            if (callerLlmStatus === undefined || callerFailedCats === undefined) {
+                try {
+                    const [storedRow] = await this.db
+                        .select({ fields: tenderExtractions.fields })
+                        .from(tenderExtractions)
+                        .where(eq(tenderExtractions.tenderId, tenderId))
+                        .limit(1);
+                    if (storedRow && storedRow.fields && typeof storedRow.fields === 'object') {
+                        existingMetadata = (storedRow.fields as any)?.metadata;
+                    }
+                } catch {
+                    // Ignore DB read error on missing table or initial write
+                }
+            }
+
+            const effectiveLlmStatus =
+                callerLlmStatus !== undefined
+                    ? callerLlmStatus
+                    : existingMetadata?.llm_status !== undefined
+                    ? existingMetadata.llm_status
+                    : null; // NEVER default to "ok"
+
+            const effectiveFailedCategories =
+                callerFailedCats !== undefined
+                    ? callerFailedCats
+                    : existingMetadata?.failed_categories !== undefined
+                    ? existingMetadata.failed_categories
+                    : [];
+
+            const fieldsToPersist: Record<string, any> = {};
+            for (const [key, fieldVal] of Object.entries(extractionResult.fields || {})) {
+                if (key === 'metadata' || key === 'biddingRequirementsAnalysis') {
+                    fieldsToPersist[key] = fieldVal;
+                } else if (fieldVal && typeof fieldVal === 'object') {
+                    fieldsToPersist[key] = {
+                        ...(fieldVal as any),
+                        reviewed: false,
+                    };
+                } else {
+                    fieldsToPersist[key] = fieldVal;
+                }
+            }
+            fieldsToPersist.metadata = {
+                llm_status: effectiveLlmStatus,
+                failed_categories: effectiveFailedCategories,
+            };
+            extractionResult.fields = fieldsToPersist as any;
+            const totalPersistFieldCount = Object.keys(fieldsToPersist).length;
+
             try {
-                this.logger.info(`[AutoExtract] Sending save request to persist extraction for tender ${tenderId}`, {
+                this.logger.info(`[AutoExtract] Sending save request to persist extraction in single transaction for tender ${tenderId}`, {
                     event_type: 'autoextract_save',
                     action: 'save_request_sent',
                     tenderId,
-                    fieldsCount: fieldCount,
+                    fieldsCount: totalPersistFieldCount,
                 });
 
-                await this.db
-                    .insert(tenderExtractions)
-                    .values({
-                        tenderId,
-                        fields: extractionResult.fields,
-                        missingFields: extractionResult.missing_fields,
-                        extractionVersion: extractionResult.extraction_version || '1.0.0',
-                        processingTimeMs: extractionResult.processing_time_ms,
-                        userId: userId || null,
-                        updatedAt: new Date(),
-                    })
-                    .onConflictDoUpdate({
-                        target: tenderExtractions.tenderId,
-                        set: {
-                            // Replace the extraction data but keep other features' cached keys
-                            // (the bidding-requirements analysis) instead of wiping them.
-                            fields: extractionFieldsUpsertValue(extractionResult.fields),
+                const runner = this.db.transaction ? this.db.transaction.bind(this.db) : async (fn: any) => fn(this.db);
+                await runner(async (tx: any) => {
+                    await tx
+                        .insert(tenderExtractions)
+                        .values({
+                            tenderId,
+                            fields: fieldsToPersist,
                             missingFields: extractionResult.missing_fields,
-                            extractionVersion: extractionResult.extraction_version || '1.0.0',
+                            extractionVersion: (job.data as any)?.extractionVersion || extractionResult.extraction_version || '1.1.0',
                             processingTimeMs: extractionResult.processing_time_ms,
                             userId: userId || null,
                             updatedAt: new Date(),
-                        },
-                    });
+                        })
+                        .onConflictDoUpdate({
+                            target: tenderExtractions.tenderId,
+                            set: {
+                                // Replace the extraction data but keep other features' cached keys
+                                // (the bidding-requirements analysis) instead of wiping them.
+                                fields: extractionFieldsUpsertValue(fieldsToPersist),
+                                missingFields: extractionResult.missing_fields,
+                                extractionVersion: (job.data as any)?.extractionVersion || extractionResult.extraction_version || '1.1.0',
+                                processingTimeMs: extractionResult.processing_time_ms,
+                                userId: userId || null,
+                                updatedAt: new Date(),
+                            },
+                        });
+                });
 
                 this.logger.info(`[AutoExtract] Extraction result saved successfully for tender ${tenderId}`, {
                     event_type: 'autoextract_save',
                     action: 'save_success',
                     tenderId,
-                    fieldsCount: fieldCount,
+                    fieldsCount: totalPersistFieldCount,
                 });
 
                 // Follow-up check: confirm persisted data matches
@@ -302,7 +358,7 @@ export class PdfExtractionProcessor implements OnModuleInit {
                     .limit(1);
 
                 const persistedFieldsCount = persistedRow ? Object.keys(persistedRow.fields || {}).length : 0;
-                const matches = Boolean(persistedRow && persistedFieldsCount === fieldCount);
+                const matches = Boolean(persistedRow && persistedFieldsCount === totalPersistFieldCount);
 
                 this.logger.info(`[AutoExtract] Follow-up check for tender ${tenderId}: verified=${matches}`, {
                     event_type: 'autoextract_save',
@@ -321,9 +377,9 @@ export class PdfExtractionProcessor implements OnModuleInit {
                     failureTimestamp: new Date().toISOString(),
                     error: underlyingError,
                     rawExtraction: {
-                        fields: extractionResult.fields,
+                        fields: fieldsToPersist,
                         missing_fields: extractionResult.missing_fields,
-                        extraction_version: extractionResult.extraction_version || '1.0.0',
+                        extraction_version: extractionResult.extraction_version || '1.1.0',
                         processing_time_ms: extractionResult.processing_time_ms,
                     },
                 };

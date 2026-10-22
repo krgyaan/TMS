@@ -128,6 +128,8 @@ TMS_TO_SOURCE_KEY_MAP: Dict[str, str] = {
     "grievanceContact": "grievance_contact_display",
     "grievanceEmail": "grievance_email_display",
     "courierAddress": "courier_address_display",
+    "gemBidEndDate": "gem_bid_end_date_display",
+    "gemBidOpeningDate": "gem_bid_opening_date_display",
 }
 
 # Explicit alias map from TMS display keys and DTO field names to Layer-1 snapshot labels,
@@ -474,10 +476,21 @@ def _normalize_extracted_value_for_key(tms_key: str, raw_val: Any) -> Any:
     return s
 
 
-# Reasons a field's citation cannot point at a verified page/snippet.
 UNLOCATED_NO_SOURCE_RECORD = "no_source_record"          # no Layer-1 record exists for this field
 UNLOCATED_VALUE_CHANGED = "value_changed_after_extraction"  # snapshot exists but no longer matches the value
 UNLOCATED_NO_PAGE = "no_page_recorded"                  # value matches, but the page was never captured
+UNLOCATED_RULE_DERIVED = "Derived from tender rules/mode without dedicated text citation"
+
+RULE_DERIVED_FIELDS = {
+    "pbgMode",
+    "siteVisit",
+    "siteVisitRequired",
+    "physicalDocsRequired",
+    "physicalDocType",
+    "physicalDocsDeadline",
+    "ldType",
+    "mafRequired",
+}
 
 
 def _has_real_page(page: Any) -> bool:
@@ -489,7 +502,10 @@ def _build_citation(tms_key: str, item: Dict[str, Any]) -> Dict[str, Any]:
     raw = item.get("value")
     norm = _normalize_extracted_value_for_key(tms_key, raw)
     if norm is not None:
-        item["raw_value"] = str(raw if raw is not None else "")
+        if "raw_value" in item and item["raw_value"] is None:
+            item["raw_value"] = None
+        else:
+            item["raw_value"] = str(raw if raw is not None else "")
         item["value"] = norm
     snippet = item.get("snippet") or None
     item["snippet"] = snippet
@@ -600,6 +616,7 @@ def _resolve_dual_source_for_tms_key(
     has_atc: bool,
     clean_value: Any,
     source: Optional[str],
+    field_flags: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     candidates = [tms_key, tms_key.lower()]
     if source_field_name:
@@ -657,6 +674,19 @@ def _resolve_dual_source_for_tms_key(
         for slot in present
     }
 
+    has_unmapped_flag = any(f.get("code") == "UNMAPPED_VALUE" for f in (field_flags or []))
+    if has_unmapped_flag:
+        for slot in present:
+            if raw_items.get(slot):
+                supports[slot] = True
+
+    has_per_schedule_emd_flag = any(f.get("code") == "PER_SCHEDULE_EMD" for f in (field_flags or []))
+    if has_per_schedule_emd_flag:
+        for slot in present:
+            if items.get(slot):
+                items[slot]["raw_value"] = None
+            supports[slot] = True
+
     unlocated: Optional[Dict[str, Any]] = None
     if present and not any(supports.values()):
         # Every snapshot record disagrees with the final value: the value was
@@ -703,6 +733,7 @@ def _format_field_object(
     is_self_classified_atc: bool = False,
     has_atc: bool = False,
     raw_display_value: Optional[Any] = None,
+    field_flags: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """
     Transforms an extracted TMS DTO field into a structured object containing:
@@ -710,9 +741,25 @@ def _format_field_object(
     - confidence: "high" | "fallback" | "missing" | "not_applicable"
     - source: "regex" | "atc" | "llm" | None
     - sources: { self_classified_atc: bool, has_conflict: bool, main_tender: dict | None, atc: dict | None }
+    - flags: [{ code: str, message: str, rawValue: str | null }]
     """
     status_val = field_statuses.get(source_field_name) if source_field_name else None
     raw_source = field_sources.get(source_field_name) if source_field_name else None
+
+    flags_list = list(field_flags or [])
+    if (
+        tms_key == "commercialEvaluation"
+        and dto_value is None
+        and raw_display_value is not None
+        and str(raw_display_value).strip() not in ("", "NA", "N/A", "None", "Not Found", "NOT_APPLICABLE", "Not Applicable", "⚠️ MISSING")
+    ):
+        raw_eval_str = str(raw_display_value).strip()
+        if not any(f.get("code") == "UNMAPPED_VALUE" for f in flags_list):
+            flags_list.append({
+                "code": "UNMAPPED_VALUE",
+                "message": f"Raw value '{raw_eval_str}' could not be mapped to known evaluation modes ('item-wise', 'overall')",
+                "rawValue": raw_eval_str,
+            })
 
     # Derive not-applicable status for fee amounts if sibling mode is not-applicable
     if (
@@ -763,7 +810,8 @@ def _format_field_object(
             clean_value = dto_value
 
     # 2. Determine source: 'regex' | 'atc' | 'llm' | None
-    if confidence == "missing" or clean_value is None:
+    has_unmapped_flag = any(f.get("code") == "UNMAPPED_VALUE" for f in flags_list)
+    if (confidence == "missing" or clean_value is None) and not has_unmapped_flag:
         source: Optional[str] = None
     else:
         if not raw_source:
@@ -781,21 +829,45 @@ def _format_field_object(
                 else:
                     source = None
 
-    sources_obj = _resolve_dual_source_for_tms_key(
-        tms_key=tms_key,
-        source_field_name=source_field_name,
-        dual_sources=dual_sources or {},
-        is_self_classified_atc=is_self_classified_atc,
-        has_atc=has_atc,
-        clean_value=clean_value,
-        source=source,
-    )
+    if tms_key in RULE_DERIVED_FIELDS:
+        source = "rule"
+        sources_obj = {
+            "self_classified_atc": bool(is_self_classified_atc),
+            "has_conflict": False,
+            "main_tender": None,
+            "atc": None,
+            "located": False,
+            "page": None,
+            "snippet": None,
+            "unlocated_reason": UNLOCATED_RULE_DERIVED,
+            "unlocated": {
+                "value": clean_value,
+                "raw_value": None if clean_value is None else str(clean_value),
+                "page": None,
+                "snippet": None,
+                "located": False,
+                "unlocated_reason": UNLOCATED_RULE_DERIVED,
+                "document": None,
+            },
+        }
+    else:
+        sources_obj = _resolve_dual_source_for_tms_key(
+            tms_key=tms_key,
+            source_field_name=source_field_name,
+            dual_sources=dual_sources or {},
+            is_self_classified_atc=is_self_classified_atc,
+            has_atc=has_atc,
+            clean_value=clean_value,
+            source=source,
+            field_flags=flags_list,
+        )
 
     return {
         "value": clean_value,
         "confidence": confidence,
         "source": source,
         "sources": sources_obj,
+        "flags": flags_list,
     }
 
 
@@ -907,6 +979,8 @@ async def extract_tender(
             fields: Dict[str, Any] = {}
             missing_fields: List[str] = []
 
+            field_flags_map: Dict[str, List[Dict[str, Any]]] = infosheet_data.get("_field_flags", {})
+
             # 2. Merge DTO-shaped values with confidence and source metadata
             for tms_key, dto_val in tms_dto.items():
                 source_key = TMS_TO_SOURCE_KEY_MAP.get(tms_key)
@@ -923,6 +997,7 @@ async def extract_tender(
                     is_self_classified_atc=is_self_classified_atc,
                     has_atc=has_atc,
                     raw_display_value=infosheet_data.get(source_key),
+                    field_flags=list(field_flags_map.get(tms_key, [])),
                 )
                 fields[tms_key] = field_obj
 
@@ -937,17 +1012,20 @@ async def extract_tender(
 
             # 3. Construct final response envelope matching TMS specification
             response: Dict[str, Any] = {
-                "extraction_version": "1.0.0",
+                "extraction_version": "1.1.0",
                 "fields": fields,
                 "missing_fields": missing_fields,
                 "processing_time_ms": processing_time_ms,
                 "llm_usage": infosheet_data.get("_llm_usage"),
                 "llm_status": infosheet_data.get("_llm_status", "ok"),
+                "failed_categories": infosheet_data.get("_failed_categories", []),
                 "self_classified_atc": is_self_classified_atc,
                 "has_atc": has_atc,
                 "ambiguous_field_conflicts": ambiguous_field_conflicts,
                 "documentIdentityCheck": document_identity_check,
             }
+            if infosheet_data.get("per_schedule_emd"):
+                response["per_schedule_emd"] = infosheet_data.get("per_schedule_emd")
 
 
             logger.info(

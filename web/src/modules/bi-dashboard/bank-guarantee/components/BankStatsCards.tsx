@@ -51,7 +51,7 @@ const BankStatsCards = ({ cardStats }: { cardStats: BankGuaranteeCardStats }) =>
     if (!cardStats?.bankStats || Object.keys(cardStats.bankStats).length === 0) return null;
 
     return (
-        <div ref={containerRef} className="grid justify-center grid-flow-col auto-cols-[250px] md:auto-cols-[300px] gap-3 mb-6">
+        <div ref={containerRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 mb-6">
             {Object.entries(cardStats.bankStats).map(([bankName, stats]) => {
                 const isExpanded = expandedBanks.includes(bankName);
 
@@ -63,31 +63,31 @@ const BankStatsCards = ({ cardStats }: { cardStats: BankGuaranteeCardStats }) =>
                             group relative overflow-hidden cursor-pointer transition-all duration-300
                             border
                             ${isExpanded
-                                ? 'bg-card border-emerald-500/50 shadow-lg scale-[1.02] z-10 ring-1 ring-emerald-500/20'
+                                ? 'bg-card border-emerald-500/50 shadow-lg z-10 ring-1 ring-emerald-500/20'
                                 : 'bg-card/40 border-border/60 hover:bg-card hover:border-border hover:shadow-md'}
                         `}
                     >
                         <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-green-600 transition-opacity duration-300 ${isExpanded ? 'opacity-100' : 'opacity-0'}`} />
 
-                        <CardHeader className="px-3 pb-0 flex flex-row items-start justify-between space-y-0">
-                            <div className="space-y-0.5">
-                                <CardTitle className="text-sm font-semibold tracking-tight text-foreground">
+                        <CardHeader className="px-2.5 pb-0 flex flex-row items-start justify-between space-y-0 gap-2">
+                            <div className="space-y-0.5 min-w-0">
+                                <CardTitle className="text-xs font-semibold tracking-tight text-foreground truncate">
                                     {bankNameMap[bankName] || bankName}
                                 </CardTitle>
-                                <p className="text-[10px] text-muted-foreground font-medium">
+                                <p className="text-[10px] text-muted-foreground font-medium truncate">
                                     {stats.percentage.toFixed(2)}% of BGs
                                 </p>
                             </div>
-                            <div className={`h-7 w-7 rounded-full flex items-center justify-center transition-colors duration-300 ${isExpanded ? 'bg-emerald-500 text-white' : 'bg-secondary text-muted-foreground'}`}>
-                                <Landmark size={14} />
+                            <div className={`shrink-0 h-6 w-6 rounded-full flex items-center justify-center transition-colors duration-300 ${isExpanded ? 'bg-emerald-500 text-white' : 'bg-secondary text-muted-foreground'}`}>
+                                <Landmark size={12} />
                             </div>
                         </CardHeader>
 
-                        <CardContent className="px-3 pt-0">
+                        <CardContent className="px-2.5 pt-0">
                             <div>
                                 <span className="text-[9px] font-semibold text-muted-foreground/70 uppercase tracking-wider">Total BG Amount</span>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-lg font-bold text-foreground tracking-tight">
+                                <div className="flex items-center justify-between gap-1">
+                                    <span className="text-base font-bold text-foreground tracking-tight truncate">
                                         {formatINR(stats.amount)}
                                     </span>
                                     <ChevronDown
@@ -103,24 +103,24 @@ const BankStatsCards = ({ cardStats }: { cardStats: BankGuaranteeCardStats }) =>
                                 <div className="overflow-hidden">
                                     <div className="h-px w-full bg-border/50 mb-3" />
 
-                                    <div className="grid grid-cols-3 gap-2 mb-3">
-                                        <div className="space-y-0.5">
+                                    <div className="grid grid-cols-3 gap-1.5 mb-3">
+                                        <div className="space-y-0.5 min-w-0">
                                             <p className="text-[9px] uppercase text-muted-foreground">FDR 10%</p>
-                                            <p className="text-[11px] font-medium text-emerald-600">{formatINR(stats.fdrAmount10)}</p>
+                                            <p className="text-[10px] font-medium text-emerald-600 truncate">{formatINR(stats.fdrAmount10)}</p>
                                         </div>
-                                        <div className="space-y-0.5">
+                                        <div className="space-y-0.5 min-w-0">
                                             <p className="text-[9px] uppercase text-muted-foreground">FDR 15%</p>
-                                            <p className="text-[11px] font-medium text-emerald-600">{formatINR(stats.fdrAmount15)}</p>
+                                            <p className="text-[10px] font-medium text-emerald-600 truncate">{formatINR(stats.fdrAmount15)}</p>
                                         </div>
-                                        <div className="space-y-0.5">
+                                        <div className="space-y-0.5 min-w-0">
                                             <p className="text-[9px] uppercase text-muted-foreground">FDR 100%</p>
-                                            <p className="text-[11px] font-medium text-emerald-600">{formatINR(stats.fdrAmount100)}</p>
+                                            <p className="text-[10px] font-medium text-emerald-600 truncate">{formatINR(stats.fdrAmount100)}</p>
                                         </div>
                                     </div>
 
                                     <div className="flex items-center">
-                                        <Badge variant="outline" className="h-5 px-2 text-[10px] font-normal text-muted-foreground bg-secondary/30 border-border/50">
-                                            <Wallet className="w-2.5 h-2.5 mr-1" />
+                                        <Badge variant="outline" className="h-5 px-1.5 text-[10px] font-normal text-muted-foreground bg-secondary/30 border-border/50 whitespace-nowrap">
+                                            <Wallet className="w-2.5 h-2.5 mr-1 shrink-0" />
                                             {stats.count} BGs Created
                                         </Badge>
                                     </div>

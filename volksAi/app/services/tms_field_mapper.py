@@ -437,20 +437,36 @@ def _map_yes_no(val: Any) -> Optional[str]:
 
 
 def _map_yes_no_or_none(val: Any) -> Optional[str]:
-    """Maps truthy/yes -> 'YES', falsey/no -> 'NO', empty/not specified -> None."""
+    """
+    Explicit token-based matcher for yes/no/none fields (siteVisitRequired, sampleSubmissionRequired, miiRequired).
+    'Not mandatory', 'Optional', 'Self-acquaintance', 'Not specified' -> None (missing).
+    'Not required', 'No', 'Not applicable', 'False' -> 'NO'.
+    'Required', 'Mandatory', 'Yes', 'True', 'Applicable' -> 'YES'.
+    """
     if _is_empty(val):
         return None
     s = str(val).strip().upper()
-    if s in ("NOT SPECIFIED", "NA", "N/A", "NONE", "NOT FOUND"):
+    if s in ("NOT SPECIFIED", "NA", "N/A", "NONE", "NOT FOUND", "⚠️ MISSING", "NIL"):
         return None
-    if s.startswith("NO"):
+
+    # Explicit missing / non-mandatory phrases (must precede 'MANDATORY' or 'NO' checks)
+    if "NOT MANDATORY" in s or "OPTIONAL" in s or "SELF-ACQUAINTANCE" in s:
+        return None
+    if any(phrase in s for phrase in ["DISCRETIONARY", "ADVISED TO INSPECT", "SELF-ACQUAINT", "AT BIDDER DISCRETION"]):
+        return None
+
+    # Explicit NO phrases
+    if "NOT REQUIRED" in s or "NOT APPLICABLE" in s:
         return "NO"
-    if s.startswith("YES"):
-        return "YES"
-    if "YES" in s or "MANDATORY" in s:
-        return "YES"
-    if "NO" in s:
+    if re.search(r"\b(?:NO|FALSE)\b", s):
         return "NO"
+
+    # Explicit YES phrases
+    if "MANDATORY" in s or "REQUIRED" in s:
+        return "YES"
+    if re.search(r"\b(?:YES|TRUE|APPLICABLE)\b", s):
+        return "YES"
+
     return None
 
 
@@ -765,7 +781,7 @@ def map_to_tms_dto(raw_infosheet_data: Dict[str, Any]) -> Dict[str, Any]:
         "preBidMeeting": None if _is_empty(raw.get("pre_bid_meeting_display")) or str(raw.get("pre_bid_meeting_display")).strip().lower() in ("na", "n/a", "none", "none specified / no pre-bid meeting scheduled") else str(raw.get("pre_bid_meeting_display")).strip(),
 
         # Site Visit / Survey
-        "siteVisit": None if _is_empty(raw.get("site_visit_display") or raw.get("readiness_site_visit_display")) or str(raw.get("site_visit_display") or raw.get("readiness_site_visit_display")).strip().lower() in ("not specified", "na", "n/a", "none") else str(raw.get("site_visit_display") or raw.get("readiness_site_visit_display")).strip(),
+        "siteVisit": None if _is_empty(raw.get("site_visit_display") or raw.get("readiness_site_visit_display")) or str(raw.get("site_visit_display") or raw.get("readiness_site_visit_display")).strip().lower() in ("not specified", "na", "n/a", "none", "not mandatory", "optional", "self-acquaintance") else str(raw.get("site_visit_display") or raw.get("readiness_site_visit_display")).strip(),
         "siteVisitRequired": _map_yes_no_or_none(raw.get("site_visit_display") or raw.get("readiness_site_visit_display")),
 
         # Sample Submission / Testing

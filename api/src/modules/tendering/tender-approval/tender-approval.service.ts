@@ -690,9 +690,9 @@ export class TenderApprovalService {
 
                     const infoSheet = await this.tenderInfoSheetsService.findByTenderId(tenderId);
                     if (infoSheet) {
-                        if (infoSheet.tenderValue != null) updateData.gstValues = String(infoSheet.tenderValue);
+                        if (infoSheet.tenderValue != null && Number(infoSheet.tenderValue) > 0) updateData.gstValues = String(infoSheet.tenderValue);
                         if (infoSheet.tenderFeeAmount != null) updateData.tenderFees = String(infoSheet.tenderFeeAmount);
-                        if (infoSheet.emdAmount != null) updateData.emd = String(infoSheet.emdAmount);
+                        if (infoSheet.emdAmount != null && Number(infoSheet.emdAmount) > 0) updateData.emd = String(infoSheet.emdAmount);
                     }
                     break; 
                 }

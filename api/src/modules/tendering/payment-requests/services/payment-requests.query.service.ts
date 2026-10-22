@@ -880,6 +880,8 @@ export class PaymentRequestsQueryService {
                     bgDate: instrumentBgDetails.bgDate,
                     validityDate: instrumentBgDetails.validityDate,
                     claimExpiryDate: instrumentBgDetails.claimExpiryDate,
+                    bgExpiryDate: instrumentBgDetails.bgExpiryDate,
+                    bgClaim: instrumentBgDetails.bgClaim,
                     beneficiaryName: instrumentBgDetails.beneficiaryName,
                     beneficiaryAddress: instrumentBgDetails.beneficiaryAddress,
                     bankName: instrumentBgDetails.bankName,
@@ -942,8 +944,6 @@ export class PaymentRequestsQueryService {
 
         if (!request) return null;
 
-        console.log("request in findByIdWithTender", request);
-
         const instruments = await this.db
             .select({
                 id: paymentInstruments.id,
@@ -956,6 +956,7 @@ export class PaymentRequestsQueryService {
                 courierDeadline: paymentInstruments.courierDeadline,
                 favouring: paymentInstruments.favouring,
                 payableAt: paymentInstruments.payableAt,
+                expiryDate: paymentInstruments.expiryDate,
                 status: paymentInstruments.status,
                 isActive: paymentInstruments.isActive,
             })
@@ -964,8 +965,6 @@ export class PaymentRequestsQueryService {
                 eq(paymentInstruments.requestId, requestId),
                 eq(paymentInstruments.isActive, true)
             ));
-
-        console.log("instruments in findByIdWithTender", instruments);
 
         const instrumentsWithDetails = await Promise.all(instruments.map(async (instrument) => {
             let details: any = null;
@@ -994,6 +993,8 @@ export class PaymentRequestsQueryService {
                     bgDate: instrumentBgDetails.bgDate,
                     validityDate: instrumentBgDetails.validityDate,
                     claimExpiryDate: instrumentBgDetails.claimExpiryDate,
+                    bgExpiryDate: instrumentBgDetails.bgExpiryDate,
+                    bgClaim: instrumentBgDetails.bgClaim,
                     beneficiaryName: instrumentBgDetails.beneficiaryName,
                     beneficiaryAddress: instrumentBgDetails.beneficiaryAddress,
                     bankName: instrumentBgDetails.bankName,
@@ -1003,9 +1004,11 @@ export class PaymentRequestsQueryService {
                     bgPo: instrumentBgDetails.bgPo,
                     bgBankAcc: instrumentBgDetails.bgBankAcc,
                     bgBankIfsc: instrumentBgDetails.bgBankIfsc,
+                    bgBankAccName: instrumentBgDetails.bgBankAccName,
                     bgClientUser: instrumentBgDetails.bgClientUser,
                     bgClientCp: instrumentBgDetails.bgClientCp,
                     bgClientFin: instrumentBgDetails.bgClientFin,
+                    stampCharges: instrumentBgDetails.stampCharges,
                 }).from(instrumentBgDetails).where(eq(instrumentBgDetails.instrumentId, instrument.id)).limit(1);
             } else if (instrument.instrumentType === 'Cheque') {
                 [details] = await this.db.select({
@@ -1034,8 +1037,6 @@ export class PaymentRequestsQueryService {
             return this.mapInstrumentResponse(instrument, details);
         }));
 
-        console.log("instrumentsWithDetails in findByIdWithTender", instrumentsWithDetails);
-        
         return {
             ...this.mapPaymentRequest(request),
             requestedByName: request.requestedByName,
@@ -1129,6 +1130,8 @@ export class PaymentRequestsQueryService {
                     bgDate: instrumentBgDetails.bgDate,
                     validityDate: instrumentBgDetails.validityDate,
                     claimExpiryDate: instrumentBgDetails.claimExpiryDate,
+                    bgExpiryDate: instrumentBgDetails.bgExpiryDate,
+                    bgClaim: instrumentBgDetails.bgClaim,
                     beneficiaryName: instrumentBgDetails.beneficiaryName,
                     beneficiaryAddress: instrumentBgDetails.beneficiaryAddress,
                     bankName: instrumentBgDetails.bankName,
@@ -1137,7 +1140,7 @@ export class PaymentRequestsQueryService {
                     bgSoftCopy: instrumentBgDetails.bgSoftCopy,
                     bgPo: instrumentBgDetails.bgPo,
                     courierNo: instrumentBgDetails.courierNo,
-                    stampCharge: instrumentBgDetails.stampCharge,
+                    stampCharges: instrumentBgDetails.stampCharges,
                     extensionLetter: instrumentBgDetails.extensionLetter,
                     newBgClaim: instrumentBgDetails.newBgClaim,
                     extendedAmount: instrumentBgDetails.extendedAmount,
@@ -1361,6 +1364,7 @@ export class PaymentRequestsQueryService {
             amount: instrument.amount?.toString() || '0',
             favouring: instrument.favouring,
             payableAt: instrument.payableAt,
+            expiryDate: instrument.expiryDate,
             courierAddress: instrument.courierAddress,
             courierDeadline: instrument.courierDeadline != null ? Number(instrument.courierDeadline) : null,
             status: instrument.status,
@@ -1411,11 +1415,22 @@ export class PaymentRequestsQueryService {
                         bgDate: details.bgDate,
                         validityDate: details.validityDate,
                         claimExpiryDate: details.claimExpiryDate,
+                        bgExpiryDate: details.bgExpiryDate,
+                        bgClaim: details.bgClaim,
                         beneficiaryName: details.beneficiaryName,
                         beneficiaryAddress: details.beneficiaryAddress,
                         bankName: details.bankName,
                         bgNeeds: details.bgNeeds,
                         bgPurpose: details.bgPurpose,
+                        bgSoftCopy: details.bgSoftCopy,
+                        bgPo: details.bgPo,
+                        bgBankAcc: details.bgBankAcc,
+                        bgBankIfsc: details.bgBankIfsc,
+                        bgBankAccName: details.bgBankAccName,
+                        bgClientUser: details.bgClientUser,
+                        bgClientCp: details.bgClientCp,
+                        bgClientFin: details.bgClientFin,
+                        stampCharges: details.stampCharges,
                     } : null,
                 };
             case 'Cheque':
@@ -1562,15 +1577,15 @@ export class PaymentRequestsQueryService {
             bgPurpose: details?.bgPurpose || '',
             bgFavouring: details?.beneficiaryName || instrument?.favouring || '',
             bgAddress: details?.beneficiaryAddress || '',
-            bgExpiryDate: details?.bgDate || instrument?.expiryDate || null,
-            bgClaimPeriod: details?.claimExpiryDate || null,
+            bgExpiryDate: instrument?.expiryDate || details?.bgExpiryDate || null,
+            bgClaimPeriod: details?.bgClaim || null,
             bgStampValue: details?.stampCharges ? Number(details.stampCharges) : null,
             bgFormatFiles: details?.bgSoftCopy ? [details.bgSoftCopy] : [],
             bgPoFiles: details?.bgPo ? [details.bgPo] : [],
             bgClientUserEmail: details?.bgClientUser || '',
             bgClientCpEmail: details?.bgClientCp || '',
             bgClientFinanceEmail: details?.bgClientFin || '',
-            bgBankAccountName: details?.beneficiaryName || '',
+            bgBankAccountName: details?.bgBankAccName || '',
             bgBankAccountNo: details?.bgBankAcc || '',
             bgBankIfsc: details?.bgBankIfsc || '',
             bgCourierAddress: instrument?.courierAddress || '',

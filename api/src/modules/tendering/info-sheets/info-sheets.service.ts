@@ -51,6 +51,17 @@ export interface ResolvedTenderDocuments {
     otherDocumentsPaths: string[];
 }
 
+export const formatCurrency = (
+    value: string | number | null | undefined
+): string => {
+    if (value === null || value === undefined) return '—';
+    if (typeof value === 'string' && value.trim() === '') return '—';
+    const num = Number(value);
+    if (isNaN(num)) return '—';
+    if (num === 0) return '0';
+    return `₹${num.toLocaleString('en-IN')}`;
+};
+
 @Injectable()
 export class TenderInfoSheetsService {
     private readonly logger;
@@ -1305,17 +1316,6 @@ export class TenderInfoSheetsService {
 
         // ── Helpers 
 
-        const formatCurrency = (
-            value: string | number | null | undefined
-        ): string => {
-            if (value === null || value === undefined || value === '')
-                return '0';
-            const num = Number(value);
-            if (isNaN(num)) return '0';
-            if (num === 0) return '0';
-            return `₹${num.toLocaleString('en-IN')}`;
-        };
-
         const formatArray = (
             arr: string[] | null | undefined
         ): string => {
@@ -1415,7 +1415,7 @@ export class TenderInfoSheetsService {
             processing_fee_required:
                 infoSheet.processingFeeRequired || 'No',
             processing_fee_required_bool:
-                infoSheet.processingFeeRequired == 'YES',
+                String(infoSheet.processingFeeRequired).toUpperCase() === 'YES',
             processing_fee_amount: formatCurrency(
                 infoSheet.processingFeeAmount
             ),
@@ -1426,7 +1426,7 @@ export class TenderInfoSheetsService {
             // ── Tender Fee 
             tender_fee_required: infoSheet.tenderFeeRequired || 'No',
             tender_fee_required_bool:
-                infoSheet.tenderFeeRequired == 'YES',
+                String(infoSheet.tenderFeeRequired).toUpperCase() === 'YES',
             tender_fees: formatCurrency(infoSheet.tenderFeeAmount),
             tender_fees_in_form_of: formatArray(
                 parseModeField(infoSheet.tenderFeeMode)
@@ -1435,16 +1435,15 @@ export class TenderInfoSheetsService {
             // ── EMD 
             emd_required: infoSheet.emdRequired || 'No',
             emd_required_bool:
-                infoSheet.emdRequired == 'YES' ||
-                infoSheet.emdRequired == 'EXEMPT',
+                String(infoSheet.emdRequired).toUpperCase() === 'YES' ||
+                String(infoSheet.emdRequired).toUpperCase() === 'EXEMPT',
             emd: formatCurrency(infoSheet.emdAmount),
             emd_in_form_of: formatArray(
                 parseModeField(infoSheet.emdMode)
             ),
 
             // ── Tender Value / OEM 
-            tender_value:
-                formatCurrency(infoSheet.tenderValue) || 'Not specified',
+            tender_value: formatCurrency(infoSheet.tenderValue),
             oem_experience: infoSheet.oemExperience || 'Not specified',
 
             // ── Bid / Commercial 
@@ -1859,16 +1858,22 @@ export class TenderInfoSheetsService {
                 }
             }
 
+            const isStale = row.extractionVersion === 'stale';
+            const metadata = (row.fields as any)?.metadata;
             return {
                 tenderId: row.tenderId,
                 fields: row.fields as Record<string, any>,
                 missing_fields: row.missingFields || [],
-                extraction_version: row.extractionVersion || '1.0.0',
+                extraction_version: row.extractionVersion || '1.1.0',
                 processing_time_ms: row.processingTimeMs || 0,
                 updatedAt: row.updatedAt,
                 self_classified_atc: selfClassifiedAtc,
                 has_atc: hasAtc,
                 ambiguous_field_conflicts: conflicts,
+                llm_status: metadata?.llm_status || 'ok',
+                failed_categories: metadata?.failed_categories || [],
+                stale: isStale,
+                isStale: isStale,
             };
         } catch (error: any) {
             const underlyingError = error?.cause?.message || error?.message || String(error);
@@ -1890,14 +1895,59 @@ export class TenderInfoSheetsService {
             missing_fields?: string[];
             extraction_version?: string;
             processing_time_ms?: number;
+            llm_status?: string;
+            failed_categories?: string[];
         },
         userId: number,
     ) {
         await this.tenderInfosService.validateExists(tenderId);
 
+        // Retrieve existing metadata if caller sends none (never default to 'ok')
+        let existingMetadata: any = null;
+        const callerLlmStatus = data.llm_status ?? (data.fields as any)?.metadata?.llm_status;
+        const callerFailedCats = data.failed_categories ?? (data.fields as any)?.metadata?.failed_categories;
+
+        if (callerLlmStatus === undefined || callerFailedCats === undefined) {
+            try {
+                const [storedRow] = await this.db
+                    .select({ fields: tenderExtractions.fields })
+                    .from(tenderExtractions)
+                    .where(eq(tenderExtractions.tenderId, tenderId))
+                    .limit(1);
+                if (storedRow && storedRow.fields && typeof storedRow.fields === 'object') {
+                    existingMetadata = (storedRow.fields as any)?.metadata;
+                }
+            } catch {
+                // Ignore DB read error on missing table or initial write
+            }
+        }
+
+        const effectiveLlmStatus =
+            callerLlmStatus !== undefined
+                ? callerLlmStatus
+                : existingMetadata?.llm_status !== undefined
+                ? existingMetadata.llm_status
+                : null; // NEVER default to "ok"
+
+        const effectiveFailedCategories =
+            callerFailedCats !== undefined
+                ? callerFailedCats
+                : existingMetadata?.failed_categories !== undefined
+                ? existingMetadata.failed_categories
+                : [];
+
+        const fieldsToPersist: Record<string, any> = {
+            ...data.fields,
+            metadata: {
+                ...((data.fields as any)?.metadata || {}),
+                llm_status: effectiveLlmStatus,
+                failed_categories: effectiveFailedCategories,
+            },
+        };
+
         // Extraction-owned keys only: preserved keys (e.g. biddingRequirementsAnalysis) are
         // carried over from the stored row and must not skew the save verification below.
-        const fieldsCount = countExtractionFieldKeys(data.fields);
+        const fieldsCount = countExtractionFieldKeys(fieldsToPersist);
 
         this.logger.log(`[AutoExtract] Save request initiated for tender ${tenderId}`, {
             event_type: 'autoextract_save',
@@ -1912,9 +1962,9 @@ export class TenderInfoSheetsService {
                 .insert(tenderExtractions)
                 .values({
                     tenderId,
-                    fields: data.fields,
+                    fields: fieldsToPersist,
                     missingFields: data.missing_fields || [],
-                    extractionVersion: data.extraction_version || '1.0.0',
+                    extractionVersion: data.extraction_version || '1.1.0',
                     processingTimeMs: data.processing_time_ms || null,
                     userId,
                     updatedAt: new Date(),
@@ -1924,9 +1974,9 @@ export class TenderInfoSheetsService {
                     set: {
                         // Replace the extraction data but keep other features' cached keys
                         // (the bidding-requirements analysis) instead of wiping them.
-                        fields: extractionFieldsUpsertValue(data.fields),
+                        fields: extractionFieldsUpsertValue(fieldsToPersist),
                         missingFields: data.missing_fields || [],
-                        extractionVersion: data.extraction_version || '1.0.0',
+                        extractionVersion: data.extraction_version || '1.1.0',
                         processingTimeMs: data.processing_time_ms || null,
                         userId,
                         updatedAt: new Date(),
@@ -1976,7 +2026,7 @@ export class TenderInfoSheetsService {
                 rawExtraction: {
                     fields: data.fields,
                     missing_fields: data.missing_fields || [],
-                    extraction_version: data.extraction_version || '1.0.0',
+                    extraction_version: data.extraction_version || '1.1.0',
                     processing_time_ms: data.processing_time_ms || null,
                 },
             };
@@ -2007,17 +2057,20 @@ export class TenderInfoSheetsService {
         }
 
         if (jobStatus.state === 'completed') {
+            const metadata = (jobStatus.result?.fields as any)?.metadata;
             return {
                 jobId: jobStatus.jobId,
                 status: 'completed',
                 fields: jobStatus.result?.fields ?? {},
                 missing_fields: jobStatus.result?.missing_fields ?? [],
-                extraction_version: jobStatus.result?.extraction_version ?? '1.0.0',
+                extraction_version: jobStatus.result?.extraction_version ?? '1.1.0',
                 processing_time_ms: jobStatus.result?.processing_time_ms ?? 0,
                 self_classified_atc: jobStatus.result?.self_classified_atc,
                 has_atc: jobStatus.result?.has_atc,
                 ambiguous_field_conflicts: jobStatus.result?.ambiguous_field_conflicts,
                 documentIdentityCheck: jobStatus.result?.documentIdentityCheck,
+                llm_status: jobStatus.result?.llm_status ?? metadata?.llm_status ?? 'ok',
+                failed_categories: jobStatus.result?.failed_categories ?? metadata?.failed_categories ?? [],
             };
         }
 

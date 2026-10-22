@@ -33,12 +33,6 @@ const TABS_CONFIG: Array<{ key: BankGuaranteeDashboardTab; name: string; icon: R
         description: 'New bank guarantee requests',
     },
     {
-        key: 'live-yes',
-        name: 'Live YES',
-        icon: <Shield className="h-4 w-4" />,
-        description: 'Live bank guarantees from YES Bank',
-    },
-    {
         key: 'live-pnb',
         name: 'Live PNB',
         icon: <Shield className="h-4 w-4" />,
@@ -49,6 +43,12 @@ const TABS_CONFIG: Array<{ key: BankGuaranteeDashboardTab; name: string; icon: R
         name: 'Live BG Limit',
         icon: <Shield className="h-4 w-4" />,
         description: 'Live bank guarantees within limit',
+    },
+    {
+        key: 'live-sbi',
+        name: 'Live SBI',
+        icon: <Shield className="h-4 w-4" />,
+        description: 'Live bank guarantees from SBI',
     },
     {
         key: 'cancelled',
@@ -63,6 +63,13 @@ const TABS_CONFIG: Array<{ key: BankGuaranteeDashboardTab; name: string; icon: R
         description: 'Rejected bank guarantees',
     }
 ];
+
+const compareDates = (dateA: Date | string | null, dateB: Date | string | null): number => {
+    if (!dateA && !dateB) return 0;
+    if (!dateA) return 1;
+    if (!dateB) return -1;
+    return new Date(dateA).getTime() - new Date(dateB).getTime();
+};
 
 const getStatusVariant = (status: string | null): string => {
     if (!status) return 'secondary';
@@ -86,7 +93,7 @@ const BankGuaranteeListPage = () => {
         handleSortChanged,
         handlePageSizeChange,
     } = usePersistentTableState({
-        storageKey: 'bank-guarantees',
+        storageKey: 'bank-guarantees-v3',
         defaultTab: 'new-requests' as BankGuaranteeDashboardTab,
     });
     const navigate = useNavigate();
@@ -95,14 +102,14 @@ const BankGuaranteeListPage = () => {
         const out: Record<string, any> = {};
         if (data.bgNo) out['BG No'] = data.bgNo;
         if (data.bgDate) out['BG Date'] = new Date(data.bgDate).toLocaleDateString('en-GB');
-        if (data.beneficiaryName) out['Beneficiary'] = data.beneficiaryName;
         if (data.bgPurpose) out['BG Purpose'] = data.bgPurpose;
         if (data.bgNeeds) out['BG Needs'] = data.bgNeeds;
         if (data.bankName) out['Bank'] = data.bankName;
         if (data.issueDate) out['Issue Date'] = new Date(data.issueDate).toLocaleDateString('en-GB');
         if (data.expiryDate) out['Expiry Date'] = new Date(data.expiryDate).toLocaleDateString('en-GB');
         if (data.payableAt) out['Payable At'] = data.payableAt;
-        if (data.favouring) out['Favouring'] = data.favouring;
+        // NOTE: "BG in Favour of" is intentionally not emitted here. It would
+        // duplicate the 'BG in Favour of' column that mapRow already produces.
         return out;
     };
 
@@ -111,44 +118,41 @@ const BankGuaranteeListPage = () => {
         getExportDataFn: (params) => bankGuaranteesService.getExportData(params),
         tabsConfig: TABS_CONFIG,
         pendingTabKey: 'new-requests',
-        tabsWithForm: ['live-yes', 'live-pnb', 'live-bg-limit', 'cancelled', 'rejected'],
+        tabsWithForm: ['live-pnb', 'live-bg-limit', 'live-sbi', 'cancelled', 'rejected'],
         filenamePrefix: 'bank-guarantees',
         flattenFormData,
         mapPendingRow: (r: any) => ({
             'Tender Name': r.projectName || '',
             'Tender No': r.projectNo || '',
-            'BG Date': r.bgDate ? new Date(r.bgDate).toLocaleDateString('en-GB') : '',
+            'BG Creation Date': r.bgDate ? new Date(r.bgDate).toLocaleDateString('en-GB') : '',
             'BG No': r.bgNo || '',
-            'Beneficiary name': r.beneficiaryName || '',
-            'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+            'Beneficiary Name': r.beneficiaryName || r.favouring || '',
             'Amount': r.amount || '',
-            'Expiry Date': r.bgExpiryDate ? new Date(r.bgExpiryDate).toLocaleDateString('en-GB') : '',
-            'BG Claim Period': r.bgClaimPeriod ? `${r.bgClaimPeriod} days` : '',
-            'BG Charges paid': r.bgChargesPaid || '',
-            'BG Charges Calculated': r.bgChargesCalculated || '',
+            'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+            'Expiry Date': r.bgExpiryDateCoalesced ? new Date(r.bgExpiryDateCoalesced).toLocaleDateString('en-GB') : '',
+            'Claim Expiry Date': r.bgClaimExpiryDate ? new Date(r.bgClaimExpiryDate).toLocaleDateString('en-GB') : '',
+            'Charges Paid': r.bgChargesPaid || '',
             'FDR No': r.fdrNo || '',
             'FDR Value': r.fdrValue || '',
             'Tender Status': r.tenderStatus || '',
-            'Expiry': r.expiryStatus || '',
+            'Expiry Status': r.expiryStatus || '',
             'BG Status': r.bgStatus || '',
         }),
         mapRow: (r: any, isAllTab: boolean) => {
             const base: Record<string, any> = {
                 'Tender Name': r.projectName || r.tenderName || '',
                 'Tender No': r.tenderNo || r.projectNo || '',
-                'BG Date': r.bgDate ? new Date(r.bgDate).toLocaleDateString('en-GB') : '',
+                'BG Creation Date': r.bgDate ? new Date(r.bgDate).toLocaleDateString('en-GB') : '',
                 'BG No': r.bgNo || '',
-                'Beneficiary name': r.beneficiaryName || '',
-                'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+                'Beneficiary Name': r.beneficiaryName || r.favouring || '',
                 'Amount': r.amount || '',
-                'Expiry Date': r.bgExpiryDate ? new Date(r.bgExpiryDate).toLocaleDateString('en-GB') : '',
-                'BG Claim Period': r.bgClaimPeriod ? `${r.bgClaimPeriod} days` : '',
-                'BG Charges paid': r.bgChargesPaid || '',
-                'BG Charges Calculated': r.bgChargesCalculated || '',
+                'BG Expiry Date': r.bgExpiryDateCoalesced ? new Date(r.bgExpiryDateCoalesced).toLocaleDateString('en-GB') : '',
+                'BG Claim Period Expiry Date': r.bgClaimExpiryDate ? new Date(r.bgClaimExpiryDate).toLocaleDateString('en-GB') : '',
+                'Charges Paid': r.bgChargesPaid || '',
                 'FDR No': r.fdrNo || '',
                 'FDR Value': r.fdrValue || '',
                 'Tender Status': r.tenderStatus || '',
-                'Expiry': r.expiryStatus || '',
+                'Expiry Status': r.expiryStatus || '',
                 'BG Status': r.bgStatus || '',
             };
             if (isAllTab) base['Tab'] = r._tab || '';
@@ -201,18 +205,12 @@ const BankGuaranteeListPage = () => {
         () => [
             {
                 field: 'bgDate',
-                headerName: 'BG Date',
-                width: 110,
+                headerName: 'BG Creation Date',
+                width: 140,
                 colId: 'bgDate',
                 sortable: true,
                 valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
-                comparator: (dateA, dateB) => {
-                    if (!dateA && !dateB) return 0;
-                    if (!dateA) return 1;
-                    if (!dateB) return -1;
-                    return new Date(dateA).getTime() - new Date(dateB).getTime();
-                },
-                hide: activeTab === 'new-requests' || activeTab === 'rejected',
+                comparator: compareDates,
             },
             {
                 field: 'bgNo',
@@ -222,11 +220,10 @@ const BankGuaranteeListPage = () => {
                 valueGetter: (params) => params.data?.bgNo || '—',
                 sortable: true,
                 filter: true,
-                hide: activeTab === 'new-requests' || activeTab === 'rejected',
             },
             {
                 field: 'beneficiaryName',
-                headerName: 'Beneficiary name',
+                headerName: 'Beneficiary Name',
                 width: 180,
                 maxWidth: 180,
                 colId: 'beneficiaryName',
@@ -235,19 +232,11 @@ const BankGuaranteeListPage = () => {
                 filter: true,
             },
             tenderNameCol<BankGuaranteeDashboardRow>('tenderNo', {
-                headerName: 'Tender Details',
+                headerName: 'Tender Name',
                 filter: true,
                 width: 200,
                 maxWidth: 200,
             }),
-            {
-                field: 'bidValidity',
-                headerName: 'Bid Validity',
-                width: 110,
-                colId: 'bidValidity',
-                sortable: true,
-                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
-            },
             {
                 field: 'amount',
                 headerName: 'Amount',
@@ -257,60 +246,47 @@ const BankGuaranteeListPage = () => {
                 valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
             },
             {
-                field: 'bgExpiryDate',
-                headerName: 'Expiry Date',
-                width: 110,
-                colId: 'bgExpiryDate',
-                sortable: true,
+                field: 'bidValidity',
+                headerName: 'Bid Validity',
+                width: 130,
+                colId: 'bidValidity',
+                sortable: false,
                 valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
-                comparator: (dateA, dateB) => {
-                    if (!dateA && !dateB) return 0;
-                    if (!dateA) return 1;
-                    if (!dateB) return -1;
-                    return new Date(dateA).getTime() - new Date(dateB).getTime();
-                },
-                hide: activeTab === 'new-requests' || activeTab === 'rejected',
             },
             {
-                field: 'bgClaimPeriod',
-                headerName: 'BG Claim Period',
-                width: 140,
-                colId: 'bgClaimPeriod',
-                valueGetter: (params) => {
-                    const value = params.data?.bgClaimPeriod;
-                    return value !== null && value !== undefined ? `${value} days` : '—';
-                },
+                field: 'bgExpiryDateCoalesced',
+                headerName: 'Expiry Date',
+                width: 130,
+                colId: 'bgExpiryDateCoalesced',
                 sortable: true,
-                filter: true,
-                hide: activeTab === 'new-requests' || activeTab === 'rejected',
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+                comparator: compareDates,
+            },
+            {
+                field: 'bgClaimExpiryDate',
+                headerName: 'Claim Expiry Date',
+                width: 200,
+                colId: 'bgClaimExpiryDate',
+                sortable: true,
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+                comparator: compareDates,
             },
             {
                 field: 'bgChargesPaid',
-                headerName: 'BG Charges paid',
+                headerName: 'Charges Paid',
                 width: 100,
                 colId: 'bgChargesPaid',
                 sortable: true,
                 valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
-                hide: activeTab === 'new-requests' || activeTab === 'rejected',
-            },
-            {
-                field: 'bgChargesCalculated',
-                headerName: 'BG Charges Calculated',
-                width: 110,
-                colId: 'bgChargesCalculated',
-                sortable: true,
-                valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
-                hide: activeTab === 'new-requests' || activeTab === 'rejected',
             },
             {
                 field: 'fdrNo',
-                headerName: 'FDR No',
-                width: 100,
+                headerName: 'FDR No. Linked to the BG',
+                width: 200,
                 colId: 'fdrNo',
                 valueGetter: (params) => params.data?.fdrNo || '—',
                 sortable: true,
                 filter: true,
-                hide: activeTab === 'new-requests' || activeTab === 'rejected',
             },
             {
                 field: 'fdrValue',
@@ -319,7 +295,6 @@ const BankGuaranteeListPage = () => {
                 colId: 'fdrValue',
                 sortable: true,
                 valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
-                hide: activeTab === 'new-requests' || activeTab === 'rejected',
             },
             {
                 field: 'tenderStatus',
@@ -331,7 +306,7 @@ const BankGuaranteeListPage = () => {
                 filter: true,
             },
             {
-                headerName: 'Expiry',
+                headerName: 'Expiry Status',
                 width: 120,
                 colId: 'expiryStatus',
                 sortable: true,
@@ -367,7 +342,7 @@ const BankGuaranteeListPage = () => {
                 width: 57,
             },
         ],
-        [bgActions, activeTab]
+        [bgActions]
     );
 
     const tabsWithData = useMemo(() => {

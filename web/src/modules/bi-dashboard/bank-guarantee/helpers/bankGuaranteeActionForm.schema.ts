@@ -4,13 +4,34 @@ import { z } from 'zod';
 const ContactPersonSchema = z.object({
     name: z.string().min(1, 'Name is required'),
     phone: z.string().optional().nullable(),
-    email: z.string().email().optional().nullable(),
+    email: z.string().email().optional().nullable().or(z.literal('')),
+});
+
+// Bank mail ids are repeatable rows (useFieldArray). A freshly added row starts
+// blank, so an empty string has to validate -- otherwise the default row would
+// block submit. Same `.or(z.literal(''))` shape as the bgClient* emails below.
+const MailRowSchema = z.object({
+    email: z.email().optional().or(z.literal('')),
 });
 
 // Base schema with common fields
 const BaseActionFormSchema = z.object({
     action: z.string().min(1, 'Action is required'),
 });
+
+const hasFile = (value: unknown): boolean => {
+    if (!value) return false;
+    if (Array.isArray(value)) return value.length > 0;
+    if (typeof value === 'string') {
+        try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? parsed.length > 0 : true;
+        } catch {
+            return true;
+        }
+    }
+    return true;
+};
 
 // Bank Guarantee Action Form Schema
 export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
@@ -20,14 +41,31 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     approve_bg: z.enum(['Accept the BG given by TE', 'Upload by Imran']).optional(),
     bg_format_imran: z.any().optional(), // File
     prefilled_signed_bg: z.array(z.any()).optional(), // Files
+    // FDR % agreed at approval time. Separate from `fdr_per` (step 3).
+    bg_approved_fdr_per: z.enum(['10', '15', '100']).optional(),
+    bank_mail_ids: z.array(MailRowSchema).optional(),
+    bank_mail_ids_cc: z.array(MailRowSchema).optional(),
 
     // Accounts Form (BG) 2 - After BG Creation
     bg_no: z.string().optional(),
     bg_date: z.string().optional(),
     bg_validity: z.string().optional(),
     bg_claim_period: z.string().optional(),
-    courier_no: z.string().optional(),
     bg2_remark: z.string().optional(),
+
+    // Courier Dispatch (BG) 2 - creates a couriers row, id stored in req_no
+    courierOrg: z.string().optional(),
+    courierName: z.string().optional(),
+    courierPhone: z.string().optional(),
+    courierAddrLine1: z.string().optional(),
+    courierAddrLine2: z.string().optional(),
+    courierCity: z.string().optional(),
+    courierState: z.string().optional(),
+    courierPincode: z.string().optional(),
+    empFrom: z.coerce.number().optional(),
+    delDate: z.string().optional(),
+    urgency: z.coerce.number().optional(),
+    courier_docs: z.array(z.string()).optional(),
 
     // Accounts Form (BG) 3 - Capture FDR Details
     sfms_conf: z.any().optional(), // File
@@ -41,18 +79,17 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     sfms_charge_deducted: z.coerce.number().optional(),
     stamp_charge_deducted: z.coerce.number().optional(),
     other_charge_deducted: z.coerce.number().optional(),
-    bg_favouring: z.string().optional(),
-    amount: z.coerce.number().optional(),
 
     // Initiate Followup
     organisation_name: z.string().optional(),
     contacts: z.array(ContactPersonSchema).optional(),
     followup_start_date: z.string().optional(),
-    frequency: z.number().int().min(1).max(6).optional(),
+    frequency: z.coerce.number().int().min(1).max(6).optional(),
     stop_reason: z.number().int().min(1).max(4).optional().nullable(),
     proof_text: z.string().optional().nullable(),
     stop_remarks: z.string().optional().nullable(),
     proof_image: z.any().optional(), // File
+    attachments: z.array(z.string()).optional(),
 
     // Request Extension
     modification_required: z.enum(['Yes', 'No']).optional(),
@@ -123,7 +160,7 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     (data) => {
         // Conditional validation: bg_format_imran required when Upload by Imran
         if (data.action === 'accounts-form-1' && data.approve_bg === 'Upload by Imran') {
-            return !!data.bg_format_imran;
+            return hasFile(data.bg_format_imran);
         }
         return true;
     },
@@ -209,7 +246,7 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     (data) => {
         // Action 5: ext_letter is required
         if (data.action === 'request-extension') {
-            return !!data.ext_letter;
+            return hasFile(data.ext_letter);
         }
         return true;
     },
@@ -221,7 +258,7 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     (data) => {
         // Action 6: docket_no, docket_slip are required
         if (data.action === 'returned-courier') {
-            return !!data.docket_no && !!data.docket_slip;
+            return !!data.docket_no && hasFile(data.docket_slip);
         }
         return true;
     },
@@ -233,7 +270,7 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     (data) => {
         // Action 7: stamp_covering_letter is required
         if (data.action === 'request-cancellation') {
-            return !!data.stamp_covering_letter;
+            return hasFile(data.stamp_covering_letter);
         }
         return true;
     },
@@ -245,7 +282,7 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     (data) => {
         // Action 8: cancell_confirm is required
         if (data.action === 'bg-cancellation-confirmation') {
-            return !!data.cancell_confirm;
+            return hasFile(data.cancell_confirm);
         }
         return true;
     },
@@ -253,17 +290,25 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
         message: 'Bank BG cancellation request is required',
         path: ['cancell_confirm'],
     }
-).refine(
-    (data) => {
-        // Accounts Form (BG) 2: core BG details are required
-        if (data.action === 'accounts-form-2') {
-            return !!data.bg_no && !!data.bg_date && !!data.bg_validity;
+).superRefine(
+    (data, ctx) => {
+        // Accounts Form (BG) 2: core BG + courier details are required
+        if (data.action !== 'accounts-form-2') return;
+        if (!data.bg_no) ctx.addIssue({ code: 'custom', message: 'BG number is required', path: ['bg_no'] });
+        if (!data.bg_date) ctx.addIssue({ code: 'custom', message: 'BG creation date is required', path: ['bg_date'] });
+        if (!data.bg_validity) ctx.addIssue({ code: 'custom', message: 'BG validity is required', path: ['bg_validity'] });
+        if (!data.courierOrg) ctx.addIssue({ code: 'custom', message: 'Courier organization is required', path: ['courierOrg'] });
+        if (!data.courierName) ctx.addIssue({ code: 'custom', message: 'Courier recipient name is required', path: ['courierName'] });
+        if (!data.courierPhone) ctx.addIssue({ code: 'custom', message: 'Courier phone is required', path: ['courierPhone'] });
+        if (!data.courierAddrLine1) ctx.addIssue({ code: 'custom', message: 'Courier address is required', path: ['courierAddrLine1'] });
+        if (!data.courierPincode) {
+            ctx.addIssue({ code: 'custom', message: 'Courier pin code is required', path: ['courierPincode'] });
+        } else if (!/^\d{6}$/.test(data.courierPincode)) {
+            ctx.addIssue({ code: 'custom', message: 'Courier pin code must be 6 digits', path: ['courierPincode'] });
         }
-        return true;
-    },
-    {
-        message: 'BG number, creation date, and validity are required',
-        path: ['bg_no'],
+        if (!data.empFrom) ctx.addIssue({ code: 'custom', message: 'Courier sender is required', path: ['empFrom'] });
+        if (!data.delDate) ctx.addIssue({ code: 'custom', message: 'Delivery date is required', path: ['delDate'] });
+        if (!data.urgency) ctx.addIssue({ code: 'custom', message: 'Dispatch urgency is required', path: ['urgency'] });
     }
 ).refine(
     (data) => {

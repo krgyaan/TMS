@@ -31,8 +31,8 @@ export function extractionFieldsUpsertValue(newFields: Record<string, unknown> |
     return sql`${JSON.stringify(incoming)}::jsonb || ${sql.join(carried, sql` || `)}`;
 }
 
-/** Number of extraction-owned keys in a fields object (preserved keys excluded). */
+/** Number of extraction-owned keys in a fields object (preserved keys and metadata excluded). */
 export function countExtractionFieldKeys(fields: Record<string, unknown> | null | undefined): number {
-    const preserved = new Set<string>(PRESERVED_EXTRACTION_FIELD_KEYS);
-    return Object.keys(fields ?? {}).filter((k) => !preserved.has(k)).length;
+    const ignored = new Set<string>([...PRESERVED_EXTRACTION_FIELD_KEYS, 'metadata']);
+    return Object.keys(fields ?? {}).filter((k) => !ignored.has(k)).length;
 }

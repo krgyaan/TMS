@@ -12,7 +12,7 @@ import { RaSection } from "@/modules/tendering/ras/components/RaShow";
 import { TenderResultSection } from "./components/TenderResultView";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
-import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
+import { TenderStepsPageLayout } from "@/modules/tendering/components/TenderStepsPageLayout";
 import { useTenderStepStatuses } from "@/hooks/api/useTenderStepStatuses";
 import { BasicDetailsSection } from "@/modules/operations/wo-basic-details/components/BasicDetailsSection";
 import { useWoBasicDetailsByTender } from "@/hooks/api/useWoBasicDetails";
@@ -95,7 +95,7 @@ export default function TenderResultShowPage() {
     }
 
     return (
-        <ShowPageLayout
+        <TenderStepsPageLayout tenderId={tenderIdNum}
             steps={tenderSteps.filter(s => [
                 "tender-details", 
                 "physical-docs", 

@@ -176,7 +176,17 @@ export function getTabSqlCondition(tab: string) {
                 or(
                     and(eq(paymentInstruments.action, 1), eq(paymentInstruments.status, 'ACCOUNTS_FORM_ACCEPTED')),
                     and(eq(paymentInstruments.action, 2), eq(paymentInstruments.status, 'FOLLOWUP_INITIATED'), inArray(paymentInstruments.instrumentType, ['DD', 'FDR', 'Cheque', 'Bank Transfer', 'Portal Payment'])),
-                    and(eq(paymentInstruments.action, 4), eq(paymentInstruments.status, 'FOLLOWUP_INITIATED'), eq(paymentInstruments.instrumentType, 'BG'))
+                    and(
+                        eq(paymentInstruments.instrumentType, 'BG'),
+                        inArray(paymentInstruments.status, [
+                            BG_STATUSES.ACCOUNTS_FORM_ACCEPTED,
+                            BG_STATUSES.BG_CREATED,
+                            BG_STATUSES.FDR_DETAILS_CAPTURED,
+                            BG_STATUSES.FOLLOWUP_INITIATED,
+                            BG_STATUSES.EXTENSION_REQUESTED,
+                            BG_STATUSES.CANCELLATION_REQUESTED
+                        ])
+                    )
                 )
             );
         case 'rejected':
