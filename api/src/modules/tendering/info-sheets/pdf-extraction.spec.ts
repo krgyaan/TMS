@@ -1,4 +1,4 @@
-import { PdfExtractionProducer } from './pdf-extraction.producer';
+import { PdfExtractionProducer, EnqueueExtractionResult } from './pdf-extraction.producer';
 import { PdfExtractionProcessor } from './pdf-extraction.processor';
 import { PdfExtractionJobData, PdfExtractionJobResult } from './types/pdf-extraction.types';
 import * as fs from 'fs';
