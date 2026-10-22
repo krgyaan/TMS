@@ -1,4 +1,5 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, ne, isNull, sql } from "drizzle-orm";
+import { BadRequestException } from "@nestjs/common";
 import type { DbInstance } from "@/db";
 import { inventory } from "@/db/schemas/operations/inventory.schema";
 import { inventoryMovements } from "@/db/schemas/operations/inventory-movements.schema";
@@ -139,6 +140,27 @@ export async function poHasPurchaseInvoice(tx: DbInstance, poId: number): Promis
         .where(and(eq(purchaseInvoices.purchaseOrderId, poId), isNull(purchaseInvoices.vendorWorkOrderId)))
         .then(rows => rows[0]);
     return !!existing;
+}
+
+/**
+ * Removing/relinking the last invoice of a PO whose items already sit in inventory
+ * would leave un-invoiced stock — block it.
+ */
+export function invoiceRemovalLeavesBareStock(remainingInvoiceCount: number, hasPoApprovalMovements: boolean): boolean {
+    return remainingInvoiceCount === 0 && hasPoApprovalMovements;
+}
+
+export async function assertPoInvoiceRemovable(tx: DbInstance, poId: number, invoiceId: number): Promise<void> {
+    const remaining = await tx
+        .select({ id: purchaseInvoices.id })
+        .from(purchaseInvoices)
+        .where(and(eq(purchaseInvoices.purchaseOrderId, poId), ne(purchaseInvoices.id, invoiceId)));
+
+    if (!invoiceRemovalLeavesBareStock(remaining.length, await hasApprovalMovements(tx, "po", poId))) return;
+
+    throw new BadRequestException(
+        "Cannot remove the last purchase invoice against this PO — its items are already in inventory. Upload a replacement invoice first."
+    );
 }
 
 /**

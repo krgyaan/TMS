@@ -8,6 +8,7 @@ ml-ocr/__pycache__
 logs
 grafana-dashboard.json
 AGENTS.md
+CLAUDE.md
 .opencode
 opencode.json
 deploy.sh
