@@ -52,6 +52,20 @@ export interface TenderInfoWithNames extends TenderInfo {
     enquiryId?: number | null;
 }
 
+export interface TenderStatusHistoryEntry {
+    id: number;
+    tenderId: number;
+    prevStatus: number | null;
+    prevStatusName: string | null;
+    newStatus: number;
+    newStatusName: string | null;
+    comment: string | null;
+    changedBy: number;
+    changedByName: string | null;
+    changedByUsername: string | null;
+    createdAt: Date | string;
+}
+
 export interface StructuredTenderDocuments {
     schemaVersion: number;
     mainTender: string | null;

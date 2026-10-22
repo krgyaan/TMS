@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Check, ChevronDown, Loader2, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -177,7 +177,7 @@ export function AccordionSection({
     );
 }
 
-interface ShowPageLayoutProps {
+export interface ShowPageLayoutProps {
     steps: StepConfig[];
     /** Which step is currently scrolled into view (used for ring highlight). */
     activeSection?: string;
@@ -189,6 +189,8 @@ interface ShowPageLayoutProps {
     onBack?: () => void;
     backLabel?: string;
     renderSectionContent: (stepId: string) => React.ReactNode;
+    /** Optional right-side panel (e.g. status history) rendered next to the steps on desktop. */
+    rightPanel?: React.ReactNode;
     /** @deprecated No longer used — kept for backward-compat only */
     onJump?: (id: string) => void;
 }
@@ -204,12 +206,93 @@ export function ShowPageLayout({
     onBack,
     backLabel = "Back to List",
     renderSectionContent,
+    rightPanel,
 }: ShowPageLayoutProps) {
     const [internalActive, setInternalActive] = useState(steps[0]?.id ?? "");
     const currentActive = activeSection ?? internalActive;
 
     const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
     const isJumping = useRef(false);
+
+    const panelRef = useRef<HTMLElement>(null);
+    const panelHeightRef = useRef(0);
+    const viewportRef = useRef(0);
+    const scrollRef = useRef(0);
+    const gridRef = useRef<HTMLDivElement>(null);
+    const spacerRef = useRef<HTMLDivElement>(null);
+    const [spacerHeight, setSpacerHeight] = useState(0);
+    const hasRightPanel = Boolean(rightPanel);
+
+    // Slide-up pinned panel: stays fixed at the top when it fits the viewport,
+    // otherwise moves up with the page scroll until its bottom becomes visible.
+    const PANEL_TOP = 80; // 64px header + 16px gap
+    const BOTTOM_GAP = 16;
+
+    useLayoutEffect(() => {
+        if (!hasRightPanel) return;
+        const el = panelRef.current;
+        if (!el) return;
+
+        const apply = () => {
+            const available = viewportRef.current - PANEL_TOP - BOTTOM_GAP;
+            const height = panelHeightRef.current;
+            const top =
+                height > available && available > 0
+                    ? Math.max(PANEL_TOP - scrollRef.current, PANEL_TOP + available - height)
+                    : PANEL_TOP;
+            el.style.top = `${top}px`;
+        };
+
+        // The slide-up only travels as far as the page can scroll. When every
+        // section is collapsed the page is short, so extend it with an empty
+        // spacer until the full panel becomes reachable.
+        const updateSpacer = () => {
+            const available = viewportRef.current - PANEL_TOP - BOTTOM_GAP;
+            const overflow = Math.max(0, panelHeightRef.current - available);
+            const current = spacerRef.current?.offsetHeight ?? 0;
+            const naturalMaxScroll = Math.max(
+                0,
+                document.documentElement.scrollHeight - window.innerHeight - current
+            );
+            const desired = Math.max(0, overflow - naturalMaxScroll);
+            if (Math.abs(desired - current) > 1) setSpacerHeight(desired);
+        };
+
+        const measure = () => {
+            const content = el.firstElementChild as HTMLElement | null;
+            panelHeightRef.current = content?.offsetHeight ?? el.scrollHeight;
+            viewportRef.current = window.innerHeight;
+            apply();
+            updateSpacer();
+        };
+
+        measure();
+        const ro = new ResizeObserver(measure);
+        const observed = el.firstElementChild;
+        if (observed) ro.observe(observed);
+        const gridEl = gridRef.current;
+        if (gridEl) ro.observe(gridEl);
+        window.addEventListener("resize", measure);
+
+        let raf = 0;
+        const onScroll = () => {
+            if (raf) return;
+            raf = requestAnimationFrame(() => {
+                raf = 0;
+                scrollRef.current = window.scrollY;
+                apply();
+            });
+        };
+        window.addEventListener("scroll", onScroll, { passive: true });
+        onScroll();
+
+        return () => {
+            ro.disconnect();
+            window.removeEventListener("resize", measure);
+            window.removeEventListener("scroll", onScroll);
+            if (raf) cancelAnimationFrame(raf);
+        };
+    }, [hasRightPanel]);
 
     // Scroll spy — keeps ring highlight in sync with viewport position
     useEffect(() => {
@@ -237,10 +320,10 @@ export function ShowPageLayout({
         };
     }, [steps, onSectionVisible]);
 
-    return (
-        <div className="space-y-8">
-            {/* Sticky Header */}
-            <div className="sticky top-[-1rem] z-30 bg-background py-4 -mt-4 border rounded-2xl border-primary transition-all">
+    const content = (
+        <>
+            {/* Header — scrolls with the page, passes under the app header */}
+            <div className="relative z-[5] bg-background py-4 -mt-4 border rounded-2xl border-primary">
                 <div className="flex items-center justify-between px-4">
                     {onBack && (
                         <Button
@@ -290,6 +373,31 @@ export function ShowPageLayout({
                     </AccordionSection>
                 ))}
             </main>
-        </div>
+        </>
     );
+
+    if (rightPanel) {
+        return (
+            <>
+                <div ref={gridRef} className="space-y-8 xl:grid xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start xl:gap-6">
+                    <div className="min-w-0 space-y-8">{content}</div>
+                    <aside
+                        ref={panelRef}
+                        className="xl:fixed xl:right-4 xl:z-0 xl:w-[280px]"
+                        style={{ top: PANEL_TOP }}
+                    >
+                        {rightPanel}
+                    </aside>
+                </div>
+                <div
+                    ref={spacerRef}
+                    className="hidden xl:block"
+                    style={{ height: spacerHeight }}
+                    aria-hidden
+                />
+            </>
+        );
+    }
+
+    return <div className="space-y-8">{content}</div>;
 }

@@ -11,7 +11,7 @@ import { CostingSheetSection } from '@/modules/tendering/costing-sheets/componen
 import { BidSubmissionSection } from '@/modules/tendering/bid-submissions/components/BidSubmissionView';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
-import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
+import { TenderStepsPageLayout } from "@/modules/tendering/components/TenderStepsPageLayout";
 import { useTenderStepStatuses } from "@/hooks/api/useTenderStepStatuses";
 import { EnquiryTenderFlow } from "@/modules/tendering/tenders/components/EnquiryTenderFlow";
 
@@ -73,7 +73,7 @@ export default function RfqResponseShowPage() {
     }
 
     return (
-        <ShowPageLayout
+        <TenderStepsPageLayout tenderId={tenderId}
             steps={tenderSteps.filter(s => ["tender-details", "physical-docs", "rfq", "rfq-response", "emd-fees", "checklist", "costing", "bid"].includes(s.id))}
             expandedSections={expandedSections}
             onToggleSection={toggleSection}

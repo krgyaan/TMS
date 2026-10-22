@@ -14,7 +14,7 @@ import { TqTenderSection } from "@/modules/tendering/tq-management/components/Tq
 import { TenderResultSection } from "@/modules/tendering/results/components/TenderResultView";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
-import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
+import { TenderStepsPageLayout } from "@/modules/tendering/components/TenderStepsPageLayout";
 import { useTenderStepStatuses } from "@/hooks/api/useTenderStepStatuses";
 import { EnquiryTenderFlow } from "@/modules/tendering/tenders/components/EnquiryTenderFlow";
 
@@ -76,7 +76,9 @@ export default function EmdShowPage() {
 
     if (isPaymentRequestView) {
         return (
-            <ShowPageLayout
+            <TenderStepsPageLayout
+                tenderId={tenderId}
+                showStatusHistory={false}
                 steps={[{
                     id: 'emd-fees', label: 'Payment Request',
                     shortLabel: "",
@@ -109,7 +111,8 @@ export default function EmdShowPage() {
     }
 
     return (
-        <ShowPageLayout
+        <TenderStepsPageLayout
+            tenderId={tenderId}
             steps={tenderSteps.filter(s => ["tender-details", "physical-docs", "rfq", "emd-fees", "checklist", "costing", "bid", "tq-management", "ra-management", "result"].includes(s.id))}
             expandedSections={expandedSections}
             onToggleSection={toggleSection}
