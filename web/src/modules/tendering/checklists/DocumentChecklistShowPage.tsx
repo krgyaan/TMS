@@ -10,7 +10,7 @@ import { CostingSheetSection } from "@/modules/tendering/costing-sheets/componen
 import { RaSection } from "@/modules/tendering/ras/components/RaShow";
 import { TqTenderSection } from "@/modules/tendering/tq-management/components/TqView";
 import { TenderResultSection } from "@/modules/tendering/results/components/TenderResultView";
-import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
+import { TenderStepsPageLayout } from "@/modules/tendering/components/TenderStepsPageLayout";
 import { useTenderStepStatuses } from "@/hooks/api/useTenderStepStatuses";
 import { BidSubmissionSection } from "../bid-submissions/components/BidSubmissionView";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -77,7 +77,7 @@ export default function DocumentChecklistShowPage() {
     }
 
     return (
-        <ShowPageLayout
+        <TenderStepsPageLayout tenderId={tenderId}
             steps={tenderSteps.filter(s => ["tender-details", "physical-docs", "rfq", "emd-fees", "checklist", "costing", "bid", "tq-management", "ra-management", "result"].includes(s.id))}
             expandedSections={expandedSections}
             onToggleSection={toggleSection}
