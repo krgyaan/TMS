@@ -41,6 +41,8 @@ const DATE_FORMAT = "dd-MM-yyyy hh:mm a";
 
 const containsOem = (column: PgColumn, oem: number) => sql<boolean>`${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(${column}::text, '')), '\\s*,\\s*'))`;
 
+const containsOemInJsonArray = (column: PgColumn, oem: number) => sql<boolean>`${column}::text LIKE ${'%"' + oem + '"%'}`;
+
 @Injectable()
 export class OemPerformanceService {
     constructor(
@@ -122,13 +124,17 @@ export class OemPerformanceService {
                 tlStatus: tenderInfos.tlStatus,
                 status: tenderInfos.status,
                 sentToOem: containsOem(tenderInfos.rfqTo, oem),
-                notAllowedForOem: containsOem(tenderInfos.oemNotAllowed, oem),
+                notAllowedForOem: containsOemInJsonArray(tenderInfos.oemNotAllowed, oem),
             })
             .from(tenderInfos)
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .leftJoin(teams, eq(teams.id, tenderInfos.team))
             .where(
-                and(between(tenderInfos.dueDate, from, to), eq(tenderInfos.deleteStatus, 0), or(containsOem(tenderInfos.rfqTo, oem), containsOem(tenderInfos.oemNotAllowed, oem)))
+                and(
+                    between(tenderInfos.updatedAt, from, to),
+                    eq(tenderInfos.deleteStatus, 0),
+                    or(containsOem(tenderInfos.rfqTo, oem), containsOemInJsonArray(tenderInfos.oemNotAllowed, oem))
+                )
             )
             .orderBy(tenderInfos.dueDate);
     }
