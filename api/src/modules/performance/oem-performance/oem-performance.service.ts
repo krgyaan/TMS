@@ -22,6 +22,7 @@ import {
     type OemPerformanceResponse,
     type OemSummary,
     type RfqInfoRow,
+    type RfqSentRawRow,
     type RfqSentToOemRow,
     type SummarizableTender,
     type SummaryItem,
@@ -38,8 +39,7 @@ const STATUS = {
 
 const DATE_FORMAT = "dd-MM-yyyy hh:mm a";
 
-const containsOem = (column: PgColumn, oem: number) =>
-    sql<boolean>`${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(${column}::text, '')), '\\s*,\\s*'))`;
+const containsOem = (column: PgColumn, oem: number) => sql<boolean>`${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(${column}::text, '')), '\\s*,\\s*'))`;
 
 @Injectable()
 export class OemPerformanceService {
@@ -60,17 +60,18 @@ export class OemPerformanceService {
         this.logger.info("Fetching OEM performance", { oem, fromDate, toDate });
 
         try {
-            const [tenderRows, bidRows, rfqInfoRows, quotationTenders] = await Promise.all([
+            const [tenderRows, bidRows, rfqInfoRows, quotationTenders, rfqSentRows] = await Promise.all([
                 this.fetchOemTenders(oem, from, to),
                 this.fetchBidTenders(oem, from, to),
                 this.fetchRfqInfo(oem, from, to),
                 this.fetchQuotationReceivedTenders(oem, from, to),
+                this.fetchRfqsSentToOem(oem, from, to),
             ]);
 
             const rfqInfoByTender = new Map(rfqInfoRows.map(r => [Number(r.tenderId), r]));
 
             const notAllowedTenders = this.buildNotAllowedTenders(tenderRows);
-            const rfqsSentToOem = this.buildRfqsSentToOem(tenderRows, rfqInfoByTender);
+            const rfqsSentToOem = this.buildRfqsSentToOem(rfqSentRows);
             const missedTenders = this.buildLifecycleTenders(tenderRows, rfqInfoByTender, STATUS.MISSED, "Missed");
             const wonTenders = this.buildLifecycleTenders(tenderRows, rfqInfoByTender, STATUS.WON, "Won");
             const lostTenders = this.buildLifecycleTenders(tenderRows, rfqInfoByTender, STATUS.LOST, "Lost");
@@ -127,14 +128,7 @@ export class OemPerformanceService {
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .leftJoin(teams, eq(teams.id, tenderInfos.team))
             .where(
-                and(
-                    between(tenderInfos.dueDate, from, to),
-                    eq(tenderInfos.deleteStatus, 0),
-                    or(
-                        containsOem(tenderInfos.rfqTo, oem),
-                        containsOem(tenderInfos.oemNotAllowed, oem)
-                    )
-                )
+                and(between(tenderInfos.dueDate, from, to), eq(tenderInfos.deleteStatus, 0), or(containsOem(tenderInfos.rfqTo, oem), containsOem(tenderInfos.oemNotAllowed, oem)))
             )
             .orderBy(tenderInfos.dueDate);
     }
@@ -252,6 +246,44 @@ export class OemPerformanceService {
         return rows as unknown as RfqInfoRow[];
     }
 
+    private async fetchRfqsSentToOem(oem: number, from: Date, to: Date): Promise<RfqSentRawRow[]> {
+        const { rows } = await this.db.execute(sql`
+            SELECT t.id                       AS "id",
+                   t.tender_no                AS "tenderNo",
+                   t.tender_name              AS "tenderName",
+                   t.due_date                 AS "dueDate",
+                   t.gst_values               AS "gstValues",
+                   u.name                     AS "member",
+                   tm.name                    AS "team",
+                   MIN(r.created_at)          AS "rfqSentOn",
+                   MAX(rr.receipt_datetime)   AS "rfqResponseOn",
+                   MIN(r.created_at)          AS "createdAt"
+            FROM rfqs r
+            INNER JOIN tender_infos t
+                   ON t.id = r.tender_id
+                  AND t.delete_status = 0
+            LEFT JOIN users u ON u.id = t.team_member
+            LEFT JOIN teams tm ON tm.id = t.team
+            LEFT JOIN rfq_responses rr
+                   ON rr.rfq_id = r.id
+                  AND (
+                        rr.vendor_id IN (SELECT v.id FROM vendors v WHERE v.org_id = ${oem})
+                        OR (
+                            COALESCE(rr.vendor_id, 0) = 0
+                            AND ${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(r.requested_organization::text, '')), '\\s*,\\s*'))
+                        )
+                      )
+            WHERE r.created_at BETWEEN ${from} AND ${to}
+              AND (
+                    ${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(r.requested_organization::text, '')), '\\s*,\\s*'))
+                    OR ${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(t.rfq_to::text, '')), '\\s*,\\s*'))
+                  )
+            GROUP BY t.id, t.tender_no, t.tender_name, t.due_date, t.gst_values, u.name, tm.name
+            ORDER BY t.due_date
+        `);
+        return rows as unknown as RfqSentRawRow[];
+    }
+
     // ─── Builders ─────────────────────────────────────────────────────────────
 
     private buildNotAllowedTenders(tenders: TenderRow[]): NotAllowedTenderRow[] {
@@ -269,32 +301,22 @@ export class OemPerformanceService {
             }));
     }
 
-    private buildRfqsSentToOem(tenders: TenderRow[], rfqInfoByTender: Map<number, RfqInfoRow>): RfqSentToOemRow[] {
-        return tenders
-            .filter(t => t.sentToOem && rfqInfoByTender.has(t.id))
-            .map(t => {
-                const info = rfqInfoByTender.get(t.id)!;
-                return {
-                    id: t.id,
-                    tenderNo: t.tenderNo,
-                    tenderName: t.tenderName,
-                    dueDate: format(t.dueDate, DATE_FORMAT),
-                    gstValues: t.gstValues,
-                    member: t.teamMemberName ?? "—",
-                    team: t.teamName ?? "—",
-                    rfqSentOn: info.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
-                    rfqResponseOn: info.responseOn ? format(info.responseOn, DATE_FORMAT) : null,
-                    createdAt: info.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
-                };
-            });
+    private buildRfqsSentToOem(rows: RfqSentRawRow[]): RfqSentToOemRow[] {
+        return rows.map(r => ({
+            id: r.id,
+            tenderNo: r.tenderNo,
+            tenderName: r.tenderName,
+            dueDate: r.dueDate ? format(r.dueDate, DATE_FORMAT) : "—",
+            gstValues: r.gstValues,
+            member: r.member ?? "—",
+            team: r.team ?? "—",
+            rfqSentOn: r.rfqSentOn ? format(r.rfqSentOn, DATE_FORMAT) : "—",
+            rfqResponseOn: r.rfqResponseOn ? format(r.rfqResponseOn, DATE_FORMAT) : null,
+            createdAt: r.createdAt ? format(r.createdAt, DATE_FORMAT) : "—",
+        }));
     }
 
-    private buildLifecycleTenders(
-        tenders: TenderRow[],
-        rfqInfoByTender: Map<number, RfqInfoRow>,
-        statuses: readonly number[],
-        statusLabel: string
-    ): LifecycleTenderRow[] {
+    private buildLifecycleTenders(tenders: TenderRow[], rfqInfoByTender: Map<number, RfqInfoRow>, statuses: readonly number[], statusLabel: string): LifecycleTenderRow[] {
         return tenders
             .filter(t => t.sentToOem && statuses.includes(Number(t.status)))
             .map(t => {
@@ -313,10 +335,7 @@ export class OemPerformanceService {
             });
     }
 
-    private buildQuotationReceivedTenders(
-        quotationTenders: TenderRow[],
-        rfqInfoByTender: Map<number, RfqInfoRow>
-    ): LifecycleTenderRow[] {
+    private buildQuotationReceivedTenders(quotationTenders: TenderRow[], rfqInfoByTender: Map<number, RfqInfoRow>): LifecycleTenderRow[] {
         return quotationTenders.map(t => {
             const info = rfqInfoByTender.get(t.id);
             return {
@@ -333,11 +352,7 @@ export class OemPerformanceService {
         });
     }
 
-    private buildBidTenders(
-        tenders: TenderRow[],
-        bids: BidTenderRow[],
-        rfqInfoByTender: Map<number, RfqInfoRow>
-    ): LifecycleTenderRow[] {
+    private buildBidTenders(tenders: TenderRow[], bids: BidTenderRow[], rfqInfoByTender: Map<number, RfqInfoRow>): LifecycleTenderRow[] {
         const bidTenderIds = new Set<number>();
         for (const row of bids) {
             if (row.bidStatus === "Bid Submitted") bidTenderIds.add(Number(row.tenderId));
@@ -442,10 +457,7 @@ export class OemPerformanceService {
     }
 
     private makeSummaryItem(rows: SummarizableTender[]): SummaryItem {
-        return rows.reduce<SummaryItem>(
-            (acc, r) => this.add(acc, r),
-            { count: 0, value: 0, tenders: [] }
-        );
+        return rows.reduce<SummaryItem>((acc, r) => this.add(acc, r), { count: 0, value: 0, tenders: [] });
     }
 
     private emptySummaryItem(): SummaryItem {

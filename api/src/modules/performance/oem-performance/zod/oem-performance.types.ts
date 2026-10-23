@@ -30,6 +30,19 @@ export interface RfqInfoRow {
     responseOn: Date | null;
 }
 
+export interface RfqSentRawRow {
+    id: number;
+    tenderNo: string;
+    tenderName: string;
+    dueDate: Date;
+    gstValues: string;
+    member: string | null;
+    team: string | null;
+    rfqSentOn: Date | null;
+    rfqResponseOn: Date | null;
+    createdAt: Date | null;
+}
+
 // ─── Summary item ─────────────────────────────────────────────────────────────
 
 export interface SummarizableTender {
