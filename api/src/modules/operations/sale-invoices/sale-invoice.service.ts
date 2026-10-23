@@ -8,6 +8,7 @@ import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 
 import { projects } from "@/db/schemas/master/projects.schema";
+import { transporters } from "@/db/schemas/master/transporters.schema";
 import { users } from "@/db/schemas/auth/users.schema";
 import { woBasicDetails, woDetails, woBillingBoq, woBuybackBoq, woBillingAddresses, woShippingAddresses } from "@/db/schemas/operations/work-order.schema";
 import { saleInvoices, saleInvoiceItems } from "@/db/schemas/operations/sale-invoices.schema";
@@ -16,6 +17,7 @@ import { purchaseOrderProducts } from "@/db/schemas/operations/purchase-order-pr
 import { PdfGeneratorService } from "@/modules/pdf/pdf-generator.service";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
+import type { CreateSaleInvoiceDto } from "./dto/create-sale-invoice.dto";
 
 @Injectable()
 export class SaleInvoiceService {
@@ -100,7 +102,7 @@ export class SaleInvoiceService {
         return `SI/${sanitizedName}/${fyString}/SI${String(seq).padStart(4, "0")}`;
     }
 
-    async create(body: any, userId: number) {
+    async create(body: CreateSaleInvoiceDto, userId: number) {
         const projectId = body.projectId;
 
         const [project] = await this.db
@@ -122,9 +124,37 @@ export class SaleInvoiceService {
 
         const invoiceNumber = await this.generateInvoiceNumber(project.projectName || undefined);
 
-        const linkedIds = (body.items || [])
-            .filter((i: any) => i.purchaseOrderProductId)
-            .map((i: any) => Number(i.purchaseOrderProductId));
+        // Validate BOQ line-item sr nos against this project's WO billing BOQ
+        if (body.woDetailId) {
+            const boqRows = await this.db
+                .select({ srNo: woBillingBoq.srNo })
+                .from(woBillingBoq)
+                .where(eq(woBillingBoq.woDetailId, body.woDetailId));
+            const validSrNos = new Set(boqRows.map((b) => b.srNo));
+            // An empty billing BOQ means there is nothing to map against (free-form
+            // line items, srNo 0 from the no-BOQ fallback in the create form) — skip.
+            if (validSrNos.size > 0) {
+                for (const item of body.items) {
+                    if (!validSrNos.has(item.lineItemSrNo)) {
+                        throw new BadRequestException(
+                            `Line item ${item.lineItemSrNo} does not exist in the WO Billing BOQ for this project`,
+                        );
+                    }
+                }
+            }
+        }
+
+        const linkedIds = body.items.map((i) => Number(i.purchaseOrderProductId));
+        const seenProductIds = new Set<number>();
+        for (const id of linkedIds) {
+            if (seenProductIds.has(id)) {
+                throw new BadRequestException(
+                    "The same PO item is mapped more than once — combine quantities into a single row",
+                );
+            }
+            seenProductIds.add(id);
+        }
+
         const poProductMap = new Map<number, any>();
         if (linkedIds.length > 0) {
             const poProducts = await this.db
@@ -147,7 +177,6 @@ export class SaleInvoiceService {
             poProducts.forEach((p) => poProductMap.set(p.id, p));
 
             for (const item of body.items) {
-                if (!item.purchaseOrderProductId) continue;
                 const prod = poProductMap.get(Number(item.purchaseOrderProductId));
                 if (!prod || prod.projectId !== projectId || prod.poApproved !== true) {
                     throw new BadRequestException(
@@ -157,9 +186,35 @@ export class SaleInvoiceService {
             }
         }
 
+        // Validate transporter (snapshot details so later master edits don't alter history)
+        let transporterSnapshot: { name?: string; phone?: string; gstNo?: string; address?: string } | null = null;
+        if (body.transporterId) {
+            const [transporter] = await this.db
+                .select()
+                .from(transporters)
+                .where(and(eq(transporters.id, body.transporterId), eq(transporters.status, true)));
+            if (!transporter) {
+                throw new BadRequestException("Selected transporter was not found or is inactive");
+            }
+            transporterSnapshot = {
+                name: transporter.name ?? undefined,
+                phone: transporter.phone ?? undefined,
+                gstNo: transporter.gstNo ?? undefined,
+                address: transporter.address ?? undefined,
+            };
+        }
+
         let totalPreGst = 0;
         let totalGst = 0;
-        let grandTotal = 0;
+        for (const item of body.items) {
+            const amount = Number(item.qty) * Number(item.rate);
+            totalPreGst += amount;
+            totalGst += (amount * Number(item.gstRate)) / 100;
+        }
+        const freight = Number(body.freight || 0);
+        const otherCharges = Number(body.otherCharges || 0);
+        const roundOff = Number(body.roundOff || 0);
+        const grandTotal = totalPreGst + totalGst + freight + otherCharges + roundOff;
 
         const si = (
             await this.db
@@ -177,10 +232,14 @@ export class SaleInvoiceService {
                     billingPanNo: body.billingPanNo || null,
                     billingMsmeNo: body.billingMsmeNo || null,
                     billingCinNo: body.billingCinNo || null,
+                    billingAddressId: body.billingAddressId ?? null,
                     shippingCustomerName: body.shippingCustomerName,
                     shippingAddress: body.shippingAddress,
                     shippingGst: body.shippingGst || null,
                     shippingPanNo: body.shippingPanNo || null,
+                    shippingAddressId: body.shippingAddressId ?? null,
+                    transporterId: body.transporterId ?? null,
+                    transporterDetails: transporterSnapshot,
                     dispatchFromName: body.dispatchFromName || null,
                     dispatchFromAddress: body.dispatchFromAddress || null,
                     dispatchFromGst: body.dispatchFromGst || null,
@@ -189,6 +248,9 @@ export class SaleInvoiceService {
                     dispatchToName: body.dispatchToName || null,
                     dispatchToAddress: body.dispatchToAddress || null,
                     dispatchToGst: body.dispatchToGst || null,
+                    freight: freight.toString(),
+                    otherCharges: otherCharges.toString(),
+                    roundOff: roundOff.toString(),
                     status: "oe_request",
                     raisedBy: userId,
                     team: teamId,
@@ -197,7 +259,7 @@ export class SaleInvoiceService {
                 .returning()
         )[0];
 
-        if (body.items && body.items.length > 0) {
+        if (body.items.length > 0) {
             for (const item of body.items) {
                 const qty = Number(item.qty);
                 const rate = Number(item.rate);
@@ -206,18 +268,15 @@ export class SaleInvoiceService {
                 const gstAmount = (amount * gstRate) / 100;
                 const totalAmount = amount + gstAmount;
 
-                totalPreGst += amount;
-                totalGst += gstAmount;
-                grandTotal += totalAmount;
-
-                const prod = item.purchaseOrderProductId ? poProductMap.get(Number(item.purchaseOrderProductId)) : null;
+                const prod = poProductMap.get(Number(item.purchaseOrderProductId));
 
                 await this.db.insert(saleInvoiceItems).values({
                     saleInvoiceId: si.id,
-                    purchaseOrderProductId: item.purchaseOrderProductId ? Number(item.purchaseOrderProductId) : null,
+                    purchaseOrderProductId: Number(item.purchaseOrderProductId),
+                    lineItemSrNo: item.lineItemSrNo,
                     unit: item.unit || prod?.unit || null,
                     hsnSac: item.hsnSac || prod?.hsnSac || null,
-                    srNo: item.srNo || null,
+                    srNo: item.srNo || item.lineItemSrNo || null,
                     itemDescription: item.itemDescription,
                     quantity: item.qty.toString(),
                     rate: item.rate.toString(),
@@ -241,6 +300,43 @@ export class SaleInvoiceService {
         this.logger.info(`Sale Invoice created: ${invoiceNumber}`);
 
         return this.getById(si.id);
+    }
+
+    async addWoAddress(
+        type: string,
+        body: { woDetailId: number; customerName: string; address: string; gst?: string },
+        userId: number,
+    ) {
+        if (type !== "billing" && type !== "shipping") {
+            throw new BadRequestException(`Address type must be "billing" or "shipping"`);
+        }
+        const woDetailId = Number(body.woDetailId);
+        const customerName = (body.customerName || "").trim();
+        const address = (body.address || "").trim();
+        if (!woDetailId) throw new BadRequestException("woDetailId is required");
+        if (!customerName) throw new BadRequestException("Customer name is required");
+        if (!address) throw new BadRequestException("Address is required");
+
+        const [woDetail] = await this.db
+            .select({ id: woDetails.id })
+            .from(woDetails)
+            .where(eq(woDetails.id, woDetailId));
+        if (!woDetail) throw new NotFoundException("Work order detail not found");
+
+        const table = type === "billing" ? woBillingAddresses : woShippingAddresses;
+        const [row] = await this.db
+            .insert(table)
+            .values({
+                woDetailId,
+                srNos: [],
+                customerName,
+                address,
+                gst: (body.gst || "").trim() || null,
+            })
+            .returning();
+
+        this.logger.info(`WO ${type} address #${row.id} added for woDetail ${woDetailId} by user ${userId}`);
+        return row;
     }
 
     async createDraft(id: number, userId: number) {
@@ -401,19 +497,32 @@ export class SaleInvoiceService {
             .from(saleInvoiceItems)
             .where(eq(saleInvoiceItems.saleInvoiceId, id));
 
-        const linkedItems = items.filter((it) => it.purchaseOrderProductId != null);
-        for (const item of linkedItems) {
+        // One PO item can be split across several BOQ line-item rows — validate the
+        // summed quantity per purchase order product, not per row.
+        const qtyByProduct = new Map<number, { qty: number; label: string }>();
+        for (const item of items) {
+            if (item.purchaseOrderProductId == null) continue;
+            const key = Number(item.purchaseOrderProductId);
+            const existing = qtyByProduct.get(key);
+            if (existing) {
+                existing.qty += Number(item.quantity);
+            } else {
+                qtyByProduct.set(key, { qty: Number(item.quantity), label: item.itemDescription || "" });
+            }
+        }
+
+        for (const [productId, { qty: requestedQty, label }] of qtyByProduct) {
             const [prod] = await this.db
                 .select({ qty: purchaseOrderProducts.qty })
                 .from(purchaseOrderProducts)
-                .where(eq(purchaseOrderProducts.id, item.purchaseOrderProductId!));
+                .where(eq(purchaseOrderProducts.id, productId));
             if (!prod) continue;
 
-            const invoicedQty = await this.getInvoicedQtyForProduct(item.purchaseOrderProductId!, id);
+            const invoicedQty = await this.getInvoicedQtyForProduct(productId, id);
             const remaining = Number(prod.qty) - invoicedQty;
-            if (Number(item.quantity) > remaining) {
+            if (requestedQty > remaining) {
                 throw new BadRequestException(
-                    `Cannot finalize invoice: "${item.itemDescription}" quantity ${item.quantity} exceeds remaining PO quantity ${Math.max(0, remaining)}`
+                    `Cannot finalize invoice: "${label}" quantity ${requestedQty} exceeds remaining PO quantity ${Math.max(0, remaining)}`
                 );
             }
         }
@@ -877,10 +986,14 @@ export class SaleInvoiceService {
                 billingPanNo: saleInvoices.billingPanNo,
                 billingMsmeNo: saleInvoices.billingMsmeNo,
                 billingCinNo: saleInvoices.billingCinNo,
+                billingAddressId: saleInvoices.billingAddressId,
                 shippingCustomerName: saleInvoices.shippingCustomerName,
                 shippingAddress: saleInvoices.shippingAddress,
                 shippingGst: saleInvoices.shippingGst,
                 shippingPanNo: saleInvoices.shippingPanNo,
+                shippingAddressId: saleInvoices.shippingAddressId,
+                transporterId: saleInvoices.transporterId,
+                transporterDetails: saleInvoices.transporterDetails,
                 dispatchFromName: saleInvoices.dispatchFromName,
                 dispatchFromAddress: saleInvoices.dispatchFromAddress,
                 dispatchFromGst: saleInvoices.dispatchFromGst,
@@ -891,6 +1004,9 @@ export class SaleInvoiceService {
                 dispatchToGst: saleInvoices.dispatchToGst,
                 totalPreGst: saleInvoices.totalPreGst,
                 totalGst: saleInvoices.totalGst,
+                freight: saleInvoices.freight,
+                otherCharges: saleInvoices.otherCharges,
+                roundOff: saleInvoices.roundOff,
                 grandTotal: saleInvoices.grandTotal,
                 invoiceTaxableAmount: saleInvoices.invoiceTaxableAmount,
                 invoiceIgst: saleInvoices.invoiceIgst,
@@ -950,6 +1066,7 @@ export class SaleInvoiceService {
                 id: saleInvoiceItems.id,
                 saleInvoiceId: saleInvoiceItems.saleInvoiceId,
                 purchaseOrderProductId: saleInvoiceItems.purchaseOrderProductId,
+                lineItemSrNo: saleInvoiceItems.lineItemSrNo,
                 unit: saleInvoiceItems.unit,
                 hsnSac: saleInvoiceItems.hsnSac,
                 srNo: saleInvoiceItems.srNo,

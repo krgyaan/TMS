@@ -68,6 +68,7 @@ import { StatusesModule } from "@/modules/master/statuses/statuses.module";
 import { TeamsModule } from "@/modules/master/teams/teams.module";
 import { TenderStatusModule } from "@/modules/master/tender-status/tender-status.module";
 import { TqTypesModule } from "@/modules/master/tq-types/tq-types.module";
+import { TransportersModule } from "@/modules/master/transporters/transporters.module";
 import { UserProfilesModule } from "@/modules/master/user-profiles/user-profiles.module";
 import { UsersModule } from "@/modules/master/users/users.module";
 import { WebsitesModule } from "@/modules/master/websites/websites.module";
@@ -188,6 +189,7 @@ import { QueueMonitoringModule } from "./modules/queue-monitoring/queue-monitori
         OrganizationsModule,
         StatusesModule,
         TqTypesModule,
+        TransportersModule,
         VendorMasterModule,
         GoogleIntegrationModule,
         IntegrationsModule,
