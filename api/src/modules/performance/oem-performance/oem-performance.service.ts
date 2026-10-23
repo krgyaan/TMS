@@ -152,28 +152,9 @@ export class OemPerformanceService {
             INNER JOIN rfqs r ON r.tender_id = t.id
             INNER JOIN rfq_responses rr
                 ON rr.rfq_id = r.id
-                AND (rr.response_status = 1 OR rr.response_status IS NULL)
-                AND (
-                        rr.vendor_id IN (SELECT v.id FROM vendors v WHERE v.org_id = ${oem})
-                        OR (
-                            COALESCE(rr.vendor_id, 0) = 0
-                            AND ${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(r.requested_organization::text, '')), '\\s*,\\s*'))
-                        )
-                    )
-            WHERE t.due_date BETWEEN ${from} AND ${to}
+                AND rr.organization_id = ${oem}
+            WHERE rr.receipt_datetime BETWEEN ${from} AND ${to}
             AND t.delete_status = 0
-            AND ${oem}::text = ANY(
-                    regexp_split_to_array(
-                    btrim(coalesce(r.requested_organization::text, '')),
-                    '\\s*,\\s*'
-                    )
-                )
-            AND EXISTS (
-                    SELECT 1
-                    FROM rfq_response_documents rrd
-                    WHERE rrd.rfq_response_id = rr.id
-                    AND rrd.doc_type = 'QUOTATION'
-                )
         `);
         return rows as unknown as TenderRow[];
     }
@@ -266,13 +247,7 @@ export class OemPerformanceService {
             LEFT JOIN teams tm ON tm.id = t.team
             LEFT JOIN rfq_responses rr
                    ON rr.rfq_id = r.id
-                  AND (
-                        rr.vendor_id IN (SELECT v.id FROM vendors v WHERE v.org_id = ${oem})
-                        OR (
-                            COALESCE(rr.vendor_id, 0) = 0
-                            AND ${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(r.requested_organization::text, '')), '\\s*,\\s*'))
-                        )
-                      )
+                  AND rr.organization_id = ${oem}
             WHERE r.created_at BETWEEN ${from} AND ${to}
               AND (
                     ${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(r.requested_organization::text, '')), '\\s*,\\s*'))
