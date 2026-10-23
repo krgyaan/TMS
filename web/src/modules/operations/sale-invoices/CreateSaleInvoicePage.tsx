@@ -238,11 +238,11 @@ export default function CreateSaleInvoicePage() {
 
     const { fields, append, remove } = useFieldArray({
         control: form.control,
-        name: "items" as any,
+        name: "items",
     });
 
     const fv = form.watch();
-    const items = (fv.items ?? []) as any[];
+    const items = fv.items ?? [];
     const selectedLineSrNos = fv.selectedLineSrNos ?? [];
     const selectedBillingAddressId = fv.selectedBillingAddressId ?? "";
     const selectedShippingAddressId = fv.selectedShippingAddressId ?? "";

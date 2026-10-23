@@ -1,5 +1,5 @@
 import { BaseApiService } from './base.service';
-import type { CreateSaleInvoiceDTO } from '@/modules/operations/sale-invoices/helpers/saleInvoice.types';
+import type { CreateSaleInvoiceDTO, WoBillingData } from '@/modules/operations/sale-invoices/helpers/saleInvoice.types';
 import axiosInstance from '@/lib/axios';
 
 class SaleInvoiceApiService extends BaseApiService {
@@ -7,7 +7,7 @@ class SaleInvoiceApiService extends BaseApiService {
         super('/sale-invoices');
     }
 
-    async getWoBillingData(projectId: number): Promise<any> {
+    async getWoBillingData(projectId: number): Promise<WoBillingData> {
         return this.get(`/wo-billing-data/${projectId}`);
     }
 

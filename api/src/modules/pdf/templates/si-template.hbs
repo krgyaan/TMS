@@ -1,156 +1,252 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Tax Invoice</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tax Invoice - {{invoice_number}}</title>
 </head>
-<body style="font-family: Arial, sans-serif; font-size: 12px; color: #000; margin: 20px;">
 
-    {{#if is_draft}}
-    <div style="text-align: center; border: 2px solid #b91c1c; color: #b91c1c; padding: 4px; font-weight: bold; font-size: 14px; margin-bottom: 10px;">
-        DRAFT — REVISION {{revision}}
+<body style="margin:0;background:#fff;color:#111;font-family:Arial,Helvetica,sans-serif;font-size:10px;">
+    <div
+        style="width:281mm;min-height:194mm;margin:0 auto;padding:8mm 8mm 0;box-sizing:border-box;background:#fff;page-break-after:always;position:relative;">
+        <div style="text-align:center;font-size:11px;font-weight:bold;height:25mm;">Tax Invoice</div>
+        <div style="position:absolute;top:12mm;right:8mm;width:34mm;height:34mm;"><img alt="Invoice QR code"
+                src="data:image/png;base64,{{qr_code_base64}}" style="width:100%;height:100%;object-fit:contain;"></div>
+        <table style="width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:5mm;">
+            <tr>
+                <td style="width:22mm;padding:1px 0;border:0;">IRN</td>
+                <td style="border:0;font-weight:bold;overflow-wrap:anywhere;">{{irn}}</td>
+            </tr>
+            <tr>
+                <td style="padding:1px 0;border:0;">Ack No.</td>
+                <td style="border:0;font-weight:bold;">{{ack_number}}</td>
+            </tr>
+            <tr>
+                <td style="padding:1px 0;border:0;">Ack Date</td>
+                <td style="border:0;font-weight:bold;">{{formatDate invoice_date}}</td>
+            </tr>
+        </table>
+        <table style="width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:4mm;font-size:10px;">
+            <tr>
+                <td style="width:12%;border:1px solid #222;padding:2px;vertical-align:top;">
+                    <img src="data:image/png;base64,{{ img_logo_base64 }}" alt="Volks Energie Logo" style="height: 60px;">
+                </td>
+                <td style="width:32%;border:1px solid #222;padding:2px;vertical-align:top;line-height:1.42;">
+                    <b>{{seller_name}}</b><br>{{seller_address_line1}}<br>{{seller_address_line2}}<br>{{seller_city_state_pin}}<br>UDYAM
+                    : <b>{{seller_udyam}}</b> (Small)<br>GSTIN/UIN: <b>{{seller_gst}}</b><br>State Name : <b>Delhi</b>,
+                    Code : <b>07</b><br>CIN: <b>{{seller_cin}}</b></td>
+                <td style="width:21%;border:1px solid #222;padding:2px;vertical-align:top;line-height:1.42;">Invoice
+                    No<br><b>{{invoice_number}}</b><br>Dated<br><b>{{formatDate invoice_date}}</b>
+                    <hr style="border:0;border-top:1px solid #222;margin:2px -2px;">Buyer’s Order
+                    No.<br><b>{{buyer_order_number}}</b><br>Dated<br><b>{{formatDate buyer_order_date}}</b>
+                </td>
+                <td style="width:35%;border:1px solid #222;padding:2px;vertical-align:top;line-height:1.42;"></td>
+            </tr>
+        </table>
+        <table
+            style="width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:4mm;font-size:10px;line-height:1.45;">
+            <tr>
+                <td style="width:12%;border:1px solid #222;padding:2px;">VE Project Code<br>Project Manager<br>Phone
+                    Number<br>Email Id</td>
+                <td style="width:32%;border:1px solid #222;padding:2px;">DC/2324/IGGL/B &amp;
+                    BC/AS/OLKS<br>{{project_manager}}<br>{{project_manager_phone}}<br>{{project_manager_email}}</td>
+                <td style="width:21%;border:1px solid #222;padding:2px;">Transporter Name<br>Transporter GST
+                    No<br>Transport Via<br>Bill of Lading/LR-RR No<br>Motor Vehicle No.</td>
+                <td style="width:35%;border:1px solid #222;padding:2px;">
+                    {{transporter_name}}<br>{{transporter_gst}}<br>-<br>{{bill_of_lading_number}}<br>{{vehicle_number}}
+                </td>
+            </tr>
+        </table>
+        <table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:10px;line-height:1.35;">
+            <tr>
+                <th colspan="2" style="border:1px solid #222;padding:3px;text-align:center;">Buyer (Bill to)</th>
+                <th colspan="2" style="border:1px solid #222;padding:3px;text-align:center;">Consignee (Ship to)</th>
+                <th colspan="2" style="border:1px solid #222;padding:3px;text-align:center;">Dispatch From</th>
+            </tr>
+            <tr>
+                <td colspan="2" style="width:30%;border:1px solid #222;padding:3px;vertical-align:top;height:25mm;">
+                    {{buyer_name}}<br>{{buyer_address_line1}}<br>{{buyer_address_line2}}<br>{{buyer_address_line3}}<br>PIN
+                    NO {{buyer_pin}}</td>
+                <td colspan="2" style="width:35%;border:1px solid #222;padding:3px;vertical-align:top;">
+                    {{buyer_name}}<br>{{consignee_address_line1}}<br>{{consignee_address_line2}}<br>{{consignee_address_line3}}<br>{{consignee_address_line4}}<br>{{consignee_address_line5}}<br>PIN
+                    NO {{consignee_pin}}</td>
+                <td colspan="2" style="width:35%;border:1px solid #222;padding:3px;vertical-align:top;">
+                    {{dispatch_from_name}}<br>Plot 10/1A, 1B&amp;1C,
+                    Abbanakuppe,<br>{{dispatch_address_line2}}<br>{{dispatch_address_line3}}<br>PIN NO {{dispatch_pin}}
+                </td>
+            </tr>
+            <tr>
+                <td style="width:12%;border:1px solid #222;padding:2px;">GSTIN/UIN<br>PAN/IT No<br>State Name<br>Place
+                    of Supply<br>Contact Person<br>Phone No</td>
+                <td style="width:18%;border:1px solid #222;padding:2px;">
+                    {{buyer_gst}}<br>{{buyer_pan}}<br>-<br>-<br>Manipur<br>-</td>
+                <td style="width:13%;border:1px solid #222;padding:2px;">GSTIN/UIN<br>PAN/IT No<br>State Name<br>Place
+                    of Supply<br>Contact Person<br>Phone No</td>
+                <td style="width:22%;border:1px solid #222;padding:2px;">
+                    {{buyer_gst}}<br>{{buyer_pan}}<br>Manipur<br>Manipur<br>-<br>-</td>
+                <td style="width:11%;border:1px solid #222;padding:2px;">GSTIN/UIN<br>PAN/IT No<br>State Name<br>Place
+                    of Supply<br>Contact Person<br>Phone No</td>
+                <td style="width:24%;border:1px solid #222;padding:2px;">
+                    {{dispatch_gst}}<br>{{dispatch_pan}}<br>Karnataka<br>West
+                    Bengal<br>{{dispatch_contact_person}}<br>{{dispatch_phone}}</td>
+            </tr>
+        </table>
     </div>
-    {{else}}
-    <div style="text-align: center; border: 2px solid #166534; color: #166534; padding: 4px; font-weight: bold; font-size: 14px; margin-bottom: 10px;">
-        FINAL INVOICE
+    <div
+        style="width:281mm;min-height:194mm;margin:0 auto;padding:8mm 8mm 0;box-sizing:border-box;background:#fff;position:relative;">
+        <table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:9px;line-height:1.3;">
+            <colgroup>
+                <col style="width:2%">
+                <col style="width:34.5%">
+                <col style="width:6%">
+                <col style="width:5.5%">
+                <col style="width:7%">
+                <col style="width:3.5%">
+                <col style="width:4%">
+                <col style="width:8%">
+                <col style="width:3.5%">
+                <col style="width:7%">
+                <col style="width:3.5%">
+                <col style="width:7%">
+                <col style="width:8.5%">
+            </colgroup>
+            <tr>
+                <th rowspan="2" style="border:1px solid #222;padding:3px;">Sl.<br>No.</th>
+                <th rowspan="2" style="border:1px solid #222;padding:3px;">Description of Goods</th>
+                <th rowspan="2" style="border:1px solid #222;padding:3px;">HSN/SAC</th>
+                <th rowspan="2" style="border:1px solid #222;padding:3px;">Quantity</th>
+                <th rowspan="2" style="border:1px solid #222;padding:3px;">Rate</th>
+                <th rowspan="2" style="border:1px solid #222;padding:3px;">Per</th>
+                <th rowspan="2" style="border:1px solid #222;padding:3px;">Disc. %</th>
+                <th rowspan="2" style="border:1px solid #222;padding:3px;">Taxable Value</th>{{#if is_interstate}}<th
+                    colspan="2" style="border:1px solid #222;padding:3px;">IGST</th>{{else}}<th colspan="2"
+                    style="border:1px solid #222;padding:3px;">CGST</th>
+                <th colspan="2" style="border:1px solid #222;padding:3px;">SGST</th>{{/if}}<th rowspan="2"
+                    style="border:1px solid #222;padding:3px;">Total Amount</th>
+            </tr>
+            <tr>
+                <th style="border:1px solid #222;padding:3px;">Rate</th>
+                <th style="border:1px solid #222;padding:3px;">Amount</th>
+                <th style="border:1px solid #222;padding:3px;">Rate</th>
+                <th style="border:1px solid #222;padding:3px;">Amount</th>
+            </tr>
+            {{#each items}}
+            <tr style="height:24mm;vertical-align:top;">
+                <td style="border:1px solid #222;padding:3px;">{{inc @index}}</td>
+                <td style="border:1px solid #222;padding:3px;">
+                    <b>{{this.description}}</b><br>{{this.details_line1}}<br>{{this.details_line2}}<br>{{this.details_line3}}<br><br><br><br>LESS:
+                    <b>Round Off</b></td>
+                <td style="border:1px solid #222;padding:3px;">{{this.hsn_sac}}</td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;"><b>{{this.quantity}}</b></td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency this.taxable_value}}
+                </td>
+                <td style="border:1px solid #222;padding:3px;text-align:center;">{{this.unit}}</td>
+                <td style="border:1px solid #222;padding:3px;text-align:center;">{{this.discount_percent}}%</td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;"><b>{{formatCurrency
+                        this.taxable_value}}</b></td>
+                <td style="border:1px solid #222;padding:3px;text-align:center;">{{../cgst_rate}}%</td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;"><b>{{formatCurrency
+                        this.cgst_amount}}</b></td>
+                <td style="border:1px solid #222;padding:3px;text-align:center;">{{../sgst_rate}}%</td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;"><b>{{formatCurrency
+                        this.cgst_amount}}</b><br><br><br><br><br><br><br><br><b>-0.20</b></td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;"><b>{{formatCurrency this.total}}</b>
+                </td>
+            </tr>
+            {{/each}}
+            <tr>
+                <td style="border:1px solid #222;padding:3px;" colspan="3"></td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;">{{quantity}}</td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency taxable_value}}</td>
+                <td style="border:1px solid #222;padding:3px;text-align:center;">SET</td>
+                <td style="border:1px solid #222;padding:3px;"></td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency taxable_value}}</td>
+                <td style="border:1px solid #222;padding:3px;"></td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency cgst_amount}}</td>
+                <td style="border:1px solid #222;padding:3px;"></td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency cgst_amount}}</td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency grand_total}}</td>
+            </tr>
+            <tr>
+                <td colspan="12" style="border:1px solid #222;padding:3px;">Amount Chargeable (in words)
+                    <b>{{amount_in_words}}</b></td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;">E &amp; O.E.</td>
+            </tr>
+        </table>
+        <table style="width:100%;border-collapse:collapse;table-layout:fixed;margin-top:4mm;font-size:9px;">
+            <colgroup>
+                <col style="width:58%">
+                <col style="width:10%">
+                <col style="width:5%">
+                <col style="width:8%">
+                <col style="width:5%">
+                <col style="width:8%">
+                <col style="width:6%">
+            </colgroup>
+            <tr>
+                <td rowspan="4" style="border:1px solid #222;"></td>
+                <th style="border:1px solid #222;padding:3px;">Taxable Value</th>{{#if is_interstate}}<th colspan="2"
+                    style="border:1px solid #222;padding:3px;">IGST</th>{{else}}<th colspan="2"
+                    style="border:1px solid #222;padding:3px;">CGST</th>
+                <th colspan="2" style="border:1px solid #222;padding:3px;">SGST</th>{{/if}}<th
+                    style="border:1px solid #222;padding:3px;">Total</th>
+            </tr>
+            <tr>
+                <td style="border:1px solid #222;padding:3px;"></td>
+                <th style="border:1px solid #222;padding:3px;">Rate</th>
+                <th style="border:1px solid #222;padding:3px;">Amount</th>
+                <th style="border:1px solid #222;padding:3px;">Rate</th>
+                <th style="border:1px solid #222;padding:3px;">Amount</th>
+                <th style="border:1px solid #222;padding:3px;">Tax Amount</th>
+            </tr>
+            <tr>
+                <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency taxable_value}}</td>
+                <td style="border:1px solid #222;padding:3px;text-align:center;">9%</td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency cgst_amount}}</td>
+                <td style="border:1px solid #222;padding:3px;text-align:center;">9%</td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency cgst_amount}}</td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency total_tax_amount}}</td>
+            </tr>
+            <tr>
+                <td style="border:1px solid #222;padding:3px;text-align:right;"><b>{{formatCurrency taxable_value}}</b>
+                </td>
+                <td style="border:1px solid #222;padding:3px;"></td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;"><b>{{formatCurrency cgst_amount}}</b>
+                </td>
+                <td style="border:1px solid #222;padding:3px;"></td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;"><b>{{formatCurrency cgst_amount}}</b>
+                </td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;"><b>{{formatCurrency
+                        total_tax_amount}}</b></td>
+            </tr>
+        </table>
+        <table
+            style="width:100%;border-collapse:collapse;table-layout:fixed;margin-top:4mm;font-size:9px;line-height:1.45;">
+            <tr>
+                <td colspan="2" style="border:1px solid #222;padding:3px;">Tax Amount (in words) :
+                    <b>{{tax_amount_in_words}}</b></td>
+            </tr>
+            <tr>
+                <td style="width:56%;border:1px solid #222;padding:3px;vertical-align:top;"><u>Declaration</u><br>We
+                    declare that this invoice shows the actual price of the goods described and that all particulars are
+                    true<br>and correct.</td>
+                <td style="width:44%;border:1px solid #222;padding:3px;vertical-align:top;">Company’s PAN :
+                    <b>{{company_pan}}</b><br>Company’s Bank Details:<br>Bank Name : <b>{{bank_name}}</b><br>A/c No. :
+                    <b>{{bank_account_number}}</b><br>Branch &amp; IFS Code : <b>GROUND AND 1ST FLOOR, A-42, VISHAL
+                        ENCLAVE, &amp; YESB0000030</b><br>SWIFT Code : -</td>
+            </tr>
+            <tr>
+                <td style="width:30%;border:1px solid #222;padding:3px;vertical-align:top;height:19mm;">Prepared
+                    by<br><br><b>{{prepared_by_name}}</b><br>{{prepared_by_email}}<br>{{prepared_by_phone}}</td>
+                <td style="width:35%;border:1px solid #222;padding:3px;vertical-align:top;">Approved
+                    by<br><br><b>{{approved_by_name}}</b><br>{{approved_by_email}}<br>{{approved_by_phone}}</td>
+                <td style="width:35%;border:1px solid #222;padding:3px;vertical-align:top;text-align:right;"><b>for
+                        {{seller_name}}</b>
+                    <div style="height:12mm;"></div>Authorised Signatory
+                </td>
+            </tr>
+        </table>
     </div>
-    {{/if}}
-
-    <!-- Header -->
-    <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px; border: 1px solid #000;">
-      <thead>
-        <tr>
-            <th colspan="3" style="border: 1px solid #000; padding: 8px; text-align: center; font-size: 16px;">
-                TAX INVOICE
-            </th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-            <td style="width: 15%; vertical-align: top; border: 1px solid #000; padding: 8px;">
-                <img src="data:image/png;base64,{{ img_logo_base64 }}" alt="Volks Energie Logo" style="height: 60px;">
-            </td>
-
-            <td style="width: 40%; vertical-align: top; border: 1px solid #000; padding: 8px;">
-                <strong>Volks Energie Pvt. Ltd.</strong><br>
-                B-1/D8, 2nd floor, Mohan Cooperative Industrial Estate,<br>
-                New Delhi - 110044<br>
-                PAN No.: AADCV9396C<br>
-                GST No.: 07AADCV9396C1ZZ
-            </td>
-
-            <td style="width: 45%; vertical-align: top; border: 1px solid #000; padding: 8px;">
-                <strong>Invoice No.:</strong> {{invoice_number}}<br>
-                <strong>Invoice Date:</strong> {{formatDate invoice_date}}<br>
-                <strong>Project Name:</strong> {{project_name}}<br>
-                <strong>PO Ref.:</strong> {{po_number}}
-            </td>
-        </tr>
-
-        <tr>
-            <td style="vertical-align: top; border: 1px solid #000; padding: 8px;">
-                <strong>Billing To:</strong><br>
-                {{billing_name}}<br>
-                {{billing_address}}<br>
-                {{#if billing_email}}Email: {{billing_email}}<br>{{/if}}
-                {{#if billing_gst}}GST No.: {{billing_gst}}<br>{{/if}}
-                {{#if billing_pan_no}}PAN No.: {{billing_pan_no}}<br>{{/if}}
-                {{#if billing_msme_no}}MSME No.: {{billing_msme_no}}<br>{{/if}}
-                {{#if billing_cin_no}}CIN No.: {{billing_cin_no}}{{/if}}
-            </td>
-
-            <td style="vertical-align: top; border: 1px solid #000; padding: 8px;">
-                <strong>Ship To:</strong><br>
-                {{shipping_name}}<br>
-                {{shipping_address}}<br>
-                {{#if shipping_gst}}GST No.: {{shipping_gst}}<br>{{/if}}
-                {{#if shipping_pan_no}}PAN No.: {{shipping_pan_no}}{{/if}}
-            </td>
-
-            <td style="vertical-align: top; border: 1px solid #000; padding: 8px;">
-                <strong>Dispatch From:</strong><br>
-                {{#if dispatch_from_name}}{{dispatch_from_name}}<br>{{/if}}
-                {{#if dispatch_from_address}}{{dispatch_from_address}}<br>{{/if}}
-                {{#if dispatch_from_gst}}GST No.: {{dispatch_from_gst}}<br>{{/if}}
-                {{#if dispatch_vehicle_no}}Vehicle No.: {{dispatch_vehicle_no}}<br>{{/if}}
-                {{#if dispatch_lr_no}}LR No.: {{dispatch_lr_no}}{{/if}}
-                {{#unless dispatch_from_name}}{{#unless dispatch_from_address}}{{#unless dispatch_vehicle_no}}{{#unless dispatch_lr_no}}—{{/unless}}{{/unless}}{{/unless}}{{/unless}}
-                <br><br>
-                <strong>Dispatch To:</strong><br>
-                {{#if dispatch_to_name}}{{dispatch_to_name}}<br>{{/if}}
-                {{#if dispatch_to_address}}{{dispatch_to_address}}<br>{{/if}}
-                {{#if dispatch_to_gst}}GST No.: {{dispatch_to_gst}}{{/if}}
-                {{#unless dispatch_to_name}}{{#unless dispatch_to_address}}—{{/unless}}{{/unless}}
-            </td>
-        </tr>
-      </tbody>
-    </table>
-
-    <!-- Items Table -->
-    <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; margin-bottom: 10px;">
-        <tr>
-            <th style="border: 1px solid #000; padding: 5px;">Sr. No</th>
-            <th style="border: 1px solid #000; padding: 5px;">Item Description</th>
-            <th style="border: 1px solid #000; padding: 5px;">HSN/SAC</th>
-            <th style="border: 1px solid #000; padding: 5px;">Quantity</th>
-            <th style="border: 1px solid #000; padding: 5px;">Rate</th>
-            <th style="border: 1px solid #000; padding: 5px;">Amount</th>
-            <th style="border: 1px solid #000; padding: 5px;">GST Rate</th>
-            <th style="border: 1px solid #000; padding: 5px;">GST Amount</th>
-            <th style="border: 1px solid #000; padding: 5px;">Total</th>
-        </tr>
-
-        {{#each items}}
-        <tr>
-            <td style="border: 1px solid #000; padding: 5px;">{{sr_no}}</td>
-            <td style="border: 1px solid #000; padding: 5px;">{{description}}</td>
-            <td style="border: 1px solid #000; padding: 5px;">{{hsn_sac}}</td>
-            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{quantity}} {{unit}}</td>
-            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{formatCurrency rate}}</td>
-            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{formatCurrency amount}}</td>
-            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{gst_rate}}%</td>
-            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{formatCurrency gst_amount}}</td>
-            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{formatCurrency total}}</td>
-        </tr>
-        {{/each}}
-
-        <!-- Totals -->
-        <tr>
-            <td colspan="5" style="border: 1px solid #000; padding: 5px; text-align: right;">
-                <strong>Total Amount</strong>
-            </td>
-            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{formatCurrency total_amount}}</td>
-            <td></td>
-            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{formatCurrency total_gst_amt}}</td>
-            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{formatCurrency grand_total}}</td>
-        </tr>
-    </table>
-
-    <p><strong>Total Amount (In Words):</strong> {{grand_total_in_words}}</p>
-
-    {{#if remarks}}
-    <div>
-        <strong>Remarks:</strong> {{remarks}}
-    </div>
-    {{/if}}
-
-    <!-- Footer -->
-    <p style="margin-top: 20px; text-align: center;">
-        *** This is electronically generated document. It does not require any signature from M/s. Volks Energie Pvt. Ltd. ***
-    </p>
-
-    <table style="width: 100%; margin-top: 40px;">
-        <tr>
-            <td style="text-align: left;">
-                For M/s Volks Energie Pvt Ltd<br><br><br><br><br><br>
-                Authorized Signatory
-            </td>
-            <td style="text-align: right;">
-                For M/s {{billing_name}}<br><br><br><br><br><br>
-                Authorized Signatory
-            </td>
-        </tr>
-    </table>
-
 </body>
+
 </html>
