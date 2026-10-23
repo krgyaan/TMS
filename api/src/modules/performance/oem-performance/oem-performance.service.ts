@@ -144,6 +144,7 @@ export class OemPerformanceService {
                 t.status                 AS "status",
                 u.name                   AS "teamMemberName",
                 tm.name                  AS "teamName",
+                MAX(rr.receipt_datetime) AS "responseOn",
                 ${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(t.rfq_to::text, '')), '\\s*,\\s*')) AS "sentToOem",
                 ${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(t.oem_not_allowed::text, '')), '\\s*,\\s*')) AS "notAllowedForOem"
             FROM tender_infos t
@@ -155,6 +156,7 @@ export class OemPerformanceService {
                 AND rr.organization_id = ${oem}
             WHERE rr.receipt_datetime BETWEEN ${from} AND ${to}
             AND t.delete_status = 0
+            GROUP BY t.id, t.tender_no, t.tender_name, t.due_date, t.gst_values, t.tl_status, t.status, u.name, tm.name
         `);
         return rows as unknown as TenderRow[];
     }
@@ -322,6 +324,7 @@ export class OemPerformanceService {
                 member: t.teamMemberName ?? "—",
                 team: t.teamName ?? "—",
                 createdAt: info?.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
+                rfqResponseOn: t.responseOn ? format(t.responseOn, DATE_FORMAT) : null,
                 status: "Quotation Received",
             };
         });

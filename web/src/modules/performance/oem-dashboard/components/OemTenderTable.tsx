@@ -110,7 +110,7 @@ export default function OemTenderTable({ params, tab }: OemTenderTableProps) {
             case "rfq_sent":
                 return [
                     ...common,
-                    { field: "createdAt", headerName: "Created At", sortable: true, filter: false, width: 170 },
+                    { field: "createdAt", headerName: "RFQ Sent", sortable: true, filter: false, width: 170 },
                     {
                         field: "rfqResponseOn",
                         headerName: "Response On",
@@ -145,6 +145,30 @@ export default function OemTenderTable({ params, tab }: OemTenderTableProps) {
                                 {p.value}
                             </Badge>
                         ),
+                    },
+                    actionCol,
+                ];
+            case "quotation_received":
+                return [
+                    ...common,
+                    { field: "createdAt", headerName: "RFQ Sent On", sortable: true, filter: false, width: 170 },
+                    {
+                        field: "rfqResponseOn",
+                        headerName: "Response On",
+                        sortable: true,
+                        filter: true,
+                        width: 170,
+                        valueFormatter: p => (p.value ? String(p.value) : "Pending"),
+                        cellRenderer: (p: CustomCellRendererProps<OemTenderRow>) =>
+                            p.value ? (
+                                <Badge variant="default" className="h-5 px-2 font-normal">
+                                    {String(p.value)}
+                                </Badge>
+                            ) : (
+                                <Badge variant="secondary" className="h-5 px-2 font-normal">
+                                    Pending
+                                </Badge>
+                            ),
                     },
                     actionCol,
                 ];

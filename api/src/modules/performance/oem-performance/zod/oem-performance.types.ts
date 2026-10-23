@@ -12,6 +12,7 @@ export interface TenderRow {
     status: number;
     sentToOem: boolean;
     notAllowedForOem: boolean;
+    responseOn?: Date | null;
 }
 
 export interface BidTenderRow {

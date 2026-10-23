@@ -68,6 +68,7 @@ export interface LifecycleTenderRow {
     team: string;
     createdAt: string;
     status: string;
+    rfqResponseOn?: string | null;
 }
 
 export interface OemPerformanceResponse {
