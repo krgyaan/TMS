@@ -162,4 +162,23 @@ export interface OemPerformanceParams {
     oemId: number;
     fromDate: string;
     toDate: string;
+    tab?: string;
 }
+
+/* ─── Tab config ───────────────────────────────────────────────────────────── */
+
+export const OEM_TABS = [
+    { key: "rfq_sent", label: "RFQs Sent" },
+    { key: "tenders_not_allowed", label: "Not Allowed" },
+    { key: "tenders_missed", label: "Missed" },
+    { key: "tenders_bid", label: "Bid" },
+    { key: "tender_results_awaited", label: "Results Awaited" },
+    { key: "tenders_disqualified", label: "Disqualified" },
+    { key: "tenders_won", label: "Won" },
+    { key: "tenders_lost", label: "Lost" },
+    { key: "quotation_received", label: "Quotation Received" },
+] as const;
+
+export type OemTabKey = (typeof OEM_TABS)[number]["key"];
+
+export const DEFAULT_OEM_TAB: OemTabKey = "rfq_sent";

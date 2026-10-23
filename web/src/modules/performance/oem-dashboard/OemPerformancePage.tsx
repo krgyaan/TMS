@@ -1,38 +1,32 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Download } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { useVendorOrganizations } from "@/hooks/api/useVendorOrganizations";
-import { useOemPerformance } from "@/hooks/api/useOemPerformance";
-import type { LifecycleTenderRow, OemPerformanceParams } from "./helpers/oem-performance.types";
-import { exportToCSV } from "./helpers/oem-performance.mapper";
+import type { OemPerformanceParams } from "./helpers/oem-performance.types";
+import { OEM_TABS, DEFAULT_OEM_TAB } from "./helpers/oem-performance.types";
 
 import OemFilterCard from "./components/OemFilterCard";
-import TendersNotAllowedTable from "./components/TendersNotAllowedTable";
-import MissedTenderTable from "./components/MissedTenderTable";
-import BidTenderTable from "./components/BidTenderTable";
-import ResultsAwaitedTenderTable from "./components/ResultsAwaitedTenderTable";
-import DisqualifiedTenderTable from "./components/DisqualifiedTenderTable";
-import WonTenderTable from "./components/WonTenderTable";
-import LostTenderTable from "./components/LostTenderTable";
-import QuotationReceivedTable from "./components/QuotationReceivedTable";
-import RfqsSentTable from "./components/RfqsSentTable";
+import OemTenderTable from "./components/OemTenderTable";
 import TenderCountBarChart from "./components/TenderCountBarChart";
 import DonutChartPerformance from "./components/DonutChartPerformance";
 
 const storageKey = "oem-performance-filters";
+
+const VALID_TAB_KEYS: ReadonlySet<string> = new Set<string>(OEM_TABS.map(t => t.key));
 
 function readSubmittedParams(search: string): OemPerformanceParams | null {
     const searchParams = new URLSearchParams(search);
     const rawOemId = searchParams.get("oemId");
     const from = searchParams.get("fromDate");
     const to = searchParams.get("toDate");
+    const tab = searchParams.get("tab");
     const oemId = rawOemId !== null ? Number(rawOemId) : NaN;
 
     if (Number.isFinite(oemId) && from && to) {
-        return { oemId, fromDate: from, toDate: to };
+        const resolvedTab = tab && VALID_TAB_KEYS.has(tab) ? tab : DEFAULT_OEM_TAB;
+        return { oemId, fromDate: from, toDate: to, tab: resolvedTab };
     }
 
     try {
@@ -43,14 +37,17 @@ function readSubmittedParams(search: string): OemPerformanceParams | null {
         const storedOemId = Number(storedParams.get("oemId"));
         const storedFromDate = storedParams.get("fromDate");
         const storedToDate = storedParams.get("toDate");
+        const storedTab = storedParams.get("tab");
         if (Number.isFinite(storedOemId) && storedFromDate && storedToDate) {
-            return { oemId: storedOemId, fromDate: storedFromDate, toDate: storedToDate };
+            const resolvedTab = storedTab && VALID_TAB_KEYS.has(storedTab) ? storedTab : DEFAULT_OEM_TAB;
+            return { oemId: storedOemId, fromDate: storedFromDate, toDate: storedToDate, tab: resolvedTab };
         }
 
         try {
             const legacy = JSON.parse(stored) as Partial<OemPerformanceParams>;
             if (Number.isFinite(Number(legacy.oemId)) && legacy.fromDate && legacy.toDate) {
-                return { oemId: Number(legacy.oemId), fromDate: legacy.fromDate, toDate: legacy.toDate };
+                const resolvedTab = legacy.tab && VALID_TAB_KEYS.has(legacy.tab) ? legacy.tab : DEFAULT_OEM_TAB;
+                return { oemId: Number(legacy.oemId), fromDate: legacy.fromDate, toDate: legacy.toDate, tab: resolvedTab };
             }
         } catch {
             return null;
@@ -61,6 +58,15 @@ function readSubmittedParams(search: string): OemPerformanceParams | null {
     }
 }
 
+function buildSearch(params: OemPerformanceParams, tab: string): URLSearchParams {
+    return new URLSearchParams({
+        oemId: String(params.oemId),
+        fromDate: params.fromDate,
+        toDate: params.toDate,
+        tab,
+    });
+}
+
 export default function OemPerformancePage() {
     const location = useLocation();
     const navigate = useNavigate();
@@ -69,15 +75,11 @@ export default function OemPerformancePage() {
     const [selectedOemId, setSelectedOemId] = useState<number | null>(() => appliedParams?.oemId ?? null);
     const [fromDate, setFromDate] = useState<string | null>(() => appliedParams?.fromDate ?? null);
     const [toDate, setToDate] = useState<string | null>(() => appliedParams?.toDate ?? null);
+    const [activeTab, setActiveTab] = useState<string>(() => appliedParams?.tab ?? DEFAULT_OEM_TAB);
 
     useEffect(() => {
         if (location.search || !appliedParams) return;
-        const search = new URLSearchParams({
-            oemId: String(appliedParams.oemId),
-            fromDate: appliedParams.fromDate,
-            toDate: appliedParams.toDate,
-        });
-        navigate({ search: `?${search.toString()}` }, { replace: true });
+        navigate({ search: `?${buildSearch(appliedParams, appliedParams.tab ?? DEFAULT_OEM_TAB).toString()}` }, { replace: true });
     }, [appliedParams, location.search, navigate]);
 
     const params = useMemo(() => {
@@ -92,115 +94,13 @@ export default function OemPerformancePage() {
 
     const { data: oems = [] } = useVendorOrganizations();
 
-    // Same query key as the table components — served from cache, no extra request.
-    const { data } = useOemPerformance(appliedParams);
-
-    const tendersNotAllowed = useMemo(() => data?.tendersByKpi.tendersNotAllowed ?? [], [data]);
-    const rfqsSent = useMemo(() => data?.tendersByKpi.rfqsSent ?? [], [data]);
-    const tendersMissed = useMemo(() => data?.tendersByKpi.tendersMissed ?? [], [data]);
-    const tendersDisqualified = useMemo(() => data?.tendersByKpi.tendersDisqualified ?? [], [data]);
-    const tenderResultsAwaited = useMemo(() => data?.tendersByKpi.tenderResultsAwaited ?? [], [data]);
-    const tendersBid = useMemo(() => data?.tendersByKpi.tendersSubmitted ?? [], [data]);
-    const tendersWon = useMemo(() => data?.tendersByKpi.tendersWon ?? [], [data]);
-    const tendersLost = useMemo(() => data?.tendersByKpi.tendersLost ?? [], [data]);
-
-    const handleExportReport = useCallback(() => {
-        const selectedOem = oems.find(o => o.id === selectedOemId);
-        const oemName = selectedOem?.name || "Unknown OEM";
-
-        // Export all tables data
-        const allData: Record<string, string>[] = [];
-
-        // Add Tenders Not Allowed
-        tendersNotAllowed.forEach(t => {
-            allData.push({
-                section: "Tenders Not Allowed",
-                member: t.member,
-                team: t.team,
-                tenderName: t.tenderName,
-                tenderNo: t.tenderNo,
-                gstValue: t.gstValues,
-                dueDate: t.dueDate,
-                reason: t.reason,
-                rfqSentOn: "",
-                rfqResponseOn: "",
-            });
-        });
-
-        // Add RFQs Sent
-        rfqsSent.forEach(t => {
-            allData.push({
-                section: "RFQs Sent",
-                member: t.member,
-                team: t.team,
-                tenderName: t.tenderName,
-                tenderNo: t.tenderNo,
-                gstValue: t.gstValues,
-                dueDate: t.dueDate,
-                reason: "",
-                rfqSentOn: t.rfqSentOn,
-                rfqResponseOn: t.rfqResponseOn || "Pending",
-            });
-        });
-
-        // Add missed tenders (rich row shape)
-        tendersMissed.forEach(t => {
-            allData.push({
-                section: "Tenders Missed",
-                member: t.member,
-                team: t.team,
-                tenderName: t.tenderName,
-                tenderNo: t.tenderNo,
-                gstValue: t.gstValues,
-                dueDate: t.dueDate,
-                reason: "",
-                rfqSentOn: t.createdAt,
-                rfqResponseOn: "",
-            });
-        });
-
-        // Add lifecycle buckets
-        const lifecycleSections: { section: string; rows: LifecycleTenderRow[] }[] = [
-            { section: "Tenders Bid", rows: tendersBid },
-            { section: "Tender Results Awaited", rows: tenderResultsAwaited },
-            { section: "Tenders Disqualified", rows: tendersDisqualified },
-            { section: "Tenders Won", rows: tendersWon },
-            { section: "Tenders Lost", rows: tendersLost },
-        ];
-
-        for (const { section, rows } of lifecycleSections) {
-            for (const t of rows) {
-                allData.push({
-                    section,
-                    member: t.member,
-                    team: t.team,
-                    tenderName: t.tenderName,
-                    tenderNo: t.tenderNo,
-                    gstValue: t.gstValues,
-                    dueDate: t.dueDate,
-                    reason: "",
-                    rfqSentOn: t.createdAt,
-                    rfqResponseOn: "",
-                });
-            }
-        }
-
-        const headers = [
-            { key: "section", label: "Section" },
-            { key: "member", label: "Team Member" },
-            { key: "team", label: "Team" },
-            { key: "tenderName", label: "Tender Name" },
-            { key: "tenderNo", label: "Tender No" },
-            { key: "gstValue", label: "GST Value" },
-            { key: "dueDate", label: "Due Date" },
-            { key: "reason", label: "Reason" },
-            { key: "rfqSentOn", label: "RFQ Sent On" },
-            { key: "rfqResponseOn", label: "RFQ Response On" },
-        ];
-
-        const filename = `OEM_Performance_Report_${oemName}_${fromDate}_to_${toDate}`;
-        exportToCSV(allData, filename, headers);
-    }, [tendersNotAllowed, rfqsSent, tendersMissed, tendersBid, tenderResultsAwaited, tendersDisqualified, tendersWon, tendersLost, oems, selectedOemId, fromDate, toDate]);
+    const handleTabChange = (value: string) => {
+        setActiveTab(value);
+        if (!appliedParams) return;
+        const search = buildSearch(appliedParams, value);
+        localStorage.setItem(storageKey, search.toString());
+        navigate({ search: `?${search.toString()}` }, { replace: true });
+    };
 
     return (
         <div className="space-y-6">
@@ -211,10 +111,6 @@ export default function OemPerformancePage() {
                             <CardTitle>OEM Performance Report</CardTitle>
                             <CardDescription>Analyze performance metrics and interactions with selected Original Equipment Manufacturers.</CardDescription>
                         </div>
-                        <Button variant="outline" onClick={handleExportReport} disabled={!appliedParams} className="gap-2">
-                            <Download className="h-4 w-4" />
-                            Export Report
-                        </Button>
                     </div>
                 </CardHeader>
                 <CardContent />
@@ -230,35 +126,28 @@ export default function OemPerformancePage() {
                 onToDate={setToDate}
                 onSubmit={() => {
                     if (!params) return;
-                    setAppliedParams(params);
-                    localStorage.setItem(
-                        storageKey,
-                        new URLSearchParams({
-                            oemId: String(params.oemId),
-                            fromDate: params.fromDate,
-                            toDate: params.toDate,
-                        }).toString()
-                    );
-                    const search = new URLSearchParams({
-                        oemId: String(params.oemId),
-                        fromDate: params.fromDate,
-                        toDate: params.toDate,
-                    });
+                    const next = { ...params, tab: activeTab };
+                    setAppliedParams(next);
+                    const search = buildSearch(params, activeTab);
+                    localStorage.setItem(storageKey, search.toString());
                     navigate({ search: `?${search.toString()}` }, { replace: true });
                 }}
             />
 
             {appliedParams && (
                 <>
-                    <TendersNotAllowedTable params={appliedParams} />
-                    <MissedTenderTable params={appliedParams} />
-                    <BidTenderTable params={appliedParams} />
-                    <ResultsAwaitedTenderTable params={appliedParams} />
-                    <DisqualifiedTenderTable params={appliedParams} />
-                    <WonTenderTable params={appliedParams} />
-                    <LostTenderTable params={appliedParams} />
-                    <QuotationReceivedTable params={appliedParams} />
-                    <RfqsSentTable params={appliedParams} />
+                    <Tabs value={activeTab} onValueChange={handleTabChange}>
+                        <TabsList className="h-auto flex-wrap justify-start">
+                            {OEM_TABS.map(tab => (
+                                <TabsTrigger key={tab.key} value={tab.key} className="text-xs">
+                                    {tab.label}
+                                </TabsTrigger>
+                            ))}
+                        </TabsList>
+                    </Tabs>
+
+                    <OemTenderTable params={appliedParams} tab={activeTab} />
+
                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                         <TenderCountBarChart params={appliedParams} />
                         <DonutChartPerformance params={appliedParams} />
