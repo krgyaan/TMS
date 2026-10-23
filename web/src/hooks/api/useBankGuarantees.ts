@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { bankGuaranteesService } from '@/services/api/bank-guarantees.service';
+import { paymentRequestsKey } from '@/hooks/api/usePaymentRequests';
 import type {
     BankGuaranteeDashboardRow,
     BankGuaranteeDashboardCounts,
@@ -121,6 +122,7 @@ export const useUpdateBankGuarantee = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.all });
             queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.counts() });
+            queryClient.invalidateQueries({ queryKey: paymentRequestsKey.all });
         },
     });
 };
@@ -134,6 +136,7 @@ export const useUpdateBankGuaranteeAction = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.all });
             queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.counts() });
+            queryClient.invalidateQueries({ queryKey: paymentRequestsKey.all });
         },
     });
 };

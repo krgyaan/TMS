@@ -62,9 +62,6 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
     }, [initialData, form]);
 
     const handleSubmit = async (values: FormValues) => {
-        console.log("Initial Form Values", initialData);
-        console.log("Updated Form Values", values);
-
         if (isEditMode) {
             const updatePromises: Promise<any>[] = [];
 

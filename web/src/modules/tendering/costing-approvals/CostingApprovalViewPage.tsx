@@ -7,7 +7,7 @@ import { RfqSection } from '@/modules/tendering/rfqs/components/RfqView';
 import { EmdTenderFeeSection } from '@/modules/tendering/emds-tenderfees/components/EmdTenderFeeShow';
 import { DocumentChecklistSection } from '@/modules/tendering/checklists/components/DocumentChecklistView';
 import { BidSubmissionSection } from '@/modules/tendering/bid-submissions/components/BidSubmissionView';
-import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
+import { TenderStepsPageLayout } from "@/modules/tendering/components/TenderStepsPageLayout";
 import { useTenderStepStatuses } from "@/hooks/api/useTenderStepStatuses";
 import { CostingSheetSection } from '../costing-sheets/components/CostingSheetView';
 import { RaSection } from '../ras/components/RaShow';
@@ -66,7 +66,7 @@ export default function CostingApprovalViewPage() {
     }
 
     return (
-        <ShowPageLayout
+        <TenderStepsPageLayout tenderId={tenderId}
             steps={tenderSteps.filter(s => ["tender-details", "physical-docs", "rfq", "emd-fees", "checklist", "costing", "bid", "tq-management", "ra-management", "result"].includes(s.id))}
             expandedSections={expandedSections}
             onToggleSection={toggleSection}

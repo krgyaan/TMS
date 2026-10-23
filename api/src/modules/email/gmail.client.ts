@@ -5,6 +5,7 @@ import { eq, and } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { DRIZZLE } from '@db/database.module';
 import { oauthAccounts, emailLabels, emailThreads } from '@/db/schemas';
+import { OAuthTokenService } from '@/modules/integrations/oauth-token.service';
 import { ResolvedEmail, SendResult } from './dto/send-email.dto';
 import type { DbInstance } from '@/db';
 import * as fs from 'fs';
@@ -21,6 +22,7 @@ export class GmailClient {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly config: ConfigService,
+        private readonly oauthTokenService: OAuthTokenService,
     ) {
         this.domain = this.config.get('EMAIL_DOMAIN', 'yourdomain.com');
         this.oauth2Client = new google.auth.OAuth2(
@@ -38,72 +40,29 @@ export class GmailClient {
     }
 
     /**
-     * Get valid OAuth token for user (refreshes if needed)
+     * Get valid OAuth token for user (uses OAuthTokenService with auto-refresh)
+     * Returns token + email, or null if no valid OAuth account
      */
     async getValidToken(userId: number): Promise<{ accessToken: string; email: string } | null> {
+        const token = await this.oauthTokenService.getValidToken(userId, 'google');
+        if (!token) {
+            this.logger.warn(`No valid OAuth token for user ${userId}`);
+            return null;
+        }
+
+        // Get email from database
         const account = await this.db
             .select()
             .from(oauthAccounts)
             .where(and(eq(oauthAccounts.userId, userId), eq(oauthAccounts.provider, 'google')))
             .limit(1);
 
-        if (!account.length) {
-            this.logger.warn(`No OAuth account for user ${userId}`);
-            return null;
-        }
-
-        const oauth = account[0];
-
-        // Check if token expired (with 5 min buffer)
-        const now = new Date();
-        const expiresAt = oauth.expiresAt ? new Date(oauth.expiresAt) : null;
-        const isExpired = !expiresAt || expiresAt.getTime() - 5 * 60 * 1000 < now.getTime();
-
-        if (isExpired && oauth.refreshToken) {
-            return this.refreshToken(oauth);
-        }
+        const email = account[0]?.providerEmail || '';
 
         return {
-            accessToken: oauth.accessToken,
-            email: oauth.providerEmail || '',
+            accessToken: token.accessToken,
+            email,
         };
-    }
-
-    /**
-     * Refresh expired OAuth token
-     */
-    private async refreshToken(
-        oauth: typeof oauthAccounts.$inferSelect,
-    ): Promise<{ accessToken: string; email: string } | null> {
-        try {
-            this.oauth2Client.setCredentials({ refresh_token: oauth.refreshToken });
-            const { credentials } = await this.oauth2Client.refreshAccessToken();
-
-            if (!credentials.access_token) {
-                this.logger.error(`Token refresh succeeded but no access_token for user ${oauth.userId}`);
-                return null;
-            }
-
-            // Update in database
-            await this.db
-                .update(oauthAccounts)
-                .set({
-                    accessToken: credentials.access_token,
-                    expiresAt: credentials.expiry_date ? new Date(credentials.expiry_date) : null,
-                    updatedAt: new Date(),
-                })
-                .where(eq(oauthAccounts.id, oauth.id));
-
-            this.logger.log(`Refreshed token for user ${oauth.userId}`);
-
-            return {
-                accessToken: credentials.access_token,
-                email: oauth.providerEmail || '',
-            };
-        } catch (error) {
-            this.logger.error(`Token refresh failed for user ${oauth.userId}:`, error.message);
-            return null;
-        }
     }
 
     /**
@@ -458,7 +417,7 @@ export class GmailClient {
 
             return labelId;
         } catch (error) {
-            this.logger.error('Failed to create label:', error.message);
+            this.logger.error('Failed to create label:', error instanceof Error ? error.message : String(error));
             return null;
         }
     }
@@ -494,7 +453,7 @@ export class GmailClient {
                     });
                     lastLabelId = response.data.id || null;
                 } catch (error) {
-                    if (error.code === 409) {
+                    if ((error as any)?.code === 409) {
                         // Already exists (race condition)
                         lastLabelId = await this.findLabelByName(gmail, currentPath);
                     } else {
@@ -538,7 +497,7 @@ export class GmailClient {
                 requestBody: { addLabelIds: [labelId] },
             });
         } catch (error) {
-            this.logger.warn('Failed to apply label:', error.message);
+            this.logger.warn('Failed to apply label:', error instanceof Error ? error.message : String(error));
         }
     }
 

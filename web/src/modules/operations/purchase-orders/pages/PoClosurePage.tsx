@@ -169,7 +169,8 @@ const PoClosurePage: React.FC = () => {
             await fetchData();
         } catch (err) {
             console.error(err);
-            setSaveMsg({ type: "error", text: "Failed to delete purchase invoice." });
+            const apiMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+            setSaveMsg({ type: "error", text: typeof apiMessage === "string" ? apiMessage : "Failed to delete purchase invoice." });
         } finally {
             setDeletePurchaseInvoice(null);
         }

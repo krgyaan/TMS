@@ -20,7 +20,7 @@ import { normalizeVendorName, isUniqueViolation } from "@/modules/master/vendor-
 import { purchaseOrderProducts } from "@/db/schemas/operations/purchase-order-products.schema";
 import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
 import { orderExtraCharges } from "@/db/schemas/operations/order-extra-charges.schema";
-import { tryMaterializePoInventory, poHasPurchaseInvoice } from "@/modules/operations/inventory/inventory.materialize";
+import { tryMaterializePoInventory, poHasPurchaseInvoice, assertPoInvoiceRemovable } from "@/modules/operations/inventory/inventory.materialize";
 import { woBasicDetails } from "@/db/schemas/operations/work-order.schema";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
@@ -1505,41 +1505,45 @@ export class PurchaseOrderService {
         if (!po) throw new NotFoundException("Purchase Order not found");
 
         const created: any[] = [];
-        for (const item of items) {
-            const invoiceNo = (item.invoiceNo ?? "").toString().trim();
-            if (!invoiceNo) {
-                throw new BadRequestException("Invoice number is required for every purchase invoice");
+        await this.db.transaction(async tx => {
+            for (const item of items) {
+                const invoiceNo = (item.invoiceNo ?? "").toString().trim();
+                if (!invoiceNo) {
+                    throw new BadRequestException("Invoice number is required for every purchase invoice");
+                }
+
+                const duplicate = await tx
+                    .select({ id: purchaseInvoices.id })
+                    .from(purchaseInvoices)
+                    .where(and(eq(purchaseInvoices.projectId, po.projectId), eq(purchaseInvoices.invoiceNo, invoiceNo)))
+                    .limit(1)
+                    .then(rows => rows[0]);
+                if (duplicate) {
+                    throw new BadRequestException(`Invoice number "${invoiceNo}" already exists for this project`);
+                }
+
+                const pi = (
+                    await tx
+                        .insert(purchaseInvoices)
+                        .values({
+                            projectId: po.projectId,
+                            purchaseOrderId: id,
+                            invoiceNo,
+                            category: item.category ?? po.category ?? null,
+                            partyName: item.partyName ?? po.sellerName ?? null,
+                            valuePreGst: item.valuePreGst?.toString(),
+                            gstAmount: item.gstAmount?.toString(),
+                            invoiceDate: item.invoiceDate,
+                            invoiceFile: Array.isArray(item.invoiceFile) ? item.invoiceFile[0] : item.invoiceFile,
+                            uploadedBy: userId,
+                        })
+                        .returning()
+                )[0];
+                created.push(pi);
             }
 
-            const duplicate = await this.db
-                .select({ id: purchaseInvoices.id })
-                .from(purchaseInvoices)
-                .where(and(eq(purchaseInvoices.projectId, po.projectId), eq(purchaseInvoices.invoiceNo, invoiceNo)))
-                .limit(1)
-                .then(rows => rows[0]);
-            if (duplicate) {
-                throw new BadRequestException(`Invoice number "${invoiceNo}" already exists for this project`);
-            }
-
-            const pi = (
-                await this.db
-                    .insert(purchaseInvoices)
-                    .values({
-                        projectId: po.projectId,
-                        purchaseOrderId: id,
-                        invoiceNo,
-                        category: item.category ?? po.category ?? null,
-                        partyName: item.partyName ?? po.sellerName ?? null,
-                        valuePreGst: item.valuePreGst?.toString(),
-                        gstAmount: item.gstAmount?.toString(),
-                        invoiceDate: item.invoiceDate,
-                        invoiceFile: Array.isArray(item.invoiceFile) ? item.invoiceFile[0] : item.invoiceFile,
-                        uploadedBy: userId,
-                    })
-                    .returning()
-            )[0];
-            created.push(pi);
-        }
+            await tryMaterializePoInventory(tx, id, userId);
+        });
 
         this.logger.info(`Bulk created ${created.length} purchase invoices for PO #${id}`);
         return created;
@@ -1636,7 +1640,10 @@ export class PurchaseOrderService {
             .then(rows => rows[0]);
         if (!pi) throw new NotFoundException("Purchase invoice not found");
 
-        await this.db.delete(purchaseInvoices).where(eq(purchaseInvoices.id, piId));
+        await this.db.transaction(async tx => {
+            await assertPoInvoiceRemovable(tx, poId, piId);
+            await tx.delete(purchaseInvoices).where(eq(purchaseInvoices.id, piId));
+        });
         this.logger.info(`Purchase invoice deleted: ${piId} for PO #${poId}`);
         return { success: true };
     }

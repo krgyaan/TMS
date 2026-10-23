@@ -38,8 +38,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private static extractJwtFromRequest(config: AuthConfig): JwtFromRequestFunction {
         return (req: Request): string | null => {
             // 1. Try httpOnly cookie
-            if (req.cookies?.[config.cookie.name]) {
-                return req.cookies[config.cookie.name];
+            if (req.cookies?.[config.accessTokenCookie.name]) {
+                return req.cookies[config.accessTokenCookie.name];
             }
 
             // 2. Fallback to Authorization header

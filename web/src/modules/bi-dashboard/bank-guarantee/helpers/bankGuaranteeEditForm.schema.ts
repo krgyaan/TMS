@@ -9,20 +9,17 @@ export const BankGuaranteeEditFormSchema = z.object({
     expiryDate: z.string().optional().nullable(),
     validityDate: z.string().optional().nullable(),
     claimExpiryDate: z.string().optional().nullable(),
-    status: z.string().optional(),
+    bgExpiryDate: z.string().optional().nullable(),
+    bgClaim: z.string().optional().nullable(),
     action: z.coerce.number().optional(),
-    utr: z.string().optional().nullable(),
-    docketNo: z.string().optional().nullable(),
     courierAddress: z.string().optional().nullable(),
     courierDeadline: z.coerce.number().optional().nullable(),
     bg_req: z.string().optional().nullable(),
-    modification_required: z.string().optional().nullable(),
-    approve_bg: z.string().optional().nullable(),
+    approveBg: z.string().optional().nullable(),
 
     // BG Details fields
     bgNo: z.string().optional().nullable(),
     bgDate: z.string().optional().nullable(),
-    beneficiaryName: z.string().optional().nullable(),
     beneficiaryAddress: z.string().optional().nullable(),
     bankName: z.string().optional().nullable(),
     cashMarginPercent: z.coerce.number().optional().nullable(),
@@ -41,7 +38,13 @@ export const BankGuaranteeEditFormSchema = z.object({
     fdrValidity: z.string().optional().nullable(),
     fdrRoi: z.coerce.number().optional().nullable(),
 
+    // Bank mail ids are repeatable rows; an empty string must validate so a
+    // blank row doesn't block submit.
+    bankMailIds: z.array(z.object({ email: z.email().optional().or(z.literal('')) })).optional(),
+    bankMailIdsCc: z.array(z.object({ email: z.email().optional().or(z.literal('')) })).optional(),
+
     // Extension Details
+    modification_required: z.enum(['Yes', 'No']).optional(),
     extendedAmount: z.coerce.number().optional().nullable(),
     extendedValidityDate: z.string().optional().nullable(),
     extendedClaimExpiryDate: z.string().optional().nullable(),
@@ -72,13 +75,43 @@ export const BankGuaranteeEditFormSchema = z.object({
     bgClientFin: z.string().optional().nullable(),
     bgBankAcc: z.string().optional().nullable(),
     bgBankIfsc: z.string().optional().nullable(),
+    bgBankAccName: z.string().optional().nullable(),
     courierNo: z.string().optional().nullable(),
+
+    // Courier Dispatch (BG) 2
+    courierOrg: z.string().optional().nullable(),
+    courierName: z.string().optional().nullable(),
+    courierPhone: z.string().optional().nullable(),
+    courierAddrLine1: z.string().optional().nullable(),
+    courierAddrLine2: z.string().optional().nullable(),
+    courierCity: z.string().optional().nullable(),
+    courierState: z.string().optional().nullable(),
+    courierPincode: z.string().optional().nullable(),
+    empFrom: z.coerce.number().optional().nullable(),
+    delDate: z.string().optional().nullable(),
+    urgency: z.coerce.number().optional().nullable(),
+    courier_docs: z.any().optional(),
     cancelRemark: z.string().optional().nullable(),
     bgFdrCancelDate: z.string().optional().nullable(),
     bgFdrCancelAmount: z.coerce.number().optional().nullable(),
     bgFdrCancelRefNo: z.string().optional().nullable(),
     bg2Remark: z.string().optional().nullable(),
     reasonReq: z.string().optional().nullable(),
-});
+}).superRefine(
+    (data, ctx) => {
+        if (!data.courierOrg) return;
+        if (!data.courierName) ctx.addIssue({ code: 'custom', message: 'Courier recipient name is required', path: ['courierName'] });
+        if (!data.courierPhone) ctx.addIssue({ code: 'custom', message: 'Courier phone is required', path: ['courierPhone'] });
+        if (!data.courierAddrLine1) ctx.addIssue({ code: 'custom', message: 'Courier address is required', path: ['courierAddrLine1'] });
+        if (!data.courierPincode) {
+            ctx.addIssue({ code: 'custom', message: 'Courier pin code is required', path: ['courierPincode'] });
+        } else if (!/^\d{6}$/.test(data.courierPincode)) {
+            ctx.addIssue({ code: 'custom', message: 'Courier pin code must be 6 digits', path: ['courierPincode'] });
+        }
+        if (!data.empFrom) ctx.addIssue({ code: 'custom', message: 'Courier sender is required', path: ['empFrom'] });
+        if (!data.delDate) ctx.addIssue({ code: 'custom', message: 'Delivery date is required', path: ['delDate'] });
+        if (!data.urgency) ctx.addIssue({ code: 'custom', message: 'Dispatch urgency is required', path: ['urgency'] });
+    }
+);
 
 export type BankGuaranteeEditFormValues = z.infer<typeof BankGuaranteeEditFormSchema>;

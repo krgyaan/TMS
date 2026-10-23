@@ -23,6 +23,7 @@ export { leadTypesService } from "./lead-type.service";
 export { loanPartiesService } from "./loan-party.service";
 export { timerDashboardService } from "./timer-dashboard.service";
 export { tenderInfosService } from "./tenders.service";
+export { tenderStatusHistoryService } from "./tender-status-history.service";
 export { infoSheetsService } from "./info-sheet.service";
 export { paymentRequestsService } from "./payment-requests.service";
 export { rfqsService } from "./rfqs.service";
@@ -61,6 +62,7 @@ export {
 } from "./public-notification.service";
 export { urlShortenerService } from "./url-shortener.service";
 export { healthService } from "./health.service";
+export { queueMonitoringService } from "./queue-monitoring.service";
 export { inventoryApi } from "./inventory.api";
 export { customerPerformanceService } from "./customer-performance.service";
 export { businessPerformanceService } from "./business-performance.service";

@@ -15,8 +15,8 @@ export class PurchaseInvoiceController {
 
     @Put(":id")
     @HttpCode(HttpStatus.OK)
-    update(@Param("id", ParseIntPipe) id: number, @Body() body: any) {
-        return this.service.update(id, body);
+    update(@Param("id", ParseIntPipe) id: number, @Body() body: any, @CurrentUser() user: ValidatedUser) {
+        return this.service.update(id, body, user.id);
     }
 
     @Get("project/:projectId")

@@ -18,6 +18,7 @@ import { MailerService } from "@/mailer/mailer.service";
 
 type SessionWithToken = {
     accessToken: string;
+    refreshToken: string;
     user: UserWithRelations & { permissions: string[] };
 };
 
@@ -33,6 +34,12 @@ export type JwtPayload = {
     iat?: number;
     exp?: number;
     permissions : string[];
+};
+
+export type RefreshTokenPayload = {
+    sub: number;
+    iat?: number;
+    exp?: number;
 };
 
 const GoogleLoginStateSchema = z.object({ purpose: z.literal("google-login") });
@@ -203,9 +210,14 @@ export class AuthService {
         };
 
         const accessToken = await this.jwtService.signAsync(payload);
+        const refreshToken = await this.jwtService.signAsync(
+            { sub: userId } as any,
+            { secret: this.config.jwtRefreshSecret, expiresIn: this.config.jwtRefreshExpiration } as any
+        );
 
         return {
             accessToken,
+            refreshToken,
             user: { ...userWithRelations, permissions },
         };
     }

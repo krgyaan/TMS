@@ -9,7 +9,7 @@ import { purchaseOrderProducts } from "@/db/schemas/operations/purchase-order-pr
 import { vendorWorkOrderItems } from "@/db/schemas/operations/vendor-work-order-items.schema";
 import { orderExtraCharges } from "@/db/schemas/operations/order-extra-charges.schema";
 import { gst2bReco } from "@/db/schemas/operations/gst2b-reco.schema";
-import { tryMaterializePoInventory } from "@/modules/operations/inventory/inventory.materialize";
+import { tryMaterializePoInventory, assertPoInvoiceRemovable } from "@/modules/operations/inventory/inventory.materialize";
 import { CashFlowService } from "@/modules/operations/cash-flows/cash-flow.service";
 import { PurchaseOrderService } from "@/modules/operations/purchase-orders/purchase-order.service";
 import { VendorWorkOrderService } from "@/modules/operations/vendor-work-orders/vendor-work-order.service";
@@ -295,7 +295,7 @@ gstAmount: gstAmount.toFixed(2),
         return pi;
     }
 
-    async update(id: number, body: any) {
+    async update(id: number, body: any, userId?: number) {
         const existing = await this.db
             .select()
             .from(purchaseInvoices)
@@ -320,9 +320,14 @@ gstAmount: gstAmount.toFixed(2),
 
         const purchaseOrderId = body.purchaseOrderId ?? existing.purchaseOrderId ?? null;
         const vendorWorkOrderId = body.vendorWorkOrderId ?? existing.vendorWorkOrderId ?? null;
+        const poUnlinked = !!existing.purchaseOrderId && Number(existing.purchaseOrderId) !== Number(purchaseOrderId ?? null);
 
-        const updated = (
-            await this.db
+        const updated = await this.db.transaction(async tx => {
+            if (poUnlinked) {
+                await assertPoInvoiceRemovable(tx, Number(existing.purchaseOrderId), id);
+            }
+
+            const [row] = await tx
                 .update(purchaseInvoices)
                 .set({
                     invoiceNo,
@@ -337,8 +342,14 @@ gstAmount: gstAmount.toFixed(2),
                     updatedAt: new Date(),
                 })
                 .where(eq(purchaseInvoices.id, id))
-                .returning()
-        )[0];
+                .returning();
+
+            if (purchaseOrderId) {
+                await tryMaterializePoInventory(tx, Number(purchaseOrderId), userId ?? existing.uploadedBy ?? null);
+            }
+
+            return row;
+        });
 
         return updated;
     }
