@@ -29,6 +29,30 @@ export const useCreateSaleInvoice = () => {
     });
 };
 
+export const useAddWoAddress = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({
+            type,
+            woDetailId,
+            customerName,
+            address,
+            gst,
+        }: {
+            type: "billing" | "shipping";
+            woDetailId: number;
+            customerName: string;
+            address: string;
+            gst?: string;
+        }) => saleInvoiceApi.addWoAddress(type, { woDetailId, customerName, address, gst }),
+        onSuccess: () => {
+            // Refresh the WO billing data so the new address shows up in the picker.
+            queryClient.invalidateQueries({ queryKey: ["sale-invoices", "wo-billing-data"] });
+        },
+    });
+};
+
 export const useProjectSaleInvoices = (projectId: number | null) => {
     return useQuery({
         queryKey: saleInvoiceKeys.projectSaleInvoices(projectId!),
