@@ -11,9 +11,8 @@ import type { ActionItem } from "@/components/ui/ActionMenu";
 /* Icons */
 import { Eye } from "lucide-react";
 import { paths } from "@/app/routes/paths";
-import { useOemPerformance } from "@/hooks/api/useOemPerformance";
 import { formatINR } from "@/hooks/useINRFormatter";
-import type { NotAllowedTenderRow, LifecycleTenderRow, RfqSentToOemRow, OemPerformanceParams } from "../helpers/oem-performance.types";
+import type { NotAllowedTenderRow, LifecycleTenderRow, RfqSentToOemRow, OemPerformanceParams, TendersByKpi } from "../helpers/oem-performance.types";
 import { OEM_TABS } from "../helpers/oem-performance.types";
 
 import type { ColDef } from "ag-grid-community";
@@ -34,11 +33,12 @@ type OemTenderRow = (NotAllowedTenderRow | LifecycleTenderRow | RfqSentToOemRow)
 interface OemTenderTableProps {
     params: OemPerformanceParams | null;
     tab: string;
+    data: { tendersByKpi: TendersByKpi } | undefined;
+    isLoading: boolean;
 }
 
-export default function OemTenderTable({ params, tab }: OemTenderTableProps) {
+export default function OemTenderTable({ params, tab, data, isLoading }: OemTenderTableProps) {
     const navigate = useNavigate();
-    const { data, isLoading } = useOemPerformance(params);
 
     const rows = useMemo<OemTenderRow[]>(() => {
         if (!data) return [];
@@ -193,8 +193,6 @@ export default function OemTenderTable({ params, tab }: OemTenderTableProps) {
         }
     }, [actions, tab]);
 
-    const activeTab = OEM_TABS.find(t => t.key === tab) ?? OEM_TABS[0];
-
     if (!params) return null;
 
     if (isLoading) {
@@ -210,6 +208,8 @@ export default function OemTenderTable({ params, tab }: OemTenderTableProps) {
             </Card>
         );
     }
+
+    const activeTab = OEM_TABS.find(t => t.key === tab) ?? OEM_TABS[0];
 
     return (
         <Card>

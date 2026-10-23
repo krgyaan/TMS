@@ -2,8 +2,10 @@ import { useEffect, useState, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 
 import { useVendorOrganizations } from "@/hooks/api/useVendorOrganizations";
+import { useOemPerformance } from "@/hooks/api/useOemPerformance";
 import type { OemPerformanceParams } from "./helpers/oem-performance.types";
 import { OEM_TABS, DEFAULT_OEM_TAB } from "./helpers/oem-performance.types";
 
@@ -77,11 +79,6 @@ export default function OemPerformancePage() {
     const [toDate, setToDate] = useState<string | null>(() => appliedParams?.toDate ?? null);
     const [activeTab, setActiveTab] = useState<string>(() => appliedParams?.tab ?? DEFAULT_OEM_TAB);
 
-    useEffect(() => {
-        if (location.search || !appliedParams) return;
-        navigate({ search: `?${buildSearch(appliedParams, appliedParams.tab ?? DEFAULT_OEM_TAB).toString()}` }, { replace: true });
-    }, [appliedParams, location.search, navigate]);
-
     const params = useMemo(() => {
         if (!selectedOemId || !fromDate || !toDate) return null;
 
@@ -93,6 +90,19 @@ export default function OemPerformancePage() {
     }, [selectedOemId, fromDate, toDate]);
 
     const { data: oems = [] } = useVendorOrganizations();
+    const { data: oemData, isLoading: dataLoading } = useOemPerformance(params);
+
+    const tabCounts = useMemo(() => ({
+        rfq_sent: oemData?.tendersByKpi.rfqsSent?.length ?? 0,
+        tenders_not_allowed: oemData?.tendersByKpi.tendersNotAllowed?.length ?? 0,
+        tenders_missed: oemData?.tendersByKpi.tendersMissed?.length ?? 0,
+        tenders_bid: oemData?.tendersByKpi.tendersSubmitted?.length ?? 0,
+        tender_results_awaited: oemData?.tendersByKpi.tenderResultsAwaited?.length ?? 0,
+        tenders_disqualified: oemData?.tendersByKpi.tendersDisqualified?.length ?? 0,
+        tenders_won: oemData?.tendersByKpi.tendersWon?.length ?? 0,
+        tenders_lost: oemData?.tendersByKpi.tendersLost?.length ?? 0,
+        quotation_received: oemData?.tendersByKpi.quotationReceived?.length ?? 0,
+    }), [oemData]);
 
     const handleTabChange = (value: string) => {
         setActiveTab(value);
@@ -101,6 +111,11 @@ export default function OemPerformancePage() {
         localStorage.setItem(storageKey, search.toString());
         navigate({ search: `?${search.toString()}` }, { replace: true });
     };
+
+    useEffect(() => {
+        if (location.search || !appliedParams) return;
+        navigate({ search: `?${buildSearch(appliedParams, appliedParams.tab ?? DEFAULT_OEM_TAB).toString()}` }, { replace: true });
+    }, [appliedParams, location.search, navigate]);
 
     return (
         <div className="space-y-6">
@@ -137,16 +152,19 @@ export default function OemPerformancePage() {
             {appliedParams && (
                 <>
                     <Tabs value={activeTab} onValueChange={handleTabChange}>
-                        <TabsList className="h-auto flex-wrap justify-start">
+                        <TabsList className="h-auto flex-wrap justify-center">
                             {OEM_TABS.map(tab => (
-                                <TabsTrigger key={tab.key} value={tab.key} className="text-xs">
+                                <TabsTrigger key={tab.key} value={tab.key} className="text-xs flex items-center gap-1.5">
                                     {tab.label}
+                                    <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                                        {tabCounts[tab.key as keyof typeof tabCounts]}
+                                    </Badge>
                                 </TabsTrigger>
                             ))}
                         </TabsList>
                     </Tabs>
 
-                    <OemTenderTable params={appliedParams} tab={activeTab} />
+                    <OemTenderTable params={appliedParams} tab={activeTab} data={oemData} isLoading={dataLoading} />
 
                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                         <TenderCountBarChart params={appliedParams} />
