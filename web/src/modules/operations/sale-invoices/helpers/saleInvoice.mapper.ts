@@ -25,10 +25,13 @@ export function mapSaleInvoiceFormToCreateDTO(
         billingPanNo: values.billingPanNo || undefined,
         billingMsmeNo: values.billingMsmeNo || undefined,
         billingCinNo: values.billingCinNo || undefined,
+        billingAddressId: values.selectedBillingAddressId ? Number(values.selectedBillingAddressId) : null,
         shippingCustomerName: values.shippingCustomerName,
         shippingAddress: values.shippingAddress,
         shippingGst: values.shippingGst || undefined,
         shippingPanNo: values.shippingPanNo || undefined,
+        shippingAddressId: values.selectedShippingAddressId ? Number(values.selectedShippingAddressId) : null,
+        transporterId: values.transporterId ? Number(values.transporterId) : null,
         dispatchFromName: values.dispatchFromName || undefined,
         dispatchFromAddress: values.dispatchFromAddress || undefined,
         dispatchFromGst: values.dispatchFromGst || undefined,
@@ -37,15 +40,19 @@ export function mapSaleInvoiceFormToCreateDTO(
         dispatchToName: values.dispatchToName || undefined,
         dispatchToAddress: values.dispatchToAddress || undefined,
         dispatchToGst: values.dispatchToGst || undefined,
+        freight: Number(values.freight || 0),
+        otherCharges: Number(values.otherCharges || 0),
+        roundOff: Number(values.roundOff || 0),
         items: values.items
-            .filter(item => item.itemDescription && item.qty !== null && item.rate !== null && item.qty > 0)
-            .map(item => ({
-                srNo: item.srNo,
+            .filter((item) => item.itemDescription && item.qty !== null && item.rate !== null && item.qty > 0)
+            .map((item) => ({
+                lineItemSrNo: item.lineItemSrNo,
+                purchaseOrderProductId: item.purchaseOrderProductId,
+                srNo: item.lineItemSrNo > 0 ? item.lineItemSrNo : undefined,
                 itemDescription: item.itemDescription,
                 qty: item.qty!,
                 rate: item.rate!,
                 gstRate: item.gstRate,
-                purchaseOrderProductId: item.purchaseOrderProductId,
                 unit: item.unit,
                 hsnSac: item.hsnSac,
             })),

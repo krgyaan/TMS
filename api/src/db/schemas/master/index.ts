@@ -46,3 +46,6 @@ export * from "./emd-responsibilities";
 // Circulars
 export * from "./circulars.schema";
 
+// Transporters
+export * from "./transporters.schema";
+

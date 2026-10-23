@@ -4,6 +4,7 @@ import { createReadStream, existsSync } from "fs";
 import { join } from "path";
 import { CurrentUser } from "@/modules/auth/decorators/current-user.decorator";
 import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
+import { createSaleInvoiceSchema, type CreateSaleInvoiceDto } from "./dto/create-sale-invoice.dto";
 import { SaleInvoiceService } from "./sale-invoice.service";
 
 @Controller("sale-invoices")
@@ -15,10 +16,21 @@ export class SaleInvoiceController {
         return this.service.getWoBillingData(projectId);
     }
 
+    @Post("wo-addresses/:type")
+    @HttpCode(HttpStatus.CREATED)
+    addWoAddress(
+        @Param("type") type: string,
+        @Body() body: { woDetailId: number; customerName: string; address: string; gst?: string },
+        @CurrentUser() user: ValidatedUser,
+    ) {
+        return this.service.addWoAddress(type, body, user.id);
+    }
+
     @Post()
     @HttpCode(HttpStatus.CREATED)
-    create(@Body() body: any, @CurrentUser() user: ValidatedUser) {
-        return this.service.create(body, user.id);
+    create(@Body() body: unknown, @CurrentUser() user: ValidatedUser) {
+        const parsed = createSaleInvoiceSchema.parse(body) as CreateSaleInvoiceDto;
+        return this.service.create(parsed, user.id);
     }
 
     @Get("project/:projectId")

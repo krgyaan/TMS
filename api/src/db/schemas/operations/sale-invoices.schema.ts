@@ -1,5 +1,7 @@
 import { bigint, bigserial, date, index, integer, jsonb, numeric, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
 import { purchaseOrderProducts } from "./purchase-order-products.schema";
+import { woBillingAddresses, woShippingAddresses } from "./work-order.schema";
+import { transporters } from "../master/transporters.schema";
 
 export const saleInvoices = pgTable("sale_invoices", {
     id: bigserial("id", { mode: "number" }).primaryKey(),
@@ -18,11 +20,20 @@ export const saleInvoices = pgTable("sale_invoices", {
     billingPanNo: varchar("billing_pan_no", { length: 50 }),
     billingMsmeNo: varchar("billing_msme_no", { length: 50 }),
     billingCinNo: varchar("billing_cin_no", { length: 50 }),
+    billingAddressId: bigint("billing_address_id", { mode: "number" })
+        .references(() => woBillingAddresses.id, { onDelete: "set null" }),
 
     shippingCustomerName: varchar("shipping_customer_name", { length: 255 }),
     shippingAddress: text("shipping_address"),
     shippingGst: varchar("shipping_gst", { length: 15 }),
     shippingPanNo: varchar("shipping_pan_no", { length: 50 }),
+    shippingAddressId: bigint("shipping_address_id", { mode: "number" })
+        .references(() => woShippingAddresses.id, { onDelete: "set null" }),
+
+    transporterId: bigint("transporter_id", { mode: "number" })
+        .references(() => transporters.id, { onDelete: "set null" }),
+    transporterDetails: jsonb("transporter_details")
+        .$type<{ name?: string; phone?: string; gstNo?: string; address?: string } | null>(),
 
     dispatchFromName: varchar("dispatch_from_name", { length: 255 }),
     dispatchFromAddress: text("dispatch_from_address"),
@@ -35,6 +46,9 @@ export const saleInvoices = pgTable("sale_invoices", {
 
     totalPreGst: numeric("total_pre_gst", { precision: 20, scale: 2 }),
     totalGst: numeric("total_gst", { precision: 20, scale: 2 }),
+    freight: numeric("freight", { precision: 20, scale: 2 }).default("0"),
+    otherCharges: numeric("other_charges", { precision: 20, scale: 2 }).default("0"),
+    roundOff: numeric("round_off", { precision: 20, scale: 2 }).default("0"),
     grandTotal: numeric("grand_total", { precision: 20, scale: 2 }),
 
     invoiceTaxableAmount: numeric("invoice_taxable_amount", { precision: 20, scale: 2 }),
@@ -97,6 +111,7 @@ export const saleInvoiceItems = pgTable("sale_invoice_items", {
         .references(() => saleInvoices.id, { onDelete: "cascade" }),
     purchaseOrderProductId: bigint("purchase_order_product_id", { mode: "number" })
         .references(() => purchaseOrderProducts.id, { onDelete: "set null" }),
+    lineItemSrNo: integer("line_item_sr_no"),
     unit: varchar("unit", { length: 20 }),
     hsnSac: varchar("hsn_sac", { length: 100 }),
 

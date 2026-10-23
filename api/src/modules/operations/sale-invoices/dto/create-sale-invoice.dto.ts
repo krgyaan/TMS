@@ -11,10 +11,13 @@ export const createSaleInvoiceSchema = z.object({
     billingPanNo: z.string().optional().default(""),
     billingMsmeNo: z.string().optional().default(""),
     billingCinNo: z.string().optional().default(""),
+    billingAddressId: z.number().optional().nullable().default(null),
     shippingCustomerName: z.string().min(1, "Shipping customer name is required"),
     shippingAddress: z.string().min(1, "Shipping address is required"),
     shippingGst: z.string().optional().default(""),
     shippingPanNo: z.string().optional().default(""),
+    shippingAddressId: z.number().optional().nullable().default(null),
+    transporterId: z.number().optional().nullable().default(null),
     dispatchFromName: z.string().optional().default(""),
     dispatchFromAddress: z.string().optional().default(""),
     dispatchFromGst: z.string().optional().default(""),
@@ -23,15 +26,25 @@ export const createSaleInvoiceSchema = z.object({
     dispatchToName: z.string().optional().default(""),
     dispatchToAddress: z.string().optional().default(""),
     dispatchToGst: z.string().optional().default(""),
-    items: z.array(z.object({
-        srNo: z.number().optional(),
-        itemDescription: z.string().min(1, "Description is required"),
-        qty: z.number(),
-        rate: z.number(),
-        gstRate: z.number().default(18),
-        purchaseOrderProductId: z.number().optional(),
-        unit: z.string().optional(),
-        hsnSac: z.string().optional(),
-    })).min(1, "At least one item is required"),
+    freight: z.number().optional().default(0),
+    otherCharges: z.number().optional().default(0),
+    roundOff: z.number().optional().default(0),
+    items: z
+        .array(
+            z.object({
+                lineItemSrNo: z.number().int().min(0, "Line item is required"),
+                purchaseOrderProductId: z.number(),
+                srNo: z.number().optional(),
+                itemDescription: z.string().min(1, "Description is required"),
+                qty: z.number().positive("Qty must be greater than 0"),
+                rate: z.number().min(0, "Rate is required"),
+                gstRate: z.number().default(18),
+                unit: z.string().optional(),
+                hsnSac: z.string().optional(),
+            }),
+        )
+        .min(1, "At least one item is required"),
     remarks: z.string().optional().default(""),
 });
+
+export type CreateSaleInvoiceDto = z.infer<typeof createSaleInvoiceSchema>;
