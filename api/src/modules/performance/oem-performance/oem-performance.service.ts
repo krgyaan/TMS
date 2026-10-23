@@ -79,7 +79,7 @@ export class OemPerformanceService {
             const lostTenders = this.buildLifecycleTenders(tenderRows, rfqInfoByTender, STATUS.LOST, "Lost");
             const disqualifiedTenders = this.buildLifecycleTenders(tenderRows, rfqInfoByTender, STATUS.DISQUALIFIED, "Disqualified");
             const resultsAwaitedTenders = this.buildLifecycleTenders(tenderRows, rfqInfoByTender, STATUS.RESULTS_AWAITED, "Results Awaited");
-            const bidTenders = this.buildBidTenders(tenderRows, bidRows, rfqInfoByTender);
+            const bidTenders = this.buildBidTenders(bidRows, rfqInfoByTender);
             const quotationReceivedTenders = this.buildQuotationReceivedTenders(quotationTenders, rfqInfoByTender);
             const summary = this.buildSummary(tenderRows, bidRows);
             const monthlyTrend = this.buildMonthlyTrend(bidRows);
@@ -175,29 +175,22 @@ export class OemPerformanceService {
                    t.gst_values           AS "gstValues",
                    bs.status              AS "bidStatus",
                    t.status               AS "tenderStatus",
-                   COALESCE(bs.submission_datetime, bs.created_at) AS "submissionDatetime"
+                   bs.submission_datetime AS "submissionDatetime",
+                   t.due_date             AS "dueDate",
+                   u.name                 AS "teamMemberName",
+                   tm.name                AS "teamName"
             FROM bid_submissions bs
             INNER JOIN tender_infos t ON t.id = bs.tender_id
+            LEFT JOIN users u ON u.id = t.team_member
+            LEFT JOIN teams tm ON tm.id = t.team
+            INNER JOIN tender_costing_sheets cs ON cs.tender_id = t.id
+                AND cs.oem_vendor_ids @> to_jsonb(${oem}::int)
+            INNER JOIN tender_costing_details cd ON cd.tender_costing_sheets_id = cs.id
+                AND cd.status = 'Approved'
             WHERE t.delete_status = 0
-              AND COALESCE(bs.submission_datetime, bs.created_at) BETWEEN ${from} AND ${to}
-              AND (
-                    EXISTS (
-                        SELECT 1
-                        FROM tender_costing_sheets cs
-                        WHERE cs.tender_id = t.id
-                          AND cs.oem_vendor_ids @> to_jsonb(${oem}::int)
-                    )
-                 OR (
-                        NOT EXISTS (
-                            SELECT 1
-                            FROM tender_costing_sheets cs
-                            WHERE cs.tender_id = t.id
-                              AND cs.oem_vendor_ids IS NOT NULL
-                              AND jsonb_array_length(cs.oem_vendor_ids) > 0
-                        )
-                        AND ${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(t.rfq_to::text, '')), '\\s*,\\s*'))
-                 )
-              )
+              AND bs.status IN ('Bid Submitted', 'Submission Pending')
+              AND bs.submission_datetime IS NOT NULL
+              AND bs.submission_datetime BETWEEN ${from} AND ${to}
         `);
         return rows as unknown as BidTenderRow[];
     }
@@ -336,26 +329,21 @@ export class OemPerformanceService {
         });
     }
 
-    private buildBidTenders(tenders: TenderRow[], bids: BidTenderRow[], rfqInfoByTender: Map<number, RfqInfoRow>): LifecycleTenderRow[] {
-        const bidTenderIds = new Set<number>();
-        for (const row of bids) {
-            if (row.bidStatus === "Bid Submitted") bidTenderIds.add(Number(row.tenderId));
-        }
-
-        return tenders
-            .filter(t => t.sentToOem && bidTenderIds.has(t.id))
-            .map(t => {
-                const info = rfqInfoByTender.get(t.id);
+    private buildBidTenders(bids: BidTenderRow[], rfqInfoByTender: Map<number, RfqInfoRow>): LifecycleTenderRow[] {
+        return bids
+            .filter(b => b.bidStatus === "Bid Submitted" || b.bidStatus === "Submission Pending")
+            .map(b => {
+                const info = rfqInfoByTender.get(b.tenderId);
                 return {
-                    id: t.id,
-                    tenderNo: t.tenderNo,
-                    tenderName: t.tenderName,
-                    dueDate: format(t.dueDate, DATE_FORMAT),
-                    gstValues: t.gstValues,
-                    member: t.teamMemberName ?? "—",
-                    team: t.teamName ?? "—",
+                    id: b.tenderId,
+                    tenderNo: b.tenderNo,
+                    tenderName: b.tenderName,
+                    dueDate: format(b.dueDate, DATE_FORMAT),
+                    gstValues: b.gstValues,
+                    member: b.teamMemberName ?? "—",
+                    team: b.teamName ?? "—",
                     createdAt: info?.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
-                    status: "Bid Submitted",
+                    status: b.bidStatus,
                 };
             });
     }

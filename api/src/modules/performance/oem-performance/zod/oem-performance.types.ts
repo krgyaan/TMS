@@ -23,6 +23,9 @@ export interface BidTenderRow {
     bidStatus: "Submission Pending" | "Bid Submitted" | "Tender Missed";
     tenderStatus: number;
     submissionDatetime: Date | null;
+    dueDate: Date;
+    teamMemberName: string | null;
+    teamName: string | null;
 }
 
 export interface RfqInfoRow {
