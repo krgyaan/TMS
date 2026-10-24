@@ -78,11 +78,6 @@ export const getGstStateCode = (gstin: string | null | undefined): string | null
 
 export const isValidGstin = (gstin: string): boolean => getGstStateCode(gstin) !== null;
 
-export const splitAddress = (address: string | null | undefined): [string, string, string] => {
-    const lines = (address ?? "").split(/[,\n]/).map((line) => line.trim()).filter(Boolean);
-    return [lines[0] ?? "", lines[1] ?? "", lines.slice(2).join(", ")];
-};
-
 export const buildSaleInvoicePdfItems = (
     items: Array<{
         srNo: number | null;
@@ -110,9 +105,6 @@ export const buildSaleInvoicePdfItems = (
     return {
         sr_no: item.srNo ?? index + 1,
         description: item.itemDescription || "",
-        details_line1: "",
-        details_line2: "",
-        details_line3: "",
         hsn_sac: item.hsnSac || "",
         quantity,
         rate,
@@ -363,9 +355,16 @@ export class SaleInvoiceService {
                     woDetailId: body.woDetailId,
                     invoiceNumber,
                     invoiceDate: body.invoiceDate,
+                    projectManagerName: body.projectManagerName || null,
+                    projectManagerPhone: body.projectManagerPhone || null,
+                    projectManagerEmail: body.projectManagerEmail || null,
                     billingCustomerName: body.billingCustomerName,
                     billingAddress: body.billingAddress,
                     billingGst: body.billingGst || null,
+                    billingStateName: body.billingStateName || null,
+                    billingPlaceOfSupply: body.billingPlaceOfSupply || null,
+                    billingContactPerson: body.billingContactPerson || null,
+                    billingPhone: body.billingPhone || null,
                     billingEmail: body.billingEmail || null,
                     billingPanNo: body.billingPanNo || null,
                     billingMsmeNo: body.billingMsmeNo || null,
@@ -374,10 +373,15 @@ export class SaleInvoiceService {
                     shippingCustomerName: body.shippingCustomerName,
                     shippingAddress: body.shippingAddress,
                     shippingGst: body.shippingGst || null,
+                    shippingStateName: body.shippingStateName || null,
+                    shippingPlaceOfSupply: body.shippingPlaceOfSupply || null,
+                    shippingContactPerson: body.shippingContactPerson || null,
+                    shippingPhone: body.shippingPhone || null,
                     shippingPanNo: body.shippingPanNo || null,
                     shippingAddressId: body.shippingAddressId ?? null,
                     transporterId: body.transporterId ?? null,
                     transporterDetails: transporterSnapshot,
+                    transportVia: body.transportVia || null,
                     dispatchFromName: body.dispatchFromName || null,
                     dispatchFromAddress: body.dispatchFromAddress || null,
                     dispatchFromGst: body.dispatchFromGst || null,
@@ -716,11 +720,32 @@ export class SaleInvoiceService {
         const [creator] = si.raisedBy
             ? await this.db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, si.raisedBy))
             : [];
-        const billingAddress = splitAddress(si.billingAddress);
-        const shippingAddress = splitAddress(si.shippingAddress);
-        const dispatchAddress = splitAddress(si.dispatchFromAddress);
+        const billingBoqRows = si.woDetailId
+            ? await this.db
+                .select({ srNo: woBillingBoq.srNo, itemDescription: woBillingBoq.itemDescription })
+                .from(woBillingBoq)
+                .where(eq(woBillingBoq.woDetailId, si.woDetailId))
+            : [];
+        const boqDescriptionBySrNo = new Map(billingBoqRows.map((row) => [row.srNo, row.itemDescription]));
+        const linkedProductIds = items
+            .map((item) => item.purchaseOrderProductId)
+            .filter((id): id is number => id != null);
+        const poProducts = linkedProductIds.length > 0
+            ? await this.db
+                .select({ id: purchaseOrderProducts.id, description: purchaseOrderProducts.description })
+                .from(purchaseOrderProducts)
+                .where(inArray(purchaseOrderProducts.id, linkedProductIds))
+            : [];
+        const poDescriptionById = new Map(poProducts.map((row) => [row.id, row.description]));
         const isInterstate = buyerStateCode !== "07";
-        const rows = buildSaleInvoicePdfItems(items, isInterstate);
+        const rows = buildSaleInvoicePdfItems(items, isInterstate).map((row, index) => {
+            const item = items[index];
+            return {
+                ...row,
+                boq_item_name: boqDescriptionBySrNo.get(item.lineItemSrNo) || "",
+                po_item_description: poDescriptionById.get(item.purchaseOrderProductId) || item.itemDescription || "",
+            };
+        });
 
         const totalQuantity = rows.reduce((sum, item) => sum + item.quantity, 0);
         const lineItemSubtotal = rows.reduce((sum, item) => sum + item.total, 0);
@@ -755,38 +780,35 @@ export class SaleInvoiceService {
             buyer_order_date: project?.poDate || "",
             project_code: project?.projectCode || "",
             project_name: project?.projectName || "",
-            project_manager: "",
-            project_manager_phone: "",
-            project_manager_email: "",
+            project_manager: si.projectManagerName || "",
+            project_manager_phone: si.projectManagerPhone || "",
+            project_manager_email: si.projectManagerEmail || "",
             transporter_name: transporter.name || "",
             transporter_gst: transporter.gstNo || "",
+            transporter_mode: si.transportVia || "",
             transporter_phone: transporter.phone || "",
             bill_of_lading_number: si.dispatchLrNo || "",
             vehicle_number: si.dispatchVehicleNo || "",
             buyer_name: si.billingCustomerName || "",
-            buyer_address_line1: billingAddress[0],
-            buyer_address_line2: billingAddress[1],
-            buyer_address_line3: billingAddress[2],
+            buyer_address: si.billingAddress || "",
             buyer_pin: "",
             buyer_gst: si.billingGst || "",
             buyer_pan: si.billingPanNo || "",
-            buyer_state: buyerState,
-            buyer_contact_person: "",
-            buyer_phone: "",
+            buyer_state: si.billingStateName || buyerState,
+            buyer_place_of_supply: si.billingPlaceOfSupply || buyerState,
+            buyer_contact_person: si.billingContactPerson || "",
+            buyer_phone: si.billingPhone || "",
             consignee_name: si.shippingCustomerName || "",
-            consignee_address_line1: shippingAddress[0],
-            consignee_address_line2: shippingAddress[1],
-            consignee_address_line3: shippingAddress[2],
-            consignee_address_line4: "",
-            consignee_address_line5: "",
+            consignee_address: si.shippingAddress || "",
             consignee_pin: "",
             consignee_gst: si.shippingGst || "",
             consignee_pan: si.shippingPanNo || "",
-            consignee_state: GST_STATE_NAMES[getGstStateCode(si.shippingGst) || ""] || "",
+            consignee_state: si.shippingStateName || GST_STATE_NAMES[getGstStateCode(si.shippingGst) || ""] || "",
+            consignee_place_of_supply: si.shippingPlaceOfSupply || GST_STATE_NAMES[getGstStateCode(si.shippingGst) || ""] || "",
+            consignee_contact_person: si.shippingContactPerson || "",
+            consignee_phone: si.shippingPhone || "",
             dispatch_from_name: si.dispatchFromName || "",
-            dispatch_address_line1: dispatchAddress[0],
-            dispatch_address_line2: dispatchAddress[1],
-            dispatch_address_line3: dispatchAddress[2],
+            dispatch_address: si.dispatchFromAddress || "",
             dispatch_pin: "",
             dispatch_gst: si.dispatchFromGst || "",
             dispatch_pan: "",
@@ -1214,9 +1236,16 @@ export class SaleInvoiceService {
                 woDetailId: saleInvoices.woDetailId,
                 invoiceNumber: saleInvoices.invoiceNumber,
                 invoiceDate: saleInvoices.invoiceDate,
+                projectManagerName: saleInvoices.projectManagerName,
+                projectManagerPhone: saleInvoices.projectManagerPhone,
+                projectManagerEmail: saleInvoices.projectManagerEmail,
                 billingCustomerName: saleInvoices.billingCustomerName,
                 billingAddress: saleInvoices.billingAddress,
                 billingGst: saleInvoices.billingGst,
+                billingStateName: saleInvoices.billingStateName,
+                billingPlaceOfSupply: saleInvoices.billingPlaceOfSupply,
+                billingContactPerson: saleInvoices.billingContactPerson,
+                billingPhone: saleInvoices.billingPhone,
                 billingEmail: saleInvoices.billingEmail,
                 billingPanNo: saleInvoices.billingPanNo,
                 billingMsmeNo: saleInvoices.billingMsmeNo,
@@ -1225,10 +1254,15 @@ export class SaleInvoiceService {
                 shippingCustomerName: saleInvoices.shippingCustomerName,
                 shippingAddress: saleInvoices.shippingAddress,
                 shippingGst: saleInvoices.shippingGst,
+                shippingStateName: saleInvoices.shippingStateName,
+                shippingPlaceOfSupply: saleInvoices.shippingPlaceOfSupply,
+                shippingContactPerson: saleInvoices.shippingContactPerson,
+                shippingPhone: saleInvoices.shippingPhone,
                 shippingPanNo: saleInvoices.shippingPanNo,
                 shippingAddressId: saleInvoices.shippingAddressId,
                 transporterId: saleInvoices.transporterId,
                 transporterDetails: saleInvoices.transporterDetails,
+                transportVia: saleInvoices.transportVia,
                 dispatchFromName: saleInvoices.dispatchFromName,
                 dispatchFromAddress: saleInvoices.dispatchFromAddress,
                 dispatchFromGst: saleInvoices.dispatchFromGst,
