@@ -12,6 +12,7 @@ export interface TenderRow {
     status: number;
     sentToOem: boolean;
     notAllowedForOem: boolean;
+    responseOn?: Date | null;
 }
 
 export interface BidTenderRow {
@@ -22,12 +23,28 @@ export interface BidTenderRow {
     bidStatus: "Submission Pending" | "Bid Submitted" | "Tender Missed";
     tenderStatus: number;
     submissionDatetime: Date | null;
+    dueDate: Date;
+    teamMemberName: string | null;
+    teamName: string | null;
 }
 
 export interface RfqInfoRow {
     tenderId: number;
     rfqSentOn: Date | null;
     responseOn: Date | null;
+}
+
+export interface RfqSentRawRow {
+    id: number;
+    tenderNo: string;
+    tenderName: string;
+    dueDate: Date;
+    gstValues: string;
+    member: string | null;
+    team: string | null;
+    rfqSentOn: Date | null;
+    rfqResponseOn: Date | null;
+    createdAt: Date | null;
 }
 
 // ─── Summary item ─────────────────────────────────────────────────────────────
@@ -89,7 +106,7 @@ export interface RfqSentToOemRow {
     createdAt: string;
 }
 
-export interface LifecycleTenderRow {
+export type LifecycleTenderRow = {
     id: number;
     tenderNo: string;
     tenderName: string;
@@ -99,7 +116,9 @@ export interface LifecycleTenderRow {
     team: string;
     createdAt: string;
     status: string;
-}
+    submissionTime?: string;
+    resultDate?: string;
+};
 
 export interface OemPerformanceResponse {
     summary: OemSummary;
@@ -108,6 +127,7 @@ export interface OemPerformanceResponse {
     missedTenders: LifecycleTenderRow[];
     wonTenders: LifecycleTenderRow[];
     lostTenders: LifecycleTenderRow[];
+    cancelledTenders: LifecycleTenderRow[];
     disqualifiedTenders: LifecycleTenderRow[];
     resultsAwaitedTenders: LifecycleTenderRow[];
     bidTenders: LifecycleTenderRow[];
