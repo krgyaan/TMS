@@ -62,19 +62,20 @@ export class OemPerformanceService {
         this.logger.info("Fetching OEM performance", { oem, fromDate, toDate });
 
         try {
-            const [tenderRows, bidRows, rfqInfoRows, quotationTenders, rfqSentRows] = await Promise.all([
+            const [tenderRows, bidRows, rfqInfoRows, quotationTenders, rfqSentRows, missedBidRows] = await Promise.all([
                 this.fetchOemTenders(oem, from, to),
                 this.fetchBidTenders(oem, from, to),
                 this.fetchRfqInfo(oem, from, to),
                 this.fetchQuotationReceivedTenders(oem, from, to),
                 this.fetchRfqsSentToOem(oem, from, to),
+                this.fetchMissedTenders(oem, from, to),
             ]);
 
             const rfqInfoByTender = new Map(rfqInfoRows.map(r => [Number(r.tenderId), r]));
 
             const notAllowedTenders = this.buildNotAllowedTenders(tenderRows);
             const rfqsSentToOem = this.buildRfqsSentToOem(rfqSentRows);
-            const missedTenders = this.buildLifecycleTenders(tenderRows, rfqInfoByTender, STATUS.MISSED, "Missed");
+            const missedTenders = this.buildMissedTenders(missedBidRows, rfqInfoByTender);
             const wonTenders = this.buildLifecycleTenders(tenderRows, rfqInfoByTender, STATUS.WON, "Won");
             const lostTenders = this.buildLifecycleTenders(tenderRows, rfqInfoByTender, STATUS.LOST, "Lost");
             const disqualifiedTenders = this.buildLifecycleTenders(tenderRows, rfqInfoByTender, STATUS.DISQUALIFIED, "Disqualified");
@@ -191,6 +192,33 @@ export class OemPerformanceService {
               AND bs.status IN ('Bid Submitted', 'Submission Pending')
               AND bs.submission_datetime IS NOT NULL
               AND bs.submission_datetime BETWEEN ${from} AND ${to}
+        `);
+        return rows as unknown as BidTenderRow[];
+    }
+
+    private async fetchMissedTenders(oem: number, from: Date, to: Date): Promise<BidTenderRow[]> {
+        const { rows } = await this.db.execute(sql`
+            SELECT bs.tender_id           AS "tenderId",
+                t.tender_no            AS "tenderNo",
+                t.tender_name          AS "tenderName",
+                t.gst_values           AS "gstValues",
+                bs.status              AS "bidStatus",
+                t.status               AS "tenderStatus",
+                bs.submission_datetime AS "submissionDatetime",
+                t.due_date             AS "dueDate",
+                u.name                 AS "teamMemberName",
+                tm.name                AS "teamName"
+            FROM bid_submissions bs
+            INNER JOIN tender_infos t ON t.id = bs.tender_id
+            LEFT JOIN users u ON u.id = t.team_member
+            LEFT JOIN teams tm ON tm.id = t.team
+            INNER JOIN tender_costing_sheets cs ON cs.tender_id = t.id
+                AND cs.oem_vendor_ids @> to_jsonb(${oem}::int)
+            INNER JOIN tender_costing_details cd ON cd.tender_costing_sheets_id = cs.id
+                AND cd.status = 'Approved'
+            WHERE t.delete_status = 0
+            AND bs.status = 'Tender Missed'
+            AND bs.created_at BETWEEN ${from} AND ${to}
         `);
         return rows as unknown as BidTenderRow[];
     }
@@ -330,25 +358,41 @@ export class OemPerformanceService {
     }
 
     private buildBidTenders(bids: BidTenderRow[], rfqInfoByTender: Map<number, RfqInfoRow>): LifecycleTenderRow[] {
-    return bids
-        .filter(b => b.bidStatus === "Bid Submitted" || b.bidStatus === "Submission Pending")
-        .map(b => {
-            const info = rfqInfoByTender.get(b.tenderId);
+        return bids
+            .filter(b => b.bidStatus === "Bid Submitted" || b.bidStatus === "Submission Pending")
+            .map(b => {
+                const info = rfqInfoByTender.get(b.tenderId);
+                return {
+                    id: b.tenderId,
+                    tenderNo: b.tenderNo,
+                    tenderName: b.tenderName,
+                    dueDate: format(b.dueDate, DATE_FORMAT),
+                    gstValues: b.gstValues,
+                    member: b.teamMemberName ?? "—",
+                    team: b.teamName ?? "—",
+                    createdAt: info?.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
+                    submissionTime: b.submissionDatetime ? format(b.submissionDatetime, DATE_FORMAT) : "—", // 👈 new
+                    status: b.bidStatus,
+                };
+            });
+    }
+    private buildMissedTenders(rows: BidTenderRow[], rfqInfoByTender: Map<number, RfqInfoRow>): LifecycleTenderRow[] {
+        return rows.map(r => {
+            const info = rfqInfoByTender.get(r.tenderId);
             return {
-                id: b.tenderId,
-                tenderNo: b.tenderNo,
-                tenderName: b.tenderName,
-                dueDate: format(b.dueDate, DATE_FORMAT),
-                gstValues: b.gstValues,
-                member: b.teamMemberName ?? "—",
-                team: b.teamName ?? "—",
+                id: r.tenderId,
+                tenderNo: r.tenderNo,
+                tenderName: r.tenderName,
+                dueDate: format(r.dueDate, DATE_FORMAT),
+                gstValues: r.gstValues,
+                member: r.teamMemberName ?? "—",
+                team: r.teamName ?? "—",
                 createdAt: info?.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
-                submissionTime: b.submissionDatetime ? format(b.submissionDatetime, DATE_FORMAT) : "—", // 👈 new
-                status: b.bidStatus,
+                status: "Missed",
             };
         });
-}
-
+    }
+    
     private buildSummary(tenders: TenderRow[], bids: BidTenderRow[]): OemSummary {
         const assigned = tenders.filter(t => t.sentToOem);
         const approved = assigned.filter(t => t.tlStatus === 1);
