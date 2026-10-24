@@ -301,49 +301,81 @@ export default function DocumentChecklistForm({
                                         Re-analyze
                                     </Button>
                                 )}
-                                {suggestMutation.isPending && (
+                                {suggestionPanel.analyzing && (
                                     <Button type="button" variant="outline" size="sm" disabled>
-                                        <Sparkles className="mr-2 h-4 w-4" />
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                         Analyzing tender documents…
                                     </Button>
                                 )}
                             </div>
 
-                            {suggestMutation.isPending && (
-                                <Alert>
-                                    <AlertCircle className="h-4 w-4" />
+                            {/* In-progress state */}
+                            {suggestionPanel.analyzing && (
+                                <Alert className="bg-muted/50 border-primary/20">
+                                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
                                     <AlertDescription>
-                                        Reading the tender's main and ATC documents and identifying bidding
+                                        Reading the tender&apos;s main and ATC documents and identifying bidding
                                         requirements — this can take up to a minute for large tenders.
                                     </AlertDescription>
                                 </Alert>
                             )}
 
-                            {suggestMutation.isError && (
+                            {/* Failed state */}
+                            {(suggestionPanel.failed || suggestMutation.isError) && (
                                 <Alert variant="destructive">
                                     <AlertCircle className="h-4 w-4" />
-                                    <AlertDescription>
-                                        {(() => {
-                                            const data = (suggestMutation.error as any)?.response?.data;
-                                            let message = data?.message || (suggestMutation.error as any)?.message || 'Failed to analyze bidding requirements for this tender';
-                                            if (message === 'Internal server error' && data?.code) {
-                                                message = `Analysis failed: ${data.code}`;
-                                            }
-                                            return message;
-                                        })()}
+                                    <AlertDescription className="flex items-center justify-between">
+                                        <span>
+                                            {(() => {
+                                                const data = (suggestMutation.error as any)?.response?.data;
+                                                let message = data?.message || (suggestMutation.error as any)?.message || suggestionPanel.error || 'Failed to analyze bidding requirements for this tender';
+                                                if (message === 'Internal server error' && data?.code) {
+                                                    message = `Analysis failed: ${data.code}`;
+                                                }
+                                                return message;
+                                            })()}
+                                        </span>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="ml-4 h-7 text-xs border-destructive-foreground/30 hover:bg-destructive-foreground/10"
+                                            onClick={() => suggestMutation.mutate({ tenderId, forceRefresh: true })}
+                                        >
+                                            <RefreshCw className="mr-1 h-3 w-3" />
+                                            Retry
+                                        </Button>
                                     </AlertDescription>
                                 </Alert>
                             )}
 
+                            {/* Checking cache state on load */}
                             {suggestionPanel.checkingCache && (
-                                <p className="text-sm text-muted-foreground">Checking for a saved analysis…</p>
+                                <p className="text-sm text-muted-foreground flex items-center gap-2">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Checking for a saved analysis…
+                                </p>
                             )}
 
-                            {suggestions && !suggestMutation.isPending && suggestions.requirements.length === 0 && (
+                            {/* Clear "not analysed yet" state */}
+                            {suggestionPanel.notAnalysedYet && (
+                                <div
+                                    data-testid="not-analysed-yet"
+                                    className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground bg-muted/20"
+                                >
+                                    <Sparkles className="mx-auto h-8 w-8 text-muted-foreground/40 mb-2" />
+                                    <p className="font-medium text-foreground">Tender documents have not been analysed yet</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        Click &ldquo;Analyze Tender Documents&rdquo; to extract suggested bidding requirements and annexures using AI.
+                                    </p>
+                                </div>
+                            )}
+
+                            {suggestions && !suggestionPanel.analyzing && suggestions.requirements.length === 0 && (
                                 <Alert>
                                     <AlertCircle className="h-4 w-4" />
                                     <AlertDescription>
-                                        No additional document requirements were identified in the tender's documents.
+                                        No additional document requirements were identified in the tender&apos;s documents.
                                     </AlertDescription>
                                 </Alert>
                             )}

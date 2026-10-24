@@ -53,11 +53,39 @@ test('cached analysis on load: shown immediately, only "Re-analyze" offered', ()
     assert.equal(s.checkingCache, false);
 });
 
-test('never analysed: "Analyze Tender Documents" offered, nothing shown', () => {
+test('never analysed: "Analyze Tender Documents" offered, notAnalysedYet is true', () => {
     const s = resolveSuggestionPanel({ cached: null, cacheLoading: false, fresh: undefined, analyzing: false });
     assert.equal(s.analysis, null);
     assert.equal(s.showAnalyze, true);
     assert.equal(s.showReanalyze, false);
+    assert.equal(s.notAnalysedYet, true);
+    assert.equal(s.status, 'idle');
+    assert.equal(s.failed, false);
+});
+
+test('in-progress state: analyzing is true, buttons hidden, status is running', () => {
+    const s = resolveSuggestionPanel({ cached: null, cacheLoading: false, fresh: undefined, analyzing: true });
+    assert.equal(s.analyzing, true);
+    assert.equal(s.status, 'running');
+    assert.equal(s.showAnalyze, false);
+    assert.equal(s.showReanalyze, false);
+    assert.equal(s.notAnalysedYet, false);
+});
+
+test('failed state: failed is true, status is failed, error is preserved', () => {
+    const s = resolveSuggestionPanel({
+        cached: null,
+        cacheLoading: false,
+        fresh: undefined,
+        analyzing: false,
+        failed: true,
+        error: 'VolksAI analysis failed',
+    });
+    assert.equal(s.failed, true);
+    assert.equal(s.status, 'failed');
+    assert.equal(s.error, 'VolksAI analysis failed');
+    assert.equal(s.showAnalyze, false);
+    assert.equal(s.notAnalysedYet, false);
 });
 
 test('while the cache read is in flight: no button yet (no premature paid analysis)', () => {
@@ -112,11 +140,20 @@ test('page-load read hits only the cache-only route and returns the cached analy
     assert.deepEqual(hits, ['/api/v1/document-checklists/tender/1175/bidding-requirements/cached']);
 });
 
-test('page-load read of a never-analysed tender returns null (and still only hits /cached)', async () => {
+test('page-load read of a never-analysed tender returns null with no console errors', async () => {
     hits = [];
     cachedPayload = { analysis: null };
-    assert.equal(await documentChecklistService.getCachedRequirements(1175), null);
-    assert.deepEqual(hits, ['/api/v1/document-checklists/tender/1175/bidding-requirements/cached']);
+    const originalConsoleError = console.error;
+    const errors: any[] = [];
+    console.error = (...args) => errors.push(args);
+    try {
+        const res = await documentChecklistService.getCachedRequirements(1175);
+        assert.equal(res, null);
+        assert.deepEqual(hits, ['/api/v1/document-checklists/tender/1175/bidding-requirements/cached']);
+        assert.equal(errors.length, 0, 'Must produce no console errors on unanalysed tender');
+    } finally {
+        console.error = originalConsoleError;
+    }
 });
 
 test('"Analyze" uses the normal endpoint; "Re-analyze" sends forceRefresh=true', async () => {
