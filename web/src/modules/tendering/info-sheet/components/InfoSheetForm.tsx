@@ -81,6 +81,12 @@ export function TenderInformationForm({
         processing_time_ms?: number;
         documentIdentityCheck?: DocumentIdentityCheck | null;
         llm_status?: string;
+        last_error?: {
+            status?: number | null;
+            type?: string;
+            message?: string;
+            detail?: string;
+        } | null;
         failed_categories?: string[];
         stale?: boolean;
         isStale?: boolean;
@@ -174,6 +180,7 @@ export function TenderInformationForm({
                     processing_time_ms: res.processing_time_ms,
                     documentIdentityCheck: res.documentIdentityCheck,
                     llm_status: res.llm_status,
+                    last_error: (res as any)?.last_error || (res?.fields as any)?.metadata?.last_error || null,
                     failed_categories: res.failed_categories,
                 });
                 const populateResult = populateFormFromExtraction(form, res.fields as any);
@@ -223,6 +230,7 @@ export function TenderInformationForm({
                             processing_time_ms: statusRes.processing_time_ms,
                             documentIdentityCheck: statusRes.documentIdentityCheck,
                             llm_status: statusRes.llm_status,
+                            last_error: (statusRes as any)?.last_error || (statusRes?.fields as any)?.metadata?.last_error || null,
                             failed_categories: statusRes.failed_categories,
                         });
 
@@ -234,9 +242,21 @@ export function TenderInformationForm({
                         const missingCount = statusRes.missing_fields?.length || 0;
                         const fallbackCount = Object.values(indicators).filter((i) => i.type === 'fallback').length;
 
-                        if (statusRes.llm_status === 'llm_unavailable') {
+                        const lastErr = (statusRes as any)?.last_error || (statusRes?.fields as any)?.metadata?.last_error;
+                        const isLlmFailed = statusRes.llm_status && statusRes.llm_status !== 'ok';
+
+                        if (isLlmFailed) {
+                            const errMessage = lastErr?.type === 'auth_error' || lastErr?.status === 401 || statusRes.llm_status === 'auth_error'
+                                ? 'AI step failed: Anthropic API key rejected'
+                                : lastErr?.type === 'timeout' || lastErr?.status === 408 || statusRes.llm_status === 'timeout'
+                                ? 'AI step failed: Request timed out'
+                                : lastErr?.type === 'rate_limited' || lastErr?.status === 429 || statusRes.llm_status === 'rate_limited'
+                                ? 'AI step failed: Rate limit exceeded (429)'
+                                : lastErr?.type === 'model_not_found' || lastErr?.status === 404 || statusRes.llm_status === 'model_not_found'
+                                ? 'AI step failed: Model not found'
+                                : 'AI step failed, some fields were not extracted';
                             toast.warning(
-                                `AI step failed, some fields were not extracted. Partial extraction completed (${populateResult.populatedCount} fields auto-populated).`,
+                                `${errMessage}. Partial extraction completed (${populateResult.populatedCount} fields auto-populated).`,
                                 { id: 'auto-extract', duration: 7000 },
                             );
                         } else {
@@ -471,7 +491,7 @@ export function TenderInformationForm({
                                     <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
                                     <span>AI Extracted (Outdated)</span>
                                 </Badge>
-                            ) : extractionData?.llm_status === 'llm_unavailable' ? (
+                            ) : ((extractionData?.llm_status && extractionData?.llm_status !== 'ok') || Boolean(extractionData?.last_error)) ? (
                                 <Badge
                                     variant="outline"
                                     data-testid="ai-extracted-partial-badge"
@@ -562,7 +582,7 @@ export function TenderInformationForm({
                         </AlertDescription>
                     </Alert>
                 )}
-                {extractionData?.llm_status === 'llm_unavailable' && (
+                {((extractionData?.llm_status && extractionData.llm_status !== 'ok') || Boolean(extractionData?.last_error)) && (
                     <Alert
                         role="alert"
                         data-testid="ai-extraction-unavailable"
@@ -572,11 +592,23 @@ export function TenderInformationForm({
                         <AlertDescription className="text-amber-800 dark:text-amber-200">
                             <div className="space-y-1.5">
                                 <p className="font-semibold text-base">
-                                    AI step failed, some fields were not extracted
+                                    {extractionData?.last_error?.type === 'auth_error' || extractionData?.last_error?.status === 401 || extractionData?.llm_status === 'auth_error'
+                                        ? 'AI step failed: Anthropic API key rejected (401 Unauthorized)'
+                                        : extractionData?.last_error?.type === 'timeout' || extractionData?.last_error?.status === 408 || extractionData?.llm_status === 'timeout'
+                                        ? 'AI step failed: Request timed out'
+                                        : extractionData?.last_error?.type === 'rate_limited' || extractionData?.last_error?.status === 429 || extractionData?.llm_status === 'rate_limited'
+                                        ? 'AI step failed: Rate limit exceeded (429)'
+                                        : extractionData?.last_error?.type === 'model_not_found' || extractionData?.last_error?.status === 404 || extractionData?.llm_status === 'model_not_found'
+                                        ? 'AI step failed: Model not found'
+                                        : 'AI step failed, some fields were not extracted'}
                                 </p>
                                 <p className="text-sm">
-                                    The AI service could not be reached or encountered an error. Document parsing completed using rule-based pattern matching only. Some complex fields may require manual review.
-                                    {extractionData.failed_categories && extractionData.failed_categories.length > 0 && (
+                                    {extractionData?.last_error?.type === 'auth_error' || extractionData?.last_error?.status === 401 || extractionData?.llm_status === 'auth_error'
+                                        ? 'The Anthropic API key was rejected by the service. Please verify ANTHROPIC_API_KEY in the environment configuration. Document parsing completed using rule-based pattern matching only.'
+                                        : extractionData?.last_error?.type === 'timeout' || extractionData?.last_error?.status === 408 || extractionData?.llm_status === 'timeout'
+                                        ? 'The AI request timed out before finishing. Document parsing completed using rule-based pattern matching only.'
+                                        : 'The AI service could not be reached or encountered an error. Document parsing completed using rule-based pattern matching only. Some complex fields may require manual review.'}
+                                    {extractionData?.failed_categories && extractionData.failed_categories.length > 0 && (
                                         <span className="block mt-1 text-xs opacity-90 font-medium">
                                             Skipped categories: {extractionData.failed_categories.join(', ')}
                                         </span>

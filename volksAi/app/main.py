@@ -36,6 +36,11 @@ def verify_anthropic_api_key():
     placeholder_vals = ["your_claude_api_key_here", "your_anthropic_api_key_here", "your_key_here", "placeholder", "xxx"]
     if not key or any(p in key.lower() for p in placeholder_vals):
         logger.error("[STARTUP] FATAL: ANTHROPIC_API_KEY is not configured or is a placeholder.")
+        health.set_health_status("degraded", llm_status="not_configured", last_error={
+            "status": None,
+            "type": "missing_key",
+            "message": "ANTHROPIC_API_KEY is not configured or is a placeholder"
+        })
         return
     try:
         import anthropic
@@ -47,12 +52,17 @@ def verify_anthropic_api_key():
             messages=[{"role": "user", "content": "ping"}],
         )
         logger.info("[STARTUP] Anthropic API connection verified successfully. Claude is active.")
+        health.set_health_status("ok", llm_status="ok")
     except Exception as exc:
         status_code = getattr(exc, "status_code", None)
+        from app.services.llm_field_resolver import classify_anthropic_error
+        err_info = classify_anthropic_error(exc)
         logger.error(
-            "[STARTUP] Anthropic API startup check failed: status_code=%s, error_type=%s, detail=%s",
-            status_code, type(exc).__name__, exc
+            "[STARTUP] Anthropic API startup check failed: status_code=%s, error_type=%s, msg=%s",
+            status_code, err_info["type"], err_info["message"]
         )
+        # If startup probe gets a 401 (or other failure), report degraded so it is visible
+        health.set_health_status("degraded", llm_status=err_info["type"], last_error=err_info)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

@@ -68,6 +68,13 @@ export interface PdfExtractionJobResult {
     llm_usage?: Record<string, any>;
     llm_status?: string;
     failed_categories?: string[];
+    last_error?: {
+        status?: number | null;
+        type?: string;
+        message?: string;
+        detail?: string;
+        class?: string;
+    } | null;
     self_classified_atc?: boolean;
     has_atc?: boolean;
     ambiguous_field_conflicts?: Record<string, any>;

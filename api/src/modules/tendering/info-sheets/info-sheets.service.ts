@@ -1871,6 +1871,7 @@ export class TenderInfoSheetsService {
                 has_atc: hasAtc,
                 ambiguous_field_conflicts: conflicts,
                 llm_status: metadata?.llm_status || 'ok',
+                last_error: metadata?.last_error || null,
                 failed_categories: metadata?.failed_categories || [],
                 stale: isStale,
                 isStale: isStale,
@@ -1936,12 +1937,22 @@ export class TenderInfoSheetsService {
                 ? existingMetadata.failed_categories
                 : [];
 
+        const callerLastError =
+            (data as any)?.last_error ?? (data.fields as any)?.metadata?.last_error;
+        const effectiveLastError =
+            callerLastError !== undefined
+                ? callerLastError
+                : existingMetadata?.last_error !== undefined
+                ? existingMetadata.last_error
+                : null;
+
         const fieldsToPersist: Record<string, any> = {
             ...data.fields,
             metadata: {
                 ...((data.fields as any)?.metadata || {}),
                 llm_status: effectiveLlmStatus,
                 failed_categories: effectiveFailedCategories,
+                ...(effectiveLastError !== null && effectiveLastError !== undefined ? { last_error: effectiveLastError } : {}),
             },
         };
 

@@ -22,7 +22,7 @@ from app.core.logging import get_logger
 logger = get_logger(__name__)
 
 MAIN_TENDER_MAX_PAGES = int(os.getenv("MAIN_TENDER_MAX_PAGES", "150"))
-CHILD_PDF_MAX_PAGES = int(os.getenv("CHILD_PDF_MAX_PAGES", "60"))
+CHILD_PDF_MAX_PAGES = int(os.getenv("CHILD_PDF_MAX_PAGES", "400"))
 
 
 # BUG 3 FIX: Field precedence constants defining field ownership rules
@@ -581,7 +581,7 @@ def ingest_parent_tender_pdf(
                     logger.debug(f"Could not parse extra child PDF {c_pdf}: {c_err}")
 
             # Upsert standalone resolve_atc_anchor_fields output into atc_sections (Task 2)
-            atc_full_text = "\n".join([p.get("text", "") for p in atc_page_texts])
+            atc_full_text = "\n".join([f"\n--- [PAGE {p.get('page', i+1)}] ---\n" + p.get("text", "") for i, p in enumerate(atc_page_texts)])
             atc_checkboxes = [cb for p in atc_page_texts for cb in p.get("checkboxes", [])]
             from app.services.tender_mapper import resolve_atc_anchor_fields
             resolved_atc = resolve_atc_anchor_fields(atc_full_text, checkboxes=atc_checkboxes, page_texts=atc_page_texts)
@@ -908,7 +908,7 @@ def ingest_parent_tender_pdf(
                         if k in FIELD_PROMPT_MAP:
                             missing_keys.append(k)
                 # Combine parent and ATC child texts to ensure LLM has full context
-                parent_text = "\n".join([p.get("text", "") for p in all_pages])
+                parent_text = "\n".join([f"\n--- [PAGE {p.get('page', i+1)}] ---\n" + p.get("text", "") for i, p in enumerate(all_pages)])
                 target_text = f"{parent_text}\n\n{atc_full_text}".strip() if atc_full_text else parent_text.strip()
                 
                 # Check for BEC / Section-II content in target text
@@ -957,6 +957,14 @@ def ingest_parent_tender_pdf(
                             infosheet_data["_failed_categories"] = list(resolver.failed_categories)
                         elif llm_resolved.get("_failed_categories"):
                             infosheet_data["_failed_categories"] = list(llm_resolved["_failed_categories"])
+                        if "_last_error" in llm_resolved:
+                            infosheet_data["_last_error"] = llm_resolved["_last_error"]
+                        elif getattr(resolver, "last_error", None):
+                            infosheet_data["_last_error"] = resolver.last_error
+
+                        for k, v in llm_resolved.items():
+                            if k.startswith("_raw_tool_call_") or k.startswith("_scoped_text_"):
+                                infosheet_data[k] = v
 
                         field_statuses = cast(Dict[str, str], infosheet_data.get("_info_sheet_statuses", {}))
                         missing_fields = cast(List[str], infosheet_data.get("missing_fields", []))
@@ -1129,6 +1137,10 @@ def ingest_parent_tender_pdf(
                             infosheet_data["_llm_status"] = "llm_unavailable"
                         if getattr(resolver, "failed_categories", None):
                             infosheet_data["_failed_categories"] = list(resolver.failed_categories)
+                        if "_last_error" in ambig_decisions:
+                            infosheet_data["_last_error"] = ambig_decisions["_last_error"]
+                        elif getattr(resolver, "last_error", None):
+                            infosheet_data["_last_error"] = resolver.last_error
 
                         field_statuses = cast(Dict[str, str], infosheet_data.get("_info_sheet_statuses", {}))
 

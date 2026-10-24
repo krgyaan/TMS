@@ -300,9 +300,20 @@ export class PdfExtractionProcessor implements OnModuleInit {
                     fieldsToPersist[key] = fieldVal;
                 }
             }
+            const callerLastError =
+                extractionResult.last_error ??
+                (extractionResult.fields as any)?.metadata?.last_error;
+            const effectiveLastError =
+                callerLastError !== undefined
+                    ? callerLastError
+                    : existingMetadata?.last_error !== undefined
+                    ? existingMetadata.last_error
+                    : null;
+
             fieldsToPersist.metadata = {
                 llm_status: effectiveLlmStatus,
                 failed_categories: effectiveFailedCategories,
+                ...(effectiveLastError !== null && effectiveLastError !== undefined ? { last_error: effectiveLastError } : {}),
             };
             extractionResult.fields = fieldsToPersist as any;
             const totalPersistFieldCount = Object.keys(fieldsToPersist).length;
