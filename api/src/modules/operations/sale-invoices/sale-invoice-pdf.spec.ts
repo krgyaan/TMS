@@ -2,19 +2,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as Handlebars from "handlebars";
 import { getPdfMargins, isLandscape } from "@/modules/pdf/config/pdf-config";
-import {
-    buildSaleInvoicePdfItems,
-    buildSaleInvoiceTaxSummary,
-    computeSaleInvoicePdfHash,
-    getGstStateCode,
-    isValidGstin,
-    SaleInvoiceService,
-    splitAddress,
-} from "./sale-invoice.service";
+import { buildSaleInvoicePdfItems, buildSaleInvoiceTaxSummary, computeSaleInvoicePdfHash, getGstStateCode, isValidGstin, SaleInvoiceService } from "./sale-invoice.service";
 
 const pdfItem = (
     overrides: Partial<{
         srNo: number | null;
+        lineItemSrNo: number;
+        purchaseOrderProductId: number;
         itemDescription: string | null;
         quantity: string | number | null;
         rate: string | number | null;
@@ -27,6 +21,8 @@ const pdfItem = (
     }> = {}
 ) => ({
     srNo: 1,
+    lineItemSrNo: 7,
+    purchaseOrderProductId: 88,
     itemDescription: "Widget",
     quantity: "2",
     rate: "100.00",
@@ -42,7 +38,7 @@ const pdfItem = (
 describe("sale invoice PDF data helpers", () => {
     const templateSource = readFileSync(join(__dirname, "../../pdf/templates/si-template.hbs"), "utf8");
 
-    const render = (isInterstate: boolean) => {
+    const render = (isInterstate: boolean, boqItemName = "Test BOQ item") => {
         const handlebars = Handlebars.create();
         handlebars.registerHelper("inc", (value: number) => value + 1);
         handlebars.registerHelper("formatDate", (value: string) => value || "");
@@ -54,6 +50,8 @@ describe("sale invoice PDF data helpers", () => {
             items: [
                 {
                     description: "Test widget",
+                    boq_item_name: boqItemName,
+                    po_item_description: "Test PO description",
                     quantity: 2,
                     rate: 100,
                     unit: "EA",
@@ -86,7 +84,12 @@ describe("sale invoice PDF data helpers", () => {
             seller_state: "Delhi",
             seller_state_code: "07",
             buyer_name: "Buyer",
+            buyer_address: "Buyer line one\nBuyer line two",
             buyer_state: "Karnataka",
+            consignee_name: "Consignee",
+            consignee_address: "Consignee line one\nConsignee line two",
+            dispatch_from_name: "Dispatch warehouse",
+            dispatch_address: "Dispatch line one\nDispatch line two",
         });
     };
 
@@ -104,10 +107,6 @@ describe("sale invoice PDF data helpers", () => {
         expect(isLandscape("po")).toBe(false);
         expect(isLandscape("unknown")).toBe(false);
         expect(getPdfMargins("si")).toEqual({ top: "5mm", right: "7.5mm", bottom: "5mm", left: "7.5mm" });
-    });
-
-    it("splits addresses into three printable lines without losing overflow", () => {
-        expect(splitAddress("Unit 4, Industrial Estate, Bengaluru, Karnataka 560001")).toEqual(["Unit 4", "Industrial Estate", "Bengaluru, Karnataka 560001"]);
     });
 
     it("allocates interstate tax to IGST", () => {
@@ -148,24 +147,31 @@ describe("sale invoice PDF data helpers", () => {
     it.each([false, true])("renders the %s GST layout without sample constants", isInterstate => {
         const html = render(isInterstate);
 
-        expect(html).toContain("Test widget");
+        expect(html).toContain("<b>Test BOQ item</b>");
+        expect(html).toContain("Test PO description");
         expect(html).toContain(isInterstate ? 'colspan="10"' : 'colspan="11"');
+        expect(html).toMatch(/<pre[^>]*>Buyer line one\nBuyer line two<\/pre>/);
+        expect(html).toMatch(/<pre[^>]*>Consignee line one\nConsignee line two<\/pre>/);
+        expect(html).toMatch(/<pre[^>]*>Dispatch line one\nDispatch line two<\/pre>/);
         expect(html).not.toMatch(/-0\.20|Plot 10\/1A/);
     });
 
+    it("uses the PO description as the bold fallback when no BOQ match exists", () => {
+        const html = render(true, "");
+
+        expect(html).toContain("<b>Test PO description</b>");
+    });
+
     it("builds the production PDF payload using billing GSTIN jurisdiction", async () => {
+        const queryResults: unknown[][] = [
+            [{ projectName: "Test Project", projectCode: "TP-1", poNo: "PO-123", poDate: "2026-10-20" }],
+            [{ srNo: 7, itemDescription: "WO BOQ item" }],
+            [{ id: 88, description: "Live PO product description" }],
+        ];
         const db = {
             select: () => ({
                 from: () => ({
-                    where: () =>
-                        Promise.resolve([
-                            {
-                                projectName: "Test Project",
-                                projectCode: "TP-1",
-                                poNo: "PO-123",
-                                poDate: "2026-10-20",
-                            },
-                        ]),
+                    where: () => Promise.resolve(queryResults.shift() ?? []),
                 }),
             }),
         };
@@ -175,6 +181,7 @@ describe("sale invoice PDF data helpers", () => {
             id: 1,
             invoiceNumber: "SI/TEST/0001",
             invoiceDate: "2026-10-23",
+            woDetailId: 4,
             billingCustomerName: "Buyer",
             billingAddress: "Unit 4, Industrial Estate",
             billingGst: "29ABCDE1234F1ZW",
@@ -195,7 +202,9 @@ describe("sale invoice PDF data helpers", () => {
         expect(data["project_code"]).toBe("TP-1");
         expect(data["buyer_order_number"]).toBe("PO-123");
         expect(data["buyer_order_date"]).toBe("2026-10-20");
-        expect(data["buyer_address_line1"]).toBe("Unit 4");
+        expect(data["buyer_address"]).toBe("Unit 4, Industrial Estate");
+        expect(rows[0].boq_item_name).toBe("WO BOQ item");
+        expect(rows[0].po_item_description).toBe("Live PO product description");
         expect(rows[0].igst_amount).toBe(36);
         expect(rows[0].cgst_amount).toBe(0);
     });

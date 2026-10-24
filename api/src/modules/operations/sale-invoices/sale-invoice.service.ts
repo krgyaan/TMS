@@ -78,11 +78,6 @@ export const getGstStateCode = (gstin: string | null | undefined): string | null
 
 export const isValidGstin = (gstin: string): boolean => getGstStateCode(gstin) !== null;
 
-export const splitAddress = (address: string | null | undefined): [string, string, string] => {
-    const lines = (address ?? "").split(/[,\n]/).map((line) => line.trim()).filter(Boolean);
-    return [lines[0] ?? "", lines[1] ?? "", lines.slice(2).join(", ")];
-};
-
 export const buildSaleInvoicePdfItems = (
     items: Array<{
         srNo: number | null;
@@ -110,9 +105,6 @@ export const buildSaleInvoicePdfItems = (
     return {
         sr_no: item.srNo ?? index + 1,
         description: item.itemDescription || "",
-        details_line1: "",
-        details_line2: "",
-        details_line3: "",
         hsn_sac: item.hsnSac || "",
         quantity,
         rate,
@@ -716,11 +708,32 @@ export class SaleInvoiceService {
         const [creator] = si.raisedBy
             ? await this.db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, si.raisedBy))
             : [];
-        const billingAddress = splitAddress(si.billingAddress);
-        const shippingAddress = splitAddress(si.shippingAddress);
-        const dispatchAddress = splitAddress(si.dispatchFromAddress);
+        const billingBoqRows = si.woDetailId
+            ? await this.db
+                .select({ srNo: woBillingBoq.srNo, itemDescription: woBillingBoq.itemDescription })
+                .from(woBillingBoq)
+                .where(eq(woBillingBoq.woDetailId, si.woDetailId))
+            : [];
+        const boqDescriptionBySrNo = new Map(billingBoqRows.map((row) => [row.srNo, row.itemDescription]));
+        const linkedProductIds = items
+            .map((item) => item.purchaseOrderProductId)
+            .filter((id): id is number => id != null);
+        const poProducts = linkedProductIds.length > 0
+            ? await this.db
+                .select({ id: purchaseOrderProducts.id, description: purchaseOrderProducts.description })
+                .from(purchaseOrderProducts)
+                .where(inArray(purchaseOrderProducts.id, linkedProductIds))
+            : [];
+        const poDescriptionById = new Map(poProducts.map((row) => [row.id, row.description]));
         const isInterstate = buyerStateCode !== "07";
-        const rows = buildSaleInvoicePdfItems(items, isInterstate);
+        const rows = buildSaleInvoicePdfItems(items, isInterstate).map((row, index) => {
+            const item = items[index];
+            return {
+                ...row,
+                boq_item_name: boqDescriptionBySrNo.get(item.lineItemSrNo) || "",
+                po_item_description: poDescriptionById.get(item.purchaseOrderProductId) || item.itemDescription || "",
+            };
+        });
 
         const totalQuantity = rows.reduce((sum, item) => sum + item.quantity, 0);
         const lineItemSubtotal = rows.reduce((sum, item) => sum + item.total, 0);
@@ -764,9 +777,7 @@ export class SaleInvoiceService {
             bill_of_lading_number: si.dispatchLrNo || "",
             vehicle_number: si.dispatchVehicleNo || "",
             buyer_name: si.billingCustomerName || "",
-            buyer_address_line1: billingAddress[0],
-            buyer_address_line2: billingAddress[1],
-            buyer_address_line3: billingAddress[2],
+            buyer_address: si.billingAddress || "",
             buyer_pin: "",
             buyer_gst: si.billingGst || "",
             buyer_pan: si.billingPanNo || "",
@@ -774,19 +785,13 @@ export class SaleInvoiceService {
             buyer_contact_person: "",
             buyer_phone: "",
             consignee_name: si.shippingCustomerName || "",
-            consignee_address_line1: shippingAddress[0],
-            consignee_address_line2: shippingAddress[1],
-            consignee_address_line3: shippingAddress[2],
-            consignee_address_line4: "",
-            consignee_address_line5: "",
+            consignee_address: si.shippingAddress || "",
             consignee_pin: "",
             consignee_gst: si.shippingGst || "",
             consignee_pan: si.shippingPanNo || "",
             consignee_state: GST_STATE_NAMES[getGstStateCode(si.shippingGst) || ""] || "",
             dispatch_from_name: si.dispatchFromName || "",
-            dispatch_address_line1: dispatchAddress[0],
-            dispatch_address_line2: dispatchAddress[1],
-            dispatch_address_line3: dispatchAddress[2],
+            dispatch_address: si.dispatchFromAddress || "",
             dispatch_pin: "",
             dispatch_gst: si.dispatchFromGst || "",
             dispatch_pan: "",
