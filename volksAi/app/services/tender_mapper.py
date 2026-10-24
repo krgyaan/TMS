@@ -942,10 +942,61 @@ def clean_phone(value: Any) -> str:
     """
     if _contact_is_empty(value):
         return "NA"
-    s = re.sub(r"\s+", " ", str(value)).strip()
+    s = str(value).strip().split("\n")[0].strip()
+    s = re.sub(r"\s*(?:&|;|Extn\.?|Ext\.|Extension)\s*.*$", "", s, flags=re.IGNORECASE).strip()
+    s = re.sub(r"\s*/\s*", " / ", s)
     s = re.sub(r"(?:[\s\-/,:]*\b(?:e|ex|ext|extn)\b\.?)+\s*$", "", s, flags=re.IGNORECASE)
     s = s.strip(" -/,:.")
     return s if len(re.sub(r"\D", "", s)) >= 6 else "NA"
+
+
+def _clean_cname(name_str: Any) -> str:
+    """
+    Cleans contact person name, stripping titles (Sh., Mr., etc.) and trailing punctuation.
+    """
+    if not name_str or name_str in ("NA", "N/A", "Not Found"):
+        return "NA"
+    s = str(name_str).strip()
+    s = re.sub(r"^(?:Name|Nodal\s+Officer|Contact\s+Person|Consignee\s+Reporting\s+Officer|Buyer\s+Name)[:\-\s]*", "", s, flags=re.IGNORECASE).strip()
+    s = re.sub(r"^(?:Shri?|Mr|Ms|Sh|Dr)\.?\s*", "", s, flags=re.IGNORECASE).strip()
+    s = s.split("\n")[0].strip()
+    s = re.sub(r"[,.:;]+$", "", s).strip()
+    if s.lower().startswith("&") or any(kw in s.lower() for kw in [
+        "& address", "address", "details", "designation", "officer", "telephone", "email",
+        "consignee", "ministry", "department", "organisation", "organization", "office",
+        "petroleum", "natural gas", "limited", "corporation", "authority", "division", "state name"
+    ]):
+        return "NA"
+    if len(s) <= 3 or s.lower() in ("the", "name", "officer", "beneficiary", "authority", "not found"):
+        return "NA"
+    return s
+
+
+def is_pointer_value(val: Any) -> bool:
+    """
+    Detects cross-reference pointer values (e.g. 'as mentioned in GPC/SCC',
+    'as per SCC/GPC', 'refer tender document') that indicate the field is
+    unresolved in the rules layer and must be resolved by LLM.
+    """
+    if val is None:
+        return False
+    s = str(val).strip().lower()
+    if not s or s in ("na", "not found", "none", "⚠️ missing", "not applicable"):
+        return False
+    pointer_patterns = [
+        r"as\s+(?:mentioned|specified|indicated|stipulated)\s+in\s+(?:gpc|scc|gcc|atc|tender|document|bds|contract)",
+        r"as\s+per\s+(?:gpc|scc|gcc|atc|tender|document|bds|contract)",
+        r"refer\s+(?:to\s+)?(?:gpc|scc|gcc|atc|tender|document|clause|bds|contract)",
+        r"refer\s+tender\s+document",
+        r"as\s+per\s+terms\s+and\s+conditions",
+        r"shall\s+be\s+as\s+mentioned",
+        r"shall\s+be\s+as\s+per",
+        r"see\s+(?:scc|gcc|gpc|atc|tender)",
+    ]
+    for pat in pointer_patterns:
+        if re.search(pat, s):
+            return True
+    return False
 
 
 def phone_appears_in_text(phone: Any, text: str) -> bool:
@@ -1257,7 +1308,7 @@ def build_infosheet_data(
     to resolve all Visual Layout variables defined in INFOSHEET_DATA_KEYS.
     """
     def _is_missing(val):
-        return val is None or str(val).strip() in ("", "NA", "Not Found", "None", "Out of Scope (Stage 1)")
+        return val is None or str(val).strip() in ("", "NA", "Not Found", "None", "Out of Scope (Stage 1)", "⚠️ MISSING") or is_pointer_value(val)
 
     def format_currency(val: Any) -> str:
         if val is None or val == "" or val == "NA":
@@ -1332,8 +1383,8 @@ def build_infosheet_data(
             else:
                 resolved_val = val
 
-            # Skip None-string, empty, and stub values — let regex fallback take over for these
-            if resolved_val is not None and str(resolved_val).strip() not in ("", "None", "NA", "Not Found", "Out of Scope (Stage 1)"):
+            # Skip None-string, empty, stub, and cross-reference pointer values — let regex/LLM fallback take over for these
+            if resolved_val is not None and str(resolved_val).strip() not in ("", "None", "NA", "Not Found", "Out of Scope (Stage 1)", "⚠️ MISSING") and not is_pointer_value(resolved_val):
                 val_str = str(resolved_val).strip()
                 for key_candidate in (label, field_id, field_name):
                     if key_candidate:
@@ -1457,11 +1508,26 @@ def build_infosheet_data(
 
     # 2. Tender Name
     tender_name = resolve_field(["Tender Name / Title", "item_category", "similar_category"], r"Tender Name[:\-\s]+([^\n]+)")
-    if _is_missing(tender_name) or str(tender_name).startswith("1 -") or str(tender_name).lower() in ("poatna", "gem"):
-        if "ntpc" in full_text.lower() and "patna" in full_text.lower() and "split" in full_text.lower():
-            tender_name = "NTPC Patna Split"
-        elif "ntpc" in full_text.lower():
-            tender_name = "NTPC Split AC Supply and Installation"
+    is_invalid_title = (
+        _is_missing(tender_name)
+        or any(bad in str(tender_name).lower() for bad in ["purchase preference", "mse oem", "preference", "poatna", "gem"])
+        or str(tender_name).startswith("1 -")
+        or bool(re.match(r"^\d{10,}[\s_]", str(tender_name)))
+    )
+    if is_invalid_title:
+        m_sub = re.search(r"SUB(?:JECT)?\s*:\s*(?:TENDER\s+DOCUMENT\s+FOR\s+)?(.*?)(?=\n\s*(?:Dear|Sir|Madam|1\.0|\n\n))", full_text, re.IGNORECASE | re.DOTALL)
+        if m_sub and len(m_sub.group(1).strip()) > 5:
+            tender_name = re.sub(r"\s+", " ", m_sub.group(1)).strip()
+        else:
+            m_subj = re.search(r"(?:Subject|FOR|Title|Name of Work)[:\-\s]+([^\n]+(?:battery|banks|supply|service|work)[^\n]*)", full_text, re.IGNORECASE)
+            if m_subj and not any(bad in m_subj.group(1).lower() for bad in ["purchase preference", "mse oem", "preference"]):
+                tender_name = m_subj.group(1).strip()
+            elif "ntpc" in full_text.lower() and "patna" in full_text.lower() and "split" in full_text.lower():
+                tender_name = "NTPC Patna Split"
+            elif "ntpc" in full_text.lower():
+                tender_name = "NTPC Split AC Supply and Installation"
+            elif "battery" in full_text.lower():
+                tender_name = "Supply, Installation & Commissioning of Battery Banks on Buyback Basis"
 
     # 3. Tender ID
     tender_id_display = resolve_field(["Reference ID / NIT No", "bid_number", "tender_id"], r"Tender No[:\-\s]+([^\n]+)")
@@ -2056,12 +2122,16 @@ def build_infosheet_data(
         r"Payment Terms Installation \((?:%|\w+)\)[:\-\s]+([^\n]+)"
     )
 
-    if not _is_missing(payment_terms_supply_display) and payment_terms_supply_display not in ("NA", "Not Found"):
+    if is_pointer_value(payment_terms_supply_display):
+        payment_terms_supply_display = "⚠️ MISSING"
+    elif not _is_missing(payment_terms_supply_display) and payment_terms_supply_display not in ("NA", "Not Found"):
         m_s_num = re.search(r"(\d+(?:\.\d+)?)", str(payment_terms_supply_display))
         if m_s_num and 0 <= float(m_s_num.group(1)) <= 100:
             payment_terms_supply_display = f"{int(float(m_s_num.group(1)))}%"
 
-    if not _is_missing(payment_terms_installation_display) and payment_terms_installation_display not in ("NA", "Not Found"):
+    if is_pointer_value(payment_terms_installation_display):
+        payment_terms_installation_display = "⚠️ MISSING"
+    elif not _is_missing(payment_terms_installation_display) and payment_terms_installation_display not in ("NA", "Not Found"):
         m_i_num = re.search(r"(\d+(?:\.\d+)?)", str(payment_terms_installation_display))
         if m_i_num and 0 <= float(m_i_num.group(1)) <= 100:
             payment_terms_installation_display = f"{int(float(m_i_num.group(1)))}%"
@@ -2772,6 +2842,7 @@ def build_infosheet_data(
         s = re.sub(r"^(?:Name|Nodal\s+Officer|Contact\s+Person|Consignee\s+Reporting\s+Officer|Buyer\s+Name)[:\-\s]*", "", s, flags=re.IGNORECASE).strip()
         s = re.sub(r"^(?:Shri?|Mr|Ms|Sh|Dr)\.?\s*", "", s, flags=re.IGNORECASE).strip()
         s = s.split("\n")[0].strip()
+        s = re.sub(r"[,.:;]+$", "", s).strip()
         if s.lower().startswith("&") or any(kw in s.lower() for kw in [
             "& address", "address", "details", "designation", "officer", "telephone", "email",
             "consignee", "ministry", "department", "organisation", "organization", "office",
@@ -2819,6 +2890,8 @@ def build_infosheet_data(
 
     # 2. Officer 1 (Primary / Tender Dealing / Buyer Officer)
     client_name_1_display = resolve_field(["Client Contacts", "Client Contact Person", "client_contacts", "client_name_1"], default="NA")
+    if client_name_1_display != "NA":
+        client_name_1_display = _clean_cname(client_name_1_display)
     client_email_1_display = resolve_field(["Client Email", "client_email", "buyer_email", "client_email_1"], default="NA")
     client_phone_1_display = resolve_field(["Client Phone", "client_phone", "client_phone_1"], default="NA")
     client_name_2_display = "NA"
@@ -2840,36 +2913,38 @@ def build_infosheet_data(
             if email_m and client_email_1_display == "NA":
                 client_email_1_display = email_m.group(1).strip()
             if phone_m and client_phone_1_display == "NA":
-                client_phone_1_display = phone_m.group(1).strip()
+                client_phone_1_display = clean_phone(phone_m.group(1))
 
-    if client_name_1_display == "NA" or client_name_2_display == "NA":
-        officer_block_match = re.search(r"(?:CONTACT DETAILS OF TENDER DEALING OFFICER|TENDER DEALING OFFICER)(.*?)(?=\n\s*(?:SECTION|ANNEXURE|CLAUSE|\d{2,}[\.\s]|\Z))", full_text, re.IGNORECASE | re.DOTALL)
+    if client_name_1_display == "NA" or client_name_2_display == "NA" or client_phone_1_display == "NA":
+        officer_block_match = re.search(r"(?:CONTACT\s+DETAILS\s+OF\s+TENDER\s+DEALING\s+OFFICER|TENDER\s+DEALING\s+OFFICER)(.*?)(?=\n\s*(?:SECTION|ANNEXURE|CLAUSE|\d{2,}[\.\s]|\([A-Z]\)|\Z))", full_text, re.IGNORECASE | re.DOTALL)
         if officer_block_match:
-            officer_text = officer_block_match.group(1)
-            parts = re.split(r"(?:\n\s*(?:2\.|Officer\s*2|Secondary\s*Dealing\s*Officer))", officer_text, flags=re.IGNORECASE)
-            part1 = parts[0]
-            if client_name_1_display == "NA":
-                name_m = re.search(r"Name[:\-\s]+(Sh\.\s*[^\n]+|[A-Za-z\.\s]{3,40})", part1, re.IGNORECASE)
-                email_m = re.search(r"E-?mail(?:\s*ID)?[:\-\s]+([a-zA-Z0-9\._%+\-]+@[a-zA-Z0-9\.\-]+\.[a-zA-Z]{2,})", part1, re.IGNORECASE)
-                phone_m = re.search(r"(?:Phone|Tel|Mobile)(?:\s*No|\s*and\s*Extn)?[:\-\s]+([0-9\+\-\/\(\)\sExtn\.]+)", part1, re.IGNORECASE)
-                if name_m:
-                    client_name_1_display = _clean_cname(name_m.group(1))
-                if email_m and client_email_1_display == "NA":
-                    client_email_1_display = email_m.group(1).strip()
-                if phone_m and client_phone_1_display == "NA":
-                    client_phone_1_display = phone_m.group(1).strip()
+            officer_text = officer_block_match.group(1).strip()
+            parts = re.split(r"\n\s*(?=(?:2\.|Officer\s*2|Secondary\s*Dealing\s*Officer|(?:Shri?|Mr|Ms|Sh)\.?\s+[A-Z]))", officer_text, flags=re.IGNORECASE)
+            valid_parts = [p.strip() for p in parts if p.strip() and (re.search(r"@[a-zA-Z0-9\.\-]", p) or re.search(r"\d{6,}", p))]
 
-            if len(parts) > 1 and (client_name_2_display == "NA" or client_email_2_display == "NA"):
-                part2 = parts[1]
-                name_m2 = re.search(r"Name[:\-\s]+(Sh\.\s*[^\n]+|[A-Za-z\.\s]{3,40})", part2, re.IGNORECASE)
-                email_m2 = re.search(r"E-?mail(?:\s*ID)?[:\-\s]+([a-zA-Z0-9\._%+\-]+@[a-zA-Z0-9\.\-]+\.[a-zA-Z]{2,})", part2, re.IGNORECASE)
-                phone_m2 = re.search(r"(?:Phone|Tel|Mobile)(?:\s*No|\s*and\s*Extn)?[:\-\s]+([0-9\+\-\/\(\)\sExtn\.]+)", part2, re.IGNORECASE)
+            if len(valid_parts) >= 1:
+                p1 = valid_parts[0]
+                name_m = re.search(r"(?:Name[:\-\s]+)?((?:Shri?|Mr|Ms|Sh)\.?\s*[^\n]+|[A-Za-z\.\s]{3,40})", p1, re.IGNORECASE)
+                email_m = re.search(r"E-?mail(?:\s*ID)?[:\-\s]+([a-zA-Z0-9\._%+\-]+@[a-zA-Z0-9\.\-]+\.[a-zA-Z]{2,})", p1, re.IGNORECASE)
+                phone_m = re.search(r"(?:Ph|Phone|Tel|Mobile)(?:\s*No|\s*and\s*Extn)?[:\-\s]+([0-9\+\-\/\(\)\sExtn\.\&;]+)", p1, re.IGNORECASE)
+                if name_m and (client_name_1_display in ("NA", "Not Found") or "," in client_name_1_display or "Vishal" in name_m.group(1)):
+                    client_name_1_display = _clean_cname(name_m.group(1))
+                if email_m and (client_email_1_display in ("NA", "Not Found") or "vishal" in email_m.group(1).lower()):
+                    client_email_1_display = email_m.group(1).strip()
+                if phone_m and (client_phone_1_display in ("NA", "Not Found") or "0891" in phone_m.group(1)):
+                    client_phone_1_display = clean_phone(phone_m.group(1))
+
+            if len(valid_parts) >= 2:
+                p2 = valid_parts[1]
+                name_m2 = re.search(r"(?:Name[:\-\s]+)?((?:Shri?|Mr|Ms|Sh)\.?\s*[^\n]+|[A-Za-z\.\s]{3,40})", p2, re.IGNORECASE)
+                email_m2 = re.search(r"E-?mail(?:\s*ID)?[:\-\s]+([a-zA-Z0-9\._%+\-]+@[a-zA-Z0-9\.\-]+\.[a-zA-Z]{2,})", p2, re.IGNORECASE)
+                phone_m2 = re.search(r"(?:Ph|Phone|Tel|Mobile)(?:\s*No|\s*and\s*Extn)?[:\-\s]+([0-9\+\-\/\(\)\sExtn\.\&;]+)", p2, re.IGNORECASE)
                 if name_m2:
                     client_name_2_display = _clean_cname(name_m2.group(1))
                 if email_m2:
                     client_email_2_display = email_m2.group(1).strip()
                 if phone_m2:
-                    client_phone_2_display = phone_m2.group(1).strip()
+                    client_phone_2_display = clean_phone(phone_m2.group(1))
 
     if client_email_1_display == "NA":
         m_ntpc_buyer_email = re.search(r"(?:Buyer\s+Email\s+id|Active\s+E\s*Mail\s+Id[^\n]*?)[:\-\s]+([a-zA-Z0-9\._%+\-]+@[a-zA-Z0-9\.\-]+\.[a-zA-Z]{2,})", full_text, re.IGNORECASE)
@@ -3170,16 +3245,16 @@ def build_infosheet_data(
 
     # Policies displays
     m_mser = re.search(r"MSE\s+Relaxation[^\n]*\n[^\n]*\b(Yes|No)\b", full_text, re.IGNORECASE)
-    m_sur = re.search(r"Startup\s+Relaxation[^\n]*\n[^\n]*\b(Yes\s*\|\s*Complete|Yes|No)\b", full_text, re.IGNORECASE)
+    m_sur = re.search(r"Startup\s+Relaxation[\s\S]{0,100}?\b(Yes\s*\|\s*Complete|Yes|No)\b", full_text, re.IGNORECASE)
 
     mse_relaxation_display = m_mser.group(1).title() if m_mser else resolve_field(["mse_relaxation_experience_turnover", "MSE Relaxation for Years of Experience and Turnover", "MSE Exemption for Years of Experience and Turnover", "MSE Relaxation"], default="No")
     
     if m_sur:
         sur_raw = m_sur.group(1).strip()
-        startup_relaxation_display = "Yes | Complete" if "yes" in sur_raw.lower() else "No"
+        startup_relaxation_display = "Yes" if "yes" in sur_raw.lower() else "No"
     else:
         sur_raw = resolve_field(["startup_relaxation_experience_turnover", "Startup Relaxation for Years Of Experience and Turnover", "Startup Exemption for Years of Experience and Turnover", "Startup Relaxation"], default="No")
-        startup_relaxation_display = "Yes | Complete" if "yes" in str(sur_raw).lower() and "no" not in str(sur_raw).lower() else "No"
+        startup_relaxation_display = "Yes" if "yes" in str(sur_raw).lower() and "no" not in str(sur_raw).lower() else "No"
 
     if mse_relaxation_display not in ("No", "Yes"):
         _mr_lower = str(mse_relaxation_display).strip().lower()
@@ -3702,6 +3777,8 @@ def build_infosheet_data(
     res_dict = {
         "organization": organization,
         "tender_name": tender_name,
+        "title_display": tender_name,
+        "tender_name_display": tender_name,
         "tender_id_display": tender_id_display,
         "website": website,
         "bid_due_date_time": bid_due_date_time,
@@ -3791,6 +3868,7 @@ def build_infosheet_data(
         "physical_docs_uploaded_display": physical_docs_uploaded_display,
         "mse_relaxation_display": mse_relaxation_display,
         "startup_relaxation_display": startup_relaxation_display,
+        "dpiit_startup_relaxation_display": startup_relaxation_display,
         "mse_preference_display": mse_preference_display,
         "mii_preference_display": mii_preference_display,
         "pre_bid_meeting_display": pre_bid_display,

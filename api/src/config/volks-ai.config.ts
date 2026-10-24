@@ -6,6 +6,9 @@ const volksAiEnvSchema = z.object({
     VOLKS_AI_TIMEOUT_MS: z
         .preprocess((v) => (v !== undefined && v !== '' ? Number(v) : 120000), z.number().int().positive())
         .default(120000),
+    AUTO_ENQUEUE_CHECKLIST_ANALYSIS: z
+        .preprocess((v) => v === 'true' || v === true, z.boolean())
+        .default(false),
 });
 
 export type VolksAiConfig = z.infer<typeof volksAiEnvSchema>;
@@ -17,6 +20,8 @@ export default registerAs('volksAi', () => {
     return {
         serviceUrl: env.VOLKS_AI_SERVICE_URL,
         timeoutMs: env.VOLKS_AI_TIMEOUT_MS,
+        autoEnqueueChecklistAnalysis: env.AUTO_ENQUEUE_CHECKLIST_ANALYSIS,
+        AUTO_ENQUEUE_CHECKLIST_ANALYSIS: env.AUTO_ENQUEUE_CHECKLIST_ANALYSIS,
         VOLKS_AI_SERVICE_URL: env.VOLKS_AI_SERVICE_URL,
         VOLKS_AI_TIMEOUT_MS: env.VOLKS_AI_TIMEOUT_MS,
     };

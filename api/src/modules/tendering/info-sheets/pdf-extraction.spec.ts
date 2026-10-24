@@ -1097,7 +1097,217 @@ describe('PDF Extraction Queue Integration (Phase 8)', () => {
                 global.fetch = originalFetch;
             }
         });
+
+        describe('Auto-enqueue checklist analysis (Item 3)', () => {
+            it('should NOT enqueue checklist analysis when AUTO_ENQUEUE_CHECKLIST_ANALYSIS is false (default off)', async () => {
+                const mockResult: PdfExtractionJobResult = {
+                    fields: { tenderValue: { value: 100000, confidence: 'high', source: 'regex' } },
+                    missing_fields: [],
+                    extraction_version: '1.1.0',
+                    processing_time_ms: 500,
+                    llm_status: 'ok',
+                    failed_categories: [],
+                };
+
+                const originalFetch = global.fetch;
+                global.fetch = jest.fn().mockResolvedValue({
+                    ok: true,
+                    status: 200,
+                    json: async () => mockResult,
+                } as any);
+
+                const mockDb: any = {
+                    insert: jest.fn().mockReturnValue({
+                        values: jest.fn().mockReturnValue({
+                            onConflictDoUpdate: jest.fn().mockResolvedValue({}),
+                        }),
+                    }),
+                    select: jest.fn().mockReturnValue({
+                        from: jest.fn().mockReturnValue({
+                            where: jest.fn().mockReturnValue({
+                                limit: jest.fn().mockResolvedValue([{ id: 1, tenderId: 888, fields: {} }]),
+                            }),
+                        }),
+                    }),
+                };
+
+                const mockBiddingReqService: any = {
+                    startOrGetAnalysis: jest.fn().mockResolvedValue({ status: 'pending' }),
+                };
+
+                // Config returns false for auto-enqueue
+                const configServiceOff: any = {
+                    get: jest.fn((key: string) => {
+                        if (key === 'volksAi.autoEnqueueChecklistAnalysis' || key === 'AUTO_ENQUEUE_CHECKLIST_ANALYSIS') {
+                            return false;
+                        }
+                        return mockConfigService.get(key);
+                    }),
+                };
+
+                const proc = new PdfExtractionProcessor(
+                    configServiceOff,
+                    mockFileUploadService,
+                    { recordUsage: jest.fn(), recordTpmEntry: jest.fn(), getCurrentTpm: jest.fn() } as any,
+                    mockLogger,
+                    mockDb,
+                    mockBiddingReqService,
+                );
+
+                try {
+                    const mockJob: any = {
+                        id: 'extract-tender-888',
+                        data: { tenderId: 888, pdfPath: tempPdfFile, userId: 1 },
+                    };
+
+                    await proc.processJob(mockJob, 'http://localhost:8001', 120000);
+
+                    expect(mockBiddingReqService.startOrGetAnalysis).not.toHaveBeenCalled();
+                } finally {
+                    global.fetch = originalFetch;
+                }
+            });
+
+            it('should enqueue checklist analysis when AUTO_ENQUEUE_CHECKLIST_ANALYSIS is true', async () => {
+                const mockResult: PdfExtractionJobResult = {
+                    fields: { tenderValue: { value: 100000, confidence: 'high', source: 'regex' } },
+                    missing_fields: [],
+                    extraction_version: '1.1.0',
+                    processing_time_ms: 500,
+                    llm_status: 'ok',
+                    failed_categories: [],
+                };
+
+                const originalFetch = global.fetch;
+                global.fetch = jest.fn().mockResolvedValue({
+                    ok: true,
+                    status: 200,
+                    json: async () => mockResult,
+                } as any);
+
+                const mockDb: any = {
+                    insert: jest.fn().mockReturnValue({
+                        values: jest.fn().mockReturnValue({
+                            onConflictDoUpdate: jest.fn().mockResolvedValue({}),
+                        }),
+                    }),
+                    select: jest.fn().mockReturnValue({
+                        from: jest.fn().mockReturnValue({
+                            where: jest.fn().mockReturnValue({
+                                limit: jest.fn().mockResolvedValue([{ id: 1, tenderId: 889, fields: {} }]),
+                            }),
+                        }),
+                    }),
+                };
+
+                const mockBiddingReqService: any = {
+                    startOrGetAnalysis: jest.fn().mockResolvedValue({ status: 'pending' }),
+                };
+
+                // Config returns true for auto-enqueue
+                const configServiceOn: any = {
+                    get: jest.fn((key: string) => {
+                        if (key === 'volksAi.autoEnqueueChecklistAnalysis' || key === 'AUTO_ENQUEUE_CHECKLIST_ANALYSIS') {
+                            return true;
+                        }
+                        return mockConfigService.get(key);
+                    }),
+                };
+
+                const proc = new PdfExtractionProcessor(
+                    configServiceOn,
+                    mockFileUploadService,
+                    { recordUsage: jest.fn(), recordTpmEntry: jest.fn(), getCurrentTpm: jest.fn() } as any,
+                    mockLogger,
+                    mockDb,
+                    mockBiddingReqService,
+                );
+
+                try {
+                    const mockJob: any = {
+                        id: 'extract-tender-889',
+                        data: { tenderId: 889, pdfPath: tempPdfFile, userId: 77 },
+                    };
+
+                    await proc.processJob(mockJob, 'http://localhost:8001', 120000);
+
+                    expect(mockBiddingReqService.startOrGetAnalysis).toHaveBeenCalledWith(889, false, 77);
+                } finally {
+                    global.fetch = originalFetch;
+                }
+            });
+
+            it('should handle errors gracefully if startOrGetAnalysis throws, without failing the extraction', async () => {
+                const mockResult: PdfExtractionJobResult = {
+                    fields: { tenderValue: { value: 100000, confidence: 'high', source: 'regex' } },
+                    missing_fields: [],
+                    extraction_version: '1.1.0',
+                    processing_time_ms: 500,
+                    llm_status: 'ok',
+                    failed_categories: [],
+                };
+
+                const originalFetch = global.fetch;
+                global.fetch = jest.fn().mockResolvedValue({
+                    ok: true,
+                    status: 200,
+                    json: async () => mockResult,
+                } as any);
+
+                const mockDb: any = {
+                    insert: jest.fn().mockReturnValue({
+                        values: jest.fn().mockReturnValue({
+                            onConflictDoUpdate: jest.fn().mockResolvedValue({}),
+                        }),
+                    }),
+                    select: jest.fn().mockReturnValue({
+                        from: jest.fn().mockReturnValue({
+                            where: jest.fn().mockReturnValue({
+                                limit: jest.fn().mockResolvedValue([{ id: 1, tenderId: 890, fields: {} }]),
+                            }),
+                        }),
+                    }),
+                };
+
+                const mockBiddingReqService: any = {
+                    startOrGetAnalysis: jest.fn().mockRejectedValue(new Error('Redis connection failure')),
+                };
+
+                const configServiceOn: any = {
+                    get: jest.fn((key: string) => {
+                        if (key === 'volksAi.autoEnqueueChecklistAnalysis' || key === 'AUTO_ENQUEUE_CHECKLIST_ANALYSIS') {
+                            return true;
+                        }
+                        return mockConfigService.get(key);
+                    }),
+                };
+
+                const proc = new PdfExtractionProcessor(
+                    configServiceOn,
+                    mockFileUploadService,
+                    { recordUsage: jest.fn(), recordTpmEntry: jest.fn(), getCurrentTpm: jest.fn() } as any,
+                    mockLogger,
+                    mockDb,
+                    mockBiddingReqService,
+                );
+
+                try {
+                    const mockJob: any = {
+                        id: 'extract-tender-890',
+                        data: { tenderId: 890, pdfPath: tempPdfFile, userId: 77 },
+                    };
+
+                    const result = await proc.processJob(mockJob, 'http://localhost:8001', 120000);
+
+                    expect(result).toBeDefined();
+                    expect(mockLogger.error).toHaveBeenCalledWith(
+                        expect.stringContaining('Failed to auto-enqueue checklist analysis for tender 890'),
+                        expect.anything(),
+                    );
+                } finally {
+                    global.fetch = originalFetch;
+                }
+            });
+        });
     });
 });
-
-

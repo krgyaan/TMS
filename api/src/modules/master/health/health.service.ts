@@ -157,7 +157,7 @@ export class HealthService implements OnApplicationBootstrap {
                 data: {
                     currentTpm,
                     status: "healthy",
-                    models: ["claude-haiku-4-5-20251001", "claude-sonnet-5"],
+                    models: ["claude-haiku-4-5-20251001", "claude-sonnet-5-5"],
                 },
             };
         } catch (err: unknown) {

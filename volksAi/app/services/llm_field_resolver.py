@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 # If updating models or pricing, re-verify against the official docs URL above.
 # =============================================================================
 ROLE_1_MODEL_DEFAULT = os.getenv("ANTHROPIC_ROLE1_MODEL", "claude-haiku-4-5-20251001")
-ROLE_2_MODEL_DEFAULT = os.getenv("ANTHROPIC_ROLE2_MODEL", "claude-sonnet-5")
+ROLE_2_MODEL_DEFAULT = os.getenv("ANTHROPIC_ROLE2_MODEL", os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5-5"))
 
 # Capped max output token ceilings (tight ceilings preventing runaway output cost)
 ROLE_1_MAX_TOKENS = int(os.getenv("ANTHROPIC_ROLE1_MAX_TOKENS", "600"))
@@ -63,13 +63,13 @@ SONNET_5_CACHE_WRITE_1H_PER_M = 4.00
 SONNET_5_CACHE_READ_PER_M = 0.20
 
 # Token budget per tender (gates strictly on integer raw_processing_tokens = in + out + cache_create + cache_read)
-LLM_TOKEN_BUDGET_PER_TENDER = int(os.getenv("LLM_TOKEN_BUDGET_PER_TENDER", "20000"))
+LLM_TOKEN_BUDGET_PER_TENDER = int(os.getenv("LLM_TOKEN_BUDGET_PER_TENDER", "100000"))
 
-# STEP 4 fix: extract_scoped_context's opening bid-summary slice and final combined
-# cap previously allowed up to 18,000 / 25,000 characters per category, driving
-# ~7,100 input tokens per Role 1 call. Capped to the 6,000-8,000 char target range.
+# Scoped context character bounds per section
 SCOPED_CONTEXT_BID_SUMMARY_OPENING_CHARS = 5000
-SCOPED_CONTEXT_MAX_CHARS = 6000
+SCOPED_CONTEXT_MAX_CHARS = int(os.getenv("SCOPED_CONTEXT_MAX_CHARS", "6000"))
+SCOPED_CONTEXT_MAX_CHARS_SCC = int(os.getenv("SCOPED_CONTEXT_MAX_CHARS_SCC", "10000"))
+SCOPED_CONTEXT_MAX_CHARS_BEC = int(os.getenv("SCOPED_CONTEXT_MAX_CHARS_BEC", "10000"))
 
 # Path where few-shot examples accumulate across all parsed documents
 _MEMORY_DIR = Path(__file__).parent.parent / "storage" / "llm_memory"
@@ -177,19 +177,15 @@ AMBIGUITY_FIELD_DEFINITIONS: Dict[str, str] = {
         "Financial Criteria Not Applicable or exempt for all bidders in this tender."
     ),
     "payment_terms_supply_display": (
-        "Percentage of contract/order value paid for goods supply milestone upon receipt/delivery of materials. "
-        "CRITICAL RULE: If the scoped tender clauses specify a milestone schedule (such as 70% on supply, 30% on installation; "
-        "or 80% on supply, 20% on installation; or 85% on supply, 15% on installation), extract the supply milestone percentage. "
-        "If the candidate value matches the milestone percentage explicitly specified in the scoped clauses (e.g. '70%', '80%', '85%'), "
-        "choose action='confirm'. NEVER override with numbers not literally present in the scoped text. "
-        "Return as percentage string (e.g. '70%', '80%', '85%')."
+        "Payment terms for supply portion, including all milestone percentages and conditions (e.g. 80% on receipt and acceptance at site, 20% after completion incl. handing over documents and taking away buy-back batteries). "
+        "If candidate matches the milestone terms explicitly specified in the scoped clauses, choose action='confirm'. "
+        "NEVER override with numbers not literally present in the scoped text."
     ),
     "payment_terms_installation_display": (
-        "Percentage of contract/order value paid upon completion of installation, testing, and commissioning milestone "
-        "(e.g. '30%', '20%', '15%'). For pure-supply tenders with no installation/commissioning scope, installation terms are NOT APPLICABLE / null — NEVER invent an installation percentage. "
-        "CRITICAL RULE: If the candidate value matches the installation milestone in the scoped clauses (e.g. '30%', '20%', '15%'), "
-        "choose action='confirm'. NEVER override with figures not explicitly present in the scoped text. "
-        "Return as percentage string (e.g. '30%', '20%', '15%')."
+        "Payment terms for service / installation portion, including milestone percentage and condition (e.g. 100% after completion of installation and commissioning of all SV stations). "
+        "For pure-supply tenders with no installation/commissioning scope, installation terms are NOT APPLICABLE / null — NEVER invent an installation percentage. "
+        "If candidate matches the installation milestone in the scoped clauses, choose action='confirm'. "
+        "NEVER override with figures not explicitly present in the scoped text."
     ),
     "delivery_time_supply_display": (
         "Goods supply delivery timeline in days (e.g. '90 Days', '140 Days', '150 Days'). "
@@ -390,14 +386,14 @@ def _fmt_years(v) -> Optional[str]:
 
 FIELD_PROMPT_MAP: Dict[str, Tuple[str, str, str, Any]] = {
     "payment_terms_supply_display": (
-        "payment_terms_supply_pct", "integer",
-        "% of contract value paid on supply/delivery/receipt of materials, as an integer X, only if literally stated in the text",
-        _fmt_pct,
+        "payment_terms_supply", "string",
+        "Payment terms for supply portion, including all milestone percentages and conditions (e.g. 80% on receipt and acceptance at site, 20% after completion incl. handing over documents and taking away buy-back batteries), only if literally stated in the text",
+        _fmt_str,
     ),
     "payment_terms_installation_display": (
-        "payment_terms_installation_pct", "integer",
-        "% paid on installation/commissioning/site acceptance, as an integer Y, only if literally stated in the text. Set null / Not Applicable for pure-supply tenders without installation.",
-        _fmt_pct,
+        "payment_terms_installation", "string",
+        "Payment terms for service / installation portion, including milestone percentage and condition (e.g. 100% after completion of installation and commissioning of all SV stations), only if literally stated in the text. Set 'Not Applicable' if no service/installation scope.",
+        _fmt_str,
     ),
     "ld_percentage_display": (
         "ld_percentage_per_week", "number",
@@ -658,21 +654,106 @@ FIELD_PROMPT_MAP: Dict[str, Tuple[str, str, str, Any]] = {
 # ─────────────────────────────────────────────────────────────────────────────
 # Scoped Context Extractor for Role 1 & Role 2
 # ─────────────────────────────────────────────────────────────────────────────
+def _find_section_slice(
+    text: str,
+    heading_patterns: List[str],
+    stop_pattern: Optional[str] = None,
+    max_chars: int = 10000,
+    min_body_chars: int = 300,
+) -> Tuple[str, Optional[int], Optional[int]]:
+    """
+    Finds real section headings by filtering out table-of-contents, checklists,
+    and cross-references, and selecting the LAST heading followed by substantial body text.
+    Returns (scoped_text, start_page, end_page).
+    """
+    candidates = []
+    for pat in heading_patterns:
+        for m in re.finditer(pat, text, re.IGNORECASE | re.MULTILINE):
+            start = m.start()
+            end = m.end()
+
+            window_before = text[max(0, start - 200):start]
+            window_after = text[end:min(len(text), end + 400)]
+
+            # 1. Skip if preceded by TOC or checklist indicators
+            if re.search(
+                r"\b(?:CONTENTS\s+OF|TABLE\s+OF\s+CONTENTS|\bINDEX\b|CHECKLIST|LIST\s+OF\s+FORMS|PROFORMA|FORMAT)\b",
+                window_before,
+                re.IGNORECASE,
+            ):
+                continue
+
+            # 2. Skip TOC style lines where multiple sections are listed with ➢ or followed within 200 chars by another section
+            if re.search(
+                r"(?:➢\s*Section|Section\s*[-–—]?\s*[IVX]+|\.\.\.|\bPage\s+\d+)",
+                window_after[:200],
+                re.IGNORECASE,
+            ):
+                continue
+
+            # 3. Skip in-text cross references like 'as per Section-II'
+            if re.search(
+                r"\b(?:as\s+per|in\s+accordance\s+with|refer\s+to|meets\s+the|clause\s+no\.?|stipulated\s+in)\b\s*$",
+                window_before.strip(),
+                re.IGNORECASE,
+            ):
+                continue
+
+            # 4. Check substantial body text after heading
+            body_sample = text[end:min(len(text), end + 1000)].strip()
+            if len(body_sample) < min_body_chars:
+                continue
+
+            candidates.append((start, end, m.group(0)))
+
+    if not candidates:
+        return "", None, None
+
+    # Pick the LAST candidate followed by substantial body text
+    candidates.sort(key=lambda x: x[0])
+    chosen_start, chosen_end, _ = candidates[-1]
+
+    text_slice = text[chosen_start:]
+    if stop_pattern:
+        stop_m = re.search(stop_pattern, text_slice[chosen_end - chosen_start:], re.IGNORECASE)
+        if stop_m:
+            text_slice = text_slice[:chosen_end - chosen_start + stop_m.start()]
+
+    scoped = text_slice[:max_chars].strip()
+
+    prev_pages = list(re.finditer(r"--- \[PAGE (\d+)\] ---", text[:chosen_start + 50]))
+    start_page = int(prev_pages[-1].group(1)) if prev_pages else 1
+
+    slice_pages = list(re.finditer(r"--- \[PAGE (\d+)\] ---", text[:chosen_start + len(scoped)]))
+    end_page = int(slice_pages[-1].group(1)) if slice_pages else start_page
+
+    return scoped, start_page, end_page
+
+
 def extract_scoped_context(full_text: str, target: str) -> str:
     """
     Extracts scoped document sections relevant to specific ambiguous fields or categories
     to keep token usage minimal and focus Claude on relevant clauses.
-    Instruments and logs section names and character counts.
+    Anchors on real section headings, taking the LAST occurrence followed by substantial body text.
+    Returns empty string if section is not found (no 6000-char blind fallback).
     """
     if not full_text:
         logger.info("[SCOPED_CONTEXT] Target '%s': empty full_text provided (0 chars)", target)
+        print(f"[SCOPED_CONTEXT] Category '{target}': not_found (0 chars)")
         return ""
-    
-    snippets = []
-    section_names = []
-    t_lower = target.lower()
 
-    # Determine category matching
+    t_lower = target.lower()
+    is_bec = (
+        "bec" in t_lower or "eligibility" in t_lower or "net_worth" in t_lower
+        or "order_value" in t_lower or "turnover" in t_lower or "working_capital" in t_lower
+        or "solvency" in t_lower or "maf" in t_lower or "years" in t_lower
+    )
+    is_payment = "payment" in t_lower
+    is_prs_ld = "prs" in t_lower or "ld" in t_lower or "liquidated" in t_lower or "delay" in t_lower
+    is_delivery = "delivery" in t_lower or "timeline" in t_lower or "completion" in t_lower or "period" in t_lower
+    is_scc_cat = is_payment or is_prs_ld or is_delivery
+    is_pbg_sd = "pbg" in t_lower or "epbg" in t_lower or "sd" in t_lower or "security" in t_lower or "cps" in t_lower
+    is_contacts = "contacts" in t_lower or "client" in t_lower or "courier" in t_lower or "address" in t_lower or "bds" in t_lower
     is_bid_summary = (
         "bid_summary" in t_lower
         or "tender_value" in t_lower
@@ -681,163 +762,132 @@ def extract_scoped_context(full_text: str, target: str) -> str:
         or "validity" in t_lower
         or "identity" in t_lower
     )
-    is_contacts = "contacts" in t_lower or "client" in t_lower or "courier" in t_lower or "address" in t_lower
-    is_bec = (
-        "bec" in t_lower or "eligibility" in t_lower or "net_worth" in t_lower
-        or "order_value" in t_lower or "turnover" in t_lower or "working_capital" in t_lower
-        or "solvency" in t_lower or "maf" in t_lower or "years" in t_lower
-    )
-    is_payment = "payment" in t_lower
-    is_pbg_sd = "pbg" in t_lower or "epbg" in t_lower or "sd" in t_lower or "security" in t_lower or "cps" in t_lower
-    is_prs_ld = "prs" in t_lower or "ld" in t_lower or "liquidated" in t_lower or "delay" in t_lower
-    is_delivery = "delivery" in t_lower or "timeline" in t_lower or "completion" in t_lower or "period" in t_lower
     is_commercial = "commercial" in t_lower or "reverse_auction" in t_lower or "ra" in t_lower or "evaluation" in t_lower
 
-    if is_bid_summary:
-        # 1. Opening slice contains GeM Bid Details, NIT, Estimated Value, EMD, Validity.
-        # Capped well below SCOPED_CONTEXT_MAX_CHARS so the EMD/Fee/Value clause
-        # matches below still have room in the final combined budget.
-        snippets.append(
-            "=== Tender Document Opening & Bid Summary (Pages 1-5) ===\n"
-            + full_text[:SCOPED_CONTEXT_BID_SUMMARY_OPENING_CHARS].strip()
+    scoped_text = ""
+    start_page: Optional[int] = None
+    end_page: Optional[int] = None
+
+    if is_bec:
+        bec_pats = [
+            r"^[^\n\w]{0,10}(?:SECTION\s*[-–—]?\s*II\b[^\n]*\n+)?\s*(?:SECTION\s*[-–—]?\s*II\s*[-–—:]?\s*)?BID\s+EVALUATION\s+CRITERIA(?:\s*&?\s*EVALUATION\s+METHODOLOGY)?",
+            r"^[^\n\w]{0,10}SECTION\s*[-–—]?\s*II\b[^\n]*\n+\s*BID\s+EVALUATION\s+CRITERIA",
+            r"BID\s+EVALUATION\s+CRITERIA\s*&\s*EVALUATION\s+METHODOLOGY",
+        ]
+        scoped_text, start_page, end_page = _find_section_slice(
+            full_text, bec_pats, stop_pattern=r"\n[^\n\w]{0,10}SECTION\s*[-–—]?\s*III\b", max_chars=SCOPED_CONTEXT_MAX_CHARS_BEC
         )
-        section_names.append("Document Opening / Bid Details (pos 0)")
 
-        # 2. Search for any NIT, IFB, EMD, Fee, or Value clauses in the remainder of text
-        for m in re.finditer(
-            r"(?:NOTICE\s+INVITING\s+TENDER|INVITATION\s+FOR\s+BIDS|\bNIT\b|\bIFB\b|EMD\s+DETAIL|EARNEST\s+MONEY|TENDER\s+FEE|PROCESSING\s+FEE|ESTIMATED\s+(?:BID\s+)?VALUE|BID\s+SECURITY)[\s\S]{0,2500}",
+    elif is_scc_cat:
+        scc_pats = [
+            r"^[^\n\w]{0,10}(?:SECTION\s*[-–—]?\s*V\b[^\n]*\n+)?\s*(?:SECTION\s*[-–—]?\s*V\s*[-–—:]?\s*)?SPECIAL\s+CONDITIONS\s+OF\s+CONTRACT(?:\s*\[SCC\])?",
+            r"^[^\n\w]{0,10}SECTION\s*[-–—]?\s*V\b[^\n]*\n+\s*SPECIAL\s+CONDITIONS\s+OF\s+CONTRACT",
+            r"SPECIAL\s+CONDITIONS\s+OF\s+CONTRACT\s*\[SCC\]",
+        ]
+        scoped_text, start_page, end_page = _find_section_slice(
+            full_text, scc_pats, stop_pattern=r"\n[^\n\w]{0,10}SECTION\s*[-–—]?\s*VI\b", max_chars=SCOPED_CONTEXT_MAX_CHARS_SCC
+        )
+
+    elif is_pbg_sd:
+        # Target the exact CPS / Security Deposit clause in GCC/SCC
+        cps_pats = [
+            r"\n\s*(?:\d+(?:\.\d+)*\s+)?CONTRACT\s+PERFORMANCE\s+SECURITY(?:\s*\(CPS\))?(?:\s*/\s*SECURITY\s+DEPOSIT(?:\s*\[CPS/SD\])?)?\s*[:\-]?\s*\n",
+            r"\n\s*(?:\d+(?:\.\d+)*\s+)?CONTRACT\s+PERFORMANCE\s+SECURITY\s*\(CPS\)[:\s\n]",
+            r"\n\s*(?:\d+(?:\.\d+)*\s+)?CONTRACT\s+PERFORMANCE\s+SECURITY\s*/\s*SECURITY\s+DEPOSIT\s*\[CPS/SD\]",
+        ]
+        cps_text, cps_sp, cps_ep = _find_section_slice(
+            full_text, cps_pats, stop_pattern=r"\n\s*(?:(?:1[3-9]|[2-9]\d)\.0\b|SECTION\s*[-–—]?\s*(?:VI|VII)\b|13\.0\b)", max_chars=4000
+        )
+
+        # Target GeM Bid ePBG detail table from main tender
+        epbg_m = re.search(
+            r"(?:ईपीबीजी\s*विवरण|ePBG\s+Detail|ePBG\s+Percentage)[\s\S]{0,1200}?(?=(?:\n\s*--- \[PAGE|\Z))",
             full_text, re.IGNORECASE
-        ):
-            if m.start() > SCOPED_CONTEXT_BID_SUMMARY_OPENING_CHARS:
-                snippets.append(f"=== EMD / Fee / Value Clause (pos {m.start()}) ===\n" + m.group(0).strip())
-                section_names.append(f"EMD/Fee Clause (pos {m.start()})")
+        )
+        epbg_text = ""
+        epbg_page = None
+        if epbg_m:
+            epbg_text = epbg_m.group(0).strip()
+            pre_pages = list(re.finditer(r"--- \[PAGE (\d+)\] ---", full_text[:epbg_m.start() + 100]))
+            if pre_pages:
+                epbg_page = int(pre_pages[-1].group(1))
 
-    if is_contacts:
-        # 1. IFB Tag (G)/(H), Contact details, dealing officer, buyer address
+        combined_pbg = []
+        if epbg_text:
+            combined_pbg.append(f"=== GeM Bid ePBG Detail (Page {epbg_page or 3}) ===\n{epbg_text}")
+        if cps_text:
+            combined_pbg.append(f"=== Contract Performance Security (CPS) Clause (Pages {cps_sp}-{cps_ep}) ===\n{cps_text}")
+
+        scoped_text = "\n\n".join(combined_pbg)[:SCOPED_CONTEXT_MAX_CHARS_SCC].strip()
+        if scoped_text:
+            start_page = epbg_page or cps_sp or 3
+            end_page = cps_ep or cps_sp or epbg_page or 115
+
+    elif is_contacts:
+        snippets = []
         for m in re.finditer(
             r"(?:TAG\s*[\(\[]?[GgHh][\)\]]?|CONTACT\s+DETAILS|TENDER\s+DEALING\s+OFFICER|NODAL\s+OFFICER|OFFICER\s+DETAILS|BUYER\s+DETAILS|BUYER\s+CONTACT|CONSIGNEE\s+DETAILS|COURIER\s+ADDRESS|COMMUNICATION\s+ADDRESS|OFFICE\s+ADDRESS|SUBMISSION\s+ADDRESS)[\s\S]{0,2500}",
             full_text, re.IGNORECASE
         ):
-            snippets.append(f"=== Contacts & Address Block (pos {m.start()}) ===\n" + m.group(0).strip())
-            section_names.append(f"Contacts Block (pos {m.start()})")
+            snippets.append(m.group(0).strip())
+            if len("\n\n".join(snippets)) > 5000:
+                break
 
-        # 2. Section-III BDS / Bidding Data Sheet
         bds_m = re.search(
-            r"(?:SECTION\s*[-–—]?\s*III\b|BIDDING\s+DATA\s+SHEET|\bBDS\b)[\s\S]{0,6000}?(?=(?:SECTION\s*[-–—]?\s*IV|\Z))",
+            r"(?:SECTION\s*[-–—]?\s*III\b|BIDDING\s+DATA\s+SHEET|\bBDS\b)[\s\S]{0,5000}?(?=(?:SECTION\s*[-–—]?\s*IV|\Z))",
             full_text, re.IGNORECASE
         )
         if bds_m:
-            snippets.append("=== SECTION-III / BIDDING DATA SHEET (BDS) ===\n" + bds_m.group(0).strip())
-            section_names.append("SECTION-III / BDS")
+            snippets.append("=== SECTION-III / BDS ===\n" + bds_m.group(0).strip())
 
-    if is_bec:
-        # 1. Section-II / BEC block
-        bec_m = re.search(
-            r"(?:SECTION\s*[-–—]?\s*II\b|BID\s+EVALUATION\s+CRITERIA|\bBEC\b|TECHNICAL\s+CRITERIA|ELIGIBILITY\s+CRITERIA)[\s\S]{0,7000}?(?=(?:SECTION\s*[-–—]?\s*III|BIDDING\s+DATA\s+SHEET|\bBDS\b|\Z))",
-            full_text, re.IGNORECASE
-        )
-        if bec_m:
-            snippets.append("=== SECTION-II / BID EVALUATION CRITERIA (BEC) ===\n" + bec_m.group(0).strip())
-            section_names.append("SECTION-II / BEC")
+        scoped_text = "\n\n".join(snippets)[:SCOPED_CONTEXT_MAX_CHARS].strip()
+        if scoped_text:
+            start_page = 3
+            end_page = 30
 
-        # 2. Occurrences of net worth, turnover, working capital, solvency, MAF
+    elif is_bid_summary:
+        snippets = ["=== Tender Document Opening & Bid Summary (Pages 1-5) ===\n" + full_text[:SCOPED_CONTEXT_BID_SUMMARY_OPENING_CHARS].strip()]
         for m in re.finditer(
-            r"\b(?:net\s*worth|financial\s+criteria|annual\s+turnover|working\s+capital|solvency\s+certificate|manufacturer\s+authorization|executed\s+order)\b",
+            r"(?:NOTICE\s+INVITING\s+TENDER|INVITATION\s+FOR\s+BIDS|\bNIT\b|\bIFB\b|EMD\s+DETAIL|EARNEST\s+MONEY|TENDER\s+FEE|PROCESSING\s+FEE|ESTIMATED\s+(?:BID\s+)?VALUE|BID\s+SECURITY)[\s\S]{0,2000}",
             full_text, re.IGNORECASE
         ):
-            start = max(0, m.start() - 300)
-            end = min(len(full_text), m.end() + 700)
-            snippets.append(f"=== Clause Context: '{m.group(0)}' ===\n" + full_text[start:end].strip())
-            section_names.append(f"Clause: '{m.group(0)}'")
+            if m.start() > SCOPED_CONTEXT_BID_SUMMARY_OPENING_CHARS:
+                snippets.append(m.group(0).strip())
+                if len("\n\n".join(snippets)) > 7000:
+                    break
+        scoped_text = "\n\n".join(snippets)[:SCOPED_CONTEXT_MAX_CHARS].strip()
+        start_page = 1
+        end_page = 5
 
-    if is_payment:
-        # Search for payment terms clauses with prioritized milestone matching
-        found_matches = []
-        for m in re.finditer(
-            r"(?:TERMS\s+OF\s+PAYMENT|PAYMENT\s+TERMS|PAYMENT\s+SCHEDULE|MILESTONE\s+PAYMENT|REVISED\s+TERMS\s+OF\s+PAYMENT)",
-            full_text, re.IGNORECASE
-        ):
-            start = max(0, m.start() - 200)
-            end = min(len(full_text), m.end() + 1500)
-            clause_text = full_text[start:end].strip()
-            has_milestone_pct = bool(re.search(r"\b(?:70|80|90|30|20|10|95|5)\s*%", clause_text))
-            has_supply_install = bool(re.search(r"\b(?:supply|installation|receipt|commissioning)\b", clause_text, re.IGNORECASE))
-            score = (2 if has_milestone_pct else 0) + (1 if has_supply_install else 0)
-            found_matches.append((score, m.start(), m.group(0), clause_text))
-
-        found_matches.sort(key=lambda x: (x[0], -x[1]), reverse=True)
-        for score, pos, header, clause_text in found_matches:
-            snippets.append(f"=== Payment Clause: '{header}' (pos {pos}) ===\n{clause_text}")
-            section_names.append(f"Payment Clause: '{header}' (score={score})")
-
-        # Special Conditions / SCC
-        scc_m = re.search(
-            r"(?:SECTION\s*[-–—]?\s*V\b|SPECIAL\s+CONDITIONS\s+OF\s+CONTRACT|\bSCC\b)[\s\S]{0,4000}?(?=(?:SECTION\s*[-–—]?\s*VI|\Z))",
-            full_text, re.IGNORECASE
-        )
-        if scc_m:
-            snippets.append("=== SPECIAL CONDITIONS OF CONTRACT (SCC) ===\n" + scc_m.group(0)[:3000].strip())
-            section_names.append("SCC Section")
-
-    if is_pbg_sd:
-        for m in re.finditer(
-            r"(?:ePBG\s+Detail|CONTRACT\s+PERFORMANCE\s+SECURITY|PERFORMANCE\s+BANK\s+GUARANTEE|SECURITY\s+DEPOSIT|\bPBG\b|\bCPS\b)[\s\S]{0,3500}",
-            full_text, re.IGNORECASE
-        ):
-            snippets.append(f"=== PBG / Security Deposit Block (pos {m.start()}) ===\n" + m.group(0).strip())
-            section_names.append(f"PBG/SD Block (pos {m.start()})")
-
-    if is_prs_ld:
-        for m in re.finditer(
-            r"(?:PRICE\s+REDUCTION\s+SCHEDULE|\bPRS\b|LIQUIDATED\s+DAMAGES|\bLD\b)[\s\S]{0,2500}",
-            full_text, re.IGNORECASE
-        ):
-            snippets.append(f"=== PRS / LD Block (pos {m.start()}) ===\n" + m.group(0).strip())
-            section_names.append(f"PRS/LD Block (pos {m.start()})")
-
-    if is_delivery:
-        found_delivery = []
-        for m in re.finditer(
-            r"(?:DELIVERY\s+PERIOD|PERIOD\s+OF\s+WORK|TIME\s+FOR\s+COMPLETION|COMPLETION\s+SCHEDULE|DELIVERY\s+SCHEDULE)",
-            full_text, re.IGNORECASE
-        ):
-            start = max(0, m.start() - 200)
-            end = min(len(full_text), m.end() + 1200)
-            d_text = full_text[start:end].strip()
-            has_days_months = bool(re.search(r"\b\d+\s*(?:days|months|weeks)\b", d_text, re.IGNORECASE))
-            score = 2 if has_days_months else 0
-            found_delivery.append((score, m.start(), m.group(0), d_text))
-
-        found_delivery.sort(key=lambda x: (x[0], -x[1]), reverse=True)
-        for score, pos, header, d_text in found_delivery:
-            snippets.append(f"=== Delivery / Completion Clause: '{header}' (pos {pos}) ===\n{d_text}")
-            section_names.append(f"Delivery Clause: '{header}' (score={score})")
-
-    if is_commercial:
+    elif is_commercial:
+        snippets = []
         for m in re.finditer(
             r"(?:COMMERCIAL\s+EVALUATION|EVALUATION\s+METHOD|REVERSE\s+AUCTION|BID\s+TO\s+RA)[\s\S]{0,2500}",
             full_text, re.IGNORECASE
         ):
-            snippets.append(f"=== Commercial / Evaluation Block (pos {m.start()}) ===\n" + m.group(0).strip())
-            section_names.append(f"Commercial Block (pos {m.start()})")
+            snippets.append(m.group(0).strip())
+        scoped_text = "\n\n".join(snippets)[:SCOPED_CONTEXT_MAX_CHARS].strip()
+        if scoped_text:
+            start_page = 8
+            end_page = 12
 
-    if not snippets:
-        fallback_text = full_text[:SCOPED_CONTEXT_MAX_CHARS]
+    if not scoped_text:
         logger.warning(
-            "[SCOPED_CONTEXT] Target '%s': NO specific section matched! Falling back to first %d characters (%d chars).",
-            target, SCOPED_CONTEXT_MAX_CHARS, len(fallback_text)
+            "[SCOPED_CONTEXT] Category '%s': NO specific section matched! Returning empty context (not_found).",
+            target
         )
-        return fallback_text
+        print(f"[SCOPED_CONTEXT] Category '{target}': not_found (0 chars)")
+        return ""
 
-    combined = "\n\n".join(snippets[:10])
-    final_scoped = combined[:SCOPED_CONTEXT_MAX_CHARS]
-
+    first_120 = scoped_text[:120].replace('\n', ' ')
     logger.info(
-        "[SCOPED_CONTEXT] Target '%s': Selected %d sections (%s) -> Total %d characters sent (full doc: %d chars, %.1f%% of full doc)",
-        target, len(section_names[:10]), section_names[:10], len(final_scoped), len(full_text),
-        (len(final_scoped) / max(len(full_text), 1)) * 100
+        "[SCOPED_CONTEXT] Category '%s': Pages %s-%s (%d chars). First 120 chars: %r",
+        target, start_page, end_page, len(scoped_text), first_120
     )
-    return final_scoped
+    print(
+        f"[SCOPED_CONTEXT] Category '{target}': Pages {start_page}-{end_page} ({len(scoped_text)} chars). First 120 chars: {first_120!r}"
+    )
+    return scoped_text
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1080,6 +1130,44 @@ def _build_ambiguity_tool_schema() -> Dict[str, Any]:
             },
             "required": ["decisions"]
         }
+    }
+
+
+def classify_anthropic_error(exc: Exception) -> Dict[str, Any]:
+    """
+    Classifies exceptions from Anthropic API calls into canonical error_type and user-friendly message.
+    Ensures no secret key is ever exposed.
+    """
+    status_code = getattr(exc, "status_code", None)
+    err_str = str(exc)
+    err_lower = err_str.lower()
+    exc_cls = type(exc).__name__
+    cls_lower = exc_cls.lower()
+
+    if status_code == 401 or "authentication" in cls_lower or "invalid x-api-key" in err_lower or "api key" in err_lower:
+        error_type = "auth_error"
+        msg = "Anthropic API key rejected (401 Unauthorized)"
+    elif status_code == 404 or "not_found" in err_lower or "model" in err_lower:
+        error_type = "model_not_found"
+        msg = "Anthropic model not found"
+    elif status_code == 429 or "rate_limit" in cls_lower or "rate limit" in err_lower:
+        error_type = "rate_limited"
+        msg = "Anthropic rate limit exceeded (429)"
+    elif status_code == 408 or "timeout" in cls_lower or "timeout" in err_lower:
+        error_type = "timeout"
+        msg = "Anthropic request timed out"
+    else:
+        error_type = "api_error"
+        msg = f"Anthropic call failed ({exc_cls}: {status_code or 'no status'})"
+
+    # Redact any key-like substrings
+    sanitized_detail = re.sub(r'sk-ant-[a-zA-Z0-9_\-]+', '[REDACTED]', err_str)[:250]
+    return {
+        "status": status_code,
+        "type": error_type,
+        "message": msg,
+        "detail": sanitized_detail,
+        "class": exc_cls,
     }
 
 
@@ -1409,9 +1497,10 @@ class LLMFieldResolver:
                     "[LLM_FALLBACK][Role 1] Global LLM time budget (%.1fs) exceeded before category '%s'. Stopping all LLM calls.",
                     self.time_budget_sec, cat
                 )
-                self.llm_status = "llm_unavailable"
-                self.last_error = {"class": "TimeoutError", "status": 408, "detail": "Global time budget exceeded"}
-                results["_llm_status"] = "llm_unavailable"
+                self.llm_status = "timeout"
+                self.last_error = {"class": "TimeoutError", "status": 408, "type": "timeout", "message": "Global LLM time budget exceeded", "detail": "Global time budget exceeded"}
+                results["_llm_status"] = "timeout"
+                results["_last_error"] = self.last_error
 
                 cat_idx = sorted_categories.index(cat)
                 for remaining_cat in sorted_categories[cat_idx:]:
@@ -1421,6 +1510,15 @@ class LLMFieldResolver:
                 return results
 
             scoped_text = extract_scoped_context(atc_full_text, cat)
+            if not scoped_text or not scoped_text.strip():
+                logger.warning(
+                    "[SCOPED_CONTEXT][Role 1] Category '%s' section not found; marking 'not_found' without calling LLM.", cat
+                )
+                if cat not in self.failed_categories:
+                    self.failed_categories.append(cat)
+                results[f"_status_{cat}"] = "not_found"
+                continue
+
             logger.info(
                 "[SCOPED_CONTEXT][Role 1] Category '%s' (%d fields: %s): Scoped %d chars from %d full doc chars",
                 cat, len(cat_fields), cat_fields, len(scoped_text), len(atc_full_text)
@@ -1496,6 +1594,20 @@ class LLMFieldResolver:
                                 extracted_dict = getattr(block, "input", {}) or {}
                                 break
 
+                        results[f"_raw_tool_call_{cat}"] = extracted_dict
+                        results[f"_scoped_text_{cat}"] = scoped_text
+
+                        print(f"\n==================================================", flush=True)
+                        print(f"[CATEGORY: {cat}] RAW SCOPED TEXT & LLM TOOL CALL", flush=True)
+                        print(f"==================================================", flush=True)
+                        print(f"--- FIRST 300 CHARS OF SCOPED TEXT ---", flush=True)
+                        print(scoped_text[:300], flush=True)
+                        print(f"--- LAST 200 CHARS OF SCOPED TEXT ---", flush=True)
+                        print(scoped_text[-200:], flush=True)
+                        print(f"--- RAW LLM TOOL-CALL OUTPUT (JSON) ---", flush=True)
+                        print(json.dumps(extracted_dict, indent=2), flush=True)
+                        print(f"==================================================\n", flush=True)
+
                         for prompt_field, raw_val in extracted_dict.items():
                             if raw_val is None:
                                 continue
@@ -1521,15 +1633,17 @@ class LLMFieldResolver:
 
                 except Exception as exc:
                     status_code = getattr(exc, "status_code", None)
+                    err_info = classify_anthropic_error(exc)
+                    self.last_error = err_info
+                    self.llm_status = err_info["type"]
+                    results["_llm_status"] = err_info["type"]
+                    results["_last_error"] = err_info
+
                     if self._is_non_retryable_error(exc):
                         logger.error(
-                            "[LLM_FALLBACK][Role 1] Non-retryable error for category '%s': class=%s, status=%s, detail=%s. Stopping all LLM calls.",
-                            cat, type(exc).__name__, status_code, exc
+                            "[LLM_FALLBACK][Role 1] Non-retryable error for category '%s': type=%s, status=%s, msg=%s. Stopping all LLM calls.",
+                            cat, err_info["type"], status_code, err_info["message"]
                         )
-                        self.llm_status = "llm_unavailable"
-                        self.last_error = {"class": type(exc).__name__, "status": status_code, "detail": "Non-retryable error"}
-                        results["_llm_status"] = "llm_unavailable"
-
                         cat_idx = sorted_categories.index(cat)
                         for remaining_cat in sorted_categories[cat_idx:]:
                             if remaining_cat not in self.failed_categories:
@@ -1543,9 +1657,10 @@ class LLMFieldResolver:
                                 "[LLM_FALLBACK][Role 1] Global LLM time budget (%.1fs) exceeded during retry for category '%s'. Giving up.",
                                 self.time_budget_sec, cat
                             )
-                            self.llm_status = "llm_unavailable"
-                            self.last_error = {"class": "TimeoutError", "status": 408, "detail": "Global time budget exceeded during retry"}
-                            results["_llm_status"] = "llm_unavailable"
+                            self.llm_status = "timeout"
+                            self.last_error = {"class": "TimeoutError", "status": 408, "type": "timeout", "message": "Global time budget exceeded during retry", "detail": "Global time budget exceeded"}
+                            results["_llm_status"] = "timeout"
+                            results["_last_error"] = self.last_error
 
                             cat_idx = sorted_categories.index(cat)
                             for remaining_cat in sorted_categories[cat_idx:]:
@@ -1562,9 +1677,10 @@ class LLMFieldResolver:
                                     "[LLM_FALLBACK][Role 1] Backoff sleep (%.2fs) exceeds remaining budget (%.2fs) for category '%s'. Aborting retries.",
                                     sleep_sec, remaining, cat
                                 )
-                                self.llm_status = "llm_unavailable"
-                                self.last_error = {"class": "TimeoutError", "status": 408, "detail": "Global time budget exceeded"}
-                                results["_llm_status"] = "llm_unavailable"
+                                self.llm_status = "timeout"
+                                self.last_error = {"class": "TimeoutError", "status": 408, "type": "timeout", "message": "Global time budget exceeded", "detail": "Global time budget exceeded"}
+                                results["_llm_status"] = "timeout"
+                                results["_last_error"] = self.last_error
 
                                 cat_idx = sorted_categories.index(cat)
                                 for remaining_cat in sorted_categories[cat_idx:]:
@@ -1574,20 +1690,16 @@ class LLMFieldResolver:
                                 return results
 
                             logger.warning(
-                                "[LLM_FALLBACK][Role 1] Retryable error for category '%s' (attempt %d/%d): class=%s, status=%s. Backing off for %.2fs...",
-                                cat, retry_count + 1, max_retries, type(exc).__name__, status_code, sleep_sec
+                                "[LLM_FALLBACK][Role 1] Retryable error for category '%s' (attempt %d/%d): type=%s, status=%s. Backing off for %.2fs...",
+                                cat, retry_count + 1, max_retries, err_info["type"], status_code, sleep_sec
                             )
                             time.sleep(sleep_sec)
                             continue
                         else:
                             logger.error(
-                                "[LLM_FALLBACK][Role 1] Retries exhausted for category '%s' after %d attempts: class=%s, status=%s. Giving up.",
-                                cat, max_retries, type(exc).__name__, status_code
+                                "[LLM_FALLBACK][Role 1] Retries exhausted for category '%s' after %d attempts: type=%s, status=%s. Giving up.",
+                                cat, max_retries, err_info["type"], status_code
                             )
-                            self.llm_status = "llm_unavailable"
-                            self.last_error = {"class": type(exc).__name__, "status": status_code, "detail": "Retries exhausted"}
-                            results["_llm_status"] = "llm_unavailable"
-
                             cat_idx = sorted_categories.index(cat)
                             for remaining_cat in sorted_categories[cat_idx:]:
                                 if remaining_cat not in self.failed_categories:
@@ -1596,13 +1708,9 @@ class LLMFieldResolver:
                             return results
                     else:
                         logger.error(
-                            "[LLM_FALLBACK][Role 1] Unexpected error for category '%s': class=%s, status=%s, detail=%s. Stopping.",
-                            cat, type(exc).__name__, status_code, exc
+                            "[LLM_FALLBACK][Role 1] Unexpected error for category '%s': type=%s, status=%s, msg=%s. Stopping.",
+                            cat, err_info["type"], status_code, err_info["message"]
                         )
-                        self.llm_status = "llm_unavailable"
-                        self.last_error = {"class": type(exc).__name__, "status": status_code, "detail": "Unexpected error"}
-                        results["_llm_status"] = "llm_unavailable"
-
                         cat_idx = sorted_categories.index(cat)
                         for remaining_cat in sorted_categories[cat_idx:]:
                             if remaining_cat not in self.failed_categories:
@@ -1707,7 +1815,7 @@ class LLMFieldResolver:
                 system=system_blocks,
                 messages=[{"role": "user", "content": user_prompt}],
                 tools=[tool_spec],
-                tool_choice={"type": "tool", "name": "resolve_ambiguous_fields"},
+                tool_choice={"type": "auto"},
             )
 
             if hasattr(response, "usage") and response.usage:
@@ -1718,13 +1826,17 @@ class LLMFieldResolver:
                 )
 
             decisions_list: List[Dict[str, Any]] = []
+            raw_role2_tool_call: Dict[str, Any] = {}
             for block in response.content:
                 if getattr(block, "type", "") == "tool_use" and getattr(block, "name", "") == "resolve_ambiguous_fields":
                     input_data = getattr(block, "input", {}) or {}
+                    raw_role2_tool_call = input_data
                     decisions_list = input_data.get("decisions", [])
                     break
 
             results: Dict[str, Dict[str, Any]] = {}
+            if raw_role2_tool_call:
+                results["_raw_tool_call_role2"] = raw_role2_tool_call
             for d in decisions_list:
                 f_name = d.get("field_name")
                 if not f_name or f_name not in fields_to_check:
@@ -1744,15 +1856,19 @@ class LLMFieldResolver:
 
         except Exception as exc:
             status_code = getattr(exc, "status_code", None)
+            err_info = classify_anthropic_error(exc)
             logger.error(
-                "[LLM_AMBIGUITY][Role 2] Claude ambiguity resolution failed: class=%s, status=%s, detail=%s",
-                type(exc).__name__, status_code, exc
+                "[LLM_AMBIGUITY][Role 2] Claude ambiguity resolution failed: type=%s, status=%s, msg=%s",
+                err_info["type"], status_code, err_info["message"]
             )
-            self.llm_status = "llm_unavailable"
-            self.last_error = {"class": type(exc).__name__, "status": status_code, "detail": "Ambiguity resolution error"}
+            self.llm_status = err_info["type"]
+            self.last_error = err_info
             if "ambiguity_resolution" not in self.failed_categories:
                 self.failed_categories.append("ambiguity_resolution")
-            return {"_llm_status": {"action": "error", "reasoning": "llm_unavailable"}}
+            return {
+                "_llm_status": {"action": "error", "reasoning": err_info["type"]},
+                "_last_error": err_info,
+            }
 
     # Backward compatibility alias
     def resolve(

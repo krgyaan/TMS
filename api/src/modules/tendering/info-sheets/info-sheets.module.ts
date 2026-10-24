@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { DatabaseModule } from '@db/database.module';
 import { TendersModule } from '@/modules/tendering/tenders/tenders.module';
 import { TenderInfoSheetsController } from '@/modules/tendering/info-sheets/info-sheets.controller';
@@ -9,6 +9,7 @@ import { TimersModule } from '@/modules/timers/timers.module';
 import { ClientDirectoryModule } from '@/modules/shared/client-directory/client-directory.module';
 import { FileUploadModule } from '@/modules/file-upload/file-upload.module';
 import { ClaudeUsageModule } from '@/modules/master/claude-usage/claude-usage.module';
+import { DocumentChecklistsModule } from '@/modules/tendering/checklists/document-checklists.module';
 import { PdfExtractionProducer } from './pdf-extraction.producer';
 import { PdfExtractionProcessor } from './pdf-extraction.processor';
 
@@ -22,6 +23,7 @@ import { PdfExtractionProcessor } from './pdf-extraction.processor';
         ClientDirectoryModule,
         FileUploadModule,
         ClaudeUsageModule,
+        forwardRef(() => DocumentChecklistsModule),
     ],
     controllers: [TenderInfoSheetsController],
     providers: [TenderInfoSheetsService, PdfExtractionProducer, PdfExtractionProcessor],

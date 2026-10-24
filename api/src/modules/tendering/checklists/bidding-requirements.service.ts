@@ -302,7 +302,13 @@ export class BiddingRequirementsService {
         }
 
         // 1. Idempotency: If job is already 'done' and not forceRefresh, return saved result immediately with no LLM call
-        if (existingJob?.status === 'done' && existingJob.result && !forceRefresh) {
+        const resultSchemaVersion = Number((existingJob?.result as any)?.schemaVersion) || 0;
+        if (
+            existingJob?.status === 'done' &&
+            existingJob.result &&
+            !forceRefresh &&
+            resultSchemaVersion >= BIDDING_REQUIREMENTS_SCHEMA_VERSION
+        ) {
             this.logger.log(
                 `[BiddingRequirementsJob] Returning existing completed job ${existingJob.id} for tender ${tenderId} (hash: ${documentHash.slice(0, 12)})`,
             );

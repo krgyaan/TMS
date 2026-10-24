@@ -22,7 +22,7 @@ from app.core.logging import get_logger
 logger = get_logger(__name__)
 
 MAIN_TENDER_MAX_PAGES = int(os.getenv("MAIN_TENDER_MAX_PAGES", "150"))
-CHILD_PDF_MAX_PAGES = int(os.getenv("CHILD_PDF_MAX_PAGES", "60"))
+CHILD_PDF_MAX_PAGES = int(os.getenv("CHILD_PDF_MAX_PAGES", "400"))
 
 
 # BUG 3 FIX: Field precedence constants defining field ownership rules
@@ -581,7 +581,7 @@ def ingest_parent_tender_pdf(
                     logger.debug(f"Could not parse extra child PDF {c_pdf}: {c_err}")
 
             # Upsert standalone resolve_atc_anchor_fields output into atc_sections (Task 2)
-            atc_full_text = "\n".join([p.get("text", "") for p in atc_page_texts])
+            atc_full_text = "\n".join([f"\n--- [PAGE {p.get('page', i+1)}] ---\n" + p.get("text", "") for i, p in enumerate(atc_page_texts)])
             atc_checkboxes = [cb for p in atc_page_texts for cb in p.get("checkboxes", [])]
             from app.services.tender_mapper import resolve_atc_anchor_fields
             resolved_atc = resolve_atc_anchor_fields(atc_full_text, checkboxes=atc_checkboxes, page_texts=atc_page_texts)
@@ -827,6 +827,7 @@ def ingest_parent_tender_pdf(
                     FIELD_STATUS_MISSING,
                     CONTACT_SLOT_KEYS,
                     contact_integrity_violations,
+                    is_pointer_value,
                 )
                 _CONTACT_KEYS = tuple(k for slot in CONTACT_SLOT_KEYS for k in slot)
                 _DISPLAY_KEY_TO_LABEL = {
@@ -901,14 +902,15 @@ def ingest_parent_tender_pdf(
                     if k not in infosheet_data
                     or infosheet_data.get(k) in _stub_vals
                     or (isinstance(infosheet_data.get(k), str) and not str(infosheet_data.get(k)).strip())
+                    or is_pointer_value(infosheet_data.get(k))
                 ]
-                # Also include any remaining non-display keys from infosheet_data that are stub
+                # Also include any remaining non-display keys from infosheet_data that are stub or pointer
                 for k, v in infosheet_data.items():
-                    if not k.startswith("_") and k not in missing_keys and (v in _stub_vals or (isinstance(v, str) and not v.strip())):
+                    if not k.startswith("_") and k not in missing_keys and (v in _stub_vals or (isinstance(v, str) and not v.strip()) or is_pointer_value(v)):
                         if k in FIELD_PROMPT_MAP:
                             missing_keys.append(k)
                 # Combine parent and ATC child texts to ensure LLM has full context
-                parent_text = "\n".join([p.get("text", "") for p in all_pages])
+                parent_text = "\n".join([f"\n--- [PAGE {p.get('page', i+1)}] ---\n" + p.get("text", "") for i, p in enumerate(all_pages)])
                 target_text = f"{parent_text}\n\n{atc_full_text}".strip() if atc_full_text else parent_text.strip()
                 
                 # Check for BEC / Section-II content in target text
@@ -930,6 +932,23 @@ def ingest_parent_tender_pdf(
                             )
                             if is_suspicious or bec_key == "custom_eligibility_criteria_display":
                                 keys_to_resolve.append(bec_key)
+
+                # Payment terms milestone check: if either field is missing, pointer, or a bare percentage without milestone description, resolve via LLM
+                for pay_k in ("payment_terms_supply_display", "payment_terms_installation_display"):
+                    p_val = str(infosheet_data.get(pay_k, "")).strip()
+                    if pay_k not in keys_to_resolve and (
+                        p_val in _stub_vals
+                        or is_pointer_value(p_val)
+                        or re.fullmatch(r"\d+%", p_val)
+                        or not any(kw in p_val.lower() for kw in ["receipt", "acceptance", "commissioning", "installation", "completion"])
+                    ):
+                        keys_to_resolve.append(pay_k)
+
+                if "payment_terms_supply_display" in keys_to_resolve or "payment_terms_installation_display" in keys_to_resolve:
+                    if "payment_terms_supply_display" not in keys_to_resolve:
+                        keys_to_resolve.append("payment_terms_supply_display")
+                    if "payment_terms_installation_display" not in keys_to_resolve:
+                        keys_to_resolve.append("payment_terms_installation_display")
 
                 resolver = LLMFieldResolver()
                 if target_text and resolver.enabled:
@@ -957,6 +976,14 @@ def ingest_parent_tender_pdf(
                             infosheet_data["_failed_categories"] = list(resolver.failed_categories)
                         elif llm_resolved.get("_failed_categories"):
                             infosheet_data["_failed_categories"] = list(llm_resolved["_failed_categories"])
+                        if "_last_error" in llm_resolved:
+                            infosheet_data["_last_error"] = llm_resolved["_last_error"]
+                        elif getattr(resolver, "last_error", None):
+                            infosheet_data["_last_error"] = resolver.last_error
+
+                        for k, v in llm_resolved.items():
+                            if k.startswith("_raw_tool_call_") or k.startswith("_scoped_text_"):
+                                infosheet_data[k] = v
 
                         field_statuses = cast(Dict[str, str], infosheet_data.get("_info_sheet_statuses", {}))
                         missing_fields = cast(List[str], infosheet_data.get("missing_fields", []))
@@ -970,12 +997,17 @@ def ingest_parent_tender_pdf(
                                 continue
 
                             current_val = infosheet_data.get(key)
-                            is_stub = current_val in _stub_vals or (isinstance(current_val, str) and not current_val.strip())
+                            is_stub = current_val in _stub_vals or (isinstance(current_val, str) and not current_val.strip()) or is_pointer_value(current_val)
 
                             # Contact integrity: never merge an LLM contact value that is not literally
                             # in the tender text (invented name/phone) or that makes one person occupy
                             # two contact slots (e.g. Buyer + HOD collapsed into one repeated identity).
                             if key in _CONTACT_KEYS:
+                                from app.services.tender_mapper import clean_phone, _clean_cname
+                                if "phone" in key:
+                                    val = clean_phone(val)
+                                elif "name" in key:
+                                    val = _clean_cname(val)
                                 _before = {k: infosheet_data.get(k) for k in _CONTACT_KEYS}
                                 _after = dict(_before, **{key: val})
                                 _new_violations = (
@@ -1009,7 +1041,13 @@ def ingest_parent_tender_pdf(
                                     if not curr_has_unit and val_has_unit:
                                         is_bec_override = True
 
-                            if is_stub or is_bec_override:
+                            is_payment_override = False
+                            if key in ("payment_terms_supply_display", "payment_terms_installation_display"):
+                                curr_s = str(current_val).strip()
+                                if is_stub or is_pointer_value(current_val) or re.fullmatch(r"\d+%", curr_s):
+                                    is_payment_override = True
+
+                            if is_stub or is_bec_override or is_payment_override:
                                 infosheet_data[key] = val
                                 logger.info("[LLM_FALLBACK][Role 1] Merged '%s' = %r into infosheet_data (override=%s, prev=%r)", key, val, is_bec_override, current_val)
                                 
@@ -1080,14 +1118,15 @@ def ingest_parent_tender_pdf(
                     ambig_candidates: Dict[str, Any] = {}
 
                     for f_name, c_val in raw_candidates.items():
-                        # Change 6: Filter out unambiguous Layer 1 extractions
-                        if is_unambiguous_layer1(f_name, c_val, target_text):
-                            ambig_dispositions[f_name] = "skipped_unambiguous_layer1"
-                            logger.info(
-                                "[LLM_AMBIGUITY][Role 2] Skipping '%s': exactly one unambiguous candidate in Layer 1 (%r)",
-                                f_name, c_val
-                            )
-                            continue
+                        # Exempt payment terms from unambiguous Layer 1 skip to force Role 2 verification
+                        if f_name not in ("payment_terms_supply_display", "payment_terms_installation_display"):
+                            if is_unambiguous_layer1(f_name, c_val, target_text):
+                                ambig_dispositions[f_name] = "skipped_unambiguous_layer1"
+                                logger.info(
+                                    "[LLM_AMBIGUITY][Role 2] Skipping '%s': exactly one unambiguous candidate in Layer 1 (%r)",
+                                    f_name, c_val
+                                )
+                                continue
 
                         # Change 5: Actionable budget guard (integer raw_processing_tokens)
                         f_prio = AMBIGUITY_FIELD_PRIORITY.get(f_name, 3)
@@ -1129,6 +1168,12 @@ def ingest_parent_tender_pdf(
                             infosheet_data["_llm_status"] = "llm_unavailable"
                         if getattr(resolver, "failed_categories", None):
                             infosheet_data["_failed_categories"] = list(resolver.failed_categories)
+                        if "_last_error" in ambig_decisions:
+                            infosheet_data["_last_error"] = ambig_decisions["_last_error"]
+                        elif getattr(resolver, "last_error", None):
+                            infosheet_data["_last_error"] = resolver.last_error
+                        if "_raw_tool_call_role2" in ambig_decisions:
+                            infosheet_data["_raw_tool_call_role2"] = ambig_decisions["_raw_tool_call_role2"]
 
                         field_statuses = cast(Dict[str, str], infosheet_data.get("_info_sheet_statuses", {}))
 

@@ -8,16 +8,18 @@ async function main() {
   const service = app.get(TenderInfoSheetsService);
   const claudeService = app.get(ClaudeUsageService);
   
-  console.log('Testing autoExtractFromPdf for tender 3629...');
-  const res = await service.autoExtractFromPdf(3629, 100);
+  console.log('Testing autoExtractFromPdf for tender 3642 with force: true...');
+  const res = await service.autoExtractFromPdf(3642, 100, true);
   console.log('Enqueue result:', JSON.stringify(res));
   
-  for (let i = 0; i < 35; i++) {
+  for (let i = 0; i < 60; i++) {
     await new Promise(r => setTimeout(r, 2000));
     const status = await service.getAutoExtractStatus(res.jobId);
     console.log(`Poll attempt ${i + 1}: ${status.status}`);
     if (status.status === 'completed') {
       console.log('Fields extracted count:', Object.keys(status.fields || {}).length);
+      console.log('Extracted llm_status:', status.llm_status);
+      console.log('Extracted missing_fields count:', (status.missing_fields || []).length);
       break;
     }
     if (status.status === 'failed') {

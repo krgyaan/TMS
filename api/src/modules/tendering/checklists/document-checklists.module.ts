@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { DatabaseModule } from '@db/database.module';
 import { BiddingRequirementsService } from '@/modules/tendering/checklists/bidding-requirements.service';
 import { DocumentChecklistsController } from '@/modules/tendering/checklists/document-checklists.controller';
@@ -17,13 +17,13 @@ import { ClaudeUsageModule } from '@/modules/master/claude-usage/claude-usage.mo
         EmailModule,
         TendersModule,
         TimersModule,
-        TenderInfoSheetsModule,
+        forwardRef(() => TenderInfoSheetsModule),
         FileUploadModule,
         FinanceDocumentsModule,
         ClaudeUsageModule,
     ],
     controllers: [DocumentChecklistsController],
     providers: [DocumentChecklistsService, BiddingRequirementsService],
-    exports: [DocumentChecklistsService],
+    exports: [DocumentChecklistsService, BiddingRequirementsService],
 })
 export class DocumentChecklistsModule { }

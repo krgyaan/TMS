@@ -1,0 +1,828 @@
+python : [ATC_RESOLVER] ATC_LINK_NOT_FOUND: Anchor phrase detected on Page 2, but no resolvable URI link annotation 
+found.
+At line:1 char:1
++ python scratch/verify_pipeline_repro.py > scratch/run_output.txt 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([ATC_RESOLVER] ...notation found.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[ATC_RESOLVER] ATC_LINK_NOT_FOUND: Anchor phrase detected on Page 7, but no resolvable URI link annotation found.
+[ATC_RESOLVER] ATC_LINK_NOT_FOUND: Anchor phrase detected on Page 8, but no resolvable URI link annotation found.
+[OCR_DIAGNOSTICS] Failed to initialize PaddleOCR: Descriptors cannot be created directly.
+If this call came from a _pb2.py file, your generated code is out of date and must be regenerated with protoc >= 
+3.19.0.
+If you cannot immediately regenerate your protos, some other possible workarounds are:
+ 1. Downgrade the protobuf package to 3.20.x or lower.
+ 2. Set PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python (but this will use pure-Python parsing and will be much slower).
+
+More information: https://developers.google.com/protocol-buffers/docs/news/2022-05-06#python-updates. Falling back to 
+Tesseract.
+================================================================================
+1. RUNNING PIPELINE ON GEM/2026/B/8074394
+================================================================================
+
+============================================================
+CHILD FILE EXTRACTION SUMMARY
+============================================================
+Parent PDF: C:\Users\Asus\Desktop\Tender_Volks\TMS\tms\api\uploads\tendering\tender-documents\1792817184361_GAIL_Vijaywada.pdf
+Embedded attachments extracted: 0
+Annotation attachments extracted: 0
+External PDF/document links downloaded: 0
+Total files saved locally: 0
+Saved file paths:
+============================================================
+
+
+[FIELD_EXTRACTOR_DEBUG] Starting field extraction on 169/169 page(s) (doc_source: 'main_tender').
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'EMD' (expected type: 'currency')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'EMD': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'Tender Fee' (expected type: 'fee')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'Tender Fee': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'Bid Submission Start Date' (expected type: 'date')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'Bid Submission Start Date': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'Bid Submission End Date' (expected type: 'date')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'Bid Submission End Date': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'Bid Opening Date' (expected type: 'date')
+  [FIELD_EXTRACTOR_DEBUG] Next-block match: 'Bid Opening Date& Time :' | '16.10.2026, 15:00 Hrs' -> '16.10.2026'
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'Bid Opening Date': '16.10.2026' (conf: 0.85)
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'NIT No' (expected type: 'nit')
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'TENDER ID: GEM/2026/B/8074394' -> 'GEM/2026/B/8074394'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'e-Marketplace (GeM) Bid No. GEM/2026/B/8074394' -> 'GEM/2026/B/8074394'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'TENDER NO: GAIL/VIZP142900/ELECT-GK, [GEM/2026/B/8074394]' -> 'GEM/2026/B/8074394'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'TENDER NO: GAIL/VIZP142900/ELECT-GK, [GEM/2026/B/8074394]' -> 'GEM/2026/B/8074394'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'TENDER NO: GAIL/VIZP142900/ELECT-GK [GEM BID NO. GEM/2026/B/8074394] FOR SUPPLY' -> 'GEM/2026/B/8074394'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'TENDER NO: GAIL/VIZP142900/ELECT-GK [GEM BID NO. GEM/2026/B/8074394] FOR' -> 'GEM/2026/B/8074394'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'TENDER NO: GAIL/VIZP142900/ELECT-GK [GEM BID NO. GEM/2026/B/8074394] FOR' -> 'GEM/2026/B/8074394'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'TENDER NO: GAIL/VIZP142900/ELECT-GK [GEM BID NO. GEM/2026/B/8074394] FOR' -> 'GEM/2026/B/8074394'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'TENDER NO: GAIL/VIZP142900/ELECT-GK [GEM BID NO. GEM/2026/B/8074394] FOR' -> 'GEM/2026/B/8074394'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'TENDER NO: GAIL/VIZP142900/ELECT-GK [GEM BID NO. GEM/2026/B/8074394] FOR' -> 'GEM/2026/B/8074394'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'TENDER NO: GAIL/VIZP142900/ELECT-GK [GEM BID NO. GEM/2026/B/8074394] FOR' -> 'GEM/2026/B/8074394'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'TENDER NO: GAIL/VIZP142900/ELECT-GK [GEM BID NO. GEM/2026/B/8074394] FOR' -> 'GEM/2026/B/8074394'
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'NIT No': 'GEM/2026/B/8074394' (conf: 0.95)
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'Tender Value' (expected type: 'currency')
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'contract / order value is 5 lac or above]' -> '5 '
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'Tender Value': '5 ' (conf: 0.95)
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'Organisation' (expected type: 'org')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'Organisation': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'Pre-Bid Meeting Date' (expected type: 'date')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'Pre-Bid Meeting Date': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'Bid Validity Period' (expected type: 'validity')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'Bid Validity Period': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'Period of Work' (expected type: 'period')
+  [FIELD_EXTRACTOR_DEBUG] Spatial neighbor match: 'Delivery Period/' -> 'a) Upto 3 months' -> '3 months'
+  [FIELD_EXTRACTOR_DEBUG] Spatial neighbor match: 'Delivery Period/' -> 'a) Upto 3 months' -> '3 months'
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'Period of Work': '3 months' (conf: 0.85)
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'bid_number' (expected type: 'nit')
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'TENDER ID: GEM/2026/B/8074394' -> 'GEM/2026/B/8074394'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'e-Marketplace (GeM) Bid No. GEM/2026/B/8074394' -> 'GEM/2026/B/8074394'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'TENDER NO: GAIL/VIZP142900/ELECT-GK, [GEM/2026/B/8074394]' -> 'GEM/2026/B/8074394'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'TENDER NO: GAIL/VIZP142900/ELECT-GK, [GEM/2026/B/8074394]' -> 'GEM/2026/B/8074394'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'TENDER NO: GAIL/VIZP142900/ELECT-GK [GEM BID NO. GEM/2026/B/8074394] FOR SUPPLY' -> 'GEM/2026/B/8074394'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'TENDER NO: GAIL/VIZP142900/ELECT-GK [GEM BID NO. GEM/2026/B/8074394] FOR' -> 'GEM/2026/B/8074394'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'TENDER NO: GAIL/VIZP142900/ELECT-GK [GEM BID NO. GEM/2026/B/8074394] FOR' -> 'GEM/2026/B/8074394'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'TENDER NO: GAIL/VIZP142900/ELECT-GK [GEM BID NO. GEM/2026/B/8074394] FOR' -> 'GEM/2026/B/8074394'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'TENDER NO: GAIL/VIZP142900/ELECT-GK [GEM BID NO. GEM/2026/B/8074394] FOR' -> 'GEM/2026/B/8074394'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'TENDER NO: GAIL/VIZP142900/ELECT-GK [GEM BID NO. GEM/2026/B/8074394] FOR' -> 'GEM/2026/B/8074394'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'TENDER NO: GAIL/VIZP142900/ELECT-GK [GEM BID NO. GEM/2026/B/8074394] FOR' -> 'GEM/2026/B/8074394'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'TENDER NO: GAIL/VIZP142900/ELECT-GK [GEM BID NO. GEM/2026/B/8074394] FOR' -> 'GEM/2026/B/8074394'
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'bid_number': 'GEM/2026/B/8074394' (conf: 0.95)
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'tender_date' (expected type: 'date')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'tender_date': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'bid_end_datetime' (expected type: 'datetime')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'bid_end_datetime': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'bid_open_datetime' (expected type: 'datetime')
+  [FIELD_EXTRACTOR_DEBUG] Next-block match: 'Bid Opening Date& Time :' | '16.10.2026, 15:00 Hrs' -> '16.10.2026'
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'bid_open_datetime': '16.10.2026' (conf: 0.85)
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'ministry_name' (expected type: 'org')
+  [FIELD_EXTRACTOR_DEBUG] Same-block match (org preposition): 'Ministry of Commerce & Industry and relaxation is to be given to the specific goods / jobs domain' -> 'Ministry of Commerce & Industry and relaxation is to be given to the specific goods / jobs domain'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match (org preposition): 'or the Ministry of Petroleum and Natural Gas.' -> 'or the Ministry of Petroleum and Natural Gas.'
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'ministry_name': 'Ministry of Commerce & Industry and relaxation is to be given to the specific goods / jobs domain' (conf: 0.95)
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'department_name' (expected type: 'org')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'department_name': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'organisation_name' (expected type: 'org')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'organisation_name': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'office_name' (expected type: 'org')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'office_name': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'buyer_email' (expected type: 'email')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'buyer_email': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'item_category' (expected type: 'text')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'item_category': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'similar_category' (expected type: 'text')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'similar_category': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'contract_period' (expected type: 'period')
+  [FIELD_EXTRACTOR_DEBUG] Spatial neighbor match: 'Delivery Period/' -> 'a) Upto 3 months' -> '3 months'
+  [FIELD_EXTRACTOR_DEBUG] Spatial neighbor match: 'Delivery Period/' -> 'a) Upto 3 months' -> '3 months'
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'contract_period': '3 months' (conf: 0.85)
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'minimum_average_annual_turnover' (expected type: 'currency')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'minimum_average_annual_turnover': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'years_of_past_experience' (expected type: 'experience')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'years_of_past_experience': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'past_experience_required' (expected type: 'yes_no')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'past_experience_required': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'tender_id' (expected type: 'nit')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'tender_id': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'bid_published_date' (expected type: 'date')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'bid_published_date': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'ministry_state_name' (expected type: 'org')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'ministry_state_name': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'total_quantity' (expected type: 'integer')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'total_quantity': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'bid_opening_datetime' (expected type: 'datetime')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'bid_opening_datetime': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'bid_validity_days' (expected type: 'validity')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'bid_validity_days': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'auto_extension_days' (expected type: 'integer')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'auto_extension_days': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'auto_extension_max_count' (expected type: 'integer')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'auto_extension_max_count': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'min_bids_to_disable_auto_extension' (expected type: 'integer')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'min_bids_to_disable_auto_extension': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'pre_bid_meeting' (expected type: 'text')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'pre_bid_meeting': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'emd_advisory_bank' (expected type: 'text')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'emd_advisory_bank': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'pbg_percentage' (expected type: 'percentage')
+  [FIELD_EXTRACTOR_DEBUG] Next-block match: 'CONTRACT PERFORMANCE SECURITY / SECURITY DEPOSIT' | '39. PROCEDURE FOR ACTION IN CASE CORRUPT/ FRAUDULENT' -> '39'
+  [FIELD_EXTRACTOR_DEBUG] Spatial neighbor match: 'Contract Performance Security / Security Deposit' -> '46' -> '46'
+  [FIELD_EXTRACTOR_DEBUG] Next-block match: 'CONTRACT PERFORMANCE SECURITY / SECURITY DEPOSIT [CPS/SD]' | '38.1' -> '38.1'
+  [FIELD_EXTRACTOR_DEBUG] Spatial neighbor match: 'Performance Security against FOA/DLOA no. _______ (service provider to specify the' -> 'officer immediately through email/letter and necessarily within 30 days from the date of Fax of' -> '30 '
+  [FIELD_EXTRACTOR_DEBUG] Spatial neighbor match: 'Contract Performance Security/ Security Deposit' -> 'contract / order value is 5 lac or above]' -> '5 '
+  [FIELD_EXTRACTOR_DEBUG] Spatial neighbor match: 'Performance Guarantee in the form therein mentioned. The form of payment of Contract Performance' -> 'net worth more than Rs. 100,00,00,000.00 [Rupees One Hundred Crores] or its equivalent in' -> '100'
+  [FIELD_EXTRACTOR_DEBUG] Next-block match: 'Contract Performance Security / Security Deposit.' | '5.' -> '5'
+  [FIELD_EXTRACTOR_DEBUG] Spatial neighbor match: 'Performance Security / Security Deposit.' -> '1' -> '1'
+  [FIELD_EXTRACTOR_DEBUG] Next-block match: 'Contract Performance Security' | '13.' -> '13'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: '12.0 CONTRACT PERFORMANCE SECURITY (CPS):' -> '12.0 '
+  [FIELD_EXTRACTOR_DEBUG] Spatial neighbor match: 'Performance Security (CPS) in the form of Demand Draft/online direct transfer/Bank Guarantee' -> '12.2 The proceeds of CPS shall be appropriated by the Purchaser as compensation for any loss resulting' -> '12.2 '
+  [FIELD_EXTRACTOR_DEBUG] Next-block match: 'Contract Performance Security in full or part.' | '15. DELIVERY & DOCUMENTS AND DISPATCH SCHEDULE' -> '15'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: '20.2 Performance Guarantee of Equipment' -> '20.2 '
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'pbg_percentage': '12.0 ' (conf: 0.95)
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'pbg_duration_months' (expected type: 'integer')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'pbg_duration_months': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'pbg_advisory_bank' (expected type: 'text')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'pbg_advisory_bank': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'beneficiary_name' (expected type: 'text')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'beneficiary_name': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'evaluation_method' (expected type: 'text')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'evaluation_method': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'reverse_auction_enabled' (expected type: 'yes_no')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'reverse_auction_enabled': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'bid_type' (expected type: 'text')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'bid_type': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'inspection_required' (expected type: 'yes_no')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'inspection_required': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'arbitration_clause' (expected type: 'yes_no')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'arbitration_clause': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'mediation_clause' (expected type: 'yes_no')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'mediation_clause': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'mse_relaxation_experience_turnover' (expected type: 'yes_no')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'mse_relaxation_experience_turnover': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'startup_relaxation_experience_turnover' (expected type: 'text')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'startup_relaxation_experience_turnover': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'mse_purchase_preference' (expected type: 'yes_no')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'mse_purchase_preference': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'mse_preference_price_band_percent' (expected type: 'currency')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'mse_preference_price_band_percent': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'mse_preference_max_qty_percent' (expected type: 'currency')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'mse_preference_max_qty_percent': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'mii_purchase_preference' (expected type: 'yes_no')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'mii_purchase_preference': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'mii_non_applicability_reason' (expected type: 'text')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'mii_non_applicability_reason': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'required_documents' (expected type: 'text')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'required_documents': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'atc_document_link_present' (expected type: 'yes_no')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'atc_document_link_present': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'land_border_clause_present' (expected type: 'yes_no')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'land_border_clause_present': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'payment_terms_supply_percent' (expected type: 'text')
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'Payment terms shall be as mentioned in GPC/SCC.' -> 'shall be as mentioned in GPC/SCC.'
+  [FIELD_EXTRACTOR_DEBUG] Next-block match: 'Terms of Payment' | '22.' -> '22.'
+  [FIELD_EXTRACTOR_DEBUG] Next-block match: '21. TERMS OF PAYMENT' | '21.1 In case of supply, payment shall be released within 15 days after receipt and acceptance of goods' -> '21.1 In case of supply, payment shall be released within 15 days after receipt and acceptance of goods'
+  [FIELD_EXTRACTOR_DEBUG] Spatial neighbor match: 'PAYMENT TERMS:' -> 'Supply portion:' -> 'Supply portion:'
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'payment_terms_supply_percent': 'shall be as mentioned in GPC/SCC.' (conf: 0.95)
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'payment_terms_installation_percent' (expected type: 'text')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'payment_terms_installation_percent': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'maf_required' (expected type: 'yes_no')
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'maf_required': Not Found
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'prs_ld' (expected type: 'text')
+  [FIELD_EXTRACTOR_DEBUG] Next-block match: 'CREDIT NOTE TOWARDS PRS' | '50. UNIQUE DOCUMENT IDENTIFICATION NUMBER BY PRACTICING' -> '50. UNIQUE DOCUMENT IDENTIFICATION NUMBER BY PRACTICING'
+  [FIELD_EXTRACTOR_DEBUG] Next-block match: 'Price Reduction Schedule' | '(h)' -> '(h)'
+  [FIELD_EXTRACTOR_DEBUG] Next-block match: 'TOWARDS PRS' | 'PRS is the reduction in the consideration / contract value for the goods / services covered under' -> 'PRS is the reduction in the consideration / contract value for the goods / services covered under'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'PRS is the reduction in the consideration / contract value for the goods / services covered under' -> 'is the reduction in the consideration / contract value for the goods / services covered under'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'price reduction due to delay (refer PRS Clause).' -> 'Clause).'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'Price Reduction Schedule (PRS) for Delayed Delivery' -> '(PRS) for Delayed Delivery'
+  [FIELD_EXTRACTOR_DEBUG] Same-block match: 'completion period, no PRS shall be applicable.' -> 'shall be applicable.'
+  [FIELD_EXTRACTOR_DEBUG] Next-block match: 'Price Reduction Schedule:' | 'Supply, Installation and commissioning: - In case of delay the total price shall Be reduced by \xbd' -> 'Supply, Installation and commissioning: - In case of delay the total price shall Be reduced by \xbd'
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'prs_ld': 'is the reduction in the consideration / contract value for the goods / services covered under' (conf: 0.95)
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'client_contact_person' (expected type: 'text')
+  [FIELD_EXTRACTOR_DEBUG] Next-block match: 'Kind Attn:' | 'Sh. Vishal Kumar,' -> 'Sh. Vishal Kumar,'
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'client_contact_person': 'Sh. Vishal Kumar,' (conf: 0.85)
+[FIELD_EXTRACTOR_DEBUG] Processing rule 'full_courier_address_with_pincode' (expected type: 'text')
+  [FIELD_EXTRACTOR_DEBUG] Next-block match: '(G) DEALING GAIL\u2019S OFFICE ADDRESS' | 'GAIL (INDIA) LIMITED' -> 'GAIL (INDIA) LIMITED'
+[FIELD_EXTRACTOR_DEBUG] Extracted value for 'full_courier_address_with_pincode': 'GAIL (INDIA) LIMITED' (conf: 0.85)
+[FIELD_EXTRACTOR_DEBUG] Finished extraction. Total extracted fields count: 82
+
+[SCHEDULE_QTY_MISMATCH] sum(schedule quantities)=521229.0 != total_quantity=16.0 ΓÇö 1 schedule row(s) parsed, -521213 
+unit(s) unaccounted for.
+[SCOPED_CONTEXT] Category 'pbg_sd': Pages 115-115 (2653 chars). First 120 chars: '=== Contract Performance Security (CPS) Clause (Pages 115-115) === 12.0 CONTRACT PERFORMANCE SECURITY (CPS):    12.1 Wit'
+
+==================================================
+[CATEGORY: pbg_sd] RAW SCOPED TEXT & LLM TOOL CALL
+==================================================
+--- FIRST 300 CHARS OF SCOPED TEXT ---
+=== Contract Performance Security (CPS) Clause (Pages 115-115) ===
+12.0 CONTRACT PERFORMANCE SECURITY (CPS): 
+ 
+12.1 Within 30 days after the SupplierΓÇÖs receipt of FOA, the Supplier shall furnish Contract 
+Performance Security (CPS) in the form of Demand Draft/online direct transfer/Bank Guarantee 
+
+--- LAST 200 CHARS OF SCOPED TEXT ---
+ltant on demand any balance 
+remaining due. No interest shall be payable by the Purchaser/Consultant for sum deposited as CPS 
+and no claim whatsoever in this regard shall be entertained by Purchaser.
+--- RAW LLM TOOL-CALL OUTPUT (JSON) ---
+{
+  "sd_required": true,
+  "sd_mode": "Demand Draft, online direct transfer, Bank Guarantee",
+  "sd_percentage": null,
+  "sd_duration_months": null
+}
+==================================================
+
+[SCOPED_CONTEXT] Category 'payment_terms': Pages 161-164 (6754 chars). First 120 chars: 'SPECIAL CONDITIONS OF CONTRACT [SCC]  Subject:  Supply, Installation & Commissioning of Battery Banks for SV stations (S'
+
+==================================================
+[CATEGORY: payment_terms] RAW SCOPED TEXT & LLM TOOL CALL
+==================================================
+--- FIRST 300 CHARS OF SCOPED TEXT ---
+SPECIAL CONDITIONS OF CONTRACT [SCC] 
+Subject:  Supply, Installation & Commissioning of Battery Banks for SV stations (SV-15,17,20 & 
+26) under G. Konduru jurisdiction of VSPL. 
+ 
+1.0 
+General: 
+The technical specifications shall be applicable for the work covered by this contract over and 
+above wi
+--- LAST 200 CHARS OF SCOPED TEXT ---
+UPPLY AND INSTALLATION OF NEW NI-CD BATTERY BANKS FOR SV-15, SV-17, SV-20 & SV-26 
+UNDER G. KONDURU JURISDICTION ON BUYBACK BASIS AGAINST TENDER NO. 
+GEM/2026/B/8074394 [GAIL/VIZP142900/ELECT-GK] 
+164
+--- RAW LLM TOOL-CALL OUTPUT (JSON) ---
+{
+  "payment_terms_supply": "80% payment (100% taxes and duties) shall be released after receipt and acceptance of the materials on site. Balance 20% shall be released after completion of job in all respect including handing over of all documents as per the Purchase order and acceptance by Engineer-in-Charge (EIC) and taking away the buyback batteries from the sites.",
+  "payment_terms_installation": "100% payment shall be done after completion of installation commissioning of all the SV station battery banks successfully."
+}
+==================================================
+
+[SCOPED_CONTEXT] Category 'prs_ld': Pages 161-164 (6754 chars). First 120 chars: 'SPECIAL CONDITIONS OF CONTRACT [SCC]  Subject:  Supply, Installation & Commissioning of Battery Banks for SV stations (S'
+
+==================================================
+[CATEGORY: prs_ld] RAW SCOPED TEXT & LLM TOOL CALL
+==================================================
+--- FIRST 300 CHARS OF SCOPED TEXT ---
+SPECIAL CONDITIONS OF CONTRACT [SCC] 
+Subject:  Supply, Installation & Commissioning of Battery Banks for SV stations (SV-15,17,20 & 
+26) under G. Konduru jurisdiction of VSPL. 
+ 
+1.0 
+General: 
+The technical specifications shall be applicable for the work covered by this contract over and 
+above wi
+--- LAST 200 CHARS OF SCOPED TEXT ---
+UPPLY AND INSTALLATION OF NEW NI-CD BATTERY BANKS FOR SV-15, SV-17, SV-20 & SV-26 
+UNDER G. KONDURU JURISDICTION ON BUYBACK BASIS AGAINST TENDER NO. 
+GEM/2026/B/8074394 [GAIL/VIZP142900/ELECT-GK] 
+164
+--- RAW LLM TOOL-CALL OUTPUT (JSON) ---
+{
+  "ld_percentage_per_week": 0.5,
+  "max_ld_percentage": 5
+}
+==================================================
+
+[SCOPED_CONTEXT] Category 'bec_criteria': Pages 9-12 (10000 chars). First 120 chars: 'BID EVALUATION CRITERIA & EVALUATION METHODOLOGY      A.  TECHNICAL CRITERIA:    (a)  Bidder should be a manufacturer of'
+
+==================================================
+[CATEGORY: bec_criteria] RAW SCOPED TEXT & LLM TOOL CALL
+==================================================
+--- FIRST 300 CHARS OF SCOPED TEXT ---
+BID EVALUATION CRITERIA & EVALUATION METHODOLOGY 
+   
+A. 
+TECHNICAL CRITERIA: 
+ 
+(a) 
+Bidder should be a manufacturer of industrial Nickel cadmium Battery or authorized dealer/ 
+distributor/ Indian Subsidiary of manufacturer of industrial Nickel cadmium Battery. 
+ 
+1. 
+In case bidder is Manufacturer
+--- LAST 200 CHARS OF SCOPED TEXT ---
+2 
+ 
+ 
+(iv) Undertaking from the supporting company to the effect that in addition to invoking the PBG 
+submitted by the bidding company, the PBG provided by supporting company shall be 
+invoked by GA
+--- RAW LLM TOOL-CALL OUTPUT (JSON) ---
+{
+  "maf_required": true,
+  "custom_eligibility_criteria": "Bidder must be a manufacturer of industrial Nickel-Cadmium Battery or authorized dealer/distributor/Indian Subsidiary of manufacturer of industrial Nickel-Cadmium Battery. If manufacturer, proof of manufacturing (Company registration certificate, ISO certificate, NSIC certificate, Excise registration certificate, or equivalent evidencing manufacture of Nickel-Cadmium battery) must be submitted. If authorized dealer/distributor/Indian Subsidiary, valid distributorship/dealership certificate directly issued by the manufacturer (valid as on bid opening date) along with proof of principal being manufacturer of Nickel-Cadmium battery must be submitted. Bidder must have executed a purchase order of value not less than 19.16 Lakhs for supply, installation, testing and commissioning of Battery Banks at any Industries during last seven (7) years from the due date of bid submission. Copy of purchase order/work order and execution proof (execution certificate/completion certificate/invoice) along with payment proof/inspection report issued by end user must be submitted with cross reference between PO/WO and execution proof. Jobs executed for subsidiary/fellow subsidiary/Holding company will be considered subject to submission of tax paid invoices duly certified by Statutory Auditor.",
+  "order_value_1": "19.16 Lakhs",
+  "order_value_2": null,
+  "order_value_3": null,
+  "avg_annual_turnover_value": null,
+  "working_capital_value": null,
+  "solvency_certificate_value": null,
+  "net_worth_value": null,
+  "avg_annual_turnover_type": "Not Applicable",
+  "working_capital_type": "Not Applicable",
+  "net_worth_type": "Not Applicable",
+  "solvency_certificate_type": "Not Applicable"
+}
+==================================================
+
+[SCOPED_CONTEXT] Category 'bid_summary': Pages 1-5 (6000 chars). First 120 chars: '=== Tender Document Opening & Bid Summary (Pages 1-5) === --- [PAGE 1] --- \x01αñ¼αñí \x01αñ╡αñ╡αñ░αñú/Bid Details \x01αñ¼αñí αñ¼αñéαñª αñ╣αÑïαñ¿αÑç αñò\x10 αññαñ╛αñ░\x13αñû/αñ╕'
+
+==================================================
+[CATEGORY: bid_summary] RAW SCOPED TEXT & LLM TOOL CALL
+==================================================
+--- FIRST 300 CHARS OF SCOPED TEXT ---
+=== Tender Document Opening & Bid Summary (Pages 1-5) ===
+--- [PAGE 1] ---
+αñ¼αñí αñ╡αñ╡αñ░αñú/Bid Details
+αñ¼αñí αñ¼αñéαñª αñ╣αÑïαñ¿αÑç αñò αññαñ╛αñ░αñû/αñ╕αñ«αñ» /Bid End Date/Time
+15-10-2026 15:00:00
+αñ¼αñí αñûαÑüαñ▓αñ¿αÑç αñò αññαñ╛αñ░αñû/αñ╕αñ«αñ» /Bid Opening
+Date/Time
+16-10-2026 15:00:00
+αñ¼αñí αñ¬αÑçαñ╢αñòαñ╢ αñ╡αÑêαñºαññαñ╛ (αñ¼αñéαñª αñ╣αÑïαñ¿αÑç αñò αññαñ╛αñ░αñû αñ╕αÑç)/Bid Offer
+Validity (From End Date
+--- LAST 200 CHARS OF SCOPED TEXT ---
+t. If buyer needs more items along with the main
+item, the same must be added through bunching category based items or by bunching custom catalogues
+or bunching a BoQ with the main category based item
+--- RAW LLM TOOL-CALL OUTPUT (JSON) ---
+{
+  "tender_value": null,
+  "tender_fee_amount": null,
+  "tender_fee_mode": null,
+  "processing_fee_amount": null,
+  "processing_fee_mode": null
+}
+==================================================
+
+[SCOPED_CONTEXT] Category 'contacts_bds': Pages 3-30 (5139 chars). First 120 chars: 'Contact details of Grievance redressal HOD Email id :narasingha.rao@gail.co.in  Buyer Email id: vishal1@gail.co.in αñòαÑüαñ▓ αñ«'
+
+==================================================
+[CATEGORY: contacts_bds] RAW SCOPED TEXT & LLM TOOL CALL
+==================================================
+--- FIRST 300 CHARS OF SCOPED TEXT ---
+Contact details of
+Grievance redressal
+HOD Email id :narasingha.rao@gail.co.in 
+Buyer Email id: vishal1@gail.co.in
+αñòαÑüαñ▓ αñ«αñ╛ αñ╛/Total Quantity
+16
+αñ╡'αññαÑü (αÑçαñúαÑÇ /Item Category
+BATTERY BANK NICKEL CADMIUM TYPE: KPL500P CAPACITY:
+500AH VOLTAGE: 1.2V NO OF CELLS: 19 , Installation,
+Commissioning and Testing of 
+--- LAST 200 CHARS OF SCOPED TEXT ---
+or CPS of the bidder/vendor/contractor 
+shall be forfeited / Bid Security Declaration clause
+
+=== SECTION-III / BDS ===
+Section-III  
+: 
+Instructions to Bidders [ITB], Annexures & Forms & Format ** 
+Γ₧ó
+--- RAW LLM TOOL-CALL OUTPUT (JSON) ---
+{
+  "client_name_2": "Sh. Narasinga Rao Ch",
+  "client_email_2": "narasingha.rao@gail.co.in",
+  "client_phone_2": "0891-2749771; Extn.: 885-380"
+}
+==================================================
+
+[SCOPED_CONTEXT] Category 'payment_terms_supply_display': Pages 161-164 (6754 chars). First 120 chars: 'SPECIAL CONDITIONS OF CONTRACT [SCC]  Subject:  Supply, Installation & Commissioning of Battery Banks for SV stations (S'
+[SCOPED_CONTEXT] Category 'payment_terms_installation_display': Pages 161-164 (6754 chars). First 120 chars: 'SPECIAL CONDITIONS OF CONTRACT [SCC]  Subject:  Supply, Installation & Commissioning of Battery Banks for SV stations (S'
+
+================================================================================
+2. EXTRACTION STATUS AND LLM METRICS
+================================================================================
+llm_status: ok
+last_error: null
+failed_categories: []
+llm_usage: {
+  "role1_model": "claude-haiku-4-5-20251001",
+  "role2_model": "claude-sonnet-5-5",
+  "input_tokens": 22980,
+  "output_tokens": 1473,
+  "cache_creation_tokens": 8979,
+  "cache_read_tokens": 41485,
+  "raw_tokens": 74917,
+  "raw_processing_tokens": 74917,
+  "total_tokens": 74917,
+  "budget_weighted_tokens": 37580.5,
+  "cache_hit_rate_pct": 64.4,
+  "role1_retries": 0,
+  "estimated_cost_usd": 0.05503,
+  "stages": {
+    "missing_field_fallback": {
+      "call_type": "missing_field_fallback",
+      "model": "claude-haiku-4-5-20251001",
+      "input_tokens": 16221,
+      "output_tokens": 1132,
+      "cache_creation_tokens": 8297,
+      "cache_read_tokens": 41485,
+      "total_tokens": 67135,
+      "estimated_cost_usd": 0.036402,
+      "calls_count": 6
+    },
+    "ambiguity_resolution": {
+      "call_type": "ambiguity_resolution",
+      "model": "claude-sonnet-5-5",
+      "input_tokens": 6759,
+      "output_tokens": 341,
+      "cache_creation_tokens": 682,
+      "cache_read_tokens": 0,
+      "total_tokens": 7782,
+      "estimated_cost_usd": 0.018633,
+      "calls_count": 1
+    }
+  },
+  "ambiguity_dispositions": {
+    "payment_terms_supply_display": "evaluated_role2",
+    "payment_terms_installation_display": "evaluated_role2",
+    "delivery_time_supply_display": "skipped_unambiguous_layer1",
+    "delivery_time_installation_display": "skipped_unambiguous_layer1"
+  }
+}
+
+================================================================================
+3. RAW SCOPED TEXT AND RAW LLM TOOL-CALL OUTPUT PER CATEGORY
+================================================================================
+
+############################################################
+CATEGORY: pbg_sd (Unknown)
+############################################################
+Scoped text length: 2653 characters
+
+--- FIRST 300 CHARACTERS OF SCOPED TEXT ---
+=== Contract Performance Security (CPS) Clause (Pages 115-115) ===
+12.0 CONTRACT PERFORMANCE SECURITY (CPS): 
+ 
+12.1 Within 30 days after the SupplierΓÇÖs receipt of FOA, the Supplier shall furnish Contract 
+Performance Security (CPS) in the form of Demand Draft/online direct transfer/Bank Guarantee 
+
+
+--- LAST 200 CHARACTERS OF SCOPED TEXT ---
+ltant on demand any balance 
+remaining due. No interest shall be payable by the Purchaser/Consultant for sum deposited as CPS 
+and no claim whatsoever in this regard shall be entertained by Purchaser.
+
+--- RAW LLM TOOL-CALL OUTPUT (JSON) ---
+{
+  "sd_required": true,
+  "sd_mode": "Demand Draft, online direct transfer, Bank Guarantee",
+  "sd_percentage": null,
+  "sd_duration_months": null
+}
+
+############################################################
+CATEGORY: payment_terms (Pages 162 - 164)
+############################################################
+Scoped text length: 6754 characters
+
+--- FIRST 300 CHARACTERS OF SCOPED TEXT ---
+SPECIAL CONDITIONS OF CONTRACT [SCC] 
+Subject:  Supply, Installation & Commissioning of Battery Banks for SV stations (SV-15,17,20 & 
+26) under G. Konduru jurisdiction of VSPL. 
+ 
+1.0 
+General: 
+The technical specifications shall be applicable for the work covered by this contract over and 
+above wi
+
+--- LAST 200 CHARACTERS OF SCOPED TEXT ---
+UPPLY AND INSTALLATION OF NEW NI-CD BATTERY BANKS FOR SV-15, SV-17, SV-20 & SV-26 
+UNDER G. KONDURU JURISDICTION ON BUYBACK BASIS AGAINST TENDER NO. 
+GEM/2026/B/8074394 [GAIL/VIZP142900/ELECT-GK] 
+164
+
+--- RAW LLM TOOL-CALL OUTPUT (JSON) ---
+{
+  "payment_terms_supply": "80% payment (100% taxes and duties) shall be released after receipt and acceptance of the materials on site. Balance 20% shall be released after completion of job in all respect including handing over of all documents as per the Purchase order and acceptance by Engineer-in-Charge (EIC) and taking away the buyback batteries from the sites.",
+  "payment_terms_installation": "100% payment shall be done after completion of installation commissioning of all the SV station battery banks successfully."
+}
+
+############################################################
+CATEGORY: prs_ld (Pages 162 - 164)
+############################################################
+Scoped text length: 6754 characters
+
+--- FIRST 300 CHARACTERS OF SCOPED TEXT ---
+SPECIAL CONDITIONS OF CONTRACT [SCC] 
+Subject:  Supply, Installation & Commissioning of Battery Banks for SV stations (SV-15,17,20 & 
+26) under G. Konduru jurisdiction of VSPL. 
+ 
+1.0 
+General: 
+The technical specifications shall be applicable for the work covered by this contract over and 
+above wi
+
+--- LAST 200 CHARACTERS OF SCOPED TEXT ---
+UPPLY AND INSTALLATION OF NEW NI-CD BATTERY BANKS FOR SV-15, SV-17, SV-20 & SV-26 
+UNDER G. KONDURU JURISDICTION ON BUYBACK BASIS AGAINST TENDER NO. 
+GEM/2026/B/8074394 [GAIL/VIZP142900/ELECT-GK] 
+164
+
+--- RAW LLM TOOL-CALL OUTPUT (JSON) ---
+{
+  "ld_percentage_per_week": 0.5,
+  "max_ld_percentage": 5
+}
+
+############################################################
+CATEGORY: bec_criteria (Pages 10 - 12)
+############################################################
+Scoped text length: 10000 characters
+
+--- FIRST 300 CHARACTERS OF SCOPED TEXT ---
+BID EVALUATION CRITERIA & EVALUATION METHODOLOGY 
+   
+A. 
+TECHNICAL CRITERIA: 
+ 
+(a) 
+Bidder should be a manufacturer of industrial Nickel cadmium Battery or authorized dealer/ 
+distributor/ Indian Subsidiary of manufacturer of industrial Nickel cadmium Battery. 
+ 
+1. 
+In case bidder is Manufacturer
+
+--- LAST 200 CHARACTERS OF SCOPED TEXT ---
+2 
+ 
+ 
+(iv) Undertaking from the supporting company to the effect that in addition to invoking the PBG 
+submitted by the bidding company, the PBG provided by supporting company shall be 
+invoked by GA
+
+--- RAW LLM TOOL-CALL OUTPUT (JSON) ---
+{
+  "maf_required": true,
+  "custom_eligibility_criteria": "Bidder must be a manufacturer of industrial Nickel-Cadmium Battery or authorized dealer/distributor/Indian Subsidiary of manufacturer of industrial Nickel-Cadmium Battery. If manufacturer, proof of manufacturing (Company registration certificate, ISO certificate, NSIC certificate, Excise registration certificate, or equivalent evidencing manufacture of Nickel-Cadmium battery) must be submitted. If authorized dealer/distributor/Indian Subsidiary, valid distributorship/dealership certificate directly issued by the manufacturer (valid as on bid opening date) along with proof of principal being manufacturer of Nickel-Cadmium battery must be submitted. Bidder must have executed a purchase order of value not less than 19.16 Lakhs for supply, installation, testing and commissioning of Battery Banks at any Industries during last seven (7) years from the due date of bid submission. Copy of purchase order/work order and execution proof (execution certificate/completion certificate/invoice) along with payment proof/inspection report issued by end user must be submitted with cross reference between PO/WO and execution proof. Jobs executed for subsidiary/fellow subsidiary/Holding company will be considered subject to submission of tax paid invoices duly certified by Statutory Auditor.",
+  "order_value_1": "19.16 Lakhs",
+  "order_value_2": null,
+  "order_value_3": null,
+  "avg_annual_turnover_value": null,
+  "working_capital_value": null,
+  "solvency_certificate_value": null,
+  "net_worth_value": null,
+  "avg_annual_turnover_type": "Not Applicable",
+  "working_capital_type": "Not Applicable",
+  "net_worth_type": "Not Applicable",
+  "solvency_certificate_type": "Not Applicable"
+}
+
+############################################################
+CATEGORY: delivery_timeline (Unknown)
+############################################################
+Scoped text length: 0 characters
+(No scoped text captured)
+
+--- RAW LLM TOOL-CALL OUTPUT (JSON) ---
+{}
+
+############################################################
+CATEGORY: bid_summary (Pages 1 - 3)
+############################################################
+Scoped text length: 6000 characters
+
+--- FIRST 300 CHARACTERS OF SCOPED TEXT ---
+=== Tender Document Opening & Bid Summary (Pages 1-5) ===
+--- [PAGE 1] ---
+αñ¼αñí αñ╡αñ╡αñ░αñú/Bid Details
+αñ¼αñí αñ¼αñéαñª αñ╣αÑïαñ¿αÑç αñò αññαñ╛αñ░αñû/αñ╕αñ«αñ» /Bid End Date/Time
+15-10-2026 15:00:00
+αñ¼αñí αñûαÑüαñ▓αñ¿αÑç αñò αññαñ╛αñ░αñû/αñ╕αñ«αñ» /Bid Opening
+Date/Time
+16-10-2026 15:00:00
+αñ¼αñí αñ¬αÑçαñ╢αñòαñ╢ αñ╡αÑêαñºαññαñ╛ (αñ¼αñéαñª αñ╣αÑïαñ¿αÑç αñò αññαñ╛αñ░αñû αñ╕αÑç)/Bid Offer
+Validity (From End Date
+
+--- LAST 200 CHARACTERS OF SCOPED TEXT ---
+t. If buyer needs more items along with the main
+item, the same must be added through bunching category based items or by bunching custom catalogues
+or bunching a BoQ with the main category based item
+
+--- RAW LLM TOOL-CALL OUTPUT (JSON) ---
+{
+  "tender_value": null,
+  "tender_fee_amount": null,
+  "tender_fee_mode": null,
+  "processing_fee_amount": null,
+  "processing_fee_mode": null
+}
+
+############################################################
+CATEGORY: contacts_bds (Pages 2 - 4)
+############################################################
+Scoped text length: 5139 characters
+
+--- FIRST 300 CHARACTERS OF SCOPED TEXT ---
+Contact details of
+Grievance redressal
+HOD Email id :narasingha.rao@gail.co.in 
+Buyer Email id: vishal1@gail.co.in
+αñòαÑüαñ▓ αñ«αñ╛ αñ╛/Total Quantity
+16
+αñ╡'αññαÑü (αÑçαñúαÑÇ /Item Category
+BATTERY BANK NICKEL CADMIUM TYPE: KPL500P CAPACITY:
+500AH VOLTAGE: 1.2V NO OF CELLS: 19 , Installation,
+Commissioning and Testing of 
+
+--- LAST 200 CHARACTERS OF SCOPED TEXT ---
+or CPS of the bidder/vendor/contractor 
+shall be forfeited / Bid Security Declaration clause
+
+=== SECTION-III / BDS ===
+Section-III  
+: 
+Instructions to Bidders [ITB], Annexures & Forms & Format ** 
+Γ₧ó
+
+--- RAW LLM TOOL-CALL OUTPUT (JSON) ---
+{
+  "client_name_2": "Sh. Narasinga Rao Ch",
+  "client_email_2": "narasingha.rao@gail.co.in",
+  "client_phone_2": "0891-2749771; Extn.: 885-380"
+}
+
+================================================================================
+4. ROLE 2 (CLAUDE SONNET 5.5) RAW TOOL-CALL OUTPUT AND REASONING
+================================================================================
+{
+  "decisions": [
+    {
+      "field_name": "payment_terms_supply_display",
+      "action": "confirm",
+      "resolved_value": "80% payment (100% taxes and duties) shall be released after receipt and acceptance of the materials on site. Balance 20% shall be released after completion of job in all respect including handing over of all documents as per the Purchase order and acceptance by Engineer-in-Charge (EIC) and taking away the buyback batteries from the sites.",
+      "reasoning": "Matches Clause 8.0 A (i) and (ii) Supply portion milestones literally."
+    },
+    {
+      "field_name": "payment_terms_installation_display",
+      "action": "confirm",
+      "resolved_value": "100% payment shall be done after completion of installation commissioning of all the SV station battery banks successfully.",
+      "reasoning": "Matches Clause 8.0 B Service portion literally; tender includes installation and commissioning scope."
+    }
+  ]
+}
+
+================================================================================
+5. ALL EXTRACTED FIELDS WITH SOURCE (source=llm vs source=rules)
+================================================================================
+  organization: 'Gail India Limited'  (source=rules)
+  tender_name: 'SUPPLY AND INSTALLATION OF NEW NI-CD BATTERY BANKS FOR SV-15, SV-17, SV-20 & SV-26 UNDER G. KONDURU JURISDICTION ON BUYBACK BASIS'  (source=rules)
+  title_display: 'SUPPLY AND INSTALLATION OF NEW NI-CD BATTERY BANKS FOR SV-15, SV-17, SV-20 & SV-26 UNDER G. KONDURU JURISDICTION ON BUYBACK BASIS'  (source=rules)
+  tender_name_display: 'SUPPLY AND INSTALLATION OF NEW NI-CD BATTERY BANKS FOR SV-15, SV-17, SV-20 & SV-26 UNDER G. KONDURU JURISDICTION ON BUYBACK BASIS'  (source=rules)
+  tender_id_display: 'GEM/2026/B/8074394'  (source=rules)
+  website: 'https://gem.gov.in'  (source=rules)
+  bid_due_date_time: '15-10-2026 15:00:00'  (source=rules)
+  gem_bid_end_date_display: '15-10-2026 15:00:00'  (source=rules)
+  bid_opening_date_time: '16-10-2026 15:00:00'  (source=rules)
+  gem_bid_opening_date_display: '16-10-2026 15:00:00'  (source=rules)
+  te_recommendation_display: 'ΓÜá∩╕Å MISSING'  (source=rules)
+  te_rejection_reason_display: 'N/A'  (source=rules)
+  processing_fee_amount_display: 'Γé╣0.00'  (source=rules)
+  processing_fee_mode_display: 'Not Applicable'  (source=rules)
+  tender_fee_amount_display: 'Γé╣0.00'  (source=rules)
+  tender_fee_mode_display: 'Not Applicable'  (source=rules)
+  emd_amount_display: 'Γé╣65,000'  (source=rules)
+  emd_required_display: 'Yes'  (source=rules)
+  tender_value_display: 'ΓÜá∩╕Å MISSING'  (source=rules)
+  emd_mode_display: 'BT/DD/SB/FDR/BG'  (source=rules)
+  bid_validity_days_display: '90 Days'  (source=rules)
+  bid_validity_days: 90  (source=rules)
+  commercial_evaluation_display: 'Total value wise'  (source=rules)
+  reverse_auction_applicable_display: 'No'  (source=rules)
+  bid_type_display: 'Two Packet Bid'  (source=rules)
+  atc_document_link_display: 'https://fulfilment.gem.gov.in/contract/slafds?fileDownloadPath=SLA_UPLOAD_PATH/2026/Sep/GEM_2026_B_8074394/CLM0010/TENDOC_054c055a-7dad-4fc0-bfee1790161816636_gailvizaggem@.pao1.pdf'  (source=rules)
+  maf_required_display: 'Yes'  (source=llm)
+  delivery_time_supply_display: '153 Days'  (source=rules)
+  delivery_time_installation_display: 'Inclusive (SITC Scope)'  (source=rules)
+  installation_inclusive_display: 'Yes'  (source=rules)
+  pbg_mode_display: 'DD / Insurance Surety Bond (SB) / FDR / Bank Guarantee (BG) / Letter of Credit (LC)'  (source=rules)
+  payment_terms_supply_display: '80% payment (100% taxes and duties) shall be released after receipt and acceptance of the materials on site. Balance 20% shall be released after completion of job in all respect including handing over of all documents as per the Purchase order and acceptance by Engineer-in-Charge (EIC) and taking away the buyback batteries from the sites.'  (source=llm)
+  payment_terms_installation_display: '100% payment shall be done after completion of installation commissioning of all the SV station battery banks successfully.'  (source=llm)
+  sd_mode_display: 'Demand Draft, online direct transfer, Bank Guarantee'  (source=llm)
+  ld_percentage_display: '0.5%'  (source=llm)
+  max_ld_percentage_display: '5%'  (source=llm)
+  ld_type_display: 'PRS'  (source=rules)
+  ld_required: 'Yes'  (source=rules)
+  pbg_required_display: 'Yes'  (source=rules)
+  pbg_percentage_display: '5%'  (source=rules)
+  sd_required_display: 'Yes'  (source=llm)
+  sd_percentage_display: 'ΓÜá∩╕Å MISSING'  (source=rules)
+  pbg_duration_display: '26'  (source=rules)
+  sd_duration_display: 'ΓÜá∩╕Å MISSING'  (source=rules)
+  warranty_display: 'obligations) awarded'  (source=rules)
+  physical_docs_required_display: 'Yes'  (source=rules)
+  physical_docs_deadline_display: 'Within 7 days of Bid Due Date'  (source=rules)
+  physical_doc_type_display: 'EMD_AND_OTHER_DOCUMENTS'  (source=rules)
+  age_in_yrs: '7'  (source=rules)
+  experience_years_display: '7'  (source=rules)
+  order_value_1_display: '19.16 Lakhs'  (source=llm)
+  avg_annual_turnover_type_display: 'Not Applicable'  (source=rules)
+  avg_annual_turnover_value_display: 'Γé╣0.00'  (source=rules)
+  order_value_2_display: 'Not Applicable'  (source=rules)
+  working_capital_type_display: 'Not Applicable'  (source=rules)
+  working_capital_value_display: 'Γé╣0.00'  (source=rules)
+  order_value_3_display: 'Not Applicable'  (source=rules)
+  net_worth_type_display: 'Not Applicable'  (source=rules)
+  net_worth_value_display: 'Γé╣0.00'  (source=rules)
+  po_selected_documents_display: 'N/A'  (source=rules)
+  solvency_certificate_type_display: 'Not Applicable'  (source=rules)
+  solvency_certificate_value_display: 'Γé╣0.00'  (source=rules)
+  custom_eligibility_criteria_display: 'Bidder must be a manufacturer of industrial Nickel-Cadmium Battery or authorized dealer/distributor/Indian Subsidiary of manufacturer of industrial Nickel-Cadmium Battery. If manufacturer, proof of manufacturing (Company registration certificate, ISO certificate, NSIC certificate, Excise registration certificate, or equivalent evidencing manufacture of Nickel-Cadmium battery) must be submitted. If authorized dealer/distributor/Indian Subsidiary, valid distributorship/dealership certificate directly issued by the manufacturer (valid as on bid opening date) along with proof of principal being manufacturer of Nickel-Cadmium battery must be submitted. Bidder must have executed a purchase order of value not less than 19.16 Lakhs for supply, installation, testing and commissioning of Battery Banks at any Industries during last seven (7) years from the due date of bid submission. Copy of purchase order/work order and execution proof (execution certificate/completion certificate/invoice) along with payment proof/inspection report issued by end user must be submitted with cross reference between PO/WO and execution proof. Jobs executed for subsidiary/fellow subsidiary/Holding company will be considered subject to submission of tax paid invoices duly certified by Statutory Auditor.'  (source=llm)
+  commercial_eligibility_documents_display: 'N/A'  (source=rules)
+  client_name_1_display: 'Vishal Kumar'  (source=rules)
+  client_email_1_display: 'vishal1@gail.co.in'  (source=rules)
+  client_phone_1_display: '0891-2513682 / 2748423'  (source=rules)
+  client_name_2_display: 'Narasinga Rao Ch'  (source=llm)
+  client_email_2_display: 'narasingha.rao@gail.co.in'  (source=llm)
+  client_phone_2_display: '0891-2749771'  (source=llm)
+  client_name_3_display: 'N/A'  (source=rules)
+  client_email_3_display: 'N/A'  (source=rules)
+  client_phone_3_display: 'N/A'  (source=rules)
+  grievance_contact_display: 'NA'  (source=rules)
+  grievance_email_display: 'narasingha.rao@gail.co.in'  (source=rules)
+  doc_1_display: 'Experience Criteria'  (source=rules)
+  doc_2_display: 'Certificate (Requested in ATC)'  (source=rules)
+  doc_3_display: 'Additional Doc 1 (Requested in ATC)'  (source=rules)
+  doc_4_display: 'Additional Doc 2 (Requested in ATC)'  (source=rules)
+  doc_5_display: 'Additional Doc 3 (Requested in ATC)'  (source=rules)
+  doc_6_display: 'Additional Doc 4 (Requested in ATC)'  (source=rules)
+  doc_7_display: 'N/A'  (source=rules)
+  doc_8_display: 'N/A'  (source=rules)
+  doc_9_display: 'N/A'  (source=rules)
+  courier_address_display: 'GAIL (INDIA) LIMITED'  (source=rules)
+  courier_provider_display: 'N/A'  (source=rules)
+  courier_docket_no_display: 'N/A'  (source=rules)
+  courier_delivery_time_display: 'N/A'  (source=rules)
+  docket_slip_upload_display: 'N/A'  (source=rules)
+  physical_docs_uploaded_display: 'N/A'  (source=rules)
+  mse_relaxation_display: 'No'  (source=rules)
+  startup_relaxation_display: 'Yes'  (source=rules)
+  dpiit_startup_relaxation_display: 'Yes'  (source=rules)
+  mse_preference_display: 'Yes (Band: L1+15%, Qty: 100%)'  (source=rules)
+  mii_preference_display: 'No'  (source=rules)
+  pre_bid_meeting_display: '30.09.2026 11.00 Hrs, MS Teams, Meeting ID: 445 976 685 185 326, Passcode: Sw7MX9R3'  (source=rules)
+  site_visit_display: 'Not specified'  (source=rules)
+  sample_submission_display: 'Not specified'  (source=rules)
+  schedule_1_details_display: 'Sch 1 | Qty: 521229 | Delivery: 153 days | SUPPLY AND INSTALLATION OF NEW NI-CD BATTERY BANKS FOR SV-15, SV-17, SV-20 & SV-26 UNDER G. KONDURU JURISDICTION ON BUYBACK BASIS | Specs: BATTERY BANK NICKEL CADMIUM TYPE: KPL500P CAPACITY: 500AH VOLTAGE: 1.2V NO: OF CELLS: 19 ( 8 pieces ) ΓÜá QTY MISMATCH: schedules sum 521229.0 vs header total 16.0'  (source=rules)
+  schedule_2_details_display: 'N/A'  (source=rules)
+  schedule_3_details_display: 'N/A'  (source=rules)
+  schedule_4_details_display: 'ΓÜá∩╕Å MISSING'  (source=rules)
+  readiness_site_visit_display: 'Not specified'  (source=rules)
+  readiness_pre_bid_display: '30.09.2026 11.00 Hrs, MS Teams, Meeting ID: 445 976 685 185 326, Passcode: Sw7MX9R3 | Written queries accepted as per tender timeline'  (source=rules)
+  readiness_timeline_display: 'Pre-Bid: 30.09.2026 11.00 Hrs, MS Teams, Meeting ID: 445 976 685 185 326, Passcode: Sw7MX9R3  ΓåÆ  Bid Due: 15-10-2026 15:00:00  ΓåÆ  Physical Docs: Within 7 days of Bid Due Date  ΓåÆ  Clarifications: 2 Days'  (source=rules)
+  readiness_capital_display: 'EMD: Γé╣65,000 (via BT/DD/SB/FDR/BG)  |  PBG: 5% for 26'  (source=rules)
+  readiness_bec_display: 'Exp: 7 Yrs (Min PO Value: Not Applicable)  |  Financial BEC: Not Applicable (Exempted)'  (source=rules)
+  readiness_certifications_display: 'Experience Criteria'  (source=rules)
+  readiness_delivery_display: 'Supply Delivery: 153 Days  |  Installation/Completion: Inclusive (SITC Scope)'  (source=rules)
+  readiness_buyback_display: 'Yes ΓÇö Existing equipment buyback & site removal required'  (source=rules)
+  readiness_ra_display: 'No (Direct item-wise / schedule-wise evaluation without Reverse Auction)'  (source=rules)
+  readiness_disqualifiers_display: 'Standard GeM Terms (Zero deviation allowed on EMD, PBG, BEC, Delivery)'  (source=rules)
+  readiness_penalty_risk_display: 'Not Specified'  (source=rules)
+  per_schedule_emd: [{'schedule': 'Schedule 1', 'amount': 65000.0}]  (source=rules)
+  status_summary: {'OK': 52, 'OK_FALLBACK': 12, 'NOT_APPLICABLE': 34, 'MISSING': 0}  (source=rules)
+  missing_fields: ['te_recommendation_display', 'tender_value_display', 'sd_percentage_display', 'sd_duration_display', 'schedule_4_details_display']  (source=rules)
+  payment_terms_supply_display_reasoning: 'Matches Clause 8.0 A (i) and (ii) Supply portion milestones literally.'  (source=rules)
+  payment_terms_installation_display_reasoning: 'Matches Clause 8.0 B Service portion literally; tender includes installation and commissioning scope.'  (source=rules)
+
+================================================================================
+6. COMPARISON AGAINST EXPECTED VALUES (PASS/FAIL TABLE)
+================================================================================
+Field                               | Source       | Status | Actual Value                             | Expected
+------------------------------------------------------------------------------------------------------------------------
+pbg_sd (PBG %)                      | source=rules | PASS   | 5%                                       | ePBG 5%
+pbg_sd (Duration)                   | source=rules | PASS   | 26                                       | 26 months
+payment_terms (Supply)              | source=llm   | PASS   | 80% payment (100% taxes and duties) sh   | 80% on receipt and acceptance at site, 20% after completion + buy-back removal
+payment_terms (Installation / Service) | source=llm   | PASS   | 100% payment shall be done after compl   | service 100% after commissioning
+prs_ld (Rate)                       | source=llm   | PASS   | 0.5%                                     | 0.5% per week of delay
+prs_ld (Max Cap)                    | source=llm   | PASS   | 5%                                       | max 5%
+delivery_timeline (Supply)          | source=rules | PASS   | 153 Days                                 | 4 months / 120 days from FOA/LOA (or 153 Days GeM schedule)
+delivery_timeline (Installation)    | source=rules | PASS   | Inclusive (SITC Scope)                   | 1 month / 30 days from supply
+bec_criteria (Technical)            | source=llm   | PASS   | Bidder must be a manufacturer of indus   | supply of Ni-Cd batteries
+bec_criteria (Turnover)             | source=rules | PASS   | Γé╣0.00                                    | annual turnover (Not Applicable / Exempted for this tender)
+bec_criteria (Net Worth)            | source=rules | PASS   | Not Applicable                           | Net worth (Not Applicable / Exempted for this tender)
+bid_summary (Title / Work)          | source=rules | PASS   | SUPPLY AND INSTALLATION OF NEW NI-CD B   | supply and installation of Ni-Cd battery bank with buyback
+contacts_bds (Officer 1 Name)       | source=rules | PASS   | Vishal Kumar                             | Vishal Kumar
+contacts_bds (Officer 1 Phone)      | source=rules | PASS   | 0891-2513682 / 2748423                   | 0891-2513682 / 2748423
+contacts_bds (Officer 2 Name)       | source=llm   | PASS   | Narasinga Rao Ch                         | Narasinga Rao Ch
+contacts_bds (Officer 2 Phone)      | source=llm   | PASS   | 0891-2749771                             | 0891-2749771
+startup_relaxation (DPIIT)          | source=rules | PASS   | Yes                                      | DPIIT startup relaxation applicable = Yes

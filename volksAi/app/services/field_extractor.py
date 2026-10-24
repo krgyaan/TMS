@@ -5,6 +5,7 @@ from typing import List, Dict, Any, Optional
 from app.models.models import PageResult, TextBlock
 from app.ocr.extractors.field_extractor import FieldExtractor
 from app.ocr.extractors.gem_field_extractor import GemFieldExtractor
+from app.services.tender_mapper import is_pointer_value
 
 logger = logging.getLogger(__name__)
 
@@ -181,7 +182,11 @@ def extract_tender_fields(
     label_to_field = {}
     for i, f in enumerate(extracted):
         label = label_mapping.get(f.field_name, f.field_name)
-        status = "missing" if (f.value is None or f.value == "Not Found") else "extracted"
+        if is_pointer_value(f.value):
+            f.value = None
+            status = "missing"
+        else:
+            status = "missing" if (f.value is None or f.value == "Not Found") else "extracted"
         
         # Determine and normalize source tag per canonical set
         raw_source = getattr(f, "source", None) or "main_tender"
