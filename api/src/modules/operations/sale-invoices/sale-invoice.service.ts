@@ -704,24 +704,18 @@ export class SaleInvoiceService {
             throw new BadRequestException("A valid billing GSTIN is required to generate the invoice PDF");
         }
 
-        const linkedProductIds = items
-            .filter((item) => item.purchaseOrderProductId != null)
-            .map((item) => Number(item.purchaseOrderProductId));
-        const poRows = linkedProductIds.length > 0
-            ? await this.db
-                .select({ poNumber: purchaseOrders.poNumber, poDate: purchaseOrders.poDate })
-                .from(purchaseOrderProducts)
-                .innerJoin(purchaseOrders, eq(purchaseOrders.id, purchaseOrderProducts.purchaseOrderId))
-                .where(inArray(purchaseOrderProducts.id, linkedProductIds))
-            : [];
         const [project] = await this.db
-            .select({ projectName: projects.projectName, projectCode: projects.projectCode })
+            .select({
+                projectName: projects.projectName,
+                projectCode: projects.projectCode,
+                poNo: projects.poNo,
+                poDate: projects.poDate,
+            })
             .from(projects)
             .where(eq(projects.id, si.projectId));
         const [creator] = si.raisedBy
             ? await this.db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, si.raisedBy))
             : [];
-        const poNumbers = [...new Set(poRows.map((row) => row.poNumber).filter((value): value is string => Boolean(value)))];
         const billingAddress = splitAddress(si.billingAddress);
         const shippingAddress = splitAddress(si.shippingAddress);
         const dispatchAddress = splitAddress(si.dispatchFromAddress);
@@ -757,8 +751,8 @@ export class SaleInvoiceService {
             seller_state: "Delhi",
             seller_state_code: "07",
             seller_cin: "",
-            buyer_order_number: poNumbers.join(", "),
-            buyer_order_date: poRows.find((row) => row.poDate)?.poDate || "",
+            buyer_order_number: project?.poNo || "",
+            buyer_order_date: project?.poDate || "",
             project_code: project?.projectCode || "",
             project_name: project?.projectName || "",
             project_manager: "",

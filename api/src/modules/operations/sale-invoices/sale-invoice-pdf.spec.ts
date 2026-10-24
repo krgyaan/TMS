@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as Handlebars from "handlebars";
+import { getPdfMargins, isLandscape } from "@/modules/pdf/config/pdf-config";
 import {
     buildSaleInvoicePdfItems,
     buildSaleInvoiceTaxSummary,
@@ -98,6 +99,13 @@ describe("sale invoice PDF data helpers", () => {
         expect(getGstStateCode(undefined)).toBeNull();
     });
 
+    it("uses landscape orientation only for sale-invoice PDFs", () => {
+        expect(isLandscape("si")).toBe(true);
+        expect(isLandscape("po")).toBe(false);
+        expect(isLandscape("unknown")).toBe(false);
+        expect(getPdfMargins("si")).toEqual({ top: "5mm", right: "7.5mm", bottom: "5mm", left: "7.5mm" });
+    });
+
     it("splits addresses into three printable lines without losing overflow", () => {
         expect(splitAddress("Unit 4, Industrial Estate, Bengaluru, Karnataka 560001")).toEqual(["Unit 4", "Industrial Estate", "Bengaluru, Karnataka 560001"]);
     });
@@ -141,15 +149,23 @@ describe("sale invoice PDF data helpers", () => {
         const html = render(isInterstate);
 
         expect(html).toContain("Test widget");
-        expect(html).toContain(isInterstate ? 'colspan="11"' : 'colspan="13"');
-        expect(html).not.toMatch(/-0\.20|Plot 10\/1A|GROUND AND 1ST FLOOR/);
+        expect(html).toContain(isInterstate ? 'colspan="10"' : 'colspan="11"');
+        expect(html).not.toMatch(/-0\.20|Plot 10\/1A/);
     });
 
     it("builds the production PDF payload using billing GSTIN jurisdiction", async () => {
         const db = {
             select: () => ({
                 from: () => ({
-                    where: () => Promise.resolve([{ projectName: "Test Project", projectCode: "TP-1" }]),
+                    where: () =>
+                        Promise.resolve([
+                            {
+                                projectName: "Test Project",
+                                projectCode: "TP-1",
+                                poNo: "PO-123",
+                                poDate: "2026-10-20",
+                            },
+                        ]),
                 }),
             }),
         };
@@ -177,6 +193,8 @@ describe("sale invoice PDF data helpers", () => {
 
         expect(data["is_interstate"]).toBe(true);
         expect(data["project_code"]).toBe("TP-1");
+        expect(data["buyer_order_number"]).toBe("PO-123");
+        expect(data["buyer_order_date"]).toBe("2026-10-20");
         expect(data["buyer_address_line1"]).toBe("Unit 4");
         expect(rows[0].igst_amount).toBe(36);
         expect(rows[0].cgst_amount).toBe(0);

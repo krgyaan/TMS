@@ -8,7 +8,7 @@
 
 <body style="margin:0;background:#fff;color:#111;font-family: Arial, sans-serif;font-size:10px;">
     <div
-        style="width:281mm;min-height:194mm;margin:0 auto;padding:8mm 8mm 0;box-sizing:border-box;background:#fff;position:relative;">
+        style="width:281mm;margin:0 auto;padding:8mm 8mm 0;box-sizing:border-box;position:relative;">
         <div style="text-align:center;font-size:11px;font-weight:bold;height:25mm;">Tax Invoice</div>
         {{#if qr_code_base64}}
         <div style="position:absolute;top:12mm;right:8mm;width:34mm;height:34mm;">
@@ -16,33 +16,39 @@
         </div>
         {{/if}}
         <table style="width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:5mm;">
+            {{#if irn}}
             <tr>
                 <td style="width:22mm;padding:1px 0;border:0;">IRN</td>
-                <td style="border:0;font-weight:bold;overflow-wrap:anywhere;">{{#if irn}}{{irn}}{{/if}}</td>
+                <td style="border:0;font-weight:bold;">{{irn}}</td>
             </tr>
+            {{/if}}
+            {{#if ack_number}}
             <tr>
                 <td style="padding:1px 0;border:0;">Ack No.</td>
-                <td style="border:0;font-weight:bold;">{{#if ack_number}}{{ack_number}}{{/if}}</td>
+                <td style="border:0;font-weight:bold;">{{ack_number}}</td>
             </tr>
+            {{/if}}
+            {{#if ack_date}}
             <tr>
                 <td style="padding:1px 0;border:0;">Ack Date</td>
-                <td style="border:0;font-weight:bold;">{{#if ack_date}}{{formatDate ack_date}}{{/if}}</td>
+                <td style="border:0;font-weight:bold;">{{formatDate ack_date}}</td>
             </tr>
+            {{/if}}
         </table>
-        <table style="width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:4mm;font-size:10px;">
+        <table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:10px;">
             <tr>
                 <td style="width:12%;border:1px solid #222;padding:2px;vertical-align:top;">
                     <img src="data:image/png;base64,{{ img_logo_base64 }}" alt="Volks Energie Logo" style="height: 60px;">
                 </td>
                 <td style="width:32%;border:1px solid #222;padding:2px;vertical-align:top;line-height:1.42;">
-                    <b>{{seller_name}}</b><br>
-                    {{seller_address_line1}}<br>
-                    {{seller_address_line2}}<br>
-                    {{seller_city_state_pin}}<br
-                    >UDYAM: <b>{{seller_udyam}}</b><br>
-                    GSTIN/UIN: <b>{{seller_gst}}</b><br>
-                    State Name: <b>{{seller_state}}</b>, Code: <b>{{seller_state_code}}</b><br>
-                    CIN: <b>{{seller_cin}}</b>
+                    <b>Volks Energie Private Limited</b><br>
+                    B-1, D-8, 2nd Floor,<br>
+                    Mohan Cooperative Industrial Estate,<br>
+                    New Delhi Delhi - 110044<br>
+                    UDYAM: <b>UDYAM-DL-09-000465 (small)</b><br>
+                    GSTIN/UIN: <b>07AADCV9396C1ZZ</b><br>
+                    State Name: <b>Delhi</b>, Code: <b>07</b><br>
+                    CIN: <b>U40100DL2011PTC228907</b>
                 </td>
                 <td style="width:21%;border:1px solid #222;padding:2px;vertical-align:top;line-height:1.42;">
                     Invoice No<br>
@@ -228,25 +234,32 @@
             <tr style="height:24mm;vertical-align:top;">
                 <td style="border:1px solid #222;padding:3px;">{{inc @index}}</td>
                 <td style="border:1px solid #222;padding:3px;">
-                    <b>{{this.description}}</b><br>{{this.details_line1}}<br>{{this.details_line2}}<br>{{this.details_line3}}</td>
+                    <b>{{this.description}}</b><br>
+                    {{this.details_line1}}<br>
+                    {{this.details_line2}}<br>
+                    {{this.details_line3}}
+                </td>
                 <td style="border:1px solid #222;padding:3px;">{{this.hsn_sac}}</td>
                 <td style="border:1px solid #222;padding:3px;text-align:right;"><b>{{this.quantity}}</b></td>
                 <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency this.rate}}</td>
                 <td style="border:1px solid #222;padding:3px;text-align:center;">{{this.unit}}</td>
                 <td style="border:1px solid #222;padding:3px;text-align:center;">{{this.discount_percent}}%</td>
-                <td style="border:1px solid #222;padding:3px;text-align:right;"><b>{{formatCurrency
-                        this.taxable_value}}</b></td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;">
+                    <b>{{formatCurrency this.taxable_value}}</b>
+                </td>
                 {{#if ../is_interstate}}
                 <td style="border:1px solid #222;padding:3px;text-align:center;">{{this.igst_rate}}%</td>
                 <td style="border:1px solid #222;padding:3px;text-align:right;"><b>{{formatCurrency this.igst_amount}}</b></td>
                 {{else}}
                 <td style="border:1px solid #222;padding:3px;text-align:center;">{{this.cgst_rate}}%</td>
-                <td style="border:1px solid #222;padding:3px;text-align:right;"><b>{{formatCurrency
-                        this.cgst_amount}}</b></td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;">
+                    <b>{{formatCurrency this.cgst_amount}}</b>
+                </td>
                 <td style="border:1px solid #222;padding:3px;text-align:center;">{{this.sgst_rate}}%</td>
                 <td style="border:1px solid #222;padding:3px;text-align:right;"><b>{{formatCurrency this.sgst_amount}}</b></td>
                 {{/if}}
-                <td style="border:1px solid #222;padding:3px;text-align:right;"><b>{{formatCurrency this.total}}</b>
+                <td style="border:1px solid #222;padding:3px;text-align:right;">
+                    <b>{{formatCurrency this.total}}</b>
                 </td>
             </tr>
             {{/each}}
@@ -297,7 +310,7 @@
                 {{else}}
                 <td colspan="4" style="border:1px solid #222;padding:3px;"></td>
                 {{/if}}
-                <td style="border:1px solid #22２;padding:3px;text-align:right;">{{formatCurrency round_off}}</td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency round_off}}</td>
             </tr>
             {{/if}}
             <tr>
@@ -315,15 +328,16 @@
                 <td style="border:1px solid #222;padding:3px;text-align:right;"><b>{{formatCurrency grand_total}}</b></td>
             </tr>
             <tr>
-                <td colspan="{{#if is_interstate}}11{{else}}12{{/if}}" style="border:1px solid #222;padding:3px;">
-                    Amount Chargeable (in words) <b>{{amount_in_words}}</b>
+                <td colspan="{{#if is_interstate}}10{{else}}11{{/if}}" style="border:1px solid #222;padding:3px;">
+                    Amount Chargeable (in words): <b>{{amount_in_words}}</b>
                 </td>
                 <td style="border:1px solid #222;padding:3px;text-align:right;">E &amp; O.E.</td>
             </tr>
         </table>
         <table style="width:100%;border-collapse:collapse;table-layout:fixed;margin-top:4mm;font-size:9px;">
             <colgroup>
-                <col style="width:34%">
+                <col style="width:16.5%">
+                <col style="width:16.5%">
                 <col style="width:16.5%">
                 <col style="width:16.5%">
                 <col style="width:16.5%">
@@ -355,20 +369,21 @@
         <table
             style="width:100%;border-collapse:collapse;table-layout:fixed;margin-top:4mm;font-size:9px;line-height:1.45;">
             <tr>
-                <td colspan="2" style="border:1px solid #222;padding:3px;">Tax Amount (in words) :
-                    <b>{{tax_amount_in_words}}</b></td>
+                <td colspan="3" style="border:1px solid #222;padding:3px;">
+                    Tax Amount (in words): <b>{{tax_amount_in_words}}</b>
+                </td>
             </tr>
             <tr>
                 <td style="width:56%;border:1px solid #222;padding:3px;vertical-align:top;">
                     <u>Declaration</u><br>
                     We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.
                 </td>
-                <td style="width:44%;border:1px solid #222;padding:3px;vertical-align:top;">
-                    Company's PAN: <b>{{company_pan}}</b><br>
+                <td style="width:44%;border:1px solid #222;padding:3px;vertical-align:top;" colspan="2">
+                    Company's PAN: <b>AADCV9396C</b><br>
                     Company's Bank Details:<br>
-                    Bank Name: <b>{{bank_name}}</b><br>
-                    A/c No.: <b>{{bank_account_number}}</b><br>
-                    Branch &amp; IFS Code: <b>{{bank_branch_ifsc}}</b><br>
+                    Bank Name: <b>Yes Bank (CC A/c)</b><br>
+                    A/c No.: <b>003084600002011</b><br>
+                    Branch &amp; IFS Code: <b>GROUND AND 1ST FLOOR, A-42, VISHAL ENCLAVE, &amp; YESB0000030</b><br>
                     SWIFT Code: <b>-</b>
                 </td>
             </tr>
