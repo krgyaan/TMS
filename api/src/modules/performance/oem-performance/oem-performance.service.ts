@@ -257,27 +257,48 @@ export class OemPerformanceService {
     private async fetchBidTenders(oem: number, from: Date, to: Date): Promise<BidTenderRow[]> {
         const { rows } = await this.db.execute(sql`
             SELECT bs.tender_id           AS "tenderId",
-                   t.tender_no            AS "tenderNo",
-                   t.tender_name          AS "tenderName",
-                   t.gst_values           AS "gstValues",
-                   bs.status              AS "bidStatus",
-                   t.status               AS "tenderStatus",
-                   bs.submission_datetime AS "submissionDatetime",
-                   t.due_date             AS "dueDate",
-                   u.name                 AS "teamMemberName",
-                   tm.name                AS "teamName"
+                t.tender_no            AS "tenderNo",
+                t.tender_name          AS "tenderName",
+                t.gst_values           AS "gstValues",
+                bs.status              AS "bidStatus",
+                t.status               AS "tenderStatus",
+                bs.submission_datetime AS "submissionDatetime",
+                t.due_date             AS "dueDate",
+                u.name                 AS "teamMemberName",
+                tm.name                AS "teamName",
+                bo.bidded_by           AS "biddedBy"
             FROM bid_submissions bs
             INNER JOIN tender_infos t ON t.id = bs.tender_id
             LEFT JOIN users u ON u.id = t.team_member
             LEFT JOIN teams tm ON tm.id = t.team
-            INNER JOIN tender_costing_sheets cs ON cs.tender_id = t.id
-                AND cs.oem_vendor_ids @> to_jsonb(${oem}::int)
-            INNER JOIN tender_costing_details cd ON cd.tender_costing_sheets_id = cs.id
-                AND cd.status = 'Approved'
+            LEFT JOIN LATERAL (
+                SELECT string_agg(DISTINCT vo.name, ', ') AS bidded_by
+                FROM tender_costing_sheets cs2
+                INNER JOIN tender_costing_details cd2
+                    ON cd2.tender_costing_sheets_id = cs2.id
+                AND cd2.status = 'Approved'
+                CROSS JOIN LATERAL (
+                    SELECT CASE
+                        WHEN cs2.oem_vendor_ids IS NOT NULL AND jsonb_array_length(cs2.oem_vendor_ids) > 0
+                        THEN cs2.oem_vendor_ids
+                        ELSE (
+                            SELECT jsonb_agg(x)
+                            FROM rfqs r2,
+                                unnest(regexp_split_to_array(btrim(coalesce(r2.requested_organization::text, '')), '\\s*,\\s*')) AS x
+                            WHERE r2.tender_id = cs2.tender_id
+                            AND x <> ''
+                        )
+                    END AS ids_json
+                ) resolved
+                CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(resolved.ids_json, '[]'::jsonb)) AS oem_id(val)
+                INNER JOIN vendor_organizations vo ON vo.id = oem_id.val::int
+                WHERE cs2.tender_id = t.id
+            ) bo ON true
             WHERE t.delete_status = 0
-              AND bs.status IN ('Bid Submitted', 'Submission Pending')
-              AND bs.submission_datetime IS NOT NULL
-              AND t.created_at BETWEEN ${from} AND ${to}
+            AND bs.status IN ('Bid Submitted', 'Submission Pending')
+            AND bs.submission_datetime IS NOT NULL
+            AND t.created_at BETWEEN ${from} AND ${to}
+            AND ${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(t.rfq_to::text, '')), '\\s*,\\s*'))
         `);
         return rows as unknown as BidTenderRow[];
     }
@@ -458,11 +479,11 @@ export class OemPerformanceService {
                     team: b.teamName ?? "—",
                     createdAt: info?.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
                     submissionTime: b.submissionDatetime ? format(b.submissionDatetime, DATE_FORMAT) : "—",
+                    biddedBy: b.biddedBy ?? "—",
                     status: b.bidStatus,
                 };
             });
     }
-
     private buildMissedTenders(rows: BidTenderRow[], rfqInfoByTender: Map<number, RfqInfoRow>): LifecycleTenderRow[] {
         return rows.map(r => {
             const info = rfqInfoByTender.get(r.tenderId);
