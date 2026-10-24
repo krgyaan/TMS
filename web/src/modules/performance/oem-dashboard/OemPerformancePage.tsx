@@ -101,6 +101,7 @@ export default function OemPerformancePage() {
         tenders_disqualified: oemData?.tendersByKpi.tendersDisqualified?.length ?? 0,
         tenders_won: oemData?.tendersByKpi.tendersWon?.length ?? 0,
         tenders_lost: oemData?.tendersByKpi.tendersLost?.length ?? 0,
+        tenders_cancelled: oemData?.tendersByKpi.tendersCancelled?.length ?? 0,
         quotation_received: oemData?.tendersByKpi.quotationReceived?.length ?? 0,
     }), [oemData]);
 
