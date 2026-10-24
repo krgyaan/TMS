@@ -58,7 +58,7 @@ export interface RfqSentToOemRow {
     createdAt: string;
 }
 
-export interface LifecycleTenderRow {
+export type LifecycleTenderRow = {
     id: number;
     tenderNo: string;
     tenderName: string;
@@ -68,7 +68,9 @@ export interface LifecycleTenderRow {
     team: string;
     createdAt: string;
     status: string;
-}
+    submissionTime?: string;
+    resultDate?: string;
+};
 
 export interface OemPerformanceResponse {
     summary: OemSummary;
@@ -77,6 +79,7 @@ export interface OemPerformanceResponse {
     missedTenders: LifecycleTenderRow[];
     wonTenders: LifecycleTenderRow[];
     lostTenders: LifecycleTenderRow[];
+    cancelledTenders: LifecycleTenderRow[];
     disqualifiedTenders: LifecycleTenderRow[];
     resultsAwaitedTenders: LifecycleTenderRow[];
     bidTenders: LifecycleTenderRow[];
@@ -136,6 +139,7 @@ export interface TendersByKpi {
     total: TenderListItem[];
     tendersWon: LifecycleTenderRow[];
     tendersLost: LifecycleTenderRow[];
+    tendersCancelled: LifecycleTenderRow[];
     tendersSubmitted: LifecycleTenderRow[];
     tendersMissed: LifecycleTenderRow[];
     tendersDisqualified: LifecycleTenderRow[];
@@ -162,4 +166,24 @@ export interface OemPerformanceParams {
     oemId: number;
     fromDate: string;
     toDate: string;
+    tab?: string;
 }
+
+/* ─── Tab config ───────────────────────────────────────────────────────────── */
+
+export const OEM_TABS = [
+    { key: "rfq_sent", label: "RFQs Sent" },
+    { key: "tenders_not_allowed", label: "Not Allowed" },
+    { key: "tenders_missed", label: "Missed" },
+    { key: "tenders_bid", label: "Bid" },
+    { key: "tender_results_awaited", label: "Results Awaited" },
+    { key: "tenders_disqualified", label: "Disqualified" },
+    { key: "tenders_won", label: "Won" },
+    { key: "tenders_lost", label: "Lost" },
+    { key: "tenders_cancelled", label: "Cancelled" },
+    { key: "quotation_received", label: "Quotation Received" },
+] as const;
+
+export type OemTabKey = (typeof OEM_TABS)[number]["key"];
+
+export const DEFAULT_OEM_TAB: OemTabKey = "rfq_sent";
