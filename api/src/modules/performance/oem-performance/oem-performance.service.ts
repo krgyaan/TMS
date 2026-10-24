@@ -92,7 +92,8 @@ export class OemPerformanceService {
             
             const missedTenders = this.buildMissedTenders(missedBidRows, rfqInfoByTender);
             const wonTenders = this.buildResultBasedTenders(resultRows, rfqInfoByTender, ["Won"], "Won");
-            const lostTenders = this.buildResultBasedTenders(resultRows, rfqInfoByTender, ["Lost", "Cancelled"], "Lost");
+            const lostTenders = this.buildResultBasedTenders(resultRows, rfqInfoByTender, ["Lost"], "Lost");
+            const cancelledTenders = this.buildResultBasedTenders(resultRows, rfqInfoByTender, ["Cancelled"], "Cancelled");
             const disqualifiedTenders = this.buildResultBasedTenders(resultRows, rfqInfoByTender, ["Disqualified"], "Disqualified");
             const resultsAwaitedTenders = this.buildResultBasedTenders(resultRows, rfqInfoByTender, ["Under Evaluation"], "Results Awaited");
 
@@ -105,6 +106,7 @@ export class OemPerformanceService {
                 missedTenders,
                 wonTenders,
                 lostTenders,
+                cancelledTenders,
                 disqualifiedTenders,
                 resultsAwaitedTenders,
                 bidTenders,

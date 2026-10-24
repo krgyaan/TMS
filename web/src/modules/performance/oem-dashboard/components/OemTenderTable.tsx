@@ -46,23 +46,25 @@ export default function OemTenderTable({ params, tab, data, isLoading }: OemTend
         const kpi = data.tendersByKpi;
         switch (tab) {
             case "rfq_sent":
-                return kpi.rfqsSent;
+                return kpi.rfqsSent ?? [];
             case "tenders_not_allowed":
-                return kpi.tendersNotAllowed;
+                return kpi.tendersNotAllowed ?? [];
             case "tenders_missed":
-                return kpi.tendersMissed;
+                return kpi.tendersMissed ?? [];
             case "tenders_bid":
-                return kpi.tendersSubmitted;
+                return kpi.tendersSubmitted ?? [];
             case "tender_results_awaited":
-                return kpi.tenderResultsAwaited;
+                return kpi.tenderResultsAwaited ?? [];
             case "tenders_disqualified":
-                return kpi.tendersDisqualified;
+                return kpi.tendersDisqualified ?? [];
             case "tenders_won":
-                return kpi.tendersWon;
+                return kpi.tendersWon ?? [];
             case "tenders_lost":
-                return kpi.tendersLost;
+                return kpi.tendersLost ?? [];
+            case "tenders_cancelled":
+                return kpi.tendersCancelled ?? [];
             case "quotation_received":
-                return kpi.quotationReceived;
+                return kpi.quotationReceived ?? [];
             default:
                 return [];
         }

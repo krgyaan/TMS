@@ -117,7 +117,7 @@ export interface LifecycleTenderRow {
     createdAt: string;
     status: string;
     rfqResponseOn?: string | null;
-    submissionTime?: string; 
+    submissionTime?: string;
 }
 
 export interface OemPerformanceResponse {
@@ -127,6 +127,7 @@ export interface OemPerformanceResponse {
     missedTenders: LifecycleTenderRow[];
     wonTenders: LifecycleTenderRow[];
     lostTenders: LifecycleTenderRow[];
+    cancelledTenders: LifecycleTenderRow[];
     disqualifiedTenders: LifecycleTenderRow[];
     resultsAwaitedTenders: LifecycleTenderRow[];
     bidTenders: LifecycleTenderRow[];
