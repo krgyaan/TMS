@@ -106,7 +106,7 @@ export interface RfqSentToOemRow {
     createdAt: string;
 }
 
-export interface LifecycleTenderRow {
+export type LifecycleTenderRow = {
     id: number;
     tenderNo: string;
     tenderName: string;
@@ -116,9 +116,9 @@ export interface LifecycleTenderRow {
     team: string;
     createdAt: string;
     status: string;
-    rfqResponseOn?: string | null;
     submissionTime?: string;
-}
+    resultDate?: string;
+};
 
 export interface OemPerformanceResponse {
     summary: OemSummary;

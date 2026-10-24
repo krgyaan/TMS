@@ -484,6 +484,7 @@ export class OemPerformanceService {
                     member: r.teamMemberName ?? "—",
                     team: r.teamName ?? "—",
                     createdAt: info?.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
+                    resultDate: r.resultDate ? format(r.resultDate, DATE_FORMAT) : "—",
                     status: label,
                 };
             });

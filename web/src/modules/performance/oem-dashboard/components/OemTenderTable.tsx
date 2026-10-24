@@ -27,8 +27,8 @@ type OemTenderRow = (NotAllowedTenderRow | LifecycleTenderRow | RfqSentToOemRow)
     status?: string;
     createdAt?: string;
     submissionTime?: string;
+    resultDate?: string;
 };
-
 /* ─── Component ────────────────────────────────────────────────────────────── */
 
 interface OemTenderTableProps {
@@ -161,6 +161,28 @@ export default function OemTenderTable({ params, tab, data, isLoading }: OemTend
                         sortable: true,
                         filter: true,
                         width: 220,
+                        cellRenderer: (p: CustomCellRendererProps<OemTenderRow>) => (
+                            <Badge variant="secondary" className="h-5 px-2 font-normal">
+                                {p.value}
+                            </Badge>
+                        ),
+                    },
+                    actionCol,
+                ];
+            case "tenders_won":
+            case "tenders_lost":
+            case "tenders_cancelled":
+            case "tenders_disqualified":
+            case "tender_results_awaited":
+                return [
+                    ...common,
+                    { field: "resultDate", headerName: "Result Date", sortable: true, filter: false, width: 170 },
+                    {
+                        field: "status",
+                        headerName: "Status",
+                        sortable: true,
+                        filter: true,
+                        width: 150,
                         cellRenderer: (p: CustomCellRendererProps<OemTenderRow>) => (
                             <Badge variant="secondary" className="h-5 px-2 font-normal">
                                 {p.value}
