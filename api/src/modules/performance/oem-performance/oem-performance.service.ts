@@ -63,13 +63,14 @@ export class OemPerformanceService {
 
         try {
             const [
-                tenderRows, 
-                bidRows, 
-                rfqInfoRows, 
-                quotationTenders, 
-                rfqSentRows, 
-                missedBidRows, 
-                resultRows
+                tenderRows,
+                bidRows,
+                rfqInfoRows,
+                quotationTenders,
+                rfqSentRows,
+                missedBidRows,
+                resultRows,
+                resultsAwaitedNoResultRows,
             ] = await Promise.all([
                 this.fetchOemTenders(oem, from, to),
                 this.fetchBidTenders(oem, from, to),
@@ -78,6 +79,7 @@ export class OemPerformanceService {
                 this.fetchRfqsSentToOem(oem, from, to),
                 this.fetchMissedTenders(oem, from, to),
                 this.fetchResultBasedTenders(oem, from, to),
+                this.fetchResultsAwaitedNoResultTenders(oem, from, to),
             ]);
 
             const rfqInfoByTender = new Map(rfqInfoRows.map(r => [Number(r.tenderId), r]));
@@ -95,7 +97,10 @@ export class OemPerformanceService {
             const lostTenders = this.buildResultBasedTenders(resultRows, rfqInfoByTender, ["Lost"], "Lost");
             const cancelledTenders = this.buildResultBasedTenders(resultRows, rfqInfoByTender, ["Cancelled"], "Cancelled");
             const disqualifiedTenders = this.buildResultBasedTenders(resultRows, rfqInfoByTender, ["Disqualified"], "Disqualified");
-            const resultsAwaitedTenders = this.buildResultBasedTenders(resultRows, rfqInfoByTender, ["Under Evaluation"], "Results Awaited");
+            const resultsAwaitedTenders = [
+                ...this.buildResultBasedTenders(resultRows, rfqInfoByTender, ["Under Evaluation"], "Results Awaited"),
+                ...this.buildResultsAwaitedNoResult(resultsAwaitedNoResultRows, rfqInfoByTender),
+            ];
 
             this.logger.info("OEM performance computed", { oem });
 
@@ -213,6 +218,34 @@ export class OemPerformanceService {
             GROUP BY t.id, t.tender_no, t.tender_name, t.due_date, t.gst_values, t.tl_status, t.status, u.name, tm.name
         `);
         return rows as unknown as TenderRow[];
+    }
+    private async fetchResultsAwaitedNoResultTenders(oem: number, from: Date, to: Date): Promise<BidTenderRow[]> {
+        const { rows } = await this.db.execute(sql`
+            SELECT bs.tender_id           AS "tenderId",
+                t.tender_no            AS "tenderNo",
+                t.tender_name          AS "tenderName",
+                t.gst_values           AS "gstValues",
+                bs.status              AS "bidStatus",
+                t.status               AS "tenderStatus",
+                bs.submission_datetime AS "submissionDatetime",
+                t.due_date             AS "dueDate",
+                u.name                 AS "teamMemberName",
+                tm.name                AS "teamName"
+            FROM bid_submissions bs
+            INNER JOIN tender_infos t ON t.id = bs.tender_id
+            LEFT JOIN users u ON u.id = t.team_member
+            LEFT JOIN teams tm ON tm.id = t.team
+            INNER JOIN tender_costing_sheets cs ON cs.tender_id = t.id
+                AND cs.oem_vendor_ids @> to_jsonb(${oem}::int)
+            INNER JOIN tender_costing_details cd ON cd.tender_costing_sheets_id = cs.id
+                AND cd.status = 'Approved'
+            LEFT JOIN tender_results tr ON tr.tender_id = t.id
+            WHERE t.delete_status = 0
+            AND bs.status = 'Bid Submitted'
+            AND tr.id IS NULL
+            AND bs.submission_datetime BETWEEN ${from} AND ${to}
+        `);
+        return rows as unknown as BidTenderRow[];
     }
 
     private async fetchBidTenders(oem: number, from: Date, to: Date): Promise<BidTenderRow[]> {
@@ -527,6 +560,23 @@ export class OemPerformanceService {
         }
 
         return [...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month));
+    }
+    private buildResultsAwaitedNoResult(rows: BidTenderRow[], rfqInfoByTender: Map<number, RfqInfoRow>): LifecycleTenderRow[] {
+        return rows.map(r => {
+            const info = rfqInfoByTender.get(r.tenderId);
+            return {
+                id: r.tenderId,
+                tenderNo: r.tenderNo,
+                tenderName: r.tenderName,
+                dueDate: format(r.dueDate, DATE_FORMAT),
+                gstValues: r.gstValues,
+                member: r.teamMemberName ?? "—",
+                team: r.teamName ?? "—",
+                createdAt: info?.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
+                resultDate: "—",
+                status: "Results Awaited",
+            };
+        });
     }
 
     // ─── Utilities ────────────────────────────────────────────────────────────
