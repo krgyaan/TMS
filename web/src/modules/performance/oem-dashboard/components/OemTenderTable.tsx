@@ -28,9 +28,8 @@ type OemTenderRow = (NotAllowedTenderRow | LifecycleTenderRow | RfqSentToOemRow)
     createdAt?: string;
     submissionTime?: string;
     resultDate?: string;
+    biddedBy?: string;
 };
-/* ─── Component ────────────────────────────────────────────────────────────── */
-
 interface OemTenderTableProps {
     params: OemPerformanceParams | null;
     tab: string;
@@ -138,6 +137,7 @@ export default function OemTenderTable({ params, tab, data, isLoading }: OemTend
                 return [
                     ...common,
                     { field: "submissionTime", headerName: "Submission Time", sortable: true, filter: false, width: 170 },
+                    { field: "biddedBy", headerName: "Bidded By", sortable: true, filter: true, width: 180 },
                     {
                         field: "status",
                         headerName: "Status",
