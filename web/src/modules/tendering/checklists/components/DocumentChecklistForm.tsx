@@ -14,6 +14,7 @@ import { CompactFileUploader } from '@/components/file-upload';
 import { paths } from '@/app/routes/paths';
 import { MultiSelectField } from '@/components/form/MultiSelectField';
 import { useEffect, useMemo, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
     useCreateDocumentChecklist,
     useUpdateDocumentChecklist,
@@ -31,6 +32,8 @@ import { formatDateTime } from '@/hooks/useFormatedDate';
 import { DocumentChecklistFormSchema } from '../helpers/documentChecklist.schema';
 import { resolveSuggestionPanel } from '../helpers/suggestionPanel';
 import { buildAnnexureRows } from '../helpers/annexureRows';
+import { infoSheetsService } from '@/services/api/info-sheet.service';
+import { extractInfosheetSuggestions, type InfosheetSuggestion } from '../helpers/infosheetSuggestions';
 import {
     STANDARD_DOCUMENT_OPTIONS,
     computeAutoPreselectedDocuments,
@@ -76,6 +79,19 @@ export default function DocumentChecklistForm({
     const suggestMutation = useSuggestedBiddingRequirements();
     // Page-load, cache-only read: shows a completed analysis without starting a new one.
     const cachedSuggestions = useCachedBiddingRequirements(tenderId);
+
+    // Stored infosheet extraction read (read-only; no Claude call)
+    const savedExtractionQuery = useQuery({
+        queryKey: ['tender-info-sheet', 'saved-extraction', tenderId],
+        queryFn: () => infoSheetsService.getSavedExtraction(tenderId),
+        enabled: Boolean(tenderId && !Number.isNaN(tenderId)),
+        staleTime: 5 * 60 * 1000,
+    });
+
+    const infosheetSuggestions = useMemo(() => {
+        const fields = savedExtractionQuery.data?.fields;
+        return extractInfosheetSuggestions(fields as any);
+    }, [savedExtractionQuery.data]);
     const suggestionPanel = resolveSuggestionPanel({
         cached: cachedSuggestions.data,
         cacheLoading: cachedSuggestions.isLoading,
@@ -163,6 +179,21 @@ export default function DocumentChecklistForm({
     const handleAddSuggestion = (requirement: SuggestedBiddingRequirement) => {
         if (isSuggestionAdded(requirement)) return;
         append({ name: requirement.documentName, path: '' });
+    };
+
+    const isInfosheetDocAdded = (name: string) => {
+        const lower = name.trim().toLowerCase();
+        return (
+            existingExtraDocNames.has(lower) ||
+            (form.getValues('selectedDocuments') || []).some(
+                (s) => s.trim().toLowerCase() === lower
+            )
+        );
+    };
+
+    const handleAddInfosheetDoc = (name: string) => {
+        if (isInfosheetDocAdded(name)) return;
+        append({ name, path: '' });
     };
 
     const isAnnexureAdded = (name: string) =>
