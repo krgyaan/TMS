@@ -62,28 +62,39 @@ export class OemPerformanceService {
         this.logger.info("Fetching OEM performance", { oem, fromDate, toDate });
 
         try {
-            const [tenderRows, bidRows, rfqInfoRows, quotationTenders, rfqSentRows, missedBidRows] = await Promise.all([
+            const [
+                tenderRows, 
+                bidRows, 
+                rfqInfoRows, 
+                quotationTenders, 
+                rfqSentRows, 
+                missedBidRows, 
+                resultRows
+            ] = await Promise.all([
                 this.fetchOemTenders(oem, from, to),
                 this.fetchBidTenders(oem, from, to),
                 this.fetchRfqInfo(oem, from, to),
                 this.fetchQuotationReceivedTenders(oem, from, to),
                 this.fetchRfqsSentToOem(oem, from, to),
                 this.fetchMissedTenders(oem, from, to),
+                this.fetchResultBasedTenders(oem, from, to),
             ]);
 
             const rfqInfoByTender = new Map(rfqInfoRows.map(r => [Number(r.tenderId), r]));
 
-            const notAllowedTenders = this.buildNotAllowedTenders(tenderRows);
-            const rfqsSentToOem = this.buildRfqsSentToOem(rfqSentRows);
-            const missedTenders = this.buildMissedTenders(missedBidRows, rfqInfoByTender);
-            const wonTenders = this.buildLifecycleTenders(tenderRows, rfqInfoByTender, STATUS.WON, "Won");
-            const lostTenders = this.buildLifecycleTenders(tenderRows, rfqInfoByTender, STATUS.LOST, "Lost");
-            const disqualifiedTenders = this.buildLifecycleTenders(tenderRows, rfqInfoByTender, STATUS.DISQUALIFIED, "Disqualified");
-            const resultsAwaitedTenders = this.buildLifecycleTenders(tenderRows, rfqInfoByTender, STATUS.RESULTS_AWAITED, "Results Awaited");
-            const bidTenders = this.buildBidTenders(bidRows, rfqInfoByTender);
-            const quotationReceivedTenders = this.buildQuotationReceivedTenders(quotationTenders, rfqInfoByTender);
             const summary = this.buildSummary(tenderRows, bidRows);
             const monthlyTrend = this.buildMonthlyTrend(bidRows);
+
+            const notAllowedTenders = this.buildNotAllowedTenders(tenderRows);
+            const rfqsSentToOem = this.buildRfqsSentToOem(rfqSentRows);
+            const quotationReceivedTenders = this.buildQuotationReceivedTenders(quotationTenders, rfqInfoByTender);
+            const bidTenders = this.buildBidTenders(bidRows, rfqInfoByTender);
+            
+            const missedTenders = this.buildMissedTenders(missedBidRows, rfqInfoByTender);
+            const wonTenders = this.buildResultBasedTenders(resultRows, rfqInfoByTender, ["Won"], "Won");
+            const lostTenders = this.buildResultBasedTenders(resultRows, rfqInfoByTender, ["Lost", "Cancelled"], "Lost");
+            const disqualifiedTenders = this.buildResultBasedTenders(resultRows, rfqInfoByTender, ["Disqualified"], "Disqualified");
+            const resultsAwaitedTenders = this.buildResultBasedTenders(resultRows, rfqInfoByTender, ["Under Evaluation"], "Results Awaited");
 
             this.logger.info("OEM performance computed", { oem });
 
@@ -108,6 +119,40 @@ export class OemPerformanceService {
             });
             throw error;
         }
+    }
+
+
+    private async fetchResultBasedTenders(oem: number, from: Date, to: Date): Promise<any[]> {
+        const { rows } = await this.db.execute(sql`
+            SELECT 
+                tr.tender_id           AS "tenderId",
+                t.tender_no            AS "tenderNo",
+                t.tender_name          AS "tenderName",
+                t.due_date             AS "dueDate",
+                t.gst_values           AS "gstValues",
+                tr.status              AS "resultStatus",
+                u.name                 AS "teamMemberName",
+                tm.name                AS "teamName",
+                tr.created_at          AS "trCreatedAt",
+                COALESCE(tr.result_uploaded_at, tr.updated_at) AS "resultDate"
+            FROM tender_results tr
+            INNER JOIN tender_infos t ON t.id = tr.tender_id
+            INNER JOIN bid_submissions bs ON bs.tender_id = t.id
+            INNER JOIN tender_costing_sheets cs ON cs.tender_id = t.id
+            INNER JOIN tender_costing_details cd ON cd.tender_costing_sheets_id = cs.id
+            LEFT JOIN users u ON u.id = t.team_member
+            LEFT JOIN teams tm ON tm.id = t.team
+            WHERE t.delete_status = 0
+            AND bs.status = 'Bid Submitted'
+            AND cd.status = 'Approved'
+            AND cs.oem_vendor_ids @> to_jsonb(${oem}::int)
+            AND (
+                (tr.status IN ('Under Evaluation', 'Disqualified') AND tr.created_at BETWEEN ${from} AND ${to})
+                OR
+                (tr.status IN ('Won', 'Lost', 'Cancelled') AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN ${from} AND ${to})
+            )
+        `);
+        return rows;
     }
 
     // ─── Fetchers ─────────────────────────────────────────────────────────────
@@ -421,6 +466,25 @@ export class OemPerformanceService {
         }
 
         return summary;
+    }
+    
+    private buildResultBasedTenders(rows: any[], rfqInfoByTender: Map<number, RfqInfoRow>, targetStatuses: string[], label: string): LifecycleTenderRow[] {
+        return rows
+            .filter(r => targetStatuses.includes(r.resultStatus))
+            .map(r => {
+                const info = rfqInfoByTender.get(r.tenderId);
+                return {
+                    id: r.tenderId,
+                    tenderNo: r.tenderNo,
+                    tenderName: r.tenderName,
+                    dueDate: format(r.dueDate, DATE_FORMAT),
+                    gstValues: r.gstValues,
+                    member: r.teamMemberName ?? "—",
+                    team: r.teamName ?? "—",
+                    createdAt: info?.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
+                    status: label,
+                };
+            });
     }
 
     private buildMonthlyTrend(bids: BidTenderRow[]): MonthlyTrendPoint[] {
