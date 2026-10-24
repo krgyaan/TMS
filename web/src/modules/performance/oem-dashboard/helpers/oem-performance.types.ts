@@ -69,6 +69,7 @@ export interface LifecycleTenderRow {
     createdAt: string;
     status: string;
     rfqResponseOn?: string | null;
+    submissionTime?: string; 
 }
 
 export interface OemPerformanceResponse {

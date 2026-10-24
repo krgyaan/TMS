@@ -330,23 +330,24 @@ export class OemPerformanceService {
     }
 
     private buildBidTenders(bids: BidTenderRow[], rfqInfoByTender: Map<number, RfqInfoRow>): LifecycleTenderRow[] {
-        return bids
-            .filter(b => b.bidStatus === "Bid Submitted" || b.bidStatus === "Submission Pending")
-            .map(b => {
-                const info = rfqInfoByTender.get(b.tenderId);
-                return {
-                    id: b.tenderId,
-                    tenderNo: b.tenderNo,
-                    tenderName: b.tenderName,
-                    dueDate: format(b.dueDate, DATE_FORMAT),
-                    gstValues: b.gstValues,
-                    member: b.teamMemberName ?? "—",
-                    team: b.teamName ?? "—",
-                    createdAt: info?.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
-                    status: b.bidStatus,
-                };
-            });
-    }
+    return bids
+        .filter(b => b.bidStatus === "Bid Submitted" || b.bidStatus === "Submission Pending")
+        .map(b => {
+            const info = rfqInfoByTender.get(b.tenderId);
+            return {
+                id: b.tenderId,
+                tenderNo: b.tenderNo,
+                tenderName: b.tenderName,
+                dueDate: format(b.dueDate, DATE_FORMAT),
+                gstValues: b.gstValues,
+                member: b.teamMemberName ?? "—",
+                team: b.teamName ?? "—",
+                createdAt: info?.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
+                submissionTime: b.submissionDatetime ? format(b.submissionDatetime, DATE_FORMAT) : "—", // 👈 new
+                status: b.bidStatus,
+            };
+        });
+}
 
     private buildSummary(tenders: TenderRow[], bids: BidTenderRow[]): OemSummary {
         const assigned = tenders.filter(t => t.sentToOem);

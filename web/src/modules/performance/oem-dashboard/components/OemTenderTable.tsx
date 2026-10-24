@@ -26,6 +26,7 @@ type OemTenderRow = (NotAllowedTenderRow | LifecycleTenderRow | RfqSentToOemRow)
     rfqResponseOn?: string | null;
     status?: string;
     createdAt?: string;
+    submissionTime?: string;
 };
 
 /* ─── Component ────────────────────────────────────────────────────────────── */
@@ -128,6 +129,24 @@ export default function OemTenderTable({ params, tab, data, isLoading }: OemTend
                                     Pending
                                 </Badge>
                             ),
+                    },
+                    actionCol,
+                ];
+            case "tenders_bid":
+                return [
+                    ...common,
+                    { field: "submissionTime", headerName: "Submission Time", sortable: true, filter: false, width: 170 },
+                    {
+                        field: "status",
+                        headerName: "Status",
+                        sortable: true,
+                        filter: true,
+                        width: 150,
+                        cellRenderer: (p: CustomCellRendererProps<OemTenderRow>) => (
+                            <Badge variant="secondary" className="h-5 px-2 font-normal">
+                                {p.value}
+                            </Badge>
+                        ),
                     },
                     actionCol,
                 ];
