@@ -16,40 +16,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { useProjectInventory } from "@/hooks/api/usePurchaseOrders";
 import { useAddWoAddress, useCreateSaleInvoice, useWoBillingData } from "@/hooks/api/useSaleInvoices";
+import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import { useCreateTransporter, useTransporterOptions } from "@/hooks/api/useTransporters";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-    AlertCircle,
-    ArrowLeft,
-    ArrowRight,
-    Building2,
-    CheckCircle2,
-    ClipboardCheck,
-    FileText,
-    ListChecks,
-    Loader2,
-    Mail,
-    MapPin,
-    Plus,
-    Truck,
-    Trash2,
-} from "lucide-react";
-import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { AlertCircle, ArrowLeft, ArrowRight, Building2, CheckCircle2, ClipboardCheck, FileText, ListChecks, Loader2, Mail, MapPin, Plus, UserCheck, Truck, Trash2 } from "lucide-react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
+import type { User } from "@/types/api.types";
 import { InventoryItemCombobox } from "./components/InventoryItemCombobox";
 import { TransporterDialog, type TransporterPayload } from "./components/TransporterDialog";
 import { WoAddressDialog, type WoAddressPayload } from "./components/WoAddressDialog";
-import { formatCurrency, formatDateForInput, mapSaleInvoiceFormToCreateDTO } from "./helpers/saleInvoice.mapper";
-import {
-    saleInvoiceFormSchema,
-    stepOneFields,
-    stepTwoFields,
-    type SaleInvoiceFormValues,
-} from "./helpers/saleInvoice.schema";
+import { formatCurrency, formatDateForInput, getGstStateName, mapSaleInvoiceFormToCreateDTO } from "./helpers/saleInvoice.mapper";
+import { saleInvoiceFormSchema, stepOneFields, stepTwoFields, type SaleInvoiceFormValues } from "./helpers/saleInvoice.schema";
 import type { ProjectInventoryItem } from "./helpers/saleInvoice.types";
 
 const STEPS = [
@@ -60,10 +42,18 @@ const STEPS = [
 
 const defaultFormValues: SaleInvoiceFormValues = {
     invoiceDate: formatDateForInput(new Date()),
+    selectedProjectManagerId: "",
+    projectManagerName: "",
+    projectManagerPhone: "",
+    projectManagerEmail: "",
     selectedLineSrNos: [],
     billingCustomerName: "",
     billingAddress: "",
     billingGst: "",
+    billingStateName: "",
+    billingPlaceOfSupply: "",
+    billingContactPerson: "",
+    billingPhone: "",
     billingEmail: "",
     billingPanNo: "",
     billingMsmeNo: "",
@@ -71,10 +61,15 @@ const defaultFormValues: SaleInvoiceFormValues = {
     shippingCustomerName: "",
     shippingAddress: "",
     shippingGst: "",
+    shippingStateName: "",
+    shippingPlaceOfSupply: "",
+    shippingContactPerson: "",
+    shippingPhone: "",
     shippingPanNo: "",
     selectedBillingAddressId: "",
     selectedShippingAddressId: "",
     transporterId: "",
+    transportVia: "",
     dispatchFromName: "",
     dispatchFromAddress: "",
     dispatchFromGst: "",
@@ -103,6 +98,10 @@ const STEP_TWO_ERROR_KEYS = new Set([
     "billingCustomerName",
     "billingAddress",
     "billingGst",
+    "billingStateName",
+    "billingPlaceOfSupply",
+    "billingContactPerson",
+    "billingPhone",
     "billingEmail",
     "billingPanNo",
     "billingMsmeNo",
@@ -110,10 +109,15 @@ const STEP_TWO_ERROR_KEYS = new Set([
     "shippingCustomerName",
     "shippingAddress",
     "shippingGst",
+    "shippingStateName",
+    "shippingPlaceOfSupply",
+    "shippingContactPerson",
+    "shippingPhone",
     "shippingPanNo",
     "selectedBillingAddressId",
     "selectedShippingAddressId",
     "transporterId",
+    "transportVia",
     "dispatchFromName",
     "dispatchFromAddress",
     "dispatchFromGst",
@@ -219,6 +223,7 @@ export default function CreateSaleInvoicePage() {
     const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
     const { data: woBillingData, isLoading: isWoDataLoading } = useWoBillingData(projectId);
     const { data: inventoryData } = useProjectInventory(projectId);
+    const { data: teamMembers = [] } = useGetTeamMembers(0);
     const createSIMutation = useCreateSaleInvoice();
     const addWoAddressMutation = useAddWoAddress();
     const createTransporterMutation = useCreateTransporter();
@@ -247,6 +252,8 @@ export default function CreateSaleInvoicePage() {
     const selectedBillingAddressId = fv.selectedBillingAddressId ?? "";
     const selectedShippingAddressId = fv.selectedShippingAddressId ?? "";
     const transporterId = fv.transporterId ?? "";
+    const selectedProjectManagerId = fv.selectedProjectManagerId ?? "";
+    const activeTeamMembers = useMemo(() => teamMembers.filter((user: User) => user.isActive), [teamMembers]);
 
     const hasBoq = (woBillingData?.billingBoq?.length ?? 0) > 0;
     const boqRows = woBillingData?.billingBoq ?? [];
@@ -339,6 +346,23 @@ export default function CreateSaleInvoicePage() {
     );
     const selectedTransporter = transporterRows?.find((t) => String(t.id) === transporterId);
 
+    const prefillGstState = useCallback((side: "billing" | "shipping", gstin: string, force = false) => {
+        const stateName = getGstStateName(gstin);
+        if (!stateName) return;
+        const stateField = side === "billing" ? "billingStateName" : "shippingStateName";
+        const placeField = side === "billing" ? "billingPlaceOfSupply" : "shippingPlaceOfSupply";
+        if (force || !form.getFieldState(stateField).isDirty) form.setValue(stateField, stateName);
+        if (force || !form.getFieldState(placeField).isDirty) form.setValue(placeField, stateName);
+    }, [form]);
+
+    useEffect(() => {
+        const user = activeTeamMembers.find((member) => String(member.id) === selectedProjectManagerId);
+        if (!user) return;
+        form.setValue("projectManagerName", user.name || "");
+        form.setValue("projectManagerPhone", user.mobile || "");
+        form.setValue("projectManagerEmail", user.email || "");
+    }, [activeTeamMembers, selectedProjectManagerId, form]);
+
     const lastAppliedBillingRef = useRef("");
     useEffect(() => {
         if (!selectedBillingAddressId) {
@@ -354,7 +378,8 @@ export default function CreateSaleInvoicePage() {
         form.setValue("billingCustomerName", addr.customerName || "");
         form.setValue("billingAddress", addr.address || "");
         form.setValue("billingGst", addr.gst || "");
-    }, [selectedBillingAddressId, woBillingData, form]);
+        prefillGstState("billing", addr.gst || "", true);
+    }, [selectedBillingAddressId, woBillingData, form, prefillGstState]);
 
     const lastAppliedShippingRef = useRef("");
     useEffect(() => {
@@ -371,7 +396,8 @@ export default function CreateSaleInvoicePage() {
         form.setValue("shippingCustomerName", addr.customerName || "");
         form.setValue("shippingAddress", addr.address || "");
         form.setValue("shippingGst", addr.gst || "");
-    }, [selectedShippingAddressId, woBillingData, form]);
+        prefillGstState("shipping", addr.gst || "", true);
+    }, [selectedShippingAddressId, woBillingData, form, prefillGstState]);
 
     useEffect(() => {
         if (isWoDataLoading || hasBoq) return;
@@ -888,6 +914,35 @@ export default function CreateSaleInvoicePage() {
                                     </FieldWrapper>
                                 </div>
 
+                                <div className="border rounded-lg border-dashed p-4 space-y-4">
+                                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                                        <UserCheck className="h-5 w-5" />
+                                        Project Manager
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
+                                        <SelectField
+                                            control={form.control}
+                                            name="selectedProjectManagerId"
+                                            label="Quick Fill from User"
+                                            options={activeTeamMembers.map((user: User) => ({
+                                                id: String(user.id),
+                                                name: user.name || user.email || `User ${user.id}`,
+                                            }))}
+                                            placeholder="Select a project manager..."
+                                            valueType="string"
+                                        />
+                                        <FieldWrapper control={form.control} name="projectManagerName" label="Name">
+                                            {(field) => <Input {...field} placeholder="Project manager name" />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="projectManagerPhone" label="Phone">
+                                            {(field) => <Input {...field} placeholder="Phone number" />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="projectManagerEmail" label="Email">
+                                            {(field) => <Input {...field} type="email" placeholder="Email address" />}
+                                        </FieldWrapper>
+                                    </div>
+                                </div>
+
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                     <div className="border rounded-lg border-primary border-dashed p-4 space-y-4">
                                         <div className="flex items-center justify-between gap-2">
@@ -947,9 +1002,25 @@ export default function CreateSaleInvoicePage() {
                                                         placeholder="e.g. 27ABCDE1234F1Z5"
                                                         className="font-mono"
                                                         maxLength={15}
-                                                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                                        onChange={(e) => {
+                                                            const gstin = e.target.value.toUpperCase();
+                                                            field.onChange(gstin);
+                                                            prefillGstState("billing", gstin);
+                                                        }}
                                                     />
                                                 )}
+                                            </FieldWrapper>
+                                            <FieldWrapper control={form.control} name="billingStateName" label="State Name">
+                                                {(field) => <Input {...field} placeholder="State name" />}
+                                            </FieldWrapper>
+                                            <FieldWrapper control={form.control} name="billingPlaceOfSupply" label="Place of Supply">
+                                                {(field) => <Input {...field} placeholder="Place of supply" />}
+                                            </FieldWrapper>
+                                            <FieldWrapper control={form.control} name="billingContactPerson" label="Contact Person">
+                                                {(field) => <Input {...field} placeholder="Contact person" />}
+                                            </FieldWrapper>
+                                            <FieldWrapper control={form.control} name="billingPhone" label="Phone No">
+                                                {(field) => <Input {...field} type="tel" placeholder="Phone number" />}
                                             </FieldWrapper>
                                             <FieldWrapper
                                                 control={form.control}
@@ -1064,9 +1135,25 @@ export default function CreateSaleInvoicePage() {
                                                         placeholder="e.g. 27ABCDE1234F1Z5"
                                                         className="font-mono"
                                                         maxLength={15}
-                                                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                                        onChange={(e) => {
+                                                            const gstin = e.target.value.toUpperCase();
+                                                            field.onChange(gstin);
+                                                            prefillGstState("shipping", gstin);
+                                                        }}
                                                     />
                                                 )}
+                                            </FieldWrapper>
+                                            <FieldWrapper control={form.control} name="shippingStateName" label="State Name">
+                                                {(field) => <Input {...field} placeholder="State name" />}
+                                            </FieldWrapper>
+                                            <FieldWrapper control={form.control} name="shippingPlaceOfSupply" label="Place of Supply">
+                                                {(field) => <Input {...field} placeholder="Place of supply" />}
+                                            </FieldWrapper>
+                                            <FieldWrapper control={form.control} name="shippingContactPerson" label="Contact Person">
+                                                {(field) => <Input {...field} placeholder="Contact person" />}
+                                            </FieldWrapper>
+                                            <FieldWrapper control={form.control} name="shippingPhone" label="Phone No">
+                                                {(field) => <Input {...field} type="tel" placeholder="Phone number" />}
                                             </FieldWrapper>
                                             <FieldWrapper control={form.control} name="shippingPanNo" label="PAN Number">
                                                 {(field) => (
@@ -1105,7 +1192,10 @@ export default function CreateSaleInvoicePage() {
                                             isLoading={isTransporterLoading}
                                             valueType="string"
                                         />
-                                        <p className="text-sm text-muted-foreground md:pt-8">
+                                        <FieldWrapper control={form.control} name="transportVia" label="Transport Via">
+                                            {(field) => <Input {...field} placeholder="Road, rail, air, etc." />}
+                                        </FieldWrapper>
+                                        <p className="text-sm text-muted-foreground md:col-span-2">
                                             Transporter details are stored with the invoice at creation time. Vehicle and LR numbers can
                                             still be edited below.
                                         </p>

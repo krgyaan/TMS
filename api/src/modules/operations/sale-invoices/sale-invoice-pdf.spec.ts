@@ -47,6 +47,10 @@ describe("sale invoice PDF data helpers", () => {
             is_interstate: isInterstate,
             invoice_number: "SI/TEST/0001",
             invoice_date: "2026-10-23",
+            project_manager: "Priya Manager",
+            project_manager_phone: "9876543210",
+            project_manager_email: "priya@example.com",
+            transporter_mode: "Road",
             items: [
                 {
                     description: "Test widget",
@@ -86,8 +90,15 @@ describe("sale invoice PDF data helpers", () => {
             buyer_name: "Buyer",
             buyer_address: "Buyer line one\nBuyer line two",
             buyer_state: "Karnataka",
+            buyer_place_of_supply: "Bengaluru",
+            buyer_contact_person: "Buyer Contact",
+            buyer_phone: "9876500001",
             consignee_name: "Consignee",
             consignee_address: "Consignee line one\nConsignee line two",
+            consignee_state: "Tamil Nadu",
+            consignee_place_of_supply: "Chennai",
+            consignee_contact_person: "Consignee Contact",
+            consignee_phone: "9876500002",
             dispatch_from_name: "Dispatch warehouse",
             dispatch_address: "Dispatch line one\nDispatch line two",
         });
@@ -149,6 +160,11 @@ describe("sale invoice PDF data helpers", () => {
 
         expect(html).toContain("<b>Test BOQ item</b>");
         expect(html).toContain("Test PO description");
+        expect(html).toContain("Priya Manager");
+        expect(html).toContain("Road");
+        expect(html).toContain("Bengaluru");
+        expect(html).toContain("Buyer Contact");
+        expect(html).toContain("Consignee Contact");
         expect(html).toContain(isInterstate ? 'colspan="10"' : 'colspan="11"');
         expect(html).toMatch(/<pre[^>]*>Buyer line one\nBuyer line two<\/pre>/);
         expect(html).toMatch(/<pre[^>]*>Consignee line one\nConsignee line two<\/pre>/);
@@ -182,9 +198,21 @@ describe("sale invoice PDF data helpers", () => {
             invoiceNumber: "SI/TEST/0001",
             invoiceDate: "2026-10-23",
             woDetailId: 4,
+            projectManagerName: "Priya Manager",
+            projectManagerPhone: "9876543210",
+            projectManagerEmail: "priya@example.com",
             billingCustomerName: "Buyer",
             billingAddress: "Unit 4, Industrial Estate",
             billingGst: "29ABCDE1234F1ZW",
+            billingStateName: "Karnataka",
+            billingPlaceOfSupply: "Bengaluru",
+            billingContactPerson: "Buyer Contact",
+            billingPhone: "9876500001",
+            shippingStateName: "Tamil Nadu",
+            shippingPlaceOfSupply: "Chennai",
+            shippingContactPerson: "Consignee Contact",
+            shippingPhone: "9876500002",
+            transportVia: "Road",
             projectId: 1,
             raisedBy: null,
             approvedBy: null,
@@ -203,6 +231,15 @@ describe("sale invoice PDF data helpers", () => {
         expect(data["buyer_order_number"]).toBe("PO-123");
         expect(data["buyer_order_date"]).toBe("2026-10-20");
         expect(data["buyer_address"]).toBe("Unit 4, Industrial Estate");
+        expect(data["project_manager"]).toBe("Priya Manager");
+        expect(data["project_manager_phone"]).toBe("9876543210");
+        expect(data["buyer_state"]).toBe("Karnataka");
+        expect(data["buyer_place_of_supply"]).toBe("Bengaluru");
+        expect(data["buyer_contact_person"]).toBe("Buyer Contact");
+        expect(data["consignee_state"]).toBe("Tamil Nadu");
+        expect(data["consignee_place_of_supply"]).toBe("Chennai");
+        expect(data["consignee_contact_person"]).toBe("Consignee Contact");
+        expect(data["transporter_mode"]).toBe("Road");
         expect(rows[0].boq_item_name).toBe("WO BOQ item");
         expect(rows[0].po_item_description).toBe("Live PO product description");
         expect(rows[0].igst_amount).toBe(36);
