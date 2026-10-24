@@ -1,11 +1,21 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, NotFoundException, Param, ParseIntPipe, Patch, Post, Query, Res } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, NotFoundException, Param, ParseIntPipe, Patch, Post, Query, Res, UseGuards } from "@nestjs/common";
 import type { Response } from "express";
 import { createReadStream, existsSync } from "fs";
 import { join } from "path";
+import { z } from "zod";
 import { CurrentUser } from "@/modules/auth/decorators/current-user.decorator";
+import { RequireAnyPermission } from "@/modules/auth/decorators";
+import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
+import { PermissionGuard } from "@/modules/auth/guards/permission.guard";
 import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
 import { createSaleInvoiceSchema, type CreateSaleInvoiceDto } from "./dto/create-sale-invoice.dto";
-import { SaleInvoiceService } from "./sale-invoice.service";
+import { isValidGstin, SaleInvoiceService } from "./sale-invoice.service";
+
+const billingCorrectionSchema = z.object({
+    billingCustomerName: z.string().trim().min(1),
+    billingAddress: z.string().trim().min(1),
+    billingGst: z.string().trim().toUpperCase().refine(isValidGstin, "Enter a valid billing GSTIN"),
+});
 
 @Controller("sale-invoices")
 export class SaleInvoiceController {
@@ -89,6 +99,20 @@ export class SaleInvoiceController {
         return this.service.updateStatus(id, body);
     }
 
+    @Patch(":id/billing-details")
+    @UseGuards(JwtAuthGuard, PermissionGuard)
+    @RequireAnyPermission(
+        { module: "ops.sale-invoices", action: "update" },
+        { module: "accounts.sale-invoices", action: "update" },
+    )
+    updateBillingDetails(
+        @Param("id", ParseIntPipe) id: number,
+        @Body() body: unknown,
+        @CurrentUser() user: ValidatedUser,
+    ) {
+        return this.service.updateBillingDetails(id, billingCorrectionSchema.parse(body), user.id);
+    }
+
     @Patch(":id")
     update(
         @Param("id", ParseIntPipe) id: number,
@@ -101,6 +125,17 @@ export class SaleInvoiceController {
     @Get(":id/pdf/versions")
     getPdfVersions(@Param("id", ParseIntPipe) id: number) {
         return this.service.getSaleInvoicePdfVersions(id);
+    }
+
+    @Post(":id/pdf/retry")
+    @HttpCode(HttpStatus.OK)
+    @UseGuards(JwtAuthGuard, PermissionGuard)
+    @RequireAnyPermission(
+        { module: "ops.sale-invoices", action: "update" },
+        { module: "accounts.sale-invoices", action: "update" },
+    )
+    retryPdfGeneration(@Param("id", ParseIntPipe) id: number) {
+        return this.service.retryPdfGeneration(id);
     }
 
     @Delete(":id/pdf/versions/:version")
