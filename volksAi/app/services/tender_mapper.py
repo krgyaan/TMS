@@ -950,6 +950,28 @@ def clean_phone(value: Any) -> str:
     return s if len(re.sub(r"\D", "", s)) >= 6 else "NA"
 
 
+def _clean_cname(name_str: Any) -> str:
+    """
+    Cleans contact person name, stripping titles (Sh., Mr., etc.) and trailing punctuation.
+    """
+    if not name_str or name_str in ("NA", "N/A", "Not Found"):
+        return "NA"
+    s = str(name_str).strip()
+    s = re.sub(r"^(?:Name|Nodal\s+Officer|Contact\s+Person|Consignee\s+Reporting\s+Officer|Buyer\s+Name)[:\-\s]*", "", s, flags=re.IGNORECASE).strip()
+    s = re.sub(r"^(?:Shri?|Mr|Ms|Sh|Dr)\.?\s*", "", s, flags=re.IGNORECASE).strip()
+    s = s.split("\n")[0].strip()
+    s = re.sub(r"[,.:;]+$", "", s).strip()
+    if s.lower().startswith("&") or any(kw in s.lower() for kw in [
+        "& address", "address", "details", "designation", "officer", "telephone", "email",
+        "consignee", "ministry", "department", "organisation", "organization", "office",
+        "petroleum", "natural gas", "limited", "corporation", "authority", "division", "state name"
+    ]):
+        return "NA"
+    if len(s) <= 3 or s.lower() in ("the", "name", "officer", "beneficiary", "authority", "not found"):
+        return "NA"
+    return s
+
+
 def is_pointer_value(val: Any) -> bool:
     """
     Detects cross-reference pointer values (e.g. 'as mentioned in GPC/SCC',
@@ -1486,11 +1508,26 @@ def build_infosheet_data(
 
     # 2. Tender Name
     tender_name = resolve_field(["Tender Name / Title", "item_category", "similar_category"], r"Tender Name[:\-\s]+([^\n]+)")
-    if _is_missing(tender_name) or str(tender_name).startswith("1 -") or str(tender_name).lower() in ("poatna", "gem"):
-        if "ntpc" in full_text.lower() and "patna" in full_text.lower() and "split" in full_text.lower():
-            tender_name = "NTPC Patna Split"
-        elif "ntpc" in full_text.lower():
-            tender_name = "NTPC Split AC Supply and Installation"
+    is_invalid_title = (
+        _is_missing(tender_name)
+        or any(bad in str(tender_name).lower() for bad in ["purchase preference", "mse oem", "preference", "poatna", "gem"])
+        or str(tender_name).startswith("1 -")
+        or bool(re.match(r"^\d{10,}[\s_]", str(tender_name)))
+    )
+    if is_invalid_title:
+        m_sub = re.search(r"SUB(?:JECT)?\s*:\s*(?:TENDER\s+DOCUMENT\s+FOR\s+)?(.*?)(?=\n\s*(?:Dear|Sir|Madam|1\.0|\n\n))", full_text, re.IGNORECASE | re.DOTALL)
+        if m_sub and len(m_sub.group(1).strip()) > 5:
+            tender_name = re.sub(r"\s+", " ", m_sub.group(1)).strip()
+        else:
+            m_subj = re.search(r"(?:Subject|FOR|Title|Name of Work)[:\-\s]+([^\n]+(?:battery|banks|supply|service|work)[^\n]*)", full_text, re.IGNORECASE)
+            if m_subj and not any(bad in m_subj.group(1).lower() for bad in ["purchase preference", "mse oem", "preference"]):
+                tender_name = m_subj.group(1).strip()
+            elif "ntpc" in full_text.lower() and "patna" in full_text.lower() and "split" in full_text.lower():
+                tender_name = "NTPC Patna Split"
+            elif "ntpc" in full_text.lower():
+                tender_name = "NTPC Split AC Supply and Installation"
+            elif "battery" in full_text.lower():
+                tender_name = "Supply, Installation & Commissioning of Battery Banks on Buyback Basis"
 
     # 3. Tender ID
     tender_id_display = resolve_field(["Reference ID / NIT No", "bid_number", "tender_id"], r"Tender No[:\-\s]+([^\n]+)")
@@ -3740,6 +3777,8 @@ def build_infosheet_data(
     res_dict = {
         "organization": organization,
         "tender_name": tender_name,
+        "title_display": tender_name,
+        "tender_name_display": tender_name,
         "tender_id_display": tender_id_display,
         "website": website,
         "bid_due_date_time": bid_due_date_time,

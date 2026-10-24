@@ -1,4 +1,4 @@
-import { Inject, Injectable, OnModuleInit, Optional } from '@nestjs/common';
+import { Inject, Injectable, OnModuleInit, Optional, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Job, Worker } from 'bullmq';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
@@ -14,6 +14,7 @@ import { ClaudeUsageService } from '@/modules/master/claude-usage/claude-usage.s
 import { startHeartbeat } from '@/infra/queue/worker-heartbeat';
 import { PdfExtractionJobData, PdfExtractionJobResult } from './types/pdf-extraction.types';
 import { extractionFieldsUpsertValue } from './extraction-fields-merge';
+import { BiddingRequirementsService } from '@/modules/tendering/checklists/bidding-requirements.service';
 
 @Injectable()
 export class PdfExtractionProcessor implements OnModuleInit {
@@ -28,6 +29,9 @@ export class PdfExtractionProcessor implements OnModuleInit {
         @Optional()
         @Inject(DRIZZLE)
         private readonly db?: DbInstance,
+        @Optional()
+        @Inject(forwardRef(() => BiddingRequirementsService))
+        private readonly biddingRequirementsService?: BiddingRequirementsService,
     ) {}
 
 
@@ -378,6 +382,30 @@ export class PdfExtractionProcessor implements OnModuleInit {
                     verified: matches,
                     persistedFieldsCount,
                 });
+
+                // AUTO_ENQUEUE_CHECKLIST_ANALYSIS: Behind a flag (default off), enqueue checklist analysis when extraction completes successfully
+                const autoEnqueue =
+                    this.configService.get<boolean>('volksAi.autoEnqueueChecklistAnalysis') ??
+                    (this.configService.get<string>('AUTO_ENQUEUE_CHECKLIST_ANALYSIS') === 'true' ||
+                     process.env.AUTO_ENQUEUE_CHECKLIST_ANALYSIS === 'true');
+
+                if (autoEnqueue && this.biddingRequirementsService) {
+                    try {
+                        this.logger.info(
+                            `[AutoExtract] Auto-enqueueing checklist analysis for tender ${tenderId} (flag AUTO_ENQUEUE_CHECKLIST_ANALYSIS enabled)`,
+                            { event_type: 'autoextract_save', action: 'auto_enqueue_checklist', tenderId },
+                        );
+                        await this.biddingRequirementsService.startOrGetAnalysis(tenderId, false, userId);
+                    } catch (enqueueErr: any) {
+                        this.logger.error(
+                            `[AutoExtract] Failed to auto-enqueue checklist analysis for tender ${tenderId}: ${enqueueErr?.message || enqueueErr}`,
+                            {
+                                error: enqueueErr?.message || enqueueErr,
+                                stack: enqueueErr?.stack,
+                            },
+                        );
+                    }
+                }
             } catch (dbErr: any) {
                 const underlyingError = dbErr?.cause?.message || dbErr?.message || String(dbErr);
                 const fallbackRecoveryPayload = {

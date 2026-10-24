@@ -63,7 +63,7 @@ SONNET_5_CACHE_WRITE_1H_PER_M = 4.00
 SONNET_5_CACHE_READ_PER_M = 0.20
 
 # Token budget per tender (gates strictly on integer raw_processing_tokens = in + out + cache_create + cache_read)
-LLM_TOKEN_BUDGET_PER_TENDER = int(os.getenv("LLM_TOKEN_BUDGET_PER_TENDER", "20000"))
+LLM_TOKEN_BUDGET_PER_TENDER = int(os.getenv("LLM_TOKEN_BUDGET_PER_TENDER", "100000"))
 
 # Scoped context character bounds per section
 SCOPED_CONTEXT_BID_SUMMARY_OPENING_CHARS = 5000
@@ -177,19 +177,15 @@ AMBIGUITY_FIELD_DEFINITIONS: Dict[str, str] = {
         "Financial Criteria Not Applicable or exempt for all bidders in this tender."
     ),
     "payment_terms_supply_display": (
-        "Percentage of contract/order value paid for goods supply milestone upon receipt/delivery of materials. "
-        "CRITICAL RULE: If the scoped tender clauses specify a milestone schedule (such as 70% on supply, 30% on installation; "
-        "or 80% on supply, 20% on installation; or 85% on supply, 15% on installation), extract the supply milestone percentage. "
-        "If the candidate value matches the milestone percentage explicitly specified in the scoped clauses (e.g. '70%', '80%', '85%'), "
-        "choose action='confirm'. NEVER override with numbers not literally present in the scoped text. "
-        "Return as percentage string (e.g. '70%', '80%', '85%')."
+        "Payment terms for supply portion, including all milestone percentages and conditions (e.g. 80% on receipt and acceptance at site, 20% after completion incl. handing over documents and taking away buy-back batteries). "
+        "If candidate matches the milestone terms explicitly specified in the scoped clauses, choose action='confirm'. "
+        "NEVER override with numbers not literally present in the scoped text."
     ),
     "payment_terms_installation_display": (
-        "Percentage of contract/order value paid upon completion of installation, testing, and commissioning milestone "
-        "(e.g. '30%', '20%', '15%'). For pure-supply tenders with no installation/commissioning scope, installation terms are NOT APPLICABLE / null — NEVER invent an installation percentage. "
-        "CRITICAL RULE: If the candidate value matches the installation milestone in the scoped clauses (e.g. '30%', '20%', '15%'), "
-        "choose action='confirm'. NEVER override with figures not explicitly present in the scoped text. "
-        "Return as percentage string (e.g. '30%', '20%', '15%')."
+        "Payment terms for service / installation portion, including milestone percentage and condition (e.g. 100% after completion of installation and commissioning of all SV stations). "
+        "For pure-supply tenders with no installation/commissioning scope, installation terms are NOT APPLICABLE / null — NEVER invent an installation percentage. "
+        "If candidate matches the installation milestone in the scoped clauses, choose action='confirm'. "
+        "NEVER override with figures not explicitly present in the scoped text."
     ),
     "delivery_time_supply_display": (
         "Goods supply delivery timeline in days (e.g. '90 Days', '140 Days', '150 Days'). "
@@ -390,14 +386,14 @@ def _fmt_years(v) -> Optional[str]:
 
 FIELD_PROMPT_MAP: Dict[str, Tuple[str, str, str, Any]] = {
     "payment_terms_supply_display": (
-        "payment_terms_supply_pct", "integer",
-        "% of contract value paid on supply/delivery/receipt of materials, as an integer X, only if literally stated in the text",
-        _fmt_pct,
+        "payment_terms_supply", "string",
+        "Payment terms for supply portion, including all milestone percentages and conditions (e.g. 80% on receipt and acceptance at site, 20% after completion incl. handing over documents and taking away buy-back batteries), only if literally stated in the text",
+        _fmt_str,
     ),
     "payment_terms_installation_display": (
-        "payment_terms_installation_pct", "integer",
-        "% paid on installation/commissioning/site acceptance, as an integer Y, only if literally stated in the text. Set null / Not Applicable for pure-supply tenders without installation.",
-        _fmt_pct,
+        "payment_terms_installation", "string",
+        "Payment terms for service / installation portion, including milestone percentage and condition (e.g. 100% after completion of installation and commissioning of all SV stations), only if literally stated in the text. Set 'Not Applicable' if no service/installation scope.",
+        _fmt_str,
     ),
     "ld_percentage_display": (
         "ld_percentage_per_week", "number",
@@ -795,12 +791,12 @@ def extract_scoped_context(full_text: str, target: str) -> str:
     elif is_pbg_sd:
         # Target the exact CPS / Security Deposit clause in GCC/SCC
         cps_pats = [
-            r"\n\s*12\.0\s+CONTRACT\s+PERFORMANCE\s+SECURITY\s*\(CPS\):?",
-            r"\n\s*CONTRACT\s+PERFORMANCE\s+SECURITY\s*\(CPS\):?",
-            r"\n\s*CONTRACT\s+PERFORMANCE\s+SECURITY\s*/\s*SECURITY\s+DEPOSIT\s*\[CPS/SD\]",
+            r"\n\s*(?:\d+(?:\.\d+)*\s+)?CONTRACT\s+PERFORMANCE\s+SECURITY(?:\s*\(CPS\))?(?:\s*/\s*SECURITY\s+DEPOSIT(?:\s*\[CPS/SD\])?)?\s*[:\-]?\s*\n",
+            r"\n\s*(?:\d+(?:\.\d+)*\s+)?CONTRACT\s+PERFORMANCE\s+SECURITY\s*\(CPS\)[:\s\n]",
+            r"\n\s*(?:\d+(?:\.\d+)*\s+)?CONTRACT\s+PERFORMANCE\s+SECURITY\s*/\s*SECURITY\s+DEPOSIT\s*\[CPS/SD\]",
         ]
         cps_text, cps_sp, cps_ep = _find_section_slice(
-            full_text, cps_pats, stop_pattern=r"\n\s*(?:13\.0\b|SECTION\s*[-–—]?\s*VI\b)", max_chars=4000
+            full_text, cps_pats, stop_pattern=r"\n\s*(?:(?:1[3-9]|[2-9]\d)\.0\b|SECTION\s*[-–—]?\s*(?:VI|VII)\b|13\.0\b)", max_chars=4000
         )
 
         # Target GeM Bid ePBG detail table from main tender
@@ -1819,7 +1815,7 @@ class LLMFieldResolver:
                 system=system_blocks,
                 messages=[{"role": "user", "content": user_prompt}],
                 tools=[tool_spec],
-                tool_choice={"type": "tool", "name": "resolve_ambiguous_fields"},
+                tool_choice={"type": "auto"},
             )
 
             if hasattr(response, "usage") and response.usage:
@@ -1830,13 +1826,17 @@ class LLMFieldResolver:
                 )
 
             decisions_list: List[Dict[str, Any]] = []
+            raw_role2_tool_call: Dict[str, Any] = {}
             for block in response.content:
                 if getattr(block, "type", "") == "tool_use" and getattr(block, "name", "") == "resolve_ambiguous_fields":
                     input_data = getattr(block, "input", {}) or {}
+                    raw_role2_tool_call = input_data
                     decisions_list = input_data.get("decisions", [])
                     break
 
             results: Dict[str, Dict[str, Any]] = {}
+            if raw_role2_tool_call:
+                results["_raw_tool_call_role2"] = raw_role2_tool_call
             for d in decisions_list:
                 f_name = d.get("field_name")
                 if not f_name or f_name not in fields_to_check:

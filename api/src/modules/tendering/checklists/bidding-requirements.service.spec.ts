@@ -830,6 +830,53 @@ describe('BiddingRequirementsService', () => {
             expect(fetchSpy).not.toHaveBeenCalled();
         });
 
+        it('does NOT skip and triggers fresh analysis when cached schemaVersion is older than current', async () => {
+            const staleResult = {
+                jobId: 'breq_old_123',
+                requirements: [{ documentName: 'PAN', category: 'standard', required: true }],
+                annexures: [],
+                schemaVersion: 0,
+            };
+            mockDb.select.mockReturnValueOnce({
+                from: jest.fn().mockReturnValueOnce({
+                    where: jest.fn().mockResolvedValueOnce([
+                        {
+                            id: 42,
+                            tenderId: 1175,
+                            documentHash: 'hash123',
+                            status: 'done',
+                            result: staleResult,
+                        },
+                    ]),
+                }),
+            });
+            mockDb.update = jest.fn().mockReturnValue({
+                set: jest.fn().mockReturnValue({
+                    where: jest.fn().mockReturnValue({
+                        returning: jest.fn().mockResolvedValue([
+                            {
+                                id: 42,
+                                tenderId: 1175,
+                                documentHash: 'hash123',
+                                status: 'pending',
+                                startedAt: new Date(),
+                            },
+                        ]),
+                    }),
+                }),
+            });
+
+            const execSpy = jest.spyOn(service as any, 'executeJobInBackground').mockResolvedValue(undefined);
+
+            const res = await service.startOrGetAnalysis(1175, false);
+
+            expect(res.jobId).toBe(42);
+            expect(res.status).toBe('pending');
+            expect(mockDb.update).toHaveBeenCalled();
+            expect(execSpy).toHaveBeenCalledWith(42, 1175, expect.anything(), expect.anything(), expect.anything(), undefined);
+            execSpy.mockRestore();
+        });
+
         it('joins in-flight job without starting duplicate job when status is running or pending', async () => {
             mockDb.select.mockReturnValueOnce({
                 from: jest.fn().mockReturnValueOnce({
