@@ -4,19 +4,24 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
     useApproveSaleInvoice,
     useCreateSaleInvoiceDraft,
     useDeleteSaleInvoicePdfVersion,
     useFinalizeSaleInvoice,
+    useRetrySaleInvoicePdf,
     useSaleInvoice,
     useSaleInvoicePdfVersions,
+    useUpdateSaleInvoiceBillingDetails,
 } from "@/hooks/api/useSaleInvoices";
 import { saleInvoiceApi } from "@/services/api/sale-invoice.api";
+import { useAuth } from "@/contexts/AuthContext";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
-import { AlertCircle, ArrowLeft, Banknote, Calculator, CheckCircle2, Download, ExternalLink, FileText, History, IndianRupee, Lock, Package, PencilLine, Trash2, Truck } from "lucide-react";
-import { useMemo, useState } from "react";
+import { AlertCircle, ArrowLeft, Banknote, Calculator, CheckCircle2, Download, ExternalLink, FileText, History, IndianRupee, Lock, Package, PencilLine, RefreshCw, Trash2, Truck } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { fileUploadService } from "@/services/api/file-upload.service";
 import { toast } from "sonner";
@@ -64,6 +69,9 @@ const ViewSaleInvoicePage = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const siId = Number(siIdParam);
+    const { hasPermission } = useAuth();
+    const canManagePdf =
+        hasPermission("ops.sale-invoices", "update") || hasPermission("accounts.sale-invoices", "update");
 
     const { data: si, isLoading, isError, error } = useSaleInvoice(siId);
     const { data: pdfVersions, isLoading: isPdfVersionsLoading } = useSaleInvoicePdfVersions(siId);
@@ -71,15 +79,33 @@ const ViewSaleInvoicePage = () => {
     const finalizeMutation = useFinalizeSaleInvoice();
     const createDraftMutation = useCreateSaleInvoiceDraft();
     const deletePdfVersionMutation = useDeleteSaleInvoicePdfVersion();
+    const retryPdfMutation = useRetrySaleInvoicePdf();
+    const updateBillingDetailsMutation = useUpdateSaleInvoiceBillingDetails();
     const [isRequestChangesOpen, setIsRequestChangesOpen] = useState(false);
     const [isRejectOpen, setIsRejectOpen] = useState(false);
+    const [billingCorrection, setBillingCorrection] = useState({
+        billingCustomerName: "",
+        billingAddress: "",
+        billingGst: "",
+    });
+
+    useEffect(() => {
+        if (!si) return;
+        setBillingCorrection({
+            billingCustomerName: si.billingCustomerName || "",
+            billingAddress: si.billingAddress || "",
+            billingGst: si.billingGst || "",
+        });
+    }, [si]);
 
     const isAccountsSection = location.pathname.includes("/accounts/");
+    const latestPdfVersion = Object.keys(pdfVersions ?? {}).sort().at(-1);
+    const orderedPdfVersions = Object.entries(pdfVersions ?? {}).sort(([a], [b]) => b.localeCompare(a));
 
     const handleCreateDraft = async () => {
         try {
             await createDraftMutation.mutateAsync(siId);
-            toast.success("Draft created. PDF generated.");
+            toast.success("Draft created. Review the latest invoice PDF.");
         } catch (err) {
             toast.error(err instanceof Error ? err.message : "Failed to create draft");
         }
@@ -106,12 +132,40 @@ const ViewSaleInvoicePage = () => {
     };
 
     const handleDeletePdfVersion = async (version: string) => {
+        if (version === latestPdfVersion) {
+            toast.error("The latest PDF version cannot be deleted.");
+            return;
+        }
         if (!window.confirm(`Delete PDF version ${version}?`)) return;
         try {
             await deletePdfVersionMutation.mutateAsync({ id: siId, version });
             toast.success("PDF version deleted");
         } catch (err) {
             toast.error(err instanceof Error ? err.message : "Failed to delete PDF version");
+        }
+    };
+
+    const handleRetryPdf = async () => {
+        try {
+            const result = await retryPdfMutation.mutateAsync(siId);
+            toast.success(result.status === "generated" ? "Invoice PDF generated." : "The latest invoice PDF is already current.");
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Failed to generate invoice PDF");
+        }
+    };
+
+    const handleSaveBillingCorrection = async () => {
+        try {
+            const result = await updateBillingDetailsMutation.mutateAsync({ id: siId, ...billingCorrection });
+            if (result.pdfGeneration?.status === "failed") {
+                toast.error(result.pdfGeneration.message || "Billing details saved, but PDF generation failed.");
+            } else if (result.pdfGeneration?.status === "unchanged") {
+                toast.success("Billing details saved. The latest PDF already matches.");
+            } else {
+                toast.success("Billing details saved and PDF version generated.");
+            }
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Failed to save billing details");
         }
     };
 
@@ -338,25 +392,32 @@ const ViewSaleInvoicePage = () => {
                     </Card>
                 )}
                 {/* PDF Versions */}
-                {(si.status === "draft" || si.status === "changes_requested" || si.status === "approved") && (
-                    <Card>
+                <Card>
                         <CardHeader><CardTitle className="flex items-center gap-2 text-base"><FileText className="h-5 w-5" />Invoice PDF</CardTitle></CardHeader>
                         <CardContent>
-                            <div className="flex items-center gap-3 mb-3">
-                                <Button size="sm" variant="outline" asChild>
-                                    <a href={saleInvoiceApi.getSaleInvoicePdfUrl(siId)} target="_blank" rel="noopener noreferrer">
-                                        <Download className="mr-2 h-4 w-4" />
-                                        Download PDF
-                                    </a>
-                                </Button>
+                            <div className="flex items-center gap-3 mb-3 flex-wrap">
+                                {pdfVersions && Object.keys(pdfVersions).length > 0 && (
+                                    <Button size="sm" variant="outline" asChild>
+                                        <a href={saleInvoiceApi.getSaleInvoicePdfUrl(siId)} target="_blank" rel="noopener noreferrer">
+                                            <Download className="mr-2 h-4 w-4" />
+                                            Download Latest PDF
+                                        </a>
+                                    </Button>
+                                )}
+                                {canManagePdf && (
+                                    <Button size="sm" variant="outline" onClick={handleRetryPdf} disabled={retryPdfMutation.isPending}>
+                                        <RefreshCw className={`mr-2 h-4 w-4 ${retryPdfMutation.isPending ? "animate-spin" : ""}`} />
+                                        {retryPdfMutation.isPending ? "Generating..." : "Generate / Retry PDF"}
+                                    </Button>
+                                )}
                             </div>
                             {isPdfVersionsLoading ? (
                                 <Skeleton className="h-16 w-full rounded-lg" />
                             ) : pdfVersions && Object.keys(pdfVersions).length > 0 ? (
                                 <div className="space-y-2">
-                                    {Object.entries(pdfVersions).map(([version]) => (
+                                    {orderedPdfVersions.map(([version]) => (
                                         <div key={version} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                                            <span className="font-mono text-xs">{version}</span>
+                                            <span className="font-mono text-xs">{version}{version === latestPdfVersion ? " (latest)" : ""}</span>
                                             <div className="flex items-center gap-2">
                                                 <Button size="sm" variant="ghost" className="h-7" asChild>
                                                     <a href={saleInvoiceApi.getSaleInvoicePdfUrl(siId, version)} target="_blank" rel="noopener noreferrer">
@@ -369,7 +430,8 @@ const ViewSaleInvoicePage = () => {
                                                     variant="ghost"
                                                     className="h-7 text-muted-foreground hover:text-destructive"
                                                     onClick={() => handleDeletePdfVersion(version)}
-                                                    disabled={deletePdfVersionMutation.isPending}
+                                                    disabled={deletePdfVersionMutation.isPending || version === latestPdfVersion}
+                                                    title={version === latestPdfVersion ? "The latest PDF version is retained" : "Delete PDF version"}
                                                 >
                                                     <Trash2 className="h-3 w-3" />
                                                 </Button>
@@ -378,15 +440,40 @@ const ViewSaleInvoicePage = () => {
                                     ))}
                                 </div>
                             ) : (
-                                <p className="text-sm text-muted-foreground italic">No PDF generated yet.</p>
+                                <p className="text-sm text-muted-foreground">No PDF version is available. Verify the billing GSTIN, then retry generation.</p>
+                            )}
+                            {canManagePdf && ["oe_request", "draft", "changes_requested"].includes(si.status) && (
+                                <div className="mt-5 border-t pt-4">
+                                    <p className="mb-3 text-sm font-medium">Correct bill-to details</p>
+                                    <div className="grid gap-3 md:grid-cols-2">
+                                        <label className="space-y-1 text-sm">
+                                            <span>Buyer name</span>
+                                            <Input value={billingCorrection.billingCustomerName} onChange={(event) => setBillingCorrection((current) => ({ ...current, billingCustomerName: event.target.value }))} />
+                                        </label>
+                                        <label className="space-y-1 text-sm">
+                                            <span>Billing GSTIN</span>
+                                            <Input value={billingCorrection.billingGst} onChange={(event) => setBillingCorrection((current) => ({ ...current, billingGst: event.target.value.toUpperCase() }))} />
+                                        </label>
+                                        <label className="space-y-1 text-sm md:col-span-2">
+                                            <span>Billing address</span>
+                                            <Textarea value={billingCorrection.billingAddress} onChange={(event) => setBillingCorrection((current) => ({ ...current, billingAddress: event.target.value }))} />
+                                        </label>
+                                    </div>
+                                    <Button size="sm" className="mt-3" onClick={handleSaveBillingCorrection} disabled={updateBillingDetailsMutation.isPending}>
+                                        {updateBillingDetailsMutation.isPending ? "Saving..." : "Save and generate new version"}
+                                    </Button>
+                                </div>
                             )}
                         </CardContent>
-                    </Card>
-                )}
+                </Card>
                 {/* Invoice-level GSTs (shown when invoiced+) */}
                 {Number(si.invoiceTaxableAmount) > 0 && (
                     <Card>
-                        <CardHeader><CardTitle className="flex items-center gap-2 text-base"><IndianRupee className="h-5 w-5" />Invoice Financials</CardTitle></CardHeader>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <IndianRupee className="h-5 w-5" />Invoice Financials
+                            </CardTitle>
+                        </CardHeader>
                         <CardContent>
                             <Table>
                                 <TableBody>

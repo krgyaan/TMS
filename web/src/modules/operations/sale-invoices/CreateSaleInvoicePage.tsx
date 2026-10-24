@@ -456,7 +456,12 @@ export default function CreateSaleInvoicePage() {
         try {
             const siData = mapSaleInvoiceFormToCreateDTO(values, projectId, woBillingData?.woDetailId);
             const result = await createSIMutation.mutateAsync(siData);
-            toast.success(`Sale Invoice #${result.invoiceNumber} request created. Account team will prepare the draft.`);
+            if (result.pdfGeneration?.status === "failed") {
+                toast.error(`Sale Invoice #${result.invoiceNumber} was created, but PDF generation failed: ${result.pdfGeneration.message}`);
+                navigate(paths.operations.viewSaleInvoice(result.id));
+                return;
+            }
+            toast.success(`Sale Invoice #${result.invoiceNumber} request created with a PDF version.`);
             navigate(paths.operations.saleInvoices);
         } catch (error: any) {
             toast.error(error?.message || "Failed to create sale invoice. Please try again.");
