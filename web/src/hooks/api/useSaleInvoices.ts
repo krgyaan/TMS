@@ -100,6 +100,29 @@ export const useUpdateSaleInvoice = () => {
     });
 };
 
+export const useRetrySaleInvoicePdf = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (id: number) => saleInvoiceApi.retryPdfGeneration(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: saleInvoiceKeys.all });
+        },
+    });
+};
+
+export const useUpdateSaleInvoiceBillingDetails = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, ...data }: { id: number; billingCustomerName: string; billingAddress: string; billingGst: string }) =>
+            saleInvoiceApi.updateBillingDetails(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: saleInvoiceKeys.all });
+        },
+    });
+};
+
 export const useCreateSaleInvoiceDraft = () => {
     const queryClient = useQueryClient();
 

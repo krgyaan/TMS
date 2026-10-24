@@ -132,10 +132,11 @@ export const PDF_CONFIG = {
             templates: ['si-template'],
             storagePath: 'si',
             baseDir: 'operations/si',
+            landscape: true,
             margin: {
-                top: '10mm',
+                top: '5mm',
                 right: '7.5mm',
-                bottom: '10mm',
+                bottom: '5mm',
                 left: '7.5mm',
             },
         },
@@ -209,6 +210,11 @@ export function getPaperSize(templateType: string): string | { width: number; he
     }
 
     return undefined; // Use default A4
+}
+
+export function isLandscape(templateType: string): boolean {
+    const typeConfig = PDF_CONFIG.templateTypes[templateType as keyof typeof PDF_CONFIG.templateTypes];
+    return typeConfig && 'landscape' in typeConfig ? typeConfig.landscape === true : false;
 }
 
 /**

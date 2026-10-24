@@ -34,6 +34,17 @@ class SaleInvoiceApiService extends BaseApiService {
         return this.get(`/${id}`);
     }
 
+    async retryPdfGeneration(id: number): Promise<{ status: "generated" | "unchanged"; version?: string }> {
+        return this.post(`/${id}/pdf/retry`, {});
+    }
+
+    async updateBillingDetails(
+        id: number,
+        data: { billingCustomerName: string; billingAddress: string; billingGst: string },
+    ): Promise<any> {
+        return this.patch(`/${id}/billing-details`, data);
+    }
+
     async updateSaleInvoiceStatus(id: number, data: { status: string; invoiceDocPaths?: string[] }): Promise<any> {
         return this.patch(`/${id}/status`, data);
     }

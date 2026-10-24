@@ -18,7 +18,7 @@ const UploadInvoiceDialog = ({ row, open, onClose }: Props) => {
         if (!row) return;
         try {
             await createDraftMutation.mutateAsync(row.id);
-            toast.success(`Draft created for ${row.invoiceNumber}. PDF generated.`);
+            toast.success(`Draft created for ${row.invoiceNumber}. Review the latest invoice PDF.`);
             onClose();
         } catch (error) {
             toast.error(error instanceof Error ? error.message : "Failed to create draft");
@@ -31,7 +31,7 @@ const UploadInvoiceDialog = ({ row, open, onClose }: Props) => {
                 <DialogHeader>
                     <DialogTitle>Create Draft</DialogTitle>
                     <DialogDescription>
-                        Generate the account draft for this OE request. A draft PDF will be created for Operations approval.
+                        Generate the account draft for this OE request. Review the latest invoice PDF before approval.
                     </DialogDescription>
                 </DialogHeader>
                 {row && (
@@ -40,7 +40,7 @@ const UploadInvoiceDialog = ({ row, open, onClose }: Props) => {
                         <p className="text-sm"><strong>Customer:</strong> {row.billingCustomerName}</p>
                         {row.status === "changes_requested" && (
                             <p className="text-sm text-muted-foreground">
-                                This will regenerate the draft as a new PDF revision incorporating the requested changes.
+                                This will reopen the draft. Any corrected billing details create a new PDF version.
                             </p>
                         )}
                     </div>
