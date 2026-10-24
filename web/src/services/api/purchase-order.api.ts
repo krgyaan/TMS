@@ -9,6 +9,7 @@ import type {
     SellerPersonOption,
     ShipToOption,
 } from '@/modules/operations/purchase-orders/helpers/purchaseOrder.types';
+import type { ProjectInventoryItem } from '@/modules/operations/sale-invoices/helpers/saleInvoice.types';
 import axiosInstance from '@/lib/axios';
 
 const buildPickerQuery = (q?: string, ids?: number[], limit?: number): string => {
@@ -29,7 +30,7 @@ class PurchaseOrderApiService extends BaseApiService {
         return this.get(`/project/${projectId}`);
     }
 
-    async getProjectInventory(projectId: number): Promise<{ items: any[] }> {
+    async getProjectInventory(projectId: number): Promise<{ items: ProjectInventoryItem[] }> {
         return this.get(`/project/${projectId}/inventory`);
     }
 

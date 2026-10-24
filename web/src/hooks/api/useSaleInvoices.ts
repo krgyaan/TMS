@@ -29,6 +29,30 @@ export const useCreateSaleInvoice = () => {
     });
 };
 
+export const useAddWoAddress = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({
+            type,
+            woDetailId,
+            customerName,
+            address,
+            gst,
+        }: {
+            type: "billing" | "shipping";
+            woDetailId: number;
+            customerName: string;
+            address: string;
+            gst?: string;
+        }) => saleInvoiceApi.addWoAddress(type, { woDetailId, customerName, address, gst }),
+        onSuccess: () => {
+            // Refresh the WO billing data so the new address shows up in the picker.
+            queryClient.invalidateQueries({ queryKey: ["sale-invoices", "wo-billing-data"] });
+        },
+    });
+};
+
 export const useProjectSaleInvoices = (projectId: number | null) => {
     return useQuery({
         queryKey: saleInvoiceKeys.projectSaleInvoices(projectId!),
@@ -70,6 +94,29 @@ export const useUpdateSaleInvoice = () => {
     return useMutation({
         mutationFn: ({ id, ...data }: { id: number } & Record<string, any>) =>
             saleInvoiceApi.updateSaleInvoice(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: saleInvoiceKeys.all });
+        },
+    });
+};
+
+export const useRetrySaleInvoicePdf = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (id: number) => saleInvoiceApi.retryPdfGeneration(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: saleInvoiceKeys.all });
+        },
+    });
+};
+
+export const useUpdateSaleInvoiceBillingDetails = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, ...data }: { id: number; billingCustomerName: string; billingAddress: string; billingGst: string }) =>
+            saleInvoiceApi.updateBillingDetails(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: saleInvoiceKeys.all });
         },

@@ -9,10 +9,13 @@ export interface CreateSaleInvoiceDTO {
     billingPanNo?: string;
     billingMsmeNo?: string;
     billingCinNo?: string;
+    billingAddressId?: number | null;
     shippingCustomerName: string;
     shippingAddress: string;
     shippingGst?: string;
     shippingPanNo?: string;
+    shippingAddressId?: number | null;
+    transporterId?: number | null;
     dispatchFromName?: string;
     dispatchFromAddress?: string;
     dispatchFromGst?: string;
@@ -21,17 +24,21 @@ export interface CreateSaleInvoiceDTO {
     dispatchToName?: string;
     dispatchToAddress?: string;
     dispatchToGst?: string;
+    freight?: number;
+    otherCharges?: number;
+    roundOff?: number;
     items: SaleInvoiceItemDTO[];
     remarks?: string;
 }
 
 export interface SaleInvoiceItemDTO {
+    lineItemSrNo: number;
+    purchaseOrderProductId: number;
     srNo?: number;
     itemDescription: string;
     qty: number;
     rate: number;
     gstRate: number;
-    purchaseOrderProductId?: number;
     unit?: string;
     hsnSac?: string;
 }
@@ -79,7 +86,12 @@ export interface SaleInvoiceRow {
     shippingPanNo?: string;
     totalPreGst: number;
     totalGst: number;
+    freight?: number;
+    otherCharges?: number;
+    roundOff?: number;
     grandTotal: number;
+    transporterId?: number | null;
+    transporterDetails?: { name?: string; phone?: string; gstNo?: string; address?: string } | null;
     status: string;
     raisedBy: string;
     createdAt: string;
@@ -145,4 +157,13 @@ export interface WoBillingData {
     buybackBoq: WoBoqItem[];
     billingAddresses: WoBillingAddress[];
     shippingAddresses: WoShippingAddress[];
+}
+
+export interface Transporter {
+    id: number;
+    name: string;
+    gstNo: string | null;
+    phone: string | null;
+    address: string | null;
+    status: boolean;
 }

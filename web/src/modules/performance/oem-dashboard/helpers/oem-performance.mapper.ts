@@ -12,7 +12,19 @@ import type {
 // ─── Transform backend → component shape ─────────────────────────────────────
 
 export function mapOemPerformance(raw: OemPerformanceResponse): OemComponentData {
-    const { summary, notAllowedTenders, rfqsSentToOem, missedTenders, wonTenders, lostTenders, disqualifiedTenders, resultsAwaitedTenders, bidTenders, quotationReceivedTenders } = raw;
+    const {
+        summary,
+        notAllowedTenders,
+        rfqsSentToOem,
+        missedTenders,
+        wonTenders,
+        lostTenders,
+        cancelledTenders,
+        disqualifiedTenders,
+        resultsAwaitedTenders,
+        bidTenders,
+        quotationReceivedTenders,
+    } = raw;
 
     // Flat KPI counts — derived from the Laravel summary buckets
     const totalTendersWithOem = summary.tendersAssigned.count;
@@ -65,6 +77,7 @@ export function mapOemPerformance(raw: OemPerformanceResponse): OemComponentData
         total: totalItems,
         tendersWon: wonTenders ?? [],
         tendersLost: lostTenders ?? [],
+        tendersCancelled: cancelledTenders ?? [],
         tendersSubmitted: bidTenders ?? [],
         quotationReceived: quotationReceivedTenders ?? [],
         tendersNotAllowed: notAllowedTenders,
@@ -128,7 +141,6 @@ export const exportToCSV = (data: Record<string, unknown>[], filename: string, h
             headers
                 .map(h => {
                     const value = row[h.key];
-                    // Escape quotes and wrap in quotes if contains comma
                     const stringValue = String(value ?? "");
                     if (stringValue.includes(",") || stringValue.includes('"') || stringValue.includes("\n")) {
                         return `"${stringValue.replace(/"/g, '""')}"`;

@@ -1,5 +1,5 @@
 import { BaseApiService } from './base.service';
-import type { CreateSaleInvoiceDTO } from '@/modules/operations/sale-invoices/helpers/saleInvoice.types';
+import type { CreateSaleInvoiceDTO, WoBillingData } from '@/modules/operations/sale-invoices/helpers/saleInvoice.types';
 import axiosInstance from '@/lib/axios';
 
 class SaleInvoiceApiService extends BaseApiService {
@@ -7,8 +7,15 @@ class SaleInvoiceApiService extends BaseApiService {
         super('/sale-invoices');
     }
 
-    async getWoBillingData(projectId: number): Promise<any> {
+    async getWoBillingData(projectId: number): Promise<WoBillingData> {
         return this.get(`/wo-billing-data/${projectId}`);
+    }
+
+    async addWoAddress(
+        type: "billing" | "shipping",
+        data: { woDetailId: number; customerName: string; address: string; gst?: string },
+    ): Promise<any> {
+        return this.post(`/wo-addresses/${type}`, data);
     }
 
     async createSaleInvoice(data: CreateSaleInvoiceDTO): Promise<any> {
@@ -25,6 +32,17 @@ class SaleInvoiceApiService extends BaseApiService {
 
     async getSaleInvoiceById(id: number): Promise<any> {
         return this.get(`/${id}`);
+    }
+
+    async retryPdfGeneration(id: number): Promise<{ status: "generated" | "unchanged"; version?: string }> {
+        return this.post(`/${id}/pdf/retry`, {});
+    }
+
+    async updateBillingDetails(
+        id: number,
+        data: { billingCustomerName: string; billingAddress: string; billingGst: string },
+    ): Promise<any> {
+        return this.patch(`/${id}/billing-details`, data);
     }
 
     async updateSaleInvoiceStatus(id: number, data: { status: string; invoiceDocPaths?: string[] }): Promise<any> {

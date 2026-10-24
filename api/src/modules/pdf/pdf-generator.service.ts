@@ -4,7 +4,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as Handlebars from 'handlebars';
 import puppeteer, { Browser, Page } from 'puppeteer';
-import { PDF_CONFIG, getOutputBaseDir, getOutputPath, getRelativePath, getPaperSize, getPdfMargins } from './config/pdf-config';
+import { PDF_CONFIG, getOutputBaseDir, getOutputPath, getRelativePath, getPaperSize, getPdfMargins, isLandscape } from './config/pdf-config';
 
 @Injectable()
 export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
@@ -494,6 +494,9 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
 
             // Override margins with template-specific margins
             pdfOptions.margin = getPdfMargins(templateType);
+            if (isLandscape(templateType)) {
+                pdfOptions.landscape = true;
+            }
 
             // Override paper size if custom size is specified
             if (paperSize && typeof paperSize === 'object' && 'width' in paperSize && 'height' in paperSize) {

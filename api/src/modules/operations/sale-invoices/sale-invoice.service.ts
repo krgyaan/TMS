@@ -1,13 +1,12 @@
-import { Inject, Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
+import { Inject, Injectable, InternalServerErrorException, NotFoundException, BadRequestException } from "@nestjs/common";
 import { and, eq, desc, inArray, ne, sql } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
-import { rename } from "node:fs/promises";
+import { access, rename, unlink } from "node:fs/promises";
 import { join } from "node:path";
-
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
-
 import { projects } from "@/db/schemas/master/projects.schema";
+import { transporters } from "@/db/schemas/master/transporters.schema";
 import { users } from "@/db/schemas/auth/users.schema";
 import { woBasicDetails, woDetails, woBillingBoq, woBuybackBoq, woBillingAddresses, woShippingAddresses } from "@/db/schemas/operations/work-order.schema";
 import { saleInvoices, saleInvoiceItems } from "@/db/schemas/operations/sale-invoices.schema";
@@ -16,6 +15,147 @@ import { purchaseOrderProducts } from "@/db/schemas/operations/purchase-order-pr
 import { PdfGeneratorService } from "@/modules/pdf/pdf-generator.service";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
+import type { CreateSaleInvoiceDto } from "./dto/create-sale-invoice.dto";
+
+export const GST_STATE_NAMES: Record<string, string> = {
+    "01": "Jammu and Kashmir",
+    "02": "Himachal Pradesh",
+    "03": "Punjab",
+    "04": "Chandigarh",
+    "05": "Uttarakhand",
+    "06": "Haryana",
+    "07": "Delhi",
+    "08": "Rajasthan",
+    "09": "Uttar Pradesh",
+    "10": "Bihar",
+    "11": "Sikkim",
+    "12": "Arunachal Pradesh",
+    "13": "Nagaland",
+    "14": "Manipur",
+    "15": "Mizoram",
+    "16": "Tripura",
+    "17": "Meghalaya",
+    "18": "Assam",
+    "19": "West Bengal",
+    "20": "Jharkhand",
+    "21": "Odisha",
+    "22": "Chhattisgarh",
+    "23": "Madhya Pradesh",
+    "24": "Gujarat",
+    "25": "Daman and Diu",
+    "26": "Dadra and Nagar Haveli and Daman and Diu",
+    "27": "Maharashtra",
+    "28": "Andhra Pradesh",
+    "29": "Karnataka",
+    "30": "Goa",
+    "31": "Lakshadweep",
+    "32": "Kerala",
+    "33": "Tamil Nadu",
+    "34": "Puducherry",
+    "35": "Andaman and Nicobar Islands",
+    "36": "Telangana",
+    "37": "Andhra Pradesh",
+    "38": "Ladakh",
+    "97": "Other Territory",
+};
+
+export const getGstStateCode = (gstin: string | null | undefined): string | null => {
+    const normalized = gstin?.trim().toUpperCase() ?? "";
+    const match = /^(0[1-9]|[12][0-9]|3[0-8]|97)[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.exec(normalized);
+    if (!match) return null;
+
+    const characters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let factor = 2;
+    let sum = 0;
+    for (let index = normalized.length - 2; index >= 0; index--) {
+        const product = factor * characters.indexOf(normalized[index]);
+        sum += Math.floor(product / 36) + product % 36;
+        factor = factor === 2 ? 1 : 2;
+    }
+    const checksum = characters[(36 - (sum % 36)) % 36];
+    return checksum === normalized.at(-1) ? match[1] : null;
+};
+
+export const isValidGstin = (gstin: string): boolean => getGstStateCode(gstin) !== null;
+
+export const splitAddress = (address: string | null | undefined): [string, string, string] => {
+    const lines = (address ?? "").split(/[,\n]/).map((line) => line.trim()).filter(Boolean);
+    return [lines[0] ?? "", lines[1] ?? "", lines.slice(2).join(", ")];
+};
+
+export const buildSaleInvoicePdfItems = (
+    items: Array<{
+        srNo: number | null;
+        itemDescription: string | null;
+        quantity: string | number | null;
+        rate: string | number | null;
+        gstRate: string | number | null;
+        amount: string | number | null;
+        gstAmount: string | number | null;
+        totalAmount: string | number | null;
+        unit: string | null;
+        hsnSac: string | null;
+    }>,
+    isInterstate: boolean,
+) => items.map((item, index) => {
+    const quantity = Number(item.quantity ?? 0);
+    const rate = Number(item.rate ?? 0);
+    const gstRate = Number(item.gstRate ?? 0);
+    const taxableValue = Number(item.amount ?? quantity * rate);
+    const taxAmount = Number(item.gstAmount ?? (taxableValue * gstRate) / 100);
+    const igstAmount = isInterstate ? taxAmount : 0;
+    const cgstAmount = isInterstate ? 0 : Math.round((taxAmount / 2) * 100) / 100;
+    const sgstAmount = isInterstate ? 0 : taxAmount - cgstAmount;
+
+    return {
+        sr_no: item.srNo ?? index + 1,
+        description: item.itemDescription || "",
+        details_line1: "",
+        details_line2: "",
+        details_line3: "",
+        hsn_sac: item.hsnSac || "",
+        quantity,
+        rate,
+        unit: item.unit || "",
+        discount_percent: 0,
+        taxable_value: taxableValue,
+        gst_rate: gstRate,
+        igst_rate: isInterstate ? gstRate : 0,
+        igst_amount: igstAmount,
+        cgst_rate: isInterstate ? 0 : gstRate / 2,
+        cgst_amount: cgstAmount,
+        sgst_rate: isInterstate ? 0 : gstRate / 2,
+        sgst_amount: sgstAmount,
+        tax_amount: taxAmount,
+        total: Number(item.totalAmount ?? taxableValue + taxAmount),
+    };
+});
+
+export const buildSaleInvoiceTaxSummary = (
+    items: ReturnType<typeof buildSaleInvoicePdfItems>,
+): Array<{ rate: number; taxable_value: number; igst_amount: number; cgst_amount: number; sgst_amount: number; tax_amount: number }> => {
+    const groups = new Map<number, { rate: number; taxable_value: number; igst_amount: number; cgst_amount: number; sgst_amount: number; tax_amount: number }>();
+    for (const item of items) {
+        const group = groups.get(item.gst_rate) ?? {
+            rate: item.gst_rate,
+            taxable_value: 0,
+            igst_amount: 0,
+            cgst_amount: 0,
+            sgst_amount: 0,
+            tax_amount: 0,
+        };
+        group.taxable_value += item.taxable_value;
+        group.igst_amount += item.igst_amount;
+        group.cgst_amount += item.cgst_amount;
+        group.sgst_amount += item.sgst_amount;
+        group.tax_amount += item.tax_amount;
+        groups.set(item.gst_rate, group);
+    }
+    return [...groups.values()].sort((a, b) => a.rate - b.rate);
+};
+
+export const computeSaleInvoicePdfHash = (data: Record<string, unknown>): string =>
+    createHash("sha256").update(JSON.stringify({ templateRevision: 2, data })).digest("hex");
 
 @Injectable()
 export class SaleInvoiceService {
@@ -100,7 +240,7 @@ export class SaleInvoiceService {
         return `SI/${sanitizedName}/${fyString}/SI${String(seq).padStart(4, "0")}`;
     }
 
-    async create(body: any, userId: number) {
+    async create(body: CreateSaleInvoiceDto, userId: number) {
         const projectId = body.projectId;
 
         const [project] = await this.db
@@ -122,9 +262,37 @@ export class SaleInvoiceService {
 
         const invoiceNumber = await this.generateInvoiceNumber(project.projectName || undefined);
 
-        const linkedIds = (body.items || [])
-            .filter((i: any) => i.purchaseOrderProductId)
-            .map((i: any) => Number(i.purchaseOrderProductId));
+        // Validate BOQ line-item sr nos against this project's WO billing BOQ
+        if (body.woDetailId) {
+            const boqRows = await this.db
+                .select({ srNo: woBillingBoq.srNo })
+                .from(woBillingBoq)
+                .where(eq(woBillingBoq.woDetailId, body.woDetailId));
+            const validSrNos = new Set(boqRows.map((b) => b.srNo));
+            // An empty billing BOQ means there is nothing to map against (free-form
+            // line items, srNo 0 from the no-BOQ fallback in the create form) — skip.
+            if (validSrNos.size > 0) {
+                for (const item of body.items) {
+                    if (!validSrNos.has(item.lineItemSrNo)) {
+                        throw new BadRequestException(
+                            `Line item ${item.lineItemSrNo} does not exist in the WO Billing BOQ for this project`,
+                        );
+                    }
+                }
+            }
+        }
+
+        const linkedIds = body.items.map((i) => Number(i.purchaseOrderProductId));
+        const seenProductIds = new Set<number>();
+        for (const id of linkedIds) {
+            if (seenProductIds.has(id)) {
+                throw new BadRequestException(
+                    "The same PO item is mapped more than once - combine quantities into a single row",
+                );
+            }
+            seenProductIds.add(id);
+        }
+
         const poProductMap = new Map<number, any>();
         if (linkedIds.length > 0) {
             const poProducts = await this.db
@@ -147,7 +315,6 @@ export class SaleInvoiceService {
             poProducts.forEach((p) => poProductMap.set(p.id, p));
 
             for (const item of body.items) {
-                if (!item.purchaseOrderProductId) continue;
                 const prod = poProductMap.get(Number(item.purchaseOrderProductId));
                 if (!prod || prod.projectId !== projectId || prod.poApproved !== true) {
                     throw new BadRequestException(
@@ -157,9 +324,35 @@ export class SaleInvoiceService {
             }
         }
 
+        // Validate transporter (snapshot details so later master edits don't alter history)
+        let transporterSnapshot: { name?: string; phone?: string; gstNo?: string; address?: string } | null = null;
+        if (body.transporterId) {
+            const [transporter] = await this.db
+                .select()
+                .from(transporters)
+                .where(and(eq(transporters.id, body.transporterId), eq(transporters.status, true)));
+            if (!transporter) {
+                throw new BadRequestException("Selected transporter was not found or is inactive");
+            }
+            transporterSnapshot = {
+                name: transporter.name ?? undefined,
+                phone: transporter.phone ?? undefined,
+                gstNo: transporter.gstNo ?? undefined,
+                address: transporter.address ?? undefined,
+            };
+        }
+
         let totalPreGst = 0;
         let totalGst = 0;
-        let grandTotal = 0;
+        for (const item of body.items) {
+            const amount = Number(item.qty) * Number(item.rate);
+            totalPreGst += amount;
+            totalGst += (amount * Number(item.gstRate)) / 100;
+        }
+        const freight = Number(body.freight || 0);
+        const otherCharges = Number(body.otherCharges || 0);
+        const roundOff = Number(body.roundOff || 0);
+        const grandTotal = totalPreGst + totalGst + freight + otherCharges + roundOff;
 
         const si = (
             await this.db
@@ -177,10 +370,14 @@ export class SaleInvoiceService {
                     billingPanNo: body.billingPanNo || null,
                     billingMsmeNo: body.billingMsmeNo || null,
                     billingCinNo: body.billingCinNo || null,
+                    billingAddressId: body.billingAddressId ?? null,
                     shippingCustomerName: body.shippingCustomerName,
                     shippingAddress: body.shippingAddress,
                     shippingGst: body.shippingGst || null,
                     shippingPanNo: body.shippingPanNo || null,
+                    shippingAddressId: body.shippingAddressId ?? null,
+                    transporterId: body.transporterId ?? null,
+                    transporterDetails: transporterSnapshot,
                     dispatchFromName: body.dispatchFromName || null,
                     dispatchFromAddress: body.dispatchFromAddress || null,
                     dispatchFromGst: body.dispatchFromGst || null,
@@ -189,6 +386,9 @@ export class SaleInvoiceService {
                     dispatchToName: body.dispatchToName || null,
                     dispatchToAddress: body.dispatchToAddress || null,
                     dispatchToGst: body.dispatchToGst || null,
+                    freight: freight.toString(),
+                    otherCharges: otherCharges.toString(),
+                    roundOff: roundOff.toString(),
                     status: "oe_request",
                     raisedBy: userId,
                     team: teamId,
@@ -197,7 +397,7 @@ export class SaleInvoiceService {
                 .returning()
         )[0];
 
-        if (body.items && body.items.length > 0) {
+        if (body.items.length > 0) {
             for (const item of body.items) {
                 const qty = Number(item.qty);
                 const rate = Number(item.rate);
@@ -206,18 +406,15 @@ export class SaleInvoiceService {
                 const gstAmount = (amount * gstRate) / 100;
                 const totalAmount = amount + gstAmount;
 
-                totalPreGst += amount;
-                totalGst += gstAmount;
-                grandTotal += totalAmount;
-
-                const prod = item.purchaseOrderProductId ? poProductMap.get(Number(item.purchaseOrderProductId)) : null;
+                const prod = poProductMap.get(Number(item.purchaseOrderProductId));
 
                 await this.db.insert(saleInvoiceItems).values({
                     saleInvoiceId: si.id,
-                    purchaseOrderProductId: item.purchaseOrderProductId ? Number(item.purchaseOrderProductId) : null,
+                    purchaseOrderProductId: Number(item.purchaseOrderProductId),
+                    lineItemSrNo: item.lineItemSrNo,
                     unit: item.unit || prod?.unit || null,
                     hsnSac: item.hsnSac || prod?.hsnSac || null,
-                    srNo: item.srNo || null,
+                    srNo: item.srNo || item.lineItemSrNo || null,
                     itemDescription: item.itemDescription,
                     quantity: item.qty.toString(),
                     rate: item.rate.toString(),
@@ -240,7 +437,52 @@ export class SaleInvoiceService {
 
         this.logger.info(`Sale Invoice created: ${invoiceNumber}`);
 
-        return this.getById(si.id);
+        const created = await this.getById(si.id);
+        try {
+            const result = await this.generateSiPdf(created, created.items);
+            return { ...created, pdfGeneration: { status: result.generated ? "generated" : "unchanged", version: result.version } };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.error(`PDF generation failed for SI ${si.id}: ${message}`);
+            return { ...created, pdfGeneration: { status: "failed", message } };
+        }
+    }
+
+    async addWoAddress(
+        type: string,
+        body: { woDetailId: number; customerName: string; address: string; gst?: string },
+        userId: number,
+    ) {
+        if (type !== "billing" && type !== "shipping") {
+            throw new BadRequestException(`Address type must be "billing" or "shipping"`);
+        }
+        const woDetailId = Number(body.woDetailId);
+        const customerName = (body.customerName || "").trim();
+        const address = (body.address || "").trim();
+        if (!woDetailId) throw new BadRequestException("woDetailId is required");
+        if (!customerName) throw new BadRequestException("Customer name is required");
+        if (!address) throw new BadRequestException("Address is required");
+
+        const [woDetail] = await this.db
+            .select({ id: woDetails.id })
+            .from(woDetails)
+            .where(eq(woDetails.id, woDetailId));
+        if (!woDetail) throw new NotFoundException("Work order detail not found");
+
+        const table = type === "billing" ? woBillingAddresses : woShippingAddresses;
+        const [row] = await this.db
+            .insert(table)
+            .values({
+                woDetailId,
+                srNos: [],
+                customerName,
+                address,
+                gst: (body.gst || "").trim() || null,
+            })
+            .returning();
+
+        this.logger.info(`WO ${type} address #${row.id} added for woDetail ${woDetailId} by user ${userId}`);
+        return row;
     }
 
     async createDraft(id: number, userId: number) {
@@ -250,11 +492,6 @@ export class SaleInvoiceService {
         if (si.status !== "oe_request" && si.status !== "changes_requested") {
             throw new BadRequestException(`Cannot create draft from "${si.status}" status`);
         }
-
-        const items = await this.db
-            .select()
-            .from(saleInvoiceItems)
-            .where(eq(saleInvoiceItems.saleInvoiceId, id));
 
         const actionEntry = {
             action: "status_changed_to_draft",
@@ -274,10 +511,6 @@ export class SaleInvoiceService {
             .where(eq(saleInvoices.id, id))
             .returning();
 
-        this.generateSiPdf(updated, items).catch((err) => {
-            this.logger.error(`Failed to generate SI draft PDF for #${id}: ${err instanceof Error ? err.message : String(err)}`);
-        });
-
         this.logger.info(`Draft created for Sale Invoice #${id} by user ${userId}`);
         return this.getById(id);
     }
@@ -289,11 +522,6 @@ export class SaleInvoiceService {
         if (si.status !== "draft") {
             throw new BadRequestException(`Cannot approve invoice in "${si.status}" status. Only drafts can be approved.`);
         }
-
-        const items = await this.db
-            .select()
-            .from(saleInvoiceItems)
-            .where(eq(saleInvoiceItems.saleInvoiceId, id));
 
         const actionEntry = {
             action: "status_changed_to_approved",
@@ -313,10 +541,6 @@ export class SaleInvoiceService {
             })
             .where(eq(saleInvoices.id, id))
             .returning();
-
-        this.generateSiPdf(updated, items).catch((err) => {
-            this.logger.error(`Failed to generate SI final PDF for #${id}: ${err instanceof Error ? err.message : String(err)}`);
-        });
 
         this.logger.info(`Sale Invoice #${id} approved by user ${userId}`);
         return this.getById(id);
@@ -401,19 +625,32 @@ export class SaleInvoiceService {
             .from(saleInvoiceItems)
             .where(eq(saleInvoiceItems.saleInvoiceId, id));
 
-        const linkedItems = items.filter((it) => it.purchaseOrderProductId != null);
-        for (const item of linkedItems) {
+        // One PO item can be split across several BOQ line-item rows — validate the
+        // summed quantity per purchase order product, not per row.
+        const qtyByProduct = new Map<number, { qty: number; label: string }>();
+        for (const item of items) {
+            if (item.purchaseOrderProductId == null) continue;
+            const key = Number(item.purchaseOrderProductId);
+            const existing = qtyByProduct.get(key);
+            if (existing) {
+                existing.qty += Number(item.quantity);
+            } else {
+                qtyByProduct.set(key, { qty: Number(item.quantity), label: item.itemDescription || "" });
+            }
+        }
+
+        for (const [productId, { qty: requestedQty, label }] of qtyByProduct) {
             const [prod] = await this.db
                 .select({ qty: purchaseOrderProducts.qty })
                 .from(purchaseOrderProducts)
-                .where(eq(purchaseOrderProducts.id, item.purchaseOrderProductId!));
+                .where(eq(purchaseOrderProducts.id, productId));
             if (!prod) continue;
 
-            const invoicedQty = await this.getInvoicedQtyForProduct(item.purchaseOrderProductId!, id);
+            const invoicedQty = await this.getInvoicedQtyForProduct(productId, id);
             const remaining = Number(prod.qty) - invoicedQty;
-            if (Number(item.quantity) > remaining) {
+            if (requestedQty > remaining) {
                 throw new BadRequestException(
-                    `Cannot finalize invoice: "${item.itemDescription}" quantity ${item.quantity} exceeds remaining PO quantity ${Math.max(0, remaining)}`
+                    `Cannot finalize invoice: "${label}" quantity ${requestedQty} exceeds remaining PO quantity ${Math.max(0, remaining)}`
                 );
             }
         }
@@ -460,160 +697,208 @@ export class SaleInvoiceService {
         return Number(row?.qty || 0);
     }
 
-    private computeSIHash(si: any, items: any[]): string {
-        const fields = {
-            invoiceNumber: si.invoiceNumber,
-            invoiceDate: si.invoiceDate,
-            billingCustomerName: si.billingCustomerName,
-            billingAddress: si.billingAddress,
-            billingGst: si.billingGst,
-            shippingCustomerName: si.shippingCustomerName,
-            shippingAddress: si.shippingAddress,
-            shippingGst: si.shippingGst,
-            dispatchFromName: si.dispatchFromName,
-            dispatchFromAddress: si.dispatchFromAddress,
-            dispatchFromGst: si.dispatchFromGst,
-            dispatchVehicleNo: si.dispatchVehicleNo,
-            dispatchLrNo: si.dispatchLrNo,
-            dispatchToName: si.dispatchToName,
-            dispatchToAddress: si.dispatchToAddress,
-            dispatchToGst: si.dispatchToGst,
-            remarks: si.remarks,
-            items: (items || []).map((it: any) => ({
-                srNo: it.srNo,
-                itemDescription: it.itemDescription,
-                quantity: it.quantity,
-                rate: it.rate,
-                gstRate: it.gstRate,
-                unit: it.unit,
-                hsnSac: it.hsnSac,
-            })),
-        };
-        return createHash("sha256").update(JSON.stringify(fields)).digest("hex");
-    }
-
-    private async generateSiPdf(si: any, items: any[]) {
-        const contentHash = this.computeSIHash(si, items);
-
-        const versions = (si.generatedPdfVersions ?? {}) as Record<string, { path: string; hash: string }>;
-        const existingVersion = Object.values(versions).find((v) => v.hash === contentHash);
-        if (existingVersion) {
-            this.logger.info(`SI ${si.id}: no changes detected, reusing existing PDF`);
-            return;
-        }
-
-        const linkedProductIds = (items || [])
-            .filter((it: any) => it.purchaseOrderProductId != null)
-            .map((it: any) => Number(it.purchaseOrderProductId));
-
-        let poNumbers: string[] = [];
-        if (linkedProductIds.length > 0) {
-            const poRows = await this.db
-                .select({ poNumber: purchaseOrders.poNumber })
-                .from(purchaseOrderProducts)
-                .innerJoin(purchaseOrders, eq(purchaseOrders.id, purchaseOrderProducts.purchaseOrderId))
-                .where(inArray(purchaseOrderProducts.id, linkedProductIds));
-            poNumbers = [...new Set(poRows.map((r) => r.poNumber).filter((n): n is string => Boolean(n)))];
+    private async buildSiPdfData(si: any, items: any[]) {
+        const buyerStateCode = getGstStateCode(si.billingGst);
+        const buyerState = buyerStateCode ? GST_STATE_NAMES[buyerStateCode] : undefined;
+        if (!buyerStateCode || !buyerState) {
+            throw new BadRequestException("A valid billing GSTIN is required to generate the invoice PDF");
         }
 
         const [project] = await this.db
-            .select({ projectName: projects.projectName })
+            .select({
+                projectName: projects.projectName,
+                projectCode: projects.projectCode,
+                poNo: projects.poNo,
+                poDate: projects.poDate,
+            })
             .from(projects)
             .where(eq(projects.id, si.projectId));
+        const [creator] = si.raisedBy
+            ? await this.db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, si.raisedBy))
+            : [];
+        const billingAddress = splitAddress(si.billingAddress);
+        const shippingAddress = splitAddress(si.shippingAddress);
+        const dispatchAddress = splitAddress(si.dispatchFromAddress);
+        const isInterstate = buyerStateCode !== "07";
+        const rows = buildSaleInvoicePdfItems(items, isInterstate);
 
-        const rows = (items || []).map((it: any, i: number) => {
-            const qty = Number(it.quantity);
-            const rate = Number(it.rate);
-            const gstRate = Number(it.gstRate);
-            const amount = qty * rate;
-            const gstAmount = (amount * gstRate) / 100;
-            const total = amount + gstAmount;
-            return {
-                sr_no: it.srNo ?? i + 1,
-                description: it.itemDescription || "",
-                unit: it.unit || "",
-                quantity: qty,
-                rate,
-                amount,
-                gst_rate: gstRate,
-                gst_amount: gstAmount,
-                total,
-                hsn_sac: it.hsnSac || "",
-            };
-        });
-
-        const totalAmount = rows.reduce((s: number, i: any) => s + i.amount, 0);
-        const totalGstAmt = rows.reduce((s: number, i: any) => s + i.gst_amount, 0);
-        const grandTotal = totalAmount + totalGstAmt;
-
+        const totalQuantity = rows.reduce((sum, item) => sum + item.quantity, 0);
+        const lineItemSubtotal = rows.reduce((sum, item) => sum + item.total, 0);
+        const totalTaxableValue = rows.reduce((sum, item) => sum + item.taxable_value, 0);
+        const totalIgst = rows.reduce((sum, item) => sum + item.igst_amount, 0);
+        const totalCgst = rows.reduce((sum, item) => sum + item.cgst_amount, 0);
+        const totalSgst = rows.reduce((sum, item) => sum + item.sgst_amount, 0);
+        const totalTax = totalIgst + totalCgst + totalSgst;
+        const freight = Number(si.freight ?? 0);
+        const otherCharges = Number(si.otherCharges ?? 0);
+        const roundOff = Number(si.roundOff ?? 0);
+        const grandTotal = Number(si.grandTotal ?? totalTaxableValue + totalTax + freight + otherCharges + roundOff);
+        const transporter = (si.transporterDetails ?? {}) as { name?: string; gstNo?: string; phone?: string };
+        const dispatchStateCode = getGstStateCode(si.dispatchFromGst);
         const data = {
             invoice_number: si.invoiceNumber || "",
             invoice_date: si.invoiceDate || "",
+            irn: "",
+            ack_number: "",
+            ack_date: "",
+            qr_code_base64: "",
+            seller_name: "Volks Energie Pvt. Ltd.",
+            seller_address_line1: "",
+            seller_address_line2: "",
+            seller_city_state_pin: "",
+            seller_udyam: "",
+            seller_gst: "",
+            seller_state: "Delhi",
+            seller_state_code: "07",
+            seller_cin: "",
+            buyer_order_number: project?.poNo || "",
+            buyer_order_date: project?.poDate || "",
+            project_code: project?.projectCode || "",
             project_name: project?.projectName || "",
-            po_number: poNumbers.join(", "),
-            billing_name: si.billingCustomerName || "",
-            billing_address: si.billingAddress || "",
-            billing_gst: si.billingGst || "",
-            billing_email: si.billingEmail || "",
-            billing_pan_no: si.billingPanNo || "",
-            billing_msme_no: si.billingMsmeNo || "",
-            billing_cin_no: si.billingCinNo || "",
-            shipping_name: si.shippingCustomerName || "",
-            shipping_address: si.shippingAddress || "",
-            shipping_gst: si.shippingGst || "",
-            shipping_pan_no: si.shippingPanNo || "",
+            project_manager: "",
+            project_manager_phone: "",
+            project_manager_email: "",
+            transporter_name: transporter.name || "",
+            transporter_gst: transporter.gstNo || "",
+            transporter_phone: transporter.phone || "",
+            bill_of_lading_number: si.dispatchLrNo || "",
+            vehicle_number: si.dispatchVehicleNo || "",
+            buyer_name: si.billingCustomerName || "",
+            buyer_address_line1: billingAddress[0],
+            buyer_address_line2: billingAddress[1],
+            buyer_address_line3: billingAddress[2],
+            buyer_pin: "",
+            buyer_gst: si.billingGst || "",
+            buyer_pan: si.billingPanNo || "",
+            buyer_state: buyerState,
+            buyer_contact_person: "",
+            buyer_phone: "",
+            consignee_name: si.shippingCustomerName || "",
+            consignee_address_line1: shippingAddress[0],
+            consignee_address_line2: shippingAddress[1],
+            consignee_address_line3: shippingAddress[2],
+            consignee_address_line4: "",
+            consignee_address_line5: "",
+            consignee_pin: "",
+            consignee_gst: si.shippingGst || "",
+            consignee_pan: si.shippingPanNo || "",
+            consignee_state: GST_STATE_NAMES[getGstStateCode(si.shippingGst) || ""] || "",
             dispatch_from_name: si.dispatchFromName || "",
-            dispatch_from_address: si.dispatchFromAddress || "",
-            dispatch_from_gst: si.dispatchFromGst || "",
-            dispatch_vehicle_no: si.dispatchVehicleNo || "",
-            dispatch_lr_no: si.dispatchLrNo || "",
-            dispatch_to_name: si.dispatchToName || "",
-            dispatch_to_address: si.dispatchToAddress || "",
-            dispatch_to_gst: si.dispatchToGst || "",
+            dispatch_address_line1: dispatchAddress[0],
+            dispatch_address_line2: dispatchAddress[1],
+            dispatch_address_line3: dispatchAddress[2],
+            dispatch_pin: "",
+            dispatch_gst: si.dispatchFromGst || "",
+            dispatch_pan: "",
+            dispatch_state: GST_STATE_NAMES[dispatchStateCode || ""] || "",
+            dispatch_contact_person: "",
+            dispatch_phone: "",
+            is_interstate: isInterstate,
             items: rows,
-            total_amount: totalAmount,
-            total_gst_amt: totalGstAmt,
+            tax_breakdown: buildSaleInvoiceTaxSummary(rows),
+            quantity: totalQuantity,
+            line_item_subtotal: lineItemSubtotal,
+            taxable_value: totalTaxableValue,
+            igst_rate: isInterstate && totalTaxableValue > 0 ? (totalIgst / totalTaxableValue) * 100 : 0,
+            igst_amount: totalIgst,
+            cgst_rate: !isInterstate && totalTaxableValue > 0 ? (totalCgst / totalTaxableValue) * 100 : 0,
+            cgst_amount: totalCgst,
+            sgst_rate: !isInterstate && totalTaxableValue > 0 ? (totalSgst / totalTaxableValue) * 100 : 0,
+            sgst_amount: totalSgst,
+            total_tax_amount: totalTax,
+            freight,
+            other_charges: otherCharges,
+            round_off: roundOff,
             grand_total: grandTotal,
-            grand_total_in_words: this.pdfGenerator.grandTotalInWords(grandTotal),
-            is_draft: si.status !== "approved" && si.status !== "invoiced",
-            revision: Object.keys(versions).length + 1,
+            amount_in_words: this.pdfGenerator.grandTotalInWords(grandTotal),
+            tax_amount_in_words: this.pdfGenerator.grandTotalInWords(totalTax),
+            company_pan: "",
+            bank_name: "",
+            bank_account_number: "",
+            bank_branch_ifsc: "",
+            prepared_by_name: creator?.name || "",
+            prepared_by_email: creator?.email || "",
+            prepared_by_phone: "",
+            approved_by_name: "",
+            approved_by_email: "",
+            approved_by_phone: "",
             remarks: si.remarks || "",
         };
 
-        try {
-            const pdfPaths = await this.pdfGenerator.generatePdfs('si', data, si.id, 'SI');
-            if (pdfPaths.length > 0) {
-                const siSeq = si.invoiceNumber?.split('/').pop() || `SI${si.id}`;
-                const rand = randomUUID().split('-')[0];
-                const newFileName = `${siSeq}-${rand}.pdf`;
-                const storageDir = 'operations/si';
+        return data;
+    }
 
-                const oldPath = join(process.cwd(), 'uploads', pdfPaths[0]);
-                const newPath = join(process.cwd(), 'uploads', storageDir, newFileName);
+    private computeSIHash(data: Record<string, unknown>): string {
+        return computeSaleInvoicePdfHash(data);
+    }
 
-                for (let attempt = 0; attempt < 3; attempt++) {
-                    try { await rename(oldPath, newPath); break; }
-                    catch (e) {
-                        if ((e as NodeJS.ErrnoException).code !== 'ENOENT' || attempt === 2) throw e;
-                        await new Promise(r => setTimeout(r, 200 * (attempt + 1)));
-                    }
-                }
-
-                const finalPath = `${storageDir}/${newFileName}`;
-
-                const now = new Date();
-                const label = `v-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}-${String(now.getSeconds()).padStart(2, "0")}`;
-
-                const updatedVersions = { ...versions, [label]: { path: finalPath, hash: contentHash } };
-
+    private async generateSiPdf(si: any, items: any[]): Promise<{ generated: boolean; version?: string }> {
+        const data = await this.buildSiPdfData(si, items);
+        const contentHash = this.computeSIHash(data);
+        const versions = (si.generatedPdfVersions ?? {}) as Record<string, { path: string; hash: string }>;
+        const existingVersion = Object.entries(versions).find(([, version]) => version.hash === contentHash);
+        if (existingVersion) {
+            try {
+                await access(join(process.cwd(), "uploads", existingVersion[1].path));
+                this.logger.info(`SI ${si.id}: no changes detected, reusing existing PDF`);
+                return { generated: false };
+            } catch (error) {
+                if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
                 await this.db
                     .update(saleInvoices)
-                    .set({ generatedPdfVersions: updatedVersions })
+                    .set({ generatedPdfVersions: sql`COALESCE(${saleInvoices.generatedPdfVersions}, '{}'::jsonb) - ${existingVersion[0]}` })
                     .where(eq(saleInvoices.id, si.id));
             }
-        } catch (error) {
-            this.logger.error(`PDF generation failed for SI ${si.id}: ${error instanceof Error ? error.message : String(error)}`);
         }
+
+        const pdfPaths = await this.pdfGenerator.generatePdfs("si", data, si.id, "SI");
+        const siSequence = si.invoiceNumber?.split("/").pop() || `SI${si.id}`;
+        const fileName = `${siSequence}-${randomUUID().slice(0, 8)}.pdf`;
+        const storageDir = "operations/si";
+        const oldPath = join(process.cwd(), "uploads", pdfPaths[0]);
+        const newPath = join(process.cwd(), "uploads", storageDir, fileName);
+
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                await rename(oldPath, newPath);
+                break;
+            } catch (error) {
+                if ((error as NodeJS.ErrnoException).code !== "ENOENT" || attempt === 2) throw error;
+                await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)));
+            }
+        }
+
+        const now = new Date();
+        const label = `v-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}-${String(now.getSeconds()).padStart(2, "0")}-${String(now.getMilliseconds()).padStart(3, "0")}-${randomUUID().slice(0, 8)}`;
+        const version = { path: `${storageDir}/${fileName}`, hash: contentHash };
+
+        let stored: { id: number } | undefined;
+        try {
+            [stored] = await this.db
+                .update(saleInvoices)
+                .set({
+                    generatedPdfVersions: sql`COALESCE(${saleInvoices.generatedPdfVersions}, '{}'::jsonb) || ${JSON.stringify({ [label]: version })}::jsonb`,
+                })
+                .where(and(
+                    eq(saleInvoices.id, si.id),
+                    sql`NOT EXISTS (
+                        SELECT 1 FROM jsonb_each(${saleInvoices.generatedPdfVersions}) AS entry
+                        WHERE entry.value->>'hash' = ${contentHash}
+                    )`,
+                ))
+                .returning({ id: saleInvoices.id });
+        } catch (error) {
+            await unlink(newPath).catch(() => undefined);
+            throw error;
+        }
+
+        if (!stored) {
+            await unlink(newPath).catch(() => undefined);
+            this.logger.info(`SI ${si.id}: concurrent generation stored identical content`);
+            return { generated: false };
+        }
+
+        return { generated: true, version: label };
     }
 
     async getSaleInvoicePdf(id: number, version?: string): Promise<{ path: string; filename: string }> {
@@ -631,9 +916,7 @@ export class SaleInvoiceService {
             };
         }
 
-        const sorted = Object.entries(versions).sort((a, b) =>
-            this.parseLabelDate(b[0]).getTime() - this.parseLabelDate(a[0]).getTime()
-        );
+        const sorted = Object.entries(versions).sort(([a], [b]) => b.localeCompare(a));
         if (sorted.length === 0) throw new NotFoundException("No PDF versions found for this Sale Invoice");
         const [latestLabel, latestEntry] = sorted[0];
         return {
@@ -654,22 +937,27 @@ export class SaleInvoiceService {
 
         const versions = (si.generatedPdfVersions ?? {}) as Record<string, { path: string; hash: string }>;
         if (!versions[version]) throw new NotFoundException(`PDF version "${version}" not found`);
-
-        delete versions[version];
-
-        await this.db
-            .update(saleInvoices)
-            .set({ generatedPdfVersions: versions })
-            .where(eq(saleInvoices.id, id));
-    }
-
-    private parseLabelDate(label: string): Date {
-        const match = label.match(/^v-(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})$/);
-        if (match) {
-            const [, y, m, d, h, min, s] = match.map(Number);
-            return new Date(y, m - 1, d, h, min, s);
+        if (version === Object.keys(versions).sort().at(-1)) {
+            throw new BadRequestException("The latest PDF version cannot be deleted");
         }
-        return new Date(0);
+
+        const [updated] = await this.db
+            .update(saleInvoices)
+            .set({ generatedPdfVersions: sql`${saleInvoices.generatedPdfVersions} - ${version}` })
+            .where(and(
+                eq(saleInvoices.id, id),
+                sql`jsonb_exists(COALESCE(${saleInvoices.generatedPdfVersions}, '{}'::jsonb), ${version})`,
+                sql`NOT EXISTS (
+                    SELECT 1 FROM jsonb_object_keys(COALESCE(${saleInvoices.generatedPdfVersions}, '{}'::jsonb)) AS keys(key)
+                    WHERE keys.key > ${version}
+                )`,
+            ))
+            .returning({ id: saleInvoices.id });
+        if (!updated) throw new BadRequestException("The latest PDF version cannot be deleted");
+
+        await unlink(join(process.cwd(), "uploads", versions[version].path)).catch((error) => {
+            this.logger.warn(`Failed to remove SI ${id} PDF version file: ${error instanceof Error ? error.message : String(error)}`);
+        });
     }
 
     async getAll() {
@@ -852,6 +1140,62 @@ export class SaleInvoiceService {
         return updated;
     }
 
+    async updateBillingDetails(
+        id: number,
+        body: { billingCustomerName: string; billingAddress: string; billingGst: string },
+        userId: number,
+    ) {
+        const [existing] = await this.db.select().from(saleInvoices).where(eq(saleInvoices.id, id));
+        if (!existing) throw new NotFoundException("Sale invoice not found");
+        if (!["oe_request", "draft", "changes_requested"].includes(existing.status ?? "oe_request")) {
+            throw new BadRequestException("Billing details can only be corrected before invoice approval");
+        }
+
+        const actionEntry = {
+            action: "billing_details_corrected",
+            data: body,
+            updatedBy: userId,
+            updatedAt: new Date().toISOString(),
+        };
+        const [updated] = await this.db
+            .update(saleInvoices)
+            .set({
+                billingCustomerName: body.billingCustomerName,
+                billingAddress: body.billingAddress,
+                billingGst: body.billingGst,
+                updatedAt: new Date(),
+                actionLogs: [...(existing.actionLogs ?? []), actionEntry],
+            })
+            .where(eq(saleInvoices.id, id))
+            .returning();
+
+        const items = await this.db.select().from(saleInvoiceItems).where(eq(saleInvoiceItems.saleInvoiceId, id));
+        try {
+            const result = await this.generateSiPdf(updated, items);
+            return { ...updated, pdfGeneration: { status: result.generated ? "generated" : "unchanged", version: result.version } };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.error(`PDF generation failed after correcting SI ${id}: ${message}`);
+            return { ...updated, pdfGeneration: { status: "failed", message } };
+        }
+    }
+
+    async retryPdfGeneration(id: number) {
+        const [si] = await this.db.select().from(saleInvoices).where(eq(saleInvoices.id, id));
+        if (!si) throw new NotFoundException("Sale invoice not found");
+        const items = await this.db.select().from(saleInvoiceItems).where(eq(saleInvoiceItems.saleInvoiceId, id));
+
+        try {
+            const result = await this.generateSiPdf(si, items);
+            return { status: result.generated ? "generated" : "unchanged", version: result.version };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.error(`PDF generation retry failed for SI ${id}: ${message}`);
+            if (error instanceof BadRequestException) throw error;
+            throw new InternalServerErrorException("Invoice PDF generation failed. Please retry.");
+        }
+    }
+
     async getByProject(projectId: number) {
         const rows = await this.db
             .select()
@@ -877,10 +1221,14 @@ export class SaleInvoiceService {
                 billingPanNo: saleInvoices.billingPanNo,
                 billingMsmeNo: saleInvoices.billingMsmeNo,
                 billingCinNo: saleInvoices.billingCinNo,
+                billingAddressId: saleInvoices.billingAddressId,
                 shippingCustomerName: saleInvoices.shippingCustomerName,
                 shippingAddress: saleInvoices.shippingAddress,
                 shippingGst: saleInvoices.shippingGst,
                 shippingPanNo: saleInvoices.shippingPanNo,
+                shippingAddressId: saleInvoices.shippingAddressId,
+                transporterId: saleInvoices.transporterId,
+                transporterDetails: saleInvoices.transporterDetails,
                 dispatchFromName: saleInvoices.dispatchFromName,
                 dispatchFromAddress: saleInvoices.dispatchFromAddress,
                 dispatchFromGst: saleInvoices.dispatchFromGst,
@@ -891,6 +1239,9 @@ export class SaleInvoiceService {
                 dispatchToGst: saleInvoices.dispatchToGst,
                 totalPreGst: saleInvoices.totalPreGst,
                 totalGst: saleInvoices.totalGst,
+                freight: saleInvoices.freight,
+                otherCharges: saleInvoices.otherCharges,
+                roundOff: saleInvoices.roundOff,
                 grandTotal: saleInvoices.grandTotal,
                 invoiceTaxableAmount: saleInvoices.invoiceTaxableAmount,
                 invoiceIgst: saleInvoices.invoiceIgst,
@@ -950,6 +1301,7 @@ export class SaleInvoiceService {
                 id: saleInvoiceItems.id,
                 saleInvoiceId: saleInvoiceItems.saleInvoiceId,
                 purchaseOrderProductId: saleInvoiceItems.purchaseOrderProductId,
+                lineItemSrNo: saleInvoiceItems.lineItemSrNo,
                 unit: saleInvoiceItems.unit,
                 hsnSac: saleInvoiceItems.hsnSac,
                 srNo: saleInvoiceItems.srNo,
