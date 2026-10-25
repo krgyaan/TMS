@@ -33,6 +33,7 @@ import { RemarkDialog } from "./components/RemarkDialog";
 import { SummaryCards } from "./components/SummaryCards";
 import { mapProofFiles } from "./helpers/imprest.mapper";
 import type { ImprestRow, ProofItem } from "./helpers/imprest.types";
+import { getImprestPaginationMeta } from "./imprestPagination";
 
 /** Inline Status Toggle */
 const StatusToggle: React.FC<{
@@ -157,6 +158,10 @@ const UserImprestsPage: React.FC = () => {
     const summary = data?.summary;
     const rows = data?.imprests?.data ?? [];
     const totalRows = data?.imprests?.meta?.total ?? 0;
+    const paginationMeta = useMemo(
+        () => getImprestPaginationMeta({ pageIndex: pagination.pageIndex, pageSize: pagination.pageSize, totalRows }),
+        [pagination.pageIndex, pagination.pageSize, totalRows]
+    );
     const deleteMutation = useDeleteImprest();
     const uploadProofsMutation = useUploadImprestProofs();
     const approveMutation = useApproveImprest();
@@ -647,6 +652,36 @@ const UserImprestsPage: React.FC = () => {
                         {rows.map(row => (
                             <ImprestMobileCard key={row.id} row={row} />
                         ))}
+
+                        {totalRows > 0 && (
+                            <div className="mt-4 flex items-center justify-between gap-3 border-t pt-3">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={!paginationMeta.hasPrev || isLoading}
+                                    onClick={() => setPagination(p => ({ ...p, pageIndex: Math.max(0, p.pageIndex - 1) }))}
+                                    className="flex-1"
+                                >
+                                    Previous
+                                </Button>
+
+                                <span className="text-xs font-medium text-muted-foreground">
+                                    {paginationMeta.totalPages > 0 ? `${paginationMeta.currentPage}/${paginationMeta.totalPages}` : "0/0"}
+                                </span>
+
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={!paginationMeta.hasNext || isLoading}
+                                    onClick={() => setPagination(p => ({ ...p, pageIndex: p.pageIndex + 1 }))}
+                                    className="flex-1"
+                                >
+                                    Next
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <DataTable
