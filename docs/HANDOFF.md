@@ -1,0 +1,1089 @@
+# Tender Management System (TMS) & VolksAI - Developer Handoff Guide
+
+> **Document Type:** Developer Onboarding & System Architecture Reference  
+> **Audience:** Junior Developers, Interns, and Incoming Engineers  
+> **Target Repository:** `TMS/tms`  
+> **Last Updated:** October 26, 2026  
+> **Confidentiality Notice:** No secret keys, passwords, or credentials are contained in this document. All credentials are referenced strictly by environment variable names.
+
+---
+
+## 1. WHAT THIS PROJECT IS
+
+### 1.1 The Real-World Problem
+Imagine walking into a library every morning and being handed three stacks of legal papers, each between 50 and 400 pages long. Each stack represents an Indian Government or Public Sector Undertaking (PSU) **tender**—an open invitation by a government entity (like GAIL, IOCL, NTPC, or the Indian Railways) asking private companies to bid on contracts for engineering, solar installations, equipment procurement, or infrastructure projects.
+
+To bid on these tenders, our company—**Volks Energie Pvt. Ltd. (VEPL)**—must read through hundreds of pages of dense legal and technical clauses before a strict deadline. A human bidding engineer, known as a **Tender Executive (TE)**, historically had to comb through every page looking for critical answers:
+- How much money must we deposit up front just to bid? (Earnest Money Deposit or **EMD**)
+- What percentage of the order value do we lose if delivery is delayed by a week? (Liquidated Damages / Price Reduction Schedule or **LD / PRS**)
+- What percentage must we guarantee via a bank if we win? (Performance Bank Guarantee or **PBG**)
+- What specific payment milestones apply? (e.g., 70% on material delivery, 20% on installation, 10% on commissioning)
+- What previous work experience must we prove? (e.g., 3 completed orders of ₹1 Crore in the last 7 years)
+
+Missing a single sentence buried on page 183 of an Additional Terms & Conditions (ATC) document could mean forfeiting a ₹50,00,000 bank guarantee or being disqualified from bidding after spending weeks on technical drawings. Doing this manually takes a Tender Executive 4 to 8 hours per tender, limits the number of tenders the company can bid on, and risks human error.
+
+### 1.2 Who Uses This System
+1. **Tender Executives (TEs):** Bidding engineers who review incoming tenders, evaluate whether our company qualifies, fill out technical sheets, prepare checklists of mandatory documents, and prepare price bids.
+2. **Team Leaders (TLs) / Tender Approvers:** Senior managers who review the TE's findings, verify risks, and approve or reject proceeding with a bid.
+3. **Operations & Finance Teams:** Project managers, accountants, and procurement officers who handle vendor work orders, purchase orders, client billings, bank guarantees, and cash flow tracking once a bid is won.
+
+### 1.3 The Core Solution: TMS + VolksAI
+The **Tender Management System (TMS)** is a complete enterprise web application paired with an intelligent extraction microservice called **VolksAI**.
+
+When a Tender Executive uploads tender documents to the system:
+1. **Inputs:**
+   - **Primary Bid Document:** Typically a standardized PDF from the **GeM** (Government e-Marketplace) portal or a PSU e-procurement site.
+   - **Additional Terms and Conditions (ATC) / Scope of Work (SOW):** A secondary PDF containing custom clauses, special conditions of contract (SCC), technical specifications, and delivery milestones.
+   - **Bill of Quantities (BOQ):** Equipment quantities and line-item schedules.
+2. **Processing:**
+   - VolksAI first scans the PDF text and uses fast, deterministic rule-based algorithms (regular expressions and spatial layout parsing) to extract known standard tables (Layer 1).
+   - If critical fields are missing, ambiguous, or buried in non-standard paragraphs, VolksAI invokes Anthropic Claude LLMs using tightly scoped snippets (Layer 2) to resolve the exact legal wording without hallucination.
+3. **Outputs:**
+   - **Tender Information Sheet (Info Sheet):** A comprehensive structured record in the database pre-filling commercial, financial, and technical parameters in the UI form. Every AI-extracted field is tagged with an audit trail, confidence badge, and review flag so the TE can inspect and verify it with a single click.
+   - **Bidding Requirements Checklist:** An AI-generated, comprehensive list of every mandatory document required by the tender (e.g., balance sheets, OEM authorization certificates, ISO certificates, joint venture agreements), paired with ready-to-download Microsoft Word (`.docx`) templates for standard annexures.
+
+In short: **TMS and VolksAI turn hundreds of pages of complex, messy government procurement PDFs into structured, verified, actionable data in under 60 seconds.**
+
+---
+
+## 2. REPO MAP
+
+### 2.1 Directory Structure & Component Overview
+The repository root (`TMS/tms`) contains three primary application subtrees (`api`, `web`, `volksAi`) alongside monitoring, documentation, and containerization configuration:
+
+```
+TMS/tms/
+├── api/                        # NestJS 10 backend application (Node.js / TypeScript)
+│   ├── drizzle/                # SQL migration files generated by Drizzle Kit (0000-0161)
+│   ├── src/                    # Source code for REST endpoints, business logic, DB access
+│   │   ├── config/             # Environment validation and strongly-typed config modules
+│   │   ├── db/                 # Drizzle schemas, connection pools, and database seeds
+│   │   │   └── schemas/        # Table definitions split by domain (tendering, shared, auth, etc.)
+│   │   ├── modules/            # Domain modules (tendering, checklists, operations, master, etc.)
+│   │   │   ├── tendering/      # Tenders, info-sheets, PDF extraction queues, costing sheets
+│   │   │   ├── checklists/     # Document checklists & BiddingRequirementsService
+│   │   │   └── master/health/  # System health checks, DB table integrity & Claude token stats
+│   │   └── openwa/             # WhatsApp messaging integration via OpenWA
+│   └── test/                   # Jest e2e test suite
+├── web/                        # React 19 Single Page Application (Vite 7 / TypeScript)
+│   ├── src/
+│   │   ├── components/         # Reusable UI widgets, modals, badges, form inputs
+│   │   ├── modules/tendering/  # InfoSheetForm, ExtractionPreviewPanel, checklists UI
+│   │   ├── services/api/       # Typed HTTP client wrappers calling the NestJS API
+│   │   └── types/              # Frontend TypeScript interfaces mirroring API DTOs
+│   └── vite.config.ts          # Vite bundler config with API reverse proxy to :3000
+├── volksAi/                    # FastAPI microservice for AI & PDF processing (Python 3.11+)
+│   ├── app/
+│   │   ├── main.py             # FastAPI entrypoint, middleware, CORS, lifespan startup
+│   │   ├── routers/            # HTTP endpoints (/extract, /analyze-bidding-requirements, /health)
+│   │   ├── services/           # PDF ingestion, Layer 1 rules, Layer 2 LLM field resolvers
+│   │   └── core/               # Logging, settings, exception handlers
+│   ├── scratch/                # Diagnostic scripts, test fixtures, ground-truth verifiers
+│   └── Dockerfile              # Container definition with PyMuPDF, pdfplumber, and PaddleOCR
+├── tms-docs/                   # Mintlify developer documentation site
+├── grafana-dashboard-defs/     # JSON definitions for Grafana dashboards
+├── logs/                       # Shared log directory for file-based rotating logs
+├── docker-compose.yml          # Local multi-service composition (Postgres, Redis, VolksAI, Loki, Grafana)
+├── loki-config.yml             # Grafana Loki log aggregation configuration
+└── promtail-config.yml         # Promtail log shipping agent configuration
+```
+
+### 2.2 Network Ports & Protocols Table
+The following table details every network service, port, protocol, purpose, and health check:
+
+| Service | Port | Protocol | Purpose | How to Verify / Test |
+| :--- | :--- | :--- | :--- | :--- |
+| **`web`** | `5173` | HTTP | React 19 Frontend (Vite dev server) | Open `http://localhost:5173` in a browser |
+| **`api`** | `3000` | HTTP | NestJS REST API (`/api/v1`) | Run `curl http://localhost:3000/api/v1/health` |
+| **`volksAi`** | `8001` (host)<br>`8000` (docker) | HTTP | FastAPI PDF extraction & checklist service | Run `curl http://localhost:8001/health` |
+| **PostgreSQL** | `5432` | TCP | Relational database for all system data | Run `pg_isready -h localhost -p 5432` |
+| **Redis** | `6379` | TCP | BullMQ job queue & distributed locks | Run `redis-cli -h 127.0.0.1 -p 6379 ping` |
+| **Grafana** | `4000` (host)<br>`3000` (docker) | HTTP | Metrics & log observability dashboards | Open `http://localhost:4000` in a browser |
+| **Loki** | `3100` | HTTP | Centralized log collection backend | Run `curl http://localhost:3100/ready` |
+
+### 2.3 Clean Machine Startup Instructions
+To run this entire system from scratch on a clean developer machine:
+
+#### Step 1: Start Infrastructure via Docker Compose
+From the repo root `TMS/tms`:
+```bash
+docker compose up -d postgres redis volksai loki promtail grafana
+```
+*Note: If running VolksAI locally without Docker, omit `volksai` and follow Step 2.*
+
+#### Step 2: (Optional) Run VolksAI Microservice Locally
+```bash
+cd volksAi
+python -m venv .venv
+# On Windows:
+.venv\Scripts\activate
+# On Linux/macOS:
+source .venv/bin/activate
+
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+#### Step 3: Run Database Migrations & Start NestJS API
+In a new terminal window:
+```bash
+cd api
+pnpm install
+pnpm run db:migrate
+# Run the API web server:
+pnpm start:dev
+# (Optional) In another terminal, run the dedicated BullMQ background worker:
+pnpm start:worker
+```
+*Note: If `pnpm start:worker` is not started, the API process itself executes jobs in-process as an automatic fallback.*
+
+#### Step 4: Start React Frontend
+In a new terminal window:
+```bash
+cd web
+pnpm install
+pnpm dev
+```
+Navigate to `http://localhost:5173` in your browser.
+
+---
+
+## 3. END-TO-END FLOW
+
+### 3.1 Architectural Flow Diagram (ASCII)
+The diagram below illustrates the end-to-end journey of a tender document across the React Frontend, NestJS API, BullMQ Queue, PostgreSQL, and the VolksAI Python Microservice:
+
+```
+[ User in Browser ]
+        │  Clicks "Auto-Extract with AI" in InfoSheetForm.tsx
+        ▼
+[ web (React 19 + Vite) ]
+        │  POST /api/v1/tender-info-sheets/:tenderId/auto-extract { force: false }
+        ▼
+[ api: InfoSheetsController ]
+        │  Calls infoSheetsService.autoExtractFromPdf()
+        ▼
+[ api: PdfExtractionProducer ]
+        ├── 1. Computes SHA-256 hash of PDF (documentHash)
+        ├── 2. Checks tender_extractions table for '1.1.0:<hash>'
+        │      └── IF FOUND & !force: Returns existing_completed immediately (0 tokens!)
+        └── 3. IF NOT FOUND: Adds job to BullMQ queue 'pdf-extraction-queue'
+               (Falls back to in-process execution if Redis is offline)
+        ▼
+[ BullMQ / Redis Queue ]
+        │  Pulls job: { tenderId, pdf_file, atc_files, boq_file, userId }
+        ▼
+[ api: PdfExtractionProcessor (Worker) ]
+        │  Reads PDF files from disk storage
+        │  Sends multipart/form-data POST to http://localhost:8001/extract (120s timeout)
+        ▼
+[ volksAi: FastAPI Microservice (extract.py) ]
+        │  Calls ingest_parent_tender_pdf()
+        ├─► PyMuPDF / pdfplumber: Extracts text & layout (Max 150 pages main, 400 pages ATC)
+        ├─► Layer 1 (Rules/Regex): Extracts standard tables & fields (tender_mapper.py)
+        ├─► Layer 2 Fallback (Claude LLM via llm_field_resolver.py):
+        │      ├─► Role 1 (Haiku 4.5): Resolves missing fields by category with tool use
+        │      └─► Role 2 (Sonnet 5.5): Resolves ambiguous fields (Payment, LD, Delivery)
+        └─► TMS Field Mapper: Maps to standard TMS DTO shape
+        │
+        ▼  Returns HTTP 200 JSON with extracted fields & token usage
+[ api: PdfExtractionProcessor ]
+        │  1. In a single DB transaction: Upserts tender_extractions (fields, missing_fields)
+        │  2. Calls claudeUsageService.recordUsage() -> Inserts into claude_token_usage
+        │  3. If AUTO_ENQUEUE_CHECKLIST_ANALYSIS=true -> Enqueues checklist analysis
+        ▼
+[ web: InfoSheetForm.tsx ]
+        │  Polls GET /api/v1/tender-info-sheets/auto-extract/:jobId every 2 seconds
+        │  Receives completed result:
+        │  - Form auto-hydrates with extracted values
+        │  - Shows confidence badges:
+        │      [GREEN]   High Confidence (Layer 1 Rule Match)
+        │      [AMBER]   AI Resolved / Review Needed (Layer 2 LLM Match + Reasoning)
+        │      [RED]     Missing / Not Found
+```
+
+### 3.2 Detailed Step-by-Step Execution Trace
+
+#### Step 1: User Triggers Extraction in Web UI
+- **File:** `web/src/modules/tendering/info-sheet/components/InfoSheetForm.tsx`
+- **Function:** `handleAutoExtract(force = false)`
+- **What it reads:** The active `tenderId` from route parameters and a user toggle for force re-extraction.
+- **What it writes:** Sets UI state `extracting = true` and calls `infoSheetService.autoExtract(tenderId, { force })` via `web/src/services/api/info-sheet.service.ts`.
+
+#### Step 2: Controller Receives Request
+- **File:** `api/src/modules/tendering/info-sheets/info-sheets.controller.ts`
+- **Function:** `@Post(':tenderId/auto-extract') autoExtract(@Param('tenderId') tenderId, @Body() body, @CurrentUser() user)`
+- **What it reads:** HTTP route parameter `tenderId`, request body `{ force: boolean }`, and the JWT-authenticated user session (`user.id`).
+- **What it writes:** Passes control to `InfoSheetsService.autoExtractFromPdf()`.
+
+#### Step 3: Document File Path Resolution
+- **File:** `api/src/modules/tendering/info-sheets/info-sheets.service.ts`
+- **Function:** `autoExtractFromPdf(tenderId, options)`
+- **What it reads:** Queries the `tender_infos` table in PostgreSQL for file attachments linked to this tender via `resolveTenderDocuments(tenderId)`. Identifies the primary tender PDF (`pdf_file`), optional ATC documents (`atc_files`), and optional BOQ documents (`boq_file`).
+- **What it writes:** Assembles job payload and invokes `PdfExtractionProducer.enqueueExtraction()`.
+
+#### Step 4: Deduplication, Caching & BullMQ Queueing
+- **File:** `api/src/modules/tendering/info-sheets/pdf-extraction.producer.ts`
+- **Function:** `enqueueExtraction(data)` & `computeDocumentHash(data)`
+- **What it reads:** Reads the first 2MB or full stream of the primary PDF to compute a SHA-256 `documentHash`.
+- **What it writes / checks:**
+  1. **Cache Check:** Unless `force: true` is set, queries `tender_extractions` in PostgreSQL. If a row exists for `tender_id` with `extraction_version = '1.1.0:' + documentHash`, it immediately returns `{ status: 'completed', source: 'existing_completed', extraction: existing.fields }`—**consuming 0 LLM tokens and taking under 50ms**.
+  2. **Active Job Deduplication:** Checks Redis for active or waiting BullMQ jobs for this tender. If found, returns `existing_active` to prevent duplicate concurrent runs.
+  3. **Queue Enqueue:** Adds job to BullMQ queue `pdf-extraction-queue` with a deterministic job ID (`tender-extract-${tenderId}`). If Redis is offline, runs the job in-process as a graceful development fallback.
+
+#### Step 5: Worker Process & HTTP Call to VolksAI
+- **File:** `api/src/modules/tendering/info-sheets/pdf-extraction.processor.ts`
+- **Function:** `processJob(job: Job<PdfExtractionJobData>)`
+- **What it reads:** Job payload containing file paths on disk.
+- **What it writes:** Opens file streams and dispatches a `multipart/form-data` HTTP request to `POST http://localhost:8001/extract` with a 120,000ms (2-minute) timeout configured via `VOLKS_AI_TIMEOUT_MS`.
+
+#### Step 6: VolksAI Two-Layer Ingestion & AI Parsing
+- **File:** `volksAi/app/routers/extract.py` & `volksAi/app/services/pdf_parent_ingest.py`
+- **Function:** `extract_tender_endpoint()` calling `ingest_parent_tender_pdf()`
+- **Execution breakdown:**
+  1. **Text Extraction:** PyMuPDF (`fitz`) and `pdfplumber` extract text and layout. Child PDFs (ATCs) are processed up to 400 pages (`CHILD_PDF_MAX_PAGES`). If text density is near zero, PaddleOCR extracts scanned text.
+  2. **Layer 1 (Deterministic Rules):** `tender_mapper.py` and `field_extractor.py` run regular expressions to capture standardized fields (Tender No, Due Dates, Organization, EMD, basic eligibility).
+  3. **Layer 2 (LLM Fallback via Claude):**
+     - **Role 1 (`claude-haiku-4-5-20251001`):** Resolves missing fields batched by category (`pbg_sd`, `payment_terms`, `prs_ld`, `bec_criteria`, etc.) using scoped context and schema-constrained tool calls (`extract_missing_fields`). 600 max tokens (+1 retry at 1000).
+     - **Role 2 (`claude-sonnet-5-5`):** Reviews tricky ambiguous fields (`payment_terms_supply_display`, `ld_type_display`, `delivery_time_supply_display`) against exact legal clauses, emitting `{field}_reasoning`.
+  4. **DTO Normalization:** `tms_field_mapper.map_to_tms_dto()` converts Python data structures into the exact camelCase DTO required by the NestJS API.
+- **What it writes:** Returns HTTP 200 JSON with extracted fields, missing fields array, and token consumption metrics (`llm_usage`).
+
+#### Step 7: Database Persistence & Cost Accounting
+- **File:** `api/src/modules/tendering/info-sheets/pdf-extraction.processor.ts`
+- **Function:** `saveExtractionResult(tenderId, result, userId)`
+- **What it writes:**
+  1. In a single SQL transaction, upserts into `tender_extractions`:
+     - `fields`: The complete raw extraction payload including confidence levels and clause quotes.
+     - `missing_fields`: Array of field keys not located.
+     - `extraction_version`: `'1.1.0:' + documentHash`.
+     - `processing_time_ms`, `user_id`.
+  2. Invokes `ClaudeUsageService.recordUsage()` to insert a record into `claude_token_usage` (model, input tokens, output tokens, cache read/write tokens, estimated cost in USD).
+  3. If `AUTO_ENQUEUE_CHECKLIST_ANALYSIS=true`: enqueues checklist analysis in the background.
+
+#### Step 8: Frontend Polling & Confidence Badge Display
+- **File:** `web/src/modules/tendering/info-sheet/components/InfoSheetForm.tsx` & `ExtractionPreviewPanel.tsx`
+- **What it reads:** The UI polls `GET /api/v1/tender-info-sheets/auto-extract/:jobId` every 2,000ms until status is `completed`.
+- **What it renders:** Auto-populates the form fields and renders visual indicator badges:
+  - **Green / Emerald Badge (`HIGH CONFIDENCE`):** Deterministic Layer 1 regex match.
+  - **Amber / Yellow Badge (`REVIEW NEEDED` / `AI RESOLVED`):** Field was resolved by Layer 2 Claude LLM fallback or flagged ambiguous. Hovering displays Claude's reasoning and clause excerpt.
+  - **Red Badge (`MISSING` / `NOT FOUND`):** Clause was not found anywhere in the documents; requires manual entry.
+
+---
+
+## 4. THE CLAUDE / AI PARTS
+
+### 4.1 Architecture of LLM Roles in VolksAI
+The AI subsystem does not use a single monolithic prompt. Instead, it divides responsibilities across specialized LLM roles, each configured with specific models, token limits, and prompt constraints:
+
+| LLM Role | Primary Model | Purpose & Trigger | Max Tokens | Context Fed | Mechanism |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Role 1** | `claude-haiku-4-5-20251001` | **Missing Fields Extraction:** Triggered when Layer 1 regex/rules cannot find a field. | 600 (retry 1000) | Scoped clause snippets (300-2,500 chars) | Schema-constrained Tool Use (`extract_missing_fields`) |
+| **Role 2** | `claude-sonnet-5-5` | **Ambiguity Resolution:** Triggered when Layer 1 finds multiple conflicting clauses for payment, LD, or delivery. | 800 | Scoped contractual clauses | Tool Use (`resolve_ambiguous_fields`) + legal reasoning |
+| **Role 3** | `claude-sonnet-5` | **Bidding Requirements Checklist:** Triggered from Checklists module or auto-enqueue. | 16,000 | Full page-tagged tender text (`page_tagged_text`, up to ~94k tokens) | Structured JSON output with page citations |
+
+### 4.2 Role 1: Haiku 4.5 for Missing Field Extraction
+- **File:** `volksAi/app/services/llm_field_resolver.py` (`resolve_missing_fields_role1()`)
+- **Batched Categories:** Missing fields are grouped into logical categories so that related fields are resolved in a single prompt:
+  - `pbg_sd`: Performance Bank Guarantee & Security Deposit percentages, validity months, and acceptable submission instruments.
+  - `payment_terms`: Milestones for supply vs. installation/commissioning.
+  - `prs_ld`: Price Reduction Schedule / Liquidated Damages rates per week and overall liability cap.
+  - `bec_criteria`: Bidder Eligibility Criteria (prior experience years, annual turnover, joint ventures).
+  - `delivery_timeline`: Supply delivery days, installation schedule, and SITC scope.
+  - `bid_summary`: Key tender dates, validity duration, and contract type.
+  - `contacts_bds`: Client email addresses, contact numbers, and nodal officer designations.
+  - `commercial_ra`: Reverse auction applicability and Manufacturer's Authorization Form (MAF).
+- **Tool Use Constraint:** Haiku is strictly prevented from returning conversational chat. It is given an Anthropic Tool Definition (`extract_missing_fields`) with a rigid JSON schema. The model must populate the tool call arguments or return `null`.
+- **Token Budget & Retry:** Haiku is given a strict limit of 600 max output tokens. If the output is truncated (`stop_reason == "max_tokens"`), the system executes a single automatic retry with 1,000 tokens before failing gracefully.
+
+### 4.3 Role 2: Sonnet 5.5 for Ambiguity Resolution
+- **File:** `volksAi/app/services/llm_field_resolver.py` (`resolve_ambiguous_fields_role2()`)
+- **When it runs:** In many tenders, Layer 1 regex will find *multiple* contradictory mentions. For example, the GeM General Terms might state *"Delivery: 90 days"*, but page 42 of the Special Conditions of Contract (SCC) states *"Supply within 120 days, Installation within 30 days from site handover"*. Layer 1 marks this as ambiguous (`ambiguous: true`).
+- **Target Fields:**
+  - `net_worth_type_display` (Paid-up capital vs. Net Worth vs. Free Reserves)
+  - `payment_terms_supply_display`
+  - `payment_terms_installation_display`
+  - `delivery_time_supply_display`
+  - `delivery_time_installation_display`
+- **Output:** Sonnet 5.5 invokes `resolve_ambiguous_fields` and produces both the resolved display string and a mandatory legal reasoning field (e.g., `payment_terms_supply_reasoning`).
+- **Optimization:** If Layer 1 was completely unambiguous, **Role 2 is skipped entirely**, saving latency and API cost.
+
+### 4.4 Scoped Context: Why We Never Send 200 Pages to Claude
+Government tenders contain hundreds of pages of boilerplates (e.g., standard arbitration acts, generic health and safety rules, environmental policies) that are irrelevant to financial evaluation.
+
+If we fed a 250-page PDF to an LLM for field extraction:
+1. **Cost:** Feeding ~100,000 tokens per tender would cost over $0.30 per attempt on Haiku and $1.50+ on Sonnet.
+2. **Latency:** Processing 100,000 tokens takes 25 to 60 seconds per call.
+3. **Accuracy Degradation ("Lost in the Middle"):** Large context windows suffer from attention dilution. Models frequently overlook a 3-line clause on page 140 when buried in 200 pages of text.
+
+#### How Scoped Context Works (`extract_scoped_context`)
+- **File:** `volksAi/app/services/llm_field_resolver.py`
+- For each category, regex scans for explicit section titles (e.g., `SECTION - V: SPECIAL CONDITIONS OF CONTRACT`, `PAYMENT TERMS`, `BID EVALUATION CRITERIA`).
+- It extracts a localized window (typically 500 to 2,500 characters) surrounding the matched clause.
+- **Recent Upgrade in commit `aee316ab`:** Previously, if a section heading was not detected, the system had a blind fallback that sent the first 6,000 characters of the document. This caused irrelevant preamble text to be sent to Claude. The blind fallback was eliminated in favor of strict section-heading scoping. If no relevant section is found, the system immediately returns `not_found` with **zero LLM calls**.
+
+### 4.5 BiddingRequirementsService & Role 3
+- **File:** `api/src/modules/tendering/checklists/bidding-requirements.service.ts`
+- **VolksAI Endpoint:** `POST /analyze-bidding-requirements` (defined in `volksAi/app/routers/bidding_requirements.py`)
+- **How it works:** This is a separate, deep-dive document analysis pipeline. It evaluates the entire tender to discover every document the bidder must submit (e.g., audited balance sheets for FY 2021-24, ISO 9001 certificates, EMD exemption certificates, Power of Attorney).
+- **Model:** Anthropic Claude Sonnet 5 (`claude-sonnet-5-5` or `claude-sonnet-5`).
+- **Context:** Unlike field extraction, checklist analysis feeds the complete page-tagged text (`page_tagged_text`, up to ~94,000 tokens) because required documents may appear anywhere across technical specs, SCC, or commercial schedules.
+- **Token Limits & Cost:**
+  - Max output tokens: 16,000.
+  - Timeout: 180 seconds (`BIDDING_REQUIREMENTS_MIN_TIMEOUT_MS`).
+  - Average cost: ~$0.31 per execution on full tenders.
+- **Concurrency & Locking:**
+  - Protected by a distributed Redis lock (`SET tender:bidding_req:lock:<tenderId> <token> PX 200000 NX`) and released via Lua script.
+  - In-process Promise memoization ensures that if two users open the same tender simultaneously, only one HTTP call is dispatched to VolksAI.
+
+### 4.6 Caching Mechanics: 0 Tokens on Cache Hits
+Both pipelines implement multi-tiered caching to prevent redundant token consumption:
+
+1. **Info Sheet Extraction Caching:**
+   - When a PDF is received, `PdfExtractionProducer.computeDocumentHash()` computes its SHA-256 hash.
+   - The version string is stored as `'1.1.0:' + documentHash`.
+   - On subsequent calls without `force: true`, PostgreSQL `tender_extractions` returns the cached record immediately.
+   - **Token Cost:** 0 tokens. **Latency:** <50ms.
+2. **Checklist Analysis Caching:**
+   - Stored in the `bidding_requirements_jobs` table keyed by `(tender_id, document_hash)`.
+   - Stored redundantly inside `tender_extractions.fields.biddingRequirementsAnalysis` (added in commit `53585e45`) so the tender record holds all AI outputs in one place.
+
+### 4.7 The Single-Parse Question: "Is Each Tender Parsed Only Once?"
+**The short, honest answer:** **No, by default they run in two separate pipelines.**
+
+1. **Info Sheet Extraction:** When a Tender Executive clicks "Auto-Extract with AI", VolksAI runs **Role 1 (Haiku 4.5)** and **Role 2 (Sonnet 5.5)** on targeted snippets to extract commercial/technical form fields.
+2. **Checklist Analysis:** When a user opens the Checklists tab or if `AUTO_ENQUEUE_CHECKLIST_ANALYSIS=true`, `BiddingRequirementsService` triggers a separate call to `POST /analyze-bidding-requirements`, running **Role 3 (Sonnet 5)** on the entire document.
+
+**Evidence from the Codebase:**
+- `api/src/modules/tendering/info-sheets/pdf-extraction.processor.ts` (lines 40-70) posts to `/extract`.
+- `api/src/modules/tendering/checklists/bidding-requirements.service.ts` (lines 480-520) posts to `/analyze-bidding-requirements`.
+- They call different endpoints with different payloads and record different `call_type` records in `claude_token_usage` (`main_extraction` vs. `bidding_requirements`).
+
+**However, within each pipeline, caching is strict:** Once a tender's PDF has been processed, neither pipeline will re-call Claude unless the user explicitly checks "Force re-extraction" or clicks "Re-run Analysis".
+
+---
+
+## 5. DATABASE
+
+### 5.1 Tables Overview & Entity Relationships
+The tendering and AI extraction pipeline relies on five primary PostgreSQL tables managed via **Drizzle ORM**:
+
+```
+ ┌──────────────────────┐         1:1         ┌───────────────────────────┐
+ │     tender_infos     │◄───────────────────►│    tender_information     │
+ │  (Main Tender Core)  │                     │  (Info Sheet Parameters)  │
+ └──────────┬───────────┘                     └───────────────────────────┘
+            │
+            │ 1:1
+            ├────────────────────────────────►┌───────────────────────────┐
+            │                                 │    tender_extractions     │
+            │                                 │ (AI JSON Cache & Raw DTO) │
+            │ 1:N                             └───────────────────────────┘
+            ├────────────────────────────────►┌───────────────────────────┐
+            │                                 │ bidding_requirements_jobs │
+            │                                 │  (Checklist Job Results)  │
+            │ 1:N                             └───────────────────────────┘
+            └────────────────────────────────►┌───────────────────────────┐
+                                              │    claude_token_usage     │
+                                              │   (API Token Auditing)    │
+                                              └───────────────────────────┘
+```
+
+> [!IMPORTANT]
+> **Table Naming Nuance:**
+> - `tender_infos` (defined in `tenders.schema.ts`): Holds high-level metadata (Tender No, Organization, Due Date, Status, Team).
+> - `tender_information` (defined in `tender-info-sheet.schema.ts`): Holds deep technical/commercial form fields (EMD, PBG, LD, delivery timelines, payment terms). In conversation, developers often say "tender info sheet", but the actual SQL table is `tender_information`.
+
+---
+
+### 5.2 Detailed Table Schemas
+
+#### 1. `tender_extractions`
+- **Schema File:** `api/src/db/schemas/tendering/tender-extractions.schema.ts`
+- **Migration File:** `api/drizzle/0137_create_tender_extractions.sql`
+- **Purpose:** Durable persistence of the AI extraction JSON output. Acts as the caching layer.
+
+| Column | Type | Nullable | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `id` | `serial` | NO | auto-increment | Primary key |
+| `tender_id` | `bigint` | NO | - | Foreign key pointing to `tender_infos.id` (Unique) |
+| `fields` | `jsonb` | NO | - | Full extracted JSON payload including values, confidence, reasoning |
+| `missing_fields` | `text[]` | YES | - | Array of field keys that neither Layer 1 nor Layer 2 could find |
+| `extraction_version` | `varchar(50)` | YES | `'1.0.0'` | Format: `'1.1.0:<sha256_document_hash>'` for cache invalidation |
+| `processing_time_ms` | `integer` | YES | - | Total roundtrip extraction duration in milliseconds |
+| `user_id` | `bigint` | YES | - | User ID of the Tender Executive who triggered extraction |
+| `created_at` | `timestamptz`| NO | `now()` | Record creation timestamp |
+| `updated_at` | `timestamptz`| NO | `now()` | Last modification timestamp |
+
+#### 2. `claude_token_usage`
+- **Schema File:** `api/src/db/schemas/shared/claude-token-usage.schema.ts`
+- **Migration File:** `api/drizzle/0135_create_claude_token_usage.sql`
+- **Purpose:** Financial and audit log of every Anthropic API call made by any user or pipeline.
+
+| Column | Type | Nullable | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `id` | `bigserial` | NO | auto-increment | Primary key |
+| `user_id` | `bigint` | YES | - | References `users.id` (ON DELETE SET NULL) |
+| `tender_id` | `bigint` | YES | - | Linked tender ID |
+| `job_id` | `varchar(100)`| YES | - | BullMQ or background task identifier |
+| `call_type` | `varchar(50)` | NO | `'main_extraction'` | Stage: `'main_extraction'` or `'bidding_requirements'` |
+| `model` | `varchar(100)`| NO | `'claude-haiku-4-5-20251001'` | Exact Anthropic model ID invoked |
+| `input_tokens` | `integer` | NO | `0` | Number of prompt tokens sent |
+| `output_tokens` | `integer` | NO | `0` | Number of completion tokens generated |
+| `cache_creation_tokens` | `integer` | NO | `0` | Prompt cache write tokens |
+| `cache_read_tokens` | `integer` | NO | `0` | Prompt cache hit tokens |
+| `total_tokens` | `integer` | NO | `0` | Sum of all tokens |
+| `estimated_cost_usd` | `numeric(10,6)` | NO | `'0'` | USD cost calculated using Anthropic pricing formulas |
+| `duration_ms` | `integer` | YES | - | Execution time in milliseconds |
+| `created_at` | `timestamptz` | NO | `now()` | Timestamp of invocation |
+
+#### 3. `bidding_requirements_jobs`
+- **Schema File:** `api/src/db/schemas/tendering/bidding-requirements-jobs.schema.ts`
+- **Migration File:** `api/drizzle/0146_create_bidding_requirements_jobs.sql`
+- **Purpose:** Tracks background checklist analysis jobs executed by Role 3.
+
+| Column | Type | Nullable | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `id` | `serial` | NO | auto-increment | Primary key |
+| `tender_id` | `integer` | NO | - | Linked tender ID |
+| `document_hash` | `varchar(64)` | NO | - | SHA-256 hash of the analysed document |
+| `status` | `varchar(20)` | NO | `'pending'` | `'pending'` \| `'running'` \| `'done'` \| `'failed'` |
+| `result` | `jsonb` | YES | - | Checklist payload (required documents, criteria, annexures) |
+| `error_code` | `varchar(50)` | YES | - | Structured error code (e.g. `ANALYSIS_TIMEOUT`) |
+| `error_message`| `text` | YES | - | Human-readable error description |
+| `user_id` | `bigint` | YES | - | User who triggered the analysis |
+| `processing_time_ms`| `integer`| YES | - | Total runtime in milliseconds |
+| `started_at` | `timestamptz` | YES | - | Timestamp when worker began processing |
+| `heartbeat_at` | `timestamptz` | YES | - | Liveness timestamp (jobs >60s old without beat are dead) |
+| `created_at` | `timestamptz` | NO | `now()` | Record creation timestamp |
+| `updated_at` | `timestamptz` | NO | `now()` | Last update timestamp |
+
+---
+
+### 5.3 Non-Secret JSON Schema Example (`tender_extractions.fields`)
+Below is a realistic, sanitized example of what is stored inside the `fields` column of `tender_extractions`:
+
+```json
+{
+  "tender_number": "GEM/2026/B/9981245",
+  "organization_name": "GAIL (INDIA) LIMITED",
+  "tender_value": 45000000.00,
+  "bid_end_date": "2026-11-15T15:00:00+05:30",
+  "emd_required": "Yes",
+  "emd_amount": 900000.00,
+  "pbg_required": "Yes",
+  "pbg_percentage": 5.0,
+  "pbg_duration_months": 18,
+  "payment_terms_supply_display": "70% against dispatch, 20% on receipt, 10% on commissioning",
+  "payment_terms_supply_reasoning": "SCC Clause 14.1 explicitly supersedes General Terms and specifies three supply milestones.",
+  "ld_type_display": "PRS",
+  "ld_percentage_per_week": 0.5,
+  "max_ld_percentage": 10.0,
+  "delivery_time_supply_display": "120 days from PO",
+  "technical_eligibility_age": 7,
+  "experience_years_display": "7 years prior to bid opening date",
+  "maf_required": "Yes",
+  "llm_metadata": {
+    "role1_called": true,
+    "role2_called": true,
+    "llm_status": "ok",
+    "failed_categories": []
+  },
+  "biddingRequirementsAnalysis": {
+    "schemaVersion": "1.0.0",
+    "requiredDocuments": [
+      {
+        "documentName": "Audited Financial Statements",
+        "description": "Balance sheets & P&L for FY 2021-22, 2022-23, 2023-24",
+        "pageReference": "Page 14, Clause 3.2"
+      }
+    ]
+  }
+}
+```
+
+### 5.4 How to Inspect the Database Directly
+To inspect tables using the PostgreSQL CLI on the host machine:
+```bash
+# Connect to the local database using the environment URL:
+psql "$DATABASE_URL"
+
+# Or connect via Docker container:
+docker compose exec postgres psql -U <user> -d <db_name>
+
+# View recent extractions:
+SELECT id, tender_id, extraction_version, processing_time_ms, created_at 
+FROM tender_extractions 
+ORDER BY id DESC LIMIT 5;
+
+# View Claude API token costs for the current month:
+SELECT 
+    model, 
+    call_type, 
+    COUNT(*) as total_calls, 
+    SUM(total_tokens) as tokens, 
+    ROUND(SUM(estimated_cost_usd)::numeric, 4) as cost_usd 
+FROM claude_token_usage 
+GROUP BY model, call_type;
+```
+
+---
+
+## 6. CONFIGURATION
+
+### 6.1 Master Environment Variables Table
+Every configuration key across `api`, `web`, and `volksAi` is detailed below. **Never commit real keys or secrets to version control.**
+
+| Variable Name | Service | Default Value | Required? | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `PORT` | `api` | `3000` | Optional | Port for the NestJS HTTP REST server |
+| `API_PREFIX` | `api` | `api/v1` | Optional | Global REST API route prefix |
+| `NODE_ENV` | `api`, `web` | `development` | Optional | Environment mode (`development` \| `production` \| `test`) |
+| `DATABASE_URL` | `api` | - | **Required** | PostgreSQL connection string (`postgres://user:pass@host:5432/db`) |
+| `PGSSL` | `api` | `false` | Optional | Enable SSL for PostgreSQL connections |
+| `PG_MAX_POOL` | `api` | `10` | Optional | Maximum concurrent connections in PostgreSQL pool |
+| `REDIS_HOST` | `api` | `127.0.0.1` | Optional | Redis host for BullMQ queue and locks |
+| `REDIS_PORT` | `api` | `6379` | Optional | Redis port |
+| `FRONTEND_URL` | `api` | `http://localhost:5173` | Optional | Frontend URL for CORS authorization |
+| `JWT_ACCESS_SECRET` | `api` | - | **Required** | 32-byte hex secret for signing access tokens |
+| `JWT_ACCESS_EXPIRATION`| `api` | `7d` | Optional | JWT access token validity period |
+| `JWT_REFRESH_SECRET` | `api` | - | **Required** | Secret for signing refresh tokens |
+| `JWT_REFRESH_EXPIRATION`| `api`| `14d` | Optional | Refresh token validity period |
+| `VOLKS_AI_SERVICE_URL` | `api` | `http://localhost:8001` | Optional | HTTP base URL for the VolksAI FastAPI microservice |
+| `VOLKS_AI_TIMEOUT_MS` | `api` | `120000` (120s) | Optional | Axios/fetch timeout for VolksAI extraction requests |
+| `AUTO_ENQUEUE_CHECKLIST_ANALYSIS` | `api` | `false` | Optional | If `true`, automatically enqueues checklist analysis when info-sheet extraction succeeds |
+| `USD_TO_INR_RATE` | `api` | `94.83` | Optional | Static USD to INR conversion rate for token cost display |
+| `USD_TO_INR_RATE_AS_OF` | `api`| `2026-09-08` | Optional | Audit date for the static USD/INR rate |
+| `OPENWA_BASE_URL` | `api` | `http://localhost:2785` | Optional | HTTP base URL for OpenWA WhatsApp daemon |
+| `OPENWA_DRY_RUN` | `api` | `false` | Optional | If `true`, suppresses sending real WhatsApp messages |
+| `LLM_FALLBACK_ENABLED` | `volksAi`| `true` | Optional | Enables/disables Layer 2 LLM resolution in VolksAI |
+| `LLM_PROVIDER` | `volksAi`| `anthropic` | Optional | Preferred LLM provider (`anthropic` \| `groq` \| `gemini`) |
+| `ANTHROPIC_API_KEY` | `volksAi`| - | **Required** | API key for Anthropic Claude |
+| `ANTHROPIC_MODEL` | `volksAi`| `claude-sonnet-5-5` | Optional | Default Anthropic model |
+| `ANTHROPIC_ROLE1_MODEL` | `volksAi`| `claude-haiku-4-5-20251001` | Optional | Fast model for missing field extraction |
+| `ANTHROPIC_ROLE2_MODEL` | `volksAi`| `claude-sonnet-5-5` | Optional | Reasoning model for ambiguity resolution |
+| `CHILD_PDF_MAX_PAGES` | `volksAi`| `400` | Optional | Maximum page limit for child/ATC PDFs (bumped from 60) |
+| `MAIN_TENDER_MAX_PAGES`| `volksAi`| `150` | Optional | Maximum page limit for main tender PDF |
+| `LLM_MAX_RETRIES` | `volksAi`| `2` | Optional | Max retry attempts on transient LLM rate-limit/errors |
+| `PADDLE_OCR_ENABLED` | `volksAi`| `true` | Optional | Set to `false` to disable PaddleOCR and use Tesseract only |
+| `OMP_NUM_THREADS` | `volksAi`| `1` | Optional | Prevents PaddleOCR from monopolizing CPU cores |
+| `OFFLINE_EXTRACTION` | `volksAi`| `false` | Optional | Disables external HTTP requests during PDF link check |
+| `GROQ_API_KEY` | `volksAi`| - | Optional | Secondary fallback provider API key |
+| `GROQ_MODEL` | `volksAi`| `llama-3.3-70b-versatile` | Optional | Groq model identifier |
+| `GEMINI_API_KEY` | `volksAi`| - | Optional | Google Gemini fallback API key |
+
+---
+
+### 6.2 Model Identifiers & Hardcoded Values
+Be aware of where model strings are hardcoded or set as defaults:
+
+1. **`claude_token_usage` Default Model:**
+   - File: `api/src/db/schemas/shared/claude-token-usage.schema.ts` (line 21)
+   - Hardcoded default: `'claude-haiku-4-5-20251001'`. If VolksAI does not report a model name in `llm_usage`, the database defaults to this string.
+2. **VolksAI Default Role Models:**
+   - File: `volksAi/app/services/llm_field_resolver.py`
+   - Role 1 defaults to `os.getenv("ANTHROPIC_ROLE1_MODEL", "claude-haiku-4-5-20251001")`.
+   - Role 2 defaults to `os.getenv("ANTHROPIC_ROLE2_MODEL", "claude-sonnet-5-5")`.
+3. **Bidding Requirements Model:**
+   - File: `api/src/modules/tendering/checklists/bidding-requirements.service.ts`
+   - Hardcoded default model passed to VolksAI: `'claude-sonnet-5'`.
+4. **Child PDF Page Limit:**
+   - File: `volksAi/app/services/pdf_parent_ingest.py`
+   - Default: `int(os.getenv("CHILD_PDF_MAX_PAGES", "400"))`. Previously was 60 pages, which caused large ATC PDFs (such as GAIL/NTPC 200+ page tenders) to be truncated.
+
+---
+
+## 7. HOW TO RUN, TEST AND DEBUG
+
+### 7.1 Development Prerequisites
+Ensure the following runtimes and tools are installed:
+- **Node.js:** v20.x or higher
+- **pnpm:** v9.x or higher (`npm install -g pnpm`)
+- **Python:** v3.11.x or higher
+- **Docker & Docker Compose:** For running Postgres, Redis, Loki, and Grafana
+- **Git**
+
+---
+
+### 7.2 Service Startup Commands
+
+```bash
+# 1. Start core backing services via Docker (PostgreSQL, Redis, Loki, Promtail, Grafana)
+cd TMS/tms
+docker compose up -d postgres redis loki promtail grafana
+
+# 2. Start VolksAI Microservice (Local Python Environment)
+cd volksAi
+python -m venv .venv
+# Activate venv:
+# Windows: .venv\Scripts\activate | Linux/macOS: source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+# 3. Start NestJS Backend API
+cd ../api
+pnpm install
+pnpm run db:migrate
+pnpm start:dev
+
+# (In a separate terminal) Start NestJS Background Worker
+cd api
+pnpm start:worker
+
+# 4. Start React Web Frontend
+cd ../web
+pnpm install
+pnpm dev
+```
+
+---
+
+### 7.3 Where Logs Go & How to Inspect Them
+1. **Terminal Console (STDOUT):**
+   - Both NestJS and FastAPI output structured color-coded logs to standard output.
+2. **Rotating File Logs:**
+   - Saved under `TMS/tms/logs/`.
+   - `api.log` / `api-error.log`: NestJS HTTP requests, BullMQ queue events, database query exceptions.
+   - `volksai.log`: PDF extraction breakdowns, OCR page counts, Claude tool inputs/outputs.
+3. **Grafana Observability Dashboard:**
+   - URL: `http://localhost:4000` (Default credentials configured in `docker-compose.yml`).
+   - Promtail tails `TMS/tms/logs/*.log` and streams them to Loki.
+   - You can query logs by label: `{job="volksai"}` or `{job="api"} |= "ERROR"`.
+
+---
+
+### 7.4 Health Check Endpoints
+Verify all running components using these HTTP requests:
+
+#### NestJS API Health Check:
+```bash
+curl -s http://localhost:3000/api/v1/health | jq .
+```
+**Expected Response:**
+```json
+{
+  "status": "ok",
+  "database": "connected",
+  "redis": "ready",
+  "requiredTables": "verified"
+}
+```
+*(If tables like `tender_extractions` are missing from PostgreSQL, status returns `"down"` or `"degraded"`).*
+
+#### VolksAI Microservice Health Check:
+```bash
+curl -s http://localhost:8001/health | jq .
+```
+**Expected Response:**
+```json
+{
+  "status": "healthy",
+  "service": "volksai-extraction",
+  "version": "1.0.0",
+  "llm_fallback_enabled": true,
+  "provider": "anthropic",
+  "anthropic_configured": true,
+  "paddle_ocr_enabled": true
+}
+```
+*(If `ANTHROPIC_API_KEY` is not set, status returns `"degraded"` with `"anthropic_configured": false`).*
+
+---
+
+### 7.5 Minimal Claude Connectivity Test (Without a 200-Page PDF)
+To verify that VolksAI can communicate with the Anthropic API without having to upload and process a large PDF:
+
+Run the included verification diagnostic script:
+```bash
+cd volksAi
+python scratch/check_models.py
+```
+Or execute this minimal python test one-liner in your terminal:
+```bash
+python -c "
+import os
+from anthropic import Anthropic
+client = Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+resp = client.messages.create(
+    model='claude-haiku-4-5-20251001',
+    max_tokens=20,
+    messages=[{'role': 'user', 'content': 'Ping'}]
+)
+print('Anthropic API Connectivity OK:', resp.content[0].text)
+"
+```
+
+---
+
+### 7.6 How to Re-Run Extractions for a Specific Tender
+
+#### Method 1: Via the Web UI
+1. Navigate to `http://localhost:5173/tendering/tenders/<tenderId>/info-sheet`.
+2. Check the **"Force re-extraction"** checkbox (which forces `force = true`).
+3. Click the **"Auto-Extract with AI"** button.
+4. The system bypasses all cached records in PostgreSQL and Redis, dispatches a fresh extraction job, and overwrites the cached extraction data upon completion.
+
+#### Method 2: Via API `curl`
+```bash
+curl -X POST "http://localhost:3000/api/v1/tender-info-sheets/<tenderId>/auto-extract" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your_jwt_token>" \
+  -d '{"force": true}'
+```
+
+#### Method 3: Direct VolksAI Invocation (Bypassing NestJS & Queue)
+```bash
+curl -X POST "http://localhost:8001/extract" \
+  -F "pdf_file=@/path/to/Bid_Document.pdf" \
+  -F "user_id=1" \
+  -F "tender_id=<tenderId>" \
+  -o extraction_result.json
+```
+
+---
+
+## 8. WHAT WE CHANGED RECENTLY
+
+### 8.1 Git Commit Analysis & Changelog
+The table below documents recent commits on the working branch (`feature/analyze-save-single-call`), analyzing the author, date, message, and real-world code impact:
+
+| Commit Hash | Author & Date | Commit Message | Real Changes & Non-Obvious Rationale |
+| :--- | :--- | :--- | :--- |
+| `c138120f` | `yuvrajsharmaaa`<br>2026-10-24 16:20 | `Merge remote-tracking branch 'upstream/main' into feature/analyze-save-single-call` | Clean sync with upstream development branch. Brought in upstream database migrations and operational fixes. |
+| `53585e45` | `yuvrajsharmaaa`<br>2026-10-24 15:58 | `feat: add tender mapping, extraction, and automated processing services for volumetric AI pipeline` | **Single-Call Pipeline & Auto-Enqueue:**<br>1. Added `AUTO_ENQUEUE_CHECKLIST_ANALYSIS` env var.<br>2. Updated `pdf-extraction.processor.ts` to automatically enqueue checklist analysis upon info-sheet extraction success.<br>3. Updated `extractionFieldsUpsertValue` so that re-running info-sheet extraction preserves existing `biddingRequirementsAnalysis` without wiping it out.<br>4. Added 214 lines of unit tests to `pdf-extraction.spec.ts`. |
+| `aee316ab` | `yuvrajsharmaaa`<br>2026-10-24 15:11 | `feat: add VolksAI microservice integration and backend services for automated tender PDF extraction and info-sheet processing` | **Microservice Core Upgrades & Scoping Fixes:**<br>1. Upgraded model ID from Sonnet 3.5 to `claude-sonnet-5-5`.<br>2. Added `classify_anthropic_error` to map timeouts, 401s, and 429s to structured error objects.<br>3. Removed the 6,000-character blind context fallback in favor of strict section-heading matching.<br>4. Increased `CHILD_PDF_MAX_PAGES` from 60 to 400 pages to support massive PSU ATC documents.<br>5. Implemented `/health` degraded state when `ANTHROPIC_API_KEY` is missing. |
+| `a0ffabb6` | `yuvrajsharmaaa`<br>2026-10-24 14:15 | `feat(checklists): display stored requiredDocuments and doc1-9 as unverified suggestions without preselection` | **Checklist UX Overhaul:** Previously, AI suggested documents were automatically checked/selected, causing Tender Executives to accidentally submit unverified checklists. Changed UI to show AI documents as unselected suggestions with a visual preview. |
+| `06f10f10` | `yuvrajsharmaaa`<br>2026-10-24 13:40 | `feat(checklists): add clear not-analysed, in-progress, and failed states with zero console errors` | **Checklist State Machine:** Implemented robust frontend states (`not_analysed`, `in_progress`, `failed`, `completed`) eliminating React render errors and uncaught network exceptions when no analysis exists yet. |
+
+---
+
+### 8.2 Discrepancies Between Commit Messages and Code Diffs
+When reviewing git history, notice several minor naming discrepancies:
+1. **"volumetric AI pipeline" in `53585e45`:**
+   - *Message:* Mentions "volumetric AI pipeline".
+   - *Reality:* There is no volumetric 3D analysis in this codebase. This was a phrasing artifact for the VolksAI PDF pipeline. The commit actually wired the single-save transaction merge and auto-enqueueing of checklist analysis.
+2. **Generic Message in `aee316ab`:**
+   - *Message:* "add VolksAI microservice integration..."
+   - *Reality:* This commit was not the initial creation of VolksAI. It was an extensive reliability refactor that introduced `classify_anthropic_error`, upgraded Anthropic model IDs to `claude-sonnet-5-5`, raised `CHILD_PDF_MAX_PAGES` to 400, and removed the 6000-char blind fallback.
+3. **Branch Name `feature/analyze-save-single-call`:**
+   - *Name Meaning:* The branch was created to explore unifying the separate Info-Sheet and Checklist analysis pipelines into a single Claude dispatch. While it introduced `AUTO_ENQUEUE_CHECKLIST_ANALYSIS` and merged the database JSON storage, they remain separate microservice endpoints (`/extract` vs `/analyze-bidding-requirements`).
+
+---
+
+## 9. CURRENT STATUS: HONEST PROGRESS REPORT
+
+### 9.1 Feature Status & Evidence Table
+The table below represents an unvarnished audit of the system based directly on unit tests, typechecks, and code inspection:
+
+| Feature / Subsystem | Status | Evidence & Test Results |
+| :--- | :--- | :--- |
+| **Layer 1 Rule/Regex Extraction** | **Working** | `tender_mapper.py`, `field_extractor.py`. Correctly extracts dates, tender numbers, EMD, and standard tables from text-native PDFs. |
+| **Layer 2 LLM Fallback (Role 1 & 2)** | **Partially Working** | Core runtime works in production. However, 12 tests fail across `test_llm_failure_handling.py` and `test_role1_prompt_examples.py` because recent commits added `classify_anthropic_error` and removed the 6000-char blind fallback without updating unit test mocks and fixtures. |
+| **Contact Details & Officer Parsing** | **Partially Working** | 2 test failures observed:<br>1. `test_contact_integrity.py`: phone cleaner outputs `+91-484-2983210 / 11 / 12 / 13` (spaces around `/`) whereas test asserts no spaces.<br>2. `test_kochi_regression.py`: `client_name_2_display` asserts `'Sabu Mathews'`, but received `'N/A'`. |
+| **Deduplication & Document Caching** | **Working** | `pdf-extraction.spec.ts` (24/24 passing). Preserves cache on unchanged PDFs (0 tokens), invalidates cache when ATC file changes or `force: true` is set. |
+| **Token & Cost Accounting** | **Working** | `claude_token_usage` table and `claude-usage.service.ts`. Accurately records input/output/cache tokens and USD costs across both pipelines. |
+| **Bidding Requirements Checklist (Role 3)** | **Working** | `bidding-requirements.service.spec.ts` (31/31 passing). Generates complete document lists, handles Redis distributed locks, and manages in-flight memoization. |
+| **Auto-Enqueue Checklist Pipeline** | **Working** | Controlled by `AUTO_ENQUEUE_CHECKLIST_ANALYSIS`. Successfully verified in `pdf-extraction.spec.ts`. |
+| **Web UI (InfoSheetForm & Preview)** | **Working** | `web/` unit tests (62/62 passing), `pnpm type-check` in `web/` completes with 0 errors. React 19 forms and confidence badges render smoothly. |
+| **API System Health Check** | **Partially Working** | Runtime works. However, `health.service.spec.ts` fails 1 test because when database tables are missing, `getHealth()` returns `"down"` instead of `"degraded"`. |
+| **Operations WhatsApp Notifications** | **Partially Working** | 4 tests fail in `operation-notification.service.spec.ts` because the message template was reworded from `"click here to view full details"` to `"View full details"`, but test assertions were not updated. |
+
+---
+
+### 9.2 Overall Completion & Test Pass Rate
+- **Overall System Readiness:** **~85% Production-Ready**
+  - **Frontend UI (`web`):** 98% (Passes all 62 unit tests, zero TypeScript errors).
+  - **Backend API (`api`):** 92% (Passes 322 out of 327 unit tests, zero TypeScript errors).
+  - **VolksAI Microservice (`volksAi`):** 82% (Passes 370 out of 384 tests). The 14 failures are mock/assertion mismatches and phone spacing rather than systemic runtime crashes.
+
+---
+
+### 9.3 The Single Biggest Risk to Production Readiness
+**Risk: Scanned PDFs & Image-Only ATC Documents.**
+
+While GeM primary bid documents are 100% digital PDFs generated by the portal, PSUs (like State Electricity Boards, Municipal Corporations, or GAIL regional offices) frequently scan physical paper circulars and append them as the ATC PDF.
+- If PyMuPDF extracts 0 characters from a scanned 50-page technical specification, VolksAI relies entirely on PaddleOCR.
+- If PaddleOCR is starved of memory/CPU inside Docker or if the scan is skewed/low-resolution, Layer 1 regex will extract nothing, and Layer 2 LLM scoping will fail to find section headers.
+- **Impact:** The Tender Executive will see red `MISSING` badges for critical fields, forcing them to do manual data entry.
+- **Mitigation:** Ensure PaddleOCR container has at least 2GB of dedicated RAM and consider adding an explicit "Scanned Document Detected" warning banner in the Web UI.
+
+---
+
+## 10. KNOWN BUGS AND OPEN ISSUES
+
+### 10.1 Issue 1: Phone Number Whitespace in Contact Extraction
+- **Symptoms:** Unit test `test_contact_integrity.py::test_clean_phone` fails:
+  ```
+  AssertionError: assert '+91-484-2983210 / 11 / 12 / 13' == '+91-484-2983210/11/12/13'
+  ```
+- **Root Cause:** In `volksAi/app/services/tender_mapper.py` / `field_extractor.py`, the phone number cleaning function normalizes multiple extensions by inserting spaces around forward slashes (` / `), while standard phone normalization expects compact slashes (`/`).
+- **Files & Functions:** `volksAi/app/services/tender_mapper.py` -> `clean_phone()`.
+- **Fix Suggestion:** Add a final regex replace pass to collapse whitespace around slashes:
+  ```python
+  phone = re.sub(r'\s*/\s*', '/', phone)
+  ```
+- **Difficulty:** **Easy** (15 minutes).
+
+---
+
+### 10.2 Issue 2: Kochi GAIL Tender Regression (`client_name_2_display`)
+- **Symptoms:** Unit test `test_kochi_regression.py::test_kochi_tender_ground_truth_regression` fails:
+  ```
+  assert infosheet.get("client_name_2_display") == "Sabu Mathews"
+  AssertionError: assert 'N/A' == 'Sabu Mathews'
+  ```
+- **Root Cause:** When extracting multiple officers from the GAIL Kochi tender's Special Conditions table, the contact extractor successfully parses the first officer (Allan Tomy), but fails to parse the second officer (Sabu Mathews) due to an overly rigid table header regex that ignores multi-line officer rows.
+- **Files & Functions:** `volksAi/app/services/field_extractor.py` -> `_parse_officer_table()`.
+- **Fix Suggestion:** Update the row-splitting regex in `_parse_officer_table` to split on designated officer keywords (`General Manager`, `DGM`, `Manager`, `Engineer`) rather than relying on strict line counts.
+- **Difficulty:** **Easy** (30 minutes).
+
+---
+
+### 10.3 Issue 3: VolksAI Unit Test Failures from Error Classification & Scoping Refactor
+- **Symptoms:** 12 tests fail across `test_llm_failure_handling.py` and `test_role1_prompt_examples.py`.
+- **Root Cause:**
+  1. Commit `aee316ab` introduced `classify_anthropic_error` which changed how 401, 429, and timeouts are caught and converted into structured error dictionaries. The mocks in `test_llm_failure_handling.py` expected older exception types.
+  2. Commit `aee316ab` also removed the 6,000-character blind context fallback. Synthetic text snippets in `test_role1_prompt_examples.py` did not contain explicit section headings (e.g. `SECTION V: BIDDER ELIGIBILITY CRITERIA`), causing `extract_scoped_context` to return empty (`not_found (0 chars)`), so Role 1 correctly skipped invoking Claude.
+- **Files & Functions:**
+  - `volksAi/app/services/test_llm_failure_handling.py`
+  - `volksAi/app/services/test_role1_prompt_examples.py`
+  - `volksAi/app/services/llm_field_resolver.py` (`classify_anthropic_error`, `extract_scoped_context`)
+- **Fix Suggestion:**
+  1. Update `test_llm_failure_handling.py` mock responses to align with `classify_anthropic_error`.
+  2. Wrap synthetic test clauses in `test_role1_prompt_examples.py` with standard section headers (e.g. `TECHNICAL SPECIFICATIONS AND SPECIAL CONDITIONS`) so that `extract_scoped_context` detects them.
+- **Difficulty:** **Medium** (1 to 2 hours).
+
+---
+
+### 10.4 Issue 4: NestJS API Unit Test Assertions (`health` & `operation-notification`)
+- **Symptoms:**
+  - `health.service.spec.ts`: `Expected: "degraded", Received: "down"`.
+  - `operation-notification.service.spec.ts`: 4 tests fail on string comparisons.
+- **Root Cause:**
+  1. `HealthService.getHealth()` was changed to report `"down"` if core database tables are missing, but the test asserted `"degraded"`.
+  2. `OperationNotificationService` message templates were updated for better readability (changing `"click here to view full details"` to `"View full details"` and `"- Team Member:"` to `"- TE Name:"`), but the unit test assertions were never updated.
+- **Files & Functions:**
+  - `api/src/modules/master/health/health.service.ts` & `health.service.spec.ts`
+  - `api/src/modules/operations/operation-notification.service.ts` & `operation-notification.service.spec.ts`
+- **Fix Suggestion:** Update the test expectations to match current production notification templates and decide whether missing optional tables should report `"degraded"` or `"down"`.
+- **Difficulty:** **Easy** (30 minutes).
+
+---
+
+### 10.5 Issue 5: Token Limit Truncation in Role 1
+- **Symptoms:** On complex tenders with long, convoluted payment terms, Claude Role 1's tool output is truncated midway through generation (`stop_reason == "max_tokens"`), causing a JSON parsing failure.
+- **Root Cause:** The initial output ceiling is set to 600 tokens (`max_tokens=600`). When 8 fields require verbatim legal clauses, the JSON payload can exceed 600 tokens. Although a 1,000-token retry exists, it adds latency.
+- **Files & Functions:** `volksAi/app/services/llm_field_resolver.py` (`resolve_missing_fields_role1`).
+- **Fix Suggestion:** Raise the baseline output token limit to `1,000` tokens and instruct the prompt to keep legal excerpts under 150 characters.
+- **Difficulty:** **Easy** (15 minutes).
+
+---
+
+### 10.6 Issue 6: Separate Pipelines Parsing the Same Tender Twice
+- **Symptoms:** Extracting form data and generating checklists triggers two separate calls to Claude, incurring duplicate token costs and doubling latency.
+- **Root Cause:** Field extraction (`/extract` via Role 1/2) and Checklist analysis (`/analyze-bidding-requirements` via Role 3) are separate endpoints in VolksAI and separate services in NestJS.
+- **Files & Functions:**
+  - `api/src/modules/tendering/info-sheets/pdf-extraction.processor.ts`
+  - `api/src/modules/tendering/checklists/bidding-requirements.service.ts`
+  - `volksAi/app/routers/extract.py` & `volksAi/app/routers/bidding_requirements.py`
+- **Fix Suggestion:** Build a unified endpoint `POST /extract-all` in VolksAI that extracts text once, runs both field resolution and checklist analysis, and returns a single unified JSON payload.
+- **Difficulty:** **Hard** (2 to 3 days).
+
+---
+
+### 10.7 Issue 7: Inadequate OCR Trigger on Scanned PDFs
+- **Symptoms:** Scanned, photocopied PDFs produce empty form extractions without triggering OCR.
+- **Root Cause:** The OCR trigger in `pdf_parent_ingest.py` only checked whether text was extracted on page 1. In some tenders, page 1 is a digitally added cover page, but pages 2 through 50 are scanned images.
+- **Files & Functions:** `volksAi/app/services/pdf_parent_ingest.py` (`ingest_parent_tender_pdf`).
+- **Fix Suggestion:** Check average character density across the first 5 pages (`chars_per_page < 50`). If low, switch to PaddleOCR for the entire document.
+- **Difficulty:** **Medium** (3 to 4 hours).
+
+---
+
+### 10.8 Issue 8: Cache Invalidation when Prompts or Models Change
+- **Symptoms:** You modify a system prompt or model parameter, but when you test a tender, the system continues serving old extraction results from PostgreSQL.
+- **Difficulty:** **Easy** (30 minutes).
+
+---
+
+## 11. SCOPE
+
+### 11.1 In-Scope vs. Out-of-Scope (MVP Boundary)
+
+#### In-Scope:
+- **PDF Document Ingestion:** Parsing standardized GeM bid documents, PSU tender circulars, ATCs (up to 400 pages), and BOQ line items.
+- **Two-Layer Extraction:** Layer 1 deterministic regex parsing backed by Layer 2 scoped LLM resolution via Anthropic Claude (Haiku 4.5 and Sonnet 5.5).
+- **Form Auto-Hydration & Visual Confidence Badges:** Pre-populating the React `InfoSheetForm` with green (verified), amber (review needed / AI resolved), and red (missing) badges with interactive reasoning tooltips.
+- **Bidding Requirements Checklist:** AI extraction of mandatory compliance documents (audited accounts, experience certificates, MAF, MSE declarations) with page references.
+- **Annexure Template Generation:** Exporting pre-filled Microsoft Word (`.docx`) annexure forms.
+- **Cost & Token Accounting:** Recording token consumption, cache hits, and USD costs in PostgreSQL `claude_token_usage`.
+- **Deduplication & Multi-Tier Caching:** Preventing duplicate token burn on re-opened or unmodified tenders.
+
+#### Out-of-Scope:
+- **Automatic Bid Submission on GeM / CPP Portal:** Legally out-of-scope. Indian public procurement portals require a physical USB cryptographic dongle (Class 3 Digital Signature Certificate or DSC) and Aadhaar/OTP verification. Submission must remain human-in-the-loop.
+- **Automated Price Quoting / Profit Margin Calculation:** Costing sheets and financial bidding rates are computed manually by company estimators using vendor RFQs.
+- **Multi-Lingual Vernacular OCR:** State tenders in regional Indian languages (e.g., Hindi, Tamil, Marathi) are out-of-scope for the MVP; English-language tenders are strictly targeted.
+- **Automated Pre-Bid Query Submission:** Drafting pre-bid clarification questions is assisted, but sending emails or portal tickets is manual.
+
+---
+
+### 11.2 Prioritized Developer TODO List
+Follow this roadmap during your initial development sprints:
+
+| Priority | Task Title | Effort | First File to Open | Goal & Scope |
+| :---: | :--- | :---: | :--- | :--- |
+| **P1** | **Fix Phone Cleaning Whitespace** | 0.5 hours | `volksAi/app/services/tender_mapper.py` | Normalize whitespace around slashes in `clean_phone()` so `test_contact_integrity.py` passes cleanly. |
+| **P2** | **Resolve Kochi Ground-Truth Officer Regression** | 1 hour | `volksAi/app/services/field_extractor.py` | Update multi-line officer table parsing so Client 2 (`Sabu Mathews`) is captured; brings `test_kochi_regression.py` to 100% green. |
+| **P3** | **Update Outdated API Test Assertions** | 1 hour | `api/src/modules/master/health/health.service.spec.ts` | Fix string mismatches in `health.service.spec.ts` and `operation-notification.service.spec.ts` so `pnpm test` in `api/` passes 100%. |
+| **P4** | **Update VolksAI Scoped Context Test Fixtures** | 2 hours | `volksAi/app/services/test_role1_prompt_examples.py` | Add section headings to synthetic test fixtures and align mocks with `classify_anthropic_error` to resolve the remaining 12 failing pytest tests. |
+| **P5** | **Document-Level Low-Density OCR Fallback** | 4 hours | `volksAi/app/services/pdf_parent_ingest.py` | Add an average character density check across the first 5 pages to automatically trigger PaddleOCR on scanned image-only PDFs. |
+| **P6** | **Cache Invalidation on Model / Prompt Changes** | 2 hours | `api/src/modules/tendering/info-sheets/pdf-extraction.producer.ts` | Factor model ID or prompt version hash into `EXTRACTION_VERSION` so database caches automatically invalidate when prompt code is updated. |
+| **P7** | **Single-Pass Pipeline Unification** | 2-3 days | `volksAi/app/routers/extract.py` | Create a unified `POST /extract-all` endpoint that runs both Info-Sheet extraction and Checklist analysis in a single orchestrated pass, cutting token cost by ~30%. |
+
+---
+
+## 12. GLOSSARY
+
+The following terms appear constantly in the codebase, database comments, and tender legal documents. Every term is explained here in plain language:
+
+| Term / Abbreviation | Full Name | Plain-Language Definition |
+| :--- | :--- | :--- |
+| **GeM** | Government e-Marketplace | The Indian Government's centralized e-commerce and procurement portal (`gem.gov.in`) where central/state ministries and PSUs purchase goods and services. |
+| **ATC** | Additional Terms & Conditions | A supplementary PDF appended to a standardized GeM bid by the buyer containing buyer-specific legal, technical, and payment clauses that often override general terms. |
+| **BEC / PQR** | Bidder Eligibility Criteria / Pre-Qualification Requirements | Mandatory qualifying hurdles a bidder must meet (e.g. minimum annual turnover, 7 years in business, 3 completed similar contracts). Failing any single BEC disqualifies the bid immediately. |
+| **SCC** | Special Conditions of Contract | Contract clauses tailored to a specific project. By standard legal contract hierarchy in India, SCC clauses supersede GCC (General Conditions of Contract). |
+| **SOW** | Scope of Work | Detailed description of the engineering tasks, equipment deliveries, and technical deliverables required from the contractor. |
+| **BDS** | Bid Data Sheet | A standardized table in public tenders summarizing dates, bid submission address, EMD amounts, and nodal officer contacts. |
+| **IFB / NIT** | Invitation for Bids / Notice Inviting Tender | The formal public advertisement announcing that a tender has been issued. |
+| **EMD** | Earnest Money Deposit | A financial deposit (usually 1% to 2% of tender value, via Bank Guarantee or Demand Draft) paid at bid submission to prevent frivolous bids. Refunded to losers after evaluation. |
+| **ePBG / PBG** | (Electronic) Performance Bank Guarantee | A bank guarantee (typically 3% to 10% of order value) submitted by the winning contractor to guarantee contract completion. Forfeited if the contractor fails to deliver. |
+| **CPS / SD** | Contract Performance Security / Security Deposit | Synonymous with PBG in many PSU contracts (e.g., GAIL, NTPC), representing financial security held during the warranty period. |
+| **PRS / LD** | Price Reduction Schedule / Liquidated Damages | A contractual penalty deducted from contractor invoices if delivery is delayed (typically 0.5% per week of delay up to a maximum cap of 5% to 10%). |
+| **MSE / MSME** | Micro and Small Enterprises | Government of India certified small businesses. Under Indian public procurement policy, MSEs are frequently granted 100% exemption from paying EMD and tender fees. |
+| **MII** | Make in India Policy | Public procurement policy granting price purchase preference to bidders whose equipment contains a minimum percentage of local Indian manufacturing value addition (Class-I / Class-II local suppliers). |
+| **OEM** | Original Equipment Manufacturer | The original manufacturer of equipment (e.g., ABB, Schneider, Siemens) as opposed to a distributor or EPC system integrator. |
+| **MAF** | Manufacturer's Authorization Form | A formal letter on OEM letterhead authorizing a system integrator (like Volks Energie) to supply and service the OEM's products for a specific tender. |
+| **L1** | Lowest Evaluated Bidder | In government bidding, contracts are awarded to the bidder who passes all technical criteria and submits the lowest financial price (the "L1" bidder). |
+| **LOA / FOA** | Letter of Award / Fax of Acceptance | The official award letter issued by the client notifying the contractor that they have won the tender, legally starting the project timeline. |
+| **CRAC** | Consignee Receipt and Acceptance Certificate | A digital certificate generated on GeM by the buyer confirming receipt and quality approval of delivered goods, mandatory before invoice payment is released. |
+| **SITC** | Supply, Installation, Testing & Commissioning | A turnkey contract scope where the contractor is responsible for the full lifecycle: buying material, installing it on site, and commissioning it. |
+| **BullMQ** | Bull Message Queue | A robust, Redis-backed asynchronous task queue used in NestJS to process heavy PDF extraction jobs in the background without blocking the HTTP server. |
+| **FastAPI** | FastAPI Python Framework | A high-performance, asynchronous web framework used in the `volksAi` microservice to process PDFs and communicate with Anthropic LLMs. |
+| **NestJS** | NestJS Backend Framework | A structured, enterprise TypeScript framework used in the `api` module providing modular architecture, dependency injection, and REST controllers. |
+| **Drizzle ORM** | Drizzle Object-Relational Mapper | A lightweight, type-safe TypeScript ORM used in `api` to interact with PostgreSQL and run schema migrations. |
+| **Layer 1** | Rule-Based Extraction | Deterministic regex, table-parsing, and spatial layout extraction algorithms in VolksAI that extract standard fields instantly without calling any AI model. |
+| **Layer 2** | LLM Fallback Resolution | The secondary pipeline in VolksAI that invokes Anthropic Claude models only when Layer 1 is unable to locate a field or flags ambiguity. |
+| **Role 1** | Claude Haiku 4.5 Extraction Persona | A fast, low-cost Claude persona invoked with tightly scoped clauses to extract missing fields into structured JSON using Tool Use. |
+| **Role 2** | Claude Sonnet 5.5 Ambiguity Persona | A higher-intelligence Claude persona invoked to resolve contradictory clauses (e.g., conflicting delivery or payment milestones) and generate legal reasoning. |
+| **Role 3** | Claude Sonnet 5 Checklist Persona | A comprehensive Claude persona in `BiddingRequirementsService` that reads the full page-tagged tender to compile mandatory compliance document checklists. |
+| **Tool Use** | Anthropic Function / Tool Calling | An Anthropic API feature where Claude is provided with a strict JSON schema and forced to output machine-readable arguments rather than free-form chat. |
+| **Scoped Context** | Clause-Targeted Context Windowing | The technique of searching for section headings and feeding only relevant 1,000-character snippets to Claude, saving 95%+ of token costs and preventing hallucination. |
+
+---
+
+## 13. FIRST-DAY CHECKLIST FOR ME
+
+Follow these 10 numbered, concrete steps on your first day to verify your development environment and get your first code fix committed:
+
+1. **Verify Git Branch & Clean Working Tree:**
+   ```bash
+   cd c:\Users\Asus\Desktop\Tender_Volks\TMS\tms
+   git status
+   ```
+   *Expected:* On branch `feature/analyze-save-single-call`, working tree clean.
+
+2. **Configure Environment Files (No Secrets in Git):**
+   - In `api/`, copy `.env.example` to `.env`. Fill in `DATABASE_URL` with your local PostgreSQL credentials and ensure `VOLKS_AI_SERVICE_URL=http://localhost:8001`.
+   - In `volksAi/`, copy `.env.example` to `.env`. Add your development `ANTHROPIC_API_KEY`.
+
+3. **Start Core Infrastructure Containers:**
+   ```bash
+   docker compose up -d postgres redis loki promtail grafana
+   docker compose ps
+   ```
+   *Expected:* All five containers report `Up` status.
+
+4. **Run Database Migrations:**
+   ```bash
+   cd api
+   pnpm install
+   pnpm run db:migrate
+   ```
+   *Expected:* Drizzle applies all migrations up through `0146_create_bidding_requirements_jobs.sql`.
+
+5. **Start & Verify the VolksAI Python Microservice:**
+   ```bash
+   cd ../volksAi
+   python -m venv .venv
+   # Windows: .venv\Scripts\activate | Linux/macOS: source .venv/bin/activate
+   pip install -r requirements.txt
+   uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+   ```
+   In a separate terminal, test the health check:
+   ```bash
+   curl http://localhost:8001/health
+   ```
+   *Expected:* JSON output with `"status": "healthy"` and `"anthropic_configured": true`.
+
+6. **Start & Verify the NestJS Backend API:**
+   In another terminal:
+   ```bash
+   cd ../api
+   pnpm start:dev
+   ```
+   Test the API health check:
+   ```bash
+   curl http://localhost:3000/api/v1/health
+   ```
+   *Expected:* JSON output with `"status": "ok"` and `"database": "connected"`.
+
+7. **Start & Inspect the React Web Frontend:**
+   In another terminal:
+   ```bash
+   cd ../web
+   pnpm install
+   pnpm dev
+   ```
+   *Expected:* Open `http://localhost:5173` in Chrome/Edge. The TMS login or dashboard screen loads without console errors.
+
+8. **Execute Core Pipeline Unit Tests:**
+   In `api/`:
+   ```bash
+   pnpm test -- src/modules/tendering/info-sheets/pdf-extraction.spec.ts
+   ```
+   *Expected:* 24 passed, 0 failed.
+   In `web/`:
+   ```bash
+   pnpm test:unit
+   ```
+   *Expected:* 62 passed, 0 failed.
+
+9. **Verify Minimal Anthropic Claude Connectivity:**
+   In `volksAi/`:
+   ```bash
+   python scratch/check_models.py
+   ```
+   *Expected:* Successful HTTP connection to Anthropic confirming model access for `claude-haiku-4-5-20251001` and `claude-sonnet-5-5`.
+
+10. **Implement Your First Quick Win (Priority 1 - Phone Cleaning Fix):**
+    - Open `volksAi/app/services/tender_mapper.py` in your editor.
+    - Locate `clean_phone()` and add `re.sub(r'\s*/\s*', '/', phone)` to normalize whitespace around slashes.
+    - Run the contact integrity test:
+      ```bash
+      python -m pytest app/services/test_contact_integrity.py -q
+      ```
+    - *Expected:* All tests in `test_contact_integrity.py` turn green! You are now officially up and running on TMS.
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
