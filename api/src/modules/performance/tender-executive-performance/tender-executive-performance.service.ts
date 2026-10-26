@@ -1417,7 +1417,6 @@ export class TenderExecutiveService {
 
         const bidOpening = await exec(`
         ${baseSelect}
-        JOIN statuses st ON st.id = ti.status
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
           AND (ti.tl_approval_timestamp IS NULL OR ti.tl_approval_timestamp < ${fromUtc})
@@ -1432,7 +1431,6 @@ export class TenderExecutiveService {
                          AND bs.created_at < ${fromTz})
                   )
           )
-          AND st.tender_category NOT IN ('won', 'lost')
     `);
 
         const bidDuringTotal = await exec(`
@@ -1473,8 +1471,13 @@ export class TenderExecutiveService {
                   AND COALESCE(bs.submission_datetime, bs.created_at) <= ${toTz}
           )
           AND st.tender_category = 'dnb'
-          AND ti.updated_at >= ${fromTz}
-          AND ti.updated_at <= ${toTz}
+          AND COALESCE(
+                (SELECT MIN(bs.created_at)
+                   FROM bid_submissions bs
+                  WHERE bs.tender_id = ti.id
+                    AND bs.status = 'Tender Missed'),
+                ti.updated_at
+              ) BETWEEN ${fromTz} AND ${toTz}
     `);
 
         const bidTotal = await exec(`
