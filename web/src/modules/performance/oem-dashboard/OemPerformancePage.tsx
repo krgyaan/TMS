@@ -169,8 +169,8 @@ export default function OemPerformancePage() {
 
             {appliedParams && (
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                    <TenderCountBarChart params={appliedParams} />
-                    <DonutChartPerformance params={appliedParams} />
+                    <TenderCountBarChart data={oemData} isLoading={dataLoading} />
+                    <DonutChartPerformance data={oemData} isLoading={dataLoading} />
                 </div>
             )}
         </div>
