@@ -1,5 +1,5 @@
 import { Injectable, Inject } from "@nestjs/common";
-import { and, between, eq, or, sql } from "drizzle-orm";
+import { and, between, eq, or, sql, type SQL } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import { format } from "date-fns";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
@@ -39,9 +39,45 @@ const STATUS = {
 
 const DATE_FORMAT = "dd-MM-yyyy hh:mm a";
 
-const containsOem = (column: PgColumn, oem: number) => sql<boolean>`${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(${column}::text, '')), '\\s*,\\s*'))`;
-
 const containsOemInJsonArray = (column: PgColumn, oem: number) => sql<boolean>`${column}::text LIKE ${'%"' + oem + '"%'}`;
+
+const oemAssociation = (oem: number, tenderId: SQL, rfqTo: SQL): SQL<boolean> => sql<boolean>`
+    (
+        EXISTS (
+            SELECT 1
+            FROM tender_costing_sheets cs
+            WHERE cs.tender_id = ${tenderId}
+              AND cs.oem_vendor_ids IS NOT NULL
+              AND jsonb_array_length(cs.oem_vendor_ids) > 0
+              AND cs.oem_vendor_ids @> to_jsonb(${oem}::int)
+        )
+        OR (
+            NOT EXISTS (
+                SELECT 1
+                FROM tender_costing_sheets cs
+                WHERE cs.tender_id = ${tenderId}
+                  AND cs.oem_vendor_ids IS NOT NULL
+                  AND jsonb_array_length(cs.oem_vendor_ids) > 0
+            )
+            AND (
+                EXISTS (
+                    SELECT 1
+                    FROM rfq_responses rr
+                    INNER JOIN rfqs r ON r.id = rr.rfq_id
+                    WHERE r.tender_id = ${tenderId}
+                      AND rr.organization_id = ${oem}
+                )
+                OR EXISTS (
+                    SELECT 1
+                    FROM rfqs r
+                    WHERE r.tender_id = ${tenderId}
+                      AND ${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(r.requested_organization::text, '')), '\\s*,\\s*'))
+                )
+                OR ${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(${rfqTo}::text, '')), '\\s*,\\s*'))
+            )
+        )
+    )
+`;
 
 @Injectable()
 export class OemPerformanceService {
@@ -154,15 +190,12 @@ export class OemPerformanceService {
             FROM tender_results tr
             INNER JOIN tender_infos t ON t.id = tr.tender_id
             INNER JOIN bid_submissions bs ON bs.tender_id = t.id
-            INNER JOIN tender_costing_sheets cs ON cs.tender_id = t.id
-            INNER JOIN tender_costing_details cd ON cd.tender_costing_sheets_id = cs.id
             LEFT JOIN users u ON u.id = t.team_member
             LEFT JOIN teams tm ON tm.id = t.team
             WHERE t.delete_status = 0
             AND bs.status = 'Bid Submitted'
-            AND cd.status = 'Approved'
-            AND cs.oem_vendor_ids @> to_jsonb(${oem}::int)
             AND t.created_at BETWEEN ${from} AND ${to}
+            AND ${oemAssociation(oem, sql.raw("t.id"), sql.raw("t.rfq_to"))}
         `);
         return rows;
     }
@@ -181,7 +214,7 @@ export class OemPerformanceService {
                 teamMemberName: users.name,
                 tlStatus: tenderInfos.tlStatus,
                 status: tenderInfos.status,
-                sentToOem: containsOem(tenderInfos.rfqTo, oem),
+                sentToOem: oemAssociation(oem, sql`${tenderInfos.id}`, sql`${tenderInfos.rfqTo}`),
                 notAllowedForOem: containsOemInJsonArray(tenderInfos.oemNotAllowed, oem),
             })
             .from(tenderInfos)
@@ -191,7 +224,10 @@ export class OemPerformanceService {
                 and(
                     between(tenderInfos.createdAt, from, to),
                     eq(tenderInfos.deleteStatus, 0),
-                    or(containsOem(tenderInfos.rfqTo, oem), containsOemInJsonArray(tenderInfos.oemNotAllowed, oem))
+                    or(
+                        oemAssociation(oem, sql`${tenderInfos.id}`, sql`${tenderInfos.rfqTo}`),
+                        containsOemInJsonArray(tenderInfos.oemNotAllowed, oem)
+                    )
                 )
             )
             .orderBy(tenderInfos.dueDate);
@@ -241,15 +277,12 @@ export class OemPerformanceService {
             INNER JOIN tender_infos t ON t.id = bs.tender_id
             LEFT JOIN users u ON u.id = t.team_member
             LEFT JOIN teams tm ON tm.id = t.team
-            INNER JOIN tender_costing_sheets cs ON cs.tender_id = t.id
-                AND cs.oem_vendor_ids @> to_jsonb(${oem}::int)
-            INNER JOIN tender_costing_details cd ON cd.tender_costing_sheets_id = cs.id
-                AND cd.status = 'Approved'
             LEFT JOIN tender_results tr ON tr.tender_id = t.id
             WHERE t.delete_status = 0
             AND bs.status = 'Bid Submitted'
             AND tr.id IS NULL
             AND t.created_at BETWEEN ${from} AND ${to}
+            AND ${oemAssociation(oem, sql.raw("t.id"), sql.raw("t.rfq_to"))}
         `);
         return rows as unknown as BidTenderRow[];
     }
@@ -281,12 +314,26 @@ export class OemPerformanceService {
                     SELECT CASE
                         WHEN cs2.oem_vendor_ids IS NOT NULL AND jsonb_array_length(cs2.oem_vendor_ids) > 0
                         THEN cs2.oem_vendor_ids
-                        ELSE (
-                            SELECT jsonb_agg(x)
-                            FROM rfqs r2,
-                                unnest(regexp_split_to_array(btrim(coalesce(r2.requested_organization::text, '')), '\\s*,\\s*')) AS x
-                            WHERE r2.tender_id = cs2.tender_id
-                            AND x <> ''
+                        ELSE COALESCE(
+                            (
+                                SELECT jsonb_agg(DISTINCT rr.organization_id)
+                                FROM rfq_responses rr
+                                INNER JOIN rfqs r2 ON r2.id = rr.rfq_id
+                                WHERE r2.tender_id = cs2.tender_id
+                                  AND rr.organization_id IS NOT NULL
+                            ),
+                            (
+                                SELECT jsonb_agg(x)
+                                FROM rfqs r3,
+                                    unnest(regexp_split_to_array(btrim(coalesce(r3.requested_organization::text, '')), '\\s*,\\s*')) AS x
+                                WHERE r3.tender_id = cs2.tender_id
+                                AND x <> ''
+                            ),
+                            (
+                                SELECT jsonb_agg(x)
+                                FROM unnest(regexp_split_to_array(btrim(coalesce(t.rfq_to::text, '')), '\\s*,\\s*')) AS x
+                                WHERE x <> ''
+                            )
                         )
                     END AS ids_json
                 ) resolved
@@ -298,7 +345,7 @@ export class OemPerformanceService {
             AND bs.status IN ('Bid Submitted', 'Submission Pending')
             AND bs.submission_datetime IS NOT NULL
             AND t.created_at BETWEEN ${from} AND ${to}
-            AND ${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(t.rfq_to::text, '')), '\\s*,\\s*'))
+            AND ${oemAssociation(oem, sql.raw("t.id"), sql.raw("t.rfq_to"))}
         `);
         return rows as unknown as BidTenderRow[];
     }
@@ -319,13 +366,10 @@ export class OemPerformanceService {
             INNER JOIN tender_infos t ON t.id = bs.tender_id
             LEFT JOIN users u ON u.id = t.team_member
             LEFT JOIN teams tm ON tm.id = t.team
-            INNER JOIN tender_costing_sheets cs ON cs.tender_id = t.id
-                AND cs.oem_vendor_ids @> to_jsonb(${oem}::int)
-            INNER JOIN tender_costing_details cd ON cd.tender_costing_sheets_id = cs.id
-                AND cd.status = 'Approved'
             WHERE t.delete_status = 0
             AND bs.status = 'Tender Missed'
             AND t.created_at BETWEEN ${from} AND ${to}
+            AND ${oemAssociation(oem, sql.raw("t.id"), sql.raw("t.rfq_to"))}
         `);
         return rows as unknown as BidTenderRow[];
     }
