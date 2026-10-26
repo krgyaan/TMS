@@ -2068,17 +2068,17 @@ export class TenderExecutiveService {
                 ) AS paid_at,
                 COALESCE(itd.return_transfer_date, pi.transfer_date, pi.updated_at) AS returned_at,
                 (
-                       (pi.instrument_type IN ('DD','FDR')                      AND pi.action IN (3,4,7))
+                    (pi.instrument_type IN ('DD','FDR')                      AND pi.action IN (3,4,7))
                     OR (pi.instrument_type IN ('Bank Transfer','Portal Payment') AND pi.action IN (3,4))
                     OR (pi.instrument_type = 'BG'                               AND pi.action IN (6,8,9))
                 ) AS has_return,
                 CASE
                     WHEN (pi.instrument_type IN ('DD','FDR')                      AND pi.action IN (3,4,7))
-                      OR (pi.instrument_type IN ('Bank Transfer','Portal Payment') AND pi.action IN (3))
-                      OR (pi.instrument_type = 'BG'                               AND pi.action IN (6,8,9)) THEN 'RETURNED'
+                    OR (pi.instrument_type IN ('Bank Transfer','Portal Payment') AND pi.action IN (3))
+                    OR (pi.instrument_type = 'BG'                               AND pi.action IN (6,8,9)) THEN 'RETURNED'
                     WHEN (pi.instrument_type IN ('DD','FDR')                      AND pi.action IN (5))
-                      OR (pi.instrument_type IN ('Bank Transfer','Portal Payment') AND pi.action IN (4))
-                      OR (pi.instrument_type = 'Cheque'                           AND pi.action IN (4,5))        THEN 'SETTLED'
+                    OR (pi.instrument_type IN ('Bank Transfer','Portal Payment') AND pi.action IN (4))
+                    OR (pi.instrument_type = 'Cheque'                           AND pi.action IN (4,5))        THEN 'SETTLED'
                     ELSE 'PAID'
                 END AS emd_state
             FROM payment_requests pr
@@ -2094,6 +2094,10 @@ export class TenderExecutiveService {
             AND ti.delete_status NOT IN (1)
             AND pi.status NOT ILIKE '%rejected%'
             AND pi.status NOT ILIKE '%pending%'
+            AND NOT (
+                pi.instrument_type = 'Cheque'
+                AND (icd.linked_dd_id IS NOT NULL OR icd.linked_fdr_id IS NOT NULL)
+            )
         )`;
 
         const opening = await exec(`${emdCte}
