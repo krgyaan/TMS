@@ -120,58 +120,58 @@ export default function OemPerformancePage() {
 
     return (
         <div className="space-y-6">
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <CardTitle>OEM Performance Report</CardTitle>
-                            <CardDescription>Analyze performance metrics and interactions with selected Original Equipment Manufacturers.</CardDescription>
-                        </div>
-                    </div>
+            <Card className="shadow-sm">
+                <CardHeader className="border-b">
+                    <CardTitle>OEM Performance Report</CardTitle>
+                    <CardDescription>Analyze performance metrics and interactions with selected Original Equipment Manufacturers.</CardDescription>
                 </CardHeader>
-                <CardContent />
+                <CardContent className="space-y-6">
+                    <OemFilterCard
+                        oemOptions={oems.map(oem => ({ id: oem.id.toString(), name: oem.name }))}
+                        selectedOemId={selectedOemId}
+                        onSelectOem={setSelectedOemId}
+                        fromDate={fromDate}
+                        toDate={toDate}
+                        onFromDate={setFromDate}
+                        onToDate={setToDate}
+                        onSubmit={() => {
+                            if (!params) return;
+                            const next = { ...params, tab: activeTab };
+                            setAppliedParams(next);
+                            const search = buildSearch(params, activeTab);
+                            localStorage.setItem(storageKey, search.toString());
+                            navigate({ search: `?${search.toString()}` }, { replace: true });
+                        }}
+                    />
+
+                    {appliedParams && (
+                        <>
+                            <div className="flex justify-center">
+                                <Tabs value={activeTab} onValueChange={handleTabChange}>
+                                    <TabsList className="h-auto flex-wrap justify-center">
+                                        {OEM_TABS.map(tab => (
+                                            <TabsTrigger key={tab.key} value={tab.key} className="text-xs flex items-center gap-1.5">
+                                                {tab.label}
+                                                <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                                                    {tabCounts[tab.key as keyof typeof tabCounts]}
+                                                </Badge>
+                                            </TabsTrigger>
+                                        ))}
+                                    </TabsList>
+                                </Tabs>
+                            </div>
+
+                            <OemTenderTable params={appliedParams} tab={activeTab} data={oemData} isLoading={dataLoading} />
+                        </>
+                    )}
+                </CardContent>
             </Card>
 
-            <OemFilterCard
-                oemOptions={oems.map(oem => ({ id: oem.id.toString(), name: oem.name }))}
-                selectedOemId={selectedOemId}
-                onSelectOem={setSelectedOemId}
-                fromDate={fromDate}
-                toDate={toDate}
-                onFromDate={setFromDate}
-                onToDate={setToDate}
-                onSubmit={() => {
-                    if (!params) return;
-                    const next = { ...params, tab: activeTab };
-                    setAppliedParams(next);
-                    const search = buildSearch(params, activeTab);
-                    localStorage.setItem(storageKey, search.toString());
-                    navigate({ search: `?${search.toString()}` }, { replace: true });
-                }}
-            />
-
             {appliedParams && (
-                <>
-                    <Tabs value={activeTab} onValueChange={handleTabChange}>
-                        <TabsList className="h-auto flex-wrap justify-center">
-                            {OEM_TABS.map(tab => (
-                                <TabsTrigger key={tab.key} value={tab.key} className="text-xs flex items-center gap-1.5">
-                                    {tab.label}
-                                    <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
-                                        {tabCounts[tab.key as keyof typeof tabCounts]}
-                                    </Badge>
-                                </TabsTrigger>
-                            ))}
-                        </TabsList>
-                    </Tabs>
-
-                    <OemTenderTable params={appliedParams} tab={activeTab} data={oemData} isLoading={dataLoading} />
-
-                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                        <TenderCountBarChart params={appliedParams} />
-                        <DonutChartPerformance params={appliedParams} />
-                    </div>
-                </>
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                    <TenderCountBarChart params={appliedParams} />
+                    <DonutChartPerformance params={appliedParams} />
+                </div>
             )}
         </div>
     );

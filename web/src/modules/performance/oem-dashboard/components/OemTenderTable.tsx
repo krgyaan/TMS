@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 /* UI Components */
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import DataTable from "@/components/ui/data-table";
@@ -256,51 +255,49 @@ export default function OemTenderTable({ params, tab, data, isLoading }: OemTend
 
     if (isLoading) {
         return (
-            <Card>
-                <CardHeader className="pb-4">
-                    <Skeleton className="h-6 w-52" />
-                    <Skeleton className="h-4 w-80" />
-                </CardHeader>
-                <CardContent>
+            <div className="space-y-4">
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div>
+                        <Skeleton className="h-6 w-52" />
+                        <Skeleton className="h-4 w-80 mt-1" />
+                    </div>
+                    <Skeleton className="h-9 w-56" />
+                </div>
+                <div className="border-t pt-6">
                     <Skeleton className="h-48 w-full rounded-lg" />
-                </CardContent>
-            </Card>
+                </div>
+            </div>
         );
     }
 
     const activeTab = OEM_TABS.find(t => t.key === tab) ?? OEM_TABS[0];
 
     return (
-        <Card>
-            <CardHeader className="pb-4">
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                    <div>
-                        <CardTitle className="text-base font-semibold">{activeTab.label}</CardTitle>
-                        <CardDescription>Tenders in this category for the selected OEM and date range.</CardDescription>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="relative">
-                            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                type="text"
-                                placeholder="Search tenders..."
-                                value={search}
-                                onChange={e => setSearch(e.target.value)}
-                                className="pl-8 w-56"
-                                aria-label="Search tenders"
-                            />
-                        </div>
-                        <Badge variant="secondary">{rows.length}</Badge>
-                    </div>
+        <div className="space-y-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                    <h3 className="text-base font-semibold leading-none">{activeTab.label}</h3>
+                    <p className="text-sm text-muted-foreground mt-1.5">Tenders in this category for the selected OEM and date range.</p>
                 </div>
-            </CardHeader>
-            <CardContent className="pt-0">
+                <div className="relative">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        type="text"
+                        placeholder="Search tenders..."
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        className="pl-8 w-56"
+                        aria-label="Search tenders"
+                    />
+                </div>
+            </div>
+            <div className="border-t pt-6">
                 {rows.length === 0 ? (
                     <div className="py-12 text-center text-sm text-muted-foreground">No tenders found for this category.</div>
                 ) : (
                     <DataTable data={rows} columnDefs={columnDefs} gridOptions={{ domLayout: "autoHeight" }} onGridReady={onGridReady} />
                 )}
-            </CardContent>
-        </Card>
+            </div>
+        </div>
     );
 }
