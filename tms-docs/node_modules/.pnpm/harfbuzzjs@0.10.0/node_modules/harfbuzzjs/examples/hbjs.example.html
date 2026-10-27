@@ -1,0 +1,16 @@
+<script src="../hb.js"></script>
+<script src="../hbjs.js"></script>
+<script src="hbjs.example.js"></script>
+<script>
+
+let harfBuzzModule; // not really needed with the hbjs wrapper
+createHarfBuzz().then(hbmodule=>{
+  harfBuzzModule = hbmodule;
+  fetch('../test/fonts/noto/NotoSans-Regular.ttf').then(function (x) {
+    return x.arrayBuffer();
+  }).then(function (blob) {
+    document.body.innerText = JSON.stringify(example(hbjs(hbmodule), new Uint8Array(blob)), undefined, 2);
+    document.body.style.whiteSpace = 'pre';
+  });
+});
+</script>

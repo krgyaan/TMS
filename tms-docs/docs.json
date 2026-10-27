@@ -8,23 +8,75 @@
     "dark": "#D94F00"
   },
   "favicon": {
-    "light": "/tms-docs/images/logo.svg",
-    "dark": "/tms-docs/images/logo.svg"
+    "light": "/images/ve_favicon.png",
+    "dark": "/images/ve_favicon.png"
+  },
+  "logo": {
+    "light": "/images/dark-ve-logo.png",
+    "dark": "/images/ve_logo.png"
   },
   "navigation": {
     "pages": [
       {
-        "group": "Getting Started",
+        "group": "Overview",
         "pages": [
           "index",
-          "quickstart"
+          "quickstart",
+          "onboarding"
+        ]
+      },
+      {
+        "group": "Architecture & Flow",
+        "pages": [
+          "architecture/overview",
+          "architecture/repo-map",
+          "architecture/end-to-end-flow"
+        ]
+      },
+      {
+        "group": "VolksAI Intelligence",
+        "pages": [
+          "volksai/overview",
+          "volksai/handoff-guide",
+          "volksai/two-layer-extraction",
+          "volksai/llm-roles-and-prompts",
+          "volksai/checklists-and-requirements",
+          "volksai/ocr-and-scanned-documents",
+          "volksai/ground-truth-and-testing"
+        ]
+      },
+      {
+        "group": "Backend & Database",
+        "pages": [
+          "backend/overview",
+          "backend/database-and-schemas",
+          "backend/workers-and-queues"
+        ]
+      },
+      {
+        "group": "Frontend",
+        "pages": [
+          "frontend/overview",
+          "frontend/tendering-ui"
+        ]
+      },
+      {
+        "group": "Operations & DevOps",
+        "pages": [
+          "devops/configuration",
+          "devops/monitoring-and-logging",
+          "devops/testing-and-debugging"
+        ]
+      },
+      {
+        "group": "Reference",
+        "pages": [
+          "reference/status-and-issues",
+          "reference/scope-and-roadmap",
+          "reference/glossary"
         ]
       }
     ]
-  },
-  "logo": {
-    "light": "/tms-docs/images/dark-ve-logo.png",
-    "dark": "/tms-docs/images/ve_logo.png"
   },
   "icons": {
     "library": "fontawesome"
@@ -44,6 +96,6 @@
     "display": "header"
   },
   "search": {
-    "prompt": "Ask"
+    "prompt": "Ask TMS Docs..."
   }
 }

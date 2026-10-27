@@ -1,0 +1,47 @@
+---
+title: "Glossary & Domain Terms"
+description: "Plain-language definitions of Indian public procurement acronyms and TMS technical terminology"
+---
+
+The following terms appear frequently in the codebase, database schemas, and government tender documents:
+
+## Public Procurement & Bidding Terms
+
+| Term | Full Name | Plain-Language Definition |
+| :--- | :--- | :--- |
+| **GeM** | Government e-Marketplace | The Indian Government's centralized procurement portal (`gem.gov.in`) where central ministries, state bodies, and PSUs acquire goods and services. |
+| **ATC** | Additional Terms & Conditions | A supplementary PDF appended to a standardized GeM bid by the buyer containing custom clauses that often override general terms. |
+| **BEC / PQR** | Bidder Eligibility Criteria / Pre-Qualification Requirements | Mandatory qualifying hurdles (e.g. minimum annual turnover, 7 years in business, 3 completed contracts of ₹1 Cr). Failing any single criterion disqualifies the bidder immediately. |
+| **GCC** | General Conditions of Contract | Standard, non-negotiable contract clauses common across all government purchases. |
+| **SCC** | Special Conditions of Contract | Contract clauses tailored specifically to an individual project. Under Indian contract law, **SCC clauses legally supersede GCC clauses**. |
+| **SOW** | Scope of Work | Detailed specification of engineering deliverables, installations, equipment supply, and technical parameters. |
+| **BDS** | Bid Data Sheet | A summary table in public tenders listing due dates, bid submission address, EMD amounts, and nodal officer contacts. |
+| **IFB / NIT** | Invitation for Bids / Notice Inviting Tender | The formal public advertisement announcing that a tender has been issued. |
+| **EMD** | Earnest Money Deposit | A financial deposit (typically 1% to 2% of tender value via Bank Guarantee or Demand Draft) paid at submission to prevent frivolous bids. Fully refunded to unsuccessful bidders. |
+| **ePBG / PBG** | (Electronic) Performance Bank Guarantee | A bank guarantee (typically 3% to 10% of order value) submitted by the winning contractor to guarantee contract completion. Forfeited if the contractor fails to deliver. |
+| **CPS / SD** | Contract Performance Security / Security Deposit | Synonymous with PBG in many PSU contracts (e.g., GAIL, NTPC), representing financial security held during the contract and warranty period. |
+| **PRS / LD** | Price Reduction Schedule / Liquidated Damages | A contractual penalty deducted from contractor invoices if delivery is delayed (typically 0.5% per week of delay up to a maximum cap of 5% to 10%). |
+| **MSE / MSME** | Micro and Small Enterprises | Government of India certified small businesses. Under Indian public procurement policy, MSEs are frequently granted **100% exemption from paying EMD and tender fees**. |
+| **MII** | Make in India Policy | Policy granting price preference to bidders whose equipment contains a minimum percentage of local Indian manufacturing value addition (Class-I / Class-II local suppliers). |
+| **OEM** | Original Equipment Manufacturer | The original manufacturer of equipment (e.g., ABB, Schneider, Siemens) as opposed to a distributor or EPC system integrator. |
+| **MAF** | Manufacturer's Authorization Form | A formal letter on OEM letterhead authorizing a system integrator (like Volks Energie) to supply and service the OEM's products for a specific tender. |
+| **L1** | Lowest Evaluated Bidder | In government bidding, contracts are awarded to the bidder who passes all technical criteria and submits the lowest financial price (the "L1" bidder). |
+| **LOA / FOA** | Letter of Award / Fax of Acceptance | The official award letter issued by the buyer notifying the contractor that they have won the tender, legally starting the project delivery clock. |
+| **CRAC** | Consignee Receipt and Acceptance Certificate | A digital certificate generated on GeM by the buyer confirming receipt and quality approval of delivered goods, mandatory before invoice payment is released. |
+| **SITC** | Supply, Installation, Testing & Commissioning | A turnkey contract scope where the contractor is responsible for the full lifecycle: buying material, installing it on site, and commissioning it. |
+
+---
+
+## Technical & AI Terminology
+
+| Term | Domain | Definition |
+| :--- | :--- | :--- |
+| **Layer 1** | VolksAI | Fast, deterministic regex and spatial layout algorithms that extract standard tables and fields instantly with **0 LLM token cost**. |
+| **Layer 2** | VolksAI | The secondary fallback pipeline in VolksAI that invokes Anthropic Claude models only when Layer 1 cannot find a field or flags ambiguity. |
+| **Role 1** | VolksAI | Fast Claude Haiku 4.5 persona invoked with scoped clause snippets to resolve missing fields into structured JSON via Tool Use. |
+| **Role 2** | VolksAI | Claude Sonnet 5.5 persona invoked to resolve contradictory clauses (e.g., GCC vs SCC delivery terms) and emit legal reasoning. |
+| **Role 3** | VolksAI | Claude Sonnet 5 persona in `BiddingRequirementsService` that reads the full page-tagged tender to compile mandatory compliance checklists. |
+| **Scoped Context** | VolksAI | The technique of searching for section headings and passing only relevant 1,000-character snippets to Claude, saving 95%+ of token costs and preventing hallucination. |
+| **Tool Use** | Anthropic | An Anthropic API capability where Claude is provided with a rigid JSON schema and forced to output machine-readable arguments rather than free-form chat. |
+| **BullMQ** | Backend | A robust, Redis-backed asynchronous task queue used in NestJS to process heavy PDF extraction jobs in the background without blocking the HTTP server. |
+| **Drizzle ORM** | Backend | A lightweight, type-safe TypeScript ORM used in `api` to interact with PostgreSQL and run schema migrations. |

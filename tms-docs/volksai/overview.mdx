@@ -1,0 +1,62 @@
+---
+title: "VolksAI Microservice Overview"
+description: "High-performance Python FastAPI service for tender PDF layout analysis, OCR, and AI clause extraction"
+---
+
+**VolksAI** is a specialized Python microservice (`volksAi/`) built with FastAPI, PyMuPDF, pdfplumber, PaddleOCR, and the Anthropic SDK. Its primary objective is to transform massive, heterogeneous Indian procurement PDFs into structured, validated JSON data.
+
+## Key Capabilities
+
+* **High-Throughput PDF Parsing:** Ingests primary GeM documents and child Additional Terms & Conditions (ATC) documents up to **400 pages** (`CHILD_PDF_MAX_PAGES`).
+* **Deterministic Layout & Spatial Parsing:** Uses PyMuPDF (`fitz`) and `pdfplumber` to extract tables, key-value grids, and Bid Data Sheets without calling an LLM.
+* **Optical Character Recognition (OCR):** Falls back to PaddleOCR when scanned paper circulars or image-only pages have near-zero digital text density.
+* **Targeted Claude Intelligence:** Employs Claude Haiku 4.5 and Sonnet 5.5 using scoped context windows and Tool Use schemas.
+
+---
+
+## Service Endpoints
+
+| Method | Route | Description | Average Latency |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/health` | Liveness and readiness check; reports Anthropic configuration and OCR status | `<10ms` |
+| `POST` | `/extract` | Ingests primary PDF + ATCs; runs Layer 1 regex and Layer 2 LLM fallback | `5s - 35s` |
+| `POST` | `/analyze-bidding-requirements` | Evaluates entire document to compile mandatory bidder compliance checklist | `45s - 90s` |
+
+---
+
+## Microservice Architecture
+
+```
+volksAi/
+├── app/
+│   ├── main.py                     # FastAPI entrypoint, CORS, lifespan startup hooks
+│   ├── routers/
+│   │   ├── extract.py              # POST /extract endpoint definition
+│   │   ├── bidding_requirements.py # POST /analyze-bidding-requirements endpoint
+│   │   └── health.py               # GET /health endpoint
+│   ├── services/
+│   │   ├── pdf_parent_ingest.py    # PyMuPDF/pdfplumber parser and OCR coordinator
+│   │   ├── tender_mapper.py        # Layer 1 deterministic regex mapping
+│   │   ├── field_extractor.py      # Spatial table and text parser
+│   │   ├── llm_field_resolver.py   # Layer 2 Claude resolver (Role 1 & Role 2)
+│   │   └── tms_field_mapper.py     # Maps Python outputs to camelCase NestJS DTOs
+│   └── core/
+│       ├── config.py               # Settings loaded from environment variables
+│       └── logging.py              # Structured rotating file logger (TMS/tms/logs/volksai.log)
+├── scratch/                        # Diagnostic scripts and test fixtures
+└── requirements.txt                # Python dependencies
+```
+
+---
+
+## OCR Engine: PaddleOCR vs Tesseract
+
+Government procurement tenders in India frequently include scanned paper annexures, physical bank guarantees, or circulars signed with ink stamps.
+
+1. **Digital-First Text Extraction:** VolksAI first attempts native text extraction using PyMuPDF. If character density exceeds the threshold, OCR is skipped entirely for peak performance.
+2. **PaddleOCR Fallback:** When digital text is absent, PaddleOCR processes the page images.
+3. **Thread Safety & CPU Throttling:** `OMP_NUM_THREADS=1` is enforced in the environment to prevent native C++ OCR libraries from saturating multi-core CPUs during parallel requests.
+
+<Info>
+  **Memory Requirement:** When running with PaddleOCR enabled, ensure the host machine or container has at least **2GB to 4GB of available RAM**.
+</Info>

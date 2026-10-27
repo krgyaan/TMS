@@ -1,0 +1,21 @@
+{
+  "name": "tms-docs",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mintlify documentation for Tender Management System (TMS) & VolksAI",
+  "scripts": {
+    "dev": "mintlify dev",
+    "broken-links": "mintlify broken-links"
+  },
+  "devDependencies": {
+    "mintlify": "^4.2.1144"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@scarf/scarf",
+      "esbuild",
+      "keytar",
+      "sharp"
+    ]
+  }
+}
