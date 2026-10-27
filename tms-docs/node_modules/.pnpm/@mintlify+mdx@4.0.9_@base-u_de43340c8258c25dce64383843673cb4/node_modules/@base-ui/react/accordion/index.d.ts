@@ -1,0 +1,12 @@
+export * as Accordion from "./index.parts.js";
+export type * from "./root/AccordionRoot.js";
+export type * from "./item/AccordionItem.js";
+export type * from "./header/AccordionHeader.js";
+export type * from "./trigger/AccordionTrigger.js";
+export type * from "./panel/AccordionPanel.js";
+export * as AccordionRootDataAttributes from "./root/AccordionRootDataAttributes.js";
+export * as AccordionItemDataAttributes from "./item/AccordionItemDataAttributes.js";
+export * as AccordionHeaderDataAttributes from "./header/AccordionHeaderDataAttributes.js";
+export * as AccordionTriggerDataAttributes from "./trigger/AccordionTriggerDataAttributes.js";
+export * as AccordionPanelCssVariables from "./panel/AccordionPanelCssVars.js";
+export * as AccordionPanelDataAttributes from "./panel/AccordionPanelDataAttributes.js";

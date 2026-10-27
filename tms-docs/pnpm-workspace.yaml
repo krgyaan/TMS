@@ -1,0 +1,17 @@
+allowBuilds:
+  '@scarf/scarf': set this to true or false
+  esbuild: set this to true or false
+  keytar: set this to true or false
+  sharp: set this to true or false
+minimumReleaseAgeExclude:
+  - '@mintlify/cli@4.0.1747'
+  - '@mintlify/common@1.0.1310'
+  - '@mintlify/link-rot@3.0.1543'
+  - '@mintlify/models@0.0.379'
+  - '@mintlify/og@0.0.109'
+  - '@mintlify/package-builder@0.0.99'
+  - '@mintlify/prebuild@1.0.1479'
+  - '@mintlify/previewing@4.0.1561'
+  - '@mintlify/scraping@4.0.1186'
+  - '@mintlify/validation@0.1.944'
+  - mintlify@4.2.1144

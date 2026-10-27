@@ -8,23 +8,80 @@
     "dark": "#D94F00"
   },
   "favicon": {
-    "light": "/tms-docs/images/logo.svg",
-    "dark": "/tms-docs/images/logo.svg"
+    "light": "/images/ve_favicon.png",
+    "dark": "/images/ve_favicon.png"
+  },
+  "logo": {
+    "light": "/images/dark-ve-logo.png",
+    "dark": "/images/ve_logo.png"
   },
   "navigation": {
     "pages": [
       {
-        "group": "Getting Started",
+        "group": "Overview",
         "pages": [
           "index",
-          "quickstart"
+          "quickstart",
+          "onboarding"
+        ]
+      },
+      {
+        "group": "Architecture & Flow",
+        "pages": [
+          "architecture/overview",
+          "architecture/repo-map",
+          "architecture/end-to-end-flow"
+        ]
+      },
+      {
+        "group": "VolksAI (Deep Dive)",
+        "pages": [
+          "volksai/index",
+          "volksai/handoff-guide",
+          "volksai/ingestion-and-classification",
+          "volksai/layer1-deterministic-mapping",
+          "volksai/layer2-llm-resolver",
+          "volksai/scoped-context-and-prompts",
+          "volksai/bidding-requirements-pipeline",
+          "volksai/annexure-builder",
+          "volksai/ocr-engine",
+          "volksai/tms-field-mapping",
+          "volksai/ground-truth-and-testing",
+          "volksai/api-reference"
+        ]
+      },
+      {
+        "group": "Backend Engineering",
+        "pages": [
+          "backend/overview",
+          "backend/database-and-schemas",
+          "backend/workers-and-queues"
+        ]
+      },
+      {
+        "group": "Frontend Engineering",
+        "pages": [
+          "frontend/overview",
+          "frontend/tendering-ui"
+        ]
+      },
+      {
+        "group": "Operations & DevOps",
+        "pages": [
+          "devops/configuration",
+          "devops/monitoring-and-logging",
+          "devops/testing-and-debugging"
+        ]
+      },
+      {
+        "group": "Reference",
+        "pages": [
+          "reference/status-and-issues",
+          "reference/scope-and-roadmap",
+          "reference/glossary"
         ]
       }
     ]
-  },
-  "logo": {
-    "light": "/tms-docs/images/dark-ve-logo.png",
-    "dark": "/tms-docs/images/ve_logo.png"
   },
   "icons": {
     "library": "fontawesome"
@@ -44,6 +101,6 @@
     "display": "header"
   },
   "search": {
-    "prompt": "Ask"
+    "prompt": "Ask TMS Docs..."
   }
 }

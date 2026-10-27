@@ -1,0 +1,142 @@
+---
+title: "Testing & Debugging"
+description: "How to run test suites, debug pipelines, test Claude connectivity, and inspect extraction data"
+---
+
+This guide outlines how to execute automated tests, trigger targeted manual extractions, verify Claude API connectivity, and inspect live PostgreSQL extraction data.
+
+## Running Automated Test Suites
+
+### 1. Backend Unit & E2E Tests (`api/`)
+
+<CodeGroup>
+```bash Core Pipeline Unit Test
+cd api
+pnpm test -- src/modules/tendering/info-sheets/pdf-extraction.spec.ts
+```
+
+```bash Checklist Service Test
+cd api
+pnpm test -- src/modules/tendering/checklists/bidding-requirements.service.spec.ts
+```
+
+```bash Full Test Suite
+cd api
+pnpm test
+```
+</CodeGroup>
+
+### 2. Frontend Unit & Type Tests (`web/`)
+
+<CodeGroup>
+```bash Vitest Unit Tests
+cd web
+pnpm test:unit
+```
+
+```bash TypeScript Type Check
+cd web
+pnpm type-check
+```
+</CodeGroup>
+
+### 3. VolksAI Python Pytest (`volksAi/`)
+
+<CodeGroup>
+```bash Contact Integrity Test
+cd volksAi
+python -m pytest app/services/test_contact_integrity.py -v
+```
+
+```bash Regression Ground-Truth Test
+cd volksAi
+python -m pytest app/services/test_kochi_regression.py -v
+```
+
+```bash All Services Tests
+cd volksAi
+python -m pytest app/services/ -q
+```
+</CodeGroup>
+
+---
+
+## Minimal Claude Connectivity Test
+
+To confirm that VolksAI can communicate with the Anthropic API without having to upload and process a large 200-page tender:
+
+Run the included verification diagnostic script:
+```bash
+cd volksAi
+python scratch/check_models.py
+```
+
+Or execute this minimal python test one-liner in your terminal:
+```bash
+python -c "
+import os
+from anthropic import Anthropic
+client = Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+resp = client.messages.create(
+    model='claude-haiku-4-5-20251001',
+    max_tokens=20,
+    messages=[{'role': 'user', 'content': 'Ping'}]
+)
+print('Anthropic API Connectivity OK:', resp.content[0].text)
+"
+```
+
+---
+
+## How to Re-Run Extractions for a Specific Tender
+
+### Method 1: Via the Web UI
+1. Navigate to `http://localhost:5173/tendering/tenders/<tenderId>/info-sheet`.
+2. Check the **"Force re-extraction"** checkbox.
+3. Click the **"Auto-Extract with AI"** button.
+4. The system bypasses all cached records in PostgreSQL and Redis, dispatches a fresh extraction job, and overwrites the cached extraction data upon completion.
+
+### Method 2: Via API `curl`
+```bash
+curl -X POST "http://localhost:3000/api/v1/tender-info-sheets/<tenderId>/auto-extract" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your_jwt_token>" \
+  -d '{"force": true}'
+```
+
+### Method 3: Direct VolksAI Invocation (Bypassing NestJS & Queue)
+```bash
+curl -X POST "http://localhost:8001/extract" \
+  -F "pdf_file=@/path/to/Bid_Document.pdf" \
+  -F "user_id=1" \
+  -F "tender_id=123" \
+  -o extraction_result.json
+```
+
+---
+
+## Direct Database Inspection Queries
+
+To inspect extractions and token costs using `psql`:
+
+```sql
+-- View the 5 most recent extraction jobs
+SELECT 
+    id, 
+    tender_id, 
+    extraction_version, 
+    processing_time_ms, 
+    created_at 
+FROM tender_extractions 
+ORDER BY id DESC LIMIT 5;
+
+-- Summarize Claude token expenditure by model and call type
+SELECT 
+    model, 
+    call_type, 
+    COUNT(*) as total_calls, 
+    SUM(total_tokens) as tokens, 
+    ROUND(SUM(estimated_cost_usd)::numeric, 4) as cost_usd 
+FROM claude_token_usage 
+GROUP BY model, call_type;
+```

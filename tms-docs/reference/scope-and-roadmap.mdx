@@ -1,0 +1,39 @@
+---
+title: "Scope & Roadmap"
+description: "In-scope vs out-of-scope boundaries and prioritized developer roadmap (P1 to P7)"
+---
+
+This document establishes the functional boundary for the MVP and outlines the prioritized developer roadmap for incoming engineers.
+
+## In-Scope vs. Out-of-Scope Boundaries
+
+### In-Scope (MVP Capabilities)
+* **PDF Document Ingestion:** Parsing standardized GeM bid documents, PSU tender circulars, Additional Terms & Conditions (ATCs up to 400 pages), and BOQ line items.
+* **Two-Layer Extraction:** Deterministic Layer 1 regex table parsing backed by Layer 2 scoped LLM fallback via Anthropic Claude (Haiku 4.5 and Sonnet 5.5).
+* **Form Auto-Hydration & Visual Confidence Badges:** Pre-populating the React `InfoSheetForm` with Green (verified), Amber (AI resolved with reasoning tooltips), and Red (missing) badges.
+* **Bidding Requirements Checklist:** AI extraction of mandatory compliance certificates (balance sheets, experience certificates, MAF, MSE declarations) with exact page references.
+* **Annexure Template Generation:** Exporting pre-filled Microsoft Word (`.docx`) forms.
+* **Cost & Token Accounting:** Persisting token counts, cache hits, and USD expenditures in PostgreSQL `claude_token_usage`.
+* **Deduplication & Multi-Tier Caching:** SHA-256 PDF hashing preventing redundant token burn on unmodified tenders.
+
+### Out-of-Scope (Non-Goals for MVP)
+* **Automatic Bid Submission on GeM / CPP Portal:** Legally out-of-scope. Indian public procurement portals require a physical USB cryptographic dongle (Class 3 Digital Signature Certificate or DSC) and Aadhaar/OTP verification. Final bid submission must remain strictly human-in-the-loop.
+* **Automated Price Quoting / Profit Margin Calculation:** Costing sheets and financial bidding rates are computed manually by company estimators using vendor RFQs.
+* **Multi-Lingual Vernacular OCR:** State tenders published exclusively in regional Indian languages (e.g., Hindi, Tamil, Marathi) are out-of-scope; English-language procurement documents are strictly targeted.
+* **Automated Pre-Bid Query Submission:** Drafting clarification questions is assisted, but submitting portal tickets remains manual.
+
+---
+
+## Prioritized Developer Roadmap (P1 to P7)
+
+Follow this roadmap during your initial development sprints:
+
+| Priority | Task Title | Effort | First File to Open | Goal & Scope |
+| :---: | :--- | :---: | :--- | :--- |
+| **P1** | **Fix Phone Cleaning Whitespace** | 0.5 hours | `volksAi/app/services/tender_mapper.py` | Normalize whitespace around slashes in `clean_phone()` so `test_contact_integrity.py` passes cleanly. |
+| **P2** | **Resolve Kochi Ground-Truth Officer Regression** | 1 hour | `volksAi/app/services/field_extractor.py` | Update multi-line officer table parsing so Client 2 (`Sabu Mathews`) is captured; brings `test_kochi_regression.py` to 100% green. |
+| **P3** | **Update Outdated API Test Assertions** | 1 hour | `api/src/modules/master/health/health.service.spec.ts` | Fix string mismatches in `health.service.spec.ts` and `operation-notification.service.spec.ts` so `pnpm test` in `api/` passes 100%. |
+| **P4** | **Update VolksAI Scoped Context Test Fixtures** | 2 hours | `volksAi/app/services/test_role1_prompt_examples.py` | Add section headings to synthetic test fixtures and align mocks with `classify_anthropic_error` to resolve 12 failing pytest tests. |
+| **P5** | **Document-Level Low-Density OCR Fallback** | 4 hours | `volksAi/app/services/pdf_parent_ingest.py` | Add an average character density check across the first 5 pages to automatically trigger PaddleOCR on scanned image-only PDFs. |
+| **P6** | **Cache Invalidation on Model / Prompt Changes** | 2 hours | `api/src/modules/tendering/info-sheets/pdf-extraction.producer.ts` | Factor model ID or prompt version hash into `EXTRACTION_VERSION` so database caches automatically invalidate when prompt code is updated. |
+| **P7** | **Single-Pass Pipeline Unification** | 2-3 days | `volksAi/app/routers/extract.py` | Create a unified `POST /extract-all` endpoint that runs both Info-Sheet extraction and Checklist analysis in a single orchestrated pass, cutting token cost by ~30%. |

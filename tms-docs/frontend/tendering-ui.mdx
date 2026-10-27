@@ -1,0 +1,69 @@
+---
+title: "Tendering UI & Confidence Badges"
+description: "InfoSheetForm, ExtractionPreviewPanel, visual confidence badges, and checklist state management"
+---
+
+The tendering frontend (`web/src/modules/tendering/`) is designed to give Tender Executives full visibility into AI extraction outputs, complete with audit trails, confidence badges, and one-click manual overrides.
+
+## Key UI Components
+
+### 1. `InfoSheetForm.tsx`
+* **File:** `web/src/modules/tendering/info-sheet/components/InfoSheetForm.tsx`
+* The primary commercial and technical tender evaluation form.
+* Contains the **"Auto-Extract with AI"** action button and a **"Force re-extraction"** checkbox.
+* Listens to the extraction polling hook and auto-hydrates form inputs as soon as extraction finishes.
+
+### 2. `ExtractionPreviewPanel.tsx`
+* **File:** `web/src/modules/tendering/info-sheet/components/ExtractionPreviewPanel.tsx`
+* A side-by-side drawer allowing engineers to inspect raw extracted fields alongside the original PDF document.
+* Shows token consumption stats, elapsed processing time, and the exact clause excerpts identified by the AI.
+
+---
+
+## Visual Confidence Badges
+
+Every AI-extracted field renders an inline badge indicating extraction provenance:
+
+```
+┌─────────────────────────────────┐
+│ EMD Amount: ₹9,00,000           │ [ HIGH CONFIDENCE ]  <- Green (Deterministic)
+├─────────────────────────────────┤
+│ Payment Terms (Supply):         │ [ REVIEW NEEDED ]    <- Amber (Claude LLM)
+│ 70% against dispatch, 20% on    │   └── Tooltip: "SCC Clause 14.1 supersedes GCC..."
+│ receipt, 10% on commissioning   │
+├─────────────────────────────────┤
+│ Joint Venture Allowed: [    ]   │ [ MISSING ]          <- Red (Not Found)
+└─────────────────────────────────┘
+```
+
+* <span className="text-emerald-500 font-bold">GREEN (High Confidence):</span> Deterministic Layer 1 regex match from standardized GeM tables.
+* <span className="text-amber-500 font-bold">AMBER (AI Resolved / Review Needed):</span> Field resolved by Claude Role 1 or Role 2. Hovering displays the model's legal reasoning and the source clause quote.
+* <span className="text-red-500 font-bold">RED (Missing / Not Found):</span> Clause could not be located in the document; prompts manual entry.
+
+---
+
+## Force Re-Extraction Flow
+
+If a Tender Executive updates an attached Additional Terms & Conditions (ATC) document or wishes to re-evaluate clauses:
+
+1. Check the **"Force re-extraction"** toggle in `InfoSheetForm`.
+2. Click **"Auto-Extract with AI"**.
+3. The frontend passes `{ force: true }` in the POST body to `/api/v1/tender-info-sheets/:tenderId/auto-extract`.
+4. The backend bypasses the SHA-256 database cache, dispatches a fresh BullMQ job to VolksAI, and updates the database record upon completion.
+
+---
+
+## Bidding Requirements Checklist UI
+
+**File:** `web/src/modules/tendering/checklists/components/`
+
+The Checklists tab manages mandatory document compliance using a robust state machine:
+
+### 1. Discrete States (Commit `06f10f10`)
+* **`not_analysed`:** Clean screen with an "Analyze Bidding Requirements" action button.
+* **`in_progress`:** Real-time animated progress bar with heartbeat monitoring.
+* **`failed`:** Displays a structured error code (e.g., timeout or missing credentials) with an instant retry button.
+* **`completed`:** Categorized document checklist with page citations and annexure downloads.
+
+### 2. Unselected Suggestions Safeguard (Commit `a0ffabb6`)
+Earlier iterations automatically checked all AI-extracted documents, leading engineers to inadvertently submit incomplete bids. Extracted compliance requirements are now displayed as **unverified suggestions with document previews**, requiring explicit human verification before inclusion in the final bid package.

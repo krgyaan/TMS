@@ -1,1 +1,189 @@
+---
+title: "Quickstart"
+description: "Get the complete Tender Management System running locally in under 10 minutes"
+---
 
+Follow this guide to spin up the local development environment containing the NestJS backend, React frontend, PostgreSQL database, Redis queues, and the VolksAI extraction microservice.
+
+## Prerequisites
+
+Before starting, ensure your system has the following runtimes installed:
+
+* **Node.js:** `v20.x` or higher
+* **pnpm:** `v9.x` or higher (`npm install -g pnpm`)
+* **Python:** `v3.11.x` or higher
+* **Docker & Docker Compose:** For running PostgreSQL, Redis, Loki, and Grafana
+* **Git**
+
+---
+
+<Steps>
+  <Step title="Clone & Environment Setup">
+    Navigate to your local repository directory:
+
+    ```bash
+    cd c:\Users\Asus\Desktop\Tender_Volks\TMS\tms
+    ```
+
+    Copy the example environment files for both the API backend and the VolksAI microservice:
+
+    <CodeGroup>
+    ```bash API (.env)
+    cp api/.env.example api/.env
+    ```
+
+    ```bash VolksAI (.env)
+    cp volksAi/.env.example volksAi/.env
+    ```
+    </CodeGroup>
+
+    <Warning>
+      **API Keys & Secrets:** Never commit real secrets to version control. Add your personal development Anthropic API key to `volksAi/.env` under `ANTHROPIC_API_KEY`.
+    </Warning>
+  </Step>
+
+  <Step title="Start Infrastructure via Docker Compose">
+    Launch the database, cache queue, and observability logging containers:
+
+    ```bash
+    docker compose up -d postgres redis loki promtail grafana
+    ```
+
+    Verify all containers are healthy:
+    ```bash
+    docker compose ps
+    ```
+  </Step>
+
+  <Step title="Run Database Migrations & Seed">
+    Install backend dependencies and run Drizzle migrations to generate the PostgreSQL tables:
+
+    ```bash
+    cd api
+    pnpm install
+    pnpm run db:migrate
+    ```
+
+    *(Optional)* Seed initial master tables and default administrator roles:
+    ```bash
+    pnpm run db:seed
+    ```
+  </Step>
+
+  <Step title="Start VolksAI Microservice">
+    You can run VolksAI either via Docker or in a local Python virtual environment:
+
+    <Tabs>
+      <Tab title="Local Virtualenv (Recommended for Dev)">
+        ```bash
+        cd ../volksAi
+        python -m venv .venv
+
+        # On Windows:
+        .venv\Scripts\activate
+        # On Linux / macOS:
+        source .venv/bin/activate
+
+        pip install -r requirements.txt
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+        ```
+      </Tab>
+      <Tab title="Docker Container">
+        ```bash
+        docker compose up -d volksai
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Start the NestJS Backend API">
+    In a new terminal window, start the NestJS development server:
+
+    ```bash
+    cd api
+    pnpm start:dev
+    ```
+
+    *(Optional)* If processing high-volume background PDF extraction queues independently:
+    ```bash
+    pnpm start:worker
+    ```
+
+    <Info>
+      If the dedicated worker process is not started, the API automatically executes extraction tasks in-process as a fallback.
+    </Info>
+  </Step>
+
+  <Step title="Start the React Web Frontend">
+    In another terminal window, launch the Vite dev server:
+
+    ```bash
+    cd ../web
+    pnpm install
+    pnpm dev
+    ```
+
+    Open your browser and navigate to:
+    **`http://localhost:5173`**
+  </Step>
+</Steps>
+
+---
+
+## Verifying Service Health
+
+Verify all running services using these HTTP health endpoints:
+
+### 1. NestJS Backend API
+```bash
+curl -s http://localhost:3000/api/v1/health
+```
+
+Expected JSON response:
+```json
+{
+  "status": "ok",
+  "database": "connected",
+  "redis": "ready",
+  "requiredTables": "verified"
+}
+```
+
+### 2. VolksAI Extraction Microservice
+```bash
+curl -s http://localhost:8001/health
+```
+
+Expected JSON response:
+```json
+{
+  "status": "healthy",
+  "service": "volksai-extraction",
+  "version": "1.0.0",
+  "llm_fallback_enabled": true,
+  "provider": "anthropic",
+  "anthropic_configured": true,
+  "paddle_ocr_enabled": true
+}
+```
+
+### 3. Claude Connectivity Ping
+Verify that VolksAI can invoke Anthropic models without uploading a full 200-page tender:
+
+```bash
+cd volksAi
+python scratch/check_models.py
+```
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="First-Day Onboarding Checklist" icon="list-ol" href="/onboarding">
+    Follow the 10-step checklist to test the pipeline and solve your first P1 task.
+  </Card>
+  <Card title="End-to-End Architecture" icon="network-wired" href="/architecture/end-to-end-flow">
+    Learn how documents flow from the React UI through BullMQ into VolksAI.
+  </Card>
+</CardGroup>
