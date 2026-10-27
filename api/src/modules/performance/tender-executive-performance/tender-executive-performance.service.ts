@@ -22,6 +22,7 @@ import { STAGE_BACKLOG_CONFIG, STAGE_BACKLOG_KPI_RANK } from "../config/stage-ba
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 import { rfqs, physicalDocs } from "@/db/schemas";
+import { tenderDocumentChecklists } from "@db/schemas/tendering/tender-document-checklists.schema";
 
 function isWon(status: number) {
     return [25, 26, 27, 28].includes(status);
@@ -265,6 +266,7 @@ export class TenderExecutiveService {
             OR EXISTS (SELECT 1 FROM physical_docs d WHERE d.tender_id = ti.id AND d.created_at BETWEEN ${fromTz} AND ${toTz})
             OR EXISTS (SELECT 1 FROM tender_document_checklists c WHERE c.tender_id = ti.id AND c.created_at BETWEEN ${fromTz} AND ${toTz})
             OR EXISTS (SELECT 1 FROM tender_costing_sheets s WHERE s.tender_id = ti.id AND s.created_at BETWEEN ${fromTz} AND ${toTz})
+            OR EXISTS (SELECT 1 FROM tender_costing_details tcd JOIN tender_costing_sheets tcs ON tcs.id = tcd.tender_costing_sheets_id WHERE tcs.tender_id = ti.id AND tcd.submitted_final_price IS NOT NULL AND tcd.submitted_at BETWEEN ${fromTz} AND ${toTz})
             OR EXISTS (SELECT 1 FROM bid_submissions b WHERE b.tender_id = ti.id AND b.status = 'Bid Submitted' AND COALESCE(b.submission_datetime, b.created_at) BETWEEN ${fromTz} AND ${toTz})
             OR EXISTS (SELECT 1 FROM timers t WHERE t.entity_id = ti.id AND t.entity_type = 'TENDER' AND t.stage IN ('tender_info_sheet','rfq_sent','emd_requested','physical_docs','document_checklist','costing_sheets','bid_submission') AND t.ended_at BETWEEN ${fromTz} AND ${toTz})
             OR NOT EXISTS (SELECT 1 FROM tender_information x WHERE x.tender_id = ti.id AND x.created_at <= ${toLocal})
@@ -307,6 +309,11 @@ export class TenderExecutiveService {
             (SELECT MIN(tn.created_at) FROM tender_information tn WHERE tn.tender_id = ti.id) AS "infoFilledAt",
             (SELECT MIN(r.created_at) FROM rfqs r WHERE r.tender_id = ti.id) AS "rfqSentAt",
             (SELECT MIN(p.created_at) FROM physical_docs p WHERE p.tender_id = ti.id) AS "physicalDocsSentAt",
+            (SELECT MIN(cl.created_at) FROM tender_document_checklists cl WHERE cl.tender_id = ti.id) AS "checklistSubmittedAt",
+            (SELECT MIN(tcd.submitted_at) FROM tender_costing_details tcd JOIN tender_costing_sheets tcs ON tcs.id = tcd.tender_costing_sheets_id WHERE tcs.tender_id = ti.id AND tcd.submitted_final_price IS NOT NULL) AS "costingSubmittedAt",
+            EXISTS (SELECT 1 FROM tender_costing_details tcd JOIN tender_costing_sheets tcs ON tcs.id = tcd.tender_costing_sheets_id WHERE tcs.tender_id = ti.id AND tcd.status = 'Approved') AS "costingApproved",
+            (SELECT MIN(COALESCE(b.submission_datetime, b.created_at)) FROM bid_submissions b WHERE b.tender_id = ti.id AND b.status = 'Bid Submitted') AS "bidSubmittedAt",
+            EXISTS (SELECT 1 FROM bid_submissions tm WHERE tm.tender_id = ti.id AND tm.status = 'Tender Missed') AS "isMissed",
             (EXISTS (SELECT 1 FROM tender_information x WHERE x.tender_id = ti.id AND x.created_at BETWEEN ${fromLocal} AND ${toLocal})
             OR EXISTS (SELECT 1 FROM rfqs r WHERE r.tender_id = ti.id AND r.created_at BETWEEN ${fromTz} AND ${toTz})
             OR EXISTS (SELECT 1 FROM payment_requests p WHERE p.tender_id = ti.id AND p.purpose = 'EMD' AND p.created_at BETWEEN ${fromLocal} AND ${toLocal})
@@ -349,6 +356,7 @@ export class TenderExecutiveService {
             approvedByEnd: Boolean(row.approvedByEnd),
             missedBeforeStart: Boolean(row.missedBeforeStart),
             missedInPeriod: Boolean(row.missedInPeriod),
+            isMissed: Boolean(row.isMissed),
             rfqRequired: factString(row.rfqRequired),
             emdRequired: factString(row.emdRequired),
             physicalDocsRequired: factString(row.physicalDocsRequired),
@@ -357,6 +365,10 @@ export class TenderExecutiveService {
             infoFilledAt: row.infoFilledAt ? new Date(row.infoFilledAt as string) : null,
             rfqSentAt: row.rfqSentAt ? new Date(row.rfqSentAt as string) : null,
             physicalDocsSentAt: row.physicalDocsSentAt ? new Date(row.physicalDocsSentAt as string) : null,
+            checklistSubmittedAt: row.checklistSubmittedAt ? new Date(row.checklistSubmittedAt as string) : null,
+            costingSubmittedAt: row.costingSubmittedAt ? new Date(row.costingSubmittedAt as string) : null,
+            costingApproved: Boolean(row.costingApproved),
+            bidSubmittedAt: row.bidSubmittedAt ? new Date(row.bidSubmittedAt as string) : null,
         };
 
         for (const [stageKey, key] of Object.entries(ARTIFACT_STAGE)) {
@@ -402,6 +414,26 @@ export class TenderExecutiveService {
                 continue;
             }
 
+            if (stage.stageKey === "document_checklist" && (!facts?.tlApproved || infoFilledAt === null)) {
+                continue;
+            }
+
+            if (stage.stageKey === "costing_sheets" && !facts?.tlApproved) {
+                continue;
+            }
+
+            if (stage.stageKey === "bid_submission") {
+                if (!facts?.tlApproved) {
+                    continue;
+                }
+
+                const bidSubmittedAtGate = facts?.bidSubmittedAt instanceof Date ? (facts.bidSubmittedAt as Date) : null;
+
+                if (!bidSubmittedAtGate && !facts?.isMissed && !facts?.costingApproved) {
+                    continue;
+                }
+            }
+
             const timerRow = stage.type === "timer" && stage.timerName ? timerMap.get(`${tender.id}:${stage.timerName}`) : undefined;
             const tenderForGate = { ...tender, rfqRequired: facts?.rfqRequired ?? null, emdRequired: facts?.emdRequired ?? null, physicalDocsRequired: facts?.physicalDocsRequired ?? null };
 
@@ -434,9 +466,15 @@ export class TenderExecutiveService {
                 const timerEndedAt = timerRow?.endedAt ? new Date(timerRow.endedAt) : null;
                 const rfqSentAt = facts?.rfqSentAt instanceof Date ? (facts.rfqSentAt as Date) : null;
                 const physicalDocsSentAt = facts?.physicalDocsSentAt instanceof Date ? (facts.physicalDocsSentAt as Date) : null;
+                const checklistSubmittedAt = facts?.checklistSubmittedAt instanceof Date ? (facts.checklistSubmittedAt as Date) : null;
+                const costingSubmittedAt = facts?.costingSubmittedAt instanceof Date ? (facts.costingSubmittedAt as Date) : null;
+                const bidSubmittedAt = facts?.bidSubmittedAt instanceof Date ? (facts.bidSubmittedAt as Date) : null;
 
                 const endedAt = stage.stageKey === "rfq_sent" ? (rfqSentAt ?? timerEndedAt)
                               : stage.stageKey === "physical_docs" ? (physicalDocsSentAt ?? timerEndedAt)
+                              : stage.stageKey === "document_checklist" ? (checklistSubmittedAt ?? timerEndedAt)
+                              : stage.stageKey === "costing_sheets" ? (costingSubmittedAt ?? timerEndedAt)
+                              : stage.stageKey === "bid_submission" ? (bidSubmittedAt ?? timerEndedAt)
                               : timerEndedAt;
 
                 let na = false;
@@ -456,6 +494,12 @@ export class TenderExecutiveService {
                     const flagSpecified = typeof rawFlag === "string" && rawFlag.trim().length > 0;
                     const flagOk = !gatedStage || !flagSpecified || (stage.isApplicable ? stage.isApplicable(tenderForGate) : false);
                     na = gatedStage && flagSpecified && !flagOk;
+                } else if (stage.stageKey === "document_checklist") {
+                    na = Boolean(facts?.isMissed) || facts?.tenderCategory === "lost";
+                } else if (stage.stageKey === "costing_sheets") {
+                    na = Boolean(facts?.isMissed) || facts?.tenderCategory === "lost";
+                } else if (stage.stageKey === "bid_submission") {
+                    na = Boolean(facts?.isMissed) || facts?.tenderCategory === "lost";
                 }
 
                 const closedInPeriod = endedAt !== null && endedAt >= periodStart && endedAt <= periodEnd;
