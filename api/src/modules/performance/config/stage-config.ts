@@ -4,6 +4,8 @@ type StageGateFields = { rfqRequired?: string | null; emdRequired?: string | nul
 
 const normalized = (value: unknown) => (typeof value === "string" ? value.trim().toLowerCase() : "");
 
+const TENDER_INFO_SHEET_SLA_MS = 259200000;
+
 //OLD  KEYS : SINCE GYAN FUCKED THE ENTIRE THING UP WITH MIGRATIONS AND USING AI FOR LITERALLY EVERYTHING
 export const STAGE_CONFIG: StageConfig[] = [
     {
@@ -11,7 +13,7 @@ export const STAGE_CONFIG: StageConfig[] = [
         timerName: "tender_info_sheet",
         type: "timer",
         isApplicable: () => true,
-        resolveDeadline: tender => tender.dueDate,
+        resolveDeadline: tender => (tender.createdAt ? new Date(new Date(tender.createdAt).getTime() + TENDER_INFO_SHEET_SLA_MS) : null),
         tlStage: false,
     },
     {

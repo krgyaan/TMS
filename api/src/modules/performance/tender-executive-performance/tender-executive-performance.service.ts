@@ -227,241 +227,266 @@ export class TenderExecutiveService {
         };
     }
 
-    async getStagePerformance(query: PerformanceQueryDto): Promise<StagePerformance[]> {
-        const { userId, fromDate, toDate } = query;
+  async getStagePerformance(query: PerformanceQueryDto): Promise<StagePerformance[]> {
+    const { userId, fromDate, toDate } = query;
 
-        const activeStages = getExecutiveStages();
+    const activeStages = getExecutiveStages();
 
-        const period = istDayBounds(fromDate.toISOString().slice(0, 10), toDate.toISOString().slice(0, 10));
-        const periodEnd = period.end;
-        const periodStart = period.start;
+    const period = istDayBounds(fromDate.toISOString().slice(0, 10), toDate.toISOString().slice(0, 10));
+    const periodEnd = period.end;
+    const periodStart = period.start;
 
-        const existedByPeriod = (row?: { createdAt?: Date | string | null } | null) => {
-            if (!row) return false;
-            if (!row.createdAt) return true;
-            return new Date(row.createdAt) <= periodEnd;
-        };
+    const existedByPeriod = (row?: { createdAt?: Date | string | null } | null) => {
+        if (!row) return false;
+        if (!row.createdAt) return true;
+        return new Date(row.createdAt) <= periodEnd;
+    };
 
-        const fromDay = fromDate.toISOString().slice(0, 10);
-        const toDay = toDate.toISOString().slice(0, 10);
-        const fromTz = `'${period.start.toISOString()}'`;
-        const toTz = `'${period.end.toISOString()}'`;
-        const toUtc = toTz;
-        const fromLocal = `(DATE '${fromDay}' + TIME '00:00:00')`;
-        const toLocal = `(DATE '${toDay}' + TIME '23:59:59.999')`;
+    const fromDay = fromDate.toISOString().slice(0, 10);
+    const toDay = toDate.toISOString().slice(0, 10);
+    const fromTz = `'${period.start.toISOString()}'`;
+    const toTz = `'${period.end.toISOString()}'`;
+    const toUtc = toTz;
+    const fromLocal = `(DATE '${fromDay}' + TIME '00:00:00')`;
+    const toLocal = `(DATE '${toDay}' + TIME '23:59:59.999')`;
 
-        const tenders = (await this.db.execute(sql.raw(`
-            SELECT DISTINCT ti.*,
-                ti.tender_no   AS "tenderNo",
-                ti.tender_name AS "tenderName",
-                ti.due_date    AS "dueDate"
-            FROM tender_infos ti
-            WHERE ti.team_member = ${userId}
-            AND ti.delete_status = 0
-            AND ti.created_at <= ${toTz}
-            AND (
-                    ti.created_at BETWEEN ${fromTz} AND ${toTz}
-                OR EXISTS (SELECT 1 FROM tender_information x WHERE x.tender_id = ti.id AND x.created_at BETWEEN ${fromLocal} AND ${toLocal})
-                OR EXISTS (SELECT 1 FROM rfqs r WHERE r.tender_id = ti.id AND r.created_at BETWEEN ${fromTz} AND ${toTz})
-                OR EXISTS (SELECT 1 FROM payment_requests p WHERE p.tender_id = ti.id AND p.purpose = 'EMD' AND p.created_at BETWEEN ${fromLocal} AND ${toLocal})
-                OR EXISTS (SELECT 1 FROM physical_docs d WHERE d.tender_id = ti.id AND d.created_at BETWEEN ${fromTz} AND ${toTz})
-                OR EXISTS (SELECT 1 FROM tender_document_checklists c WHERE c.tender_id = ti.id AND c.created_at BETWEEN ${fromTz} AND ${toTz})
-                OR EXISTS (SELECT 1 FROM tender_costing_sheets s WHERE s.tender_id = ti.id AND s.created_at BETWEEN ${fromTz} AND ${toTz})
-                OR EXISTS (SELECT 1 FROM bid_submissions b WHERE b.tender_id = ti.id AND b.status = 'Bid Submitted' AND COALESCE(b.submission_datetime, b.created_at) BETWEEN ${fromTz} AND ${toTz})
-                OR EXISTS (SELECT 1 FROM timers t WHERE t.entity_id = ti.id AND t.entity_type = 'TENDER' AND t.stage IN ('tender_info_sheet','rfq_sent','emd_requested','physical_docs','document_checklist','costing_sheets','bid_submission') AND t.ended_at BETWEEN ${fromTz} AND ${toTz})
-                OR NOT EXISTS (SELECT 1 FROM tender_information x WHERE x.tender_id = ti.id AND x.created_at <= ${toLocal})
-            )
-        `))).rows as TenderInfo[];
+    const tenders = (await this.db.execute(sql.raw(`
+        SELECT DISTINCT ti.*,
+            ti.tender_no   AS "tenderNo",
+            ti.tender_name AS "tenderName",
+            ti.due_date    AS "dueDate",
+            ti.created_at  AS "createdAt"
+        FROM tender_infos ti
+        WHERE ti.team_member = ${userId}
+        AND ti.delete_status = 0
+        AND ti.created_at <= ${toTz}
+        AND (
+                ti.created_at BETWEEN ${fromTz} AND ${toTz}
+            OR EXISTS (SELECT 1 FROM tender_information x WHERE x.tender_id = ti.id AND x.created_at BETWEEN ${fromLocal} AND ${toLocal})
+            OR EXISTS (SELECT 1 FROM rfqs r WHERE r.tender_id = ti.id AND r.created_at BETWEEN ${fromTz} AND ${toTz})
+            OR EXISTS (SELECT 1 FROM payment_requests p WHERE p.tender_id = ti.id AND p.purpose = 'EMD' AND p.created_at BETWEEN ${fromLocal} AND ${toLocal})
+            OR EXISTS (SELECT 1 FROM physical_docs d WHERE d.tender_id = ti.id AND d.created_at BETWEEN ${fromTz} AND ${toTz})
+            OR EXISTS (SELECT 1 FROM tender_document_checklists c WHERE c.tender_id = ti.id AND c.created_at BETWEEN ${fromTz} AND ${toTz})
+            OR EXISTS (SELECT 1 FROM tender_costing_sheets s WHERE s.tender_id = ti.id AND s.created_at BETWEEN ${fromTz} AND ${toTz})
+            OR EXISTS (SELECT 1 FROM bid_submissions b WHERE b.tender_id = ti.id AND b.status = 'Bid Submitted' AND COALESCE(b.submission_datetime, b.created_at) BETWEEN ${fromTz} AND ${toTz})
+            OR EXISTS (SELECT 1 FROM timers t WHERE t.entity_id = ti.id AND t.entity_type = 'TENDER' AND t.stage IN ('tender_info_sheet','rfq_sent','emd_requested','physical_docs','document_checklist','costing_sheets','bid_submission') AND t.ended_at BETWEEN ${fromTz} AND ${toTz})
+            OR NOT EXISTS (SELECT 1 FROM tender_information x WHERE x.tender_id = ti.id AND x.created_at <= ${toLocal})
+        )
+    `))).rows as TenderInfo[];
 
-        if (tenders.length === 0) return [];
+    if (tenders.length === 0) return [];
 
-        const tenderIds = tenders.map(t => t.id);
+    const tenderIds = tenders.map(t => t.id);
 
-        const timerNames = activeStages.filter(s => s.type === "timer" && s.timerName).map(s => s.timerName!);
+    const timerNames = activeStages.filter(s => s.type === "timer" && s.timerName).map(s => s.timerName!);
 
-        const timers = await this.db
-            .select()
-            .from(timerTrackers)
-            .where(and(inArray(timerTrackers.entityId, tenderIds), inArray(timerTrackers.stage, timerNames)));
+    const timers = await this.db
+        .select()
+        .from(timerTrackers)
+        .where(and(inArray(timerTrackers.entityId, tenderIds), inArray(timerTrackers.stage, timerNames)));
 
-        const timerMap = new Map<string, (typeof timers)[number]>();
-        for (const t of timers) {
-            timerMap.set(`${t.entityId}:${t.stage}`, t);
-        }
-
-        const artifactFlags = (key: string, table: string, alias: string, columnExpr: string, from: string, to: string, extra = "") => `
-            EXISTS (SELECT 1 FROM ${table} ${alias} WHERE ${alias}.tender_id = ti.id ${extra}) AS "${key}Exists",
-            EXISTS (SELECT 1 FROM ${table} ${alias} WHERE ${alias}.tender_id = ti.id ${extra} AND ${columnExpr} BETWEEN ${from} AND ${to}) AS "${key}In",
-            EXISTS (SELECT 1 FROM ${table} ${alias} WHERE ${alias}.tender_id = ti.id ${extra} AND ${columnExpr} <= ${to}) AS "${key}ByEnd"`;
-
-        type ArtifactRow = Record<string, string | number | boolean | null> & { id: number };
-
-        const artifactRows = (await this.db.execute(sql.raw(`
-            SELECT
-                ti.id,
-                st.tender_category AS "tenderCategory",
-                (ti.tl_status = 1) AS "tlApproved",
-                (ti.tl_approval_timestamp IS NULL OR ti.tl_approval_timestamp <= ${toUtc}) AS "approvedByEnd",
-                ti.rfq_required AS "rfqRequired",
-                (SELECT tn.emd_required FROM tender_information tn WHERE tn.tender_id = ti.id ORDER BY tn.created_at NULLS LAST LIMIT 1) AS "emdRequired",
-                (SELECT tn.physical_docs_required FROM tender_information tn WHERE tn.tender_id = ti.id ORDER BY tn.created_at NULLS LAST LIMIT 1) AS "physicalDocsRequired",
-                (SELECT MIN(tn.created_at) FROM tender_information tn WHERE tn.tender_id = ti.id) AS "infoFilledAt",
-                (EXISTS (SELECT 1 FROM tender_information x WHERE x.tender_id = ti.id AND x.created_at BETWEEN ${fromLocal} AND ${toLocal})
-                OR EXISTS (SELECT 1 FROM rfqs r WHERE r.tender_id = ti.id AND r.created_at BETWEEN ${fromTz} AND ${toTz})
-                OR EXISTS (SELECT 1 FROM payment_requests p WHERE p.tender_id = ti.id AND p.purpose = 'EMD' AND p.created_at BETWEEN ${fromLocal} AND ${toLocal})
-                OR EXISTS (SELECT 1 FROM physical_docs d WHERE d.tender_id = ti.id AND d.created_at BETWEEN ${fromTz} AND ${toTz})
-                OR EXISTS (SELECT 1 FROM tender_document_checklists c WHERE c.tender_id = ti.id AND c.created_at BETWEEN ${fromTz} AND ${toTz})
-                OR EXISTS (SELECT 1 FROM tender_costing_sheets s WHERE s.tender_id = ti.id AND s.created_at BETWEEN ${fromTz} AND ${toTz})
-                OR EXISTS (SELECT 1 FROM bid_submissions b WHERE b.tender_id = ti.id AND b.status = 'Bid Submitted' AND COALESCE(b.submission_datetime, b.created_at) BETWEEN ${fromTz} AND ${toTz})
-                OR EXISTS (SELECT 1 FROM timers t WHERE t.entity_id = ti.id AND t.entity_type = 'TENDER' AND t.stage IN ('tender_info_sheet','rfq_sent','emd_requested','physical_docs','document_checklist','costing_sheets','bid_submission') AND t.ended_at BETWEEN ${fromTz} AND ${toTz})
-                ) AS "activeInPeriod",
-                ${artifactFlags("info", "tender_information", "ti_n", "ti_n.created_at", fromLocal, toLocal)},
-                ${artifactFlags("rfq", "rfqs", "ti_r", "ti_r.created_at", fromTz, toTz)},
-                ${artifactFlags("emd", "payment_requests", "ti_e", "ti_e.created_at", fromLocal, toLocal, "AND ti_e.purpose = 'EMD'")},
-                ${artifactFlags("phys", "physical_docs", "ti_p", "ti_p.created_at", fromTz, toTz)},
-                ${artifactFlags("chk", "tender_document_checklists", "ti_c", "ti_c.created_at", fromTz, toTz)},
-                ${artifactFlags("cost", "tender_costing_sheets", "ti_s", "ti_s.created_at", fromTz, toTz)},
-                ${artifactFlags("bid", "bid_submissions", "ti_b", "COALESCE(ti_b.submission_datetime, ti_b.created_at)", fromTz, toTz, "AND ti_b.status = 'Bid Submitted'")},
-                EXISTS (SELECT 1 FROM bid_submissions ti_m WHERE ti_m.tender_id = ti.id AND ti_m.status = 'Tender Missed' AND ti_m.created_at < ${fromTz}) AS "missedBeforeStart",
-                EXISTS (SELECT 1 FROM bid_submissions ti_m WHERE ti_m.tender_id = ti.id AND ti_m.status = 'Tender Missed' AND ti_m.created_at BETWEEN ${fromTz} AND ${toTz}) AS "missedInPeriod"
-            FROM tender_infos ti
-            LEFT JOIN statuses st ON st.id = ti.status
-            WHERE ti.id IN (${tenderIds.join(",")})
-        `))).rows as ArtifactRow[];
-
-        const artifactMap = new Map<number, TenderFacts>();
-
-        const ARTIFACT_STAGE: Record<string, string> = {
-            tender_info_sheet: "info",
-            rfq_sent: "rfq",
-            emd_requested: "emd",
-            physical_docs: "phys",
-            document_checklist: "chk",
-            costing_sheets: "cost",
-            bid_submission: "bid",
-        };
-
-        for (const row of artifactRows) {
-            const facts: TenderFacts = {
-                tenderCategory: factString(row.tenderCategory),
-                tlApproved: Boolean(row.tlApproved),
-                approvedByEnd: Boolean(row.approvedByEnd),
-                missedBeforeStart: Boolean(row.missedBeforeStart),
-                missedInPeriod: Boolean(row.missedInPeriod),
-                rfqRequired: factString(row.rfqRequired),
-                emdRequired: factString(row.emdRequired),
-                physicalDocsRequired: factString(row.physicalDocsRequired),
-                activeInPeriod: Boolean(row.activeInPeriod),
-                infoFilledAt: row.infoFilledAt ? new Date(row.infoFilledAt as string) : null,
-            };
-
-            for (const [stageKey, key] of Object.entries(ARTIFACT_STAGE)) {
-                facts[stageKey] = { exists: Boolean(row[`${key}Exists`]), inPeriod: Boolean(row[`${key}In`]), byEnd: Boolean(row[`${key}ByEnd`]) };
-            }
-
-            artifactMap.set(Number(row.id), facts);
-        }
-
-        const resultsRows = await this.db.select().from(tenderResults).where(inArray(tenderResults.tenderId, tenderIds));
-
-        const resultMap = new Map<number, (typeof resultsRows)[number]>();
-        resultsRows.forEach(r => resultMap.set(Number(r.tenderId), r));
-
-        const tqs = await this.db.select().from(tenderQueries).where(inArray(tenderQueries.tenderId, tenderIds));
-
-        const tqMap = new Map<number, (typeof tqs)[number]>();
-        tqs.forEach(tq => tqMap.set(Number(tq.tenderId), tq));
-
-        const raResults = await this.db.select().from(reverseAuctions).where(inArray(reverseAuctions.tenderId, tenderIds));
-
-        const raMap = new Map<number, (typeof raResults)[number]>();
-        raResults.forEach(ra => raMap.set(Number(ra.tenderId), ra));
-
-        const output: StagePerformance[] = [];
-
-        for (const tender of tenders) {
-            const bucket = mapStatusToKpi(Number(tender.status));
-            const hasBid = ["RESULT_AWAITED", "WON", "LOST", "DISQUALIFIED"].includes(bucket);
-            const facts = artifactMap.get(tender.id);
-
-            for (const stage of activeStages) {
-                let applicable = false;
-                let hidden = false;
-                let completed = false;
-                let onTime: boolean | null = null;
-                let startTime: Date | null = null;
-                let endTime: Date | null = null;
-
-                const timerRow = stage.type === "timer" && stage.timerName ? timerMap.get(`${tender.id}:${stage.timerName}`) : undefined;
-
-                const tenderForGate = { ...tender, rfqRequired: facts?.rfqRequired ?? null, emdRequired: facts?.emdRequired ?? null, physicalDocsRequired: facts?.physicalDocsRequired ?? null };
-
-                if (stage.stageKey === "tender_info_sheet") {
-                    const infoFilledAt = facts?.infoFilledAt instanceof Date ? (facts.infoFilledAt as Date) : null;
-                    const deadlineAt = timerDeadline(timerRow, stage, tender);
-
-                    applicable = true;
-                    completed = infoFilledAt !== null && infoFilledAt >= periodStart && infoFilledAt <= periodEnd;
-                    startTime = tender.createdAt ? new Date(tender.createdAt) : null;
-                    endTime = completed ? infoFilledAt : null;
-                    onTime = completed ? (deadlineAt !== null ? (infoFilledAt as Date) <= deadlineAt : null) : deadlineAt !== null && periodEnd > deadlineAt && infoFilledAt === null ? false : null;
-                } else if (stage.type === "timer") {
-                    const deadlineAt = timerDeadline(timerRow, stage, tender);
-                    const startedAt = timerRow?.startedAt ? new Date(timerRow.startedAt) : null;
-                    const endedAt = timerRow?.endedAt ? new Date(timerRow.endedAt) : null;
-
-                    const closedInPeriod = endedAt !== null && endedAt >= periodStart && endedAt <= periodEnd;
-                    const openAtEnd = (endedAt === null || endedAt > periodEnd) && startedAt !== null && startedAt <= periodEnd && (startedAt >= periodStart || (deadlineAt !== null && deadlineAt >= periodStart));
-                    const inWindow = deadlineAt !== null && (closedInPeriod || openAtEnd);
-
-                    const gated = GATED_STAGES.has(stage.stageKey);
-                    const sheetInPeriod = Boolean((facts?.tender_info_sheet as StageArtifactFlags | undefined)?.inPeriod);
-                    const flagOk = !gated || (stage.isApplicable ? stage.isApplicable(tenderForGate) : false);
-                    const na = gated && sheetInPeriod && !flagOk;
-
-                    applicable = !na && inWindow;
-                    hidden = gated && !na && !inWindow;
-
-                    if (applicable && deadlineAt !== null) {
-                        completed = closedInPeriod;
-                        startTime = startedAt;
-                        endTime = closedInPeriod ? endedAt : null;
-                        onTime = closedInPeriod ? endedAt <= deadlineAt : periodEnd > deadlineAt ? false : null;
-                    }
-                } else if (stage.stageKey === "tq" || stage.stageKey === "ra" || stage.stageKey === "result") {
-                    const source = (stage.stageKey === "tq" ? tqMap.get(tender.id) : stage.stageKey === "ra" ? raMap.get(tender.id) : resultMap.get(tender.id)) as { createdAt?: Date | string | null } | undefined;
-
-                    const createdAt = source?.createdAt ? new Date(source.createdAt) : null;
-                    const createdInPeriod = createdAt !== null && createdAt >= periodStart && createdAt <= periodEnd;
-
-                    applicable = stage.stageKey === "result" ? hasBid : existedByPeriod(source);
-                    completed = applicable && Boolean(source) && createdInPeriod;
-
-                    if (applicable && createdAt !== null && createdAt < periodStart) applicable = false;
-
-                    startTime = createdAt;
-                    endTime = completed ? createdAt : null;
-                    onTime = null;
-                }
-
-                output.push({
-                    tenderId: tender.id,
-                    tenderNo: tender.tenderNo ?? null,
-                    tenderName: tender.tenderName ?? null,
-                    stageKey: stage.stageKey,
-                    applicable,
-                    hidden,
-                    completed,
-                    onTime,
-                    startTime,
-                    endTime: completed ? endTime : null,
-                    deadline: timerDeadline(timerRow, stage, tender),
-                });
-            }
-        }
-
-        return output;
+    const timerMap = new Map<string, (typeof timers)[number]>();
+    for (const t of timers) {
+        timerMap.set(`${t.entityId}:${t.stage}`, t);
     }
+
+    const artifactFlags = (key: string, table: string, alias: string, columnExpr: string, from: string, to: string, extra = "") => `
+        EXISTS (SELECT 1 FROM ${table} ${alias} WHERE ${alias}.tender_id = ti.id ${extra}) AS "${key}Exists",
+        EXISTS (SELECT 1 FROM ${table} ${alias} WHERE ${alias}.tender_id = ti.id ${extra} AND ${columnExpr} BETWEEN ${from} AND ${to}) AS "${key}In",
+        EXISTS (SELECT 1 FROM ${table} ${alias} WHERE ${alias}.tender_id = ti.id ${extra} AND ${columnExpr} <= ${to}) AS "${key}ByEnd"`;
+
+    type ArtifactRow = Record<string, string | number | boolean | null> & { id: number };
+
+    const artifactRows = (await this.db.execute(sql.raw(`
+        SELECT
+            ti.id,
+            st.tender_category AS "tenderCategory",
+            (ti.tl_status = 1) AS "tlApproved",
+            (ti.tl_approval_timestamp IS NULL OR ti.tl_approval_timestamp <= ${toUtc}) AS "approvedByEnd",
+            ti.rfq_required AS "rfqRequired",
+            (SELECT tn.emd_required FROM tender_information tn WHERE tn.tender_id = ti.id ORDER BY tn.created_at NULLS LAST LIMIT 1) AS "emdRequired",
+            (SELECT tn.physical_docs_required FROM tender_information tn WHERE tn.tender_id = ti.id ORDER BY tn.created_at NULLS LAST LIMIT 1) AS "physicalDocsRequired",
+            (SELECT MIN(tn.created_at) FROM tender_information tn WHERE tn.tender_id = ti.id) AS "infoFilledAt",
+            (EXISTS (SELECT 1 FROM tender_information x WHERE x.tender_id = ti.id AND x.created_at BETWEEN ${fromLocal} AND ${toLocal})
+            OR EXISTS (SELECT 1 FROM rfqs r WHERE r.tender_id = ti.id AND r.created_at BETWEEN ${fromTz} AND ${toTz})
+            OR EXISTS (SELECT 1 FROM payment_requests p WHERE p.tender_id = ti.id AND p.purpose = 'EMD' AND p.created_at BETWEEN ${fromLocal} AND ${toLocal})
+            OR EXISTS (SELECT 1 FROM physical_docs d WHERE d.tender_id = ti.id AND d.created_at BETWEEN ${fromTz} AND ${toTz})
+            OR EXISTS (SELECT 1 FROM tender_document_checklists c WHERE c.tender_id = ti.id AND c.created_at BETWEEN ${fromTz} AND ${toTz})
+            OR EXISTS (SELECT 1 FROM tender_costing_sheets s WHERE s.tender_id = ti.id AND s.created_at BETWEEN ${fromTz} AND ${toTz})
+            OR EXISTS (SELECT 1 FROM bid_submissions b WHERE b.tender_id = ti.id AND b.status = 'Bid Submitted' AND COALESCE(b.submission_datetime, b.created_at) BETWEEN ${fromTz} AND ${toTz})
+            OR EXISTS (SELECT 1 FROM timers t WHERE t.entity_id = ti.id AND t.entity_type = 'TENDER' AND t.stage IN ('tender_info_sheet','rfq_sent','emd_requested','physical_docs','document_checklist','costing_sheets','bid_submission') AND t.ended_at BETWEEN ${fromTz} AND ${toTz})
+            ) AS "activeInPeriod",
+            ${artifactFlags("info", "tender_information", "ti_n", "ti_n.created_at", fromLocal, toLocal)},
+            ${artifactFlags("rfq", "rfqs", "ti_r", "ti_r.created_at", fromTz, toTz)},
+            ${artifactFlags("emd", "payment_requests", "ti_e", "ti_e.created_at", fromLocal, toLocal, "AND ti_e.purpose = 'EMD'")},
+            ${artifactFlags("phys", "physical_docs", "ti_p", "ti_p.created_at", fromTz, toTz)},
+            ${artifactFlags("chk", "tender_document_checklists", "ti_c", "ti_c.created_at", fromTz, toTz)},
+            ${artifactFlags("cost", "tender_costing_sheets", "ti_s", "ti_s.created_at", fromTz, toTz)},
+            ${artifactFlags("bid", "bid_submissions", "ti_b", "COALESCE(ti_b.submission_datetime, ti_b.created_at)", fromTz, toTz, "AND ti_b.status = 'Bid Submitted'")},
+            EXISTS (SELECT 1 FROM bid_submissions ti_m WHERE ti_m.tender_id = ti.id AND ti_m.status = 'Tender Missed' AND ti_m.created_at < ${fromTz}) AS "missedBeforeStart",
+            EXISTS (SELECT 1 FROM bid_submissions ti_m WHERE ti_m.tender_id = ti.id AND ti_m.status = 'Tender Missed' AND ti_m.created_at BETWEEN ${fromTz} AND ${toTz}) AS "missedInPeriod"
+        FROM tender_infos ti
+        LEFT JOIN statuses st ON st.id = ti.status
+        WHERE ti.id IN (${tenderIds.join(",")})
+    `))).rows as ArtifactRow[];
+
+    const artifactMap = new Map<number, TenderFacts>();
+
+    const ARTIFACT_STAGE: Record<string, string> = {
+        tender_info_sheet: "info",
+        rfq_sent: "rfq",
+        emd_requested: "emd",
+        physical_docs: "phys",
+        document_checklist: "chk",
+        costing_sheets: "cost",
+        bid_submission: "bid",
+    };
+
+    for (const row of artifactRows) {
+        const facts: TenderFacts = {
+            tenderCategory: factString(row.tenderCategory),
+            tlApproved: Boolean(row.tlApproved),
+            approvedByEnd: Boolean(row.approvedByEnd),
+            missedBeforeStart: Boolean(row.missedBeforeStart),
+            missedInPeriod: Boolean(row.missedInPeriod),
+            rfqRequired: factString(row.rfqRequired),
+            emdRequired: factString(row.emdRequired),
+            physicalDocsRequired: factString(row.physicalDocsRequired),
+            activeInPeriod: Boolean(row.activeInPeriod),
+            infoFilledAt: row.infoFilledAt ? new Date(row.infoFilledAt as string) : null,
+        };
+
+        for (const [stageKey, key] of Object.entries(ARTIFACT_STAGE)) {
+            facts[stageKey] = { exists: Boolean(row[`${key}Exists`]), inPeriod: Boolean(row[`${key}In`]), byEnd: Boolean(row[`${key}ByEnd`]) };
+        }
+
+        artifactMap.set(Number(row.id), facts);
+    }
+
+    const resultsRows = await this.db.select().from(tenderResults).where(inArray(tenderResults.tenderId, tenderIds));
+
+    const resultMap = new Map<number, (typeof resultsRows)[number]>();
+    resultsRows.forEach(r => resultMap.set(Number(r.tenderId), r));
+
+    const tqs = await this.db.select().from(tenderQueries).where(inArray(tenderQueries.tenderId, tenderIds));
+
+    const tqMap = new Map<number, (typeof tqs)[number]>();
+    tqs.forEach(tq => tqMap.set(Number(tq.tenderId), tq));
+
+    const raResults = await this.db.select().from(reverseAuctions).where(inArray(reverseAuctions.tenderId, tenderIds));
+
+    const raMap = new Map<number, (typeof raResults)[number]>();
+    raResults.forEach(ra => raMap.set(Number(ra.tenderId), ra));
+
+    const output: StagePerformance[] = [];
+
+    for (const tender of tenders) {
+        const bucket = mapStatusToKpi(Number(tender.status));
+        const hasBid = ["RESULT_AWAITED", "WON", "LOST", "DISQUALIFIED"].includes(bucket);
+        const facts = artifactMap.get(tender.id);
+
+        for (const stage of activeStages) {
+            let applicable = false;
+            let hidden = false;
+            let completed = false;
+            let onTime: boolean | null = null;
+            let startTime: Date | null = null;
+            let endTime: Date | null = null;
+            let resolvedDeadline: Date | null = null;
+
+            const timerRow = stage.type === "timer" && stage.timerName ? timerMap.get(`${tender.id}:${stage.timerName}`) : undefined;
+
+            const tenderForGate = { ...tender, rfqRequired: facts?.rfqRequired ?? null, emdRequired: facts?.emdRequired ?? null, physicalDocsRequired: facts?.physicalDocsRequired ?? null };
+
+            if (stage.stageKey === "tender_info_sheet") {
+                const infoFilledAt = facts?.infoFilledAt instanceof Date ? (facts.infoFilledAt as Date) : null;
+                const computedDeadline = stage.resolveDeadline(tender);
+                resolvedDeadline = computedDeadline ? new Date(computedDeadline) : null;
+                const approvalCompleted = facts?.tlApproved === true;
+
+                completed = infoFilledAt !== null && infoFilledAt >= periodStart && infoFilledAt <= periodEnd;
+
+                if (completed) {
+                    applicable = true;
+                    startTime = tender.createdAt ? new Date(tender.createdAt) : null;
+                    endTime = infoFilledAt;
+                    onTime = resolvedDeadline !== null ? (infoFilledAt as Date) <= resolvedDeadline : null;
+                } else if (infoFilledAt !== null && infoFilledAt < periodStart) {
+                    applicable = false;
+                } else if (approvalCompleted) {
+                    applicable = false;
+                } else {
+                    applicable = Number(tender.status) === 1;
+                    startTime = tender.createdAt ? new Date(tender.createdAt) : null;
+                    endTime = null;
+                    onTime = applicable && resolvedDeadline !== null && periodEnd > resolvedDeadline ? false : null;
+                }
+            } else if (stage.type === "timer") {
+                const deadlineAt = timerDeadline(timerRow, stage, tender);
+                resolvedDeadline = deadlineAt;
+                const startedAt = timerRow?.startedAt ? new Date(timerRow.startedAt) : null;
+                const endedAt = timerRow?.endedAt ? new Date(timerRow.endedAt) : null;
+
+                const gated = GATED_STAGES.has(stage.stageKey);
+                const rawFlag = stage.stageKey === "rfq_sent" ? facts?.rfqRequired : stage.stageKey === "emd_requested" ? facts?.emdRequired : stage.stageKey === "physical_docs" ? facts?.physicalDocsRequired : undefined;
+                const flagSpecified = typeof rawFlag === "string" && rawFlag.trim().length > 0;
+                const flagOk = !gated || !flagSpecified || (stage.isApplicable ? stage.isApplicable(tenderForGate) : false);
+                const na = gated && flagSpecified && !flagOk;
+
+                const closedInPeriod = endedAt !== null && endedAt >= periodStart && endedAt <= periodEnd;
+                const completedBeforeStart = endedAt !== null && endedAt < periodStart;
+
+                if (na) {
+                    applicable = false;
+                } else if (completedBeforeStart) {
+                    applicable = false;
+                } else {
+                    applicable = true;
+                    completed = closedInPeriod;
+                    startTime = startedAt;
+                    endTime = closedInPeriod ? endedAt : null;
+                    onTime = closedInPeriod
+                        ? deadlineAt !== null
+                            ? (endedAt as Date) <= deadlineAt
+                            : null
+                        : deadlineAt !== null && periodEnd > deadlineAt
+                          ? false
+                          : null;
+                }
+            } else if (stage.stageKey === "tq" || stage.stageKey === "ra" || stage.stageKey === "result") {
+                const source = (stage.stageKey === "tq" ? tqMap.get(tender.id) : stage.stageKey === "ra" ? raMap.get(tender.id) : resultMap.get(tender.id)) as { createdAt?: Date | string | null } | undefined;
+
+                const createdAt = source?.createdAt ? new Date(source.createdAt) : null;
+                const createdInPeriod = createdAt !== null && createdAt >= periodStart && createdAt <= periodEnd;
+
+                applicable = stage.stageKey === "result" ? hasBid : existedByPeriod(source);
+                completed = applicable && Boolean(source) && createdInPeriod;
+
+                if (applicable && createdAt !== null && createdAt < periodStart) applicable = false;
+
+                startTime = createdAt;
+                endTime = completed ? createdAt : null;
+                onTime = null;
+            }
+
+            output.push({
+                tenderId: tender.id,
+                tenderNo: tender.tenderNo ?? null,
+                tenderName: tender.tenderName ?? null,
+                stageKey: stage.stageKey,
+                applicable,
+                hidden,
+                completed,
+                onTime,
+                startTime,
+                endTime: completed ? endTime : null,
+                deadline: stage.stageKey === "tender_info_sheet" ? resolvedDeadline : timerDeadline(timerRow, stage, tender),
+            });
+        }
+    }
+
+    return output;
+}
 
     async getSummary(query: PerformanceQueryDto) {
         const stagePerformances = await this.getStagePerformance(query);
@@ -636,182 +661,184 @@ export class TenderExecutiveService {
     }
 
     async getStageMatrix(query: PerformanceQueryDto) {
-        const stages = (await this.getStagePerformance(query)).filter(s => !MATRIX_STAGE_EXCLUSIONS.has(s.stageKey));
+    const stages = (await this.getStagePerformance(query)).filter(s => !MATRIX_STAGE_EXCLUSIONS.has(s.stageKey));
 
-        const periodEnd = istDayBounds(query.fromDate.toISOString().slice(0, 10), query.toDate.toISOString().slice(0, 10)).end;
+    const periodEnd = istDayBounds(query.fromDate.toISOString().slice(0, 10), query.toDate.toISOString().slice(0, 10)).end;
 
-        const stageTenderIds = Array.from(new Set(stages.map(s => s.tenderId)));
-        const tenderDetails = new Map<number, { value: number; status: string | null }>();
+    const stageTenderIds = Array.from(new Set(stages.map(s => s.tenderId)));
+    const tenderDetails = new Map<number, { value: number; status: string | null }>();
 
-        if (stageTenderIds.length) {
-            const detailRows = (await this.db.execute(sql.raw(`
-                SELECT
-                    ti.id,
-                    ti.gst_values AS "value",
-                    s.name AS "status"
-                FROM tender_infos ti
-                LEFT JOIN statuses s ON s.id = ti.status
-                WHERE ti.id IN (${stageTenderIds.join(",")})
-            `))).rows as any[];
+    if (stageTenderIds.length) {
+        const detailRows = (await this.db.execute(sql.raw(`
+            SELECT
+                ti.id,
+                ti.gst_values AS "value",
+                s.name AS "status"
+            FROM tender_infos ti
+            LEFT JOIN statuses s ON s.id = ti.status
+            WHERE ti.id IN (${stageTenderIds.join(",")})
+        `))).rows as any[];
 
-            for (const row of detailRows) {
-                tenderDetails.set(Number(row.id), { value: Number(row.value ?? 0), status: row.status ?? null });
-            }
+        for (const row of detailRows) {
+            tenderDetails.set(Number(row.id), { value: Number(row.value ?? 0), status: row.status ?? null });
         }
-
-        const stageKeys = Array.from(new Set(stages.map(s => s.stageKey)));
-
-        const counters = new Map<
-            string,
-            {
-                done: number;
-                onTime: number;
-                late: number;
-                pending: number;
-                notApplicable: number;
-                drilldown: {
-                    done: any[];
-                    onTime: any[];
-                    late: any[];
-                    pending: any[];
-                    notApplicable: any[];
-                };
-            }
-        >();
-
-        for (const key of stageKeys) {
-            counters.set(key, {
-                done: 0,
-                onTime: 0,
-                late: 0,
-                pending: 0,
-                notApplicable: 0,
-                drilldown: {
-                    done: [],
-                    onTime: [],
-                    late: [],
-                    pending: [],
-                    notApplicable: [],
-                },
-            });
-        }
-
-        for (const stage of stages) {
-            const counter = counters.get(stage.stageKey)!;
-
-            const tenderMeta: StageDrilldownItem = {
-                value: tenderDetails.get(stage.tenderId)?.value ?? 0,
-                status: tenderDetails.get(stage.tenderId)?.status ?? null,
-                tenderId: stage.tenderId,
-                stageKey: stage.stageKey,
-                tenderNo: stage.tenderNo,
-                tenderName: stage.tenderName,
-                deadline: stage.deadline ?? null,
-                completedAt: stage.endTime ?? null,
-                daysOverdue:
-                    !stage.completed && stage.onTime === false && stage.deadline
-                        ? Math.max(0, Math.ceil((periodEnd.getTime() - new Date(stage.deadline).getTime()) / (1000 * 60 * 60 * 24)))
-                        : null,
-                meta: {},
-            };
-
-            switch (stage.stageKey) {
-                case "emd":
-                    tenderMeta.meta = {
-                        emdStatus: stage.completed ? "Paid" : "Pending",
-                    };
-                    break;
-
-                case "ra":
-                    tenderMeta.meta = {
-                        raApplicable: stage.applicable,
-                        raCompleted: stage.completed,
-                    };
-                    break;
-
-                case "tq":
-                    tenderMeta.meta = {
-                        tqRaised: stage.applicable,
-                        tqCompleted: stage.completed,
-                    };
-                    break;
-
-                case "result":
-                    tenderMeta.meta = {
-                        resultStatus: stage.completed ? "Declared" : "Awaited",
-                    };
-                    break;
-
-                default:
-                    tenderMeta.meta = {};
-            }
-
-            if (!stage.applicable) {
-                if (!stage.hidden) {
-                    counter.notApplicable++;
-                    counter.drilldown.notApplicable.push(tenderMeta);
-                }
-                continue;
-            }
-
-            if (!stage.completed) {
-                counter.pending++;
-                counter.drilldown.pending.push(tenderMeta);
-                continue;
-            }
-
-            counter.done++;
-            counter.drilldown.done.push(tenderMeta);
-
-            if (stage.onTime === true) {
-                counter.onTime++;
-                counter.drilldown.onTime.push(tenderMeta);
-            }
-
-            if (stage.onTime === false) {
-                counter.late++;
-                counter.drilldown.late.push(tenderMeta);
-            }
-        }
-
-        const rows = [
-            {
-                key: "done",
-                label: "Done",
-                data: stageKeys.map(k => counters.get(k)!.done),
-                drilldown: stageKeys.map(k => counters.get(k)!.drilldown.done),
-            },
-            {
-                key: "onTime",
-                label: "On Time",
-                data: stageKeys.map(k => counters.get(k)!.onTime),
-                drilldown: stageKeys.map(k => counters.get(k)!.drilldown.onTime),
-            },
-            {
-                key: "late",
-                label: "Late",
-                data: stageKeys.map(k => counters.get(k)!.late),
-                drilldown: stageKeys.map(k => counters.get(k)!.drilldown.late),
-            },
-            {
-                key: "pending",
-                label: "Pending",
-                data: stageKeys.map(k => counters.get(k)!.pending),
-                drilldown: stageKeys.map(k => counters.get(k)!.drilldown.pending),
-            },
-            {
-                key: "notApplicable",
-                label: "Not Applicable",
-                data: stageKeys.map(k => (GATED_STAGES.has(k) ? counters.get(k)!.notApplicable : 0)),
-                drilldown: stageKeys.map(k => (GATED_STAGES.has(k) ? counters.get(k)!.drilldown.notApplicable : [])),
-            },
-        ];
-
-        return {
-            stages: stageKeys,
-            rows,
-        };
     }
+
+    const stageKeys = Array.from(new Set(stages.map(s => s.stageKey)));
+
+    const counters = new Map<
+        string,
+        {
+            done: number;
+            onTime: number;
+            late: number;
+            pending: number;
+            notApplicable: number;
+            drilldown: {
+                done: any[];
+                onTime: any[];
+                late: any[];
+                pending: any[];
+                notApplicable: any[];
+            };
+        }
+    >();
+
+    for (const key of stageKeys) {
+        counters.set(key, {
+            done: 0,
+            onTime: 0,
+            late: 0,
+            pending: 0,
+            notApplicable: 0,
+            drilldown: {
+                done: [],
+                onTime: [],
+                late: [],
+                pending: [],
+                notApplicable: [],
+            },
+        });
+    }
+
+    for (const stage of stages) {
+        const counter = counters.get(stage.stageKey)!;
+
+        const tenderMeta: StageDrilldownItem = {
+            value: tenderDetails.get(stage.tenderId)?.value ?? 0,
+            status: tenderDetails.get(stage.tenderId)?.status ?? null,
+            tenderId: stage.tenderId,
+            stageKey: stage.stageKey,
+            tenderNo: stage.tenderNo,
+            tenderName: stage.tenderName,
+            deadline: stage.deadline ?? null,
+            completedAt: stage.endTime ?? null,
+            daysOverdue:
+                !stage.completed && stage.onTime === false && stage.deadline
+                    ? Math.max(0, Math.ceil((periodEnd.getTime() - new Date(stage.deadline).getTime()) / (1000 * 60 * 60 * 24)))
+                    : null,
+            meta: {},
+        };
+
+        switch (stage.stageKey) {
+            case "emd":
+                tenderMeta.meta = {
+                    emdStatus: stage.completed ? "Paid" : "Pending",
+                };
+                break;
+
+            case "ra":
+                tenderMeta.meta = {
+                    raApplicable: stage.applicable,
+                    raCompleted: stage.completed,
+                };
+                break;
+
+            case "tq":
+                tenderMeta.meta = {
+                    tqRaised: stage.applicable,
+                    tqCompleted: stage.completed,
+                };
+                break;
+
+            case "result":
+                tenderMeta.meta = {
+                    resultStatus: stage.completed ? "Declared" : "Awaited",
+                };
+                break;
+
+            default:
+                tenderMeta.meta = {};
+        }
+
+        const gated = GATED_STAGES.has(stage.stageKey);
+
+        if (!stage.applicable) {
+            if (gated) {
+                counter.notApplicable++;
+                counter.drilldown.notApplicable.push(tenderMeta);
+            }
+            continue;
+        }
+
+        if (!stage.completed) {
+            counter.pending++;
+            counter.drilldown.pending.push(tenderMeta);
+            continue;
+        }
+
+        counter.done++;
+        counter.drilldown.done.push(tenderMeta);
+
+        if (stage.onTime === true) {
+            counter.onTime++;
+            counter.drilldown.onTime.push(tenderMeta);
+        }
+
+        if (stage.onTime === false) {
+            counter.late++;
+            counter.drilldown.late.push(tenderMeta);
+        }
+    }
+
+    const rows = [
+        {
+            key: "done",
+            label: "Done",
+            data: stageKeys.map(k => counters.get(k)!.done),
+            drilldown: stageKeys.map(k => counters.get(k)!.drilldown.done),
+        },
+        {
+            key: "onTime",
+            label: "On Time",
+            data: stageKeys.map(k => counters.get(k)!.onTime),
+            drilldown: stageKeys.map(k => counters.get(k)!.drilldown.onTime),
+        },
+        {
+            key: "late",
+            label: "Late",
+            data: stageKeys.map(k => counters.get(k)!.late),
+            drilldown: stageKeys.map(k => counters.get(k)!.drilldown.late),
+        },
+        {
+            key: "pending",
+            label: "Pending",
+            data: stageKeys.map(k => counters.get(k)!.pending),
+            drilldown: stageKeys.map(k => counters.get(k)!.drilldown.pending),
+        },
+        {
+            key: "notApplicable",
+            label: "Not Applicable",
+            data: stageKeys.map(k => counters.get(k)!.notApplicable),
+            drilldown: stageKeys.map(k => counters.get(k)!.drilldown.notApplicable),
+        },
+    ];
+
+    return {
+        stages: stageKeys,
+        rows,
+    };
+}
 
     async getTenderList(query: TenderListQuery) {
         const { userId, fromDate, toDate, kpi } = query;
@@ -1201,7 +1228,7 @@ export class TenderExecutiveService {
         }));
     }
 
-       async getStageBacklogV2(query: { view: "user" | "team" | "all"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
+    async getStageBacklogV2(query: { view: "user" | "team" | "all"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
         const backlogPeriod = istDayBounds(query.fromDate.slice(0, 10), query.toDate.slice(0, 10));
 
         const fromTz = `'${backlogPeriod.start.toISOString()}'`;
@@ -1234,7 +1261,7 @@ export class TenderExecutiveService {
                     SELECT 1
                     FROM bid_submissions bs
                     WHERE bs.tender_id = ti.id
-                      AND bs.status = 'Bid Submitted'
+                    AND bs.status = 'Bid Submitted'
                 )
                 THEN COALESCE(tcd.final_price, ti.gst_values)
                 ELSE ti.gst_values
@@ -1253,7 +1280,7 @@ export class TenderExecutiveService {
                 SELECT MIN(bs.created_at)
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
-                  AND bs.status = 'Tender Missed'
+                AND bs.status = 'Tender Missed'
             ) AS missed_at,
             (
                 SELECT MIN(tr.created_at)
@@ -1273,7 +1300,7 @@ export class TenderExecutiveService {
             INNER JOIN tender_costing_details tcd
                 ON tcd.tender_costing_sheets_id = tcs.id
             WHERE tcs.tender_id = ti.id
-              AND tcd.status = 'Approved'
+            AND tcd.status = 'Approved'
             ORDER BY tcd.approved_at DESC NULLS LAST, tcd.id DESC
             LIMIT 1
         ) tcd ON true
@@ -1286,25 +1313,14 @@ export class TenderExecutiveService {
         const resolvedResultStatuses =
             "'won','lost','disqualified','cancelled','lost - h1 elimination'";
         const receivedResultStatuses = "'won','lost','cancelled','lost - h1 elimination'";
+
         const assignedOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
         AND ti.created_at < ${fromTz}
-        AND NOT EXISTS (
-            SELECT 1
-            FROM tender_information tin
-            WHERE tin.tender_id = ti.id
-            AND tin.created_at < ${fromLocal}
-        )
-        AND (
-            EXISTS (
-                SELECT 1
-                FROM tender_information tin
-                WHERE tin.tender_id = ti.id
-            )
-            OR ti.status = 1
-        )
+        AND ti.status = 1
         `);
+
         const assignedDuringTotal = await exec(`
             ${baseSelect}
             WHERE ${baseWhere()}
@@ -1314,11 +1330,22 @@ export class TenderExecutiveService {
         const assignedDuringCompleted = await exec(`
             ${baseSelect}
             WHERE ${baseWhere()}
-            AND EXISTS (
-                SELECT 1
-                FROM tender_information tin
-                WHERE tin.tender_id = ti.id
-                AND tin.created_at BETWEEN ${fromLocal} AND ${toLocal}
+            AND (
+                EXISTS (
+                    SELECT 1
+                    FROM tender_information tin
+                    WHERE tin.tender_id = ti.id
+                    AND tin.created_at BETWEEN ${fromLocal} AND ${toLocal}
+                )
+                OR (
+                    ti.created_at BETWEEN ${fromTz} AND ${toTz}
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM tender_information tin
+                        WHERE tin.tender_id = ti.id
+                    )
+                    AND ti.status <> 1
+                )
             )
             `);
 
@@ -1326,20 +1353,7 @@ export class TenderExecutiveService {
         ${baseSelect}
         WHERE ${baseWhere()}
         AND ti.created_at <= ${toTz}
-        AND NOT EXISTS (
-            SELECT 1
-            FROM tender_information tin
-            WHERE tin.tender_id = ti.id
-            AND tin.created_at <= ${toLocal}
-        )
-        AND (
-            EXISTS (
-                SELECT 1
-                FROM tender_information tin
-                WHERE tin.tender_id = ti.id
-            )
-            OR ti.status = 1
-        )
+        AND ti.status = 1
         `);
 
         const assignedTotal = assignedClosingPending;
@@ -1347,19 +1361,19 @@ export class TenderExecutiveService {
         const approvedOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND EXISTS (
-              SELECT 1
-              FROM tender_information tin
-              WHERE tin.tender_id = ti.id
+        AND EXISTS (
+            SELECT 1
+            FROM tender_information tin
+            WHERE tin.tender_id = ti.id
                 AND tin.created_at < ${fromLocal}
-          )
-          AND (
-              ti.tl_status IN (0,3)
-              OR (
-                  ti.tl_status IN (1,2)
-                  AND ti.tl_approval_timestamp >= ${fromUtc}
-              )
-          )
+        )
+        AND (
+            ti.tl_status IN (0,3)
+            OR (
+                ti.tl_status IN (1,2)
+                AND ti.tl_approval_timestamp >= ${fromUtc}
+            )
+        )
     `);
 
         const approvedDuringAccepted = await exec(`
@@ -1390,237 +1404,237 @@ export class TenderExecutiveService {
         ${baseSelect}
         JOIN tender_information tin ON tin.tender_id = ti.id
         WHERE ${baseWhere()}
-          AND tin.created_at <= ${toLocal}
-          AND (
-              ti.tl_status IN (0,3)
-              OR (
-                  ti.tl_status IN (1,2)
-                  AND ti.tl_approval_timestamp > ${toUtc}
-              )
-          )
+        AND tin.created_at <= ${toLocal}
+        AND (
+            ti.tl_status IN (0,3)
+            OR (
+                ti.tl_status IN (1,2)
+                AND ti.tl_approval_timestamp > ${toUtc}
+            )
+        )
     `);
 
         const bidOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.tl_status = 1
-          AND (ti.tl_approval_timestamp IS NULL OR ti.tl_approval_timestamp < ${fromUtc})
-          AND NOT EXISTS (
+        AND ti.tl_status = 1
+        AND (ti.tl_approval_timestamp IS NULL OR ti.tl_approval_timestamp < ${fromUtc})
+        AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
-                  AND (
+                AND (
                         (bs.status = 'Bid Submitted'
-                         AND COALESCE(bs.submission_datetime, bs.created_at) < ${fromTz})
-                     OR (bs.status = 'Tender Missed'
-                         AND bs.created_at < ${fromTz})
-                  )
-          )
+                        AND COALESCE(bs.submission_datetime, bs.created_at) < ${fromTz})
+                    OR (bs.status = 'Tender Missed'
+                        AND bs.created_at < ${fromTz})
+                )
+        )
     `);
 
         const bidDuringTotal = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.tl_approval_timestamp BETWEEN ${fromUtc} AND ${toUtc}
-          AND EXISTS (
+        AND ti.tl_approval_timestamp BETWEEN ${fromUtc} AND ${toUtc}
+        AND EXISTS (
                 SELECT 1
                 FROM tender_information tin
                 WHERE tin.tender_id = ti.id
-          )
-          AND ti.tl_status = 1
+        )
+        AND ti.tl_status = 1
     `);
 
         const bidDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.tl_status = 1
-          AND EXISTS (
+        AND ti.tl_status = 1
+        AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
-                  AND bs.status = 'Bid Submitted'
-                  AND COALESCE(bs.submission_datetime, bs.created_at) BETWEEN ${fromTz} AND ${toTz}
-          )
+                AND bs.status = 'Bid Submitted'
+                AND COALESCE(bs.submission_datetime, bs.created_at) BETWEEN ${fromTz} AND ${toTz}
+        )
     `);
 
         const dnbDuringCompleted = await exec(`
         ${baseSelect}
         JOIN statuses st ON st.id = ti.status
         WHERE ${baseWhere()}
-          AND ti.tl_status = 1
-          AND NOT EXISTS (
+        AND ti.tl_status = 1
+        AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
-                  AND bs.status = 'Bid Submitted'
-                  AND COALESCE(bs.submission_datetime, bs.created_at) <= ${toTz}
-          )
-          AND st.tender_category = 'dnb'
-          AND COALESCE(
+                AND bs.status = 'Bid Submitted'
+                AND COALESCE(bs.submission_datetime, bs.created_at) <= ${toTz}
+        )
+        AND st.tender_category = 'dnb'
+        AND COALESCE(
                 (SELECT MIN(bs.created_at)
-                   FROM bid_submissions bs
-                  WHERE bs.tender_id = ti.id
+                FROM bid_submissions bs
+                WHERE bs.tender_id = ti.id
                     AND bs.status = 'Tender Missed'),
                 ti.updated_at
-              ) BETWEEN ${fromTz} AND ${toTz}
+            ) BETWEEN ${fromTz} AND ${toTz}
     `);
 
         const bidTotal = await exec(`
         ${baseSelect}
         JOIN statuses st ON st.id = ti.status
         WHERE ${baseWhere()}
-          AND ti.tl_status = 1
-          AND (ti.tl_approval_timestamp IS NULL OR ti.tl_approval_timestamp <= ${toUtc})
-          AND st.tender_category NOT IN ('won', 'lost')
-          AND NOT EXISTS (
+        AND ti.tl_status = 1
+        AND (ti.tl_approval_timestamp IS NULL OR ti.tl_approval_timestamp <= ${toUtc})
+        AND st.tender_category NOT IN ('won', 'lost')
+        AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
-                  AND (
+                AND (
                         (bs.status = 'Bid Submitted' AND COALESCE(bs.submission_datetime, bs.created_at) <= ${toTz})
-                     OR (bs.status = 'Tender Missed'    AND bs.created_at <= ${toTz})
-                  )
-          )
+                    OR (bs.status = 'Tender Missed'    AND bs.created_at <= ${toTz})
+                )
+        )
     `);
 
         const resultAwaitedOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND EXISTS (
+        AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
-                  AND bs.status = 'Bid Submitted'
-                  AND COALESCE(bs.submission_datetime, bs.created_at) < ${fromTz}
-          )
-          AND NOT EXISTS (
+                AND bs.status = 'Bid Submitted'
+                AND COALESCE(bs.submission_datetime, bs.created_at) < ${fromTz}
+        )
+        AND NOT EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND LOWER(TRIM(tr.status)) IN (${resolvedResultStatuses})
-                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) <= ${fromTz}
-          )
+                AND LOWER(TRIM(tr.status)) IN (${resolvedResultStatuses})
+                AND COALESCE(tr.result_uploaded_at, tr.updated_at) <= ${fromTz}
+        )
     `);
 
         const resultAwaitedDuringTotal = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND EXISTS (
+        AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
-                  AND bs.status = 'Bid Submitted'
-                  AND COALESCE(bs.submission_datetime, bs.created_at) BETWEEN ${fromTz} AND ${toTz}
-          )
+                AND bs.status = 'Bid Submitted'
+                AND COALESCE(bs.submission_datetime, bs.created_at) BETWEEN ${fromTz} AND ${toTz}
+        )
     `);
 
         const wonDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.status NOT IN (${excludedStatuses})
-          AND EXISTS (
+        AND ti.status NOT IN (${excludedStatuses})
+        AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND LOWER(TRIM(tr.status)) = 'won'
-                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN ${fromTz} AND ${toTz}
-          )
+                AND LOWER(TRIM(tr.status)) = 'won'
+                AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN ${fromTz} AND ${toTz}
+        )
     `);
 
         const lostDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.status NOT IN (${excludedStatuses})
-          AND EXISTS (
+        AND ti.status NOT IN (${excludedStatuses})
+        AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND LOWER(TRIM(tr.status)) IN ('lost', 'lost - h1 elimination')
-                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN ${fromTz} AND ${toTz}
-          )
+                AND LOWER(TRIM(tr.status)) IN ('lost', 'lost - h1 elimination')
+                AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN ${fromTz} AND ${toTz}
+        )
     `);
 
         const resultAwaitedDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND EXISTS (
+        AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND LOWER(TRIM(tr.status)) IN (${receivedResultStatuses})
-                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN ${fromTz} AND ${toTz}
-          )
+                AND LOWER(TRIM(tr.status)) IN (${receivedResultStatuses})
+                AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN ${fromTz} AND ${toTz}
+        )
     `);
 
         const disqualifiedDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND EXISTS (
+        AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND LOWER(TRIM(tr.status)) = 'disqualified'
-                  AND tr.created_at BETWEEN ${fromTz} AND ${toTz}
-          )
+                AND LOWER(TRIM(tr.status)) = 'disqualified'
+                AND tr.created_at BETWEEN ${fromTz} AND ${toTz}
+        )
     `);
 
         const resultAwaitedClosing = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND EXISTS (
+        AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
-                  AND bs.status = 'Bid Submitted'
-                  AND COALESCE(bs.submission_datetime, bs.created_at) <= ${toTz}
-          )
-          AND NOT EXISTS (
+                AND bs.status = 'Bid Submitted'
+                AND COALESCE(bs.submission_datetime, bs.created_at) <= ${toTz}
+        )
+        AND NOT EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND LOWER(TRIM(tr.status)) IN (${resolvedResultStatuses})
-                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) <= ${toTz}
-          )
+                AND LOWER(TRIM(tr.status)) IN (${resolvedResultStatuses})
+                AND COALESCE(tr.result_uploaded_at, tr.updated_at) <= ${toTz}
+        )
     `);
 
         const wonOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.status NOT IN (${excludedStatuses})
-          AND EXISTS (
+        AND ti.status NOT IN (${excludedStatuses})
+        AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND LOWER(TRIM(tr.status)) = 'won'
-                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) < ${fromTz}
-          )
+                AND LOWER(TRIM(tr.status)) = 'won'
+                AND COALESCE(tr.result_uploaded_at, tr.updated_at) < ${fromTz}
+        )
     `);
 
         const lostOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.status NOT IN (${excludedStatuses})
-          AND EXISTS (
+        AND ti.status NOT IN (${excludedStatuses})
+        AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND LOWER(TRIM(tr.status)) IN ('lost', 'lost - h1 elimination')
-                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) < ${fromTz}
-          )
+                AND LOWER(TRIM(tr.status)) IN ('lost', 'lost - h1 elimination')
+                AND COALESCE(tr.result_uploaded_at, tr.updated_at) < ${fromTz}
+        )
     `);
 
         const cancelledOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.status = 18
-          AND ti.updated_at < ${fromTz}
+        AND ti.status = 18
+        AND ti.updated_at < ${fromTz}
     `);
 
         const cancelledDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.status = 18
-          AND ti.updated_at BETWEEN ${fromTz} AND ${toTz}
+        AND ti.status = 18
+        AND ti.updated_at BETWEEN ${fromTz} AND ${toTz}
     `);
 
         const wonTotalSet = new Map();
