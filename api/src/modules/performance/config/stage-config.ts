@@ -1,18 +1,27 @@
 import { StageConfig } from "./stage-config.type";
 
-type StageGateFields = { rfqRequired?: string | null; emdRequired?: string | null; physicalDocsRequired?: string | null };
+type StageGateFields = {
+    rfqRequired?: string | null;
+    emdRequired?: string | null;
+    physicalDocsRequired?: string | null;
+    physicalDocType?: string | null;
+};
+
+type InfoSheetGateFields = {
+    tlStatus?: number | null;
+    infoFilledAt?: Date | null;
+};
 
 const normalized = (value: unknown) => (typeof value === "string" ? value.trim().toLowerCase() : "");
 
 const TENDER_INFO_SHEET_SLA_MS = 259200000;
 
-//OLD  KEYS : SINCE GYAN FUCKED THE ENTIRE THING UP WITH MIGRATIONS AND USING AI FOR LITERALLY EVERYTHING
 export const STAGE_CONFIG: StageConfig[] = [
     {
         stageKey: "tender_info_sheet",
         timerName: "tender_info_sheet",
         type: "timer",
-        isApplicable: () => true,
+        isApplicable: (tender: InfoSheetGateFields) => !(Number(tender.tlStatus) === 1 && !tender.infoFilledAt),
         resolveDeadline: tender => (tender.createdAt ? new Date(new Date(tender.createdAt).getTime() + TENDER_INFO_SHEET_SLA_MS) : null),
         tlStage: false,
     },
@@ -28,7 +37,7 @@ export const STAGE_CONFIG: StageConfig[] = [
         stageKey: "rfq_sent",
         timerName: "rfq_sent",
         type: "timer",
-        isApplicable: (tender: StageGateFields) => !["no", ""].includes(normalized(tender.rfqRequired)),
+        isApplicable: (tender: StageGateFields) => normalized(tender.rfqRequired) === "yes",
         resolveDeadline: tender => tender.dueDate,
         tlStage: false,
     },
@@ -36,7 +45,7 @@ export const STAGE_CONFIG: StageConfig[] = [
         stageKey: "emd_requested",
         timerName: "emd_requested",
         type: "timer",
-        isApplicable: (tender: StageGateFields) => !["no", "exempt", ""].includes(normalized(tender.emdRequired)),
+        isApplicable: (tender: StageGateFields) => normalized(tender.emdRequired) === "yes",
         resolveDeadline: tender => tender.dueDate,
         tlStage: false,
     },
@@ -44,7 +53,7 @@ export const STAGE_CONFIG: StageConfig[] = [
         stageKey: "physical_docs",
         timerName: "physical_docs",
         type: "timer",
-        isApplicable: (tender: StageGateFields) => !["no", ""].includes(normalized(tender.physicalDocsRequired)),
+        isApplicable: (tender: StageGateFields) => normalized(tender.physicalDocsRequired) === "yes" && tender.physicalDocType !== "ONLY_EMD",
         resolveDeadline: tender => tender.dueDate,
         tlStage: false,
     },
@@ -87,7 +96,6 @@ export const STAGE_CONFIG: StageConfig[] = [
         resolveDeadline: () => null,
         tlStage: false,
     },
-
     {
         stageKey: "ra",
         type: "existence",
@@ -95,7 +103,6 @@ export const STAGE_CONFIG: StageConfig[] = [
         resolveDeadline: () => null,
         tlStage: false,
     },
-
     {
         stageKey: "result",
         type: "existence",
