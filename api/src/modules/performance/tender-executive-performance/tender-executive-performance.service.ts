@@ -21,6 +21,7 @@ import { EmdBalanceQueryDto } from "./zod/emd-balance-query.dto";
 import { STAGE_BACKLOG_CONFIG, STAGE_BACKLOG_KPI_RANK } from "../config/stage-backlog.config";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
+import { rfqs, physicalDocs } from "@/db/schemas";
 
 function isWon(status: number) {
     return [25, 26, 27, 28].includes(status);
@@ -148,10 +149,6 @@ function classifyStage(row?: StagePerformance): StageState {
         return "DONE";
     }
 
-    if (row.onTime === false) {
-        return "OVERDUE";
-    }
-
     return "PENDING";
 }
 
@@ -199,7 +196,7 @@ function factString(value: unknown): string | null {
     return typeof value === "string" ? value : null;
 }
 
-type StageState = "DONE" | "PENDING" | "OVERDUE" | "NOT_APPLICABLE";
+type StageState = "DONE" | "PENDING" | "NOT_APPLICABLE";
 
 type DrilldownDateMode = "assigned" | "infoFilled" | "approved" | "bidSubmitted" | "resultEval" | "resultUploaded" | "tenderUpdated";
 
@@ -306,7 +303,10 @@ export class TenderExecutiveService {
             ti.rfq_required AS "rfqRequired",
             (SELECT tn.emd_required FROM tender_information tn WHERE tn.tender_id = ti.id ORDER BY tn.created_at NULLS LAST LIMIT 1) AS "emdRequired",
             (SELECT tn.physical_docs_required FROM tender_information tn WHERE tn.tender_id = ti.id ORDER BY tn.created_at NULLS LAST LIMIT 1) AS "physicalDocsRequired",
+            (SELECT tn.physical_doc_type FROM tender_information tn WHERE tn.tender_id = ti.id ORDER BY tn.created_at NULLS LAST LIMIT 1) AS "physicalDocType",
             (SELECT MIN(tn.created_at) FROM tender_information tn WHERE tn.tender_id = ti.id) AS "infoFilledAt",
+            (SELECT MIN(r.created_at) FROM rfqs r WHERE r.tender_id = ti.id) AS "rfqSentAt",
+            (SELECT MIN(p.created_at) FROM physical_docs p WHERE p.tender_id = ti.id) AS "physicalDocsSentAt",
             (EXISTS (SELECT 1 FROM tender_information x WHERE x.tender_id = ti.id AND x.created_at BETWEEN ${fromLocal} AND ${toLocal})
             OR EXISTS (SELECT 1 FROM rfqs r WHERE r.tender_id = ti.id AND r.created_at BETWEEN ${fromTz} AND ${toTz})
             OR EXISTS (SELECT 1 FROM payment_requests p WHERE p.tender_id = ti.id AND p.purpose = 'EMD' AND p.created_at BETWEEN ${fromLocal} AND ${toLocal})
@@ -352,8 +352,11 @@ export class TenderExecutiveService {
             rfqRequired: factString(row.rfqRequired),
             emdRequired: factString(row.emdRequired),
             physicalDocsRequired: factString(row.physicalDocsRequired),
+            physicalDocType: factString(row.physicalDocType),
             activeInPeriod: Boolean(row.activeInPeriod),
             infoFilledAt: row.infoFilledAt ? new Date(row.infoFilledAt as string) : null,
+            rfqSentAt: row.rfqSentAt ? new Date(row.rfqSentAt as string) : null,
+            physicalDocsSentAt: row.physicalDocsSentAt ? new Date(row.physicalDocsSentAt as string) : null,
         };
 
         for (const [stageKey, key] of Object.entries(ARTIFACT_STAGE)) {
@@ -364,17 +367,14 @@ export class TenderExecutiveService {
     }
 
     const resultsRows = await this.db.select().from(tenderResults).where(inArray(tenderResults.tenderId, tenderIds));
-
     const resultMap = new Map<number, (typeof resultsRows)[number]>();
     resultsRows.forEach(r => resultMap.set(Number(r.tenderId), r));
 
     const tqs = await this.db.select().from(tenderQueries).where(inArray(tenderQueries.tenderId, tenderIds));
-
     const tqMap = new Map<number, (typeof tqs)[number]>();
     tqs.forEach(tq => tqMap.set(Number(tq.tenderId), tq));
 
     const raResults = await this.db.select().from(reverseAuctions).where(inArray(reverseAuctions.tenderId, tenderIds));
-
     const raMap = new Map<number, (typeof raResults)[number]>();
     raResults.forEach(ra => raMap.set(Number(ra.tenderId), ra));
 
@@ -394,12 +394,18 @@ export class TenderExecutiveService {
             let endTime: Date | null = null;
             let resolvedDeadline: Date | null = null;
 
-            const timerRow = stage.type === "timer" && stage.timerName ? timerMap.get(`${tender.id}:${stage.timerName}`) : undefined;
+            const infoFilledAt = facts?.infoFilledAt instanceof Date ? (facts.infoFilledAt as Date) : null;
+            const gatedStage = GATED_STAGES.has(stage.stageKey);
+            const infoFilledInPeriod = infoFilledAt !== null && infoFilledAt >= periodStart && infoFilledAt <= periodEnd;
 
+            if (gatedStage && !infoFilledInPeriod) {
+                continue;
+            }
+
+            const timerRow = stage.type === "timer" && stage.timerName ? timerMap.get(`${tender.id}:${stage.timerName}`) : undefined;
             const tenderForGate = { ...tender, rfqRequired: facts?.rfqRequired ?? null, emdRequired: facts?.emdRequired ?? null, physicalDocsRequired: facts?.physicalDocsRequired ?? null };
 
             if (stage.stageKey === "tender_info_sheet") {
-                const infoFilledAt = facts?.infoFilledAt instanceof Date ? (facts.infoFilledAt as Date) : null;
                 const computedDeadline = stage.resolveDeadline(tender);
                 resolvedDeadline = computedDeadline ? new Date(computedDeadline) : null;
                 const approvalCompleted = facts?.tlApproved === true;
@@ -425,16 +431,39 @@ export class TenderExecutiveService {
                 const deadlineAt = timerDeadline(timerRow, stage, tender);
                 resolvedDeadline = deadlineAt;
                 const startedAt = timerRow?.startedAt ? new Date(timerRow.startedAt) : null;
-                const endedAt = timerRow?.endedAt ? new Date(timerRow.endedAt) : null;
+                const timerEndedAt = timerRow?.endedAt ? new Date(timerRow.endedAt) : null;
+                const rfqSentAt = facts?.rfqSentAt instanceof Date ? (facts.rfqSentAt as Date) : null;
+                const physicalDocsSentAt = facts?.physicalDocsSentAt instanceof Date ? (facts.physicalDocsSentAt as Date) : null;
 
-                const gated = GATED_STAGES.has(stage.stageKey);
-                const rawFlag = stage.stageKey === "rfq_sent" ? facts?.rfqRequired : stage.stageKey === "emd_requested" ? facts?.emdRequired : stage.stageKey === "physical_docs" ? facts?.physicalDocsRequired : undefined;
-                const flagSpecified = typeof rawFlag === "string" && rawFlag.trim().length > 0;
-                const flagOk = !gated || !flagSpecified || (stage.isApplicable ? stage.isApplicable(tenderForGate) : false);
-                const na = gated && flagSpecified && !flagOk;
+                const endedAt = stage.stageKey === "rfq_sent" ? (rfqSentAt ?? timerEndedAt)
+                              : stage.stageKey === "physical_docs" ? (physicalDocsSentAt ?? timerEndedAt)
+                              : timerEndedAt;
+
+                let na = false;
+
+                if (stage.stageKey === "rfq_sent") {
+                    const rfqRequiredRaw = facts?.rfqRequired;
+                    const rfqRequiredYes = rfqRequiredRaw === "yes" || rfqRequiredRaw === "Yes" || rfqRequiredRaw === "YES";
+                    na = gatedStage && !rfqRequiredYes;
+                } else if (stage.stageKey === "physical_docs") {
+                    const physicalDocsRequiredRaw = facts?.physicalDocsRequired;
+                    const physicalDocsRequiredYes = physicalDocsRequiredRaw === "Yes" || physicalDocsRequiredRaw === "YES";
+                    const physicalDocType = facts?.physicalDocType;
+                    const physicalDocTypeOk = physicalDocType !== "ONLY_EMD";
+                    na = gatedStage && !(physicalDocsRequiredYes && physicalDocTypeOk);
+                } else if (stage.stageKey === "emd_requested") {
+                    const rawFlag = facts?.emdRequired;
+                    const flagSpecified = typeof rawFlag === "string" && rawFlag.trim().length > 0;
+                    const flagOk = !gatedStage || !flagSpecified || (stage.isApplicable ? stage.isApplicable(tenderForGate) : false);
+                    na = gatedStage && flagSpecified && !flagOk;
+                }
 
                 const closedInPeriod = endedAt !== null && endedAt >= periodStart && endedAt <= periodEnd;
                 const completedBeforeStart = endedAt !== null && endedAt < periodStart;
+
+                if (gatedStage && completedBeforeStart) {
+                    continue;
+                }
 
                 if (na) {
                     applicable = false;
@@ -446,24 +475,16 @@ export class TenderExecutiveService {
                     startTime = startedAt;
                     endTime = closedInPeriod ? endedAt : null;
                     onTime = closedInPeriod
-                        ? deadlineAt !== null
-                            ? (endedAt as Date) <= deadlineAt
-                            : null
-                        : deadlineAt !== null && periodEnd > deadlineAt
-                          ? false
-                          : null;
+                        ? deadlineAt !== null ? (endedAt as Date) <= deadlineAt : null
+                        : deadlineAt !== null && periodEnd > deadlineAt ? false : null;
                 }
             } else if (stage.stageKey === "tq" || stage.stageKey === "ra" || stage.stageKey === "result") {
                 const source = (stage.stageKey === "tq" ? tqMap.get(tender.id) : stage.stageKey === "ra" ? raMap.get(tender.id) : resultMap.get(tender.id)) as { createdAt?: Date | string | null } | undefined;
-
                 const createdAt = source?.createdAt ? new Date(source.createdAt) : null;
                 const createdInPeriod = createdAt !== null && createdAt >= periodStart && createdAt <= periodEnd;
-
                 applicable = stage.stageKey === "result" ? hasBid : existedByPeriod(source);
                 completed = applicable && Boolean(source) && createdInPeriod;
-
                 if (applicable && createdAt !== null && createdAt < periodStart) applicable = false;
-
                 startTime = createdAt;
                 endTime = completed ? createdAt : null;
                 onTime = null;
@@ -660,7 +681,7 @@ export class TenderExecutiveService {
         return { ...counters, tendersByKpi };
     }
 
-    async getStageMatrix(query: PerformanceQueryDto) {
+   async getStageMatrix(query: PerformanceQueryDto) {
     const stages = (await this.getStagePerformance(query)).filter(s => !MATRIX_STAGE_EXCLUSIONS.has(s.stageKey));
 
     const periodEnd = istDayBounds(query.fromDate.toISOString().slice(0, 10), query.toDate.toISOString().slice(0, 10)).end;
@@ -684,7 +705,9 @@ export class TenderExecutiveService {
         }
     }
 
-    const stageKeys = Array.from(new Set(stages.map(s => s.stageKey)));
+    const stageKeys = getExecutiveStages()
+        .map(s => s.stageKey)
+        .filter(k => !MATRIX_STAGE_EXCLUSIONS.has(k));
 
     const counters = new Map<
         string,
@@ -722,7 +745,11 @@ export class TenderExecutiveService {
     }
 
     for (const stage of stages) {
-        const counter = counters.get(stage.stageKey)!;
+        const counter = counters.get(stage.stageKey);
+
+        if (!counter) {
+            continue;
+        }
 
         const tenderMeta: StageDrilldownItem = {
             value: tenderDetails.get(stage.tenderId)?.value ?? 0,
@@ -733,15 +760,12 @@ export class TenderExecutiveService {
             tenderName: stage.tenderName,
             deadline: stage.deadline ?? null,
             completedAt: stage.endTime ?? null,
-            daysOverdue:
-                !stage.completed && stage.onTime === false && stage.deadline
-                    ? Math.max(0, Math.ceil((periodEnd.getTime() - new Date(stage.deadline).getTime()) / (1000 * 60 * 60 * 24)))
-                    : null,
+            daysOverdue: null,
             meta: {},
         };
 
         switch (stage.stageKey) {
-            case "emd":
+            case "emd_requested":
                 tenderMeta.meta = {
                     emdStatus: stage.completed ? "Paid" : "Pending",
                 };
@@ -964,228 +988,256 @@ export class TenderExecutiveService {
     }
 
     async getStageBacklog(query: StageBacklogQueryDto) {
-        const from = new Date(`${query.fromDate}T00:00:00.000Z`);
-        const to = new Date(`${query.toDate}T23:59:59.999Z`);
+    const from = new Date(`${query.fromDate}T00:00:00.000Z`);
+    const to = new Date(`${query.toDate}T23:59:59.999Z`);
 
-        const conditions = [eq(tenderInfos.deleteStatus, 0), between(tenderInfos.createdAt, new Date("2000-01-01"), to)];
+    const conditions = [eq(tenderInfos.deleteStatus, 0), between(tenderInfos.createdAt, new Date("2000-01-01"), to)];
 
-        if (query.view === "user" && query.userId) {
-            conditions.push(eq(tenderInfos.teamMember, query.userId));
-        }
-
-        if (query.view === "team" && query.teamId) {
-            conditions.push(eq(tenderInfos.team, query.teamId));
-        }
-
-        const tenders = await this.db
-            .select()
-            .from(tenderInfos)
-            .where(and(...conditions));
-
-        if (!tenders.length) return [];
-
-        const stageMatrix =
-            query.view === "user" && query.userId
-                ? await this.getStagePerformance({
-                      userId: query.userId,
-                      fromDate: from,
-                      toDate: to,
-                  })
-                : query.view === "team" && query.teamId
-                  ? await this.getStagePerformanceForTeamAggregated(query.teamId, from, to)
-                  : [];
-
-        const stageMatrixMap = new Map<string, StagePerformance>();
-        for (const row of stageMatrix) {
-            stageMatrixMap.set(`${row.tenderId}:${row.stageKey}`, row);
-        }
-
-        return STAGE_BACKLOG_CONFIG.map(stage => {
-            const metrics = {
-                opening: { count: 0, value: 0, drilldown: [] as any[] },
-                current: { count: 0, value: 0, drilldown: [] as any[] },
-                completed: { count: 0, value: 0, drilldown: [] as any[] },
-                pending: { count: 0, value: 0, drilldown: [] as any[] },
-                overdue: { count: 0, value: 0, drilldown: [] as any[] },
-            };
-
-            for (const tender of tenders) {
-                const bucket = mapStatusToKpi(Number(tender.status));
-
-                if (TERMINAL_KPI.includes(bucket)) {
-                    continue;
-                }
-
-                const matrixRow = stageMatrixMap.get(`${tender.id}:${stage.stageKey}`);
-                const startedInStageMatrix = Boolean(matrixRow);
-
-                const isOldTender = tender.createdAt < from || !startedInStageMatrix;
-
-                const value = Number(tender.gstValues ?? 0);
-
-                const meta = {
-                    tenderId: tender.id,
-                    tenderNo: tender.tenderNo ?? null,
-                    tenderName: tender.tenderName ?? null,
-                    value,
-                    status: bucket,
-                    deadline: matrixRow?.deadline ?? null,
-                    daysOverdue:
-                        matrixRow && !matrixRow.completed && matrixRow.onTime === false && matrixRow.deadline
-                            ? Math.max(0, Math.ceil((to.getTime() - new Date(matrixRow.deadline).getTime()) / (1000 * 60 * 60 * 24)))
-                            : null,
-                };
-
-                if (isOldTender) {
-                    const applicable = stage.isApplicable?.(tender) ?? true;
-
-                    const completedByStatus = STAGE_BACKLOG_KPI_RANK[bucket] >= STAGE_BACKLOG_KPI_RANK[stage.autoCompleteAfter];
-
-                    if (applicable && !completedByStatus) {
-                        metrics.opening.count++;
-                        metrics.opening.value += value;
-                        metrics.opening.drilldown.push(meta);
-                    }
-                    continue;
-                }
-
-                if (!isOldTender) {
-                    const state = classifyStage(matrixRow);
-
-                    if (state === "NOT_APPLICABLE") {
-                        continue;
-                    }
-
-                    metrics.current.count++;
-                    metrics.current.value += value;
-                    metrics.current.drilldown.push(meta);
-
-                    if (state === "DONE") {
-                        metrics.completed.count++;
-                        metrics.completed.value += value;
-                        metrics.completed.drilldown.push(meta);
-                    }
-
-                    if (state === "PENDING") {
-                        metrics.pending.count++;
-                        metrics.pending.value += value;
-                        metrics.pending.drilldown.push(meta);
-                    }
-
-                    if (state === "OVERDUE") {
-                        metrics.pending.count++;
-                        metrics.pending.value += value;
-                        metrics.pending.drilldown.push(meta);
-
-                        metrics.overdue.count++;
-                        metrics.overdue.value += value;
-                        metrics.overdue.drilldown.push(meta);
-                    }
-                }
-            }
-
-            return {
-                stageKey: stage.stageKey,
-                label: stage.label,
-                metrics,
-            };
-        });
+    if (query.view === "user" && query.userId) {
+        conditions.push(eq(tenderInfos.teamMember, query.userId));
     }
 
-    private async evaluateStagePerformance(tenders: TenderInfo[], mode: "user" | "team", userId?: number): Promise<StagePerformance[]> {
-        const activeStages = getExecutiveStages();
-        const tenderIds = tenders.map(t => t.id);
+    if (query.view === "team" && query.teamId) {
+        conditions.push(eq(tenderInfos.team, query.teamId));
+    }
 
-        let timerMap = new Map<string, any>();
+    const tenders = await this.db
+        .select()
+        .from(tenderInfos)
+        .where(and(...conditions));
 
-        const timerNames = activeStages.filter(s => s.type === "timer" && s.timerName).map(s => s.timerName!);
+    if (!tenders.length) return [];
 
-        const timerConditions = [inArray(timerTrackers.entityId, tenderIds), inArray(timerTrackers.stage, timerNames)];
+    const stageMatrix =
+        query.view === "user" && query.userId
+            ? await this.getStagePerformance({
+                  userId: query.userId,
+                  fromDate: from,
+                  toDate: to,
+              })
+            : query.view === "team" && query.teamId
+              ? await this.getStagePerformanceForTeamAggregated(query.teamId, from, to)
+              : [];
 
-        if (mode === "user" && userId) {
-            timerConditions.push(eq(timerTrackers.createdByUserId, userId));
-        }
+    const stageMatrixMap = new Map<string, StagePerformance>();
+    for (const row of stageMatrix) {
+        stageMatrixMap.set(`${row.tenderId}:${row.stageKey}`, row);
+    }
 
-        const timers = await this.db
-            .select()
-            .from(timerTrackers)
-            .where(and(...timerConditions));
-
-        timers.forEach(t => {
-            timerMap.set(`${t.entityId}:${t.stage}`, t);
-        });
-
-        const [resultsRows, tqs, raResults] = await Promise.all([
-            this.db.select().from(tenderResults).where(inArray(tenderResults.tenderId, tenderIds)),
-            this.db.select().from(tenderQueries).where(inArray(tenderQueries.tenderId, tenderIds)),
-            this.db.select().from(reverseAuctions).where(inArray(reverseAuctions.tenderId, tenderIds)),
-        ]);
-
-        const resultMap = new Map(resultsRows.map(r => [Number(r.tenderId), r]));
-        const tqMap = new Map(tqs.map(tq => [Number(tq.tenderId), tq]));
-        const raMap = new Map(raResults.map(ra => [Number(ra.tenderId), ra]));
-
-        const output: StagePerformance[] = [];
+    return STAGE_BACKLOG_CONFIG.map(stage => {
+        const metrics = {
+            opening: { count: 0, value: 0, drilldown: [] as any[] },
+            current: { count: 0, value: 0, drilldown: [] as any[] },
+            completed: { count: 0, value: 0, drilldown: [] as any[] },
+            pending: { count: 0, value: 0, drilldown: [] as any[] },
+        };
 
         for (const tender of tenders) {
-            for (const stage of activeStages) {
-                const bucket = mapStatusToKpi(Number(tender.status));
+            const bucket = mapStatusToKpi(Number(tender.status));
 
-                const hasBid = ["RESULT_AWAITED", "WON", "LOST", "DISQUALIFIED"].includes(bucket);
-                const applicable = stage.stageKey === "tq" ? tqMap.has(tender.id) : stage.stageKey === "result" ? hasBid : stage.isApplicable(tender);
+            if (TERMINAL_KPI.includes(bucket)) {
+                continue;
+            }
 
-                let completed = false;
-                let onTime: boolean | null = null;
-                let startTime: Date | null = null;
-                let endTime: Date | null = null;
+            const matrixRow = stageMatrixMap.get(`${tender.id}:${stage.stageKey}`);
+            const startedInStageMatrix = Boolean(matrixRow);
 
-                if (applicable && mode === "user" && stage.type === "timer" && stage.timerName) {
-                    const timer = timerMap.get(`${tender.id}:${stage.timerName}`);
-                    if (timer) {
-                        startTime = timer.startedAt;
-                        endTime = timer.endedAt ?? null;
+            const isOldTender = tender.createdAt < from || !startedInStageMatrix;
 
-                        if (timer.status === "completed") {
-                            completed = true;
-                            const deadline = stage.resolveDeadline(tender);
-                            onTime = deadline ? endTime! <= deadline : null;
-                        } else {
-                            const deadline = stage.resolveDeadline(tender);
-                            onTime = deadline && new Date() > deadline ? false : null;
-                        }
-                    }
+            const value = Number(tender.gstValues ?? 0);
+
+            const meta = {
+                tenderId: tender.id,
+                tenderNo: tender.tenderNo ?? null,
+                tenderName: tender.tenderName ?? null,
+                value,
+                status: bucket,
+                deadline: matrixRow?.deadline ?? null,
+            };
+
+            if (isOldTender) {
+                const applicable = stage.isApplicable?.(tender) ?? true;
+
+                const completedByStatus = STAGE_BACKLOG_KPI_RANK[bucket] >= STAGE_BACKLOG_KPI_RANK[stage.autoCompleteAfter];
+
+                if (applicable && !completedByStatus) {
+                    metrics.opening.count++;
+                    metrics.opening.value += value;
+                    metrics.opening.drilldown.push(meta);
+                }
+                continue;
+            }
+
+            if (!isOldTender) {
+                const state = classifyStage(matrixRow);
+
+                if (state === "NOT_APPLICABLE") {
+                    continue;
                 }
 
-                if (applicable && stage.type === "existence") {
-                    if (stage.stageKey === "result") {
-                        completed = Boolean(resultMap.get(tender.id)?.status);
-                    }
-                    if (stage.stageKey === "ra") {
-                        completed = raMap.has(tender.id);
-                    }
-                    if (stage.stageKey === "tq") {
-                        completed = tqMap.has(tender.id);
-                    }
-                    onTime = null;
+                metrics.current.count++;
+                metrics.current.value += value;
+                metrics.current.drilldown.push(meta);
+
+                if (state === "DONE") {
+                    metrics.completed.count++;
+                    metrics.completed.value += value;
+                    metrics.completed.drilldown.push(meta);
                 }
 
-                output.push({
-                    tenderId: tender.id,
-                    tenderNo: tender.tenderNo ?? null,
-                    tenderName: tender.tenderName ?? null,
-                    stageKey: stage.stageKey,
-                    applicable,
-                    completed,
-                    onTime,
-                    startTime,
-                    endTime,
-                    deadline: stage.resolveDeadline(tender),
-                });
+                if (state === "PENDING") {
+                    metrics.pending.count++;
+                    metrics.pending.value += value;
+                    metrics.pending.drilldown.push(meta);
+                }
             }
         }
 
-        return output;
+        return {
+            stageKey: stage.stageKey,
+            label: stage.label,
+            metrics,
+        };
+    });
+}
+
+    private async evaluateStagePerformance(tenders: TenderInfo[], mode: "user" | "team", userId?: number): Promise<StagePerformance[]> {
+    const activeStages = getExecutiveStages();
+    const tenderIds = tenders.map(t => t.id);
+
+    if (!tenderIds.length) return [];
+
+    let timerMap = new Map<string, any>();
+
+    const timerNames = activeStages.filter(s => s.type === "timer" && s.timerName).map(s => s.timerName!);
+
+    const timerConditions = [inArray(timerTrackers.entityId, tenderIds), inArray(timerTrackers.stage, timerNames)];
+
+    if (mode === "user" && userId) {
+        timerConditions.push(eq(timerTrackers.createdByUserId, userId));
     }
+
+    const timers = await this.db
+        .select()
+        .from(timerTrackers)
+        .where(and(...timerConditions));
+
+    timers.forEach(t => {
+        timerMap.set(`${t.entityId}:${t.stage}`, t);
+    });
+
+    const [resultsRows, tqs, raResults, infoRows] = await Promise.all([
+        this.db.select().from(tenderResults).where(inArray(tenderResults.tenderId, tenderIds)),
+        this.db.select().from(tenderQueries).where(inArray(tenderQueries.tenderId, tenderIds)),
+        this.db.select().from(reverseAuctions).where(inArray(reverseAuctions.tenderId, tenderIds)),
+        this.db
+            .select({
+                tenderId: tenderInformation.tenderId,
+                createdAt: tenderInformation.createdAt,
+                emdRequired: tenderInformation.emdRequired,
+                physicalDocsRequired: tenderInformation.physicalDocsRequired,
+                physicalDocType: tenderInformation.physicalDocType,
+            })
+            .from(tenderInformation)
+            .where(inArray(tenderInformation.tenderId, tenderIds)),
+    ]);
+
+    const resultMap = new Map(resultsRows.map(r => [Number(r.tenderId), r]));
+    const tqMap = new Map(tqs.map(tq => [Number(tq.tenderId), tq]));
+    const raMap = new Map(raResults.map(ra => [Number(ra.tenderId), ra]));
+    const infoMap = new Map(infoRows.map(row => [row.tenderId, row]));
+
+    const output: StagePerformance[] = [];
+
+    for (const tender of tenders) {
+        const info = infoMap.get(tender.id);
+        const infoFilledAt = info?.createdAt ?? null;
+
+        const facts = {
+            ...tender,
+            infoFilledAt,
+            emdRequired: info?.emdRequired ?? null,
+            physicalDocsRequired: info?.physicalDocsRequired ?? null,
+            physicalDocType: info?.physicalDocType ?? null,
+        };
+
+        for (const stage of activeStages) {
+            const bucket = mapStatusToKpi(Number(tender.status));
+            const hasBid = ["RESULT_AWAITED", "WON", "LOST", "DISQUALIFIED"].includes(bucket);
+
+            if (GATED_STAGES.has(stage.stageKey) && infoFilledAt === null) {
+                continue;
+            }
+
+            let applicable: boolean;
+
+            if (GATED_STAGES.has(stage.stageKey)) {
+                applicable = stage.isApplicable(facts);
+            } else if (stage.stageKey === "tq") {
+                applicable = tqMap.has(tender.id);
+            } else if (stage.stageKey === "result") {
+                applicable = hasBid;
+            } else {
+                applicable = stage.isApplicable(facts);
+            }
+
+            let completed = false;
+            let onTime: boolean | null = null;
+            let startTime: Date | null = null;
+            let endTime: Date | null = null;
+            const deadline = stage.resolveDeadline(facts);
+
+            if (applicable && stage.stageKey === "tender_info_sheet") {
+                endTime = infoFilledAt;
+                completed = infoFilledAt !== null;
+                if (completed && deadline) {
+                    onTime = endTime! <= deadline;
+                }
+            } else if (applicable && mode === "user" && stage.type === "timer" && stage.timerName) {
+                const timer = timerMap.get(`${tender.id}:${stage.timerName}`);
+                if (timer) {
+                    startTime = timer.startedAt;
+                    endTime = timer.endedAt ?? null;
+
+                    if (timer.status === "completed") {
+                        completed = true;
+                        onTime = deadline ? endTime! <= deadline : null;
+                    } else {
+                        onTime = deadline && new Date() > deadline ? false : null;
+                    }
+                }
+            }
+
+            if (applicable && stage.type === "existence") {
+                if (stage.stageKey === "result") {
+                    completed = Boolean(resultMap.get(tender.id)?.status);
+                }
+                if (stage.stageKey === "ra") {
+                    completed = raMap.has(tender.id);
+                }
+                if (stage.stageKey === "tq") {
+                    completed = tqMap.has(tender.id);
+                }
+                onTime = null;
+            }
+
+            output.push({
+                tenderId: tender.id,
+                tenderNo: tender.tenderNo ?? null,
+                tenderName: tender.tenderName ?? null,
+                stageKey: stage.stageKey,
+                applicable,
+                completed,
+                onTime,
+                startTime,
+                endTime,
+                deadline,
+            });
+        }
+    }
+
+    return output;
+}
 
     async getStagePerformanceForTeamAggregated(teamId: number, fromDate: Date, toDate: Date): Promise<StagePerformance[]> {
         const teamUsers = await this.db.select({ id: users.id }).from(users).where(eq(users.team, teamId));
