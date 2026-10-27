@@ -193,7 +193,7 @@ function timerDeadline(timerRow: { deadlineAt?: Date | string | null } | undefin
 
 type StageArtifactFlags = { exists: boolean; inPeriod: boolean; byEnd: boolean };
 
-type TenderFacts = Record<string, StageArtifactFlags | boolean | string | null | undefined>;
+type TenderFacts = Record<string, StageArtifactFlags | boolean | string | Date | null | undefined>;
 
 function factString(value: unknown): string | null {
     return typeof value === "string" ? value : null;
@@ -257,20 +257,20 @@ export class TenderExecutiveService {
                 ti.due_date    AS "dueDate"
             FROM tender_infos ti
             WHERE ti.team_member = ${userId}
-              AND ti.delete_status = 0
-              AND ti.created_at <= ${toTz}
-              AND (
+            AND ti.delete_status = 0
+            AND ti.created_at <= ${toTz}
+            AND (
                     ti.created_at BETWEEN ${fromTz} AND ${toTz}
-                 OR EXISTS (SELECT 1 FROM tender_information x WHERE x.tender_id = ti.id AND x.created_at BETWEEN ${fromLocal} AND ${toLocal})
-                 OR EXISTS (SELECT 1 FROM rfqs r WHERE r.tender_id = ti.id AND r.created_at BETWEEN ${fromTz} AND ${toTz})
-                 OR EXISTS (SELECT 1 FROM payment_requests p WHERE p.tender_id = ti.id AND p.purpose = 'EMD' AND p.created_at BETWEEN ${fromLocal} AND ${toLocal})
-                 OR EXISTS (SELECT 1 FROM physical_docs d WHERE d.tender_id = ti.id AND d.created_at BETWEEN ${fromTz} AND ${toTz})
-                 OR EXISTS (SELECT 1 FROM tender_document_checklists c WHERE c.tender_id = ti.id AND c.created_at BETWEEN ${fromTz} AND ${toTz})
-                 OR EXISTS (SELECT 1 FROM tender_costing_sheets s WHERE s.tender_id = ti.id AND s.created_at BETWEEN ${fromTz} AND ${toTz})
-                 OR EXISTS (SELECT 1 FROM bid_submissions b WHERE b.tender_id = ti.id AND b.status = 'Bid Submitted' AND COALESCE(b.submission_datetime, b.created_at) BETWEEN ${fromTz} AND ${toTz})
-                 OR EXISTS (SELECT 1 FROM timers t WHERE t.entity_id = ti.id AND t.entity_type = 'TENDER' AND t.stage IN ('tender_info_sheet','rfq_sent','emd_requested','physical_docs','document_checklist','costing_sheets','bid_submission') AND t.ended_at BETWEEN ${fromTz} AND ${toTz})
-                 OR NOT EXISTS (SELECT 1 FROM tender_information x WHERE x.tender_id = ti.id AND x.created_at <= ${toLocal})
-              )
+                OR EXISTS (SELECT 1 FROM tender_information x WHERE x.tender_id = ti.id AND x.created_at BETWEEN ${fromLocal} AND ${toLocal})
+                OR EXISTS (SELECT 1 FROM rfqs r WHERE r.tender_id = ti.id AND r.created_at BETWEEN ${fromTz} AND ${toTz})
+                OR EXISTS (SELECT 1 FROM payment_requests p WHERE p.tender_id = ti.id AND p.purpose = 'EMD' AND p.created_at BETWEEN ${fromLocal} AND ${toLocal})
+                OR EXISTS (SELECT 1 FROM physical_docs d WHERE d.tender_id = ti.id AND d.created_at BETWEEN ${fromTz} AND ${toTz})
+                OR EXISTS (SELECT 1 FROM tender_document_checklists c WHERE c.tender_id = ti.id AND c.created_at BETWEEN ${fromTz} AND ${toTz})
+                OR EXISTS (SELECT 1 FROM tender_costing_sheets s WHERE s.tender_id = ti.id AND s.created_at BETWEEN ${fromTz} AND ${toTz})
+                OR EXISTS (SELECT 1 FROM bid_submissions b WHERE b.tender_id = ti.id AND b.status = 'Bid Submitted' AND COALESCE(b.submission_datetime, b.created_at) BETWEEN ${fromTz} AND ${toTz})
+                OR EXISTS (SELECT 1 FROM timers t WHERE t.entity_id = ti.id AND t.entity_type = 'TENDER' AND t.stage IN ('tender_info_sheet','rfq_sent','emd_requested','physical_docs','document_checklist','costing_sheets','bid_submission') AND t.ended_at BETWEEN ${fromTz} AND ${toTz})
+                OR NOT EXISTS (SELECT 1 FROM tender_information x WHERE x.tender_id = ti.id AND x.created_at <= ${toLocal})
+            )
         `))).rows as TenderInfo[];
 
         if (tenders.length === 0) return [];
@@ -305,14 +305,15 @@ export class TenderExecutiveService {
                 ti.rfq_required AS "rfqRequired",
                 (SELECT tn.emd_required FROM tender_information tn WHERE tn.tender_id = ti.id ORDER BY tn.created_at NULLS LAST LIMIT 1) AS "emdRequired",
                 (SELECT tn.physical_docs_required FROM tender_information tn WHERE tn.tender_id = ti.id ORDER BY tn.created_at NULLS LAST LIMIT 1) AS "physicalDocsRequired",
+                (SELECT MIN(tn.created_at) FROM tender_information tn WHERE tn.tender_id = ti.id) AS "infoFilledAt",
                 (EXISTS (SELECT 1 FROM tender_information x WHERE x.tender_id = ti.id AND x.created_at BETWEEN ${fromLocal} AND ${toLocal})
-                 OR EXISTS (SELECT 1 FROM rfqs r WHERE r.tender_id = ti.id AND r.created_at BETWEEN ${fromTz} AND ${toTz})
-                 OR EXISTS (SELECT 1 FROM payment_requests p WHERE p.tender_id = ti.id AND p.purpose = 'EMD' AND p.created_at BETWEEN ${fromLocal} AND ${toLocal})
-                 OR EXISTS (SELECT 1 FROM physical_docs d WHERE d.tender_id = ti.id AND d.created_at BETWEEN ${fromTz} AND ${toTz})
-                 OR EXISTS (SELECT 1 FROM tender_document_checklists c WHERE c.tender_id = ti.id AND c.created_at BETWEEN ${fromTz} AND ${toTz})
-                 OR EXISTS (SELECT 1 FROM tender_costing_sheets s WHERE s.tender_id = ti.id AND s.created_at BETWEEN ${fromTz} AND ${toTz})
-                 OR EXISTS (SELECT 1 FROM bid_submissions b WHERE b.tender_id = ti.id AND b.status = 'Bid Submitted' AND COALESCE(b.submission_datetime, b.created_at) BETWEEN ${fromTz} AND ${toTz})
-                 OR EXISTS (SELECT 1 FROM timers t WHERE t.entity_id = ti.id AND t.entity_type = 'TENDER' AND t.stage IN ('tender_info_sheet','rfq_sent','emd_requested','physical_docs','document_checklist','costing_sheets','bid_submission') AND t.ended_at BETWEEN ${fromTz} AND ${toTz})
+                OR EXISTS (SELECT 1 FROM rfqs r WHERE r.tender_id = ti.id AND r.created_at BETWEEN ${fromTz} AND ${toTz})
+                OR EXISTS (SELECT 1 FROM payment_requests p WHERE p.tender_id = ti.id AND p.purpose = 'EMD' AND p.created_at BETWEEN ${fromLocal} AND ${toLocal})
+                OR EXISTS (SELECT 1 FROM physical_docs d WHERE d.tender_id = ti.id AND d.created_at BETWEEN ${fromTz} AND ${toTz})
+                OR EXISTS (SELECT 1 FROM tender_document_checklists c WHERE c.tender_id = ti.id AND c.created_at BETWEEN ${fromTz} AND ${toTz})
+                OR EXISTS (SELECT 1 FROM tender_costing_sheets s WHERE s.tender_id = ti.id AND s.created_at BETWEEN ${fromTz} AND ${toTz})
+                OR EXISTS (SELECT 1 FROM bid_submissions b WHERE b.tender_id = ti.id AND b.status = 'Bid Submitted' AND COALESCE(b.submission_datetime, b.created_at) BETWEEN ${fromTz} AND ${toTz})
+                OR EXISTS (SELECT 1 FROM timers t WHERE t.entity_id = ti.id AND t.entity_type = 'TENDER' AND t.stage IN ('tender_info_sheet','rfq_sent','emd_requested','physical_docs','document_checklist','costing_sheets','bid_submission') AND t.ended_at BETWEEN ${fromTz} AND ${toTz})
                 ) AS "activeInPeriod",
                 ${artifactFlags("info", "tender_information", "ti_n", "ti_n.created_at", fromLocal, toLocal)},
                 ${artifactFlags("rfq", "rfqs", "ti_r", "ti_r.created_at", fromTz, toTz)},
@@ -351,6 +352,7 @@ export class TenderExecutiveService {
                 emdRequired: factString(row.emdRequired),
                 physicalDocsRequired: factString(row.physicalDocsRequired),
                 activeInPeriod: Boolean(row.activeInPeriod),
+                infoFilledAt: row.infoFilledAt ? new Date(row.infoFilledAt as string) : null,
             };
 
             for (const [stageKey, key] of Object.entries(ARTIFACT_STAGE)) {
@@ -394,7 +396,16 @@ export class TenderExecutiveService {
 
                 const tenderForGate = { ...tender, rfqRequired: facts?.rfqRequired ?? null, emdRequired: facts?.emdRequired ?? null, physicalDocsRequired: facts?.physicalDocsRequired ?? null };
 
-                if (stage.type === "timer") {
+                if (stage.stageKey === "tender_info_sheet") {
+                    const infoFilledAt = facts?.infoFilledAt instanceof Date ? (facts.infoFilledAt as Date) : null;
+                    const deadlineAt = timerDeadline(timerRow, stage, tender);
+
+                    applicable = true;
+                    completed = infoFilledAt !== null && infoFilledAt >= periodStart && infoFilledAt <= periodEnd;
+                    startTime = tender.createdAt ? new Date(tender.createdAt) : null;
+                    endTime = completed ? infoFilledAt : null;
+                    onTime = completed ? (deadlineAt !== null ? (infoFilledAt as Date) <= deadlineAt : null) : deadlineAt !== null && periodEnd > deadlineAt && infoFilledAt === null ? false : null;
+                } else if (stage.type === "timer") {
                     const deadlineAt = timerDeadline(timerRow, stage, tender);
                     const startedAt = timerRow?.startedAt ? new Date(timerRow.startedAt) : null;
                     const endedAt = timerRow?.endedAt ? new Date(timerRow.endedAt) : null;
@@ -1318,22 +1329,11 @@ export class TenderExecutiveService {
         const assignedDuringCompleted = await exec(`
             ${baseSelect}
             WHERE ${baseWhere()}
-            AND (
-                EXISTS (
-                    SELECT 1
-                    FROM tender_information tin
-                    WHERE tin.tender_id = ti.id
-                    AND tin.created_at BETWEEN ${fromLocal} AND ${toLocal}
-                )
-                OR (
-                    ti.created_at BETWEEN ${fromTz} AND ${toTz}
-                    AND NOT EXISTS (
-                        SELECT 1
-                        FROM tender_information tin
-                        WHERE tin.tender_id = ti.id
-                    )
-                    AND ti.status <> 1
-                )
+            AND EXISTS (
+                SELECT 1
+                FROM tender_information tin
+                WHERE tin.tender_id = ti.id
+                AND tin.created_at BETWEEN ${fromLocal} AND ${toLocal}
             )
             `);
 
