@@ -5,7 +5,14 @@ import type { OemComponentData, OemPerformanceParams } from '@/modules/performan
 
 export const oemPerformanceKeys = {
     all: ['oem-performance'] as const,
-    report: (params: OemPerformanceParams | null) => [...oemPerformanceKeys.all, 'report', params] as const,
+    // Only the fields sent to the API form the cache key — `tab` is UI-only and
+    // must not create a separate cache entry for the same report.
+    report: (params: OemPerformanceParams | null) =>
+        [
+            ...oemPerformanceKeys.all,
+            'report',
+            params ? { oemId: params.oemId, fromDate: params.fromDate, toDate: params.toDate } : null,
+        ] as const,
 };
 
 export function useOemPerformance(params: OemPerformanceParams | null) {
