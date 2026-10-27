@@ -668,14 +668,12 @@ export class TenderExecutiveService {
                 onTime: number;
                 late: number;
                 pending: number;
-                overdue: number;
                 notApplicable: number;
                 drilldown: {
                     done: any[];
                     onTime: any[];
                     late: any[];
                     pending: any[];
-                    overdue: any[];
                     notApplicable: any[];
                 };
             }
@@ -687,14 +685,12 @@ export class TenderExecutiveService {
                 onTime: 0,
                 late: 0,
                 pending: 0,
-                overdue: 0,
                 notApplicable: 0,
                 drilldown: {
                     done: [],
                     onTime: [],
                     late: [],
                     pending: [],
-                    overdue: [],
                     notApplicable: [],
                 },
             });
@@ -751,21 +747,16 @@ export class TenderExecutiveService {
             }
 
             if (!stage.applicable) {
-                    if (!stage.hidden) {
-                        counter.notApplicable++;
-                        counter.drilldown.notApplicable.push(tenderMeta);
-                    }
-                    continue;
+                if (!stage.hidden) {
+                    counter.notApplicable++;
+                    counter.drilldown.notApplicable.push(tenderMeta);
                 }
+                continue;
+            }
 
             if (!stage.completed) {
-                if (stage.onTime === false) {
-                    counter.overdue++;
-                    counter.drilldown.overdue.push(tenderMeta);
-                } else {
-                    counter.pending++;
-                    counter.drilldown.pending.push(tenderMeta);
-                }
+                counter.pending++;
+                counter.drilldown.pending.push(tenderMeta);
                 continue;
             }
 
@@ -807,12 +798,6 @@ export class TenderExecutiveService {
                 label: "Pending",
                 data: stageKeys.map(k => counters.get(k)!.pending),
                 drilldown: stageKeys.map(k => counters.get(k)!.drilldown.pending),
-            },
-            {
-                key: "overdue",
-                label: "Overdue",
-                data: stageKeys.map(k => counters.get(k)!.overdue),
-                drilldown: stageKeys.map(k => counters.get(k)!.drilldown.overdue),
             },
             {
                 key: "notApplicable",
