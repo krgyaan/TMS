@@ -1,21 +1,22 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 /* UI Components */
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import DataTable from "@/components/ui/data-table";
+import { Input } from "@/components/ui/input";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
+import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 
 /* Icons */
-import { Eye } from "lucide-react";
+import { Eye, Search } from "lucide-react";
 import { paths } from "@/app/routes/paths";
 import { formatINR } from "@/hooks/useINRFormatter";
 import type { NotAllowedTenderRow, LifecycleTenderRow, RfqSentToOemRow, OemPerformanceParams, TendersByKpi } from "../helpers/oem-performance.types";
 import { OEM_TABS } from "../helpers/oem-performance.types";
 
-import type { ColDef } from "ag-grid-community";
+import type { ColDef, GridApi, GridReadyEvent } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
 import { TenderNameCell } from "@/components/data-grid/renderers/TenderNameCell";
 
@@ -39,6 +40,18 @@ interface OemTenderTableProps {
 
 export default function OemTenderTable({ params, tab, data, isLoading }: OemTenderTableProps) {
     const navigate = useNavigate();
+
+    const [gridApi, setGridApi] = useState<GridApi<OemTenderRow> | null>(null);
+    const [search, setSearch] = useState("");
+    const debouncedSearch = useDebouncedSearch(search, 300);
+
+    const onGridReady = useCallback((event: GridReadyEvent<OemTenderRow>) => {
+        setGridApi(event.api);
+    }, []);
+
+    useEffect(() => {
+        gridApi?.setGridOption("quickFilterText", debouncedSearch || undefined);
+    }, [gridApi, debouncedSearch]);
 
     const rows = useMemo<OemTenderRow[]>(() => {
         if (!data) return [];
@@ -85,6 +98,8 @@ export default function OemTenderTable({ params, tab, data, isLoading }: OemTend
                 flex: 1,
                 minWidth: 220,
                 cellRenderer: TenderNameCell,
+                // Search by both tender number and tender name (only tenderNo is the column field)
+                getQuickFilterText: p => `${p.data?.tenderNo ?? ""} ${p.data?.tenderName ?? ""}`,
             },
             {
                 field: "gstValues",
@@ -240,38 +255,49 @@ export default function OemTenderTable({ params, tab, data, isLoading }: OemTend
 
     if (isLoading) {
         return (
-            <Card>
-                <CardHeader className="pb-4">
-                    <Skeleton className="h-6 w-52" />
-                    <Skeleton className="h-4 w-80" />
-                </CardHeader>
-                <CardContent>
+            <div className="space-y-4">
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div>
+                        <Skeleton className="h-6 w-52" />
+                        <Skeleton className="h-4 w-80 mt-1" />
+                    </div>
+                    <Skeleton className="h-9 w-56" />
+                </div>
+                <div className="border-t pt-6">
                     <Skeleton className="h-48 w-full rounded-lg" />
-                </CardContent>
-            </Card>
+                </div>
+            </div>
         );
     }
 
     const activeTab = OEM_TABS.find(t => t.key === tab) ?? OEM_TABS[0];
 
     return (
-        <Card>
-            <CardHeader className="pb-4">
-                <div className="flex items-center justify-between gap-2">
-                    <div>
-                        <CardTitle className="text-base font-semibold">{activeTab.label}</CardTitle>
-                        <CardDescription>Tenders in this category for the selected OEM and date range.</CardDescription>
-                    </div>
-                    <Badge variant="secondary">{rows.length}</Badge>
+        <div className="space-y-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                    <h3 className="text-base font-semibold leading-none">{activeTab.label}</h3>
+                    <p className="text-sm text-muted-foreground mt-1.5">Tenders in this category for the selected OEM and date range.</p>
                 </div>
-            </CardHeader>
-            <CardContent className="pt-0">
+                <div className="relative">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        type="text"
+                        placeholder="Search tenders..."
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        className="pl-8 w-56"
+                        aria-label="Search tenders"
+                    />
+                </div>
+            </div>
+            <div className="border-t pt-6">
                 {rows.length === 0 ? (
                     <div className="py-12 text-center text-sm text-muted-foreground">No tenders found for this category.</div>
                 ) : (
-                    <DataTable data={rows} columnDefs={columnDefs} gridOptions={{ domLayout: "autoHeight" }} />
+                    <DataTable data={rows} columnDefs={columnDefs} gridOptions={{ domLayout: "autoHeight" }} onGridReady={onGridReady} />
                 )}
-            </CardContent>
-        </Card>
+            </div>
+        </div>
     );
 }
