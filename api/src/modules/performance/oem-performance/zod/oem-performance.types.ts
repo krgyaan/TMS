@@ -15,18 +15,34 @@ export interface TenderRow {
     responseOn?: Date | null;
 }
 
-export interface BidTenderRow {
+export type BidTenderRow = {
     tenderId: number;
     tenderNo: string;
     tenderName: string;
     gstValues: string;
-    bidStatus: "Submission Pending" | "Bid Submitted" | "Tender Missed";
-    tenderStatus: number;
-    submissionDatetime: Date | null;
-    dueDate: Date;
+    bidStatus: string;
+    tenderStatus: number | string;
+    submissionDatetime: Date | string | null;
+    dueDate: Date | string;
     teamMemberName: string | null;
     teamName: string | null;
-}
+    biddedBy?: string | null;
+};
+
+export type LifecycleTenderRow = {
+    id: number;
+    tenderNo: string;
+    tenderName: string;
+    dueDate: string;
+    gstValues: string;
+    member: string;
+    team: string;
+    createdAt: string;
+    status: string;
+    submissionTime?: string;
+    resultDate?: string;
+    biddedBy?: string;
+};
 
 export interface RfqInfoRow {
     tenderId: number;
@@ -106,19 +122,7 @@ export interface RfqSentToOemRow {
     createdAt: string;
 }
 
-export type LifecycleTenderRow = {
-    id: number;
-    tenderNo: string;
-    tenderName: string;
-    dueDate: string;
-    gstValues: string;
-    member: string;
-    team: string;
-    createdAt: string;
-    status: string;
-    submissionTime?: string;
-    resultDate?: string;
-};
+
 
 export interface OemPerformanceResponse {
     summary: OemSummary;

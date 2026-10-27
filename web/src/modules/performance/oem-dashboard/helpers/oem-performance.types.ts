@@ -57,6 +57,19 @@ export interface RfqSentToOemRow {
     rfqResponseOn: string | null; // null = not yet responded
     createdAt: string;
 }
+export type BidTenderRow = {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    gstValues: string;
+    bidStatus: string;
+    tenderStatus: number | string;
+    submissionDatetime: Date | string | null;
+    dueDate: Date | string;
+    teamMemberName: string | null;
+    teamName: string | null;
+    biddedBy?: string | null;
+};
 
 export type LifecycleTenderRow = {
     id: number;
@@ -70,6 +83,7 @@ export type LifecycleTenderRow = {
     status: string;
     submissionTime?: string;
     resultDate?: string;
+    biddedBy?: string;
 };
 
 export interface OemPerformanceResponse {

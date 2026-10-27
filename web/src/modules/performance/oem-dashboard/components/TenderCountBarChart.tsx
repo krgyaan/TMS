@@ -5,8 +5,7 @@ import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAx
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import { useOemPerformance } from "@/hooks/api/useOemPerformance";
-import type { OemPerformanceParams } from "../helpers/oem-performance.types";
+import type { OemComponentData } from "../helpers/oem-performance.types";
 
 const SERIES = [
     { key: "won", label: "Won", color: "#16a34a" },
@@ -51,12 +50,11 @@ function ChartTooltip({ active, label, payload }: ChartTooltipProps) {
 }
 
 interface TenderCountBarChartProps {
-    params: OemPerformanceParams | null;
+    data: OemComponentData | undefined;
+    isLoading: boolean;
 }
 
-export default function TenderCountBarChart({ params }: TenderCountBarChartProps) {
-    const { data, isLoading } = useOemPerformance(params);
-
+export default function TenderCountBarChart({ data, isLoading }: TenderCountBarChartProps) {
     const rows = useMemo(
         () =>
             (data?.monthlyTrend ?? []).map(point => ({
@@ -67,8 +65,6 @@ export default function TenderCountBarChart({ params }: TenderCountBarChartProps
             })),
         [data]
     );
-
-    if (!params) return null;
 
     if (isLoading) {
         return (

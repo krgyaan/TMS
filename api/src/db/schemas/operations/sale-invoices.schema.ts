@@ -12,10 +12,17 @@ export const saleInvoices = pgTable("sale_invoices", {
 
     invoiceNumber: varchar("invoice_number", { length: 255 }),
     invoiceDate: date("invoice_date"),
+    projectManagerName: varchar("project_manager_name", { length: 255 }),
+    projectManagerPhone: varchar("project_manager_phone", { length: 50 }),
+    projectManagerEmail: varchar("project_manager_email", { length: 255 }),
 
     billingCustomerName: varchar("billing_customer_name", { length: 255 }),
     billingAddress: text("billing_address"),
     billingGst: varchar("billing_gst", { length: 15 }),
+    billingStateName: varchar("billing_state_name", { length: 100 }),
+    billingPlaceOfSupply: varchar("billing_place_of_supply", { length: 100 }),
+    billingContactPerson: varchar("billing_contact_person", { length: 255 }),
+    billingPhone: varchar("billing_phone", { length: 50 }),
     billingEmail: varchar("billing_email", { length: 255 }),
     billingPanNo: varchar("billing_pan_no", { length: 50 }),
     billingMsmeNo: varchar("billing_msme_no", { length: 50 }),
@@ -26,6 +33,10 @@ export const saleInvoices = pgTable("sale_invoices", {
     shippingCustomerName: varchar("shipping_customer_name", { length: 255 }),
     shippingAddress: text("shipping_address"),
     shippingGst: varchar("shipping_gst", { length: 15 }),
+    shippingStateName: varchar("shipping_state_name", { length: 100 }),
+    shippingPlaceOfSupply: varchar("shipping_place_of_supply", { length: 100 }),
+    shippingContactPerson: varchar("shipping_contact_person", { length: 255 }),
+    shippingPhone: varchar("shipping_phone", { length: 50 }),
     shippingPanNo: varchar("shipping_pan_no", { length: 50 }),
     shippingAddressId: bigint("shipping_address_id", { mode: "number" })
         .references(() => woShippingAddresses.id, { onDelete: "set null" }),
@@ -34,7 +45,7 @@ export const saleInvoices = pgTable("sale_invoices", {
         .references(() => transporters.id, { onDelete: "set null" }),
     transporterDetails: jsonb("transporter_details")
         .$type<{ name?: string; phone?: string; gstNo?: string; address?: string } | null>(),
-
+    transportVia: varchar("transport_via", { length: 100 }),
     dispatchFromName: varchar("dispatch_from_name", { length: 255 }),
     dispatchFromAddress: text("dispatch_from_address"),
     dispatchFromGst: varchar("dispatch_from_gst", { length: 15 }),

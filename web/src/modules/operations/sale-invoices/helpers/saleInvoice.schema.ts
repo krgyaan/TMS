@@ -14,6 +14,10 @@ const saleInvoiceItemSchema = z.object({
 export const saleInvoiceFormSchema = z
     .object({
         invoiceDate: z.string().min(1, "Invoice date is required"),
+        selectedProjectManagerId: z.string().default(""),
+        projectManagerName: z.string().default(""),
+        projectManagerPhone: z.string().default(""),
+        projectManagerEmail: z.string().default(""),
 
         selectedLineSrNos: z
             .array(z.number().int())
@@ -24,6 +28,10 @@ export const saleInvoiceFormSchema = z
         billingCustomerName: z.string().min(1, "Billing customer name is required"),
         billingAddress: z.string().min(1, "Billing address is required"),
         billingGst: z.string().default(""),
+        billingStateName: z.string().default(""),
+        billingPlaceOfSupply: z.string().default(""),
+        billingContactPerson: z.string().default(""),
+        billingPhone: z.string().default(""),
         billingEmail: z.string().default(""),
         billingPanNo: z.string().default(""),
         billingMsmeNo: z.string().default(""),
@@ -33,9 +41,14 @@ export const saleInvoiceFormSchema = z
         shippingCustomerName: z.string().min(1, "Shipping customer name is required"),
         shippingAddress: z.string().min(1, "Shipping address is required"),
         shippingGst: z.string().default(""),
+        shippingStateName: z.string().default(""),
+        shippingPlaceOfSupply: z.string().default(""),
+        shippingContactPerson: z.string().default(""),
+        shippingPhone: z.string().default(""),
         shippingPanNo: z.string().default(""),
 
         transporterId: z.string().default(""),
+        transportVia: z.string().default(""),
 
         dispatchFromName: z.string().default(""),
         dispatchFromAddress: z.string().default(""),
