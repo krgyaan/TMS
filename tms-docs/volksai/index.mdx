@@ -1,0 +1,131 @@
+---
+title: "VolksAI Architecture & Technical Index"
+description: "In-depth engineering manual for the VolksAI document extraction microservice and multi-role LLM engine"
+---
+
+<div className="p-4 rounded-xl border border-orange-500/20 bg-orange-500/5 mb-6">
+  <div className="flex items-center gap-3">
+    <div className="p-2 bg-orange-500 text-white rounded-lg font-bold">VolksAI</div>
+    <div>
+      <h3 className="text-lg font-semibold m-0 text-orange-600 dark:text-orange-400">VolksAI Deep-Dive Engineering Manual</h3>
+      <p className="text-sm text-gray-600 dark:text-gray-400 m-0">Exhaustive architectural and algorithmic documentation for developers working directly on the VolksAI Python microservice.</p>
+    </div>
+  </div>
+</div>
+
+## Microservice Architecture
+
+**VolksAI** (`volksAi/`) is a high-throughput Python FastAPI microservice dedicated to reading heterogeneous Indian procurement documents, extracting tables deterministically, resolving complex legal clauses via Anthropic Claude, and building Word (`.docx`) annexure packages.
+
+```mermaid
+graph TD
+    Client[NestJS API / BullMQ Worker] -->|HTTP Multipart /extract| Router[extract.py Router]
+    
+    subgraph Ingestion & Pre-processing
+        Router --> Ingest[pdf_parent_ingest.py]
+        Ingest --> PyMuPDF[PyMuPDF / fitz & pdfplumber]
+        Ingest --> Classifier[document_classifier.py]
+        Ingest --> Links[pdf_link_extractor.py]
+        Ingest --> OCR[PaddleOCR Deep Learning Engine]
+    end
+    
+    subgraph Layer 1: Deterministic Engine (0 Tokens)
+        PyMuPDF --> TenderMapper[tender_mapper.py 242KB]
+        TenderMapper --> FieldAliases[gem_field_aliases.py & gail_clause_aliases.py]
+        TenderMapper --> Normalizer[normalizer.py]
+        TenderMapper --> L1Match[High Confidence Fields]
+    end
+    
+    subgraph Layer 2: Scoped LLM Engine
+        TenderMapper -->|Missing / Ambiguous| LLMResolver[llm_field_resolver.py 111KB]
+        LLMResolver --> Scope[extract_scoped_context]
+        Scope --> Role1[Role 1: Claude Haiku 4.5 Tool Use]
+        Scope --> Role2[Role 2: Claude Sonnet 5.5 Tool Use]
+    end
+
+    subgraph Document Compliance & Annexures
+        Ingest --> BiddingReq[bidding_requirements_resolver.py - Role 3 Sonnet 5]
+        Ingest --> AnnexureRes[annexure_resolver.py - Role 4 Sonnet 5]
+        AnnexureRes --> DocxBuilder[annexure_docx_builder.py - Letterhead .docx Builder]
+    end
+    
+    L1Match --> FieldMapper[tms_field_mapper.py]
+    Role1 --> FieldMapper
+    Role2 --> FieldMapper
+    FieldMapper --> Output[Structured NestJS camelCase DTO]
+```
+
+---
+
+## VolksAI Deep-Dive Topics
+
+Explore the dedicated technical guides for each layer of the VolksAI microservice:
+
+<CardGroup cols={2}>
+  <Card title="Developer Handoff Manual" icon="book-bookmark" href="/volksai/handoff-guide">
+    The complete developer onboarding and architectural handoff guide covering all 13 sections.
+  </Card>
+  <Card title="Ingestion & Classification" icon="file-pdf" href="/volksai/ingestion-and-classification">
+    PyMuPDF layout parsing, external link extraction, and deterministic document classification.
+  </Card>
+  <Card title="Layer 1 Deterministic Engine" icon="table" href="/volksai/layer1-deterministic-mapping">
+    How `tender_mapper.py` parses tables, normalizes money/dates, and resolves 65%+ of fields with 0 tokens.
+  </Card>
+  <Card title="Layer 2 Claude Architecture" icon="microchip" href="/volksai/layer2-llm-resolver">
+    Role 1 Haiku 4.5, Role 2 Sonnet 5.5, Anthropic Tool Use schemas, and token budgeting.
+  </Card>
+  <Card title="Scoped Context & Prompts" icon="crop-simple" href="/volksai/scoped-context-and-prompts">
+    Why we never send 200 pages to Claude, section-heading regex windowing, and prompt rules.
+  </Card>
+  <Card title="Bidding Requirements & Role 3" icon="list-check" href="/volksai/bidding-requirements-pipeline">
+    Deep compliance document extraction across full page-tagged text with page citation guards.
+  </Card>
+  <Card title="Role 4 & Word (.docx) Builder" icon="file-word" href="/volksai/annexure-builder">
+    AI format reproduction into typed blocks and deterministic rendering on company letterhead.
+  </Card>
+  <Card title="PaddleOCR & Scanned PDFs" icon="eye" href="/volksai/ocr-engine">
+    Deep-learning text detection, text-density heuristics, thread throttling, and memory sizing.
+  </Card>
+  <Card title="TMS DTO Field Mapping" icon="arrows-split-up-and-left" href="/volksai/tms-field-mapping">
+    Translating Python dicts to NestJS DTOs, confidence levels, and legal reasoning audit trails.
+  </Card>
+  <Card title="Ground-Truth Regressions & Tests" icon="vial-circle-check" href="/volksai/ground-truth-and-testing">
+    GAIL Kochi ground-truth regression, contact integrity tests, and `scratch/` diagnostic tools.
+  </Card>
+</CardGroup>
+
+---
+
+## Microservice Subtree Walkthrough
+
+```
+volksAi/
+├── app/
+│   ├── main.py                     # FastAPI entrypoint, middleware, CORS, lifespan startup
+│   ├── routers/
+│   │   ├── extract.py              # POST /extract (Tender PDF ingestion & field extraction)
+│   │   ├── bidding_requirements.py # POST /analyze-bidding-requirements (Checklists)
+│   │   ├── annexures.py            # POST /annexures/download-docx
+│   │   ├── classify.py             # POST /classify-documents
+│   │   └── health.py               # GET /health
+│   ├── services/
+│   │   ├── pdf_parent_ingest.py    # PyMuPDF/pdfplumber parser and PaddleOCR coordinator
+│   │   ├── pdf_link_extractor.py   # Extracts external tender document hyperlinks
+│   │   ├── document_classifier.py  # Deterministic 0-100 score document classifier
+│   │   ├── tender_mapper.py        # Layer 1 deterministic regex mapping (242 KB)
+│   │   ├── gem_field_aliases.py    # GeM table header aliases
+│   │   ├── gail_clause_aliases.py  # PSU custom contract aliases
+│   │   ├── normalizer.py           # Money, percentage, and date-time normalizers
+│   │   ├── field_extractor.py      # Spatial table and text parser
+│   │   ├── llm_field_resolver.py   # Layer 2 Claude resolver (Role 1 & Role 2) (111 KB)
+│   │   ├── bidding_requirements_resolver.py # Role 3 compliance document analyzer
+│   │   ├── annexure_resolver.py    # Role 4 annexure format identifier
+│   │   ├── annexure_docx_builder.py# Deterministic .docx builder with company letterhead
+│   │   └── tms_field_mapper.py     # Maps Python outputs to camelCase NestJS DTOs
+│   └── core/
+│       ├── config.py               # Environment configuration settings
+│       └── logging.py              # Rotating file logger writing to logs/volksai.log
+├── scratch/                        # Diagnostic scripts and test fixtures
+├── Dockerfile                      # Container definition with PyMuPDF and PaddleOCR
+└── requirements.txt                # Python dependencies
+```

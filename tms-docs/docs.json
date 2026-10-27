@@ -34,19 +34,24 @@
         ]
       },
       {
-        "group": "VolksAI Intelligence",
+        "group": "VolksAI (Deep Dive)",
         "pages": [
-          "volksai/overview",
+          "volksai/index",
           "volksai/handoff-guide",
-          "volksai/two-layer-extraction",
-          "volksai/llm-roles-and-prompts",
-          "volksai/checklists-and-requirements",
-          "volksai/ocr-and-scanned-documents",
-          "volksai/ground-truth-and-testing"
+          "volksai/ingestion-and-classification",
+          "volksai/layer1-deterministic-mapping",
+          "volksai/layer2-llm-resolver",
+          "volksai/scoped-context-and-prompts",
+          "volksai/bidding-requirements-pipeline",
+          "volksai/annexure-builder",
+          "volksai/ocr-engine",
+          "volksai/tms-field-mapping",
+          "volksai/ground-truth-and-testing",
+          "volksai/api-reference"
         ]
       },
       {
-        "group": "Backend & Database",
+        "group": "Backend Engineering",
         "pages": [
           "backend/overview",
           "backend/database-and-schemas",
@@ -54,7 +59,7 @@
         ]
       },
       {
-        "group": "Frontend",
+        "group": "Frontend Engineering",
         "pages": [
           "frontend/overview",
           "frontend/tendering-ui"
