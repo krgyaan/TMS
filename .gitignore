@@ -1,3 +1,5 @@
+node_modules/
+**/node_modules/
 myenv
 .env
 __pycache__/
