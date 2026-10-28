@@ -1,0 +1,12 @@
+export * as Autocomplete from "./index.parts.mjs";
+export * as AutocompleteTriggerDataAttributes from "./trigger/AutocompleteTriggerDataAttributes.mjs";
+export * as AutocompleteInputDataAttributes from "../combobox/input/ComboboxInputDataAttributes.mjs";
+export * as AutocompleteInputGroupDataAttributes from "./input-group/AutocompleteInputGroupDataAttributes.mjs";
+export * as AutocompleteClearDataAttributes from "./clear/AutocompleteClearDataAttributes.mjs";
+export * as AutocompleteBackdropDataAttributes from "../combobox/backdrop/ComboboxBackdropDataAttributes.mjs";
+export * as AutocompletePositionerCssVariables from "../combobox/positioner/ComboboxPositionerCssVars.mjs";
+export * as AutocompletePositionerDataAttributes from "../combobox/positioner/ComboboxPositionerDataAttributes.mjs";
+export * as AutocompletePopupDataAttributes from "../combobox/popup/ComboboxPopupDataAttributes.mjs";
+export * as AutocompleteArrowDataAttributes from "../combobox/arrow/ComboboxArrowDataAttributes.mjs";
+export * as AutocompleteItemDataAttributes from "./item/AutocompleteItemDataAttributes.mjs";
+export * as AutocompleteSeparatorDataAttributes from "../separator/SeparatorDataAttributes.mjs";

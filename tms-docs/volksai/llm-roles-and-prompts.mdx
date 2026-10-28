@@ -1,0 +1,99 @@
+---
+title: "Claude Roles & Scoped Context"
+description: "How specialized LLM roles, Tool Use schemas, and clause-targeted context windows prevent hallucinations and optimize costs"
+---
+
+VolksAI avoids monolithic prompts. Instead, it divides responsibilities across specialized Anthropic Claude roles, each configured with specific models, strict token limits, and scoped context windows.
+
+## LLM Roles Architecture
+
+| LLM Role | Model Identifier | Purpose & Trigger | Max Tokens | Context Fed | Output Mechanism |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Role 1** | `claude-haiku-4-5-20251001` | **Missing Fields Extraction:** Triggered when Layer 1 cannot find a field. | 600 (retry 1000) | Scoped clause snippets (300-2,500 chars) | Schema-constrained Tool Use (`extract_missing_fields`) |
+| **Role 2** | `claude-sonnet-5-5` | **Ambiguity Resolution:** Triggered when Layer 1 finds contradictory clauses for payment, LD, or delivery. | 800 | Scoped contractual clauses | Tool Use (`resolve_ambiguous_fields`) + legal reasoning |
+| **Role 3** | `claude-sonnet-5` | **Bidding Requirements Checklist:** Triggered from Checklists module or auto-enqueue. | 16,000 | Full page-tagged tender text (`page_tagged_text`, up to ~94k tokens) | Structured JSON with page citations |
+
+---
+
+## Role 1: Haiku 4.5 for Missing Field Extraction
+
+**File:** `volksAi/app/services/llm_field_resolver.py` (`resolve_missing_fields_role1`)
+
+When Layer 1 leaves fields empty, Role 1 extracts them in logical batches to minimize HTTP roundtrips:
+
+* `pbg_sd`: Performance Bank Guarantee percentage, validity duration, and acceptable financial instruments.
+* `payment_terms`: Milestones for equipment supply vs. installation, testing, and commissioning.
+* `prs_ld`: Price Reduction Schedule / Liquidated Damages rates per week of delay and aggregate liability caps.
+* `bec_criteria`: Bidder Eligibility Criteria (prior experience years, financial turnover, joint venture eligibility).
+* `delivery_timeline`: Delivery schedules from purchase order issuance or site handover.
+* `contacts_bds`: Client email addresses, phone extensions, and nodal officer designations.
+
+### Anthropic Tool Use Enforcement
+Role 1 is strictly prevented from returning conversational chat or markdown filler. It is given a JSON schema tool definition (`extract_missing_fields`). The model must either supply the exact extracted arguments or emit `null`.
+
+<CodeGroup>
+```json Tool Use Call Schema
+{
+  "name": "extract_missing_fields",
+  "description": "Extract missing tender parameters from provided legal clauses",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "pbg_percentage": { "type": "number", "description": "ePBG percentage of contract value" },
+      "pbg_duration_months": { "type": "integer", "description": "Validity in months" },
+      "ld_percentage_per_week": { "type": "number", "description": "Penalty rate per week of delay" },
+      "clause_excerpt": { "type": "string", "description": "Exact verbatim excerpt from tender text" }
+    },
+    "required": ["clause_excerpt"]
+  }
+}
+```
+</CodeGroup>
+
+---
+
+## Role 2: Sonnet 5.5 for Ambiguity Resolution
+
+**File:** `volksAi/app/services/llm_field_resolver.py` (`resolve_ambiguous_fields_role2`)
+
+In Indian PSU tenders, general terms often conflict with special conditions. For example, the GeM General Terms may specify *"Delivery: 90 days"*, while page 42 of the Special Conditions of Contract (SCC) specifies *"Supply within 120 days, Commissioning within 30 days"*.
+
+* Layer 1 flags this conflict as `ambiguous: true`.
+* **Role 2** evaluates the clauses against legal contract hierarchy (SCC supersedes GCC).
+* It emits the resolved value along with a mandatory legal reasoning field (e.g., `payment_terms_supply_reasoning`).
+
+---
+
+## Why We Never Send 200 Pages to Claude
+
+Government procurement tenders contain hundreds of pages of irrelevant legal boilerplate (arbitration acts, factory safety manuals, standard environmental guidelines).
+
+If a 250-page PDF were passed entirely to an LLM:
+1. **Cost:** Passing ~100,000 tokens costs over $0.30 on Haiku and $1.50+ on Sonnet per tender attempt.
+2. **Latency:** Processing a 100k-token prompt takes 25 to 60 seconds per API call.
+3. **Accuracy Degradation ("Lost in the Middle"):** Large context windows suffer from attention dilution. Models frequently miss a 2-line payment clause on page 142 when buried inside 200 pages.
+
+### How Scoped Context Works (`extract_scoped_context`)
+1. Regex scans for explicit section titles (e.g., `SECTION V: SPECIAL CONDITIONS OF CONTRACT`, `PAYMENT SCHEDULE`, `LIQUIDATED DAMAGES`).
+2. It slices a localized window (typically 500 to 2,500 characters) surrounding the matched clause.
+3. **Elimination of Blind Fallbacks:** Previous versions had a blind fallback that passed the first 6,000 characters of the document if no heading was found. This was removed in commit `aee316ab`. If no relevant section heading exists, the system immediately returns `not_found` with **zero LLM calls**.
+
+---
+
+## Error Classification & Resilience
+
+**File:** `volksAi/app/services/llm_field_resolver.py` (`classify_anthropic_error`)
+
+Anthropic API errors are caught and classified into structured response objects rather than crashing the extraction worker:
+
+```python
+def classify_anthropic_error(exc: Exception) -> dict:
+    err_str = str(exc).lower()
+    if "rate_limit" in err_str or "429" in err_str:
+        return {"status": "rate_limited", "retryable": True}
+    elif "authentication" in err_str or "401" in err_str:
+        return {"status": "auth_error", "retryable": False}
+    elif "timeout" in err_str:
+        return {"status": "timeout", "retryable": True}
+    return {"status": "unknown_error", "retryable": False}
+```

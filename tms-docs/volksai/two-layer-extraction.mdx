@@ -1,0 +1,75 @@
+---
+title: "Two-Layer Extraction Architecture"
+description: "How VolksAI combines deterministic spatial parsing with Claude LLM fallback for maximum accuracy and minimal token cost"
+---
+
+Rather than immediately feeding hundreds of PDF pages to an expensive Large Language Model, VolksAI employs a **Two-Layer Extraction Architecture**.
+
+## Architectural Comparison
+
+```mermaid
+graph TD
+    PDF[Tender PDF Package] --> PyMuPDF[PyMuPDF / pdfplumber Text & Layout Engine]
+    
+    subgraph Layer 1: Deterministic Engine (0 Tokens)
+        PyMuPDF --> L1Rules[Spatial Table & Regex Parser]
+        L1Rules -->|Standard Bid Data Found| L1Match[High Confidence Fields]
+    end
+    
+    subgraph Layer 2: LLM Fallback (Anthropic Claude)
+        L1Rules -->|Missing Fields| Role1[Role 1: Claude Haiku 4.5]
+        L1Rules -->|Ambiguous / Conflicting Clauses| Role2[Role 2: Claude Sonnet 5.5]
+        
+        Role1 -->|Structured Tool Call| AIResolved[AI Resolved Fields]
+        Role2 -->|Legal Reasoning & Resolution| AIResolved
+    end
+    
+    L1Match --> DTO[Normalized TMS DTO]
+    AIResolved --> DTO
+    L1Rules -->|Clause Not in Document| Missing[Missing Fields Array]
+    Missing --> DTO
+```
+
+---
+
+## Layer 1: Deterministic Rules & Spatial Layout
+
+**File:** `volksAi/app/services/tender_mapper.py` & `field_extractor.py`
+
+Layer 1 operates entirely without external API calls. It uses spatial bounding boxes and deterministic regular expressions tuned for standard Indian Government procurement formats:
+
+* **GeM Standard Header Tables:** Captures Bid Number (`GEM/2026/B/...`), Bid End Date & Time, Organization Name, Ministry, Department, and Total Quantity.
+* **Earnest Money Deposit (EMD):** Extracts required amount, advisory bank, and exemption eligibility.
+* **Performance Bank Guarantee (PBG):** Extracts required percentage and validity months from structured Bid Data Sheets.
+* **Basic Bidder Criteria:** Identifies turnover requirements and past experience years when displayed in standard two-column tables.
+
+<Tip>
+  **Performance Benefit:** Layer 1 executes in **under 1.5 seconds** and incurs **0 token cost**. Over 65% of standardized GeM fields are resolved entirely within Layer 1.
+</Tip>
+
+---
+
+## Layer 2: Scoped LLM Fallback (Anthropic Claude)
+
+**File:** `volksAi/app/services/llm_field_resolver.py`
+
+When Layer 1 fails to find a critical parameter or detects conflicting clauses across multiple document pages, Layer 2 is conditionally invoked:
+
+1. **Missing Fields:** If a field is `None` after Layer 1 (for example, special payment milestones buried in an ATC narrative), **Role 1 (Claude Haiku 4.5)** is triggered with scoped clause snippets.
+2. **Ambiguity Resolution:** If Layer 1 detects multiple conflicting values (e.g. general terms state 90-day delivery, but Special Conditions state 120-day delivery), **Role 2 (Claude Sonnet 5.5)** evaluates the contract hierarchy and provides legal reasoning.
+
+---
+
+## Confidence Scoring & Badge Model
+
+Every field emitted by the VolksAI pipeline is tagged with an audit trail and confidence level reflected directly in the React frontend:
+
+| Badge | Confidence Level | Source | Meaning to Tender Executive |
+| :---: | :--- | :--- | :--- |
+| <span className="text-emerald-500 font-bold">GREEN</span> | **High Confidence** | Layer 1 Deterministic | Extracted directly from a standardized table or rigid regex pattern. Highly reliable. |
+| <span className="text-amber-500 font-bold">AMBER</span> | **Review Needed / AI Resolved** | Layer 2 Claude LLM | Resolved by Claude from unstructured clauses or reconciled after conflicting statements. Hovering displays the model's exact legal reasoning and source quote. |
+| <span className="text-red-500 font-bold">RED</span> | **Missing / Not Found** | None | The clause does not exist anywhere in the uploaded document. Requires manual data entry by the engineer. |
+
+<Info>
+  **Audit Trail Guarantee:** For every Amber field, VolksAI saves `{field_name}_reasoning` and `{field_name}_clause_excerpt` into PostgreSQL, ensuring human bidding engineers can verify AI assertions in one click.
+</Info>

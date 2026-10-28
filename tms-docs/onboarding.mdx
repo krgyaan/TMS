@@ -1,0 +1,142 @@
+---
+title: "First-Day Onboarding"
+description: "10 concrete steps to verify your development environment and ship your first bug fix"
+---
+
+Welcome to the **Tender Management System (TMS)** engineering team! Follow these 10 concrete steps on your first day to set up your environment, verify test suites, and land your first commit.
+
+<Steps>
+  <Step title="Verify Git Branch & Working Tree">
+    Ensure you are on the active development branch and your working tree is clean:
+
+    ```bash
+    cd c:\Users\Asus\Desktop\Tender_Volks\TMS\tms
+    git status
+    ```
+
+    *Expected:* On branch `feature/analyze-save-single-call` (or `main`), working tree clean.
+  </Step>
+
+  <Step title="Configure Environment Files">
+    Configure local environment variables without committing credentials:
+
+    * In `api/`, copy `.env.example` to `.env`. Configure your PostgreSQL `DATABASE_URL` and ensure `VOLKS_AI_SERVICE_URL=http://localhost:8001`.
+    * In `volksAi/`, copy `.env.example` to `.env`. Add your development `ANTHROPIC_API_KEY`.
+  </Step>
+
+  <Step title="Start Infrastructure Containers">
+    Start PostgreSQL, Redis, Loki, Promtail, and Grafana:
+
+    ```bash
+    docker compose up -d postgres redis loki promtail grafana
+    docker compose ps
+    ```
+
+    *Expected:* All five containers report `Up` status.
+  </Step>
+
+  <Step title="Run Database Migrations">
+    Execute Drizzle ORM migrations to bring the database schema up to date:
+
+    ```bash
+    cd api
+    pnpm install
+    pnpm run db:migrate
+    ```
+
+    *Expected:* Drizzle applies all migrations up through `0146_create_bidding_requirements_jobs.sql`.
+  </Step>
+
+  <Step title="Start & Verify VolksAI Microservice">
+    Launch the Python extraction service:
+
+    ```bash
+    cd ../volksAi
+    python -m venv .venv
+
+    # Windows: .venv\Scripts\activate | Linux/macOS: source .venv/bin/activate
+    pip install -r requirements.txt
+    uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    ```
+
+    In another terminal, test the service health:
+    ```bash
+    curl http://localhost:8001/health
+    ```
+
+    *Expected:* Returns `"status": "healthy"` and `"anthropic_configured": true`.
+  </Step>
+
+  <Step title="Start & Verify NestJS Backend API">
+    In a new terminal window:
+
+    ```bash
+    cd ../api
+    pnpm start:dev
+    ```
+
+    Test API health check:
+    ```bash
+    curl http://localhost:3000/api/v1/health
+    ```
+
+    *Expected:* JSON response with `"status": "ok"` and `"database": "connected"`.
+  </Step>
+
+  <Step title="Start the React Web Frontend">
+    In another terminal window:
+
+    ```bash
+    cd ../web
+    pnpm install
+    pnpm dev
+    ```
+
+    *Expected:* Open `http://localhost:5173` in your browser. The TMS portal loads cleanly without console errors.
+  </Step>
+
+  <Step title="Execute Core Pipeline Unit Tests">
+    Run backend and frontend test suites to establish your baseline:
+
+    <CodeGroup>
+    ```bash Backend Tests (api)
+    cd api
+    pnpm test -- src/modules/tendering/info-sheets/pdf-extraction.spec.ts
+    # Expected: 24 passed, 0 failed
+    ```
+
+    ```bash Frontend Tests (web)
+    cd web
+    pnpm test:unit
+    # Expected: 62 passed, 0 failed
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Verify Claude API Connectivity">
+    Verify that VolksAI can invoke Anthropic models with a lightweight ping:
+
+    ```bash
+    cd volksAi
+    python scratch/check_models.py
+    ```
+
+    *Expected:* Successful HTTP connection confirming model access for `claude-haiku-4-5-20251001` and `claude-sonnet-5-5`.
+  </Step>
+
+  <Step title="Implement Your First Quick Win (P1 Task)">
+    Fix the phone cleaning whitespace regression in the contact extractor:
+
+    1. Open `volksAi/app/services/tender_mapper.py` in your editor.
+    2. Locate `clean_phone()` and add `re.sub(r'\s*/\s*', '/', phone)` to collapse spaces around extension slashes.
+    3. Run the contact integrity test:
+       ```bash
+       python -m pytest app/services/test_contact_integrity.py -q
+       ```
+    4. *Expected:* All tests in `test_contact_integrity.py` turn green! You are officially ready to build on TMS.
+  </Step>
+</Steps>
+
+<Tip>
+  Check the [Prioritized Developer Roadmap](/reference/scope-and-roadmap) for your next tasks (P2 through P7).
+</Tip>

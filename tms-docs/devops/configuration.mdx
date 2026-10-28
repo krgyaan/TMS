@@ -1,0 +1,67 @@
+---
+title: "Configuration & Environment"
+description: "Master environment variables reference, model identifiers, secrets management, and CORS"
+---
+
+This document provides a comprehensive reference for all configuration variables across `api`, `web`, and `volksAi`.
+
+<Warning>
+  **Confidentiality Notice:** Never commit secrets, passwords, or production API keys to git. All credentials must be supplied via local `.env` files or container environment injection.
+</Warning>
+
+## Master Environment Variables
+
+| Variable Name | Service | Default Value | Required? | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `PORT` | `api` | `3000` | Optional | Port for the NestJS HTTP REST server |
+| `API_PREFIX` | `api` | `api/v1` | Optional | Global REST API route prefix |
+| `NODE_ENV` | `api`, `web` | `development` | Optional | Runtime mode (`development` \| `production` \| `test`) |
+| `DATABASE_URL` | `api` | - | **Required** | PostgreSQL connection string (`postgres://user:pass@host:5432/db`) |
+| `PGSSL` | `api` | `false` | Optional | Enable SSL for PostgreSQL connections |
+| `PG_MAX_POOL` | `api` | `10` | Optional | Max connection pool size for PostgreSQL |
+| `REDIS_HOST` | `api` | `127.0.0.1` | Optional | Redis host for BullMQ queues and distributed locks |
+| `REDIS_PORT` | `api` | `6379` | Optional | Redis port |
+| `FRONTEND_URL` | `api` | `http://localhost:5173` | Optional | Frontend origin for CORS authorization |
+| `JWT_ACCESS_SECRET` | `api` | - | **Required** | 32-byte hex secret for signing access tokens |
+| `JWT_ACCESS_EXPIRATION` | `api` | `7d` | Optional | JWT access token validity period |
+| `JWT_REFRESH_SECRET` | `api` | - | **Required** | Secret for signing refresh tokens |
+| `JWT_REFRESH_EXPIRATION` | `api` | `14d` | Optional | Refresh token validity period |
+| `VOLKS_AI_SERVICE_URL` | `api` | `http://localhost:8001` | Optional | Base HTTP URL for the VolksAI microservice |
+| `VOLKS_AI_TIMEOUT_MS` | `api` | `120000` (120s) | Optional | Request timeout for VolksAI extraction calls |
+| `AUTO_ENQUEUE_CHECKLIST_ANALYSIS` | `api` | `false` | Optional | If `true`, auto-enqueues checklist analysis on info-sheet success |
+| `USD_TO_INR_RATE` | `api` | `94.83` | Optional | Static conversion rate for Claude token cost display |
+| `USD_TO_INR_RATE_AS_OF` | `api` | `2026-09-08` | Optional | Audit date for the static USD/INR rate |
+| `OPENWA_BASE_URL` | `api` | `http://localhost:2785` | Optional | Base URL for OpenWA WhatsApp daemon |
+| `OPENWA_DRY_RUN` | `api` | `false` | Optional | If `true`, suppresses sending real WhatsApp messages |
+| `LLM_FALLBACK_ENABLED` | `volksAi` | `true` | Optional | Enables/disables Layer 2 LLM resolution in VolksAI |
+| `LLM_PROVIDER` | `volksAi` | `anthropic` | Optional | Preferred provider (`anthropic` \| `groq` \| `gemini`) |
+| `ANTHROPIC_API_KEY` | `volksAi` | - | **Required** | API key for Anthropic Claude |
+| `ANTHROPIC_MODEL` | `volksAi` | `claude-sonnet-5-5` | Optional | Default fallback Anthropic model |
+| `ANTHROPIC_ROLE1_MODEL` | `volksAi` | `claude-haiku-4-5-20251001` | Optional | Fast model for missing field extraction |
+| `ANTHROPIC_ROLE2_MODEL` | `volksAi` | `claude-sonnet-5-5` | Optional | High-intelligence model for ambiguity resolution |
+| `CHILD_PDF_MAX_PAGES` | `volksAi` | `400` | Optional | Maximum page limit for child/ATC documents (bumped from 60) |
+| `MAIN_TENDER_MAX_PAGES` | `volksAi` | `150` | Optional | Maximum page limit for primary bid PDF |
+| `LLM_MAX_RETRIES` | `volksAi` | `2` | Optional | Max retry attempts on transient LLM rate-limits |
+| `PADDLE_OCR_ENABLED` | `volksAi` | `true` | Optional | Set to `false` to disable PaddleOCR and use Tesseract only |
+| `OMP_NUM_THREADS` | `volksAi` | `1` | Optional | Prevents PaddleOCR from monopolizing CPU cores |
+| `OFFLINE_EXTRACTION` | `volksAi` | `false` | Optional | Disables external HTTP requests during PDF link check |
+
+---
+
+## Model Identifiers & Hardcoded Defaults
+
+Be aware of where model identifiers are set across the codebase:
+
+1. **`claude_token_usage` Default Model:**
+   * **File:** `api/src/db/schemas/shared/claude-token-usage.schema.ts` (line 21)
+   * Hardcoded default: `'claude-haiku-4-5-20251001'`. If VolksAI does not report a model name, the database defaults to this string.
+2. **VolksAI Default Role Models:**
+   * **File:** `volksAi/app/services/llm_field_resolver.py`
+   * Role 1 defaults to `os.getenv("ANTHROPIC_ROLE1_MODEL", "claude-haiku-4-5-20251001")`.
+   * Role 2 defaults to `os.getenv("ANTHROPIC_ROLE2_MODEL", "claude-sonnet-5-5")`.
+3. **Bidding Requirements Model:**
+   * **File:** `api/src/modules/tendering/checklists/bidding-requirements.service.ts`
+   * Hardcoded default model passed to VolksAI: `'claude-sonnet-5'`.
+4. **Child PDF Page Limit:**
+   * **File:** `volksAi/app/services/pdf_parent_ingest.py`
+   * Default: `int(os.getenv("CHILD_PDF_MAX_PAGES", "400"))`. Previously was 60 pages, which caused large ATC PDFs (such as GAIL/NTPC 200+ page tenders) to be truncated.

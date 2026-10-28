@@ -1,0 +1,71 @@
+---
+title: "Frontend Architecture (React 19)"
+description: "React 19, Vite 7, Tailwind CSS v4, AG Grid enterprise data tables, and React Query 5"
+---
+
+The TMS web application (`web/`) is an enterprise-grade Single Page Application built on **React 19**, **Vite 7**, and **Tailwind CSS v4**. It features high-density data grids, reactive form auto-hydration, and real-time confidence indicators.
+
+## Frontend Technology Stack
+
+* **UI Library:** React 19 with TypeScript
+* **Build Tool:** Vite 7 with Fast Refresh and API reverse proxy
+* **Styling:** Tailwind CSS v4 with custom Volks brand palette
+* **Data Grids:** AG Grid 34 for massive multi-column enterprise tables (tenders, work orders, inventory)
+* **Server State:** TanStack React Query 5 for caching, polling, and optimistic updates
+* **UI Primitives:** Radix UI accessible headless primitives (dialogs, tooltips, popovers, dropdowns)
+* **Icons:** Lucide React icons
+
+---
+
+## Architecture & Directory Layout
+
+```
+web/src/
+├── main.tsx                # App bootstrap wrapping QueryClient, Auth, and Theme providers
+├── App.tsx                 # Route tree definitions
+├── components/             # Reusable UI primitives (buttons, modals, badges, inputs)
+├── modules/                # Feature domains mirroring API backend
+│   ├── tendering/          # Tenders list, InfoSheetForm, ExtractionPreviewPanel, Checklists
+│   ├── operations/         # Work orders, PO tracking, vendor contracts, inventory
+│   ├── accounts/           # Bank guarantees, FDRs, financial instruments
+│   ├── hrms/               # Employee directories, onboarding documents, assets
+│   ├── crm/                # Sales leads, follow-ups, happy-calling
+│   └── dashboard/          # Analytics dashboards and executive KPIs
+├── services/api/           # Strongly-typed Axios HTTP client wrappers
+├── hooks/                  # React Query mutation and query hooks
+└── types/                  # TypeScript interfaces mirroring API DTOs
+```
+
+---
+
+## Server State Management (React Query 5)
+
+TMS avoids bloated global state stores (like Redux) in favor of **TanStack React Query 5**:
+
+* **Server Data Cache:** Queries cache API responses with fine-tuned `staleTime` and `gcTime`.
+* **Automated Polling:** Background jobs (such as PDF extraction or checklist analysis) poll job status endpoints every 2,000ms until marked `completed` or `failed`.
+* **Optimistic Mutations:** Editing tender parameters updates the UI immediately while syncing in the background.
+
+---
+
+## Development Reverse Proxy
+
+During development, `web/vite.config.ts` configures an automatic proxy so frontend requests bypass browser CORS restrictions:
+
+```typescript
+export default defineConfig({
+  server: {
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+      '/uploads': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+    },
+  },
+});
+```

@@ -1,0 +1,73 @@
+---
+title: "Ground-Truth Regressions & Testing"
+description: "VolksAI pytest test suites, ground-truth tender verification, and diagnostic scratch scripts"
+---
+
+To ensure that regular expression tweaks and prompt changes do not introduce regressions across known real-world tenders, VolksAI maintains a dedicated test suite and a collection of diagnostic verification scripts in `volksAi/scratch/`.
+
+## The VolksAI Pytest Test Suite
+
+VolksAI includes 384 automated tests located in `volksAi/app/services/`:
+
+```bash
+cd volksAi
+python -m pytest app/services/ -q
+```
+
+### Key Test Suites
+
+| Test File | Focus & Verification | Current Status |
+| :--- | :--- | :--- |
+| `test_contact_integrity.py` | Validates phone number cleaning, extension extraction, and email parsing. | 1 failing assertion due to whitespace around slashes (` / `). |
+| `test_kochi_regression.py` | Ground-truth verification of the 240-page GAIL Kochi tender. Verifies dates, EMD, PBG, and officer names. | 1 failing assertion (`client_name_2_display` returns `'N/A'` instead of `'Sabu Mathews'`). |
+| `test_llm_failure_handling.py` | Verifies that timeouts, 401s, and 429s from Anthropic are converted to structured error objects. | Mocks need synchronization with `classify_anthropic_error`. |
+| `test_role1_prompt_examples.py` | Tests Claude Haiku 4.5 Tool Use output schemas across synthetic clause snippets. | Synthetic snippets need standard section headings for scoped context. |
+
+---
+
+## Diagnostic Scripts in `volksAi/scratch/`
+
+The `volksAi/scratch/` directory contains diagnostic utilities for inspecting tenders and testing models without running the entire NestJS stack:
+
+### 1. Minimal Model Connectivity Ping (`check_models.py`)
+Tests direct connectivity to the Anthropic API and verifies that `claude-haiku-4-5-20251001` and `claude-sonnet-5-5` respond:
+
+```bash
+cd volksAi
+python scratch/check_models.py
+```
+
+### 2. Contract Performance Security Locator (`find_cps_pages.py`)
+Scans a multi-hundred page tender PDF and locates all candidate pages mentioning Contract Performance Security (CPS), Security Deposit (SD), or Performance Bank Guarantee (PBG):
+
+```bash
+cd volksAi
+python scratch/find_cps_pages.py /path/to/tender.pdf
+```
+
+### 3. SCC Payment Clause Inspector (`check_scc_payment.py`)
+Extracts clauses matching Special Conditions of Contract (SCC) payment milestones and prints the verbatim legal text:
+
+```bash
+cd volksAi
+python scratch/check_scc_payment.py /path/to/tender.pdf
+```
+
+---
+
+## How to Add a New Ground-Truth Tender
+
+When onboarding a new complex PSU tender format (e.g. NTPC or Indian Railways):
+
+1. **Save Test Fixture:** Place the sanitized PDF into `volksAi/scratch/fixtures/`.
+2. **Define Ground-Truth Dictionary:** Create a JSON object representing the exact verified fields:
+   ```python
+   EXPECTED_GROUND_TRUTH = {
+       "tender_number": "GEM/2026/B/1234567",
+       "organization_name": "NTPC LIMITED",
+       "emd_amount": 500000.0,
+       "pbg_percentage": 5.0,
+       "payment_terms_supply_display": "80% against dispatch, 20% on commissioning"
+   }
+   ```
+3. **Write Regression Assertion:** Add a test function in `volksAi/app/services/` that invokes `ingest_parent_tender_pdf()` and asserts each field matches within tolerance.

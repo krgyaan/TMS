@@ -1,3 +1,8 @@
+---
+title: "Developer Handoff Guide"
+description: "Comprehensive developer onboarding and system architecture reference for TMS and VolksAI"
+---
+
 # Tender Management System (TMS) & VolksAI - Developer Handoff Guide
 
 > **Document Type:** Developer Onboarding & System Architecture Reference  
@@ -95,10 +100,10 @@ The following table details every network service, port, protocol, purpose, and 
 | :--- | :--- | :--- | :--- | :--- |
 | **`web`** | `5173` | HTTP | React 19 Frontend (Vite dev server) | Open `http://localhost:5173` in a browser |
 | **`api`** | `3000` | HTTP | NestJS REST API (`/api/v1`) | Run `curl http://localhost:3000/api/v1/health` |
-| **`volksAi`** | `8001` (host)<br>`8000` (docker) | HTTP | FastAPI PDF extraction & checklist service | Run `curl http://localhost:8001/health` |
+| **`volksAi`** | `8001` (host)<br />`8000` (docker) | HTTP | FastAPI PDF extraction & checklist service | Run `curl http://localhost:8001/health` |
 | **PostgreSQL** | `5432` | TCP | Relational database for all system data | Run `pg_isready -h localhost -p 5432` |
 | **Redis** | `6379` | TCP | BullMQ job queue & distributed locks | Run `redis-cli -h 127.0.0.1 -p 6379 ping` |
-| **Grafana** | `4000` (host)<br>`3000` (docker) | HTTP | Metrics & log observability dashboards | Open `http://localhost:4000` in a browser |
+| **Grafana** | `4000` (host)<br />`3000` (docker) | HTTP | Metrics & log observability dashboards | Open `http://localhost:4000` in a browser |
 | **Loki** | `3100` | HTTP | Centralized log collection backend | Run `curl http://localhost:3100/ready` |
 
 ### 2.3 Clean Machine Startup Instructions
@@ -343,7 +348,7 @@ Both pipelines implement multi-tiered caching to prevent redundant token consump
    - When a PDF is received, `PdfExtractionProducer.computeDocumentHash()` computes its SHA-256 hash.
    - The version string is stored as `'1.1.0:' + documentHash`.
    - On subsequent calls without `force: true`, PostgreSQL `tender_extractions` returns the cached record immediately.
-   - **Token Cost:** 0 tokens. **Latency:** <50ms.
+   - **Token Cost:** 0 tokens. **Latency:** `<50ms`.
 2. **Checklist Analysis Caching:**
    - Stored in the `bidding_requirements_jobs` table keyed by `(tender_id, document_hash)`.
    - Stored redundantly inside `tender_extractions.fields.biddingRequirementsAnalysis` (added in commit `53585e45`) so the tender record holds all AI outputs in one place.
@@ -749,11 +754,11 @@ The table below documents recent commits on the working branch (`feature/analyze
 
 | Commit Hash | Author & Date | Commit Message | Real Changes & Non-Obvious Rationale |
 | :--- | :--- | :--- | :--- |
-| `c138120f` | `yuvrajsharmaaa`<br>2026-10-24 16:20 | `Merge remote-tracking branch 'upstream/main' into feature/analyze-save-single-call` | Clean sync with upstream development branch. Brought in upstream database migrations and operational fixes. |
-| `53585e45` | `yuvrajsharmaaa`<br>2026-10-24 15:58 | `feat: add tender mapping, extraction, and automated processing services for volumetric AI pipeline` | **Single-Call Pipeline & Auto-Enqueue:**<br>1. Added `AUTO_ENQUEUE_CHECKLIST_ANALYSIS` env var.<br>2. Updated `pdf-extraction.processor.ts` to automatically enqueue checklist analysis upon info-sheet extraction success.<br>3. Updated `extractionFieldsUpsertValue` so that re-running info-sheet extraction preserves existing `biddingRequirementsAnalysis` without wiping it out.<br>4. Added 214 lines of unit tests to `pdf-extraction.spec.ts`. |
-| `aee316ab` | `yuvrajsharmaaa`<br>2026-10-24 15:11 | `feat: add VolksAI microservice integration and backend services for automated tender PDF extraction and info-sheet processing` | **Microservice Core Upgrades & Scoping Fixes:**<br>1. Upgraded model ID from Sonnet 3.5 to `claude-sonnet-5-5`.<br>2. Added `classify_anthropic_error` to map timeouts, 401s, and 429s to structured error objects.<br>3. Removed the 6,000-character blind context fallback in favor of strict section-heading matching.<br>4. Increased `CHILD_PDF_MAX_PAGES` from 60 to 400 pages to support massive PSU ATC documents.<br>5. Implemented `/health` degraded state when `ANTHROPIC_API_KEY` is missing. |
-| `a0ffabb6` | `yuvrajsharmaaa`<br>2026-10-24 14:15 | `feat(checklists): display stored requiredDocuments and doc1-9 as unverified suggestions without preselection` | **Checklist UX Overhaul:** Previously, AI suggested documents were automatically checked/selected, causing Tender Executives to accidentally submit unverified checklists. Changed UI to show AI documents as unselected suggestions with a visual preview. |
-| `06f10f10` | `yuvrajsharmaaa`<br>2026-10-24 13:40 | `feat(checklists): add clear not-analysed, in-progress, and failed states with zero console errors` | **Checklist State Machine:** Implemented robust frontend states (`not_analysed`, `in_progress`, `failed`, `completed`) eliminating React render errors and uncaught network exceptions when no analysis exists yet. |
+| `c138120f` | `yuvrajsharmaaa`<br />2026-10-24 16:20 | `Merge remote-tracking branch 'upstream/main' into feature/analyze-save-single-call` | Clean sync with upstream development branch. Brought in upstream database migrations and operational fixes. |
+| `53585e45` | `yuvrajsharmaaa`<br />2026-10-24 15:58 | `feat: add tender mapping, extraction, and automated processing services for volumetric AI pipeline` | **Single-Call Pipeline & Auto-Enqueue:**<br />1. Added `AUTO_ENQUEUE_CHECKLIST_ANALYSIS` env var.<br />2. Updated `pdf-extraction.processor.ts` to automatically enqueue checklist analysis upon info-sheet extraction success.<br />3. Updated `extractionFieldsUpsertValue` so that re-running info-sheet extraction preserves existing `biddingRequirementsAnalysis` without wiping it out.<br />4. Added 214 lines of unit tests to `pdf-extraction.spec.ts`. |
+| `aee316ab` | `yuvrajsharmaaa`<br />2026-10-24 15:11 | `feat: add VolksAI microservice integration and backend services for automated tender PDF extraction and info-sheet processing` | **Microservice Core Upgrades & Scoping Fixes:**<br />1. Upgraded model ID from Sonnet 3.5 to `claude-sonnet-5-5`.<br />2. Added `classify_anthropic_error` to map timeouts, 401s, and 429s to structured error objects.<br />3. Removed the 6,000-character blind context fallback in favor of strict section-heading matching.<br />4. Increased `CHILD_PDF_MAX_PAGES` from 60 to 400 pages to support massive PSU ATC documents.<br />5. Implemented `/health` degraded state when `ANTHROPIC_API_KEY` is missing. |
+| `a0ffabb6` | `yuvrajsharmaaa`<br />2026-10-24 14:15 | `feat(checklists): display stored requiredDocuments and doc1-9 as unverified suggestions without preselection` | **Checklist UX Overhaul:** Previously, AI suggested documents were automatically checked/selected, causing Tender Executives to accidentally submit unverified checklists. Changed UI to show AI documents as unselected suggestions with a visual preview. |
+| `06f10f10` | `yuvrajsharmaaa`<br />2026-10-24 13:40 | `feat(checklists): add clear not-analysed, in-progress, and failed states with zero console errors` | **Checklist State Machine:** Implemented robust frontend states (`not_analysed`, `in_progress`, `failed`, `completed`) eliminating React render errors and uncaught network exceptions when no analysis exists yet. |
 
 ---
 
@@ -779,7 +784,7 @@ The table below represents an unvarnished audit of the system based directly on 
 | :--- | :--- | :--- |
 | **Layer 1 Rule/Regex Extraction** | **Working** | `tender_mapper.py`, `field_extractor.py`. Correctly extracts dates, tender numbers, EMD, and standard tables from text-native PDFs. |
 | **Layer 2 LLM Fallback (Role 1 & 2)** | **Partially Working** | Core runtime works in production. However, 12 tests fail across `test_llm_failure_handling.py` and `test_role1_prompt_examples.py` because recent commits added `classify_anthropic_error` and removed the 6000-char blind fallback without updating unit test mocks and fixtures. |
-| **Contact Details & Officer Parsing** | **Partially Working** | 2 test failures observed:<br>1. `test_contact_integrity.py`: phone cleaner outputs `+91-484-2983210 / 11 / 12 / 13` (spaces around `/`) whereas test asserts no spaces.<br>2. `test_kochi_regression.py`: `client_name_2_display` asserts `'Sabu Mathews'`, but received `'N/A'`. |
+| **Contact Details & Officer Parsing** | **Partially Working** | 2 test failures observed:<br />1. `test_contact_integrity.py`: phone cleaner outputs `+91-484-2983210 / 11 / 12 / 13` (spaces around `/`) whereas test asserts no spaces.<br />2. `test_kochi_regression.py`: `client_name_2_display` asserts `'Sabu Mathews'`, but received `'N/A'`. |
 | **Deduplication & Document Caching** | **Working** | `pdf-extraction.spec.ts` (24/24 passing). Preserves cache on unchanged PDFs (0 tokens), invalidates cache when ATC file changes or `force: true` is set. |
 | **Token & Cost Accounting** | **Working** | `claude_token_usage` table and `claude-usage.service.ts`. Accurately records input/output/cache tokens and USD costs across both pipelines. |
 | **Bidding Requirements Checklist (Role 3)** | **Working** | `bidding-requirements.service.spec.ts` (31/31 passing). Generates complete document lists, handles Redis distributed locks, and manages in-flight memoization. |

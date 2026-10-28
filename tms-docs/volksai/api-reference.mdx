@@ -1,0 +1,123 @@
+---
+title: "FastAPI HTTP API Reference"
+description: "Complete request and response specifications for the VolksAI microservice endpoints"
+---
+
+The VolksAI microservice runs on port `8001` (host) / `8000` (container) and exposes asynchronous REST endpoints for tender extraction, compliance analysis, and annexure generation.
+
+## Endpoints Overview
+
+| Method | Route | Description |
+| :--- | :--- | :--- |
+| `POST` | `/extract` | Ingests tender PDFs; runs Layer 1 regex and Layer 2 Claude LLM fallback |
+| `POST` | `/analyze-bidding-requirements` | Evaluates entire document to compile mandatory bidder compliance checklist |
+| `POST` | `/annexures/download-docx` | Generates a downloadable Microsoft Word (`.docx`) file for a specific annexure |
+| `POST` | `/classify-documents` | Calculates 0-100 confidence score indicating if a document is an ATC contract |
+| `GET` | `/health` | Liveness and readiness probe reporting Anthropic and OCR configuration |
+
+---
+
+## 1. `POST /extract`
+
+Ingests primary and child tender documents and returns normalized extraction fields along with token consumption metrics.
+
+### Request Headers & Payload
+* **Content-Type:** `multipart/form-data`
+* **Form Fields:**
+  * `pdf_file` (Binary, Required): Primary GeM bid document stream.
+  * `atc_files` (Binary[], Optional): One or more Additional Terms & Conditions PDF files.
+  * `boq_file` (Binary, Optional): Bill of Quantities spreadsheet or PDF.
+  * `tender_id` (Integer / String, Required): Unique tender identifier.
+  * `user_id` (Integer / String, Required): Initiating user ID for audit logging.
+
+### Response JSON (200 OK)
+<CodeGroup>
+```json Response Payload
+{
+  "status": "success",
+  "tenderId": "123",
+  "processingTimeMs": 14250,
+  "fields": {
+    "tenderNumber": "GEM/2026/B/9981245",
+    "organizationName": "GAIL (INDIA) LIMITED",
+    "tenderValue": 45000000.0,
+    "bidEndDate": "2026-11-15T15:00:00+05:30",
+    "emdAmount": 900000.0,
+    "pbgPercentage": 5.0,
+    "paymentTermsSupplyDisplay": "70% against dispatch, 20% on receipt, 10% on commissioning",
+    "paymentTermsSupplyReasoning": "SCC Clause 14.1 explicitly supersedes General Terms.",
+    "ldPercentagePerWeek": 0.5,
+    "maxLdPercentage": 10.0,
+    "confidenceLevels": {
+      "tenderNumber": "HIGH",
+      "paymentTermsSupplyDisplay": "AI_RESOLVED",
+      "jointVentureAllowed": "MISSING"
+    }
+  },
+  "missingFields": [
+    "jointVentureAllowed"
+  ],
+  "llmUsage": {
+    "model": "claude-haiku-4-5-20251001",
+    "inputTokens": 1420,
+    "outputTokens": 310,
+    "cacheCreationTokens": 0,
+    "cacheReadTokens": 850,
+    "totalTokens": 2580,
+    "estimatedCostUsd": 0.0031
+  }
+}
+```
+</CodeGroup>
+
+---
+
+## 2. `POST /analyze-bidding-requirements`
+
+Analyzes the full page-tagged text of a tender to discover all mandatory submission documents.
+
+### Request Body (JSON)
+```json
+{
+  "tenderId": 123,
+  "documentHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}
+```
+
+### Response JSON (200 OK)
+```json
+{
+  "schemaVersion": "1.0.0",
+  "requiredDocuments": [
+    {
+      "documentName": "Audited Balance Sheets",
+      "description": "Audited financial statements and P&L for FY 2021-22, 2022-23, and 2023-24",
+      "pageReference": "[ATC Page 14]"
+    },
+    {
+      "documentName": "Manufacturer's Authorization Form (MAF)",
+      "description": "OEM authorization certificate for inverter equipment",
+      "pageReference": "[ATC Page 32]"
+    }
+  ]
+}
+```
+
+---
+
+## 3. `GET /health`
+
+Liveness and dependency readiness probe.
+
+### Response JSON (200 OK)
+```json
+{
+  "status": "healthy",
+  "service": "volksai-extraction",
+  "version": "1.0.0",
+  "llm_fallback_enabled": true,
+  "provider": "anthropic",
+  "anthropic_configured": true,
+  "paddle_ocr_enabled": true
+}
+```
