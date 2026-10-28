@@ -988,6 +988,9 @@ private readBodyFileValue(body: unknown, field: string): unknown {
     /**
      * Update instrument action with form data
      */
+    /**
+ * Update instrument action with form data
+ */
     async updateAction(
         instrumentId: number,
         body: any,
@@ -1277,6 +1280,15 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                     createdAt: new Date(),
                 });
             }
+        }
+
+        // NEW: Send BG submitted email to client department after Form 3 data is persisted
+        if (body.action === 'accounts-form-3') {
+            this.paymentRequestsNotificationService
+                .sendBgSubmittedEmail(instrumentId)
+                .catch((error) =>
+                    this.logger.error(`BG submitted email failed for instrument ${instrumentId}:`, error),
+                );
         }
 
         try {

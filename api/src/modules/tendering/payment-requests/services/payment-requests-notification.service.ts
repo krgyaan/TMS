@@ -2104,5 +2104,113 @@ export class PaymentRequestsNotificationService {
             throw error;
         }
     }
+
+    async sendBgSubmittedEmail(instrumentId: number): Promise<void> {
+        try {
+            this.logger.log(`Preparing BG submitted email for instrument ${instrumentId}`);
+
+            const [result] = await this.db
+                .select({
+                    instrument: paymentInstruments,
+                    request: paymentRequests,
+                    bgDetails: instrumentBgDetails,
+                })
+                .from(paymentInstruments)
+                .innerJoin(paymentRequests, eq(paymentInstruments.requestId, paymentRequests.id))
+                .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+                .where(eq(paymentInstruments.id, instrumentId))
+                .limit(1);
+
+            if (!result || !result.instrument) {
+                this.logger.warn(`BG submitted email skipped: instrument ${instrumentId} not found`);
+                return;
+            }
+
+            const { instrument, request, bgDetails } = result;
+
+            if (!bgDetails) {
+                this.logger.warn(`BG submitted email skipped: no BG details found for instrument ${instrumentId}`);
+                return;
+            }
+
+            if (!request.requestedBy) {
+                this.logger.warn(`BG submitted email skipped: requestedBy not found for instrument ${instrumentId}`);
+                return;
+            }
+
+            const clientEmail = bgDetails.bgClientUser;
+
+            if (!clientEmail) {
+                this.logger.warn(
+                    `BG submitted email skipped: no client/department mail id (bgClientUser) saved for instrument ${instrumentId}`,
+                );
+                return;
+            }
+
+            const toEmails: RecipientSource[] = [{ type: 'emails', emails: [clientEmail] }];
+
+            const tenderTeamId = await this.getTenderTeamId(request.tenderId || 0, request.requestedBy);
+
+            const [teUser] = await this.db
+                .select({ email: users.email })
+                .from(users)
+                .where(eq(users.id, request.requestedBy))
+                .limit(1);
+
+            const ccSources: RecipientSource[] = [
+                { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
+                { type: 'emails', emails: ['goyal@volksenergie.in'] },
+                { type: 'emails', emails: ['accounts@volksenergie.in'] },
+                { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+            ];
+
+            if (teUser?.email) {
+                ccSources.push({ type: 'emails', emails: [teUser.email] });
+            }
+
+            const attachmentFiles: string[] = [];
+            if (bgDetails.bgSoftCopy) attachmentFiles.push(bgDetails.bgSoftCopy);
+            if (bgDetails.sfmsConf) attachmentFiles.push(bgDetails.sfmsConf);
+
+            const [imranUser] = await this.db
+                .select({ id: users.id })
+                .from(users)
+                .where(eq(users.email, 'imran@volksenergie.in'))
+                .limit(1);
+
+            const fromUserId = imranUser ? imranUser.id : 33;
+
+            const purpose = bgDetails.bgPurpose || request.purpose || 'Financial security';
+
+            const tenderDate = ''; // no confirmed schema field for WO/Tender Date
+
+            await this.emailService.sendPaymentEmail({
+                requestId: instrument.requestId,
+                tenderId: request.tenderId || undefined,
+                eventType: 'BG_SUBMITTED',
+                template: 'bg-fdr',
+                subject: `Bank Guarantee submitted - ${request.tenderNo || 'N/A'} against ${purpose}`,
+                fromUserId,
+                to: toEmails,
+                cc: ccSources,
+                data: {
+                    tenderNo: request.tenderNo || 'N/A',
+                    tenderDate,
+                    bgNo: bgDetails.bgNo || '',
+                    bgExpiryDate: this.formatDateDDMMYYYY(bgDetails.bgExpiryDate),
+                    bgClaimDate: this.formatDateDDMMYYYY(bgDetails.bgClaim),
+                    beneficiaryName: instrument.favouring || bgDetails.beneficiaryName || '',
+                    amount: this.formatCurrency(Number(instrument.amount) || 0),
+                    stampPaperValue: this.formatCurrency(Number(bgDetails.stampCharges) || 0),
+                },
+                attachments: { files: attachmentFiles },
+            });
+
+            this.logger.log(`BG submitted email sent for instrument ${instrumentId} to ${clientEmail}`);
+        } catch (error) {
+            this.logger.error(`Failed to send BG submitted email for instrument ${instrumentId}:`, error);
+            throw error;
+        }
+    }
 }
 
