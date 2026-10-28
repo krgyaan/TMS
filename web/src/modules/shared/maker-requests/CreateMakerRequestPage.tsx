@@ -76,7 +76,7 @@ const fixedCategory = [
     {label: 'registration_charges', value: 'Registration Charges'},
     {label: 'pop_charges', value: 'POP Charges'},
     {label: 'bank_charges', value: 'Bank Charges'},
-    {label: 'diwali_expenses', value: 'Diwali Expenses'},
+    {label: 'diwali_gift_expenses', value: 'Diwali/Gift Expenses'},
 ];
 
 const loanReturnCategory = [
@@ -111,6 +111,20 @@ const taxesCategory = [
     {label: 'gst', value: 'GST'},
     {label: 'tds', value: 'TDS'},
     {label: 'income_tax', value: 'Income Tax'},
+];
+
+const emdCategory = [
+    {label: 'dd', value: 'Demand Draft'},
+    {label: 'bt', value: 'Bank Transfer'},
+    {label: 'pop', value: 'Pay On Portal'},
+    {label: 'bg', value: 'Bank Guarantee'},
+    {label: 'sb', value: 'Surity Bond'},
+    {label: 'fdr', value: 'Fixed Deposit Receipt'},
+];
+
+const securityCategory = [
+    {label: 'sd_vendor', value: 'Security Deposit - Vendor'},
+    {label: 'sd_landlord', value: 'Security Deposit - Landlord'},
 ];
 
 const CATEGORY_UPLOAD_CONFIG: Record<string, { allowedUserIds?: number[]; uploadInvoice: boolean; uploadPI: boolean; uploadInvoiceAfterPayment: boolean }> = {
@@ -174,6 +188,8 @@ export default function CreateMakerRequestPage() {
             own_bank: ownBankCategory,
             capital_asset_purchase: capitalAssetPurchaseCategory,
             taxes: taxesCategory,
+            emd: emdCategory,
+            security: securityCategory,
         };
         const cats = map[selectedHeading] || [];
         return cats.filter(c => {

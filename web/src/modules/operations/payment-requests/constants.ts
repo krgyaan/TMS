@@ -47,7 +47,15 @@ export const PAYMENT_AGAINST_LABELS: Record<string, string> = {
     gst: 'GST',
     tds: 'TDS',
     income_tax: 'Income Tax',
-    diwali_expenses: 'Diwali Expenses',
+    diwali_gift_expenses: 'Diwali/Gift Expenses',
+    dd: 'Demand Draft',
+    bt: 'Bank Transfer',
+    pop: 'Pay On Portal',
+    bg: 'Bank Guarantee',
+    sb: 'Surity Bond',
+    fdr: 'Fixed Deposit Receipt',
+    sd_vendor: 'Security Deposit - Vendor',
+    sd_landlord: 'Security Deposit - Landlord',
 };
 
 export const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
