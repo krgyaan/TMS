@@ -76,11 +76,12 @@ const fixedCategory = [
     {label: 'registration_charges', value: 'Registration Charges'},
     {label: 'pop_charges', value: 'POP Charges'},
     {label: 'bank_charges', value: 'Bank Charges'},
+    {label: 'diwali_expenses', value: 'Diwali Expenses'},
 ];
 
 const loanReturnCategory = [
     {label: 'related_party', value: 'Related Party'},
-    {label: 'nbfc_oc_acc', value: 'NBFC OC Account'},
+    {label: 'nbfc_od_acc', value: 'NBFC OD Account'},
     {label: 'loan_principal_return', value: 'Loan Principal Return'},
     {label: 'od_ac_interest', value: 'OD A/C Interest'},
     {label: 'cc_ac_interest', value: 'CC A/C Interest'},

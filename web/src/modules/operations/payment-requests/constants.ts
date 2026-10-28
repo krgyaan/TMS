@@ -47,6 +47,7 @@ export const PAYMENT_AGAINST_LABELS: Record<string, string> = {
     gst: 'GST',
     tds: 'TDS',
     income_tax: 'Income Tax',
+    diwali_expenses: 'Diwali Expenses',
 };
 
 export const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
