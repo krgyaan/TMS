@@ -1,0 +1,33 @@
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+    <h2 style="color: #333; text-align: center; margin-bottom: 20px;">
+        New Bank Guarantee Created and Couriered
+    </h2>
+
+    <p style="font-size: 14px; line-height: 1.6; color: #555;">
+        Dear {{data.teName}},
+    </p>
+
+    <p style="font-size: 14px; line-height: 1.6; color: #555;">
+        The request for Bank Guarantee (BG) creation has been accepted and the BG has been created.
+    </p>
+
+    <div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 4px;">
+        <p style="margin: 8px 0; font-size: 14px;"><strong>Soft Copy of the BG:</strong> attached below</p>
+        {{#if data.courierNo}}
+        <p style="margin: 8px 0; font-size: 14px;"><strong>Courier Docket no.:</strong> {{data.courierNo}}</p>
+        {{/if}}
+        {{#if data.courierProvider}}
+        <p style="margin: 8px 0; font-size: 14px;"><strong>Courier Provider:</strong> {{data.courierProvider}}</p>
+        {{/if}}
+        <p style="margin: 8px 0; font-size: 14px;"><strong>Courier Docket Slip:</strong> — (to be added later)</p>
+        <p style="margin: 8px 0; font-size: 14px; color: #888;"><strong>SFMS Confirmation of the BG will be sent in the next mail.</strong></p>
+        {{#if data.reasons}}
+        <p style="margin: 8px 0; font-size: 14px;"><strong>Remarks:</strong> {{data.reasons}}</p>
+        {{/if}}
+    </div>
+
+    <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #888;">
+        <p>Regards,</p>
+        <p>Imran, Accounts team.</p>
+    </div>
+</div>

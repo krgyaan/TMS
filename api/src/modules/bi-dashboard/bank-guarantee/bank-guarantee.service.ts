@@ -1169,6 +1169,12 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             if (body.bg_validity) bgDetailsUpdate.validityDate = body.bg_validity;
             if (body.bg_claim_period) bgDetailsUpdate.claimExpiryDate = body.bg_claim_period;
             if (body.bg2_remark) bgDetailsUpdate.bg2Remark = body.bg2_remark;
+            // Send BG creation and couriered email
+            try {
+                await this.paymentRequestsNotificationService.sendBgCreatedCourieredEmail(instrumentId);
+            } catch (error) {
+                this.logger.error(`BG creation couriered email failed for instrument ${instrumentId}:`, error);
+            }
         } else if (body.action === 'accounts-form-3') {
             if (body.fdr_no) bgDetailsUpdate.fdrNo = body.fdr_no;
             if (body.fdr_amt) bgDetailsUpdate.fdrAmt = body.fdr_amt;

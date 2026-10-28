@@ -1842,4 +1842,116 @@ export class PaymentRequestsNotificationService {
             this.logger.error(`Failed to send BG rejection email for instrument ${instrumentId}:`, error);
         }
     }
+
+    /**
+     * Send BG creation and couriered email when Accounts Form 2 is accepted
+     */
+    async sendBgCreatedCourieredEmail(instrumentId: number): Promise<void> {
+        this.logger.log(`Sending BG creation and couriered email for instrument ${instrumentId}`);
+
+        // Fetch instrument + payment request + BG details
+        const [instrument] = await this.db
+            .select()
+            .from(paymentInstruments)
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!instrument) {
+            this.logger.warn(`Instrument ${instrumentId} not found for BG creation couriered email`);
+            return;
+        }
+
+        const [paymentReq] = await this.db
+            .select({
+                requestedBy: paymentRequests.requestedBy,
+                tenderId: paymentRequests.tenderId,
+                purpose: paymentRequests.purpose,
+            })
+            .from(paymentRequests)
+            .where(eq(paymentRequests.id, instrument.requestId))
+            .limit(1);
+
+        if (!paymentReq?.requestedBy) {
+            this.logger.warn(`RequestedBy not found for BG instrument ${instrumentId}`);
+            return;
+        }
+
+        // Get TE name and email
+        const [teUser] = await this.db
+            .select({ name: users.name, email: users.email })
+            .from(users)
+            .where(eq(users.id, paymentReq.requestedBy))
+            .limit(1);
+
+        if (!teUser?.email) {
+            this.logger.warn(`TE email not found for BG instrument ${instrumentId}`);
+            return;
+        }
+
+        // Get tender team ID
+        let tenderTeamId = 1;
+        if (paymentReq.tenderId > 0) {
+            const tenderData = await this.db
+                .select({ team: tenderInfos.team })
+                .from(tenderInfos)
+                .where(eq(tenderInfos.id, paymentReq.tenderId))
+                .limit(1);
+            tenderTeamId = tenderData[0]?.team || 1;
+        }
+
+        // Get BG details for purpose and soft copy
+        const [bgDetails] = await this.db
+            .select()
+            .from(instrumentBgDetails)
+            .where(eq(instrumentBgDetails.instrumentId, instrumentId))
+            .limit(1);
+
+        // From: Imran (Accounts Leader)
+        const [sender] = await this.db
+            .select({ id: users.id })
+            .from(users)
+            .where(eq(users.email, 'imran@volksenergie.in'))
+            .limit(1);
+
+        // Get CC emails
+        const ccEmails: RecipientSource[] = [
+            { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
+            { type: 'emails', emails: ['goyal@volksenergie.in'] },
+            { type: 'emails', emails: ['accounts@volksenergie.in'] },
+            { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+        ];
+
+        try {
+            const result = await this.emailService.sendPaymentEmail({
+                requestId: instrument.requestId,
+                tenderId: paymentReq.tenderId || undefined,
+                eventType: 'BG_CREATED_COURIERED',
+                fromUserId: sender?.id ?? 33,
+                subject: `New BG created and Couriered - ${bgDetails?.bgPurpose || 'Financial security'}`,
+                template: 'bg-created-couriered',
+                data: {
+                    teName: teUser.name || 'Tender Executive',
+                    purpose: bgDetails?.bgPurpose || 'Financial security',
+                    courierNo: bgDetails?.courierNo || '',
+                    reasons: bgDetails?.bg2Remark || '',
+                },
+                to: [{ type: 'emails', emails: [teUser.email] }],
+                cc: ccEmails,
+                attachments: {
+                    files: bgDetails?.bgSoftCopy
+                        ? [`bi-dashboard/bank-guarantee/${bgDetails.bgSoftCopy}`]
+                        : [],
+                },
+            });
+
+            if (result.success) {
+                this.logger.log(`BG creation and couriered email sent successfully for instrument ${instrumentId} (logId: ${result.emailLogId})`);
+            } else {
+                this.logger.warn(`BG creation and couriered email failed for instrument ${instrumentId}: ${result.error}`);
+            }
+        } catch (error) {
+            this.logger.error(`Failed to send BG creation and couriered email for instrument ${instrumentId}:`, error);
+        }
+    }
 }
+
