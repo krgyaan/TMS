@@ -1118,6 +1118,12 @@ private readBodyFileValue(body: unknown, field: string): unknown {
 
             if (body.bg_req === 'Accepted') {
                 nextStatus = 'ACCOUNTS_FORM_ACCEPTED';
+
+                this.paymentRequestsNotificationService
+                    .sendBgBankRequestEmail(instrumentId)
+                    .catch((error) =>
+                        this.logger.error(`BG bank request email failed for instrument ${instrumentId}:`, error),
+                    ); // <-- NEW
             } else if (body.bg_req === 'Rejected') {
                 nextStatus = 'ACCOUNTS_FORM_REJECTED';
             }
