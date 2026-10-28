@@ -2,6 +2,7 @@ import { followUps } from '@/db/schemas/shared/follow-ups.schema';
 import { followUpPersons } from '@/db/schemas/shared/follow-up-persons.schema';
 import { couriers } from '@/db/schemas/shared/couriers.schema';
 import { AppLogger } from '@/logger/app-logger.service';
+import { PaymentRequestsNotificationService } from '@/modules/tendering/payment-requests/services/payment-requests-notification.service';
 import type { BankGuaranteeDashboardCounts, BankGuaranteeDashboardRow } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
 import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
@@ -30,6 +31,7 @@ export class BankGuaranteeService {
         private readonly appLogger: AppLogger,
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly followUpService: FollowUpService,
+        private readonly paymentRequestsNotificationService: PaymentRequestsNotificationService,
     ) {
         this.logger = this.appLogger.withContext(BankGuaranteeService.name);
     }
@@ -1102,12 +1104,22 @@ private readBodyFileValue(body: unknown, field: string): unknown {
         const bgDetailsUpdate: any = {};
 
         if (body.action === 'accounts-form-1') {
-            // Map approve_bg field
             if (body.approve_bg) bgDetailsUpdate.approveBg = body.approve_bg;
 
-            // Map reason_req when rejected
             if (body.bg_req === 'Rejected' && body.reason_req) {
                 bgDetailsUpdate.reasonReq = body.reason_req;
+                // Send BG rejection email to Tender Executive
+                try {
+                    await this.paymentRequestsNotificationService.sendBgRejectedEmail(instrumentId);
+                } catch (error) {
+                    this.logger.error(`BG rejection email failed for instrument ${instrumentId}:`, error);
+                }
+            }
+
+            if (body.bg_req === 'Accepted') {
+                nextStatus = 'ACCOUNTS_FORM_ACCEPTED';
+            } else if (body.bg_req === 'Rejected') {
+                nextStatus = 'ACCOUNTS_FORM_REJECTED';
             }
 
             // FDR % agreed at approval time. Accounts Form 1 and Form 3 share the
