@@ -187,7 +187,7 @@ export const CircularModal = ({ open, onOpenChange, circular, onSuccess }: Circu
                                     {!isEdit && <span className="text-destructive">*</span>}
                                 </Label>
                                 <FileUploader
-                                    context="master/circulars"
+                                    context="circulars"
                                     value={files}
                                     onChange={setFiles}
                                     disabled={saving}
