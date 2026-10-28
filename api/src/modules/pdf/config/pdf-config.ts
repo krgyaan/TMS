@@ -97,6 +97,18 @@ export const PDF_CONFIG = {
                 left: '0mm',
             },
         },
+        bgCoveringLetter: {
+            directory: 'letters',
+            templates: ['bg-covering-letter'],
+            storagePath: 'bgcovletter',
+            baseDir: 'bi-dashboard/bank-guarantee/bgcovletter',
+            margin: {
+                top: '0mm',
+                right: '0mm',
+                bottom: '0mm',
+                left: '0mm',
+            },
+        },
         ddFormat: {
             directory: 'dd',
             templates: ['dd-format'],

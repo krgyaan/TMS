@@ -2,6 +2,7 @@ import { couriers, emdResponsibility, tenderInfos, users } from '@/db/schemas';
 import { AppLogger } from '@/logger/app-logger.service';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
+import { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { PdfGeneratorService } from '@/modules/pdf/pdf-generator.service';
 import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
@@ -878,6 +879,151 @@ export class PaymentRequestsNotificationService {
                 }
             } catch (error) {
                 this.logger.error(`Failed to send cheque email for instrument ${instrumentId}:`, error);
+            }
+        } else if (mode === 'BG') {
+            try {
+                // Fetch BG details
+                const [bgDetails] = await this.db
+                    .select()
+                    .from(instrumentBgDetails)
+                    .where(eq(instrumentBgDetails.instrumentId, instrumentId))
+                    .limit(1);
+
+                const [paymentReq] = await this.db
+                    .select({
+                        requestedBy: paymentRequests.requestedBy,
+                        tenderId: paymentRequests.tenderId,
+                        purpose: paymentRequests.purpose,
+                    })
+                    .from(paymentRequests)
+                    .where(eq(paymentRequests.id, instrument.requestId))
+                    .limit(1);
+
+                if (!paymentReq?.requestedBy) {
+                    this.logger.warn(`RequestedBy not found for BG instrument ${instrumentId}`);
+                    return;
+                }
+
+                // Get tender team ID
+                let tenderTeamId = 1;
+                if (paymentReq.tenderId > 0) {
+                    const tenderData = await this.db
+                        .select({ team: tenderInfos.team })
+                        .from(tenderInfos)
+                        .where(eq(tenderInfos.id, paymentReq.tenderId))
+                        .limit(1);
+                    tenderTeamId = tenderData[0]?.team || 1;
+                }
+
+                // Get TL user
+                const [tlUser] = await this.db
+                    .select({ name: users.name })
+                    .from(users)
+                    .where(
+                        and(
+                            eq(users.team, tenderTeamId),
+                            eq(users.roleId, 3)
+                        )
+                    )
+                    .limit(1);
+
+                // Generate covering letter PDF
+                const coveringLetterData = {
+                    date: new Date().toISOString().split('T')[0],
+                    beneficiaryName: bgDetails?.beneficiaryName || '',
+                    beneficiaryAddress: bgDetails?.beneficiaryAddress || '',
+                    amount: instrument.amount || 0,
+                    bgExpiryDate: bgDetails?.bgExpiryDate ? this.formatDateDDMMYYYY(bgDetails.bgExpiryDate) : '',
+                    claimDate: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',
+                    purpose: bgDetails?.bgPurpose || 'Financial security',
+                    stampPaperValue: bgDetails?.stampCharges || 300,
+                    courierAddress: instrument.courierAddress || '',
+                    bgPurpose: bgDetails?.bgPurpose || '',
+                    actionLink: `${this.getFrontendUrl()}/bi-dashboard/bank-guarantee/action/${instrumentId}`,
+                    actionLinkText: 'Accounts Form (BG) Stage 2: After BG Creation',
+                    recipientName: 'Imran',
+                    teamLeaderName: tlUser?.name || 'Team Leader',
+                };
+
+                const coveringLetterPaths = await this.pdfGenerator.generatePdfs(
+                    'bgCoveringLetter',
+                    coveringLetterData,
+                    instrumentId,
+                    'BG'
+                );
+
+                // Get PO copy file path
+                const [bgPo] = await this.db
+                    .select({ bgPo: instrumentBgDetails.bgPo })
+                    .from(instrumentBgDetails)
+                    .where(eq(instrumentBgDetails.instrumentId, instrumentId))
+                    .limit(1);
+
+                // Build attachment paths
+                const attachmentFiles: string[] = [];
+                if (coveringLetterPaths && coveringLetterPaths.length > 0) {
+                    attachmentFiles.push(coveringLetterPaths[0]);
+                }
+                if (bgPo?.bgPo) {
+                    attachmentFiles.push(bgPo!.bgPo);
+                }
+
+                // Get recipient email - use Imran (Accounts Leader) as specified
+                // Fallback to lookup if configured, otherwise hardcode Imran
+                const toEmails: RecipientSource[] = [{ type: 'emails', emails: ['imran@volksenergie.in'] }];
+
+                // From: TE (requestedBy)
+                const fromUserId = paymentReq.requestedBy;
+
+                // Subject
+                const subject = `New Bank Guarantee - ${bgDetails?.bgPurpose || 'Financial security'}`;
+
+                // CC: Coordinator, CEO, Accounts, TL
+                const ccEmails: RecipientSource[] = [
+                    { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
+                    { type: 'emails', emails: ['goyal@volksenergie.in'] },
+                    { type: 'emails', emails: ['accounts@volksenergie.in'] },
+                    { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                ];
+
+                try {
+                    const result = await this.emailService.sendPaymentEmail({
+                        requestId: instrument.requestId,
+                        tenderId: paymentReq.tenderId || undefined,
+                        eventType: 'BG_REQUEST',
+                        fromUserId,
+                        subject,
+                        template: 'bg-request',
+                        data: {
+                            bgPurpose: bgDetails?.bgPurpose || 'Financial security',
+                            beneficiaryName: bgDetails?.beneficiaryName || '',
+                            beneficiaryAddress: bgDetails?.beneficiaryAddress || '',
+                            bgExpiryDate: bgDetails?.bgExpiryDate ? this.formatDateDDMMYYYY(bgDetails.bgExpiryDate) : '',
+                            claimDate: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',
+                            amount: instrument.amount ? this.formatCurrency(Number(instrument.amount)) : '',
+                            stampPaperValue: bgDetails?.stampCharges || 300,
+                            timeLimit: instrument.courierDeadline || 24,
+                            actionLink: `${this.getFrontendUrl()}/bi-dashboard/bank-guarantee/action/${instrumentId}`,
+                            actionLinkText: 'Accounts Form (BG) Stage 2: After BG Creation',
+                            courierAddress: instrument.courierAddress || '',
+                        },
+                        to: toEmails,
+                        cc: ccEmails,
+                        attachments: {
+                            files: attachmentFiles,
+                        },
+                    });
+
+                    if (result.success) {
+                        this.logger.log(`BG request email sent successfully for instrument ${instrumentId} (logId: ${result.emailLogId})`);
+                    } else {
+                        this.logger.warn(`BG request email failed for instrument ${instrumentId}: ${result.error}`);
+                    }
+                } catch (error) {
+                    this.logger.error(`Failed to send BG request email for instrument ${instrumentId}:`, error);
+                }
+            } catch (error) {
+                this.logger.error(`Error processing BG request email for instrument ${instrumentId}:`, error);
             }
         } else {
             this.logger.log(`Email not supported for instrument type: ${instrumentType}, Mode: ${mode}`);
