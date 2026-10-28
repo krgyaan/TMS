@@ -1,1 +1,0 @@
-export { isHTMLElement } from '@floating-ui/utils/dom';

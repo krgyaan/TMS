@@ -1,7 +1,0 @@
-export * as Toolbar from "./index.parts.mjs";
-export * as ToolbarSeparatorDataAttributes from "./separator/ToolbarSeparatorDataAttributes.mjs";
-export * as ToolbarRootDataAttributes from "./root/ToolbarRootDataAttributes.mjs";
-export * as ToolbarGroupDataAttributes from "./group/ToolbarGroupDataAttributes.mjs";
-export * as ToolbarButtonDataAttributes from "./button/ToolbarButtonDataAttributes.mjs";
-export * as ToolbarLinkDataAttributes from "./link/ToolbarLinkDataAttributes.mjs";
-export * as ToolbarInputDataAttributes from "./input/ToolbarInputDataAttributes.mjs";
