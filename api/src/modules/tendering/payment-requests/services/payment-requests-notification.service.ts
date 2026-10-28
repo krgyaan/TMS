@@ -9,7 +9,7 @@ import { instrumentBgDetails, instrumentChequeDetails, instrumentTransferDetails
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { differenceInDays } from 'date-fns';
-import { and, eq, isNull, notInArray } from 'drizzle-orm';
+import { and, eq, isNull, ne, notInArray } from 'drizzle-orm';
 
 @Injectable()
 export class PaymentRequestsNotificationService {
@@ -1263,6 +1263,7 @@ export class PaymentRequestsNotificationService {
             .where(and(
                 eq(paymentInstruments.instrumentType, 'Cheque'),
                 eq(paymentInstruments.isActive, true),
+                ne(paymentInstruments.status, 'ACCOUNTS_FORM_REJECTED'),
                 isNull(instrumentChequeDetails.linkedDdId),
                 isNull(instrumentChequeDetails.linkedFdrId),
             ));
@@ -1343,6 +1344,7 @@ export class PaymentRequestsNotificationService {
             .where(and(
                 eq(paymentInstruments.instrumentType, 'BG'),
                 eq(paymentInstruments.isActive, true),
+                ne(paymentInstruments.status, 'ACCOUNTS_FORM_REJECTED'),
                 notInArray(paymentInstruments.action, [4, 5, 6, 7, 8, 9]),
             ));
 
@@ -1465,6 +1467,7 @@ export class PaymentRequestsNotificationService {
             .where(and(
                 eq(paymentInstruments.instrumentType, 'BG'),
                 eq(paymentInstruments.isActive, true),
+                ne(paymentInstruments.status, 'ACCOUNTS_FORM_REJECTED'),
                 notInArray(paymentInstruments.action, [4, 5, 6, 7, 8, 9]),
             ));
 
