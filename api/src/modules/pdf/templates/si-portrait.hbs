@@ -25,7 +25,7 @@
             background: #fff;
             color: #111;
             font-family: Arial, sans-serif;
-            font-size: 9px;
+            font-size: 8px;
         }
 
         .wm {
@@ -64,7 +64,7 @@
         }
 
         table.cb {
-            font-size: 9px;
+            font-size: 8px;
             line-height: 1.25;
             margin-bottom: -1px;
         }
@@ -100,9 +100,8 @@
     <img class="wm" alt="" src="data:image/png;base64,{{img_logo_base64}}">
     <div class="page">
 
-        <!-- ===== Page 1 only: title, IRN, QR ===== -->
         <div style="position:relative;min-height:30mm;">
-            <div style="text-align:center;font-size:12px;font-weight:bold;padding-bottom:5mm;">Tax Invoice</div>
+            <div style="text-align:center;font-size:12px;font-weight:bold;padding-bottom:5mm;">Tax Invoice - {{invoice_number}}</div>
 
             {{#if qr_code_base64}}
             <div style="position:absolute;top:0;right:0;width:28mm;height:28mm;">
@@ -133,35 +132,34 @@
             </table>
         </div>
 
-        <!-- ===== One table: header block + item headings repeat on every page ===== -->
-        <table class="items" style="font-size:9px;line-height:1.3;">
+        <table class="items" style="font-size:8px;line-height:1.3;">
             <colgroup>
                 {{#if is_interstate}}
                 <col style="width:4%">
-                <col style="width:28%">
+                <col style="width:25%">
                 <col style="width:8%">
                 <col style="width:6%">
-                <col style="width:9%">
+                <col style="width:10%">
                 <col style="width:4%">
                 <col style="width:4%">
-                <col style="width:11%">
-                <col style="width:5%">
-                <col style="width:9%">
                 <col style="width:12%">
+                <col style="width:6%">
+                <col style="width:10%">
+                <col style="width:11%">
                 {{else}}
                 <col style="width:3%">
-                <col style="width:22%">
+                <col style="width:25%">
+                <col style="width:6%">
+                <col style="width:5%">
+                <col style="width:7%">
+                <col style="width:3%">
+                <col style="width:3%">
+                <col style="width:10%">
+                <col style="width:5%">
                 <col style="width:7%">
                 <col style="width:5%">
-                <col style="width:8%">
-                <col style="width:4%">
-                <col style="width:3%">
-                <col style="width:9%">
-                <col style="width:5%">
-                <col style="width:8%">
-                <col style="width:5%">
-                <col style="width:8%">
-                <col style="width:13%">
+                <col style="width:7%">
+                <col style="width:14%">
                 {{/if}}
             </colgroup>
             <thead>
@@ -186,7 +184,7 @@
                                     B-1, D-8, 2nd Floor,<br>
                                     Mohan Cooperative Industrial Estate,<br>
                                     New Delhi Delhi - 110044<br>
-                                    UDYAM: <b>UDYAM-DL-09-000465 (Small)</b><br>
+                                    UDYAM : <b>UDYAM-DL-09-000465 (small)</b><br>
                                     GSTIN/UIN: <b>07AADCV9396C1ZZ</b><br>
                                     State Name: <b>Delhi</b>, Code: <b>07</b><br>
                                     CIN: <b>U40100DL2011PTC228907</b>
@@ -269,7 +267,6 @@
                         </table>
                     </td>
                 </tr>
-                <!-- Item column headings (also repeat) -->
                 <tr>
                     <th rowspan="2" style="padding:3px;">Sl.<br>No.</th>
                     <th rowspan="2" style="padding:3px;">Description of Goods</th>
@@ -300,6 +297,7 @@
                 </tr>
             </thead>
             <tbody>
+
                 {{#each items}}
                 <tr style="height:14mm;">
                     <td>{{inc @index}}</td>
@@ -330,38 +328,37 @@
                 </tr>
                 {{/each}}
 
-                <!-- Totals, tax summary, bank, signatures: kept together -->
                 <tr>
                     <td class="blk" colspan="{{#if is_interstate}}11{{else}}13{{/if}}">
                         <div class="keep-together">
-                            <table style="margin-top:-1px;">
+                            <table style="font-size:8px;line-height:1.3;margin-top:-1px;">
                                 <colgroup>
                                     {{#if is_interstate}}
                                     <col style="width:4%">
-                                    <col style="width:28%">
+                                    <col style="width:25%">
                                     <col style="width:8%">
                                     <col style="width:6%">
-                                    <col style="width:9%">
+                                    <col style="width:10%">
                                     <col style="width:4%">
                                     <col style="width:4%">
-                                    <col style="width:11%">
-                                    <col style="width:5%">
-                                    <col style="width:9%">
                                     <col style="width:12%">
+                                    <col style="width:6%">
+                                    <col style="width:10%">
+                                    <col style="width:11%">
                                     {{else}}
                                     <col style="width:3%">
-                                    <col style="width:22%">
+                                    <col style="width:25%">
+                                    <col style="width:6%">
+                                    <col style="width:5%">
+                                    <col style="width:7%">
+                                    <col style="width:3%">
+                                    <col style="width:3%">
+                                    <col style="width:10%">
+                                    <col style="width:5%">
                                     <col style="width:7%">
                                     <col style="width:5%">
-                                    <col style="width:8%">
-                                    <col style="width:4%">
-                                    <col style="width:3%">
-                                    <col style="width:9%">
-                                    <col style="width:5%">
-                                    <col style="width:8%">
-                                    <col style="width:5%">
-                                    <col style="width:8%">
-                                    <col style="width:13%">
+                                    <col style="width:7%">
+                                    <col style="width:14%">
                                     {{/if}}
                                 </colgroup>
                                 <tr>
@@ -383,11 +380,7 @@
                                 <tr>
                                     <td colspan="7" style="text-align:right;">Freight</td>
                                     <td style="text-align:right;">{{formatCurrency freight}}</td>
-                                    {{#if is_interstate}}
-                                    <td colspan="2"></td>
-                                    {{else}}
-                                    <td colspan="4"></td>
-                                    {{/if}}
+                                    <td colspan="{{#if is_interstate}}2{{else}}4{{/if}}"></td>
                                     <td style="text-align:right;">{{formatCurrency freight}}</td>
                                 </tr>
                                 {{/if}}
@@ -396,11 +389,7 @@
                                 <tr>
                                     <td colspan="7" style="text-align:right;">Other Charges</td>
                                     <td style="text-align:right;">{{formatCurrency other_charges}}</td>
-                                    {{#if is_interstate}}
-                                    <td colspan="2"></td>
-                                    {{else}}
-                                    <td colspan="4"></td>
-                                    {{/if}}
+                                    <td colspan="{{#if is_interstate}}2{{else}}4{{/if}}"></td>
                                     <td style="text-align:right;">{{formatCurrency other_charges}}</td>
                                 </tr>
                                 {{/if}}
@@ -409,11 +398,7 @@
                                 <tr>
                                     <td colspan="7" style="text-align:right;">Round Off</td>
                                     <td style="text-align:right;">{{formatCurrency round_off}}</td>
-                                    {{#if is_interstate}}
-                                    <td colspan="2"></td>
-                                    {{else}}
-                                    <td colspan="4"></td>
-                                    {{/if}}
+                                    <td colspan="{{#if is_interstate}}2{{else}}4{{/if}}"></td>
                                     <td style="text-align:right;">{{formatCurrency round_off}}</td>
                                 </tr>
                                 {{/if}}
@@ -433,14 +418,14 @@
                                     <td style="text-align:right;"><b>{{formatCurrency grand_total}}</b></td>
                                 </tr>
                                 <tr>
-                                    <td colspan="{{#if is_interstate}}10{{else}}11{{/if}}" style="text-align:right;">
+                                    <td colspan="{{#if is_interstate}}10{{else}}11{{/if}}">
                                         Amount Chargeable (in words): <b>{{amount_in_words}}</b>
                                     </td>
-                                    <td style="text-align:right;">E &amp; O.E.</td>
+                                    <td style="text-align:right;" colspan="{{#if is_interstate}}1{{else}}2{{/if}}">E &amp; O.E.</td>
                                 </tr>
                             </table>
 
-                            <table style="margin-top:-1px;">
+                            <table style="margin-top:-1px;font-size:8px;">
                                 <colgroup>
                                     <col style="width:16.66%">
                                     <col style="width:16.66%">
@@ -473,19 +458,19 @@
                                 </tr>
                             </table>
 
-                            <table style="margin-top:-1px;line-height:1.45;">
+                            <table style="margin-top:-1px;font-size:8px;line-height:1.45;">
                                 <tr>
                                     <td colspan="3" style="padding:3px;">
                                         Tax Amount (in words): <b>{{tax_amount_in_words}}</b>
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td style="width:56%;padding:3px;">
+                                    <td style="width:50%;padding:3px;">
                                         <u>Declaration</u><br>
                                         We declare that this invoice shows the actual price of the goods described and
                                         that all particulars are true and correct.
                                     </td>
-                                    <td style="width:44%;padding:3px;" colspan="2">
+                                    <td style="width:50%;padding:3px;" colspan="2">
                                         Company's PAN: <b>AADCV9396C</b><br>
                                         Company's Bank Details:<br>
                                         Bank Name: <b>Au Small Finance Bank Ltd (CC A/c No. 5180) - Inflow</b><br>
@@ -495,19 +480,19 @@
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td style="width:30%;padding:3px;height:19mm;">
+                                    <td style="width:34%;padding:3px;height:19mm;">
                                         Prepared by<br><br>
                                         <b>{{prepared_by_name}}</b><br>
                                         {{prepared_by_email}}<br>
                                         {{prepared_by_phone}}
                                     </td>
-                                    <td style="width:35%;padding:3px;">
+                                    <td style="width:33%;padding:3px;">
                                         Approved by<br><br>
                                         <b>{{approved_by_name}}</b><br>
                                         {{approved_by_email}}<br>
                                         {{approved_by_phone}}
                                     </td>
-                                    <td style="width:35%;padding:3px;text-align:right;">
+                                    <td style="width:33%;padding:3px;text-align:right;">
                                         <b>for {{seller_name}}</b>
                                         <div style="height:12mm;"></div>
                                         Authorised Signatory
