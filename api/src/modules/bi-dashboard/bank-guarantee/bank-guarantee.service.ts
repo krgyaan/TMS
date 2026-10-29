@@ -1121,12 +1121,6 @@ private readBodyFileValue(body: unknown, field: string): unknown {
 
             if (body.bg_req === 'Accepted') {
                 nextStatus = 'ACCOUNTS_FORM_ACCEPTED';
-
-                this.paymentRequestsNotificationService
-                    .sendBgBankRequestEmail(instrumentId)
-                    .catch((error) =>
-                        this.logger.error(`BG bank request email failed for instrument ${instrumentId}:`, error),
-                    ); // <-- NEW
             } else if (body.bg_req === 'Rejected') {
                 nextStatus = 'ACCOUNTS_FORM_REJECTED';
             }
@@ -1178,12 +1172,6 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             if (body.bg_validity) bgDetailsUpdate.validityDate = body.bg_validity;
             if (body.bg_claim_period) bgDetailsUpdate.claimExpiryDate = body.bg_claim_period;
             if (body.bg2_remark) bgDetailsUpdate.bg2Remark = body.bg2_remark;
-            // Send BG creation and couriered email
-            try {
-                await this.paymentRequestsNotificationService.sendBgCreatedCourieredEmail(instrumentId);
-            } catch (error) {
-                this.logger.error(`BG creation couriered email failed for instrument ${instrumentId}:`, error);
-            }
         } else if (body.action === 'accounts-form-3') {
             if (body.fdr_no) bgDetailsUpdate.fdrNo = body.fdr_no;
             if (body.fdr_amt) bgDetailsUpdate.fdrAmt = body.fdr_amt;
@@ -1282,6 +1270,24 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             }
         }
 
+        // NEW: Send BG bank request email to client department after Form 1 data is persisted
+        if (body.action === 'accounts-form-1' && body.bg_req === 'Accepted') {
+            this.paymentRequestsNotificationService
+                .sendBgBankRequestEmail(instrumentId)
+                .catch((error) =>
+                    this.logger.error(`BG bank request email failed for instrument ${instrumentId}:`, error),
+                );
+        }
+
+        // NEW: Send BG creation and couriered email after Form 2 data is persisted
+        if (body.action === 'accounts-form-2') {
+            this.paymentRequestsNotificationService
+                .sendBgCreatedCourieredEmail(instrumentId)
+                .catch((error) =>
+                    this.logger.error(`BG creation couriered email failed for instrument ${instrumentId}:`, error),
+                );
+        }
+
         // NEW: Send BG submitted email to client department after Form 3 data is persisted
         if (body.action === 'accounts-form-3') {
             this.paymentRequestsNotificationService
@@ -1289,6 +1295,29 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 .catch((error) =>
                     this.logger.error(`BG submitted email failed for instrument ${instrumentId}:`, error),
                 );
+        }
+
+        // NEW: Send BG follow-up release email after initiate-followup data is persisted
+        if (body.action === 'initiate-followup') {
+            // Contacts already parsed earlier in this function (line ~1022)
+            const clientContacts = contacts?.filter((c: any) => c?.name && String(c.name).trim().length > 0) || [];
+            if (clientContacts.length === 0) {
+                this.logger.warn(`No client contacts found for BG follow-up email for instrument ${instrumentId}`);
+            } else {
+                const clientName = clientContacts[0]?.name || body.organisation_name || 'Client';
+                const clientEmails = clientContacts.map((c: any) => c.email || '').filter((e: any) => e && String(e).trim().length > 0);
+                if (clientEmails.length === 0) {
+                    this.logger.warn(`No client email addresses found for BG follow-up email`);
+                } else {
+                    await this.paymentRequestsNotificationService.sendBgFollowupReleaseEmail(
+                        instrumentId,
+                        clientEmails,
+                        clientName
+                    ).catch((err) =>
+                        this.logger.error(`BG follow-up release email failed for instrument ${instrumentId}:`, err)
+                    );
+                }
+            }
         }
 
         try {

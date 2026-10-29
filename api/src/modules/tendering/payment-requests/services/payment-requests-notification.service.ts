@@ -7,6 +7,7 @@ import { PdfGeneratorService } from '@/modules/pdf/pdf-generator.service';
 import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { instrumentBgDetails, instrumentChequeDetails, instrumentTransferDetails, paymentInstruments, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
+import { BG_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { differenceInDays } from 'date-fns';
@@ -2087,10 +2088,10 @@ export class PaymentRequestsNotificationService {
                     claimDate: this.formatDateDDMMYYYY(bgDetails.bgClaim),
                     amount: this.formatCurrency(Number(instrument.amount) || 0),
                     stampPaperValue: this.formatCurrency(Number(bgDetails.stampCharges) || 300),
-                    fdrMargin: this.formatCurrency(Number((bgDetails as any).fdrMargin) || 0),
-                    beneName: (bgDetails as any).beneName || '',
-                    beneAcc: (bgDetails as any).beneAcc || '',
-                    beneIfsc: (bgDetails as any).beneIfsc || '',
+                    fdrMargin: bgDetails.fdrPer ? `${bgDetails.fdrPer}%` : '10%/100%',
+                    beneName: bgDetails.bgBankAccName || '',
+                    beneAcc: bgDetails.bgBankAcc || '',
+                    beneIfsc: bgDetails.bgBankIfsc || '',
                     timeLimit,
                 },
                 attachments: { files: attachmentFiles },
@@ -2210,6 +2211,134 @@ export class PaymentRequestsNotificationService {
         } catch (error) {
             this.logger.error(`Failed to send BG submitted email for instrument ${instrumentId}:`, error);
             throw error;
+        }
+    }
+
+    /**
+     * Send BG follow-up release email when initiate-followup action is taken
+     */
+    async sendBgFollowupReleaseEmail(instrumentId: number, clientEmails: string[], clientName: string): Promise<void> {
+        this.logger.log(`Sending BG follow-up release email for instrument ${instrumentId}`);
+
+        // Fetch instrument + payment request + BG details
+        const [instrument] = await this.db
+            .select()
+            .from(paymentInstruments)
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!instrument) {
+            this.logger.warn(`Instrument ${instrumentId} not found for BG follow-up release email`);
+            return;
+        }
+
+        const [paymentReq] = await this.db
+            .select({
+                requestedBy: paymentRequests.requestedBy,
+                tenderId: paymentRequests.tenderId,
+                purpose: paymentRequests.purpose,
+            })
+            .from(paymentRequests)
+            .where(eq(paymentRequests.id, instrument.requestId))
+            .limit(1);
+
+        if (!paymentReq?.requestedBy) {
+            this.logger.warn(`RequestedBy not found for BG instrument ${instrumentId}`);
+            return;
+        }
+
+        // Get TE name and email
+        const [teUser] = await this.db
+            .select({ name: users.name, email: users.email })
+            .from(users)
+            .where(eq(users.id, paymentReq.requestedBy))
+            .limit(1);
+
+        if (!teUser?.email) {
+            this.logger.warn(`TE email not found for BG instrument ${instrumentId}`);
+            return;
+        }
+
+        // Get tender team ID
+        let tenderTeamId = 1;
+        if (paymentReq.tenderId > 0) {
+            const tenderData = await this.db
+                .select({ team: tenderInfos.team })
+                .from(tenderInfos)
+                .where(eq(tenderInfos.id, paymentReq.tenderId))
+                .limit(1);
+            tenderTeamId = tenderData[0]?.team || 1;
+        }
+
+        // Status mapping from BG_STATUSES
+        const statusMap: Record<string, string> = {
+            [BG_STATUSES.PENDING]: 'Pending',
+            [BG_STATUSES.ACCOUNTS_FORM_ACCEPTED]: 'Accepted',
+            [BG_STATUSES.ACCOUNTS_FORM_REJECTED]: 'Rejected',
+            [BG_STATUSES.BG_CREATED]: 'Created',
+            [BG_STATUSES.FDR_DETAILS_CAPTURED]: 'FDR Details Captured',
+            [BG_STATUSES.FOLLOWUP_INITIATED]: 'Followup Initiated',
+            [BG_STATUSES.EXTENSION_REQUESTED]: 'Extension Requested',
+            [BG_STATUSES.RETURN_VIA_COURIER]: 'Courier Returned',
+            [BG_STATUSES.CANCELLATION_REQUESTED]: 'Cancellation Request',
+            [BG_STATUSES.BG_CANCELLATION_CONFIRMED]: 'Cancelled at Branch',
+            [BG_STATUSES.FDR_CANCELLED_CONFIRMED]: 'FDR Cancellation Confirmed',
+        };
+        const statusLabel = statusMap[instrument.status] || instrument.status || '';
+
+        // Tender no / name from tender infos
+        const [tender] = await this.db
+            .select({ tenderNo: tenderInfos.tenderNo, tenderName: tenderInfos.tenderName })
+            .from(tenderInfos)
+            .where(eq(tenderInfos.id, paymentReq.tenderId))
+            .limit(1);
+
+        // BG details
+        const [bgDetails] = await this.db
+            .select()
+            .from(instrumentBgDetails)
+            .where(eq(instrumentBgDetails.instrumentId, instrumentId))
+            .limit(1);
+
+        // Compose email data
+        const data = {
+            clientName,
+            tenderNo: tender?.tenderNo || '',
+            tenderName: tender?.tenderName || '',
+            status: statusLabel,
+            amount: this.formatCurrency(Number(instrument.amount) || 0),
+            bgNo: bgDetails?.bgNo || '',
+            bgValidity: bgDetails?.bgExpiryDate ? this.formatDateDDMMYYYY(bgDetails.bgExpiryDate) : '',
+            bgClaimPeriod: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',
+            bgFavor: bgDetails?.beneficiaryName || instrument.favouring || '',
+        };
+
+        try {
+            const result = await this.emailService.sendPaymentEmail({
+                requestId: instrument.requestId,
+                tenderId: paymentReq.tenderId || undefined,
+                eventType: 'BG_FOLLOWUP_RELEASE',
+                fromUserId: (await this.db.select({ id: users.id }).from(users).where(eq(users.email, 'imran@volksenergie.in')) as any)[0]?.id ?? 33,
+                subject: `Bank Guarantee No. - ${bgDetails?.bgNo || ''} - ${statusLabel} - ${tender?.tenderNo || ''} against ${bgDetails?.bgPurpose || paymentReq.purpose || ''}`,
+                template: 'bg-followup-release',
+                data,
+                to: [{ type: 'emails', emails: clientEmails }],
+                cc: [
+                    { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
+                    { type: 'emails', emails: ['goyal@volksenergie.in'] },
+                    { type: 'emails', emails: ['accounts@volksenergie.in'] },
+                    { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                    { type: 'emails', emails: [teUser.email] },
+                ],
+            });
+
+            if (result.success) {
+                this.logger.log(`BG follow-up release email sent successfully for instrument ${instrumentId} (logId: ${result.emailLogId})`);
+            } else {
+                this.logger.warn(`BG follow-up release email failed for instrument ${instrumentId}: ${result.error}`);
+            }
+        } catch (error) {
+            this.logger.error(`Failed to send BG follow-up release email for instrument ${instrumentId}:`, error);
         }
     }
 }

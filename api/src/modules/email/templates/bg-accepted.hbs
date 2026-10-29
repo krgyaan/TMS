@@ -1,5 +1,4 @@
 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-    
 
     <p style="font-size: 14px; line-height: 1.6; color: #555;">
         Dear team,
@@ -10,28 +9,27 @@
     </p>
 
     <p style="font-size: 14px; line-height: 1.6; color: #555; margin: 20px 0;">
-        The purpose of the Bank Guarantee is <strong>{{bgPurpose}}</strong>.
+        The purpose of the Bank Guarantee is <strong>{{data.bgPurpose}}</strong>.
     </p>
 
     <div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 4px;">
-        <p style="margin: 8px 0; font-size: 14px;"><strong>BG in favour of:</strong> {{beneficiaryName}}</p>
-        <p style="margin: 8px 0; font-size: 14px;"><strong>BG address:</strong> {{beneficiaryAddress}}</p>
-        <p style="margin: 8px 0; font-size: 14px;"><strong>BG Expiry Date:</strong> {{bgExpiryDate}}</p>
-        <p style="margin: 8px 0; font-size: 14px;"><strong>BG Claim Date:</strong> {{claimDate}}</p>
-        <p style="margin: 8px 0; font-size: 14px;"><strong>Amount:</strong> Rs. {{amount}}</p>
-        <p style="margin: 8px 0; font-size: 14px;"><strong>BG Stamp paper value:</strong> Rs. {{stampPaperValue}}</p>
-        <p style="margin: 8px 0; font-size: 14px;"><strong>FDR for Margin:</strong> {{fdrMargin}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>BG in favour of:</strong> {{data.beneficiaryName}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>BG address:</strong> {{data.beneficiaryAddress}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>BG Expiry Date:</strong> {{data.bgExpiryDate}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>BG Claim Date:</strong> {{data.claimDate}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>Amount:</strong> Rs. {{data.amount}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>BG Stamp paper value:</strong> Rs. {{data.stampPaperValue}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>FDR for Margin:</strong> {{data.fdrMargin}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>BG Formats:</strong> attached with the mail.</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>PO copy/request letter from beneficiary:</strong> attached with the mail.</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>Bank Formats, Signed by CEO:</strong> attached with the mail.</p>
     </div>
-
-    <p style="font-size: 14px; line-height: 1.6; color: #555; margin: 20px 0;">
-        BG Formats, PO copy/request letter from beneficiary, and Bank Formats (signed by CEO) are attached with this mail.
-    </p>
 
     <div style="margin: 20px 0; padding: 15px; background: #e8f4fd; border-radius: 4px; border-left: 4px solid #2c3e50;">
         <p style="margin: 8px 0; font-size: 14px; font-weight: bold;">Beneficiary Account details:</p>
-        <p style="margin: 8px 0; font-size: 14px;"><strong>Beneficiary Name:</strong> {{beneName}}</p>
-        <p style="margin: 8px 0; font-size: 14px;"><strong>Account No.:</strong> {{beneAcc}}</p>
-        <p style="margin: 8px 0; font-size: 14px;"><strong>IFSC code:</strong> {{beneIfsc}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>Beneficiary Name:</strong> {{data.beneName}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>Account No.:</strong> {{data.beneAcc}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>IFSC code:</strong> {{data.beneIfsc}}</p>
     </div>
 
     <p style="font-size: 13px; line-height: 1.6; color: #a33;">
@@ -43,11 +41,11 @@
     </p>
 
     <p style="font-size: 14px; line-height: 1.6; color: #555; margin: 20px 0;">
-        Please prepare the BG within <strong>{{timeLimit}} Hrs</strong> and share the SOFT COPY of the BG along with SFMS confirmation by replying to this mail.
+        Please prepare the BG within the timeline mentioned above (<strong>{{data.timeLimit}} Hrs</strong>) and share the SOFT COPY of the BG along with SFMS confirmation by replying to this mail.
     </p>
 
     <p style="font-size: 12px; color: #666; font-style: italic; margin: 20px 0;">
-        "Ensuring timely operations is the only source of growth."
+        “Ensuring timely operations is the only source of growth.”
     </p>
 
     <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #888;">
