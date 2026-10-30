@@ -79,6 +79,7 @@ export const PDF_CONFIG = {
             directory: 'letters',
             templates: ['req-ext-letter'],
             storagePath: 'reqext',
+            baseDir: 'bi-dashboard/bank-guarantee/reqext',
             margin: {
                 top: '0mm',
                 right: '0mm',
@@ -90,6 +91,19 @@ export const PDF_CONFIG = {
             directory: 'letters',
             templates: ['req-cancel-letter'],
             storagePath: 'reqcancel',
+            baseDir: 'bi-dashboard/bank-guarantee/reqcancel',
+            margin: {
+                top: '0mm',
+                right: '0mm',
+                bottom: '0mm',
+                left: '0mm',
+            },
+        },
+        bgCoveringLetter: {
+            directory: 'letters',
+            templates: ['bg-covering-letter'],
+            storagePath: 'bgcovletter',
+            baseDir: 'bi-dashboard/bank-guarantee/bgcovletter',
             margin: {
                 top: '0mm',
                 right: '0mm',

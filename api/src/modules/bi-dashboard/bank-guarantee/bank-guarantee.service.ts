@@ -2,6 +2,7 @@ import { followUps } from '@/db/schemas/shared/follow-ups.schema';
 import { followUpPersons } from '@/db/schemas/shared/follow-up-persons.schema';
 import { couriers } from '@/db/schemas/shared/couriers.schema';
 import { AppLogger } from '@/logger/app-logger.service';
+import { PaymentRequestsNotificationService } from '@/modules/tendering/payment-requests/services/payment-requests-notification.service';
 import type { BankGuaranteeDashboardCounts, BankGuaranteeDashboardRow } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
 import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
@@ -30,6 +31,7 @@ export class BankGuaranteeService {
         private readonly appLogger: AppLogger,
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly followUpService: FollowUpService,
+        private readonly paymentRequestsNotificationService: PaymentRequestsNotificationService,
     ) {
         this.logger = this.appLogger.withContext(BankGuaranteeService.name);
     }
@@ -986,6 +988,9 @@ private readBodyFileValue(body: unknown, field: string): unknown {
     /**
      * Update instrument action with form data
      */
+    /**
+ * Update instrument action with form data
+ */
     async updateAction(
         instrumentId: number,
         body: any,
@@ -1102,12 +1107,22 @@ private readBodyFileValue(body: unknown, field: string): unknown {
         const bgDetailsUpdate: any = {};
 
         if (body.action === 'accounts-form-1') {
-            // Map approve_bg field
             if (body.approve_bg) bgDetailsUpdate.approveBg = body.approve_bg;
 
-            // Map reason_req when rejected
             if (body.bg_req === 'Rejected' && body.reason_req) {
                 bgDetailsUpdate.reasonReq = body.reason_req;
+                // Send BG rejection email to Tender Executive
+                try {
+                    await this.paymentRequestsNotificationService.sendBgRejectedEmail(instrumentId);
+                } catch (error) {
+                    this.logger.error(`BG rejection email failed for instrument ${instrumentId}:`, error);
+                }
+            }
+
+            if (body.bg_req === 'Accepted') {
+                nextStatus = 'ACCOUNTS_FORM_ACCEPTED';
+            } else if (body.bg_req === 'Rejected') {
+                nextStatus = 'ACCOUNTS_FORM_REJECTED';
             }
 
             // FDR % agreed at approval time. Accounts Form 1 and Form 3 share the
@@ -1253,6 +1268,55 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                     createdAt: new Date(),
                 });
             }
+        }
+
+        // NEW: Send BG bank request email to client department after Form 1 data is persisted
+        if (body.action === 'accounts-form-1' && body.bg_req === 'Accepted') {
+            this.paymentRequestsNotificationService
+                .sendBgBankRequestEmail(instrumentId)
+                .catch((error) =>
+                    this.logger.error(`BG bank request email failed for instrument ${instrumentId}:`, error),
+                );
+        }
+
+        // NEW: Send BG creation and couriered email after Form 2 data is persisted
+        if (body.action === 'accounts-form-2') {
+            this.paymentRequestsNotificationService
+                .sendBgCreatedCourieredEmail(instrumentId)
+                .catch((error) =>
+                    this.logger.error(`BG creation couriered email failed for instrument ${instrumentId}:`, error),
+                );
+        }
+
+        // NEW: Send BG submitted email to client department after Form 3 data is persisted
+        if (body.action === 'accounts-form-3') {
+            this.paymentRequestsNotificationService
+                .sendBgSubmittedEmail(instrumentId)
+                .catch((error) =>
+                    this.logger.error(`BG submitted email failed for instrument ${instrumentId}:`, error),
+                );
+        }
+
+        // initiate-followup: no immediate email here. The follow-up is persisted below
+        // via FollowUpService.create(), and the follow-up module handles all mail
+        // (assigned mail on create + scheduled reminder mails using its followup templates).
+
+        // NEW: Send BG cancellation request email to the bank after request-cancellation data is persisted
+        if (body.action === 'request-cancellation') {
+            this.paymentRequestsNotificationService
+                .sendBgCancellationRequestEmail(instrumentId)
+                .catch((error) =>
+                    this.logger.error(`BG cancellation request email failed for instrument ${instrumentId}:`, error),
+                );
+        }
+
+        // NEW: Send BG extension/modification request email to the bank after request-extension data is persisted
+        if (body.action === 'request-extension') {
+            this.paymentRequestsNotificationService
+                .sendBgExtensionRequestEmail(instrumentId)
+                .catch((error) =>
+                    this.logger.error(`BG extension request email failed for instrument ${instrumentId}:`, error),
+                );
         }
 
         try {
@@ -1407,7 +1471,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 bgPo: instrumentBgDetails.bgPo,
                 bankMailIds: instrumentBgDetails.bankMailIds,
                 bankMailIdsCc: instrumentBgDetails.bankMailIdsCc,
-                bankClientUser: instrumentBgDetails.bgClientUser,
+                bgClientUser: instrumentBgDetails.bgClientUser,
                 bgClientCp: instrumentBgDetails.bgClientCp,
                 bgClientFin: instrumentBgDetails.bgClientFin,
                 bgBankAcc: instrumentBgDetails.bgBankAcc,

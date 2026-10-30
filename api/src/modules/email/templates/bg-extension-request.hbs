@@ -1,0 +1,81 @@
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+
+    <p style="font-size: 14px; line-height: 1.6; color: #555;">
+        Dear Sir,
+    </p>
+
+    <p style="font-size: 14px; line-height: 1.6; color: #555; margin: 20px 0;">
+        We request the following modifications to the existing Bank Guarantee as detailed below:
+    </p>
+
+    <div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 4px;">
+        <p style="margin: 8px 0; font-size: 14px;"><strong>Bank Guarantee No.:</strong> {{data.bgNo}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>Bank Guarantee Date:</strong> {{data.bgDate}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>Bank Guarantee Value:</strong> Rs. {{data.amount}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>Bank Guarantee in favor of:</strong> {{data.bgFavour}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>Bank Guarantee Amount:</strong> Rs. {{data.amount}}</p>
+    </div>
+
+    <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 13px;">
+        <thead>
+            <tr style="background: #2c3e50; color: #fff;">
+                <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Type of Amendment</th>
+                <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Existing Value</th>
+                <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">New Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td style="border: 1px solid #ccc; padding: 8px; font-weight: bold;">Stamp Paper Amount</td>
+                <td style="border: 1px solid #ccc; padding: 8px;">{{data.stampChargeDeducted}}</td>
+                <td style="border: 1px solid #ccc; padding: 8px;">{{data.newStampChargeDeducted}}</td>
+            </tr>
+            <tr style="background: #f8f9fa;">
+                <td style="border: 1px solid #ccc; padding: 8px; font-weight: bold;">Beneficiary Name</td>
+                <td style="border: 1px solid #ccc; padding: 8px;">{{data.bgFavour}}</td>
+                <td style="border: 1px solid #ccc; padding: 8px;">{{data.newBeneficiaryName}}</td>
+            </tr>
+            <tr>
+                <td style="border: 1px solid #ccc; padding: 8px; font-weight: bold;">Amount</td>
+                <td style="border: 1px solid #ccc; padding: 8px;">Rs. {{data.amount}}</td>
+                <td style="border: 1px solid #ccc; padding: 8px;">{{data.newAmount}}</td>
+            </tr>
+            <tr style="background: #f8f9fa;">
+                <td style="border: 1px solid #ccc; padding: 8px; font-weight: bold;">Expiry Date</td>
+                <td style="border: 1px solid #ccc; padding: 8px;">{{data.bgExpiryDate}}</td>
+                <td style="border: 1px solid #ccc; padding: 8px;">{{data.newExpiryDate}}</td>
+            </tr>
+            <tr>
+                <td style="border: 1px solid #ccc; padding: 8px; font-weight: bold;">Claim Date</td>
+                <td style="border: 1px solid #ccc; padding: 8px;">{{data.bgClaimDate}}</td>
+                <td style="border: 1px solid #ccc; padding: 8px;">{{data.newClaimDate}}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <p style="font-size: 14px; line-height: 1.6; color: #555; margin: 20px 0;">
+        The request letter/email confirmation from the client has been attached to this email. Please debit our account
+        No. <strong>003063300010771</strong>, in case there are any additional charges to be paid for this modification.
+    </p>
+
+    <p style="font-size: 14px; line-height: 1.6; color: #555; margin: 20px 0;">
+        Please find attached the following documents:
+    </p>
+    <ul style="font-size: 14px; line-height: 1.8; color: #555;">
+        <li>Request Letter on VE Letterhead</li>
+        <li>Request letter/Email from the client requesting the Extension/Modification of the Bank Guarantee.</li>
+        <li>Soft Copy of the Bank Guarantee.</li>
+        <li>Soft Copy of the FDR</li>
+    </ul>
+
+    <p style="font-size: 14px; line-height: 1.6; color: #555; margin: 20px 0;">
+        The hard copy of the Bank Guarantee and request letter on our letterhead has been sent physically to the Bank
+        branch. Please contact the undersigned for any further clarification.
+    </p>
+
+    <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #888;">
+        <p>Best Regards,</p>
+        <p><strong>Piyush Goyal</strong><br>Director<br>Volks Energie Pvt. Ltd.</p>
+        <p style="margin-top: 10px;"><strong>Imran Khan</strong>,<br>+91-88825-91733<br>Accounts Leader,<br>Volks Energie Pvt. Ltd.</p>
+    </div>
+</div>

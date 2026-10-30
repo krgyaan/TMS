@@ -2,10 +2,12 @@ import { couriers, emdResponsibility, tenderInfos, users } from '@/db/schemas';
 import { AppLogger } from '@/logger/app-logger.service';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
+import { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { PdfGeneratorService } from '@/modules/pdf/pdf-generator.service';
 import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { instrumentBgDetails, instrumentChequeDetails, instrumentTransferDetails, paymentInstruments, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
+import { BG_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { differenceInDays } from 'date-fns';
@@ -102,6 +104,39 @@ export class PaymentRequestsNotificationService {
 
     private formatCurrency = (amount: number) => {
         return `₹${amount.toLocaleString('en-IN')}`;
+    };
+
+    /**
+     * Normalize a DB file-path value into a list of plain attachment paths.
+     * Multi-file upload fields are persisted either as a JSON array string
+     * (e.g. '["bi-dashboard/.../a.pdf","bi-dashboard/.../b.pdf"]') or as a
+     * single plain path, depending on how the frontend submitted them. Passing
+     * the raw JSON string to EmailService would make attachment resolution
+     * throw ("Unknown file context: [\"bi-dashboard"), killing the whole email.
+     */
+    private toAttachmentPaths = (value: string | null | undefined): string[] => {
+        if (!value || typeof value !== 'string' || value.trim().length === 0) {
+            return [];
+        }
+
+        const trimmed = value.trim();
+
+        // Dummy marker left behind when a file input was submitted without a file
+        if (trimmed.includes('[object File]')) {
+            return [];
+        }
+
+        if (trimmed.startsWith('[')) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                const list: string[] = Array.isArray(parsed) ? parsed : [parsed];
+                return list.filter((p): p is string => typeof p === 'string' && p.trim().length > 0);
+            } catch {
+                // Not valid JSON — fall through and treat it as a single path
+            }
+        }
+
+        return [trimmed];
     };
 
     async sendDdMailAfterChequeAction(
@@ -879,6 +914,152 @@ export class PaymentRequestsNotificationService {
             } catch (error) {
                 this.logger.error(`Failed to send cheque email for instrument ${instrumentId}:`, error);
             }
+        } else if (mode === 'BG') {
+            try {
+                // Fetch BG details
+                const [bgDetails] = await this.db
+                    .select()
+                    .from(instrumentBgDetails)
+                    .where(eq(instrumentBgDetails.instrumentId, instrumentId))
+                    .limit(1);
+
+                const [paymentReq] = await this.db
+                    .select({
+                        requestedBy: paymentRequests.requestedBy,
+                        tenderId: paymentRequests.tenderId,
+                        purpose: paymentRequests.purpose,
+                    })
+                    .from(paymentRequests)
+                    .where(eq(paymentRequests.id, instrument.requestId))
+                    .limit(1);
+
+                if (!paymentReq?.requestedBy) {
+                    this.logger.warn(`RequestedBy not found for BG instrument ${instrumentId}`);
+                    return;
+                }
+
+                // Get tender team ID
+                let tenderTeamId = 1;
+                if (paymentReq.tenderId > 0) {
+                    const tenderData = await this.db
+                        .select({ team: tenderInfos.team })
+                        .from(tenderInfos)
+                        .where(eq(tenderInfos.id, paymentReq.tenderId))
+                        .limit(1);
+                    tenderTeamId = tenderData[0]?.team || 1;
+                }
+
+                // Get TL user
+                const [tlUser] = await this.db
+                    .select({ name: users.name })
+                    .from(users)
+                    .where(
+                        and(
+                            eq(users.team, tenderTeamId),
+                            eq(users.roleId, 3)
+                        )
+                    )
+                    .limit(1);
+
+                // Generate covering letter PDF
+                const coveringLetterData = {
+                    date: new Date().toISOString().split('T')[0],
+                    beneficiaryName: bgDetails?.beneficiaryName || '',
+                    beneficiaryAddress: bgDetails?.beneficiaryAddress || '',
+                    amount: instrument.amount || 0,
+                    bgExpiryDate: bgDetails?.bgExpiryDate ? this.formatDateDDMMYYYY(bgDetails.bgExpiryDate) : '',
+                    claimDate: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',
+                    purpose: bgDetails?.bgPurpose || 'Financial security',
+                    stampPaperValue: bgDetails?.stampCharges || 300,
+                    courierAddress: instrument.courierAddress || '',
+                    bgPurpose: bgDetails?.bgPurpose || '',
+                    actionLink: `${this.getFrontendUrl()}/bi-dashboard/bank-guarantee/action/${instrumentId}`,
+                    actionLinkText: 'Accounts Form (BG) Stage 2: After BG Creation',
+                    recipientName: 'Imran',
+                    teamLeaderName: tlUser?.name || 'Team Leader',
+                };
+
+                const coveringLetterPaths = await this.pdfGenerator.generatePdfs(
+                    'bgCoveringLetter',
+                    coveringLetterData,
+                    instrumentId,
+                    'BG'
+                );
+
+                // Get PO copy file path
+                const [bgPo] = await this.db
+                    .select({ bgPo: instrumentBgDetails.bgPo })
+                    .from(instrumentBgDetails)
+                    .where(eq(instrumentBgDetails.instrumentId, instrumentId))
+                    .limit(1);
+
+                // Build attachment paths
+                const attachmentFiles: string[] = [];
+                if (coveringLetterPaths && coveringLetterPaths.length > 0) {
+                    attachmentFiles.push(coveringLetterPaths[0]);
+                }
+                if (bgPo?.bgPo) {
+                    attachmentFiles.push(...this.toAttachmentPaths(bgPo.bgPo));
+                }
+
+                // Get recipient email - use Imran (Accounts Leader) as specified
+                // Fallback to lookup if configured, otherwise hardcode Imran
+                const toEmails: RecipientSource[] = [{ type: 'emails', emails: ['imran@volksenergie.in'] }];
+
+                // From: TE (requestedBy)
+                const fromUserId = paymentReq.requestedBy;
+
+                // Subject
+                const subject = `New Bank Guarantee - ${bgDetails?.bgPurpose || 'Financial security'}`;
+
+                // CC: Coordinator, CEO, Accounts, TL
+                const ccEmails: RecipientSource[] = [
+                    { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
+                    { type: 'emails', emails: ['goyal@volksenergie.in'] },
+                    { type: 'emails', emails: ['accounts@volksenergie.in'] },
+                    { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                ];
+
+                try {
+                    const result = await this.emailService.sendPaymentEmail({
+                        requestId: instrument.requestId,
+                        tenderId: paymentReq.tenderId || undefined,
+                        eventType: 'BG_REQUEST',
+                        fromUserId,
+                        subject,
+                        template: 'bg-request',
+                        data: {
+                            recipientName: 'Imran',
+                            bgPurpose: bgDetails?.bgPurpose || 'Financial security',
+                            beneficiaryName: bgDetails?.beneficiaryName || '',
+                            beneficiaryAddress: bgDetails?.beneficiaryAddress || '',
+                            bgExpiryDate: bgDetails?.bgExpiryDate ? this.formatDateDDMMYYYY(bgDetails.bgExpiryDate) : '',
+                            claimDate: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',
+                            amount: instrument.amount ? Number(instrument.amount).toLocaleString('en-IN') : '',
+                            stampPaperValue: bgDetails?.stampCharges || 300,
+                            timeLimit: instrument.courierDeadline || 24,
+                            actionLink: `${this.getFrontendUrl()}/bi-dashboard/bank-guarantee/action/${instrumentId}`,
+                            actionLinkText: 'Accounts Form (BG) Stage 2: After BG Creation',
+                            courierAddress: instrument.courierAddress || '',
+                        },
+                        to: toEmails,
+                        cc: ccEmails,
+                        attachments: {
+                            files: attachmentFiles,
+                        },
+                    });
+
+                    if (result.success) {
+                        this.logger.log(`BG request email sent successfully for instrument ${instrumentId} (logId: ${result.emailLogId})`);
+                    } else {
+                        this.logger.warn(`BG request email failed for instrument ${instrumentId}: ${result.error}`);
+                    }
+                } catch (error) {
+                    this.logger.error(`Failed to send BG request email for instrument ${instrumentId}:`, error);
+                }
+            } catch (error) {
+                this.logger.error(`Error processing BG request email for instrument ${instrumentId}:`, error);
+            }
         } else {
             this.logger.log(`Email not supported for instrument type: ${instrumentType}, Mode: ${mode}`);
         }
@@ -1524,7 +1705,6 @@ export class PaymentRequestsNotificationService {
                 continue;
             }
 
-
             const apiUrl = this.configService.get<string>('app.apiUrl') || '';
             const baseUrl = apiUrl.replace('/api/v1', '');
             const softCopyUrl = bg.bgDetails.bgSoftCopy
@@ -1565,29 +1745,985 @@ export class PaymentRequestsNotificationService {
                 .where(eq(users.email, 'imran@volksenergie.in'))
                 .limit(1);
 
-            this.logger.log(`Sending BG expiry reminder for BG #${bg.instrument.id}, ${daysUntilDue} days before expiry`);
+            this.logger.log(`Sending BG claim period notification for BG #${bg.instrument.id}`);
 
             try {
                 const result = await this.emailService.sendPaymentEmail({
                     requestId: bg.request.id,
                     tenderId: bg.request.tenderId || undefined,
-                    eventType: 'BG_EXPIRY_REMINDER',
+                    eventType: 'BG_CLAIM_PERIOD',
                     fromUserId: sender?.id || 33,
-                    subject: `BG Expiry Reminder - ${data.bg_no} (${data.days} days left)`,
-                    template: 'bg-expiry-reminder',
+                    subject: `BG Claim Period Notification - ${data.bg_no}`,
+                    template: 'bg-claim-period',
                     data,
                     to: [{ type: 'emails', emails: [user.email] }],
                     cc: ccSources,
                 });
 
                 if (result.success) {
-                    this.logger.log(`BG expiry reminder sent for BG #${bg.instrument.id} (logId: ${result.emailLogId})`);
+                    this.logger.log(`BG claim period notification sent for BG #${bg.instrument.id} (logId: ${result.emailLogId})`);
                 } else {
-                    this.logger.warn(`BG expiry reminder failed for BG #${bg.instrument.id}: ${result.error}`);
+                    this.logger.warn(`BG claim period notification failed for BG #${bg.instrument.id}: ${result.error}`);
                 }
             } catch (error) {
-                this.logger.error(`Failed to send BG expiry reminder for BG #${bg.instrument.id}:`, error);
+                this.logger.error(`Failed to send BG claim period notification for BG #${bg.instrument.id}:`, error);
             }
         }
     }
+
+    /**
+     * Send BG rejection email when Accounts Form 1 is rejected
+     */
+    async sendBgRejectedEmail(instrumentId: number): Promise<void> {
+        this.logger.log(`Sending BG rejection email for instrument ${instrumentId}`);
+
+        // Fetch instrument + payment request + BG details
+        const [instrument] = await this.db
+            .select()
+            .from(paymentInstruments)
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!instrument) {
+            this.logger.warn(`Instrument ${instrumentId} not found for BG rejection email`);
+            return;
+        }
+
+        const [paymentReq] = await this.db
+            .select({
+                requestedBy: paymentRequests.requestedBy,
+                tenderId: paymentRequests.tenderId,
+                purpose: paymentRequests.purpose,
+            })
+            .from(paymentRequests)
+            .where(eq(paymentRequests.id, instrument.requestId))
+            .limit(1);
+
+        if (!paymentReq?.requestedBy) {
+            this.logger.warn(`RequestedBy not found for BG instrument ${instrumentId}`);
+            return;
+        }
+
+        // Get TE name and email
+        const [teUser] = await this.db
+            .select({ name: users.name, email: users.email })
+            .from(users)
+            .where(eq(users.id, paymentReq.requestedBy))
+            .limit(1);
+
+        if (!teUser?.email) {
+            this.logger.warn(`TE email not found for BG instrument ${instrumentId}`);
+            return;
+        }
+
+        // Get tender team ID
+        let tenderTeamId = 1;
+        if (paymentReq.tenderId > 0) {
+            const tenderData = await this.db
+                .select({ team: tenderInfos.team })
+                .from(tenderInfos)
+                .where(eq(tenderInfos.id, paymentReq.tenderId))
+                .limit(1);
+            tenderTeamId = tenderData[0]?.team || 1;
+        }
+
+        // Get TL user
+        const [tlUser] = await this.db
+            .select({ name: users.name })
+            .from(users)
+            .where(
+                and(
+                    eq(users.team, tenderTeamId),
+                    eq(users.roleId, 3)
+                )
+            )
+            .limit(1);
+
+        // Get BG details for purpose
+        const [bgDetails] = await this.db
+            .select()
+            .from(instrumentBgDetails)
+            .where(eq(instrumentBgDetails.instrumentId, instrumentId))
+            .limit(1);
+
+        // Get CC emails
+        const ccEmails: RecipientSource[] = [
+            { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
+            { type: 'emails', emails: ['goyal@volksenergie.in'] },
+            { type: 'emails', emails: ['accounts@volksenergie.in'] },
+            { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+        ];
+
+        try {
+            const result = await this.emailService.sendPaymentEmail({
+                requestId: instrument.requestId,
+                tenderId: paymentReq.tenderId || undefined,
+                eventType: 'BG_REJECTED',
+                fromUserId: (await this.db.select({ id: users.id }).from(users).where(eq(users.email, 'imran@volksenergie.in')) as any)[0]?.id ?? 33,
+                subject: `Bank Guarantee rejected - ${bgDetails?.bgPurpose || 'Financial security'}`,
+                template: 'bg-rejected',
+                data: {
+                    teName: teUser.name || 'Tender Executive',
+                    reason: instrument.rejectionReason || '',
+                    purpose: bgDetails?.bgPurpose || 'Financial security',
+                },
+                to: [{ type: 'emails', emails: [teUser.email] }],
+                cc: ccEmails,
+            });
+
+            if (result.success) {
+                this.logger.log(`BG rejection email sent successfully for instrument ${instrumentId} (logId: ${result.emailLogId})`);
+            } else {
+                this.logger.warn(`BG rejection email failed for instrument ${instrumentId}: ${result.error}`);
+            }
+        } catch (error) {
+            this.logger.error(`Failed to send BG rejection email for instrument ${instrumentId}:`, error);
+        }
+    }
+
+    /**
+     * Send BG creation and couriered email when Accounts Form 2 is accepted
+     */
+    async sendBgCreatedCourieredEmail(instrumentId: number): Promise<void> {
+        this.logger.log(`Sending BG creation and couriered email for instrument ${instrumentId}`);
+
+        // Fetch instrument + payment request + BG details
+        const [instrument] = await this.db
+            .select()
+            .from(paymentInstruments)
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!instrument) {
+            this.logger.warn(`Instrument ${instrumentId} not found for BG creation couriered email`);
+            return;
+        }
+
+        const [paymentReq] = await this.db
+            .select({
+                requestedBy: paymentRequests.requestedBy,
+                tenderId: paymentRequests.tenderId,
+                purpose: paymentRequests.purpose,
+            })
+            .from(paymentRequests)
+            .where(eq(paymentRequests.id, instrument.requestId))
+            .limit(1);
+
+        if (!paymentReq?.requestedBy) {
+            this.logger.warn(`RequestedBy not found for BG instrument ${instrumentId}`);
+            return;
+        }
+
+        // Get TE name and email
+        const [teUser] = await this.db
+            .select({ name: users.name, email: users.email })
+            .from(users)
+            .where(eq(users.id, paymentReq.requestedBy))
+            .limit(1);
+
+        if (!teUser?.email) {
+            this.logger.warn(`TE email not found for BG instrument ${instrumentId}`);
+            return;
+        }
+
+        // Get tender team ID
+        let tenderTeamId = 1;
+        if (paymentReq.tenderId > 0) {
+            const tenderData = await this.db
+                .select({ team: tenderInfos.team })
+                .from(tenderInfos)
+                .where(eq(tenderInfos.id, paymentReq.tenderId))
+                .limit(1);
+            tenderTeamId = tenderData[0]?.team || 1;
+        }
+
+        // Get BG details for purpose and soft copy
+        const [bgDetails] = await this.db
+            .select()
+            .from(instrumentBgDetails)
+            .where(eq(instrumentBgDetails.instrumentId, instrumentId))
+            .limit(1);
+
+        // From: Imran (Accounts Leader)
+        const [sender] = await this.db
+            .select({ id: users.id })
+            .from(users)
+            .where(eq(users.email, 'imran@volksenergie.in'))
+            .limit(1);
+
+        // Get CC emails
+        const ccEmails: RecipientSource[] = [
+            { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
+            { type: 'emails', emails: ['goyal@volksenergie.in'] },
+            { type: 'emails', emails: ['accounts@volksenergie.in'] },
+            { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+        ];
+
+        try {
+            const result = await this.emailService.sendPaymentEmail({
+                requestId: instrument.requestId,
+                tenderId: paymentReq.tenderId || undefined,
+                eventType: 'BG_CREATED_COURIERED',
+                fromUserId: sender?.id ?? 33,
+                subject: `New BG created and Couriered - ${bgDetails?.bgPurpose || 'Financial security'}`,
+                template: 'bg-created-couriered',
+                data: {
+                    teName: teUser.name || 'Tender Executive',
+                    purpose: bgDetails?.bgPurpose || 'Financial security',
+                    courierNo: bgDetails?.courierNo || '',
+                    reasons: bgDetails?.bg2Remark || '',
+                },
+                to: [{ type: 'emails', emails: [teUser.email] }],
+                cc: ccEmails,
+                attachments: {
+                    files: this.toAttachmentPaths(bgDetails?.bgSoftCopy).map((p) =>
+                        p.startsWith('bi-dashboard/bank-guarantee/') ? p : `bi-dashboard/bank-guarantee/${p}`,
+                    ),
+                },
+            });
+
+            if (result.success) {
+                this.logger.log(`BG creation and couriered email sent successfully for instrument ${instrumentId} (logId: ${result.emailLogId})`);
+            } else {
+                this.logger.warn(`BG creation and couriered email failed for instrument ${instrumentId}: ${result.error}`);
+            }
+        } catch (error) {
+            this.logger.error(`Failed to send BG creation and couriered email for instrument ${instrumentId}:`, error);
+        }
+    }
+
+    async sendBgBankRequestEmail(instrumentId: number): Promise<void> {
+        try {
+            this.logger.log(`Preparing BG bank request email for instrument ${instrumentId}`);
+
+            // Fetch instrument + payment request + BG details
+            const [result] = await this.db
+                .select({
+                    instrument: paymentInstruments,
+                    request: paymentRequests,
+                    bgDetails: instrumentBgDetails,
+                })
+                .from(paymentInstruments)
+                .innerJoin(paymentRequests, eq(paymentInstruments.requestId, paymentRequests.id))
+                .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+                .where(eq(paymentInstruments.id, instrumentId))
+                .limit(1);
+
+            if (!result || !result.instrument) {
+                this.logger.warn(`BG bank request email skipped: instrument ${instrumentId} not found`);
+                return;
+            }
+
+            const { instrument, request, bgDetails } = result;
+
+            if (!bgDetails) {
+                this.logger.warn(`BG bank request email skipped: no BG details found for instrument ${instrumentId}`);
+                return;
+            }
+
+            // Resolve bank "To" mail ids
+            const bankMailIds = (bgDetails.bankMailIds || []).filter(
+                (email): email is string => typeof email === 'string' && email.trim().length > 0,
+            );
+
+            if (bankMailIds.length === 0) {
+                this.logger.warn(
+                    `BG bank request email skipped: no bank mail ids saved for instrument ${instrumentId}`,
+                );
+                return;
+            }
+
+            const toEmails: RecipientSource[] = [{ type: 'emails', emails: bankMailIds }];
+
+            // Resolve tender team for role-based CC recipients
+            const tenderTeamId = await this.getTenderTeamId(request.tenderId || 0, request.requestedBy || 0);
+
+            const ccSources: RecipientSource[] = [
+                { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
+                { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                { type: 'emails', emails: ['accounts@volksenergie.in'] },
+            ];
+
+            const bankMailIdsCc = (bgDetails.bankMailIdsCc || []).filter(
+                (email): email is string => typeof email === 'string' && email.trim().length > 0,
+            );
+
+            if (bankMailIdsCc.length > 0) {
+                ccSources.push({ type: 'emails', emails: bankMailIdsCc });
+            }
+
+            // Resolve attachments: prefilled & signed BG forms, PO copy/request letter, BG Format
+            // attachments.files expects plain path strings
+            const attachmentFiles: string[] = [];
+
+            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.prefilledSignedBg));
+            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.bgPo));
+            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.bgFormatTe || bgDetails.bgFormatTl));
+
+            // Resolve "From" as CEO; fall back to Imran, then hardcoded user id
+            let fromUserId: number;
+
+            const [ceoUser] = await this.db
+                .select({ id: users.id })
+                .from(users)
+                .where(eq(users.email, 'goyal@volksenergie.in'))
+                .limit(1);
+
+            if (ceoUser) {
+                fromUserId = ceoUser.id;
+            } else {
+                this.logger.warn('CEO user not found for BG bank request email, falling back to Imran');
+                const [imranUser] = await this.db
+                    .select({ id: users.id })
+                    .from(users)
+                    .where(eq(users.email, 'imran@volksenergie.in'))
+                    .limit(1);
+
+                fromUserId = imranUser ? imranUser.id : 33;
+            }
+
+            // Compose email content fields
+            const bgPurpose = bgDetails.bgPurpose || `Performance Bank Guarantee for ${request.projectName || ''}`;
+            const beneficiaryName = bgDetails.beneficiaryName || '';
+            const beneficiaryAddress = bgDetails.beneficiaryAddress || '';
+            const timeLimit = instrument.courierDeadline || 24;
+
+            await this.emailService.sendPaymentEmail({
+                requestId: instrument.requestId,
+                tenderId: request.tenderId || undefined,
+                eventType: 'BG_BANK_REQUEST',
+                template: 'bg-accepted',
+                subject: `New Bank Guarantee required in ${timeLimit}Hrs.`,
+                fromUserId,
+                to: toEmails,
+                cc: ccSources,
+                data: {
+                    bgPurpose,
+                    beneficiaryName,
+                    beneficiaryAddress,
+                    bgExpiryDate: this.formatDateDDMMYYYY(bgDetails.bgExpiryDate),
+                    claimDate: this.formatDateDDMMYYYY(bgDetails.bgClaim),
+                    amount: (Number(instrument.amount) || 0).toLocaleString('en-IN'),
+                    stampPaperValue: (Number(bgDetails.stampCharges) || 300).toLocaleString('en-IN'),
+                    fdrMargin: bgDetails.fdrPer ? `${bgDetails.fdrPer}%` : '10%/100%',
+                    beneName: bgDetails.bgBankAccName || '',
+                    beneAcc: bgDetails.bgBankAcc || '',
+                    beneIfsc: bgDetails.bgBankIfsc || '',
+                    timeLimit,
+                },
+                attachments: { files: attachmentFiles },
+            });
+
+            this.logger.log(
+                `BG bank request email sent for instrument ${instrumentId} to ${bankMailIds.join(', ')}`,
+            );
+        } catch (error) {
+            this.logger.error(`Failed to send BG bank request email for instrument ${instrumentId}:`, error);
+            throw error;
+        }
+    }
+
+    
+    async sendBgCancellationRequestEmail(instrumentId: number): Promise<void> {
+        try {
+            this.logger.log(`Preparing BG cancellation request email for instrument ${instrumentId}`);
+
+            // Fetch instrument + payment request + BG details
+            const [result] = await this.db
+                .select({
+                    instrument: paymentInstruments,
+                    request: paymentRequests,
+                    bgDetails: instrumentBgDetails,
+                })
+                .from(paymentInstruments)
+                .innerJoin(paymentRequests, eq(paymentInstruments.requestId, paymentRequests.id))
+                .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+                .where(eq(paymentInstruments.id, instrumentId))
+                .limit(1);
+
+            if (!result || !result.instrument) {
+                this.logger.warn(`BG cancellation request email skipped: instrument ${instrumentId} not found`);
+                return;
+            }
+
+            const { instrument, request, bgDetails } = result;
+
+            if (!bgDetails) {
+                this.logger.warn(
+                    `BG cancellation request email skipped: no BG details found for instrument ${instrumentId}`,
+                );
+                return;
+            }
+
+            // Resolve bank "To" mail ids (saved at Form 1 time; YES Bank or PNB depending on the BG)
+            const bankMailIds = (bgDetails.bankMailIds || []).filter(
+                (email): email is string => typeof email === 'string' && email.trim().length > 0,
+            );
+
+            if (bankMailIds.length === 0) {
+                this.logger.warn(
+                    `BG cancellation request email skipped: no bank mail ids saved for instrument ${instrumentId}`,
+                );
+                return;
+            }
+
+            const toEmails: RecipientSource[] = [{ type: 'emails', emails: bankMailIds }];
+
+            // Resolve tender team for role-based CC recipients
+            const tenderTeamId = await this.getTenderTeamId(request.tenderId || 0, request.requestedBy || 0);
+
+            const ccSources: RecipientSource[] = [
+                { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
+                { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                { type: 'emails', emails: ['accounts@volksenergie.in'] },
+            ];
+
+            const bankMailIdsCc = (bgDetails.bankMailIdsCc || []).filter(
+                (email): email is string => typeof email === 'string' && email.trim().length > 0,
+            );
+
+            if (bankMailIdsCc.length > 0) {
+                ccSources.push({ type: 'emails', emails: bankMailIdsCc });
+            }
+
+            // Compose shared content fields (raw en-IN formatted numbers; templates carry the "Rs." prefix)
+            const bgNo = bgDetails.bgNo || '';
+            const fdrNo = bgDetails.fdrNo || '';
+            const bgDate = this.formatDateDDMMYYYY(bgDetails.bgDate);
+            const amount = (Number(instrument.amount) || 0).toLocaleString('en-IN');
+            const fdrAmt = bgDetails.fdrAmt ? (Number(bgDetails.fdrAmt) || 0).toLocaleString('en-IN') : '';
+            const bgFavour = bgDetails.beneficiaryName || instrument.favouring || '';
+            const bankName = bgDetails.extendedBankName || bgDetails.bankName || '';
+
+            // Generate the "Request Letter on VE Letterhead" PDF (template: req-cancel-letter)
+            let requestLetterPath: string | null = null;
+            try {
+                const letterPaths = await this.pdfGenerator.generatePdfs(
+                    'reqCancelLetter',
+                    {
+                        bank_name: bankName,
+                        bg_no: bgNo,
+                        bg_date: bgDate,
+                        bg_favour: bgFavour,
+                        bg_amt: amount,
+                        fdr_no: fdrNo,
+                        fdr_amt: fdrAmt,
+                    },
+                    instrumentId,
+                    'BG',
+                );
+
+                if (letterPaths && letterPaths.length > 0) {
+                    requestLetterPath = letterPaths[0];
+                }
+            } catch (error) {
+                this.logger.error(
+                    `Failed to generate cancellation request letter PDF for instrument ${instrumentId}:`,
+                    error,
+                );
+            }
+
+            // Attachments: request letter (generated), client covering letter, BG soft copy, FDR soft copy
+            const attachmentFiles: string[] = [];
+
+            if (requestLetterPath) {
+                attachmentFiles.push(requestLetterPath);
+            }
+
+            const coveringLetter = bgDetails.stampCoveringLetter || instrument.coveringLetter;
+            attachmentFiles.push(...this.toAttachmentPaths(coveringLetter));
+
+            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.bgSoftCopy));
+            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.fdrCopy));
+
+            // Resolve "From" as CEO; fall back to Imran, then hardcoded user id
+            let fromUserId: number;
+
+            const [ceoUser] = await this.db
+                .select({ id: users.id })
+                .from(users)
+                .where(eq(users.email, 'goyal@volksenergie.in'))
+                .limit(1);
+
+            if (ceoUser) {
+                fromUserId = ceoUser.id;
+            } else {
+                this.logger.warn('CEO user not found for BG cancellation request email, falling back to Imran');
+                const [imranUser] = await this.db
+                    .select({ id: users.id })
+                    .from(users)
+                    .where(eq(users.email, 'imran@volksenergie.in'))
+                    .limit(1);
+
+                fromUserId = imranUser ? imranUser.id : 33;
+            }
+
+            await this.emailService.sendPaymentEmail({
+                requestId: instrument.requestId,
+                tenderId: request.tenderId || undefined,
+                eventType: 'BG_CANCELLATION_REQUEST',
+                template: 'bg-cancellation-request',
+                subject: `Cancellation for BG No. ${bgNo} and FDR No. ${fdrNo}`,
+                fromUserId,
+                to: toEmails,
+                cc: ccSources,
+                data: {
+                    bgNo,
+                    bgDate,
+                    amount,
+                    bgFavour,
+                    fdrNo,
+                    fdrAmt,
+                },
+                attachments: { files: attachmentFiles },
+            });
+
+            this.logger.log(
+                `BG cancellation request email sent for instrument ${instrumentId} to ${bankMailIds.join(', ')}`,
+            );
+        } catch (error) {
+            this.logger.error(`Failed to send BG cancellation request email for instrument ${instrumentId}:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Send BG extension/modification request email to the bank representative when
+     * the request-extension step is submitted (client request letter/email uploaded).
+     * From: CEO. To: saved bankMailIds. CC: Coordinator, TL, accounts, bankMailIdsCc.
+     * Attaches the generated request letter (VE letterhead), the client request
+     * letter/email, the BG soft copy and the FDR soft copy.
+     */
+    async sendBgExtensionRequestEmail(instrumentId: number): Promise<void> {
+        try {
+            this.logger.log(`Preparing BG extension request email for instrument ${instrumentId}`);
+
+            // Fetch instrument + payment request + BG details
+            const [result] = await this.db
+                .select({
+                    instrument: paymentInstruments,
+                    request: paymentRequests,
+                    bgDetails: instrumentBgDetails,
+                })
+                .from(paymentInstruments)
+                .innerJoin(paymentRequests, eq(paymentInstruments.requestId, paymentRequests.id))
+                .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+                .where(eq(paymentInstruments.id, instrumentId))
+                .limit(1);
+
+            if (!result || !result.instrument) {
+                this.logger.warn(`BG extension request email skipped: instrument ${instrumentId} not found`);
+                return;
+            }
+
+            const { instrument, request, bgDetails } = result;
+
+            if (!bgDetails) {
+                this.logger.warn(`BG extension request email skipped: no BG details found for instrument ${instrumentId}`);
+                return;
+            }
+
+            // Resolve bank "To" mail ids (saved at Form 1 time; YES Bank or PNB depending on the BG)
+            const bankMailIds = (bgDetails.bankMailIds || []).filter(
+                (email): email is string => typeof email === 'string' && email.trim().length > 0,
+            );
+
+            if (bankMailIds.length === 0) {
+                this.logger.warn(
+                    `BG extension request email skipped: no bank mail ids saved for instrument ${instrumentId}`,
+                );
+                return;
+            }
+
+            const toEmails: RecipientSource[] = [{ type: 'emails', emails: bankMailIds }];
+
+            // Resolve tender team for role-based CC recipients
+            const tenderTeamId = await this.getTenderTeamId(request.tenderId || 0, request.requestedBy || 0);
+
+            const ccSources: RecipientSource[] = [
+                { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
+                { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                { type: 'emails', emails: ['accounts@volksenergie.in'] },
+            ];
+
+            const bankMailIdsCc = (bgDetails.bankMailIdsCc || []).filter(
+                (email): email is string => typeof email === 'string' && email.trim().length > 0,
+            );
+
+            if (bankMailIdsCc.length > 0) {
+                ccSources.push({ type: 'emails', emails: bankMailIdsCc });
+            }
+
+            // Compose shared content fields (raw en-IN numbers; email body lines carry the "Rs." prefix)
+            const bgNo = bgDetails.bgNo || '';
+            const bgDate = this.formatDateDDMMYYYY(bgDetails.bgDate);
+            const amount = (Number(instrument.amount) || 0).toLocaleString('en-IN');
+            const bgFavour = bgDetails.beneficiaryName || instrument.favouring || '';
+            const bgExpiryDate = this.formatDateDDMMYYYY(bgDetails.bgExpiryDate);
+            const bgClaimDate = this.formatDateDDMMYYYY(bgDetails.bgClaim);
+            const bankName = bgDetails.bankName || '';
+
+            // Table cells have no "Rs." prefix in the template, so pass full strings ('' when absent)
+            const moneyRs = (value: any): string =>
+                value === null || value === undefined || value === ''
+                    ? ''
+                    : `Rs. ${(Number(value) || 0).toLocaleString('en-IN')}`;
+            // The letter PDF prefixes "Rs." on list lines only, so table values there stay raw
+            const moneyRaw = (value: any): string =>
+                value === null || value === undefined || value === '' ? '' : (Number(value) || 0).toLocaleString('en-IN');
+
+            const stampChargeDeducted = moneyRs(bgDetails.stampChargesDeducted);
+            const newStampChargeDeducted = moneyRs(bgDetails.newStampChargeDeducted);
+            const newBeneficiaryName = bgDetails.extendedBankName || '';
+            const newAmount = moneyRs(bgDetails.extendedAmount);
+            const newExpiryDate = this.formatDateDDMMYYYY(bgDetails.extendedValidityDate);
+            const newClaimDate = this.formatDateDDMMYYYY(bgDetails.extendedClaimExpiryDate);
+
+            // Generate the "Request Letter on VE Letterhead" PDF (template: req-ext-letter)
+            let requestLetterPath: string | null = null;
+            try {
+                const letterPaths = await this.pdfGenerator.generatePdfs(
+                    'reqExtLetter',
+                    {
+                        bank_name: bankName,
+                        bg_no: bgNo,
+                        bg_date: bgDate,
+                        bg_favour: bgFavour,
+                        bg_amt: amount,
+                        stamp_charge_deducted: moneyRaw(bgDetails.stampChargesDeducted),
+                        new_stamp_charge_deducted: moneyRaw(bgDetails.newStampChargeDeducted),
+                        new_bg_bank_name: newBeneficiaryName,
+                        new_bg_amt: moneyRaw(bgDetails.extendedAmount),
+                        bg_expiry: bgExpiryDate,
+                        new_bg_expiry: newExpiryDate,
+                        bg_claim: bgClaimDate,
+                        new_bg_claim: newClaimDate,
+                    },
+                    instrumentId,
+                    'BG',
+                );
+
+                if (letterPaths && letterPaths.length > 0) {
+                    requestLetterPath = letterPaths[0];
+                }
+            } catch (error) {
+                this.logger.error(
+                    `Failed to generate extension request letter PDF for instrument ${instrumentId}:`,
+                    error,
+                );
+            }
+
+            // Attachments: request letter (generated), client request letter/email, BG soft copy, FDR soft copy
+            const attachmentFiles: string[] = [];
+
+            if (requestLetterPath) {
+                attachmentFiles.push(requestLetterPath);
+            }
+
+            if (bgDetails.extensionLetterPath) {
+                attachmentFiles.push(...this.toAttachmentPaths(bgDetails.extensionLetterPath));
+            }
+
+            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.bgSoftCopy));
+            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.fdrCopy));
+
+            // Resolve "From" as CEO; fall back to Imran, then hardcoded user id
+            let fromUserId: number;
+
+            const [ceoUser] = await this.db
+                .select({ id: users.id })
+                .from(users)
+                .where(eq(users.email, 'goyal@volksenergie.in'))
+                .limit(1);
+
+            if (ceoUser) {
+                fromUserId = ceoUser.id;
+            } else {
+                this.logger.warn('CEO user not found for BG extension request email, falling back to Imran');
+                const [imranUser] = await this.db
+                    .select({ id: users.id })
+                    .from(users)
+                    .where(eq(users.email, 'imran@volksenergie.in'))
+                    .limit(1);
+
+                fromUserId = imranUser ? imranUser.id : 33;
+            }
+
+            await this.emailService.sendPaymentEmail({
+                requestId: instrument.requestId,
+                tenderId: request.tenderId || undefined,
+                eventType: 'BG_EXTENSION_REQUEST',
+                template: 'bg-extension-request',
+                subject: `Extension/Modification of BG No. ${bgNo}`,
+                fromUserId,
+                to: toEmails,
+                cc: ccSources,
+                data: {
+                    bgNo,
+                    bgDate,
+                    amount,
+                    bgFavour,
+                    bgExpiryDate,
+                    bgClaimDate,
+                    stampChargeDeducted,
+                    newStampChargeDeducted,
+                    newBeneficiaryName,
+                    newAmount,
+                    newExpiryDate,
+                    newClaimDate,
+                },
+                attachments: { files: attachmentFiles },
+            });
+
+            this.logger.log(
+                `BG extension request email sent for instrument ${instrumentId} to ${bankMailIds.join(', ')}`,
+            );
+        } catch (error) {
+            this.logger.error(`Failed to send BG extension request email for instrument ${instrumentId}:`, error);
+            throw error;
+        }
+    }
+
+    async sendBgSubmittedEmail(instrumentId: number): Promise<void> {
+        try {
+            this.logger.log(`Preparing BG submitted email for instrument ${instrumentId}`);
+
+            const [result] = await this.db
+                .select({
+                    instrument: paymentInstruments,
+                    request: paymentRequests,
+                    bgDetails: instrumentBgDetails,
+                })
+                .from(paymentInstruments)
+                .innerJoin(paymentRequests, eq(paymentInstruments.requestId, paymentRequests.id))
+                .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+                .where(eq(paymentInstruments.id, instrumentId))
+                .limit(1);
+
+            if (!result || !result.instrument) {
+                this.logger.warn(`BG submitted email skipped: instrument ${instrumentId} not found`);
+                return;
+            }
+
+            const { instrument, request, bgDetails } = result;
+
+            if (!bgDetails) {
+                this.logger.warn(`BG submitted email skipped: no BG details found for instrument ${instrumentId}`);
+                return;
+            }
+
+            if (!request.requestedBy) {
+                this.logger.warn(`BG submitted email skipped: requestedBy not found for instrument ${instrumentId}`);
+                return;
+            }
+
+            const clientEmail = bgDetails.bgClientUser;
+
+            if (!clientEmail) {
+                this.logger.warn(
+                    `BG submitted email skipped: no client/department mail id (bgClientUser) saved for instrument ${instrumentId}`,
+                );
+                return;
+            }
+
+            const toEmails: RecipientSource[] = [{ type: 'emails', emails: [clientEmail] }];
+
+            const tenderTeamId = await this.getTenderTeamId(request.tenderId || 0, request.requestedBy);
+
+            const [teUser] = await this.db
+                .select({ email: users.email })
+                .from(users)
+                .where(eq(users.id, request.requestedBy))
+                .limit(1);
+
+            const ccSources: RecipientSource[] = [
+                { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
+                { type: 'emails', emails: ['goyal@volksenergie.in'] },
+                { type: 'emails', emails: ['accounts@volksenergie.in'] },
+                { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+            ];
+
+            if (teUser?.email) {
+                ccSources.push({ type: 'emails', emails: [teUser.email] });
+            }
+
+            const attachmentFiles: string[] = [];
+            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.bgSoftCopy));
+            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.sfmsConf));
+
+            const [imranUser] = await this.db
+                .select({ id: users.id })
+                .from(users)
+                .where(eq(users.email, 'imran@volksenergie.in'))
+                .limit(1);
+
+            const fromUserId = imranUser ? imranUser.id : 33;
+
+            const purpose = bgDetails.bgPurpose || request.purpose || 'Financial security';
+
+            const tenderDate = ''; // no confirmed schema field for WO/Tender Date
+
+            const mailResult = await this.emailService.sendPaymentEmail({
+                requestId: instrument.requestId,
+                tenderId: request.tenderId || undefined,
+                eventType: 'BG_SUBMITTED',
+                template: 'bg-fdr',
+                subject: `Bank Guarantee submitted - ${request.tenderNo || 'N/A'} against ${purpose}`,
+                fromUserId,
+                to: toEmails,
+                cc: ccSources,
+                data: {
+                    tenderNo: request.tenderNo || 'N/A',
+                    tenderDate,
+                    bgNo: bgDetails.bgNo || '',
+                    bgExpiryDate: this.formatDateDDMMYYYY(bgDetails.bgExpiryDate),
+                    bgClaimDate: this.formatDateDDMMYYYY(bgDetails.bgClaim),
+                    beneficiaryName: instrument.favouring || bgDetails.beneficiaryName || '',
+                    amount: (Number(instrument.amount) || 0).toLocaleString('en-IN'),
+                    stampPaperValue: (Number(bgDetails.stampCharges) || 0).toLocaleString('en-IN'),
+                },
+                attachments: { files: attachmentFiles },
+            });
+
+            if (mailResult.success) {
+                this.logger.log(`BG submitted email sent for instrument ${instrumentId} to ${clientEmail} (logId: ${mailResult.emailLogId})`);
+            } else {
+                this.logger.warn(
+                    `BG submitted email failed for instrument ${instrumentId} to ${clientEmail}: ${mailResult.error}`,
+                );
+            }
+        } catch (error) {
+            this.logger.error(`Failed to send BG submitted email for instrument ${instrumentId}:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Send BG follow-up release email when initiate-followup action is taken
+     */
+    async sendBgFollowupReleaseEmail(instrumentId: number, clientEmails: string[], clientName: string): Promise<void> {
+        this.logger.log(`Sending BG follow-up release email for instrument ${instrumentId}`);
+
+        // Fetch instrument + payment request + BG details
+        const [instrument] = await this.db
+            .select()
+            .from(paymentInstruments)
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!instrument) {
+            this.logger.warn(`Instrument ${instrumentId} not found for BG follow-up release email`);
+            return;
+        }
+
+        const [paymentReq] = await this.db
+            .select({
+                requestedBy: paymentRequests.requestedBy,
+                tenderId: paymentRequests.tenderId,
+                purpose: paymentRequests.purpose,
+            })
+            .from(paymentRequests)
+            .where(eq(paymentRequests.id, instrument.requestId))
+            .limit(1);
+
+        if (!paymentReq?.requestedBy) {
+            this.logger.warn(`RequestedBy not found for BG instrument ${instrumentId}`);
+            return;
+        }
+
+        // Get TE name and email
+        const [teUser] = await this.db
+            .select({ name: users.name, email: users.email })
+            .from(users)
+            .where(eq(users.id, paymentReq.requestedBy))
+            .limit(1);
+
+        if (!teUser?.email) {
+            this.logger.warn(`TE email not found for BG instrument ${instrumentId}`);
+            return;
+        }
+
+        // Get tender team ID
+        let tenderTeamId = 1;
+        if (paymentReq.tenderId > 0) {
+            const tenderData = await this.db
+                .select({ team: tenderInfos.team })
+                .from(tenderInfos)
+                .where(eq(tenderInfos.id, paymentReq.tenderId))
+                .limit(1);
+            tenderTeamId = tenderData[0]?.team || 1;
+        }
+
+        // Status mapping from BG_STATUSES
+        const statusMap: Record<string, string> = {
+            [BG_STATUSES.PENDING]: 'Pending',
+            [BG_STATUSES.ACCOUNTS_FORM_ACCEPTED]: 'Accepted',
+            [BG_STATUSES.ACCOUNTS_FORM_REJECTED]: 'Rejected',
+            [BG_STATUSES.BG_CREATED]: 'Created',
+            [BG_STATUSES.FDR_DETAILS_CAPTURED]: 'FDR Details Captured',
+            [BG_STATUSES.FOLLOWUP_INITIATED]: 'Followup Initiated',
+            [BG_STATUSES.EXTENSION_REQUESTED]: 'Extension Requested',
+            [BG_STATUSES.RETURN_VIA_COURIER]: 'Courier Returned',
+            [BG_STATUSES.CANCELLATION_REQUESTED]: 'Cancellation Request',
+            [BG_STATUSES.BG_CANCELLATION_CONFIRMED]: 'Cancelled at Branch',
+            [BG_STATUSES.FDR_CANCELLED_CONFIRMED]: 'FDR Cancellation Confirmed',
+        };
+        const statusLabel = statusMap[instrument.status] || instrument.status || '';
+
+        // Tender no / name from tender infos
+        const [tender] = await this.db
+            .select({ tenderNo: tenderInfos.tenderNo, tenderName: tenderInfos.tenderName })
+            .from(tenderInfos)
+            .where(eq(tenderInfos.id, paymentReq.tenderId))
+            .limit(1);
+
+        // BG details
+        const [bgDetails] = await this.db
+            .select()
+            .from(instrumentBgDetails)
+            .where(eq(instrumentBgDetails.instrumentId, instrumentId))
+            .limit(1);
+
+        // Compose email data
+        const data = {
+            clientName,
+            tenderNo: tender?.tenderNo || '',
+            tenderName: tender?.tenderName || '',
+            status: statusLabel,
+            amount: (Number(instrument.amount) || 0).toLocaleString('en-IN'),
+            bgNo: bgDetails?.bgNo || '',
+            bgValidity: bgDetails?.bgExpiryDate ? this.formatDateDDMMYYYY(bgDetails.bgExpiryDate) : '',
+            bgClaimPeriod: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',
+            bgFavor: bgDetails?.beneficiaryName || instrument.favouring || '',
+        };
+
+        try {
+            const result = await this.emailService.sendPaymentEmail({
+                requestId: instrument.requestId,
+                tenderId: paymentReq.tenderId || undefined,
+                eventType: 'BG_FOLLOWUP_RELEASE',
+                fromUserId: (await this.db.select({ id: users.id }).from(users).where(eq(users.email, 'imran@volksenergie.in')) as any)[0]?.id ?? 33,
+                subject: `Bank Guarantee No. - ${bgDetails?.bgNo || ''} - ${statusLabel} - ${tender?.tenderNo || ''} against ${bgDetails?.bgPurpose || paymentReq.purpose || ''}`,
+                template: 'bg-followup-release',
+                data,
+                to: [{ type: 'emails', emails: clientEmails }],
+                cc: [
+                    { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
+                    { type: 'emails', emails: ['goyal@volksenergie.in'] },
+                    { type: 'emails', emails: ['accounts@volksenergie.in'] },
+                    { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                    { type: 'emails', emails: [teUser.email] },
+                ],
+            });
+
+            if (result.success) {
+                this.logger.log(`BG follow-up release email sent successfully for instrument ${instrumentId} (logId: ${result.emailLogId})`);
+            } else {
+                this.logger.warn(`BG follow-up release email failed for instrument ${instrumentId}: ${result.error}`);
+            }
+        } catch (error) {
+            this.logger.error(`Failed to send BG follow-up release email for instrument ${instrumentId}:`, error);
+        }
+    }
 }
+

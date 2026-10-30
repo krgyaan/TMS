@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .logo { width: 80px; height: auto; margin: 0 auto 10px; }
+        .address { font-size: 12px; margin: 5px 0; }
+        .subject { font-weight: bold; font-size: 14px; text-align: center; margin: 20px 0; }
+        .details { margin: 15px 0; }
+        .details p { margin: 5px 0; }
+        .enclosure { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <img src="data:image/png;base64,{{logoBase64}}" alt="Volks Energie Logo" class="logo">
+        <div class="address">Volks Energie Pvt. Ltd.</div>
+        <div class="address">[[addressLine1]]</div>
+        <div class="address">[[addressLine2]] [[city]], [[state]] - [[pincode]]</div>
+        <div class="address">Phone: [[phone]] | Email: [[email]] | Web: [[web]]</div>
+    </div>
+
+    <p><strong>Date:</strong> {{date}}</p>
+
+    <p><strong>Subject:</strong> Request for issuance of Bank Guarantee in favour of {{beneficiaryName}}</p>
+
+    <p>Dear Sir/Madam,</p>
+
+    <p>We request you to please issue a Bank Guarantee as per the details mentioned below:</p>
+
+    <div class="details">
+        <p><strong>1. BG in favour:</strong> {{beneficiaryName}}</p>
+        <p><strong>2. Beneficiary address:</strong> {{beneficiaryAddress}}</p>
+        <p><strong>3. BG amount:</strong> Rs. {{amount}}</p>
+        <p><strong>4. BG validity:</strong> {{validityDate}}</p>
+        <p><strong>5. Claim period expiry:</strong> {{claimExpiryDate}}</p>
+        <p><strong>6. Purpose / Project:</strong> {{purpose}}</p>
+    </div>
+
+    <p>Kindly courier the BG to our office at the address given below along with the FDR / stamp paper formalities:</p>
+
+    <p><strong>Courier Address:</strong> {{courierAddress}}</p>
+
+    <p>For Volks Energie Pvt. Ltd.,</p>
+
+    <div style="margin-top: 40px;">
+        <p>______________________</p>
+        <p><strong>{{teamLeaderName}}</strong></p>
+        <p>(Team Leader - Authorised Signatory)</p>
+    </div>
+
+    <div class="enclosure">
+        <p>Encl: PO copy / request letter from beneficiary</p>
+    </div>
+</body>
+</html>
