@@ -138,6 +138,10 @@ class PurchaseOrderApiService extends BaseApiService {
         return this.get(`/${id}/pdf/versions`);
     }
 
+    async retryPdfGeneration(id: number): Promise<{ status: "generated" | "unchanged"; version?: string }> {
+        return this.post(`/${id}/pdf/retry`, {});
+    }
+
     async deletePdfVersion(id: number, version: string): Promise<void> {
         return this.delete(`/${id}/pdf/versions/${encodeURIComponent(version)}`);
     }

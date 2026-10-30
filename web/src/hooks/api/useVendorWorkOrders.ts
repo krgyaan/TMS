@@ -77,3 +77,14 @@ export function useUpdateVendorWorkOrder() {
         },
     });
 }
+
+export function useRetryVendorWorkOrderPdf() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (id: number) => vendorWorkOrderApi.retryPdfGeneration(id),
+        onSuccess: (_data, id) => {
+            queryClient.invalidateQueries({ queryKey: ["vendor-work-order", id] });
+            queryClient.invalidateQueries({ queryKey: ["vendor-work-orders", id] });
+        },
+    });
+}

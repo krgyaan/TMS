@@ -103,6 +103,17 @@ export const usePurchaseOrderDetails = (id: number) => {
     });
 };
 
+export const useRetryPurchaseOrderPdf = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (id: number) => purchaseOrderApi.retryPdfGeneration(id),
+        onSuccess: (_data, id) => {
+            queryClient.invalidateQueries({ queryKey: ["purchase-order", id] });
+            queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.purchaseOrder(id) });
+        },
+    });
+};
+
 export const useCreatePurchaseOrder = () => {
     const queryClient = useQueryClient();
     return useMutation({

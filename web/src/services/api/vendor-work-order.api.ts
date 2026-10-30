@@ -90,6 +90,10 @@ class VendorWorkOrderApiService extends BaseApiService {
         return this.get<Record<string, { path: string; hash: string }>>(`/${id}/pdf/versions`);
     }
 
+    async retryPdfGeneration(id: number): Promise<{ status: "generated" | "unchanged"; version?: string }> {
+        return this.post(`/${id}/pdf/retry`, {});
+    }
+
     async deletePdfVersion(id: number, version: string) {
         return this.delete<{ path: string; hash: string }>(`/${id}/pdf/versions/${encodeURIComponent(version)}`);
     }

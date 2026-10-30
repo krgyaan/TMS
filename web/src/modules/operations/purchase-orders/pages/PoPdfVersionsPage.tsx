@@ -1,8 +1,11 @@
 import React, { useMemo, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Download, FileText, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, FileText, RefreshCw, Trash2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { purchaseOrderApi } from "@/services/api/purchase-order.api";
+import { useRetryPurchaseOrderPdf } from "@/hooks/api/usePurchaseOrders";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { paths } from "@/app/routes/paths";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,6 +44,9 @@ const PoPdfVersionsPage: React.FC = () => {
     const queryClient = useQueryClient();
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [previewLabel, setPreviewLabel] = useState<string | null>(null);
+    const { user } = useAuth();
+    const retryPdfMutation = useRetryPurchaseOrderPdf();
+    const canRetryPdf = user?.id === 13;
 
     const poNum = Number(poId);
 
@@ -88,6 +94,19 @@ const PoPdfVersionsPage: React.FC = () => {
         [poNum, queryClient, previewLabel],
     );
 
+    const handleRetryPdf = async () => {
+        try {
+            const result = await retryPdfMutation.mutateAsync(poNum);
+            toast.success(
+                result.status === "generated"
+                    ? "Purchase Order PDF generated."
+                    : "The latest Purchase Order PDF is already current.",
+            );
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Failed to generate Purchase Order PDF");
+        }
+    };
+
     const poNumber = poData?.poNumber ?? `PO #${poId}`;
 
     return (
@@ -102,16 +121,29 @@ const PoPdfVersionsPage: React.FC = () => {
                         Select a version to preview, or download directly.
                     </CardDescription>
                 </div>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() =>
-                        navigate(paths.operations.projectDashboard(Number(projectId)))
-                    }
-                >
-                    <ArrowLeft className="mr-1 h-4 w-4" />
-                    Back
-                </Button>
+                <div className="flex items-center gap-2">
+                    {canRetryPdf && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleRetryPdf}
+                            disabled={retryPdfMutation.isPending}
+                        >
+                            <RefreshCw className={`mr-1 h-4 w-4 ${retryPdfMutation.isPending ? "animate-spin" : ""}`} />
+                            {retryPdfMutation.isPending ? "Generating..." : "Generate / Retry PDF"}
+                        </Button>
+                    )}
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                            navigate(paths.operations.projectDashboard(Number(projectId)))
+                        }
+                    >
+                        <ArrowLeft className="mr-1 h-4 w-4" />
+                        Back
+                    </Button>
+                </div>
             </CardHeader>
 
             {/* Main content: sidebar + preview */}
