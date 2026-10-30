@@ -101,7 +101,7 @@
     <div class="page">
 
         <div style="position:relative;min-height:30mm;">
-            <div style="text-align:center;font-size:12px;font-weight:bold;padding-bottom:5mm;">Tax Invoice - {{invoice_number}}</div>
+            <div style="text-align:center;font-size:12px;font-weight:bold;padding-bottom:5mm;">Tax Invoice</div>
 
             {{#if qr_code_base64}}
             <div style="position:absolute;top:0;right:0;width:28mm;height:28mm;">
@@ -232,34 +232,34 @@
                             <tr>
                                 <td colspan="2">
                                     <b>{{buyer_name}}</b><br>
-                                    <pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;margin:0;">{{buyer_address}}</pre>
+                                    <pre
+                                        style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;margin:0;">{{buyer_address}}</pre>
                                     {{#if buyer_pin}}Pin Code: {{buyer_pin}}<br>{{/if}}
                                     GSTIN/UIN: {{buyer_gst}}<br>
                                     PAN/IT No: {{buyer_pan}}<br>
                                     State Name: {{buyer_state}}<br>
-                                    Place of Supply: {{buyer_place_of_supply}}<br>
                                     Contact Person: {{buyer_contact_person}}<br>
                                     Phone No: {{buyer_phone}}
                                 </td>
                                 <td colspan="2">
                                     <b>{{consignee_name}}</b><br>
-                                    <pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;margin:0;">{{consignee_address}}</pre>
+                                    <pre
+                                        style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;margin:0;">{{consignee_address}}</pre>
                                     {{#if consignee_pin}}Pin Code: {{consignee_pin}}<br>{{/if}}
                                     GSTIN/UIN: {{consignee_gst}}<br>
                                     PAN/IT No: {{consignee_pan}}<br>
                                     State Name: {{consignee_state}}<br>
-                                    Place of Supply: {{consignee_place_of_supply}}<br>
                                     Contact Person: {{consignee_contact_person}}<br>
                                     Phone No: {{consignee_phone}}
                                 </td>
                                 <td colspan="2">
                                     <b>{{dispatch_from_name}}</b><br>
-                                    <pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;margin:0;">{{dispatch_address}}</pre>
+                                    <pre
+                                        style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;margin:0;">{{dispatch_address}}</pre>
                                     {{#if dispatch_pin}}Pin Code: {{dispatch_pin}}<br>{{/if}}
                                     GSTIN/UIN: {{dispatch_gst}}<br>
                                     PAN/IT No: {{dispatch_pan}}<br>
                                     State Name: {{dispatch_state}}<br>
-                                    Place of Supply: {{dispatch_state}}<br>
                                     Contact Person: {{dispatch_contact_person}}<br>
                                     Phone No: {{dispatch_phone}}
                                 </td>
@@ -421,7 +421,8 @@
                                     <td colspan="{{#if is_interstate}}10{{else}}11{{/if}}">
                                         Amount Chargeable (in words): <b>{{amount_in_words}}</b>
                                     </td>
-                                    <td style="text-align:right;" colspan="{{#if is_interstate}}1{{else}}2{{/if}}">E &amp; O.E.</td>
+                                    <td style="text-align:right;" colspan="{{#if is_interstate}}1{{else}}2{{/if}}">E
+                                        &amp; O.E.</td>
                                 </tr>
                             </table>
 
@@ -446,9 +447,12 @@
                                 <tr>
                                     <td style="text-align:right;">{{rate}}%</td>
                                     <td style="text-align:right;">{{formatCurrency taxable_value}}</td>
-                                    <td style="text-align:right;">{{#if ../is_interstate}}{{formatCurrency igst_amount}}{{/if}}</td>
-                                    <td style="text-align:right;">{{#unless ../is_interstate}}{{formatCurrency cgst_amount}}{{/unless}}</td>
-                                    <td style="text-align:right;">{{#unless ../is_interstate}}{{formatCurrency sgst_amount}}{{/unless}}</td>
+                                    <td style="text-align:right;">{{#if ../is_interstate}}{{formatCurrency
+                                        igst_amount}}{{/if}}</td>
+                                    <td style="text-align:right;">{{#unless ../is_interstate}}{{formatCurrency
+                                        cgst_amount}}{{/unless}}</td>
+                                    <td style="text-align:right;">{{#unless ../is_interstate}}{{formatCurrency
+                                        sgst_amount}}{{/unless}}</td>
                                     <td style="text-align:right;">{{formatCurrency tax_amount}}</td>
                                 </tr>
                                 {{/each}}
