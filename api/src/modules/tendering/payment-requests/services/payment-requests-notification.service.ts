@@ -2106,6 +2106,177 @@ export class PaymentRequestsNotificationService {
         }
     }
 
+    
+    async sendBgCancellationRequestEmail(instrumentId: number): Promise<void> {
+        try {
+            this.logger.log(`Preparing BG cancellation request email for instrument ${instrumentId}`);
+
+            // Fetch instrument + payment request + BG details
+            const [result] = await this.db
+                .select({
+                    instrument: paymentInstruments,
+                    request: paymentRequests,
+                    bgDetails: instrumentBgDetails,
+                })
+                .from(paymentInstruments)
+                .innerJoin(paymentRequests, eq(paymentInstruments.requestId, paymentRequests.id))
+                .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+                .where(eq(paymentInstruments.id, instrumentId))
+                .limit(1);
+
+            if (!result || !result.instrument) {
+                this.logger.warn(`BG cancellation request email skipped: instrument ${instrumentId} not found`);
+                return;
+            }
+
+            const { instrument, request, bgDetails } = result;
+
+            if (!bgDetails) {
+                this.logger.warn(
+                    `BG cancellation request email skipped: no BG details found for instrument ${instrumentId}`,
+                );
+                return;
+            }
+
+            // Resolve bank "To" mail ids (saved at Form 1 time; YES Bank or PNB depending on the BG)
+            const bankMailIds = (bgDetails.bankMailIds || []).filter(
+                (email): email is string => typeof email === 'string' && email.trim().length > 0,
+            );
+
+            if (bankMailIds.length === 0) {
+                this.logger.warn(
+                    `BG cancellation request email skipped: no bank mail ids saved for instrument ${instrumentId}`,
+                );
+                return;
+            }
+
+            const toEmails: RecipientSource[] = [{ type: 'emails', emails: bankMailIds }];
+
+            // Resolve tender team for role-based CC recipients
+            const tenderTeamId = await this.getTenderTeamId(request.tenderId || 0, request.requestedBy || 0);
+
+            const ccSources: RecipientSource[] = [
+                { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
+                { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                { type: 'emails', emails: ['accounts@volksenergie.in'] },
+            ];
+
+            const bankMailIdsCc = (bgDetails.bankMailIdsCc || []).filter(
+                (email): email is string => typeof email === 'string' && email.trim().length > 0,
+            );
+
+            if (bankMailIdsCc.length > 0) {
+                ccSources.push({ type: 'emails', emails: bankMailIdsCc });
+            }
+
+            // Compose shared content fields
+            const bgNo = bgDetails.bgNo || '';
+            const fdrNo = bgDetails.fdrNo || '';
+            const bgDate = this.formatDateDDMMYYYY(bgDetails.bgDate);
+            const amount = this.formatCurrency(Number(instrument.amount) || 0);
+            const fdrAmt = bgDetails.fdrAmt ? this.formatCurrency(Number(bgDetails.fdrAmt) || 0) : '';
+            const bgFavour = bgDetails.beneficiaryName || instrument.favouring || '';
+            const bankName = bgDetails.extendedBankName || bgDetails.bankName || '';
+
+            // Generate the "Request Letter on VE Letterhead" PDF (template: req-cancel-letter)
+            let requestLetterPath: string | null = null;
+            try {
+                const letterPaths = await this.pdfGenerator.generatePdfs(
+                    'reqCancelLetter',
+                    {
+                        bank_name: bankName,
+                        bg_no: bgNo,
+                        bg_date: bgDate,
+                        bg_favour: bgFavour,
+                        bg_amt: amount,
+                        fdr_no: fdrNo,
+                        fdr_amt: fdrAmt,
+                    },
+                    instrumentId,
+                    'BG',
+                );
+
+                if (letterPaths && letterPaths.length > 0) {
+                    requestLetterPath = letterPaths[0];
+                }
+            } catch (error) {
+                this.logger.error(
+                    `Failed to generate cancellation request letter PDF for instrument ${instrumentId}:`,
+                    error,
+                );
+            }
+
+            // Attachments: request letter (generated), client covering letter, BG soft copy, FDR soft copy
+            const attachmentFiles: string[] = [];
+
+            if (requestLetterPath) {
+                attachmentFiles.push(requestLetterPath);
+            }
+
+            const coveringLetter = bgDetails.stampCoveringLetter || instrument.coveringLetter;
+            if (coveringLetter) {
+                attachmentFiles.push(coveringLetter);
+            }
+
+            if (bgDetails.bgSoftCopy) {
+                attachmentFiles.push(bgDetails.bgSoftCopy);
+            }
+
+            if (bgDetails.fdrCopy) {
+                attachmentFiles.push(bgDetails.fdrCopy);
+            }
+
+            // Resolve "From" as CEO; fall back to Imran, then hardcoded user id
+            let fromUserId: number;
+
+            const [ceoUser] = await this.db
+                .select({ id: users.id })
+                .from(users)
+                .where(eq(users.email, 'goyal@volksenergie.in'))
+                .limit(1);
+
+            if (ceoUser) {
+                fromUserId = ceoUser.id;
+            } else {
+                this.logger.warn('CEO user not found for BG cancellation request email, falling back to Imran');
+                const [imranUser] = await this.db
+                    .select({ id: users.id })
+                    .from(users)
+                    .where(eq(users.email, 'imran@volksenergie.in'))
+                    .limit(1);
+
+                fromUserId = imranUser ? imranUser.id : 33;
+            }
+
+            await this.emailService.sendPaymentEmail({
+                requestId: instrument.requestId,
+                tenderId: request.tenderId || undefined,
+                eventType: 'BG_CANCELLATION_REQUEST',
+                template: 'bg-cancellation-request',
+                subject: `Cancellation for BG No. ${bgNo} and FDR No. ${fdrNo}`,
+                fromUserId,
+                to: toEmails,
+                cc: ccSources,
+                data: {
+                    bgNo,
+                    bgDate,
+                    amount,
+                    bgFavour,
+                    fdrNo,
+                    fdrAmt,
+                },
+                attachments: { files: attachmentFiles },
+            });
+
+            this.logger.log(
+                `BG cancellation request email sent for instrument ${instrumentId} to ${bankMailIds.join(', ')}`,
+            );
+        } catch (error) {
+            this.logger.error(`Failed to send BG cancellation request email for instrument ${instrumentId}:`, error);
+            throw error;
+        }
+    }
+
     async sendBgSubmittedEmail(instrumentId: number): Promise<void> {
         try {
             this.logger.log(`Preparing BG submitted email for instrument ${instrumentId}`);

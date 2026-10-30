@@ -90,6 +90,7 @@ export const PDF_CONFIG = {
             directory: 'letters',
             templates: ['req-cancel-letter'],
             storagePath: 'reqcancel',
+            baseDir: 'bi-dashboard/bank-guarantee/reqcancel',
             margin: {
                 top: '0mm',
                 right: '0mm',

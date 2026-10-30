@@ -1320,6 +1320,15 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             }
         }
 
+        // NEW: Send BG cancellation request email to the bank after request-cancellation data is persisted
+        if (body.action === 'request-cancellation') {
+            this.paymentRequestsNotificationService
+                .sendBgCancellationRequestEmail(instrumentId)
+                .catch((error) =>
+                    this.logger.error(`BG cancellation request email failed for instrument ${instrumentId}:`, error),
+                );
+        }
+
         try {
             await this.db.insert(instrumentStatusHistory).values({
                 instrumentId,
