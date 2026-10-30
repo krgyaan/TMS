@@ -1329,6 +1329,15 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 );
         }
 
+        // NEW: Send BG extension/modification request email to the bank after request-extension data is persisted
+        if (body.action === 'request-extension') {
+            this.paymentRequestsNotificationService
+                .sendBgExtensionRequestEmail(instrumentId)
+                .catch((error) =>
+                    this.logger.error(`BG extension request email failed for instrument ${instrumentId}:`, error),
+                );
+        }
+
         try {
             await this.db.insert(instrumentStatusHistory).values({
                 instrumentId,

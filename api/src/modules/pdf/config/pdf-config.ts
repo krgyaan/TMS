@@ -79,6 +79,7 @@ export const PDF_CONFIG = {
             directory: 'letters',
             templates: ['req-ext-letter'],
             storagePath: 'reqext',
+            baseDir: 'bi-dashboard/bank-guarantee/reqext',
             margin: {
                 top: '0mm',
                 right: '0mm',

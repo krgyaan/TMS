@@ -996,12 +996,13 @@ export class PaymentRequestsNotificationService {
                         subject,
                         template: 'bg-request',
                         data: {
+                            recipientName: 'Imran',
                             bgPurpose: bgDetails?.bgPurpose || 'Financial security',
                             beneficiaryName: bgDetails?.beneficiaryName || '',
                             beneficiaryAddress: bgDetails?.beneficiaryAddress || '',
                             bgExpiryDate: bgDetails?.bgExpiryDate ? this.formatDateDDMMYYYY(bgDetails.bgExpiryDate) : '',
                             claimDate: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',
-                            amount: instrument.amount ? this.formatCurrency(Number(instrument.amount)) : '',
+                            amount: instrument.amount ? Number(instrument.amount).toLocaleString('en-IN') : '',
                             stampPaperValue: bgDetails?.stampCharges || 300,
                             timeLimit: instrument.courierDeadline || 24,
                             actionLink: `${this.getFrontendUrl()}/bi-dashboard/bank-guarantee/action/${instrumentId}`,
@@ -2086,8 +2087,8 @@ export class PaymentRequestsNotificationService {
                     beneficiaryAddress,
                     bgExpiryDate: this.formatDateDDMMYYYY(bgDetails.bgExpiryDate),
                     claimDate: this.formatDateDDMMYYYY(bgDetails.bgClaim),
-                    amount: this.formatCurrency(Number(instrument.amount) || 0),
-                    stampPaperValue: this.formatCurrency(Number(bgDetails.stampCharges) || 300),
+                    amount: (Number(instrument.amount) || 0).toLocaleString('en-IN'),
+                    stampPaperValue: (Number(bgDetails.stampCharges) || 300).toLocaleString('en-IN'),
                     fdrMargin: bgDetails.fdrPer ? `${bgDetails.fdrPer}%` : '10%/100%',
                     beneName: bgDetails.bgBankAccName || '',
                     beneAcc: bgDetails.bgBankAcc || '',
@@ -2169,12 +2170,12 @@ export class PaymentRequestsNotificationService {
                 ccSources.push({ type: 'emails', emails: bankMailIdsCc });
             }
 
-            // Compose shared content fields
+            // Compose shared content fields (raw en-IN formatted numbers; templates carry the "Rs." prefix)
             const bgNo = bgDetails.bgNo || '';
             const fdrNo = bgDetails.fdrNo || '';
             const bgDate = this.formatDateDDMMYYYY(bgDetails.bgDate);
-            const amount = this.formatCurrency(Number(instrument.amount) || 0);
-            const fdrAmt = bgDetails.fdrAmt ? this.formatCurrency(Number(bgDetails.fdrAmt) || 0) : '';
+            const amount = (Number(instrument.amount) || 0).toLocaleString('en-IN');
+            const fdrAmt = bgDetails.fdrAmt ? (Number(bgDetails.fdrAmt) || 0).toLocaleString('en-IN') : '';
             const bgFavour = bgDetails.beneficiaryName || instrument.favouring || '';
             const bankName = bgDetails.extendedBankName || bgDetails.bankName || '';
 
@@ -2277,6 +2278,208 @@ export class PaymentRequestsNotificationService {
         }
     }
 
+    /**
+     * Send BG extension/modification request email to the bank representative when
+     * the request-extension step is submitted (client request letter/email uploaded).
+     * From: CEO. To: saved bankMailIds. CC: Coordinator, TL, accounts, bankMailIdsCc.
+     * Attaches the generated request letter (VE letterhead), the client request
+     * letter/email, the BG soft copy and the FDR soft copy.
+     */
+    async sendBgExtensionRequestEmail(instrumentId: number): Promise<void> {
+        try {
+            this.logger.log(`Preparing BG extension request email for instrument ${instrumentId}`);
+
+            // Fetch instrument + payment request + BG details
+            const [result] = await this.db
+                .select({
+                    instrument: paymentInstruments,
+                    request: paymentRequests,
+                    bgDetails: instrumentBgDetails,
+                })
+                .from(paymentInstruments)
+                .innerJoin(paymentRequests, eq(paymentInstruments.requestId, paymentRequests.id))
+                .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+                .where(eq(paymentInstruments.id, instrumentId))
+                .limit(1);
+
+            if (!result || !result.instrument) {
+                this.logger.warn(`BG extension request email skipped: instrument ${instrumentId} not found`);
+                return;
+            }
+
+            const { instrument, request, bgDetails } = result;
+
+            if (!bgDetails) {
+                this.logger.warn(`BG extension request email skipped: no BG details found for instrument ${instrumentId}`);
+                return;
+            }
+
+            // Resolve bank "To" mail ids (saved at Form 1 time; YES Bank or PNB depending on the BG)
+            const bankMailIds = (bgDetails.bankMailIds || []).filter(
+                (email): email is string => typeof email === 'string' && email.trim().length > 0,
+            );
+
+            if (bankMailIds.length === 0) {
+                this.logger.warn(
+                    `BG extension request email skipped: no bank mail ids saved for instrument ${instrumentId}`,
+                );
+                return;
+            }
+
+            const toEmails: RecipientSource[] = [{ type: 'emails', emails: bankMailIds }];
+
+            // Resolve tender team for role-based CC recipients
+            const tenderTeamId = await this.getTenderTeamId(request.tenderId || 0, request.requestedBy || 0);
+
+            const ccSources: RecipientSource[] = [
+                { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
+                { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                { type: 'emails', emails: ['accounts@volksenergie.in'] },
+            ];
+
+            const bankMailIdsCc = (bgDetails.bankMailIdsCc || []).filter(
+                (email): email is string => typeof email === 'string' && email.trim().length > 0,
+            );
+
+            if (bankMailIdsCc.length > 0) {
+                ccSources.push({ type: 'emails', emails: bankMailIdsCc });
+            }
+
+            // Compose shared content fields (raw en-IN numbers; email body lines carry the "Rs." prefix)
+            const bgNo = bgDetails.bgNo || '';
+            const bgDate = this.formatDateDDMMYYYY(bgDetails.bgDate);
+            const amount = (Number(instrument.amount) || 0).toLocaleString('en-IN');
+            const bgFavour = bgDetails.beneficiaryName || instrument.favouring || '';
+            const bgExpiryDate = this.formatDateDDMMYYYY(bgDetails.bgExpiryDate);
+            const bgClaimDate = this.formatDateDDMMYYYY(bgDetails.bgClaim);
+            const bankName = bgDetails.bankName || '';
+
+            // Table cells have no "Rs." prefix in the template, so pass full strings ('' when absent)
+            const moneyRs = (value: any): string =>
+                value === null || value === undefined || value === ''
+                    ? ''
+                    : `Rs. ${(Number(value) || 0).toLocaleString('en-IN')}`;
+            // The letter PDF prefixes "Rs." on list lines only, so table values there stay raw
+            const moneyRaw = (value: any): string =>
+                value === null || value === undefined || value === '' ? '' : (Number(value) || 0).toLocaleString('en-IN');
+
+            const stampChargeDeducted = moneyRs(bgDetails.stampChargesDeducted);
+            const newStampChargeDeducted = moneyRs(bgDetails.newStampChargeDeducted);
+            const newBeneficiaryName = bgDetails.extendedBankName || '';
+            const newAmount = moneyRs(bgDetails.extendedAmount);
+            const newExpiryDate = this.formatDateDDMMYYYY(bgDetails.extendedValidityDate);
+            const newClaimDate = this.formatDateDDMMYYYY(bgDetails.extendedClaimExpiryDate);
+
+            // Generate the "Request Letter on VE Letterhead" PDF (template: req-ext-letter)
+            let requestLetterPath: string | null = null;
+            try {
+                const letterPaths = await this.pdfGenerator.generatePdfs(
+                    'reqExtLetter',
+                    {
+                        bank_name: bankName,
+                        bg_no: bgNo,
+                        bg_date: bgDate,
+                        bg_favour: bgFavour,
+                        bg_amt: amount,
+                        stamp_charge_deducted: moneyRaw(bgDetails.stampChargesDeducted),
+                        new_stamp_charge_deducted: moneyRaw(bgDetails.newStampChargeDeducted),
+                        new_bg_bank_name: newBeneficiaryName,
+                        new_bg_amt: moneyRaw(bgDetails.extendedAmount),
+                        bg_expiry: bgExpiryDate,
+                        new_bg_expiry: newExpiryDate,
+                        bg_claim: bgClaimDate,
+                        new_bg_claim: newClaimDate,
+                    },
+                    instrumentId,
+                    'BG',
+                );
+
+                if (letterPaths && letterPaths.length > 0) {
+                    requestLetterPath = letterPaths[0];
+                }
+            } catch (error) {
+                this.logger.error(
+                    `Failed to generate extension request letter PDF for instrument ${instrumentId}:`,
+                    error,
+                );
+            }
+
+            // Attachments: request letter (generated), client request letter/email, BG soft copy, FDR soft copy
+            const attachmentFiles: string[] = [];
+
+            if (requestLetterPath) {
+                attachmentFiles.push(requestLetterPath);
+            }
+
+            if (bgDetails.extensionLetterPath) {
+                attachmentFiles.push(bgDetails.extensionLetterPath);
+            }
+
+            if (bgDetails.bgSoftCopy) {
+                attachmentFiles.push(bgDetails.bgSoftCopy);
+            }
+
+            if (bgDetails.fdrCopy) {
+                attachmentFiles.push(bgDetails.fdrCopy);
+            }
+
+            // Resolve "From" as CEO; fall back to Imran, then hardcoded user id
+            let fromUserId: number;
+
+            const [ceoUser] = await this.db
+                .select({ id: users.id })
+                .from(users)
+                .where(eq(users.email, 'goyal@volksenergie.in'))
+                .limit(1);
+
+            if (ceoUser) {
+                fromUserId = ceoUser.id;
+            } else {
+                this.logger.warn('CEO user not found for BG extension request email, falling back to Imran');
+                const [imranUser] = await this.db
+                    .select({ id: users.id })
+                    .from(users)
+                    .where(eq(users.email, 'imran@volksenergie.in'))
+                    .limit(1);
+
+                fromUserId = imranUser ? imranUser.id : 33;
+            }
+
+            await this.emailService.sendPaymentEmail({
+                requestId: instrument.requestId,
+                tenderId: request.tenderId || undefined,
+                eventType: 'BG_EXTENSION_REQUEST',
+                template: 'bg-extension-request',
+                subject: `Extension/Modification of BG No. ${bgNo}`,
+                fromUserId,
+                to: toEmails,
+                cc: ccSources,
+                data: {
+                    bgNo,
+                    bgDate,
+                    amount,
+                    bgFavour,
+                    bgExpiryDate,
+                    bgClaimDate,
+                    stampChargeDeducted,
+                    newStampChargeDeducted,
+                    newBeneficiaryName,
+                    newAmount,
+                    newExpiryDate,
+                    newClaimDate,
+                },
+                attachments: { files: attachmentFiles },
+            });
+
+            this.logger.log(
+                `BG extension request email sent for instrument ${instrumentId} to ${bankMailIds.join(', ')}`,
+            );
+        } catch (error) {
+            this.logger.error(`Failed to send BG extension request email for instrument ${instrumentId}:`, error);
+            throw error;
+        }
+    }
+
     async sendBgSubmittedEmail(instrumentId: number): Promise<void> {
         try {
             this.logger.log(`Preparing BG submitted email for instrument ${instrumentId}`);
@@ -2372,8 +2575,8 @@ export class PaymentRequestsNotificationService {
                     bgExpiryDate: this.formatDateDDMMYYYY(bgDetails.bgExpiryDate),
                     bgClaimDate: this.formatDateDDMMYYYY(bgDetails.bgClaim),
                     beneficiaryName: instrument.favouring || bgDetails.beneficiaryName || '',
-                    amount: this.formatCurrency(Number(instrument.amount) || 0),
-                    stampPaperValue: this.formatCurrency(Number(bgDetails.stampCharges) || 0),
+                    amount: (Number(instrument.amount) || 0).toLocaleString('en-IN'),
+                    stampPaperValue: (Number(bgDetails.stampCharges) || 0).toLocaleString('en-IN'),
                 },
                 attachments: { files: attachmentFiles },
             });
@@ -2477,7 +2680,7 @@ export class PaymentRequestsNotificationService {
             tenderNo: tender?.tenderNo || '',
             tenderName: tender?.tenderName || '',
             status: statusLabel,
-            amount: this.formatCurrency(Number(instrument.amount) || 0),
+            amount: (Number(instrument.amount) || 0).toLocaleString('en-IN'),
             bgNo: bgDetails?.bgNo || '',
             bgValidity: bgDetails?.bgExpiryDate ? this.formatDateDDMMYYYY(bgDetails.bgExpiryDate) : '',
             bgClaimPeriod: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',

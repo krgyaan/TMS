@@ -4,7 +4,7 @@
     </h2>
 
     <p style="font-size: 14px; line-height: 1.6; color: #555;">
-        Dear {{recipientName}} (Accounts Team),
+        Dear {{data.recipientName}} (Accounts Team),
     </p>
 
     <p style="font-size: 14px; line-height: 1.6; color: #555;">
@@ -12,20 +12,20 @@
     </p>
 
     <p style="font-size: 14px; line-height: 1.6; color: #555; margin: 20px 0;">
-        The purpose of the Bank Guarantee is {{bgPurpose}}.
+        The purpose of the Bank Guarantee is {{data.bgPurpose}}.
     </p>
 
     <div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 4px;">
-        <p style="margin: 8px 0; font-size: 14px;"><strong>BG in favour of:</strong> {{beneficiaryName}}</p>
-        <p style="margin: 8px 0; font-size: 14px;"><strong>BG address:</strong> {{beneficiaryAddress}}</p>
-        <p style="margin: 8px 0; font-size: 14px;"><strong>BG Expiry Date:</strong> {{bgExpiryDate}}</p>
-        <p style="margin: 8px 0; font-size: 14px;"><strong>BG Claim Date:</strong> {{claimDate}}</p>
-        <p style="margin: 8px 0; font-size: 14px;"><strong>Amount:</strong> Rs. {{amount}}</p>
-        <p style="margin: 8px 0; font-size: 14px;"><strong>BG Stamp paper value:</strong> Rs. {{stampPaperValue}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>BG in favour of:</strong> {{data.beneficiaryName}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>BG address:</strong> {{data.beneficiaryAddress}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>BG Expiry Date:</strong> {{data.bgExpiryDate}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>BG Claim Date:</strong> {{data.claimDate}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>Amount:</strong> Rs. {{data.amount}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>BG Stamp paper value:</strong> Rs. {{data.stampPaperValue}}</p>
     </div>
 
     <p style="font-size: 14px; line-height: 1.6; color: #555; margin: 20px 0;">
-        This BG is required within {{timeLimit}} Hrs.
+        This BG is required within {{data.timeLimit}} Hrs.
     </p>
 
     <div style="margin: 20px 0; padding: 15px; background: #e8f4fd; border-radius: 4px; border-left: 4px solid #2c3e50;">
@@ -33,11 +33,11 @@
             Please courier the BG to the address below keeping sufficient margin for the courier delivery time to ensure the BG reaches before the due date and time (in case of tender). Share the SOFT COPY of the BG and the Docket slip along with SFMS confirmation with us on time using the link below or your dashboard:
         </p>
         <p style="margin: 10px 0; font-size: 13px;">
-            <a href="{{actionLink}}" style="color: #0066cc; text-decoration: underline;">
-                {{actionLinkText}}
+            <a href="{{data.actionLink}}" style="color: #0066cc; text-decoration: underline;">
+                {{data.actionLinkText}}
             </a>
         </p>
-        <p style="margin: 8px 0; font-size: 14px;"><strong>Courier Address:</strong> {{courierAddress}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>Courier Address:</strong> {{data.courierAddress}}</p>
     </div>
 
     <p style="font-size: 12px; color: #666; margin: 20px 0;">
