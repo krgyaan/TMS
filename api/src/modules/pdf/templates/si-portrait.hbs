@@ -35,6 +35,7 @@
             width: 150mm;
             transform: translate(-50%, -50%);
             z-index: -1;
+            opacity: 0.1;
             pointer-events: none;
         }
 
@@ -93,11 +94,18 @@
             break-inside: avoid;
             page-break-inside: avoid;
         }
+
+        table.items>thead>tr>td.blk>table,
+        table.items>tbody>tr>td.blk>.keep-together>table {
+            width: calc(100% + 2px);
+            margin-left: -1px;
+            margin-right: -1px;
+        }
     </style>
 </head>
 
 <body>
-    <img class="wm" alt="" src="data:image/png;base64,{{img_logo_base64}}">
+    <img class="wm" alt="" src="data:image/png;base64,{{img_watermark_base64}}">
     <div class="page">
 
         <div style="position:relative;min-height:30mm;">
