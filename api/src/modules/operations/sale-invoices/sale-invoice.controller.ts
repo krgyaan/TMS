@@ -9,7 +9,7 @@ import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
 import { PermissionGuard } from "@/modules/auth/guards/permission.guard";
 import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
 import { createSaleInvoiceSchema, type CreateSaleInvoiceDto } from "./dto/create-sale-invoice.dto";
-import { SiPdfRetryGuard } from "./retry-si-pdf.guard";
+import { PdfRetryGuard } from "@/modules/pdf/pdf-retry.guard";
 import { isValidGstin, SaleInvoiceService } from "./sale-invoice.service";
 
 const billingCorrectionSchema = z.object({
@@ -130,7 +130,7 @@ export class SaleInvoiceController {
 
     @Post(":id/pdf/retry")
     @HttpCode(HttpStatus.OK)
-    @UseGuards(JwtAuthGuard, SiPdfRetryGuard)
+    @UseGuards(JwtAuthGuard, PdfRetryGuard)
     retryPdfGeneration(@Param("id", ParseIntPipe) id: number) {
         return this.service.retryPdfGeneration(id);
     }

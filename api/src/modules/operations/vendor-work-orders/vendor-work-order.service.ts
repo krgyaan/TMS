@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Inject, Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
 import { and, eq, like, desc, asc, sql, inArray, isNull, isNotNull, ne } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
@@ -1220,7 +1220,7 @@ export class VendorWorkOrderService {
 
     // Regenerates the latest VWO PDF (items + extra charges) after the PI form
     // has altered the order. Fire-and-forget from the invoice service.
-    async regeneratePdf(id: number): Promise<void> {
+    async regeneratePdf(id: number) {
         const wo = await this.db
             .select()
             .from(vendorWorkOrders)
@@ -1228,7 +1228,30 @@ export class VendorWorkOrderService {
             .then(rows => rows[0]);
         if (!wo) throw new NotFoundException("Vendor Work Order not found");
         const items = await this.db.select().from(vendorWorkOrderItems).where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
-        await this.generatePdfForWO(wo, items);
+        return this.generatePdfForWO(wo, items);
+    }
+
+    async retryPdfGeneration(id: number) {
+        const wo = await this.db
+            .select()
+            .from(vendorWorkOrders)
+            .where(eq(vendorWorkOrders.id, id))
+            .then(rows => rows[0]);
+        if (!wo) throw new NotFoundException("Vendor Work Order not found");
+        const items = await this.db.select().from(vendorWorkOrderItems).where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
+
+        try {
+            const result = await this.generatePdfForWO(wo, items);
+            return {
+                status: result.generated ? "generated" : "unchanged",
+                version: result.version,
+            };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.error(`PDF generation retry failed for VWO ${id}: ${message}`);
+            if (error instanceof BadRequestException) throw error;
+            throw new InternalServerErrorException("Vendor Work Order PDF generation failed. Please retry.");
+        }
     }
 
     async listParties(type?: string) {
@@ -1650,15 +1673,15 @@ export class VendorWorkOrderService {
         return createHash("sha256").update(JSON.stringify(fields)).digest("hex");
     }
 
-    private async generatePdfForWO(wo: any, products: any[]) {
+    private async generatePdfForWO(wo: any, products: any[]): Promise<{ generated: boolean; version?: string }> {
         const extraCharges = await this.db.select().from(orderExtraCharges).where(eq(orderExtraCharges.vendorWorkOrderId, wo.id)).orderBy(asc(orderExtraCharges.id));
         const contentHash = this.computeWOHash(wo, products, extraCharges);
 
         const versions = (wo.generatedPdfVersions ?? {}) as Record<string, { path: string; hash: string }>;
-        const existingVersion = Object.values(versions).find(v => v.hash === contentHash);
-        if (existingVersion) {
+        const existingEntry = Object.entries(versions).find(([, v]) => v.hash === contentHash);
+        if (existingEntry) {
             this.logger.info(`VWO ${wo.id}: no changes detected, reusing existing PDF`);
-            return;
+            return { generated: false, version: existingEntry[0] };
         }
 
         const items = (products || []).map((p: any, i: number) => {
@@ -1743,42 +1766,47 @@ export class VendorWorkOrderService {
 
         try {
             const pdfPaths = await this.pdfGenerator.generatePdfs("vwo", data, wo.id, "VWO");
-            if (pdfPaths.length > 0) {
-                // Rename PDF to use WO sequence number instead of timestamp (avoids Date.now() race)
-                const woSeq = wo.woNumber?.split("/").pop() || `WO${wo.id}`;
-                const rand = randomUUID().split("-")[0];
-                const newFileName = `${woSeq}-${rand}.pdf`;
-                const storageDir = "operations/vwo";
-
-                const oldPath = join(process.cwd(), "uploads", pdfPaths[0]);
-                const newPath = join(process.cwd(), "uploads", storageDir, newFileName);
-
-                for (let attempt = 0; attempt < 3; attempt++) {
-                    try {
-                        await rename(oldPath, newPath);
-                        break;
-                    } catch (e) {
-                        if ((e as NodeJS.ErrnoException).code !== "ENOENT" || attempt === 2) throw e;
-                        await new Promise(r => setTimeout(r, 200 * (attempt + 1)));
-                    }
-                }
-
-                const finalPath = `${storageDir}/${newFileName}`;
-
-                const now = new Date();
-                const label = `v-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}-${String(now.getSeconds()).padStart(2, "0")}`;
-
-                const updatedVersions = { ...versions, [label]: { path: finalPath, hash: contentHash } };
-
-                await this.db
-                    .update(vendorWorkOrders)
-                    .set({
-                        generatedPdfVersions: updatedVersions,
-                    })
-                    .where(eq(vendorWorkOrders.id, wo.id));
+            if (pdfPaths.length === 0) {
+                return { generated: false };
             }
+
+            // Rename PDF to use WO sequence number instead of timestamp (avoids Date.now() race)
+            const woSeq = wo.woNumber?.split("/").pop() || `WO${wo.id}`;
+            const rand = randomUUID().split("-")[0];
+            const newFileName = `${woSeq}-${rand}.pdf`;
+            const storageDir = "operations/vwo";
+
+            const oldPath = join(process.cwd(), "uploads", pdfPaths[0]);
+            const newPath = join(process.cwd(), "uploads", storageDir, newFileName);
+
+            for (let attempt = 0; attempt < 3; attempt++) {
+                try {
+                    await rename(oldPath, newPath);
+                    break;
+                } catch (e) {
+                    if ((e as NodeJS.ErrnoException).code !== "ENOENT" || attempt === 2) throw e;
+                    await new Promise(r => setTimeout(r, 200 * (attempt + 1)));
+                }
+            }
+
+            const finalPath = `${storageDir}/${newFileName}`;
+
+            const now = new Date();
+            const label = `v-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}-${String(now.getSeconds()).padStart(2, "0")}`;
+
+            const updatedVersions = { ...versions, [label]: { path: finalPath, hash: contentHash } };
+
+            await this.db
+                .update(vendorWorkOrders)
+                .set({
+                    generatedPdfVersions: updatedVersions,
+                })
+                .where(eq(vendorWorkOrders.id, wo.id));
+
+            return { generated: true, version: label };
         } catch (error) {
             this.logger.error(`PDF generation failed for VWO ${wo.id}: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
         }
     }
 

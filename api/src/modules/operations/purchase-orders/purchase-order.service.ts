@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Inject, Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, like, ne, or, sql, type SQL } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, rename } from "node:fs/promises";
@@ -482,15 +482,15 @@ export class PurchaseOrderService {
         return createHash("sha256").update(JSON.stringify(fields)).digest("hex");
     }
 
-    private async generatePdfForPO(po: any, products: any[]) {
+    private async generatePdfForPO(po: any, products: any[]): Promise<{ generated: boolean; version?: string }> {
         const extraCharges = await this.db.select().from(orderExtraCharges).where(eq(orderExtraCharges.purchaseOrderId, po.id)).orderBy(asc(orderExtraCharges.id));
         const contentHash = this.computePOHash(po, products, extraCharges);
 
         const versions = (po.generatedPdfVersions ?? {}) as Record<string, { path: string; hash: string }>;
-        const existingVersion = Object.values(versions).find(v => v.hash === contentHash);
-        if (existingVersion) {
+        const existingEntry = Object.entries(versions).find(([, v]) => v.hash === contentHash);
+        if (existingEntry) {
             this.logger.info(`PO ${po.id}: no changes detected, reusing existing PDF`);
-            return;
+            return { generated: false, version: existingEntry[0] };
         }
 
         const items = (products || []).map((p: any, i: number) => {
@@ -577,41 +577,46 @@ export class PurchaseOrderService {
 
         try {
             const pdfPaths = await this.pdfGenerator.generatePdfs("po", data, po.id, "PO");
-            if (pdfPaths.length > 0) {
-                const poSeq = po.poNumber?.split("/").pop() || `PO${po.id}`;
-                const rand = randomUUID().split("-")[0];
-                const newFileName = `${poSeq}-${rand}.pdf`;
-                const storageDir = "operations/po";
-
-                const oldPath = join(process.cwd(), "uploads", pdfPaths[0]);
-                const newPath = join(process.cwd(), "uploads", storageDir, newFileName);
-
-                for (let attempt = 0; attempt < 3; attempt++) {
-                    try {
-                        await rename(oldPath, newPath);
-                        break;
-                    } catch (e) {
-                        if ((e as NodeJS.ErrnoException).code !== "ENOENT" || attempt === 2) throw e;
-                        await new Promise(r => setTimeout(r, 200 * (attempt + 1)));
-                    }
-                }
-
-                const finalPath = `${storageDir}/${newFileName}`;
-
-                const now = new Date();
-                const label = `v-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}-${String(now.getSeconds()).padStart(2, "0")}`;
-
-                const updatedVersions = { ...versions, [label]: { path: finalPath, hash: contentHash } };
-
-                await this.db
-                    .update(purchaseOrders)
-                    .set({
-                        generatedPdfVersions: updatedVersions,
-                    })
-                    .where(eq(purchaseOrders.id, po.id));
+            if (pdfPaths.length === 0) {
+                return { generated: false };
             }
+
+            const poSeq = po.poNumber?.split("/").pop() || `PO${po.id}`;
+            const rand = randomUUID().split("-")[0];
+            const newFileName = `${poSeq}-${rand}.pdf`;
+            const storageDir = "operations/po";
+
+            const oldPath = join(process.cwd(), "uploads", pdfPaths[0]);
+            const newPath = join(process.cwd(), "uploads", storageDir, newFileName);
+
+            for (let attempt = 0; attempt < 3; attempt++) {
+                try {
+                    await rename(oldPath, newPath);
+                    break;
+                } catch (e) {
+                    if ((e as NodeJS.ErrnoException).code !== "ENOENT" || attempt === 2) throw e;
+                    await new Promise(r => setTimeout(r, 200 * (attempt + 1)));
+                }
+            }
+
+            const finalPath = `${storageDir}/${newFileName}`;
+
+            const now = new Date();
+            const label = `v-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}-${String(now.getSeconds()).padStart(2, "0")}`;
+
+            const updatedVersions = { ...versions, [label]: { path: finalPath, hash: contentHash } };
+
+            await this.db
+                .update(purchaseOrders)
+                .set({
+                    generatedPdfVersions: updatedVersions,
+                })
+                .where(eq(purchaseOrders.id, po.id));
+
+            return { generated: true, version: label };
         } catch (error) {
             this.logger.error(`PDF generation failed for PO ${po.id}: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
         }
     }
 
@@ -1676,11 +1681,30 @@ export class PurchaseOrderService {
 
     // Regenerates the latest PO PDF (items + extra charges) after the PI form
     // has altered the order. Fire-and-forget from the invoice service.
-    async regeneratePdf(id: number): Promise<void> {
+    async regeneratePdf(id: number) {
         const po = (await this.db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id)))[0];
         if (!po) throw new NotFoundException("Purchase Order not found");
         const products = await this.db.select().from(purchaseOrderProducts).where(eq(purchaseOrderProducts.purchaseOrderId, id));
-        await this.generatePdfForPO(po, products);
+        return this.generatePdfForPO(po, products);
+    }
+
+    async retryPdfGeneration(id: number) {
+        const po = (await this.db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id)))[0];
+        if (!po) throw new NotFoundException("Purchase Order not found");
+        const products = await this.db.select().from(purchaseOrderProducts).where(eq(purchaseOrderProducts.purchaseOrderId, id));
+
+        try {
+            const result = await this.generatePdfForPO(po, products);
+            return {
+                status: result.generated ? "generated" : "unchanged",
+                version: result.version,
+            };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.error(`PDF generation retry failed for PO ${id}: ${message}`);
+            if (error instanceof BadRequestException) throw error;
+            throw new InternalServerErrorException("Purchase Order PDF generation failed. Please retry.");
+        }
     }
 
     async listParties(type?: string) {
