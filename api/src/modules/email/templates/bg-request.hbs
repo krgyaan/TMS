@@ -1,0 +1,55 @@
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+    <h2 style="color: #333; text-align: center; margin-bottom: 20px;">
+        New Bank Guarantee
+    </h2>
+
+    <p style="font-size: 14px; line-height: 1.6; color: #555;">
+        Dear {{data.recipientName}} (Accounts Team),
+    </p>
+
+    <p style="font-size: 14px; line-height: 1.6; color: #555;">
+        Please use the pre-filled forms attached below to prepare the following Bank Guarantee.
+    </p>
+
+    <p style="font-size: 14px; line-height: 1.6; color: #555; margin: 20px 0;">
+        The purpose of the Bank Guarantee is {{data.bgPurpose}}.
+    </p>
+
+    <div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 4px;">
+        <p style="margin: 8px 0; font-size: 14px;"><strong>BG in favour of:</strong> {{data.beneficiaryName}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>BG address:</strong> {{data.beneficiaryAddress}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>BG Expiry Date:</strong> {{data.bgExpiryDate}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>BG Claim Date:</strong> {{data.claimDate}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>Amount:</strong> Rs. {{data.amount}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>BG Stamp paper value:</strong> Rs. {{data.stampPaperValue}}</p>
+    </div>
+
+    <p style="font-size: 14px; line-height: 1.6; color: #555; margin: 20px 0;">
+        This BG is required within {{data.timeLimit}} Hrs.
+    </p>
+
+    <div style="margin: 20px 0; padding: 15px; background: #e8f4fd; border-radius: 4px; border-left: 4px solid #2c3e50;">
+        <p style="margin: 8px 0; font-size: 14px;">
+            Please courier the BG to the address below keeping sufficient margin for the courier delivery time to ensure the BG reaches before the due date and time (in case of tender). Share the SOFT COPY of the BG and the Docket slip along with SFMS confirmation with us on time using the link below or your dashboard:
+        </p>
+        <p style="margin: 10px 0; font-size: 13px;">
+            <a href="{{data.actionLink}}" style="color: #0066cc; text-decoration: underline;">
+                {{data.actionLinkText}}
+            </a>
+        </p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>Courier Address:</strong> {{data.courierAddress}}</p>
+    </div>
+
+    <p style="font-size: 12px; color: #666; margin: 20px 0;">
+        Please attach the cover letter with the bank guarantee and courier the BG. (Attached below) (Pending)
+    </p>
+
+    <p style="font-size: 12px; color: #666; font-style: italic; margin: 20px 0;">
+        "Ensuring timely operations is the only source of growth."
+    </p>
+
+    <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #888;">
+        <p>Regards,</p>
+        <p>Tender Executive, Approved by Team Leader</p>
+    </div>
+</div>
