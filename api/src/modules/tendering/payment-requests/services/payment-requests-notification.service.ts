@@ -106,6 +106,39 @@ export class PaymentRequestsNotificationService {
         return `₹${amount.toLocaleString('en-IN')}`;
     };
 
+    /**
+     * Normalize a DB file-path value into a list of plain attachment paths.
+     * Multi-file upload fields are persisted either as a JSON array string
+     * (e.g. '["bi-dashboard/.../a.pdf","bi-dashboard/.../b.pdf"]') or as a
+     * single plain path, depending on how the frontend submitted them. Passing
+     * the raw JSON string to EmailService would make attachment resolution
+     * throw ("Unknown file context: [\"bi-dashboard"), killing the whole email.
+     */
+    private toAttachmentPaths = (value: string | null | undefined): string[] => {
+        if (!value || typeof value !== 'string' || value.trim().length === 0) {
+            return [];
+        }
+
+        const trimmed = value.trim();
+
+        // Dummy marker left behind when a file input was submitted without a file
+        if (trimmed.includes('[object File]')) {
+            return [];
+        }
+
+        if (trimmed.startsWith('[')) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                const list: string[] = Array.isArray(parsed) ? parsed : [parsed];
+                return list.filter((p): p is string => typeof p === 'string' && p.trim().length > 0);
+            } catch {
+                // Not valid JSON — fall through and treat it as a single path
+            }
+        }
+
+        return [trimmed];
+    };
+
     async sendDdMailAfterChequeAction(
         chequeInstrument: any,
         chequeDetails: any,
@@ -966,7 +999,7 @@ export class PaymentRequestsNotificationService {
                     attachmentFiles.push(coveringLetterPaths[0]);
                 }
                 if (bgPo?.bgPo) {
-                    attachmentFiles.push(bgPo!.bgPo);
+                    attachmentFiles.push(...this.toAttachmentPaths(bgPo.bgPo));
                 }
 
                 // Get recipient email - use Imran (Accounts Leader) as specified
@@ -1940,9 +1973,9 @@ export class PaymentRequestsNotificationService {
                 to: [{ type: 'emails', emails: [teUser.email] }],
                 cc: ccEmails,
                 attachments: {
-                    files: bgDetails?.bgSoftCopy
-                        ? [`bi-dashboard/bank-guarantee/${bgDetails.bgSoftCopy}`]
-                        : [],
+                    files: this.toAttachmentPaths(bgDetails?.bgSoftCopy).map((p) =>
+                        p.startsWith('bi-dashboard/bank-guarantee/') ? p : `bi-dashboard/bank-guarantee/${p}`,
+                    ),
                 },
             });
 
@@ -2020,29 +2053,9 @@ export class PaymentRequestsNotificationService {
             // attachments.files expects plain path strings
             const attachmentFiles: string[] = [];
 
-            if (bgDetails.prefilledSignedBg) {
-                try {
-                    const parsed = JSON.parse(bgDetails.prefilledSignedBg);
-                    const paths: string[] = Array.isArray(parsed) ? parsed : [parsed];
-                    for (const p of paths) {
-                        if (typeof p === 'string' && p.trim().length > 0) {
-                            attachmentFiles.push(p);
-                        }
-                    }
-                } catch {
-                    // Not JSON — treat as a single path string
-                    attachmentFiles.push(bgDetails.prefilledSignedBg);
-                }
-            }
-
-            if (bgDetails.bgPo) {
-                attachmentFiles.push(bgDetails.bgPo);
-            }
-
-            const bgFormatPath = bgDetails.bgFormatTe || bgDetails.bgFormatTl;
-            if (bgFormatPath) {
-                attachmentFiles.push(bgFormatPath);
-            }
+            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.prefilledSignedBg));
+            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.bgPo));
+            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.bgFormatTe || bgDetails.bgFormatTl));
 
             // Resolve "From" as CEO; fall back to Imran, then hardcoded user id
             let fromUserId: number;
@@ -2215,17 +2228,10 @@ export class PaymentRequestsNotificationService {
             }
 
             const coveringLetter = bgDetails.stampCoveringLetter || instrument.coveringLetter;
-            if (coveringLetter) {
-                attachmentFiles.push(coveringLetter);
-            }
+            attachmentFiles.push(...this.toAttachmentPaths(coveringLetter));
 
-            if (bgDetails.bgSoftCopy) {
-                attachmentFiles.push(bgDetails.bgSoftCopy);
-            }
-
-            if (bgDetails.fdrCopy) {
-                attachmentFiles.push(bgDetails.fdrCopy);
-            }
+            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.bgSoftCopy));
+            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.fdrCopy));
 
             // Resolve "From" as CEO; fall back to Imran, then hardcoded user id
             let fromUserId: number;
@@ -2412,16 +2418,11 @@ export class PaymentRequestsNotificationService {
             }
 
             if (bgDetails.extensionLetterPath) {
-                attachmentFiles.push(bgDetails.extensionLetterPath);
+                attachmentFiles.push(...this.toAttachmentPaths(bgDetails.extensionLetterPath));
             }
 
-            if (bgDetails.bgSoftCopy) {
-                attachmentFiles.push(bgDetails.bgSoftCopy);
-            }
-
-            if (bgDetails.fdrCopy) {
-                attachmentFiles.push(bgDetails.fdrCopy);
-            }
+            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.bgSoftCopy));
+            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.fdrCopy));
 
             // Resolve "From" as CEO; fall back to Imran, then hardcoded user id
             let fromUserId: number;
@@ -2544,8 +2545,8 @@ export class PaymentRequestsNotificationService {
             }
 
             const attachmentFiles: string[] = [];
-            if (bgDetails.bgSoftCopy) attachmentFiles.push(bgDetails.bgSoftCopy);
-            if (bgDetails.sfmsConf) attachmentFiles.push(bgDetails.sfmsConf);
+            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.bgSoftCopy));
+            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.sfmsConf));
 
             const [imranUser] = await this.db
                 .select({ id: users.id })
@@ -2559,7 +2560,7 @@ export class PaymentRequestsNotificationService {
 
             const tenderDate = ''; // no confirmed schema field for WO/Tender Date
 
-            await this.emailService.sendPaymentEmail({
+            const mailResult = await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
                 tenderId: request.tenderId || undefined,
                 eventType: 'BG_SUBMITTED',
@@ -2581,7 +2582,13 @@ export class PaymentRequestsNotificationService {
                 attachments: { files: attachmentFiles },
             });
 
-            this.logger.log(`BG submitted email sent for instrument ${instrumentId} to ${clientEmail}`);
+            if (mailResult.success) {
+                this.logger.log(`BG submitted email sent for instrument ${instrumentId} to ${clientEmail} (logId: ${mailResult.emailLogId})`);
+            } else {
+                this.logger.warn(
+                    `BG submitted email failed for instrument ${instrumentId} to ${clientEmail}: ${mailResult.error}`,
+                );
+            }
         } catch (error) {
             this.logger.error(`Failed to send BG submitted email for instrument ${instrumentId}:`, error);
             throw error;
