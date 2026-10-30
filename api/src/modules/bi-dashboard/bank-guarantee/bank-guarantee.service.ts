@@ -1297,28 +1297,9 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 );
         }
 
-        // NEW: Send BG follow-up release email after initiate-followup data is persisted
-        if (body.action === 'initiate-followup') {
-            // Contacts already parsed earlier in this function (line ~1022)
-            const clientContacts = contacts?.filter((c: any) => c?.name && String(c.name).trim().length > 0) || [];
-            if (clientContacts.length === 0) {
-                this.logger.warn(`No client contacts found for BG follow-up email for instrument ${instrumentId}`);
-            } else {
-                const clientName = clientContacts[0]?.name || body.organisation_name || 'Client';
-                const clientEmails = clientContacts.map((c: any) => c.email || '').filter((e: any) => e && String(e).trim().length > 0);
-                if (clientEmails.length === 0) {
-                    this.logger.warn(`No client email addresses found for BG follow-up email`);
-                } else {
-                    await this.paymentRequestsNotificationService.sendBgFollowupReleaseEmail(
-                        instrumentId,
-                        clientEmails,
-                        clientName
-                    ).catch((err) =>
-                        this.logger.error(`BG follow-up release email failed for instrument ${instrumentId}:`, err)
-                    );
-                }
-            }
-        }
+        // initiate-followup: no immediate email here. The follow-up is persisted below
+        // via FollowUpService.create(), and the follow-up module handles all mail
+        // (assigned mail on create + scheduled reminder mails using its followup templates).
 
         // NEW: Send BG cancellation request email to the bank after request-cancellation data is persisted
         if (body.action === 'request-cancellation') {
