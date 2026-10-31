@@ -5,6 +5,7 @@ import { FormControl, FormField, FormItem, FormLabel } from "@/components/ui/for
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { formatVendorName } from "@/lib/vendorName";
 
 const MSME_TYPE_OPTIONS = [
     { value: "M", label: "Manufacturer" },
@@ -34,7 +35,17 @@ export function VendorOrgFields<TFieldValues extends FieldValues>({ control, pre
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <FieldWrapper control={control} name={name("name")} label="Organization Name *">
-                    {field => <Input placeholder="Enter organization name" {...(field as any)} value={String(field.value ?? "")} />}
+                    {field => (
+                        <Input
+                            placeholder="Enter organization name"
+                            {...(field as any)}
+                            value={String(field.value ?? "")}
+                            onBlur={() => {
+                                field.onChange(formatVendorName(String(field.value ?? "")));
+                                field.onBlur();
+                            }}
+                        />
+                    )}
                 </FieldWrapper>
                 <FieldWrapper control={control} name={name("alias")} label="Alias">
                     {field => <Input placeholder="e.g. Factory, HO" {...(field as any)} value={String(field.value ?? "")} />}
