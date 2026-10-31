@@ -92,6 +92,11 @@ export class PurchaseOrderController {
         return this.service.listSellerPersons(orgId);
     }
 
+    @Get("parties/sellers/:orgId/gsts")
+    listSellerGsts(@Param("orgId", ParseIntPipe) orgId: number) {
+        return this.service.listSellerGsts(orgId);
+    }
+
     @Get("parties/ship-to")
     listShipToOptions(@Query("q") q?: string, @Query("ids") ids?: string, @Query("limit") limit?: string) {
         return this.service.listShipToOptions(q, parseIds(ids), parseLimit(limit));
