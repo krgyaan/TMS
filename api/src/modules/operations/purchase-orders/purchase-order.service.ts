@@ -26,6 +26,7 @@ import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 import { OperationNotificationService } from "@/modules/operations/operation-notification.service";
 import { round2, CLOSURE_TOLERANCE } from "@/utils/money.util";
+import { getGstStateNameFromGstin } from "@/utils/gst-state.util";
 
 @Injectable()
 export class PurchaseOrderService {
@@ -308,7 +309,7 @@ export class PurchaseOrderService {
                     poDate: body.poDate,
                     projectName: body.projectName,
 
-                    sellerName: body.sellerName,
+                    sellerName: normalizeVendorName(body.sellerName),
                     sellerOrganizationId: body.sellerOrganizationId || null,
                     sellerAddress: body.sellerAddress,
                     sellerEmail: body.sellerEmail,
@@ -380,10 +381,10 @@ export class PurchaseOrderService {
                     name: body.vendorContactPersonName,
                     email: body.vendorContactPersonEmail,
                     phone: body.vendorContactPersonPhone,
-                    org: body.sellerName,
+                    org: normalizeVendorName(body.sellerName),
                 },
                 {
-                    name: body.sellerName,
+                    name: normalizeVendorName(body.sellerName),
                     email: body.sellerEmail,
                     phone: null,
                     org: null,
@@ -406,7 +407,7 @@ export class PurchaseOrderService {
         this.notifications
             .notifyPoCreated({
                 poNumber,
-                sellerName: body.sellerName,
+                sellerName: normalizeVendorName(body.sellerName),
                 grandTotal: grandTotal.toFixed(2),
                 projectName: body.projectName,
                 createdBy: userId,
@@ -1133,7 +1134,7 @@ export class PurchaseOrderService {
                 .set({
                     poDate: body.poDate,
 
-                    sellerName: body.sellerName,
+                    sellerName: normalizeVendorName(body.sellerName),
                     sellerOrganizationId: body.sellerOrganizationId || null,
                     sellerAddress: body.sellerAddress,
                     sellerEmail: body.sellerEmail,
@@ -1224,7 +1225,7 @@ export class PurchaseOrderService {
                     name: body.vendorContactPersonName,
                     email: body.vendorContactPersonEmail,
                     phone: body.vendorContactPersonPhone,
-                    org: body.sellerName,
+                    org: normalizeVendorName(body.sellerName),
                 },
             ].filter(c => c.name)
         );
@@ -1234,7 +1235,7 @@ export class PurchaseOrderService {
         this.notifications
             .notifyPoUpdated({
                 poNumber: updatedPO.poNumber ?? `#${id}`,
-                sellerName: body.sellerName,
+                sellerName: normalizeVendorName(body.sellerName),
                 updatedBy: userId ?? 0,
             })
             .catch(err => this.logger.warn(`WhatsApp notification failed: ${err}`));
@@ -1242,25 +1243,37 @@ export class PurchaseOrderService {
         return updatedPO;
     }
 
-    // Vendor master is edited through the Vendor Master module only. PO creation
-    // used to write the contact person back into `vendors` (see the removed
-    // syncPersonForOrg) and, until this changed, also overwrote the org `name`.
-    // Writing `name` here let a PO form rename a vendor into a name that already
-    // belonged to another org, which tripped the unique index and failed PO
-    // creation with "Duplicate vendor org". `name` is now owned by vendor master.
+    // Writes the seller block back to the vendor master: organization, the
+    // selected GST registration, and the selected contact person. Conflicts are
+    // logged and skipped so a vendor-master collision never loses a PO.
     private async syncPartyFromPO(body: any) {
         if (body.sellerOrganizationId) {
-            const orgId = body.sellerOrganizationId;
-            await this.db
-                .update(vendorOrganizations)
-                .set({
-                    alias: body.sellerAlias || null,
-                    msme: body.sellerMsmeNo || null,
-                    pan: body.sellerPanNo || null,
-                    address: body.sellerAddress || null,
-                    updatedAt: new Date(),
-                })
-                .where(eq(vendorOrganizations.id, orgId));
+            const orgId = Number(body.sellerOrganizationId);
+            const patch: Record<string, any> = {
+                msme: body.sellerMsmeNo || null,
+                pan: body.sellerPanNo || null,
+                address: body.sellerAddress || null,
+                updatedAt: new Date(),
+            };
+            if (body.sellerAlias !== undefined) patch.alias = body.sellerAlias || null;
+
+            const formattedName = normalizeVendorName(body.sellerName);
+            try {
+                await this.db
+                    .update(vendorOrganizations)
+                    .set({ ...patch, ...(formattedName ? { name: formattedName } : {}) })
+                    .where(eq(vendorOrganizations.id, orgId));
+            } catch (error) {
+                if (isUniqueViolation(error) && formattedName) {
+                    this.logger.warn(`Seller name "${formattedName}" already belongs to another vendor; keeping the existing name on vendor organization ${orgId}.`);
+                    await this.db.update(vendorOrganizations).set(patch).where(eq(vendorOrganizations.id, orgId));
+                } else {
+                    throw error;
+                }
+            }
+
+            await this.syncVendorGst(orgId, body);
+            await this.syncVendorPerson(orgId, body);
         }
         if (body.shipToPartyId) {
             await this.db
@@ -1274,6 +1287,70 @@ export class PurchaseOrderService {
                 })
                 .where(eq(projectParties.id, body.shipToPartyId));
         }
+    }
+
+    private async syncVendorGst(orgId: number, body: any) {
+        const gstId = Number(body.sellerGstId);
+        if (!gstId) return;
+
+        const [row] = await this.db
+            .select({ id: vendorGsts.id })
+            .from(vendorGsts)
+            .where(and(eq(vendorGsts.id, gstId), eq(vendorGsts.orgId, orgId)))
+            .limit(1);
+        if (!row) return;
+
+        const gstNo = body.sellerGstNo ? String(body.sellerGstNo).trim().toUpperCase() : null;
+        if (gstNo) {
+            const duplicate = await this.db
+                .select({ id: vendorGsts.id })
+                .from(vendorGsts)
+                .where(and(eq(vendorGsts.orgId, orgId), ne(vendorGsts.id, gstId), sql`lower(trim(${vendorGsts.gstNo})) = ${gstNo.toLowerCase()}`))
+                .limit(1);
+            if (duplicate[0]) {
+                this.logger.warn(`GST number ${gstNo} already exists for vendor organization ${orgId}; GST not synced.`);
+                return;
+            }
+        }
+
+        const gstState = getGstStateNameFromGstin(gstNo);
+        await this.db
+            .update(vendorGsts)
+            .set({ gstNo, ...(gstState ? { gstState } : {}) })
+            .where(and(eq(vendorGsts.id, gstId), eq(vendorGsts.orgId, orgId)));
+    }
+
+    private async syncVendorPerson(orgId: number, body: any) {
+        const personId = Number(body.vendorPersonId);
+        if (!personId) return;
+
+        const [row] = await this.db
+            .select({ id: vendors.id })
+            .from(vendors)
+            .where(and(eq(vendors.id, personId), eq(vendors.orgId, orgId)))
+            .limit(1);
+        if (!row) return;
+
+        const name = body.vendorContactPersonName ? String(body.vendorContactPersonName).trim() : null;
+        const email = body.vendorContactPersonEmail ? String(body.vendorContactPersonEmail).trim() : null;
+        const mobile = body.vendorContactPersonPhone ? String(body.vendorContactPersonPhone).trim() : null;
+
+        const conflictConditions: SQL<unknown>[] = [];
+        if (email) conflictConditions.push(sql`lower(trim(${vendors.email})) = ${email.toLowerCase()}`);
+        if (mobile) conflictConditions.push(sql`trim(${vendors.mobile}) = ${mobile}`);
+        if (conflictConditions.length > 0) {
+            const duplicate = await this.db
+                .select({ id: vendors.id })
+                .from(vendors)
+                .where(and(eq(vendors.orgId, orgId), ne(vendors.id, personId), or(...conflictConditions)))
+                .limit(1);
+            if (duplicate[0]) {
+                this.logger.warn(`Contact details already exist for vendor organization ${orgId}; contact not synced.`);
+                return;
+            }
+        }
+
+        await this.db.update(vendors).set({ name, email, mobile }).where(and(eq(vendors.id, personId), eq(vendors.orgId, orgId)));
     }
 
     private async resolveCertRecipientEmails(po: any): Promise<string> {
@@ -1845,6 +1922,22 @@ export class PurchaseOrderService {
             .from(vendors)
             .where(eq(vendors.orgId, orgId))
             .orderBy(asc(vendors.id));
+    }
+
+    // GST registrations for one seller org, used by the PO/VWO seller cascade.
+    // Kept on this controller (rather than /vendor-gsts) so operations users do
+    // not need the vendor-master permission to open a PO/VWO form.
+    async listSellerGsts(orgId: number) {
+        return this.db
+            .select({
+                id: vendorGsts.id,
+                gstNo: vendorGsts.gstNo,
+                gstState: vendorGsts.gstState,
+                address: vendorGsts.address,
+            })
+            .from(vendorGsts)
+            .where(eq(vendorGsts.orgId, orgId))
+            .orderBy(asc(vendorGsts.id));
     }
 
     // Ship-to picker reads project_parties only - vendor_organizations never

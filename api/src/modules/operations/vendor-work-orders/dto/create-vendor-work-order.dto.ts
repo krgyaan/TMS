@@ -7,6 +7,8 @@ export const createVendorWorkOrderSchema = z.object({
     woDate: z.string().min(1, "WO date is required"),
     sellerId: z.number().optional(),
     sellerOrganizationId: z.number().optional(),
+    sellerGstId: z.number().optional(),
+    vendorPersonId: z.number().optional(),
     shipToPartyId: z.number().optional(),
     category: z.string().optional().default(""),
 

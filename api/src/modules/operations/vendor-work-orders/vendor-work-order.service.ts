@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Inject, Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
-import { and, eq, like, desc, asc, sql, inArray, isNull, isNotNull, ne } from "drizzle-orm";
+import { and, eq, like, desc, asc, sql, inArray, isNull, isNotNull, ne, or, type SQL } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { rename, readFile } from "node:fs/promises";
@@ -29,6 +29,7 @@ import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 import { OperationNotificationService } from "@/modules/operations/operation-notification.service";
 import { round2, CLOSURE_TOLERANCE } from "@/utils/money.util";
+import { getGstStateNameFromGstin } from "@/utils/gst-state.util";
 
 @Injectable()
 export class VendorWorkOrderService {
@@ -97,7 +98,7 @@ export class VendorWorkOrderService {
                     woDate: body.woDate,
                     projectName: body.projectName,
 
-                    sellerName: body.sellerName,
+                    sellerName: normalizeVendorName(body.sellerName),
                     sellerOrganizationId: body.sellerOrganizationId || null,
                     sellerAddress: body.sellerAddress,
                     sellerEmail: body.sellerEmail,
@@ -174,7 +175,7 @@ export class VendorWorkOrderService {
         this.notifications
             .notifyVwoCreated({
                 woNumber,
-                sellerName: body.sellerName,
+                sellerName: normalizeVendorName(body.sellerName),
                 grandTotal: grandTotal.toFixed(2),
                 projectName: body.projectName,
                 createdBy: userId,
@@ -223,7 +224,7 @@ export class VendorWorkOrderService {
                 .update(vendorWorkOrders)
                 .set({
                     woDate: body.woDate,
-                    sellerName: body.sellerName,
+                    sellerName: normalizeVendorName(body.sellerName),
                     sellerOrganizationId: body.sellerOrganizationId || null,
                     sellerAddress: body.sellerAddress,
                     sellerEmail: body.sellerEmail,
@@ -271,10 +272,10 @@ export class VendorWorkOrderService {
                     name: body.contactPersonName,
                     email: body.contactPersonEmail,
                     phone: body.contactPersonPhone,
-                    org: body.sellerName,
+                    org: normalizeVendorName(body.sellerName),
                 },
                 {
-                    name: body.sellerName,
+                    name: normalizeVendorName(body.sellerName),
                     email: body.sellerEmail,
                     phone: null,
                     org: null,
@@ -313,7 +314,7 @@ export class VendorWorkOrderService {
         this.notifications
             .notifyVwoUpdated({
                 woNumber: existing.woNumber ?? `#${id}`,
-                sellerName: body.sellerName,
+                sellerName: normalizeVendorName(body.sellerName),
                 updatedBy: userId,
             })
             .catch(err => this.logger.warn(`WhatsApp notification failed: ${err}`));
@@ -1583,19 +1584,32 @@ export class VendorWorkOrderService {
         if (!body.sellerName) return;
 
         if (body.sellerOrganizationId) {
-            const orgId = body.sellerOrganizationId;
-            // `name` is deliberately not written back: vendor master owns it.
-            // Renaming from a VWO form could collide with another org's name on
-            // the unique index and crash the save with "Duplicate vendor org".
-            await this.db
-                .update(vendorOrganizations)
-                .set({
-                    address: body.sellerAddress || undefined,
-                    msme: body.sellerMsmeNo || undefined,
-                    pan: body.sellerPanNo || undefined,
-                    updatedAt: new Date(),
-                })
-                .where(eq(vendorOrganizations.id, orgId));
+            const orgId = Number(body.sellerOrganizationId);
+            const patch: Record<string, any> = {
+                address: body.sellerAddress || null,
+                msme: body.sellerMsmeNo || null,
+                pan: body.sellerPanNo || null,
+                updatedAt: new Date(),
+            };
+            if (body.sellerAlias !== undefined) patch.alias = body.sellerAlias || null;
+
+            const formattedName = normalizeVendorName(body.sellerName);
+            try {
+                await this.db
+                    .update(vendorOrganizations)
+                    .set({ ...patch, ...(formattedName ? { name: formattedName } : {}) })
+                    .where(eq(vendorOrganizations.id, orgId));
+            } catch (error) {
+                if (isUniqueViolation(error) && formattedName) {
+                    this.logger.warn(`Seller name "${formattedName}" already belongs to another vendor; keeping the existing name on vendor organization ${orgId}.`);
+                    await this.db.update(vendorOrganizations).set(patch).where(eq(vendorOrganizations.id, orgId));
+                } else {
+                    throw error;
+                }
+            }
+
+            await this.syncVendorGst(orgId, body);
+            await this.syncVendorPerson(orgId, body);
         } else {
             // Sellers live only in vendor master; without an org id there is
             // nothing to write to rather than recreating a party row.
@@ -1628,6 +1642,70 @@ export class VendorWorkOrderService {
                 });
             }
         }
+    }
+
+    private async syncVendorGst(orgId: number, body: any) {
+        const gstId = Number(body.sellerGstId);
+        if (!gstId) return;
+
+        const [row] = await this.db
+            .select({ id: vendorGsts.id })
+            .from(vendorGsts)
+            .where(and(eq(vendorGsts.id, gstId), eq(vendorGsts.orgId, orgId)))
+            .limit(1);
+        if (!row) return;
+
+        const gstNo = body.sellerGstNo ? String(body.sellerGstNo).trim().toUpperCase() : null;
+        if (gstNo) {
+            const duplicate = await this.db
+                .select({ id: vendorGsts.id })
+                .from(vendorGsts)
+                .where(and(eq(vendorGsts.orgId, orgId), ne(vendorGsts.id, gstId), sql`lower(trim(${vendorGsts.gstNo})) = ${gstNo.toLowerCase()}`))
+                .limit(1);
+            if (duplicate[0]) {
+                this.logger.warn(`GST number ${gstNo} already exists for vendor organization ${orgId}; GST not synced.`);
+                return;
+            }
+        }
+
+        const gstState = getGstStateNameFromGstin(gstNo);
+        await this.db
+            .update(vendorGsts)
+            .set({ gstNo, ...(gstState ? { gstState } : {}) })
+            .where(and(eq(vendorGsts.id, gstId), eq(vendorGsts.orgId, orgId)));
+    }
+
+    private async syncVendorPerson(orgId: number, body: any) {
+        const personId = Number(body.vendorPersonId);
+        if (!personId) return;
+
+        const [row] = await this.db
+            .select({ id: vendors.id })
+            .from(vendors)
+            .where(and(eq(vendors.id, personId), eq(vendors.orgId, orgId)))
+            .limit(1);
+        if (!row) return;
+
+        const name = body.vendorContactPersonName ? String(body.vendorContactPersonName).trim() : null;
+        const email = body.vendorContactPersonEmail ? String(body.vendorContactPersonEmail).trim() : null;
+        const mobile = body.vendorContactPersonPhone ? String(body.vendorContactPersonPhone).trim() : null;
+
+        const conflictConditions: SQL<unknown>[] = [];
+        if (email) conflictConditions.push(sql`lower(trim(${vendors.email})) = ${email.toLowerCase()}`);
+        if (mobile) conflictConditions.push(sql`trim(${vendors.mobile}) = ${mobile}`);
+        if (conflictConditions.length > 0) {
+            const duplicate = await this.db
+                .select({ id: vendors.id })
+                .from(vendors)
+                .where(and(eq(vendors.orgId, orgId), ne(vendors.id, personId), or(...conflictConditions)))
+                .limit(1);
+            if (duplicate[0]) {
+                this.logger.warn(`Contact details already exist for vendor organization ${orgId}; contact not synced.`);
+                return;
+            }
+        }
+
+        await this.db.update(vendors).set({ name, email, mobile }).where(and(eq(vendors.id, personId), eq(vendors.orgId, orgId)));
     }
 
     private computeWOHash(wo: any, products: any[], extraCharges: any[] = []): string {
