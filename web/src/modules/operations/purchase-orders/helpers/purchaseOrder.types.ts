@@ -12,6 +12,8 @@ export interface CreatePurchaseOrderDTO {
     category?: string;
     poDate: string;
     sellerOrganizationId?: number;
+    sellerGstId?: number;
+    vendorPersonId?: number;
     shipToPartyId?: number;
     sellerName: string;
     sellerEmail?: string;
@@ -81,6 +83,13 @@ export interface SellerPersonOption {
     mobile?: string | null;
 }
 
+export interface SellerGstOption {
+    id: number;
+    gstNo?: string | null;
+    gstState?: string | null;
+    address?: string | null;
+}
+
 export interface ShipToOption {
     id: number;
     name: string;
@@ -141,6 +150,8 @@ export interface UpdatePurchaseOrderDTO {
     category?: string;
     poDate: string;
     sellerOrganizationId?: number;
+    sellerGstId?: number;
+    vendorPersonId?: number;
     shipToPartyId?: number;
     sellerName: string;
     sellerEmail?: string;

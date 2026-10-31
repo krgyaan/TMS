@@ -16,6 +16,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { usePurchaseOrderDetails, useUpdatePurchaseOrder, useCreatePoParty } from "@/hooks/api/usePurchaseOrders";
 import { useSellerSelectOptions, useShipToSelectOptions } from "@/hooks/useSelectOptions";
 import { useSellerContactPerson } from "@/hooks/useSellerContactPerson";
+import { useSellerGstSelection } from "@/hooks/useSellerGstSelection";
+import { formatVendorName } from "@/lib/vendorName";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -37,6 +39,7 @@ const defaultFormValues: PurchaseOrderFormValues = {
     category: "",
     poDate: "",
     sellerId: "",
+    sellerGstId: "",
     sellerName: "",
     sellerEmail: "",
     sellerAddress: "",
@@ -128,6 +131,7 @@ export default function EditPurchaseOrderPage() {
         defaultValues: defaultFormValues,
     });
     const selectedSellerId = form.watch("sellerId");
+    const selectedSellerGstId = form.watch("sellerGstId");
     const selectedPartyId = form.watch("partyId");
 
     // Server-searched pickers. Each owns its query (debounced inside), and pins
@@ -141,16 +145,25 @@ export default function EditPurchaseOrderPage() {
     const activeTeamMembers = useMemo(() => (teamMembers || []).filter((u: any) => u.isActive), [teamMembers]);
 
     const { sellerPersons } = useSellerContactPerson(form, { autoSelectFirstOnLoad: false });
+    const { sellerGsts, isLoading: isSellerGstsLoading } = useSellerGstSelection(form);
 
     const sellerPersonOptions = useMemo(() => sellerPersons.map(p => ({ id: String(p.id), name: p.name || "Unnamed person" })), [sellerPersons]);
+    const sellerGstOptions = useMemo(
+        () =>
+            sellerGsts.map(g => ({
+                id: String(g.id),
+                name: g.gstNo || "No GSTIN",
+                description: [g.gstState, g.address].filter(Boolean).join(" · ") || undefined,
+            })),
+        [sellerGsts],
+    );
 
     useEffect(() => {
         if (!selectedSellerId || selectedSellerId === "__create_new__") return;
         const party = sellerRows.find(p => String(p.id) === selectedSellerId);
         if (!party) return;
-        form.setValue("sellerName", party.name || "");
+        form.setValue("sellerName", formatVendorName(party.name || ""));
         form.setValue("sellerAddress", party.address || "");
-        form.setValue("sellerGstNo", party.gstNo || "");
         form.setValue("sellerPanNo", party.pan || "");
         form.setValue("sellerMsmeNo", party.msme || "");
         // Contact person is deliberately not written here: the seller effect used
@@ -186,6 +199,7 @@ export default function EditPurchaseOrderPage() {
             category: poData.category || "",
             poDate: formatDateForInput(poData.poDate),
             sellerId: poData.sellerOrganizationId ? String(poData.sellerOrganizationId) : "",
+            sellerGstId: "",
             sellerName: poData.sellerName || "",
             sellerEmail: poData.sellerEmail || "",
             sellerAddress: poData.sellerAddress || "",
@@ -479,6 +493,23 @@ export default function EditPurchaseOrderPage() {
                                     onSearch={onSellerSearch}
                                     isLoading={isSellerLoading}
                                 />
+                                <SelectField
+                                    control={form.control}
+                                    name="sellerGstId"
+                                    label="GST Registration"
+                                    options={sellerGstOptions}
+                                    placeholder={
+                                        !selectedSellerId
+                                            ? "Select a vendor first"
+                                            : isSellerGstsLoading
+                                              ? "Loading GSTs..."
+                                              : sellerGsts.length === 0
+                                                ? "No GSTs saved for this vendor"
+                                                : "Select a GST..."
+                                    }
+                                    disabled={!selectedSellerId || sellerGsts.length === 0}
+                                    valueType="string"
+                                />
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                                     <FieldWrapper
                                         control={form.control}
@@ -489,7 +520,16 @@ export default function EditPurchaseOrderPage() {
                                             </>
                                         }
                                     >
-                                        {field => <Input {...field} placeholder="Enter seller name" />}
+                                        {field => (
+                                            <Input
+                                                {...field}
+                                                placeholder="Enter seller name"
+                                                onBlur={() => {
+                                                    field.onChange(formatVendorName(field.value));
+                                                    field.onBlur();
+                                                }}
+                                            />
+                                        )}
                                     </FieldWrapper>
                                     <FieldWrapper
                                         control={form.control}
@@ -674,6 +714,7 @@ export default function EditPurchaseOrderPage() {
                                         }
                                         options={sellerPersonOptions}
                                         placeholder={sellerPersons.length ? "Select vendor contact person..." : "No persons saved for this vendor"}
+                                        disabled={!selectedSellerGstId && sellerGsts.length > 0}
                                     />
                                     <FieldWrapper control={form.control} name="vendorContactPersonName" label="Vendor Contact Name">
                                         {field => <Input {...field} placeholder="Enter vendor contact name" />}

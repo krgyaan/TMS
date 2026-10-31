@@ -27,6 +27,7 @@ export const purchaseOrderFormSchema = z
         poDate: z.string().min(1, "PO date is required"),
 
         sellerId: z.string(),
+        sellerGstId: z.string(),
         sellerName: z.string().min(1, "Seller name is required"),
         sellerEmail: z.string(),
         sellerAddress: z.string(),
