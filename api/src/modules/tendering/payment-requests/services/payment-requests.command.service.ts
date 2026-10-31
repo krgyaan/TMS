@@ -116,8 +116,8 @@ export class PaymentRequestsCommandService {
                     );
                     results.push({ request, instrument });
 
-                    // Auto-create Cheque after DD/FDR creation
-                    if ((payload.EMD.mode === 'DD' || payload.EMD.mode === 'FDR') && instrument) {
+                    // Auto-create Cheque after DD creation (FDR no longer auto-creates a Cheque)
+                    if (payload.EMD.mode === 'DD' && instrument) {
                         const chequeResult = await this.autoCreateChequeFromDdFdr(
                             tx,
                             request,
@@ -320,8 +320,9 @@ export class PaymentRequestsCommandService {
                 try {
                     const mode = instrument.instrumentType;
                     
-                    // Skip email for DD/FDR (auto-created Cheque will send its own email)
-                    if (!isAutoCreatedCheque && (mode === 'DD' || mode === 'FDR')) {
+                    // Skip email for DD (auto-created Cheque will send its own email).
+                    // FDR is sent via the dedicated FDR branch in sendPaymentInstrumentEmail().
+                    if (!isAutoCreatedCheque && mode === 'DD') {
                         continue;
                     }
                     
