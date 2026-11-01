@@ -32,6 +32,7 @@ const fixedExpenseSelection = {
     type: fixedExpenses.type,
     dueDate: fixedExpenses.dueDate,
     paymentFrequency: fixedExpenses.paymentFrequency,
+    deleteStatus: fixedExpenses.deleteStatus,
     makerId: fixedExpenses.makerId,
     makerName: makerUser.name,
     createdBy: fixedExpenses.createdBy,
@@ -52,6 +53,7 @@ type FixedExpenseRow = {
     type: string;
     dueDate: string;
     paymentFrequency: string;
+    deleteStatus: boolean;
     makerId: number | null;
     makerName: string | null;
     createdBy: number;
@@ -79,6 +81,7 @@ export class FixedExpensesService {
             type: row.type as FixedExpenseType,
             dueDate: row.dueDate ?? "",
             paymentFrequency: row.paymentFrequency as FixedExpenseFrequency,
+            deleteStatus: row.deleteStatus,
             makerId: row.makerId ?? null,
             makerName: row.makerName ?? null,
             createdBy: row.createdBy,
@@ -139,6 +142,9 @@ export class FixedExpensesService {
         if (filters?.amountType) {
             conditions.push(eq(fixedExpenses.amountType, filters.amountType));
         }
+
+        // Archived rows are hidden unless explicitly requested
+        conditions.push(eq(fixedExpenses.deleteStatus, filters?.deleteStatus ?? false));
 
         return conditions.length > 0 ? and(...conditions.filter(Boolean)) : undefined;
     }
@@ -221,6 +227,7 @@ export class FixedExpensesService {
                 type: data.type,
                 dueDate: data.dueDate,
                 paymentFrequency: data.paymentFrequency,
+                deleteStatus: false,
                 makerId: data.makerId ?? null,
                 createdBy,
                 createdAt: now,
@@ -255,8 +262,17 @@ export class FixedExpensesService {
         if (data.dueDate !== undefined) updateData.dueDate = data.dueDate;
         if (data.paymentFrequency !== undefined) updateData.paymentFrequency = data.paymentFrequency;
         if (data.makerId !== undefined) updateData.makerId = data.makerId;
+        if (data.deleteStatus !== undefined) updateData.deleteStatus = data.deleteStatus;
 
         await this.db.update(fixedExpenses).set(updateData).where(eq(fixedExpenses.id, id));
+
+        return this.findById(id);
+    }
+
+    async setArchiveStatus(id: number, deleteStatus: boolean): Promise<FixedExpenseResponse> {
+        await this.findById(id);
+
+        await this.db.update(fixedExpenses).set({ deleteStatus, updatedAt: new Date() }).where(eq(fixedExpenses.id, id));
 
         return this.findById(id);
     }

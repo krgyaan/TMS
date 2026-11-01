@@ -1,4 +1,4 @@
-import { pgTable, bigserial, bigint, varchar, numeric, date, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, bigserial, bigint, boolean, varchar, numeric, date, timestamp, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { users } from "@db/schemas/auth";
 
@@ -28,6 +28,9 @@ export const fixedExpenses = pgTable(
         type: varchar("type", { length: 50 }).notNull(),
         dueDate: date("due_date").notNull(),
         paymentFrequency: varchar("payment_frequency", { length: 20 }).notNull().default("monthly"),
+
+        // Archive flag: true = archived (soft deleted)
+        deleteStatus: boolean("delete_status").notNull().default(false),
 
         // Reserved for the future maker-checker workflow
         makerId: bigint("maker_id", { mode: "number" }).references(() => users.id),

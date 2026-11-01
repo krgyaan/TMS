@@ -38,6 +38,7 @@ const fixedExpenseBaseSchema = z.object({
     dueDate: dateString,
     paymentFrequency: z.enum(FIXED_EXPENSE_FREQUENCIES).default("monthly"),
     makerId: z.number().int().positive().optional().nullable(),
+    deleteStatus: z.boolean().default(false),
 });
 
 const requireBankDetailsWhenBankTransfer = (
@@ -73,6 +74,10 @@ export const createFixedExpenseSchema = fixedExpenseBaseSchema.superRefine(requi
 
 export const updateFixedExpenseSchema = fixedExpenseBaseSchema.partial();
 
+export const archiveFixedExpenseSchema = z.object({
+    deleteStatus: z.boolean(),
+});
+
 export const fixedExpenseQuerySchema = z.object({
     page: z.coerce.number().min(1).default(1),
     limit: z.coerce.number().min(1).max(100).default(10),
@@ -81,6 +86,10 @@ export const fixedExpenseQuerySchema = z.object({
     paymentFrequency: z.enum(FIXED_EXPENSE_FREQUENCIES).optional(),
     paymentMode: z.enum(FIXED_EXPENSE_PAYMENT_MODES).optional(),
     amountType: z.enum(FIXED_EXPENSE_AMOUNT_TYPES).optional(),
+    deleteStatus: z
+        .union([z.boolean(), z.enum(["true", "false"])])
+        .transform(value => value === true || value === "true")
+        .optional(),
     sortBy: z.enum(["partyName", "amount", "type", "dueDate", "createdAt"]).default("createdAt"),
     sortOrder: z.enum(["asc", "desc"]).default("desc"),
 });
@@ -89,6 +98,7 @@ export const fixedExpenseQuerySchema = z.object({
 
 export type CreateFixedExpenseDto = z.infer<typeof createFixedExpenseSchema>;
 export type UpdateFixedExpenseDto = z.infer<typeof updateFixedExpenseSchema>;
+export type ArchiveFixedExpenseDto = z.infer<typeof archiveFixedExpenseSchema>;
 export type FixedExpenseQuery = z.infer<typeof fixedExpenseQuerySchema>;
 
 export type FixedExpenseType = (typeof FIXED_EXPENSE_TYPES)[number];
@@ -108,6 +118,7 @@ export interface FixedExpenseResponse {
     type: FixedExpenseType;
     dueDate: string;
     paymentFrequency: FixedExpenseFrequency;
+    deleteStatus: boolean;
     makerId: number | null;
     makerName?: string | null;
     createdBy: number;

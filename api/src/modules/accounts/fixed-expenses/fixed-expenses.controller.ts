@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query } from "@nestjs/common";
 import { CurrentUser } from "@/decorators/current-user.decorator";
 import { FixedExpensesService } from "./fixed-expenses.service";
-import { createFixedExpenseSchema, fixedExpenseQuerySchema, updateFixedExpenseSchema } from "./dto/fixed-expenses.dto";
+import { archiveFixedExpenseSchema, createFixedExpenseSchema, fixedExpenseQuerySchema, updateFixedExpenseSchema } from "./dto/fixed-expenses.dto";
 
 @Controller("fixed-expenses")
 export class FixedExpensesController {
@@ -16,6 +16,7 @@ export class FixedExpensesController {
         @Query("paymentFrequency") paymentFrequency?: string,
         @Query("paymentMode") paymentMode?: string,
         @Query("amountType") amountType?: string,
+        @Query("deleteStatus") deleteStatus?: string,
         @Query("sortBy") sortBy?: string,
         @Query("sortOrder") sortOrder?: "asc" | "desc"
     ) {
@@ -27,6 +28,7 @@ export class FixedExpensesController {
             paymentFrequency,
             paymentMode,
             amountType,
+            deleteStatus,
             sortBy,
             sortOrder,
         });
@@ -50,6 +52,12 @@ export class FixedExpensesController {
     async update(@Param("id", ParseIntPipe) id: number, @Body() body: unknown) {
         const parsed = updateFixedExpenseSchema.parse(body);
         return this.fixedExpensesService.update(id, parsed);
+    }
+
+    @Patch(":id/archive")
+    async archive(@Param("id", ParseIntPipe) id: number, @Body() body: unknown) {
+        const parsed = archiveFixedExpenseSchema.parse(body);
+        return this.fixedExpensesService.setArchiveStatus(id, parsed.deleteStatus);
     }
 
     @Delete(":id")

@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS "fixed_expenses" (
     "type" varchar(50) NOT NULL,
     "due_date" date NOT NULL,
     "payment_frequency" varchar(20) NOT NULL DEFAULT 'monthly',
+    "delete_status" boolean NOT NULL DEFAULT false,
     "maker_id" bigint REFERENCES "users"("id"),
     "created_by" bigint NOT NULL REFERENCES "users"("id"),
     "created_at" timestamp with time zone NOT NULL DEFAULT now(),
