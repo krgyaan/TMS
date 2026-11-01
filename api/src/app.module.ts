@@ -105,6 +105,7 @@ import { join } from "path";
 import { AllExceptionsFilter } from "./logger/all-exception.filter";
 import { AccountChecklistModule } from "./modules/accounts/account-checklist/account-checklist.module";
 import { LoanAdvanceModule } from "./modules/accounts/loan-advance/loan-advance.module";
+import { FixedExpensesModule } from "./modules/accounts/fixed-expenses/fixed-expenses.module";
 import { TdsGstChecklistsModule } from "./modules/accounts/tds-gst-checklists/tds-gst-checklists.module";
 import { EmployeeOnboardingModule } from "./modules/hrms/employee-onboarding/employee-onboarding.module";
 import { OnboardingModule } from "./modules/hrms/onboarding/onboarding.module";
@@ -259,6 +260,7 @@ import { QueueMonitoringModule } from "./modules/queue-monitoring/queue-monitori
         RequestExtensionsModule,
         SubmitQueriesModule,
         LoanAdvanceModule,
+        FixedExpensesModule,
         TdsGstChecklistsModule,
         CustomerPerformanceModule,
         LocationPerformanceModule,
@@ -291,7 +293,7 @@ import { QueueMonitoringModule } from "./modules/queue-monitoring/queue-monitori
         OpenwaModule,
         NotificationsModule,
         PublicNotificationsModule,
-        QueueMonitoringModule
+        QueueMonitoringModule,
     ],
     controllers: [AppController, WebhookController],
     providers: [

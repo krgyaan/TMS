@@ -1,0 +1,60 @@
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query } from "@nestjs/common";
+import { CurrentUser } from "@/decorators/current-user.decorator";
+import { FixedExpensesService } from "./fixed-expenses.service";
+import { createFixedExpenseSchema, fixedExpenseQuerySchema, updateFixedExpenseSchema } from "./dto/fixed-expenses.dto";
+
+@Controller("fixed-expenses")
+export class FixedExpensesController {
+    constructor(private readonly fixedExpensesService: FixedExpensesService) {}
+
+    @Get()
+    async list(
+        @Query("page") page?: string,
+        @Query("limit") limit?: string,
+        @Query("search") search?: string,
+        @Query("type") type?: string,
+        @Query("paymentFrequency") paymentFrequency?: string,
+        @Query("paymentMode") paymentMode?: string,
+        @Query("amountType") amountType?: string,
+        @Query("sortBy") sortBy?: string,
+        @Query("sortOrder") sortOrder?: "asc" | "desc"
+    ) {
+        const filters = fixedExpenseQuerySchema.parse({
+            page: page ? parseInt(page, 10) : undefined,
+            limit: limit ? parseInt(limit, 10) : undefined,
+            search,
+            type,
+            paymentFrequency,
+            paymentMode,
+            amountType,
+            sortBy,
+            sortOrder,
+        });
+
+        return this.fixedExpensesService.findAll(filters);
+    }
+
+    @Get(":id")
+    async getById(@Param("id", ParseIntPipe) id: number) {
+        return this.fixedExpensesService.findById(id);
+    }
+
+    @Post()
+    @HttpCode(HttpStatus.CREATED)
+    async create(@Body() body: unknown, @CurrentUser("id") userId: number) {
+        const parsed = createFixedExpenseSchema.parse(body);
+        return this.fixedExpensesService.create(parsed, userId);
+    }
+
+    @Patch(":id")
+    async update(@Param("id", ParseIntPipe) id: number, @Body() body: unknown) {
+        const parsed = updateFixedExpenseSchema.parse(body);
+        return this.fixedExpensesService.update(id, parsed);
+    }
+
+    @Delete(":id")
+    @HttpCode(HttpStatus.NO_CONTENT)
+    async delete(@Param("id", ParseIntPipe) id: number) {
+        await this.fixedExpensesService.delete(id);
+    }
+}
