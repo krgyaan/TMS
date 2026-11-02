@@ -121,12 +121,36 @@ export class FixedExpensesService {
         const search = filters?.search?.trim();
 
         if (search) {
+            // Match the search term against every column visible in a row, so typing
+            // anything shown on the list (type, status, amount, date, etc.) finds it.
+            const term = `%${search}%`;
+            // Enum-like columns are stored as slugs ("auto_debit"), so also try a
+            // slugified term to make "auto debit" match.
+            const slugTerm = `%${search.replace(/\s+/g, "_")}%`;
+            // Amounts are displayed with currency formatting, so also match a
+            // numeric-only term (e.g. "5,000" / "₹5000" -> 5000).
+            const numeric = search.replace(/[^\d.]/g, "");
+            const numericTerm = numeric ? `%${numeric}%` : undefined;
+
             conditions.push(
                 or(
-                    ilike(fixedExpenses.partyName, `%${search}%`),
-                    ilike(fixedExpenses.accountName, `%${search}%`),
-                    ilike(fixedExpenses.accountNumber, `%${search}%`),
-                    ilike(fixedExpenses.ifscCode, `%${search}%`)
+                    ilike(fixedExpenses.partyName, term),
+                    ilike(fixedExpenses.type, term),
+                    ilike(fixedExpenses.status, term),
+                    ilike(fixedExpenses.amountType, term),
+                    ilike(fixedExpenses.amountType, slugTerm),
+                    ilike(fixedExpenses.paymentMode, term),
+                    ilike(fixedExpenses.paymentMode, slugTerm),
+                    ilike(fixedExpenses.paymentFrequency, term),
+                    ilike(fixedExpenses.paymentFrequency, slugTerm),
+                    ilike(fixedExpenses.accountName, term),
+                    ilike(fixedExpenses.accountNumber, term),
+                    ilike(fixedExpenses.ifscCode, term),
+                    sql`${fixedExpenses.amount}::text ilike ${term}`,
+                    numericTerm ? sql`${fixedExpenses.amount}::text ilike ${numericTerm}` : undefined,
+                    sql`${fixedExpenses.id}::text ilike ${term}`,
+                    sql`${fixedExpenses.dueDate}::text ilike ${term}`,
+                    ilike(creatorUser.name, term)
                 )
             );
         }
@@ -179,6 +203,7 @@ export class FixedExpensesService {
             this.db
                 .select({ count: sql<number>`count(*)::int` })
                 .from(fixedExpenses)
+                .leftJoin(creatorUser, eq(creatorUser.id, fixedExpenses.createdBy))
                 .where(whereClause)
                 .then(([r]) => Number(r?.count ?? 0)),
             this.db

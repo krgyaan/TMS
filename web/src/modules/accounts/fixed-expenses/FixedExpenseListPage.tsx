@@ -1,10 +1,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -38,7 +38,26 @@ const AMOUNT_TYPE_OPTIONS = [
     { label: 'Variable', value: 'variable' },
 ];
 
-const FixedExpenseListPage = () => {
+const FixedExpenseListSkeleton = () => (
+    <Card>
+        <CardHeader>
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-48 mt-2" />
+        </CardHeader>
+        <CardContent className="p-6">
+            <div className="space-y-4">
+                <div className="flex gap-2">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                        <Skeleton key={i} className="h-10 w-32" />
+                    ))}
+                </div>
+                <Skeleton className="h-[500px] w-full" />
+            </div>
+        </CardContent>
+    </Card>
+);
+
+const FixedExpenseListContent = () => {
     const {
         activeTab,
         setActiveTab,
@@ -51,10 +70,8 @@ const FixedExpenseListPage = () => {
         handleSortChanged,
         handlePageSizeChange,
     } = usePersistentTableState<'fixed' | 'variable'>({
-        storageKey: 'fixed-expenses',
+        storageKey: 'accounts-fixed-expenses',
         defaultTab: 'fixed',
-        defaultSortBy: 'createdAt',
-        defaultSortOrder: 'desc',
     });
 
     const navigate = useNavigate();
@@ -244,24 +261,7 @@ const FixedExpenseListPage = () => {
     );
 
     if (loading) {
-        return (
-            <Card>
-                <CardHeader>
-                    <Skeleton className="h-8 w-64" />
-                    <Skeleton className="h-4 w-48 mt-2" />
-                </CardHeader>
-                <CardContent className="p-6">
-                    <div className="space-y-4">
-                        <div className="flex gap-2">
-                            {Array.from({ length: 3 }).map((_, i) => (
-                                <Skeleton key={i} className="h-10 w-32" />
-                            ))}
-                        </div>
-                        <Skeleton className="h-[500px] w-full" />
-                    </div>
-                </CardContent>
-            </Card>
-        );
+        return <FixedExpenseListSkeleton />;
     }
 
     if (error) {
@@ -312,10 +312,10 @@ const FixedExpenseListPage = () => {
                     />
                     <div className="flex-1 flex justify-end">
                         <div className="relative">
-                            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
                                 type="text"
-                                placeholder="Search by party name, account no..."
+                                placeholder="Search..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 className="pl-8 w-64"
@@ -361,6 +361,61 @@ const FixedExpenseListPage = () => {
             </CardContent>
         </Card>
     );
+};
+
+
+const FixedExpenseListPage = () => {
+    const [searchParams, setSearchParams] = useSearchParams();
+    const [initialHadRedundantSort] = useState(() => {
+        const params = new URLSearchParams(window.location.search);
+        return (
+            params.get('sortBy') === 'createdAt' &&
+            params.get('sortOrder') === 'desc'
+        );
+    });
+
+    const [ready, setReady] = useState(() => {
+        try {
+            const key = 'tms:table-state:accounts-fixed-expenses';
+            const raw = window.sessionStorage.getItem(key);
+            if (raw) {
+                const saved = JSON.parse(raw) as Record<string, unknown>;
+                if (saved.sortBy === 'createdAt' && saved.sortOrder === 'desc') {
+                    delete saved.sortBy;
+                    delete saved.sortOrder;
+                    window.sessionStorage.setItem(key, JSON.stringify(saved));
+                }
+            }
+        } catch {
+            // Storage unavailable — nothing to sanitize.
+        }
+
+        return !initialHadRedundantSort;
+    });
+
+    const hasRedundantDefaultSort =
+        searchParams.get('sortBy') === 'createdAt' &&
+        searchParams.get('sortOrder') === 'desc';
+
+    useEffect(() => {
+        if (ready) return;
+
+        if (hasRedundantDefaultSort) {
+            const next = new URLSearchParams(searchParams);
+            next.delete('sortBy');
+            next.delete('sortOrder');
+            setSearchParams(next, { replace: true });
+            return;
+        }
+
+        setReady(true);
+    }, [ready, hasRedundantDefaultSort, searchParams, setSearchParams]);
+
+    if (!ready) {
+        return <FixedExpenseListSkeleton />;
+    }
+
+    return <FixedExpenseListContent />;
 };
 
 export default FixedExpenseListPage;
