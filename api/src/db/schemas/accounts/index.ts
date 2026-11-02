@@ -12,3 +12,6 @@ export * from "./employee-imprest-voucher-item.schema";
 
 // Insurance Policies
 export * from "./insurance-policy.schema";
+
+// Fixed Expenses
+export * from "./fixed-expense.schema";

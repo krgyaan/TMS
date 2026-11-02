@@ -1,5 +1,5 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, eq, like, desc, asc, sql, inArray, isNull, isNotNull, ne } from "drizzle-orm";
+import { BadRequestException, ConflictException, Inject, Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
+import { and, eq, like, desc, asc, sql, inArray, isNull, isNotNull, ne, or, type SQL } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { rename, readFile } from "node:fs/promises";
@@ -29,6 +29,7 @@ import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 import { OperationNotificationService } from "@/modules/operations/operation-notification.service";
 import { round2, CLOSURE_TOLERANCE } from "@/utils/money.util";
+import { getGstStateNameFromGstin } from "@/utils/gst-state.util";
 
 @Injectable()
 export class VendorWorkOrderService {
@@ -97,7 +98,7 @@ export class VendorWorkOrderService {
                     woDate: body.woDate,
                     projectName: body.projectName,
 
-                    sellerName: body.sellerName,
+                    sellerName: normalizeVendorName(body.sellerName),
                     sellerOrganizationId: body.sellerOrganizationId || null,
                     sellerAddress: body.sellerAddress,
                     sellerEmail: body.sellerEmail,
@@ -174,7 +175,7 @@ export class VendorWorkOrderService {
         this.notifications
             .notifyVwoCreated({
                 woNumber,
-                sellerName: body.sellerName,
+                sellerName: normalizeVendorName(body.sellerName),
                 grandTotal: grandTotal.toFixed(2),
                 projectName: body.projectName,
                 createdBy: userId,
@@ -223,7 +224,7 @@ export class VendorWorkOrderService {
                 .update(vendorWorkOrders)
                 .set({
                     woDate: body.woDate,
-                    sellerName: body.sellerName,
+                    sellerName: normalizeVendorName(body.sellerName),
                     sellerOrganizationId: body.sellerOrganizationId || null,
                     sellerAddress: body.sellerAddress,
                     sellerEmail: body.sellerEmail,
@@ -271,10 +272,10 @@ export class VendorWorkOrderService {
                     name: body.contactPersonName,
                     email: body.contactPersonEmail,
                     phone: body.contactPersonPhone,
-                    org: body.sellerName,
+                    org: normalizeVendorName(body.sellerName),
                 },
                 {
-                    name: body.sellerName,
+                    name: normalizeVendorName(body.sellerName),
                     email: body.sellerEmail,
                     phone: null,
                     org: null,
@@ -313,7 +314,7 @@ export class VendorWorkOrderService {
         this.notifications
             .notifyVwoUpdated({
                 woNumber: existing.woNumber ?? `#${id}`,
-                sellerName: body.sellerName,
+                sellerName: normalizeVendorName(body.sellerName),
                 updatedBy: userId,
             })
             .catch(err => this.logger.warn(`WhatsApp notification failed: ${err}`));
@@ -1220,7 +1221,7 @@ export class VendorWorkOrderService {
 
     // Regenerates the latest VWO PDF (items + extra charges) after the PI form
     // has altered the order. Fire-and-forget from the invoice service.
-    async regeneratePdf(id: number): Promise<void> {
+    async regeneratePdf(id: number) {
         const wo = await this.db
             .select()
             .from(vendorWorkOrders)
@@ -1228,7 +1229,30 @@ export class VendorWorkOrderService {
             .then(rows => rows[0]);
         if (!wo) throw new NotFoundException("Vendor Work Order not found");
         const items = await this.db.select().from(vendorWorkOrderItems).where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
-        await this.generatePdfForWO(wo, items);
+        return this.generatePdfForWO(wo, items);
+    }
+
+    async retryPdfGeneration(id: number) {
+        const wo = await this.db
+            .select()
+            .from(vendorWorkOrders)
+            .where(eq(vendorWorkOrders.id, id))
+            .then(rows => rows[0]);
+        if (!wo) throw new NotFoundException("Vendor Work Order not found");
+        const items = await this.db.select().from(vendorWorkOrderItems).where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
+
+        try {
+            const result = await this.generatePdfForWO(wo, items);
+            return {
+                status: result.generated ? "generated" : "unchanged",
+                version: result.version,
+            };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.error(`PDF generation retry failed for VWO ${id}: ${message}`);
+            if (error instanceof BadRequestException) throw error;
+            throw new InternalServerErrorException("Vendor Work Order PDF generation failed. Please retry.");
+        }
     }
 
     async listParties(type?: string) {
@@ -1560,19 +1584,35 @@ export class VendorWorkOrderService {
         if (!body.sellerName) return;
 
         if (body.sellerOrganizationId) {
-            const orgId = body.sellerOrganizationId;
-            // `name` is deliberately not written back: vendor master owns it.
-            // Renaming from a VWO form could collide with another org's name on
-            // the unique index and crash the save with "Duplicate vendor org".
-            await this.db
-                .update(vendorOrganizations)
-                .set({
-                    address: body.sellerAddress || undefined,
-                    msme: body.sellerMsmeNo || undefined,
-                    pan: body.sellerPanNo || undefined,
-                    updatedAt: new Date(),
-                })
-                .where(eq(vendorOrganizations.id, orgId));
+            const orgId = Number(body.sellerOrganizationId);
+            const hasGst = Number(body.sellerGstId) > 0;
+            const patch: Record<string, any> = {
+                msme: body.sellerMsmeNo || null,
+                pan: body.sellerPanNo || null,
+                // The address field belongs to the selected GST registration
+                // when one is chosen; otherwise it is the org address.
+                ...(hasGst ? {} : { address: body.sellerAddress || null }),
+                updatedAt: new Date(),
+            };
+            if (body.sellerAlias !== undefined) patch.alias = body.sellerAlias || null;
+
+            const formattedName = normalizeVendorName(body.sellerName);
+            try {
+                await this.db
+                    .update(vendorOrganizations)
+                    .set({ ...patch, ...(formattedName ? { name: formattedName } : {}) })
+                    .where(eq(vendorOrganizations.id, orgId));
+            } catch (error) {
+                if (isUniqueViolation(error) && formattedName) {
+                    this.logger.warn(`Seller name "${formattedName}" already belongs to another vendor; keeping the existing name on vendor organization ${orgId}.`);
+                    await this.db.update(vendorOrganizations).set(patch).where(eq(vendorOrganizations.id, orgId));
+                } else {
+                    throw error;
+                }
+            }
+
+            await this.syncVendorGst(orgId, body);
+            await this.syncVendorPerson(orgId, body);
         } else {
             // Sellers live only in vendor master; without an org id there is
             // nothing to write to rather than recreating a party row.
@@ -1605,6 +1645,74 @@ export class VendorWorkOrderService {
                 });
             }
         }
+    }
+
+    private async syncVendorGst(orgId: number, body: any) {
+        const gstId = Number(body.sellerGstId);
+        if (!gstId) return;
+
+        const [row] = await this.db
+            .select({ id: vendorGsts.id })
+            .from(vendorGsts)
+            .where(and(eq(vendorGsts.id, gstId), eq(vendorGsts.orgId, orgId)))
+            .limit(1);
+        if (!row) return;
+
+        const gstNo = body.sellerGstNo ? String(body.sellerGstNo).trim().toUpperCase() : null;
+        if (gstNo) {
+            const duplicate = await this.db
+                .select({ id: vendorGsts.id })
+                .from(vendorGsts)
+                .where(and(eq(vendorGsts.orgId, orgId), ne(vendorGsts.id, gstId), sql`lower(trim(${vendorGsts.gstNo})) = ${gstNo.toLowerCase()}`))
+                .limit(1);
+            if (duplicate[0]) {
+                this.logger.warn(`GST number ${gstNo} already exists for vendor organization ${orgId}; GST not synced.`);
+                return;
+            }
+        }
+
+        const gstState = getGstStateNameFromGstin(gstNo);
+        await this.db
+            .update(vendorGsts)
+            .set({
+                gstNo,
+                ...(gstState ? { gstState } : {}),
+                ...(body.sellerAddress !== undefined ? { address: body.sellerAddress || null } : {}),
+            })
+            .where(and(eq(vendorGsts.id, gstId), eq(vendorGsts.orgId, orgId)));
+    }
+
+    private async syncVendorPerson(orgId: number, body: any) {
+        const personId = Number(body.vendorPersonId);
+        if (!personId) return;
+
+        const [row] = await this.db
+            .select({ id: vendors.id })
+            .from(vendors)
+            .where(and(eq(vendors.id, personId), eq(vendors.orgId, orgId)))
+            .limit(1);
+        if (!row) return;
+
+        const name = body.vendorContactPersonName ? String(body.vendorContactPersonName).trim() : null;
+        const email = body.vendorContactPersonEmail ? String(body.vendorContactPersonEmail).trim() : null;
+        const mobile = body.vendorContactPersonPhone ? String(body.vendorContactPersonPhone).trim() : null;
+
+        const conflictConditions: SQL<unknown>[] = [];
+        if (email) conflictConditions.push(sql`lower(trim(${vendors.email})) = ${email.toLowerCase()}`);
+        if (mobile) conflictConditions.push(sql`trim(${vendors.mobile}) = ${mobile}`);
+        if (conflictConditions.length > 0) {
+            const duplicate = await this.db
+                .select({ id: vendors.id })
+                .from(vendors)
+                .where(and(eq(vendors.orgId, orgId), ne(vendors.id, personId), or(...conflictConditions)))
+                .limit(1);
+            if (duplicate[0]) {
+                this.logger.warn(`Contact details already exist for vendor organization ${orgId}; contact not synced.`);
+                return;
+            }
+        }
+
+        await this.db.update(vendors).set({ name, email, mobile }).where(and(eq(vendors.id, personId), eq(vendors.orgId, orgId)));
     }
 
     private computeWOHash(wo: any, products: any[], extraCharges: any[] = []): string {
@@ -1650,15 +1758,15 @@ export class VendorWorkOrderService {
         return createHash("sha256").update(JSON.stringify(fields)).digest("hex");
     }
 
-    private async generatePdfForWO(wo: any, products: any[]) {
+    private async generatePdfForWO(wo: any, products: any[]): Promise<{ generated: boolean; version?: string }> {
         const extraCharges = await this.db.select().from(orderExtraCharges).where(eq(orderExtraCharges.vendorWorkOrderId, wo.id)).orderBy(asc(orderExtraCharges.id));
         const contentHash = this.computeWOHash(wo, products, extraCharges);
 
         const versions = (wo.generatedPdfVersions ?? {}) as Record<string, { path: string; hash: string }>;
-        const existingVersion = Object.values(versions).find(v => v.hash === contentHash);
-        if (existingVersion) {
+        const existingEntry = Object.entries(versions).find(([, v]) => v.hash === contentHash);
+        if (existingEntry) {
             this.logger.info(`VWO ${wo.id}: no changes detected, reusing existing PDF`);
-            return;
+            return { generated: false, version: existingEntry[0] };
         }
 
         const items = (products || []).map((p: any, i: number) => {
@@ -1743,42 +1851,47 @@ export class VendorWorkOrderService {
 
         try {
             const pdfPaths = await this.pdfGenerator.generatePdfs("vwo", data, wo.id, "VWO");
-            if (pdfPaths.length > 0) {
-                // Rename PDF to use WO sequence number instead of timestamp (avoids Date.now() race)
-                const woSeq = wo.woNumber?.split("/").pop() || `WO${wo.id}`;
-                const rand = randomUUID().split("-")[0];
-                const newFileName = `${woSeq}-${rand}.pdf`;
-                const storageDir = "operations/vwo";
-
-                const oldPath = join(process.cwd(), "uploads", pdfPaths[0]);
-                const newPath = join(process.cwd(), "uploads", storageDir, newFileName);
-
-                for (let attempt = 0; attempt < 3; attempt++) {
-                    try {
-                        await rename(oldPath, newPath);
-                        break;
-                    } catch (e) {
-                        if ((e as NodeJS.ErrnoException).code !== "ENOENT" || attempt === 2) throw e;
-                        await new Promise(r => setTimeout(r, 200 * (attempt + 1)));
-                    }
-                }
-
-                const finalPath = `${storageDir}/${newFileName}`;
-
-                const now = new Date();
-                const label = `v-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}-${String(now.getSeconds()).padStart(2, "0")}`;
-
-                const updatedVersions = { ...versions, [label]: { path: finalPath, hash: contentHash } };
-
-                await this.db
-                    .update(vendorWorkOrders)
-                    .set({
-                        generatedPdfVersions: updatedVersions,
-                    })
-                    .where(eq(vendorWorkOrders.id, wo.id));
+            if (pdfPaths.length === 0) {
+                return { generated: false };
             }
+
+            // Rename PDF to use WO sequence number instead of timestamp (avoids Date.now() race)
+            const woSeq = wo.woNumber?.split("/").pop() || `WO${wo.id}`;
+            const rand = randomUUID().split("-")[0];
+            const newFileName = `${woSeq}-${rand}.pdf`;
+            const storageDir = "operations/vwo";
+
+            const oldPath = join(process.cwd(), "uploads", pdfPaths[0]);
+            const newPath = join(process.cwd(), "uploads", storageDir, newFileName);
+
+            for (let attempt = 0; attempt < 3; attempt++) {
+                try {
+                    await rename(oldPath, newPath);
+                    break;
+                } catch (e) {
+                    if ((e as NodeJS.ErrnoException).code !== "ENOENT" || attempt === 2) throw e;
+                    await new Promise(r => setTimeout(r, 200 * (attempt + 1)));
+                }
+            }
+
+            const finalPath = `${storageDir}/${newFileName}`;
+
+            const now = new Date();
+            const label = `v-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}-${String(now.getSeconds()).padStart(2, "0")}`;
+
+            const updatedVersions = { ...versions, [label]: { path: finalPath, hash: contentHash } };
+
+            await this.db
+                .update(vendorWorkOrders)
+                .set({
+                    generatedPdfVersions: updatedVersions,
+                })
+                .where(eq(vendorWorkOrders.id, wo.id));
+
+            return { generated: true, version: label };
         } catch (error) {
             this.logger.error(`PDF generation failed for VWO ${wo.id}: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
         }
     }
 

@@ -36,7 +36,7 @@ const pdfItem = (
 });
 
 describe("sale invoice PDF data helpers", () => {
-    const templateSource = readFileSync(join(__dirname, "../../pdf/templates/si-template.hbs"), "utf8");
+    const templateSource = readFileSync(join(__dirname, "../../pdf/templates/si-portrait.hbs"), "utf8");
 
     const render = (isInterstate: boolean, boqItemName = "Test BOQ item") => {
         const handlebars = Handlebars.create();
@@ -113,11 +113,11 @@ describe("sale invoice PDF data helpers", () => {
         expect(getGstStateCode(undefined)).toBeNull();
     });
 
-    it("uses landscape orientation only for sale-invoice PDFs", () => {
-        expect(isLandscape("si")).toBe(true);
+    it("uses portrait orientation only for sale-invoice PDFs", () => {
+        expect(isLandscape("si")).toBe(false);
         expect(isLandscape("po")).toBe(false);
         expect(isLandscape("unknown")).toBe(false);
-        expect(getPdfMargins("si")).toEqual({ top: "5mm", right: "7.5mm", bottom: "5mm", left: "7.5mm" });
+        expect(getPdfMargins("si")).toEqual({ top: "8mm", right: "8mm", bottom: "8mm", left: "8mm" });
     });
 
     it("allocates interstate tax to IGST", () => {

@@ -10,6 +10,7 @@ import type { PermissionRequirement } from "@/modules/auth/guards/permission.gua
 import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
 import { PermissionGuard } from "@/modules/auth/guards/permission.guard";
 import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
+import { PdfRetryGuard } from "@/modules/pdf/pdf-retry.guard";
 
 // Same dual-module situation as PurchaseOrderController: this serves /operations
 // and /accounts (picked by the `section` query param), so a permission has to
@@ -189,6 +190,13 @@ export class VendorWorkOrderController {
     @Get(":id/pdf/versions")
     getPdfVersions(@Param("id", ParseIntPipe) id: number) {
         return this.service.getPdfVersions(id);
+    }
+
+    @Post(":id/pdf/retry")
+    @HttpCode(HttpStatus.OK)
+    @UseGuards(PdfRetryGuard)
+    retryPdfGeneration(@Param("id", ParseIntPipe) id: number) {
+        return this.service.retryPdfGeneration(id);
     }
 
     @Delete(":id/pdf/versions/:version")

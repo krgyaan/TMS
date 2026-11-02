@@ -7,6 +7,7 @@ export const purchaseOrderKeys = {
     poParties: () => [...purchaseOrderKeys.all, "po-parties"] as const,
     sellerOptions: (q?: string, ids?: number[]) => [...purchaseOrderKeys.poParties(), "sellers", { q, ids }] as const,
     sellerPersons: (orgId: number) => [...purchaseOrderKeys.poParties(), "seller-persons", orgId] as const,
+    sellerGsts: (orgId: number) => [...purchaseOrderKeys.poParties(), "seller-gsts", orgId] as const,
     shipToOptions: (q?: string, ids?: number[]) => [...purchaseOrderKeys.poParties(), "ship-to", { q, ids }] as const,
     purchaseOrder: (id: number) => [...purchaseOrderKeys.all, "purchase-order", id] as const,
     projectPurchaseOrders: (projectId: number) => [...purchaseOrderKeys.all, "project", projectId] as const,
@@ -61,6 +62,15 @@ export const useSellerPersons = (orgId: number | undefined) => {
     });
 };
 
+export const useSellerGsts = (orgId: number | undefined) => {
+    return useQuery({
+        queryKey: purchaseOrderKeys.sellerGsts(orgId!),
+        queryFn: () => purchaseOrderApi.getSellerGsts(orgId!),
+        enabled: !!orgId,
+        staleTime: 5 * 60 * 1000,
+    });
+};
+
 export const useShipToOptions = (q?: string, ids?: number[]) => {
     return useQuery({
         queryKey: purchaseOrderKeys.shipToOptions(q, ids),
@@ -100,6 +110,17 @@ export const usePurchaseOrderDetails = (id: number) => {
         queryKey: purchaseOrderKeys.purchaseOrder(id),
         queryFn: () => purchaseOrderApi.getPurchaseOrder(id),
         enabled: !!id,
+    });
+};
+
+export const useRetryPurchaseOrderPdf = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (id: number) => purchaseOrderApi.retryPdfGeneration(id),
+        onSuccess: (_data, id) => {
+            queryClient.invalidateQueries({ queryKey: ["purchase-order", id] });
+            queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.purchaseOrder(id) });
+        },
     });
 };
 

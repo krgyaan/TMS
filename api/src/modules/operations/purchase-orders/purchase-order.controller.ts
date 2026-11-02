@@ -9,6 +9,7 @@ import type { PermissionRequirement } from "@/modules/auth/guards/permission.gua
 import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
 import { PermissionGuard } from "@/modules/auth/guards/permission.guard";
 import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
+import { PdfRetryGuard } from "@/modules/pdf/pdf-retry.guard";
 import { PurchaseOrderService } from "./purchase-order.service";
 
 // This controller serves both the /accounts and the /operations section (the
@@ -91,6 +92,11 @@ export class PurchaseOrderController {
         return this.service.listSellerPersons(orgId);
     }
 
+    @Get("parties/sellers/:orgId/gsts")
+    listSellerGsts(@Param("orgId", ParseIntPipe) orgId: number) {
+        return this.service.listSellerGsts(orgId);
+    }
+
     @Get("parties/ship-to")
     listShipToOptions(@Query("q") q?: string, @Query("ids") ids?: string, @Query("limit") limit?: string) {
         return this.service.listShipToOptions(q, parseIds(ids), parseLimit(limit));
@@ -113,6 +119,13 @@ export class PurchaseOrderController {
     @Get(":id/pdf/versions")
     getPurchaseOrderPdfVersions(@Param("id", ParseIntPipe) id: number) {
         return this.service.getPurchaseOrderPdfVersions(id);
+    }
+
+    @Post(":id/pdf/retry")
+    @HttpCode(HttpStatus.OK)
+    @UseGuards(PdfRetryGuard)
+    retryPdfGeneration(@Param("id", ParseIntPipe) id: number) {
+        return this.service.retryPdfGeneration(id);
     }
 
     @Delete(":id/pdf/versions/:version")
