@@ -48,6 +48,7 @@ const Accounts_VendorMaster_Edit = lazy(() => import("@/modules/master/vendor-ma
 const Accounts_VendorMaster_View = lazy(() => import("@/modules/master/vendor-master/VendorViewPage"));
 const Accounts_Parties = lazy(() => import("@/modules/master/vendor-master/PartyListPage"));
 const Accounts_InventoryPage = lazy(() => import("@/modules/operations/inventory/pages/InventoryPage"));
+const Accounts_ItemMaster = lazy(() => import("@/modules/accounts/inventory-items/InventoryItemListPage"));
 
 export default function AccountsRoutes() {
     return (
@@ -103,6 +104,7 @@ export default function AccountsRoutes() {
             <Route path="vendor-work-orders/:id/closure" element={<RouteWrapper><Accounts_VwoClosure /></RouteWrapper>} />
             <Route path="payment-requests" element={<RouteWrapper><Accounts_PaymentRequestTabs /></RouteWrapper>} />
             <Route path="inventory" element={<RouteWrapper><Accounts_InventoryPage /></RouteWrapper>} />
+            <Route path="item" element={<RouteWrapper permission={{ module: "accounts.inventory-items", action: "read" }}><Accounts_ItemMaster /></RouteWrapper>} />
             <Route path="delegation/add" element={<RouteWrapper><AddTask /></RouteWrapper>} />
             <Route path="delegation/:id" element={<RouteWrapper><TaskDetail /></RouteWrapper>} />
             <Route path="delegation/:id/update" element={<RouteWrapper><TaskStatusUpdate /></RouteWrapper>} />
