@@ -17,21 +17,43 @@ interface ChequeViewProps {
 const FileLink = ({ file, instrumentId }: { file?: string; instrumentId?: number }) => {
     if (!file) return <span className="text-muted-foreground">Not Uploaded</span>;
 
-    const href = instrumentId
-        ? paymentRequestsService.getInstrumentPdfUrl(instrumentId)
-        : fileUploadService.getFileUrl(file);
+    if (instrumentId) {
+        return (
+            <div className="flex gap-3 items-center">
+                <a
+                    href={paymentRequestsService.getInstrumentPdfUrl(instrumentId)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-primary hover:underline"
+                >
+                    <Eye className="h-4 w-4" />
+                    {'View'}
+                </a>
+            </div>
+        );
+    }
+
+    const values = file.split(',').map((value) => value.trim()).filter(Boolean);
+    const filePaths = values.filter((value) => value.includes('/'));
+
+    if (filePaths.length === 0) {
+        return <span className="text-sm">{file}</span>;
+    }
 
     return (
-        <div className="flex gap-3 items-center">
-            <a
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 text-primary hover:underline"
-            >
-                <Eye className="h-4 w-4" />
-                {'View'}
-            </a>
+        <div className="flex flex-wrap gap-3 items-center">
+            {filePaths.map((filePath, index) => (
+                <a
+                    key={filePath}
+                    href={fileUploadService.getFileUrl(filePath)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-primary hover:underline"
+                >
+                    <Eye className="h-4 w-4" />
+                    {filePaths.length > 1 ? `View ${index + 1}` : 'View'}
+                </a>
+            ))}
         </div>
     );
 };
