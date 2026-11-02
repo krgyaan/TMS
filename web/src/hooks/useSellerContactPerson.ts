@@ -47,12 +47,7 @@ export function useSellerContactPerson<
   // (must not clobber edits).
   const lastFilledIdRef = useRef<string | null>(null);
 
-  // Edit forms pass false: a loaded document's contact wins, and we never
-  // guess one from the vendor master. Consumed on the first auto-select so it
-  // only suppresses the initial load, not an explicit seller change later.
-  const skipAutoSelectRef = useRef(options?.autoSelectFirstOnLoad === false);
-
-  const setField = (name: keyof SellerContactForm, value: string) =>
+    const setField = (name: keyof SellerContactForm, value: string) =>
     form.setValue(name as never, value as never);
 
   // Seller changed -> the previous person no longer belongs to this org.
@@ -66,7 +61,6 @@ export function useSellerContactPerson<
     if (prev === sellerId) return;
 
     lastFilledIdRef.current = null;
-    skipAutoSelectRef.current = false;
     setField("vendorPersonId", "");
     setField("vendorContactPersonName", "");
     setField("vendorContactPersonPhone", "");
@@ -122,12 +116,9 @@ export function useSellerContactPerson<
       return;
     }
 
-    if (skipAutoSelectRef.current) {
-      skipAutoSelectRef.current = false;
-      return;
-    }
+    // Contact selection is explicit; only auto-select when a caller opts in.
+    if (options?.autoSelectFirstOnLoad !== true) return;
 
-    // Fresh form and the org has persons -> auto-select the first.
     const first = persons[0];
     setField("vendorPersonId", String(first.id));
     fillFrom(first);

@@ -7,6 +7,7 @@ export const purchaseOrderKeys = {
     poParties: () => [...purchaseOrderKeys.all, "po-parties"] as const,
     sellerOptions: (q?: string, ids?: number[]) => [...purchaseOrderKeys.poParties(), "sellers", { q, ids }] as const,
     sellerPersons: (orgId: number) => [...purchaseOrderKeys.poParties(), "seller-persons", orgId] as const,
+    sellerGsts: (orgId: number) => [...purchaseOrderKeys.poParties(), "seller-gsts", orgId] as const,
     shipToOptions: (q?: string, ids?: number[]) => [...purchaseOrderKeys.poParties(), "ship-to", { q, ids }] as const,
     purchaseOrder: (id: number) => [...purchaseOrderKeys.all, "purchase-order", id] as const,
     projectPurchaseOrders: (projectId: number) => [...purchaseOrderKeys.all, "project", projectId] as const,
@@ -56,6 +57,15 @@ export const useSellerPersons = (orgId: number | undefined) => {
     return useQuery({
         queryKey: purchaseOrderKeys.sellerPersons(orgId!),
         queryFn: () => purchaseOrderApi.getSellerPersons(orgId!),
+        enabled: !!orgId,
+        staleTime: 5 * 60 * 1000,
+    });
+};
+
+export const useSellerGsts = (orgId: number | undefined) => {
+    return useQuery({
+        queryKey: purchaseOrderKeys.sellerGsts(orgId!),
+        queryFn: () => purchaseOrderApi.getSellerGsts(orgId!),
         enabled: !!orgId,
         staleTime: 5 * 60 * 1000,
     });
