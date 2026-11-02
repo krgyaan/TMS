@@ -17,6 +17,7 @@ import { usePersistentTableState } from '@/hooks/usePersistentTableState';
 import { useArchiveFixedExpense, useFixedExpenses } from '@/hooks/api/useFixedExpense';
 import { useAuth } from '@/contexts/AuthContext';
 import { currencyCol, dateCol } from '@/components/data-grid';
+import { formatINR } from '@/hooks/useINRFormatter';
 import type { FixedExpenseListParams, FixedExpenseListRow } from './helpers/fixedExpense.types';
 import {
     FIXED_EXPENSE_TYPE_LABELS,
@@ -185,6 +186,14 @@ const FixedExpenseListContent = () => {
                 minWidth: 130,
                 sortable: true,
                 filter: true,
+                valueFormatter: (params) => {
+                    const isZeroVariable =
+                        params.data?.amountType === 'variable' &&
+                        Number(params.data?.amount ?? 0) === 0;
+                    if (isZeroVariable) return '—';
+                    if (params.value === null || params.value === undefined) return '—';
+                    return formatINR(params.value);
+                },
             }),
             {
                 field: 'paymentMode',

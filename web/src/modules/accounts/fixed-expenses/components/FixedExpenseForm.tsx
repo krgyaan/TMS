@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { type SubmitHandler, useForm, type Resolver, useWatch } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
@@ -7,7 +7,19 @@ import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Save, Receipt, Landmark } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
+import { ArrowLeft, Save, Receipt, Landmark, UserPlus, Plus } from 'lucide-react';
+import { toast } from 'sonner';
 import { paths } from '@/app/routes/paths';
 import { FixedExpenseFormSchema } from '../helpers/fixedExpense.schema';
 import {
@@ -16,7 +28,6 @@ import {
     type FixedExpenseListRow,
     FIXED_EXPENSE_TYPE_OPTIONS,
     FIXED_EXPENSE_AMOUNT_TYPE_OPTIONS,
-    FIXED_EXPENSE_PAYMENT_MODE_OPTIONS,
     FIXED_EXPENSE_FREQUENCY_OPTIONS,
 } from '../helpers/fixedExpense.types';
 import {
@@ -26,6 +37,7 @@ import {
     mapFixedExpenseResponseToForm,
 } from '../helpers/fixedExpense.mappers';
 import { useCreateFixedExpense, useUpdateFixedExpense } from '@/hooks/api/useFixedExpense';
+import { useBeneficiaries, useCreateBeneficiary } from '@/hooks/api/useProjectPaymentRequests';
 import { SelectField } from '@/components/form/SelectField';
 import { DateInput } from '@/components/form/DateInput';
 
@@ -55,6 +67,75 @@ export function FixedExpenseForm({ mode, existingData }: FixedExpenseFormProps) 
 
     const paymentMode = useWatch({ control: form.control, name: 'paymentMode' });
     const isBankTransfer = paymentMode === 'bank_transfer';
+    const amountType = useWatch({ control: form.control, name: 'amountType' });
+
+    const { data: beneficiaries } = useBeneficiaries();
+    const createBeneficiaryMutation = useCreateBeneficiary();
+    const [isAddBeneficiaryOpen, setIsAddBeneficiaryOpen] = useState(false);
+    const [newBeneficiary, setNewBeneficiary] = useState({
+        name: '',
+        accountNumber: '',
+        ifsc: '',
+    });
+
+    const selectedBeneficiaryId = useWatch({
+        control: form.control,
+        name: 'selectedBeneficiaryId',
+    });
+
+    const beneficiaryOptions = useMemo(
+        () =>
+            (beneficiaries ?? []).map((b) => ({
+                id: String(b.id),
+                name: `${b.name ?? 'Unnamed'}${b.accountNumber ? ` (${b.accountNumber})` : ''}`,
+            })),
+        [beneficiaries]
+    );
+
+    // Selecting a beneficiary copies its bank details into the (editable) fields.
+    useEffect(() => {
+        if (!selectedBeneficiaryId || !beneficiaries) return;
+
+        const ben = beneficiaries.find((b) => String(b.id) === selectedBeneficiaryId);
+        if (!ben) return;
+
+        form.setValue('accountName', ben.name ?? '');
+        form.setValue('accountNumber', ben.accountNumber ?? '');
+        form.setValue('ifscCode', ben.ifsc ?? '');
+    }, [selectedBeneficiaryId, beneficiaries, form]);
+
+    const handleAddBeneficiary = async () => {
+        try {
+            const created = await createBeneficiaryMutation.mutateAsync(newBeneficiary);
+            form.setValue('selectedBeneficiaryId', String(created.id));
+            setNewBeneficiary({ name: '', accountNumber: '', ifsc: '' });
+            setIsAddBeneficiaryOpen(false);
+            toast.success('Beneficiary added successfully');
+        } catch {
+            toast.error('Failed to add beneficiary');
+        }
+    };
+
+    // Variable expenses don't have a fixed amount: hide the field (rendered
+    // conditionally below) and keep the submitted value at 0.
+    useEffect(() => {
+        if (amountType === 'variable') {
+            form.setValue('amount', '0');
+            form.clearErrors('amount');
+            return;
+        }
+
+        // Clicking the already-selected "Fixed" option toggles the combobox off,
+        // which sets amountType to undefined. Fall back to "fixed" so the amount
+        // field does not disappear.
+        if (amountType !== 'fixed') {
+            form.setValue('amountType', 'fixed');
+        }
+
+        if (form.getValues('amount') === '0') {
+            form.setValue('amount', '');
+        }
+    }, [amountType, form]);
 
     // Reset form when initial values change
     useEffect(() => {
@@ -123,17 +204,19 @@ export function FixedExpenseForm({ mode, existingData }: FixedExpenseFormProps) 
                                     placeholder="Select amount type"
                                 />
 
-                                <FieldWrapper control={form.control} name="amount" label="Amount (₹)">
-                                    {(field) => (
-                                        <Input
-                                            {...field}
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
-                                            placeholder="0.00"
-                                        />
-                                    )}
-                                </FieldWrapper>
+                                <div className={amountType === 'variable' ? 'invisible' : ''}>
+                                    <FieldWrapper control={form.control} name="amount" label="Amount (₹)">
+                                        {(field) => (
+                                            <Input
+                                                {...field}
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                placeholder="0.00"
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                </div>
 
                                 <SelectField
                                     control={form.control}
@@ -171,17 +254,173 @@ export function FixedExpenseForm({ mode, existingData }: FixedExpenseFormProps) 
                                 <h3 className="text-lg font-medium">Payment Details</h3>
                             </div>
 
-                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                <SelectField
-                                    control={form.control}
-                                    name="paymentMode"
-                                    label="Payment Mode"
-                                    options={FIXED_EXPENSE_PAYMENT_MODE_OPTIONS}
-                                    placeholder="Select payment mode"
-                                />
+                            <div className="space-y-2">
+                                <Label>Payment Mode</Label>
+                                <RadioGroup
+                                    value={paymentMode}
+                                    onValueChange={(value) => {
+                                        const mode = value as FixedExpenseFormValues['paymentMode'];
+                                        form.setValue('paymentMode', mode, { shouldValidate: true });
 
-                                {isBankTransfer && (
-                                    <>
+                                        if (mode === 'auto_debit') {
+                                            form.setValue('selectedBeneficiaryId', '');
+                                            form.setValue('accountName', '');
+                                            form.setValue('accountNumber', '');
+                                            form.setValue('ifscCode', '');
+                                            form.clearErrors([
+                                                'accountName',
+                                                'accountNumber',
+                                                'ifscCode',
+                                            ]);
+                                        }
+                                    }}
+                                    className="flex gap-6"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <RadioGroupItem
+                                            value="auto_debit"
+                                            id="fixed-expense-auto-debit"
+                                        />
+                                        <Label
+                                            htmlFor="fixed-expense-auto-debit"
+                                            className="cursor-pointer font-normal"
+                                        >
+                                            Auto Debit
+                                        </Label>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <RadioGroupItem
+                                            value="bank_transfer"
+                                            id="fixed-expense-bank-transfer"
+                                        />
+                                        <Label
+                                            htmlFor="fixed-expense-bank-transfer"
+                                            className="cursor-pointer font-normal"
+                                        >
+                                            Bank Transfer
+                                        </Label>
+                                    </div>
+                                </RadioGroup>
+                            </div>
+
+                            {isBankTransfer && (
+                                <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
+                                    <h4 className="flex items-center gap-2 text-md font-semibold">
+                                        <Landmark className="h-4 w-4" />
+                                        Beneficiary Details
+                                    </h4>
+
+                                    <div className="flex items-end gap-4">
+                                        <div className="w-72">
+                                            <SelectField
+                                                control={form.control}
+                                                name="selectedBeneficiaryId"
+                                                label="Beneficiary (Master)"
+                                                options={beneficiaryOptions}
+                                                placeholder="Select beneficiary..."
+                                            />
+                                        </div>
+
+                                        <Dialog
+                                            open={isAddBeneficiaryOpen}
+                                            onOpenChange={setIsAddBeneficiaryOpen}
+                                        >
+                                            <DialogTrigger asChild>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    type="button"
+                                                    className="mb-1"
+                                                >
+                                                    <UserPlus className="mr-2 h-4 w-4" />
+                                                    Add New
+                                                </Button>
+                                            </DialogTrigger>
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                    <DialogTitle>Add New Beneficiary</DialogTitle>
+                                                    <DialogDescription>
+                                                        Save beneficiary bank details for future use
+                                                    </DialogDescription>
+                                                </DialogHeader>
+                                                <div className="space-y-4 py-4">
+                                                    <div className="space-y-1">
+                                                        <Label>
+                                                            Beneficiary Name{' '}
+                                                            <span className="text-destructive">*</span>
+                                                        </Label>
+                                                        <Input
+                                                            value={newBeneficiary.name}
+                                                            onChange={(e) =>
+                                                                setNewBeneficiary((prev) => ({
+                                                                    ...prev,
+                                                                    name: e.target.value,
+                                                                }))
+                                                            }
+                                                            placeholder="Enter beneficiary name"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <Label>
+                                                            Account Number{' '}
+                                                            <span className="text-destructive">*</span>
+                                                        </Label>
+                                                        <Input
+                                                            value={newBeneficiary.accountNumber}
+                                                            onChange={(e) =>
+                                                                setNewBeneficiary((prev) => ({
+                                                                    ...prev,
+                                                                    accountNumber: e.target.value,
+                                                                }))
+                                                            }
+                                                            placeholder="Enter account number"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <Label>
+                                                            IFSC Code{' '}
+                                                            <span className="text-destructive">*</span>
+                                                        </Label>
+                                                        <Input
+                                                            value={newBeneficiary.ifsc}
+                                                            onChange={(e) =>
+                                                                setNewBeneficiary((prev) => ({
+                                                                    ...prev,
+                                                                    ifsc: e.target.value.toUpperCase(),
+                                                                }))
+                                                            }
+                                                            placeholder="e.g. SBIN0001234"
+                                                            className="font-mono"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <DialogFooter>
+                                                    <Button
+                                                        variant="outline"
+                                                        type="button"
+                                                        onClick={() => setIsAddBeneficiaryOpen(false)}
+                                                    >
+                                                        Cancel
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        onClick={handleAddBeneficiary}
+                                                        disabled={
+                                                            createBeneficiaryMutation.isPending ||
+                                                            !newBeneficiary.name ||
+                                                            !newBeneficiary.accountNumber ||
+                                                            !newBeneficiary.ifsc
+                                                        }
+                                                    >
+                                                        <Plus className="mr-2 h-4 w-4" />
+                                                        Add
+                                                    </Button>
+                                                </DialogFooter>
+                                            </DialogContent>
+                                        </Dialog>
+                                    </div>
+
+                                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                                         <FieldWrapper
                                             control={form.control}
                                             name="accountName"
@@ -215,9 +454,9 @@ export function FixedExpenseForm({ mode, existingData }: FixedExpenseFormProps) 
                                                 />
                                             )}
                                         </FieldWrapper>
-                                    </>
-                                )}
-                            </div>
+                                    </div>
+                                </div>
+                            )}
 
                             {isBankTransfer && (
                                 <p className="text-sm text-muted-foreground">

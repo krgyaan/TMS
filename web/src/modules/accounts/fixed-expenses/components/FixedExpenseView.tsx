@@ -69,7 +69,10 @@ const FixedExpenseView = ({ fixedExpense }: FixedExpenseViewProps) => {
                             <TableCell className={labelClass}>Amount</TableCell>
                             <TableCell className="text-sm font-semibold">
                                 <span className="flex items-center gap-2">
-                                    {formatINR(fixedExpense.amount)}
+                                    {fixedExpense.amountType === 'variable' &&
+                                    Number(fixedExpense.amount) === 0
+                                        ? '—'
+                                        : formatINR(fixedExpense.amount)}
                                     <Badge variant="outline">
                                         {FIXED_EXPENSE_AMOUNT_TYPE_LABELS[fixedExpense.amountType] ??
                                             fixedExpense.amountType}
