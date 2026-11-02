@@ -8,7 +8,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Eye, Pencil, Archive, FileX2, Search, Plus, Receipt } from 'lucide-react';
+import { AlertCircle, Eye, Pencil, Archive, FileX2, Search, Plus, Receipt, ShieldAlert } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -76,7 +76,7 @@ const FixedExpenseListContent = () => {
     });
 
     const navigate = useNavigate();
-    const { canCreate, canUpdate } = useAuth();
+    const { canCreate, canRead, canUpdate, canDelete } = useAuth();
     const archiveMutation = useArchiveFixedExpense();
 
     const sort = sortModel[0];
@@ -112,7 +112,7 @@ const FixedExpenseListContent = () => {
                 label: 'Archive',
                 className: 'text-red-600',
                 icon: <Archive className="h-4 w-4 text-red-600" />,
-                visible: () => canUpdate('accounts.fixed-expenses'),
+                visible: () => canDelete('accounts.fixed-expenses'),
                 onClick: (row) => {
                     if (
                         window.confirm(
@@ -124,7 +124,7 @@ const FixedExpenseListContent = () => {
                 },
             },
         ],
-        [archiveMutation, canUpdate, navigate]
+        [archiveMutation, canDelete, canUpdate, navigate]
     );
 
     const colDefs = useMemo<ColDef<FixedExpenseListRow>[]>(
@@ -268,6 +268,20 @@ const FixedExpenseListContent = () => {
         ],
         [fixedExpenseActions]
     );
+
+    if (!canRead('accounts.fixed-expenses')) {
+        return (
+            <Card>
+                <CardContent className="py-16 flex flex-col items-center text-center gap-3">
+                    <ShieldAlert className="h-10 w-10 text-destructive" />
+                    <CardTitle>Access Denied</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                        You don&apos;t have permission to view fixed expenses.
+                    </p>
+                </CardContent>
+            </Card>
+        );
+    }
 
     if (loading) {
         return <FixedExpenseListSkeleton />;

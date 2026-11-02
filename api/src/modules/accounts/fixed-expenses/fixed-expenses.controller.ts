@@ -1,13 +1,20 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { CurrentUser } from "@/decorators/current-user.decorator";
+import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
+import { PermissionGuard } from "@/modules/auth/guards/permission.guard";
+import { CanCreate, CanDelete, CanRead, CanUpdate } from "@/modules/auth/decorators/permissions.decorator";
 import { FixedExpensesService } from "./fixed-expenses.service";
 import { archiveFixedExpenseSchema, createFixedExpenseSchema, fixedExpenseQuerySchema, updateFixedExpenseSchema } from "./dto/fixed-expenses.dto";
 
+const PERMISSION_MODULE = "accounts.fixed-expenses";
+
+@UseGuards(JwtAuthGuard, PermissionGuard)
 @Controller("fixed-expenses")
 export class FixedExpensesController {
     constructor(private readonly fixedExpensesService: FixedExpensesService) {}
 
     @Get()
+    @CanRead(PERMISSION_MODULE)
     async list(
         @Query("page") page?: string,
         @Query("limit") limit?: string,
@@ -37,11 +44,13 @@ export class FixedExpensesController {
     }
 
     @Get(":id")
+    @CanRead(PERMISSION_MODULE)
     async getById(@Param("id", ParseIntPipe) id: number) {
         return this.fixedExpensesService.findById(id);
     }
 
     @Post()
+    @CanCreate(PERMISSION_MODULE)
     @HttpCode(HttpStatus.CREATED)
     async create(@Body() body: unknown, @CurrentUser("id") userId: number) {
         const parsed = createFixedExpenseSchema.parse(body);
@@ -49,18 +58,21 @@ export class FixedExpensesController {
     }
 
     @Patch(":id")
+    @CanUpdate(PERMISSION_MODULE)
     async update(@Param("id", ParseIntPipe) id: number, @Body() body: unknown) {
         const parsed = updateFixedExpenseSchema.parse(body);
         return this.fixedExpensesService.update(id, parsed);
     }
 
     @Patch(":id/archive")
+    @CanDelete(PERMISSION_MODULE)
     async archive(@Param("id", ParseIntPipe) id: number, @Body() body: unknown) {
         const parsed = archiveFixedExpenseSchema.parse(body);
         return this.fixedExpensesService.setArchiveStatus(id, parsed.deleteStatus);
     }
 
     @Delete(":id")
+    @CanDelete(PERMISSION_MODULE)
     @HttpCode(HttpStatus.NO_CONTENT)
     async delete(@Param("id", ParseIntPipe) id: number) {
         await this.fixedExpensesService.delete(id);
