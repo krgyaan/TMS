@@ -64,6 +64,7 @@ export { urlShortenerService } from "./url-shortener.service";
 export { healthService } from "./health.service";
 export { queueMonitoringService } from "./queue-monitoring.service";
 export { inventoryApi } from "./inventory.api";
+export { inventoryItemsService } from "./inventory-items.service";
 export { customerPerformanceService } from "./customer-performance.service";
 export { businessPerformanceService } from "./business-performance.service";
 export { locationPerformanceService } from "./location-performance.service";

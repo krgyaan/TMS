@@ -596,6 +596,13 @@
       "when": 1795100000000,
       "tag": "0146_create_bidding_requirements_jobs",
       "breakpoints": true
+    },
+    {
+      "idx": 109,
+      "version": "7",
+      "when": 1796000000000,
+      "tag": "0163_create_inventory_items",
+      "breakpoints": true
     }
   ]
 }
