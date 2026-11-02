@@ -1,29 +1,19 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import DataTable from '@/components/ui/data-table';
-import type { ColDef, SortChangedEvent } from 'ag-grid-community';
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import type { ColDef } from 'ag-grid-community';
+import { useMemo } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import {
-    AlertCircle,
-    Eye,
-    Pencil,
-    Archive,
-    ArchiveRestore,
-    FileX2,
-    Search,
-    Plus,
-    Receipt,
-} from 'lucide-react';
+import { AlertCircle, Eye, Pencil, Archive, FileX2, Search, Plus, Receipt } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { QuickFilter } from '@/components/ui/quick-filter';
+import { usePersistentTableState } from '@/hooks/usePersistentTableState';
 import { useArchiveFixedExpense, useFixedExpenses } from '@/hooks/api/useFixedExpense';
 import { useAuth } from '@/contexts/AuthContext';
 import { currencyCol, dateCol } from '@/components/data-grid';
@@ -43,32 +33,33 @@ const SORTABLE_FIELDS: FixedExpenseListParams['sortBy'][] = [
     'createdAt',
 ];
 
+const AMOUNT_TYPE_OPTIONS = [
+    { label: 'Fixed', value: 'fixed' },
+    { label: 'Variable', value: 'variable' },
+];
+
 const FixedExpenseListPage = () => {
-    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
-    const [search, setSearch] = useState('');
-    const [statusFilter, setStatusFilter] = useState<'active' | 'archived'>('active');
-    const debouncedSearch = useDebouncedSearch(search, 300);
+    const {
+        activeTab,
+        setActiveTab,
+        search,
+        setSearch,
+        debouncedSearch,
+        pagination,
+        setPagination,
+        sortModel,
+        handleSortChanged,
+        handlePageSizeChange,
+    } = usePersistentTableState<'fixed' | 'variable'>({
+        storageKey: 'fixed-expenses',
+        defaultTab: 'fixed',
+        defaultSortBy: 'createdAt',
+        defaultSortOrder: 'desc',
+    });
+
     const navigate = useNavigate();
     const { canCreate, canUpdate } = useAuth();
     const archiveMutation = useArchiveFixedExpense();
-
-    useEffect(() => {
-        setPagination((p) => ({ ...p, pageIndex: 0 }));
-    }, [debouncedSearch, statusFilter]);
-
-    const handleSortChanged = useCallback((event: SortChangedEvent) => {
-        const next = event.api
-            .getColumnState()
-            .filter((col) => col.sort)
-            .map((col) => ({ colId: col.colId, sort: col.sort as 'asc' | 'desc' }));
-        setSortModel(next);
-        setPagination((p) => ({ ...p, pageIndex: 0 }));
-    }, []);
-
-    const handlePageSizeChange = useCallback((newPageSize: number) => {
-        setPagination({ pageIndex: 0, pageSize: newPageSize });
-    }, []);
 
     const sort = sortModel[0];
     const sortBy = sort && SORTABLE_FIELDS.includes(sort.colId as FixedExpenseListParams['sortBy'])
@@ -79,7 +70,7 @@ const FixedExpenseListPage = () => {
         page: pagination.pageIndex + 1,
         limit: pagination.pageSize,
         search: debouncedSearch || undefined,
-        deleteStatus: statusFilter === 'archived',
+        amountType: activeTab,
         ...(sortBy && sort ? { sortBy, sortOrder: sort.sort } : {}),
     });
 
@@ -103,23 +94,15 @@ const FixedExpenseListPage = () => {
                 label: 'Archive',
                 className: 'text-red-600',
                 icon: <Archive className="h-4 w-4 text-red-600" />,
-                visible: (row) => !row.deleteStatus && canUpdate('accounts.fixed-expenses'),
+                visible: () => canUpdate('accounts.fixed-expenses'),
                 onClick: (row) => {
                     if (
                         window.confirm(
-                            `Archive "${row.partyName}"? It will be hidden from the active list but can be restored later.`
+                            `Archive "${row.partyName}"? It will be removed from the list.`
                         )
                     ) {
                         archiveMutation.mutate({ id: row.id, deleteStatus: true });
                     }
-                },
-            },
-            {
-                label: 'Restore',
-                icon: <ArchiveRestore className="h-4 w-4" />,
-                visible: (row) => row.deleteStatus && canUpdate('accounts.fixed-expenses'),
-                onClick: (row) => {
-                    archiveMutation.mutate({ id: row.id, deleteStatus: false });
                 },
             },
         ],
@@ -249,26 +232,6 @@ const FixedExpenseListPage = () => {
                 filter: false,
             },
             {
-                field: 'deleteStatus',
-                colId: 'deleteStatus',
-                headerName: 'delete_status',
-                flex: 0.7,
-                minWidth: 110,
-                cellRenderer: (params: { data?: FixedExpenseListRow }) => {
-                    if (!params.data) return '—';
-                    return (
-                        <Badge
-                            variant={params.data.deleteStatus ? 'secondary' : 'default'}
-                            className="h-5 px-2"
-                        >
-                            {params.data.deleteStatus ? 'Archived' : 'Active'}
-                        </Badge>
-                    );
-                },
-                sortable: false,
-                filter: false,
-            },
-            {
                 headerName: 'Actions',
                 filter: false,
                 cellRenderer: createActionColumnRenderer(fixedExpenseActions),
@@ -341,32 +304,23 @@ const FixedExpenseListPage = () => {
                 </div>
             </CardHeader>
             <CardContent className="px-0">
-                <div className="flex justify-between items-center gap-4 px-6 pb-4">
-                    <div className="w-40">
-                        <Select
-                            value={statusFilter}
-                            onValueChange={(value) =>
-                                setStatusFilter(value as 'active' | 'archived')
-                            }
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="active">Active</SelectItem>
-                                <SelectItem value="archived">Archived</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="relative flex-1 max-w-sm">
-                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            type="text"
-                            placeholder="Search by party name, account no..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="pl-8"
-                        />
+                <div className="flex items-center gap-4 px-6 pb-4">
+                    <QuickFilter
+                        options={AMOUNT_TYPE_OPTIONS}
+                        value={activeTab}
+                        onChange={(value) => setActiveTab(value as 'fixed' | 'variable')}
+                    />
+                    <div className="flex-1 flex justify-end">
+                        <div className="relative">
+                            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                type="text"
+                                placeholder="Search by party name, account no..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="pl-8 w-64"
+                            />
+                        </div>
                     </div>
                 </div>
                 {rows.length === 0 ? (
@@ -374,8 +328,8 @@ const FixedExpenseListPage = () => {
                         <FileX2 className="h-12 w-12 mb-4" />
                         <p className="text-lg font-medium">No Fixed Expenses found</p>
                         <p className="text-sm mt-2">
-                            {statusFilter === 'archived'
-                                ? 'No archived fixed expenses.'
+                            {activeTab === 'variable'
+                                ? 'No variable expenses found. Switch to the Fixed tab or create a new expense.'
                                 : 'Create a new fixed expense using the "Add Fixed Expense" button above.'}
                         </p>
                     </div>

@@ -117,14 +117,6 @@ export function FixedExpenseForm({ mode, existingData }: FixedExpenseFormProps) 
 
                                 <SelectField
                                     control={form.control}
-                                    name="type"
-                                    label="Type"
-                                    options={FIXED_EXPENSE_TYPE_OPTIONS}
-                                    placeholder="Select expense type"
-                                />
-
-                                <SelectField
-                                    control={form.control}
                                     name="amountType"
                                     label="Amount Type"
                                     options={FIXED_EXPENSE_AMOUNT_TYPE_OPTIONS}
@@ -142,6 +134,14 @@ export function FixedExpenseForm({ mode, existingData }: FixedExpenseFormProps) 
                                         />
                                     )}
                                 </FieldWrapper>
+
+                                <SelectField
+                                    control={form.control}
+                                    name="type"
+                                    label="Type"
+                                    options={FIXED_EXPENSE_TYPE_OPTIONS}
+                                    placeholder="Select expense type"
+                                />
 
                                 <FieldWrapper control={form.control} name="dueDate" label="Due Date">
                                     {(field) => (

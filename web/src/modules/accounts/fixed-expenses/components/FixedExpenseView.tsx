@@ -1,13 +1,11 @@
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardAction } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Pencil, Receipt, Landmark, Archive } from 'lucide-react';
-import { paths } from '@/app/routes/paths';
+import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
+import { ArrowLeft, Receipt } from 'lucide-react';
 import { formatDate, formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
-import { useAuth } from '@/contexts/AuthContext';
 import type { FixedExpenseResponse } from '../helpers/fixedExpense.types';
 import {
     FIXED_EXPENSE_TYPE_LABELS,
@@ -16,97 +14,60 @@ import {
     FIXED_EXPENSE_AMOUNT_TYPE_LABELS,
 } from '../helpers/fixedExpense.types';
 
-interface DetailItemProps {
-    label: string;
-    value: React.ReactNode;
-    className?: string;
-}
-
-const DetailItem = ({ label, value, className = '' }: DetailItemProps) => (
-    <div className={`space-y-1 ${className}`}>
-        <p className="text-sm font-medium text-muted-foreground">{label}</p>
-        <p className="text-sm font-semibold">{value || '—'}</p>
-    </div>
-);
-
 interface FixedExpenseViewProps {
     fixedExpense: FixedExpenseResponse;
 }
 
+const labelClass = 'text-sm font-medium text-muted-foreground w-1/4';
+const valueClass = 'text-sm w-1/4';
+
 const FixedExpenseView = ({ fixedExpense }: FixedExpenseViewProps) => {
     const navigate = useNavigate();
-    const { canUpdate } = useAuth();
+    const isBankTransfer = fixedExpense.paymentMode === 'bank_transfer';
 
     return (
         <Card>
             <CardHeader>
                 <div className="flex items-center justify-between">
-                    <div>
-                        <CardTitle className="flex items-center gap-2">
-                            <Receipt className="h-6 w-6" />
-                            Fixed Expense Details
-                        </CardTitle>
-                        <CardDescription className="mt-2">
-                            View complete fixed expense information
-                        </CardDescription>
-                    </div>
+                    <CardTitle className="flex items-center gap-2">
+                        <Receipt className="h-5 w-5" />
+                        Fixed Expense Details
+                        <span className="text-sm font-normal text-muted-foreground">
+                            #{fixedExpense.id}
+                        </span>
+                    </CardTitle>
                     <CardAction className="flex gap-2">
                         <Button variant="outline" onClick={() => navigate(-1)}>
                             <ArrowLeft className="mr-2 h-4 w-4" /> Back
                         </Button>
-                        {canUpdate('accounts.fixed-expenses') && (
-                            <Button
-                                onClick={() =>
-                                    navigate(paths.accounts.fixedExpenseEdit(fixedExpense.id))
-                                }
-                            >
-                                <Pencil className="mr-2 h-4 w-4" /> Edit
-                            </Button>
-                        )}
                     </CardAction>
                 </div>
             </CardHeader>
-
-            <CardContent className="space-y-8">
-                {/* Status Banner */}
-                <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-                    <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">Status:</span>
-                            <Badge
-                                variant={fixedExpense.deleteStatus ? 'secondary' : 'default'}
-                                className="gap-1 text-sm"
-                            >
-                                {fixedExpense.deleteStatus && <Archive className="h-3 w-3" />}
-                                {fixedExpense.deleteStatus ? 'Archived' : 'Active'}
-                            </Badge>
-                        </div>
-                        <Badge variant="outline" className="text-sm">
-                            {FIXED_EXPENSE_TYPE_LABELS[fixedExpense.type] ?? fixedExpense.type}
-                        </Badge>
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                        Expense ID:{' '}
-                        <span className="font-mono font-semibold">#{fixedExpense.id}</span>
-                    </div>
-                </div>
-
-                {/* Expense Information */}
-                <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                        <Receipt className="h-5 w-5 text-muted-foreground" />
-                        <h3 className="text-lg font-semibold">Expense Information</h3>
-                    </div>
-
-                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                        <DetailItem label="Party Name" value={fixedExpense.partyName} />
-                        <DetailItem
-                            label="Type"
-                            value={FIXED_EXPENSE_TYPE_LABELS[fixedExpense.type] ?? fixedExpense.type}
-                        />
-                        <DetailItem
-                            label="Amount"
-                            value={
+            <CardContent>
+                <Table>
+                    <TableBody>
+                        {/* Expense Information */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Expense Information
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className={labelClass}>Party Name</TableCell>
+                            <TableCell className="text-sm font-semibold">
+                                {fixedExpense.partyName || '—'}
+                            </TableCell>
+                            <TableCell className={labelClass}>Type</TableCell>
+                            <TableCell className={valueClass}>
+                                <Badge variant="secondary">
+                                    {FIXED_EXPENSE_TYPE_LABELS[fixedExpense.type] ??
+                                        fixedExpense.type}
+                                </Badge>
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className={labelClass}>Amount</TableCell>
+                            <TableCell className="text-sm font-semibold">
                                 <span className="flex items-center gap-2">
                                     {formatINR(fixedExpense.amount)}
                                     <Badge variant="outline">
@@ -114,88 +75,87 @@ const FixedExpenseView = ({ fixedExpense }: FixedExpenseViewProps) => {
                                             fixedExpense.amountType}
                                     </Badge>
                                 </span>
-                            }
-                        />
-                        <DetailItem label="Due Date" value={formatDate(fixedExpense.dueDate)} />
-                        <DetailItem
-                            label="Status"
-                            value={
-                                <Badge variant="outline" className="gap-1">
-                                    {fixedExpense.status ?? 'New'}
+                            </TableCell>
+                            <TableCell className={labelClass}>Status</TableCell>
+                            <TableCell className={valueClass}>
+                                <Badge variant="outline">{fixedExpense.status || '—'}</Badge>
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className={labelClass}>Due Date</TableCell>
+                            <TableCell className="text-sm">
+                                {formatDate(fixedExpense.dueDate)}
+                            </TableCell>
+                            <TableCell className={labelClass}>Payment Frequency</TableCell>
+                            <TableCell className={valueClass}>
+                                <Badge variant="secondary">
+                                    {FIXED_EXPENSE_FREQUENCY_LABELS[
+                                        fixedExpense.paymentFrequency
+                                    ] ?? fixedExpense.paymentFrequency}
                                 </Badge>
-                            }
-                        />
-                        <DetailItem
-                            label="Payment Frequency"
-                            value={
-                                FIXED_EXPENSE_FREQUENCY_LABELS[fixedExpense.paymentFrequency] ??
-                                fixedExpense.paymentFrequency
-                            }
-                        />
-                    </div>
-                </div>
+                            </TableCell>
+                        </TableRow>
 
-                <Separator />
-
-                {/* Payment Information */}
-                <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                        <Landmark className="h-5 w-5 text-muted-foreground" />
-                        <h3 className="text-lg font-semibold">Payment Information</h3>
-                    </div>
-
-                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                        <DetailItem
-                            label="Payment Mode"
-                            value={
-                                FIXED_EXPENSE_PAYMENT_MODE_LABELS[fixedExpense.paymentMode] ??
-                                fixedExpense.paymentMode
-                            }
-                        />
-                        {fixedExpense.paymentMode === 'bank_transfer' && (
-                            <>
-                                <DetailItem
-                                    label="Account Name"
-                                    value={fixedExpense.accountName}
-                                />
-                                <DetailItem
-                                    label="Account Number"
-                                    value={fixedExpense.accountNumber}
-                                />
-                                <DetailItem label="IFSC Code" value={fixedExpense.ifscCode} />
-                            </>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className={labelClass}>Payment Mode</TableCell>
+                            <TableCell className="text-sm" colSpan={isBankTransfer ? 1 : 3}>
+                                <Badge variant="outline">
+                                    {FIXED_EXPENSE_PAYMENT_MODE_LABELS[
+                                        fixedExpense.paymentMode
+                                    ] ?? fixedExpense.paymentMode}
+                                </Badge>
+                            </TableCell>
+                            {isBankTransfer && (
+                                <>
+                                    <TableCell className={labelClass}>Account Name</TableCell>
+                                    <TableCell className="text-sm">
+                                        {fixedExpense.accountName || '—'}
+                                    </TableCell>
+                                </>
+                            )}
+                        </TableRow>
+                        {isBankTransfer && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className={labelClass}>Account Number</TableCell>
+                                <TableCell className="text-sm">
+                                    {fixedExpense.accountNumber || '—'}
+                                </TableCell>
+                                <TableCell className={labelClass}>IFSC Code</TableCell>
+                                <TableCell className="text-sm">
+                                    {fixedExpense.ifscCode || '—'}
+                                </TableCell>
+                            </TableRow>
                         )}
-                    </div>
-                </div>
 
-                <Separator />
-
-                {/* Audit Information */}
-                <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Audit Information</h3>
-
-                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                        <DetailItem
-                            label="Created By"
-                            value={fixedExpense.createdByName ?? `#${fixedExpense.createdBy}`}
-                        />
-                        <DetailItem
-                            label="Created At"
-                            value={formatDateTime(fixedExpense.createdAt)}
-                        />
-                        <DetailItem
-                            label="Last Updated"
-                            value={formatDateTime(fixedExpense.updatedAt)}
-                        />
-                        <DetailItem
-                            label="Maker"
-                            value={
-                                fixedExpense.makerName ??
-                                (fixedExpense.makerId ? `#${fixedExpense.makerId}` : '—')
-                            }
-                        />
-                    </div>
-                </div>
+                        {/* Audit Information */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Audit Information
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className={labelClass}>Created By</TableCell>
+                            <TableCell className="text-sm">
+                                {fixedExpense.createdByName ?? `#${fixedExpense.createdBy}`}
+                            </TableCell>
+                            <TableCell className={labelClass}>Created At</TableCell>
+                            <TableCell className="text-sm">
+                                {formatDateTime(fixedExpense.createdAt)}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className={labelClass}>Last Updated</TableCell>
+                            <TableCell className="text-sm">
+                                {formatDateTime(fixedExpense.updatedAt)}
+                            </TableCell>
+                            <TableCell className={labelClass}>Maker</TableCell>
+                            <TableCell className="text-sm">
+                                {fixedExpense.makerName ??
+                                    (fixedExpense.makerId ? `#${fixedExpense.makerId}` : '—')}
+                            </TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
             </CardContent>
         </Card>
     );

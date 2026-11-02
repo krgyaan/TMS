@@ -138,13 +138,6 @@ export const FIXED_EXPENSE_STATUS_OPTIONS: FixedExpenseSelectOption[] = [
     { value: 'New', label: 'New' },
 ];
 
-export const FIXED_EXPENSE_ARCHIVE_FILTER_OPTIONS = [
-    { value: 'active', label: 'Active' },
-    { value: 'archived', label: 'Archived' },
-] as const;
-
-export type FixedExpenseArchiveFilter = (typeof FIXED_EXPENSE_ARCHIVE_FILTER_OPTIONS)[number]['value'];
-
 // ===================== LABEL MAPS =====================
 
 export const FIXED_EXPENSE_TYPE_LABELS: Record<FixedExpenseType, string> = {
