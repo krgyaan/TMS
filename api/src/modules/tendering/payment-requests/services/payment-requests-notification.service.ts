@@ -6,7 +6,7 @@ import { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { PdfGeneratorService } from '@/modules/pdf/pdf-generator.service';
 import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
-import { instrumentBgDetails, instrumentChequeDetails, instrumentTransferDetails, paymentInstruments, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
+import { instrumentBgDetails, instrumentChequeDetails, instrumentFdrDetails, instrumentTransferDetails, paymentInstruments, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
 import { BG_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -913,6 +913,63 @@ export class PaymentRequestsNotificationService {
                 }
             } catch (error) {
                 this.logger.error(`Failed to send cheque email for instrument ${instrumentId}:`, error);
+            }
+        } else if (mode === 'FDR') {
+            // FDR request created directly (no auto-created Cheque).
+            // Notify the FDR responsible user so they can process the Accounts Form (FDR).
+            const [fdrDetails] = await this.db
+                .select()
+                .from(instrumentFdrDetails)
+                .where(eq(instrumentFdrDetails.instrumentId, instrumentId))
+                .limit(1);
+
+            const courierAddr = instrument.courierAddressJson as Record<string, any> | null;
+            const courierAddress = courierAddr
+                ? [
+                    courierAddr.name,
+                    courierAddr.phone,
+                    [courierAddr.line1, courierAddr.line2].filter(Boolean).join(', '),
+                    [courierAddr.city, courierAddr.state].filter(Boolean).join(', '),
+                    courierAddr.pincode ? `- ${courierAddr.pincode}` : null,
+                ].filter(Boolean).join('\n')
+                : (instrument.courierAddress ?? 'Not specified');
+
+            try {
+                const result = await this.emailService.sendPaymentEmail({
+                    requestId: instrument.requestId,
+                    tenderId: tenderId || undefined,
+                    eventType: 'FDR_REQUEST',
+                    fromUserId: requestedBy,
+                    subject: `Please create a new FDR - ${purpose}`,
+                    template: 'fdr-request',
+                    data: {
+                        fdrPurpose: fdrDetails?.fdrPurpose || 'Not specified',
+                        tenderNo: tender?.tenderNo || 'NA',
+                        tenderName: tender?.tenderName || 'Not specified',
+                        dueDateTime: this.formatDateDDMMYYYY(tender?.dueDate),
+                        beneficiaryName: instrument.favouring || 'Not specified',
+                        payableAt: instrument.payableAt || 'Not specified',
+                        amount: this.formatCurrency(Number(instrument.amount) || 0),
+                        fdrExpiryDate: this.formatDateDDMMYYYY(fdrDetails?.fdrExpiryDate),
+                        timeLimit: instrument.courierDeadline || 24,
+                        courierAddress,
+                        link: `${this.getFrontendUrl()}/bi-dashboard/fdr/action/${instrumentId}`,
+                        tlName: tlUser?.name || 'Team Leader',
+                    },
+                    to: [{ type: 'emails', emails: [toEmails] }],
+                    cc: [
+                        { type: 'role', role: 'Admin', teamId: tenderTeamId },
+                        { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                        { type: 'emails', emails: ['accounts@volksenergie.in']},
+                    ]
+                });
+                if (result.success) {
+                    this.logger.log(`FDR request email sent for instrument ${instrumentId} (logId: ${result.emailLogId})`);
+                } else {
+                    this.logger.warn(`FDR request email failed for instrument ${instrumentId}: ${result.error}`);
+                }
+            } catch (error) {
+                this.logger.error(`Failed to send FDR request email for instrument ${instrumentId}:`, error);
             }
         } else if (mode === 'BG') {
             try {
