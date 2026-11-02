@@ -3,24 +3,12 @@ import type { FixedExpenseFormValues } from './fixedExpense.schema';
 // ===================== ENUM TYPES =====================
 
 export type FixedExpenseType =
-    | 'imprest'
-    | 'communication'
-    | 'courier'
     | 'electricity'
     | 'rent'
-    | 'emi'
     | 'salary'
+    | 'communication'
     | 'software'
-    | 'office_expenses'
-    | 'printing_stationary'
-    | 'office_maintenance'
-    | 'portal_renewal_charges'
-    | 'professional_charges'
-    | 'insurance'
-    | 'registration_charges'
-    | 'pop_charges'
-    | 'bank_charges'
-    | 'diwali_gift_expenses';
+    | 'admin';
 
 export type FixedExpenseFrequency = 'monthly' | 'quarterly' | 'half_yearly' | 'annual';
 
@@ -93,28 +81,15 @@ export type { FixedExpenseFormValues };
 export type FixedExpenseSelectOption = { value: string; label: string };
 
 /**
- * Expense categories mirror the "Fixed" category group used by maker requests
- * (`fixedCategory` in modules/shared/maker-requests/CreateMakerRequestPage.tsx).
+ * Expense categories available for fixed expenses.
  */
 export const FIXED_EXPENSE_TYPE_OPTIONS: FixedExpenseSelectOption[] = [
-    { value: 'imprest', label: 'Imprest' },
-    { value: 'communication', label: 'Communication' },
-    { value: 'courier', label: 'Courier' },
     { value: 'electricity', label: 'Electricity' },
     { value: 'rent', label: 'Rent' },
-    { value: 'emi', label: 'EMI' },
     { value: 'salary', label: 'Salary' },
+    { value: 'communication', label: 'Communication' },
     { value: 'software', label: 'Software' },
-    { value: 'office_expenses', label: 'Office Expenses' },
-    { value: 'printing_stationary', label: 'Printing & Stationary' },
-    { value: 'office_maintenance', label: 'Office Maintenance' },
-    { value: 'portal_renewal_charges', label: 'Portal Renewal Charges' },
-    { value: 'professional_charges', label: 'Professional Charges' },
-    { value: 'insurance', label: 'Insurance' },
-    { value: 'registration_charges', label: 'Registration Charges' },
-    { value: 'pop_charges', label: 'POP Charges' },
-    { value: 'bank_charges', label: 'Bank Charges' },
-    { value: 'diwali_gift_expenses', label: 'Diwali/Gift Expenses' },
+    { value: 'admin', label: 'Admin' },
 ];
 
 export const FIXED_EXPENSE_FREQUENCY_OPTIONS: FixedExpenseSelectOption[] = [
@@ -141,24 +116,12 @@ export const FIXED_EXPENSE_STATUS_OPTIONS: FixedExpenseSelectOption[] = [
 // ===================== LABEL MAPS =====================
 
 export const FIXED_EXPENSE_TYPE_LABELS: Record<FixedExpenseType, string> = {
-    imprest: 'Imprest',
-    communication: 'Communication',
-    courier: 'Courier',
     electricity: 'Electricity',
     rent: 'Rent',
-    emi: 'EMI',
     salary: 'Salary',
+    communication: 'Communication',
     software: 'Software',
-    office_expenses: 'Office Expenses',
-    printing_stationary: 'Printing & Stationary',
-    office_maintenance: 'Office Maintenance',
-    portal_renewal_charges: 'Portal Renewal Charges',
-    professional_charges: 'Professional Charges',
-    insurance: 'Insurance',
-    registration_charges: 'Registration Charges',
-    pop_charges: 'POP Charges',
-    bank_charges: 'Bank Charges',
-    diwali_gift_expenses: 'Diwali/Gift Expenses',
+    admin: 'Admin',
 };
 
 export const FIXED_EXPENSE_FREQUENCY_LABELS: Record<FixedExpenseFrequency, string> = {

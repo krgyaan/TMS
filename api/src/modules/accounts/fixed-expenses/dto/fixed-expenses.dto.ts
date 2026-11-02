@@ -16,26 +16,7 @@ const optionalString = (max: number) => z.string().trim().max(max).optional().nu
 
 // ===================== ENUM VALUES =====================
 
-export const FIXED_EXPENSE_TYPES = [
-    "imprest",
-    "communication",
-    "courier",
-    "electricity",
-    "rent",
-    "emi",
-    "salary",
-    "software",
-    "office_expenses",
-    "printing_stationary",
-    "office_maintenance",
-    "portal_renewal_charges",
-    "professional_charges",
-    "insurance",
-    "registration_charges",
-    "pop_charges",
-    "bank_charges",
-    "diwali_gift_expenses",
-] as const;
+export const FIXED_EXPENSE_TYPES = ["electricity", "rent", "salary", "communication", "software", "admin"] as const;
 
 export const FIXED_EXPENSE_STATUSES = ["New"] as const;
 
