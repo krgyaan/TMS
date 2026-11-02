@@ -66,7 +66,7 @@ export function VendorSellerSection<T extends SellerFormValues>({
             sellerGsts.map(g => ({
                 id: String(g.id),
                 name: g.gstNo || "No GSTIN",
-                description: [g.gstState, g.address].filter(Boolean).join(" · ") || undefined,
+                description: [g.gstState, g.address].filter(Boolean).join(" - ") || undefined,
             })),
         [sellerGsts],
     );
@@ -192,6 +192,7 @@ export function VendorSellerSection<T extends SellerFormValues>({
                                 }
                                 disabled={!selectedSellerId || sellerGsts.length === 0}
                                 valueType="string"
+                                descriptionPlacement="below"
                             />
                         </div>
                         <FieldWrapper control={form.control} name={"sellerGstNo" as never} label="GST Number">
