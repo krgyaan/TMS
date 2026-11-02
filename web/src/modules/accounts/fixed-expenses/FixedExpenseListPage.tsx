@@ -232,11 +232,28 @@ const FixedExpenseListPage = () => {
                 filter: true,
             },
             {
-                field: 'deleteStatus',
-                colId: 'deleteStatus',
+                field: 'status',
+                colId: 'status',
                 headerName: 'Status',
                 flex: 0.7,
                 minWidth: 100,
+                cellRenderer: (params: { data?: FixedExpenseListRow }) => {
+                    if (!params.data) return '—';
+                    return (
+                        <Badge variant="outline" className="h-5 px-2">
+                            {params.data.status ?? '—'}
+                        </Badge>
+                    );
+                },
+                sortable: false,
+                filter: false,
+            },
+            {
+                field: 'deleteStatus',
+                colId: 'deleteStatus',
+                headerName: 'delete_status',
+                flex: 0.7,
+                minWidth: 110,
                 cellRenderer: (params: { data?: FixedExpenseListRow }) => {
                     if (!params.data) return '—';
                     return (

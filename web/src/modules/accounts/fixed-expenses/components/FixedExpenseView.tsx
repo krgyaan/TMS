@@ -118,6 +118,14 @@ const FixedExpenseView = ({ fixedExpense }: FixedExpenseViewProps) => {
                         />
                         <DetailItem label="Due Date" value={formatDate(fixedExpense.dueDate)} />
                         <DetailItem
+                            label="Status"
+                            value={
+                                <Badge variant="outline" className="gap-1">
+                                    {fixedExpense.status ?? 'New'}
+                                </Badge>
+                            }
+                        />
+                        <DetailItem
                             label="Payment Frequency"
                             value={
                                 FIXED_EXPENSE_FREQUENCY_LABELS[fixedExpense.paymentFrequency] ??

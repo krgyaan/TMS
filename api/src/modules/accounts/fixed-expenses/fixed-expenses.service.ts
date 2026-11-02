@@ -13,6 +13,7 @@ import type {
     FixedExpensePaymentMode,
     FixedExpenseQuery,
     FixedExpenseResponse,
+    FixedExpenseStatus,
     FixedExpenseType,
     UpdateFixedExpenseDto,
 } from "./dto/fixed-expenses.dto";
@@ -32,6 +33,7 @@ const fixedExpenseSelection = {
     type: fixedExpenses.type,
     dueDate: fixedExpenses.dueDate,
     paymentFrequency: fixedExpenses.paymentFrequency,
+    status: fixedExpenses.status,
     deleteStatus: fixedExpenses.deleteStatus,
     makerId: fixedExpenses.makerId,
     makerName: makerUser.name,
@@ -53,6 +55,7 @@ type FixedExpenseRow = {
     type: string;
     dueDate: string;
     paymentFrequency: string;
+    status: string;
     deleteStatus: boolean;
     makerId: number | null;
     makerName: string | null;
@@ -81,6 +84,7 @@ export class FixedExpensesService {
             type: row.type as FixedExpenseType,
             dueDate: row.dueDate ?? "",
             paymentFrequency: row.paymentFrequency as FixedExpenseFrequency,
+            status: row.status as FixedExpenseStatus,
             deleteStatus: row.deleteStatus,
             makerId: row.makerId ?? null,
             makerName: row.makerName ?? null,
@@ -227,6 +231,7 @@ export class FixedExpensesService {
                 type: data.type,
                 dueDate: data.dueDate,
                 paymentFrequency: data.paymentFrequency,
+                status: "New",
                 deleteStatus: false,
                 makerId: data.makerId ?? null,
                 createdBy,
@@ -261,6 +266,7 @@ export class FixedExpensesService {
         if (data.type !== undefined) updateData.type = data.type;
         if (data.dueDate !== undefined) updateData.dueDate = data.dueDate;
         if (data.paymentFrequency !== undefined) updateData.paymentFrequency = data.paymentFrequency;
+        if (data.status !== undefined) updateData.status = data.status;
         if (data.makerId !== undefined) updateData.makerId = data.makerId;
         if (data.deleteStatus !== undefined) updateData.deleteStatus = data.deleteStatus;
 

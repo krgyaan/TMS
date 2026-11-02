@@ -16,7 +16,28 @@ const optionalString = (max: number) => z.string().trim().max(max).optional().nu
 
 // ===================== ENUM VALUES =====================
 
-export const FIXED_EXPENSE_TYPES = ["electricity", "rent", "salary", "communication", "software", "admin"] as const;
+export const FIXED_EXPENSE_TYPES = [
+    "imprest",
+    "communication",
+    "courier",
+    "electricity",
+    "rent",
+    "emi",
+    "salary",
+    "software",
+    "office_expenses",
+    "printing_stationary",
+    "office_maintenance",
+    "portal_renewal_charges",
+    "professional_charges",
+    "insurance",
+    "registration_charges",
+    "pop_charges",
+    "bank_charges",
+    "diwali_gift_expenses",
+] as const;
+
+export const FIXED_EXPENSE_STATUSES = ["New"] as const;
 
 export const FIXED_EXPENSE_FREQUENCIES = ["monthly", "quarterly", "half_yearly", "annual"] as const;
 
@@ -37,6 +58,7 @@ const fixedExpenseBaseSchema = z.object({
     type: z.enum(FIXED_EXPENSE_TYPES),
     dueDate: dateString,
     paymentFrequency: z.enum(FIXED_EXPENSE_FREQUENCIES).default("monthly"),
+    status: z.enum(FIXED_EXPENSE_STATUSES).default("New"),
     makerId: z.number().int().positive().optional().nullable(),
     deleteStatus: z.boolean().default(false),
 });
@@ -105,6 +127,7 @@ export type FixedExpenseType = (typeof FIXED_EXPENSE_TYPES)[number];
 export type FixedExpenseFrequency = (typeof FIXED_EXPENSE_FREQUENCIES)[number];
 export type FixedExpensePaymentMode = (typeof FIXED_EXPENSE_PAYMENT_MODES)[number];
 export type FixedExpenseAmountType = (typeof FIXED_EXPENSE_AMOUNT_TYPES)[number];
+export type FixedExpenseStatus = (typeof FIXED_EXPENSE_STATUSES)[number];
 
 export interface FixedExpenseResponse {
     id: number;
@@ -118,6 +141,7 @@ export interface FixedExpenseResponse {
     type: FixedExpenseType;
     dueDate: string;
     paymentFrequency: FixedExpenseFrequency;
+    status: FixedExpenseStatus;
     deleteStatus: boolean;
     makerId: number | null;
     makerName?: string | null;

@@ -29,6 +29,9 @@ export const fixedExpenses = pgTable(
         dueDate: date("due_date").notNull(),
         paymentFrequency: varchar("payment_frequency", { length: 20 }).notNull().default("monthly"),
 
+        // Workflow status (New, ...)
+        status: varchar("status", { length: 30 }).notNull().default("New"),
+
         // Archive flag: true = archived (soft deleted)
         deleteStatus: boolean("delete_status").notNull().default(false),
 
