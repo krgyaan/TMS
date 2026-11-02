@@ -6,6 +6,7 @@ import { Receipt, Eye } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDate, formatDateTime } from '@/hooks/useFormatedDate';
 import { fileUploadService } from '@/services/api/file-upload.service';
+import { paymentRequestsService } from '@/services/api/payment-requests.service';
 
 interface ChequeViewProps {
     data: any;
@@ -17,7 +18,7 @@ const FileLink = ({ file, instrumentId }: { file?: string; instrumentId?: number
     if (!file) return <span className="text-muted-foreground">Not Uploaded</span>;
 
     const href = instrumentId
-        ? `/payment-requests/instruments/${instrumentId}/pdf`
+        ? paymentRequestsService.getInstrumentPdfUrl(instrumentId)
         : fileUploadService.getFileUrl(file);
 
     return (
@@ -25,6 +26,7 @@ const FileLink = ({ file, instrumentId }: { file?: string; instrumentId?: number
             <a
                 href={href}
                 target="_blank"
+                rel="noopener noreferrer"
                 className="flex items-center gap-1 text-primary hover:underline"
             >
                 <Eye className="h-4 w-4" />
@@ -39,7 +41,6 @@ export function ChequeView({
     isLoading = false,
     className = '',
 }: ChequeViewProps) {
-    console.log("Cheque: ", data);
     if (isLoading) {
         return (
             <Card className={className}>
