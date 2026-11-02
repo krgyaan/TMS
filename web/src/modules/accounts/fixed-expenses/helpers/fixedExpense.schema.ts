@@ -3,24 +3,12 @@ import { z } from 'zod';
 // ===================== ENUM VALUES =====================
 
 export const FIXED_EXPENSE_TYPES = [
-    'imprest',
-    'communication',
-    'courier',
     'electricity',
     'rent',
-    'emi',
     'salary',
+    'communication',
     'software',
-    'office_expenses',
-    'printing_stationary',
-    'office_maintenance',
-    'portal_renewal_charges',
-    'professional_charges',
-    'insurance',
-    'registration_charges',
-    'pop_charges',
-    'bank_charges',
-    'diwali_gift_expenses',
+    'admin',
 ] as const;
 
 export const FIXED_EXPENSE_FREQUENCIES = [
