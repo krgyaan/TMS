@@ -8,6 +8,7 @@ import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { instrumentBgDetails, instrumentChequeDetails, instrumentFdrDetails, instrumentTransferDetails, paymentInstruments, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
 import { BG_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
+import { getIstDayBounds } from '@/utils/ist-date';
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { differenceInDays } from 'date-fns';
@@ -1527,10 +1528,7 @@ export class PaymentRequestsNotificationService {
                 continue;
             }
 
-            const dayStart = new Date();
-            dayStart.setHours(0, 0, 0, 0);
-            const dayEnd = new Date(dayStart);
-            dayEnd.setDate(dayEnd.getDate() + 1);
+            const { start: dayStart, end: dayEnd } = getIstDayBounds();
 
             const data = {
                 purpose: cheque.chequeDetails.chequeReason || cheque.request.purpose || '',
