@@ -99,6 +99,7 @@ import { TimersModule } from "@/modules/timers/timers.module";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { APP_FILTER, APP_GUARD } from "@nestjs/core";
+import { ScheduleModule } from "@nestjs/schedule";
 import { ServeStaticModule } from "@nestjs/serve-static";
 import { SentryGlobalFilter, SentryModule } from "@sentry/nestjs/setup";
 import { join } from "path";
@@ -169,6 +170,7 @@ import { QueueMonitoringModule } from "./modules/queue-monitoring/queue-monitori
                 ...validateCurrencyEnv(env),
             }),
         }),
+        ScheduleModule.forRoot(),
         LoggerModule,
         DatabaseModule,
         UsersModule,

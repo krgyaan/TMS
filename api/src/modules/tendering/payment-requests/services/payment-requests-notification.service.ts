@@ -1,4 +1,4 @@
-import { couriers, emdResponsibility, tenderInfos, users } from '@/db/schemas';
+import { couriers, emailLogs, emdResponsibility, tenderInfos, users } from '@/db/schemas';
 import { AppLogger } from '@/logger/app-logger.service';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
@@ -11,7 +11,7 @@ import { BG_STATUSES } from '@/modules/tendering/payment-requests/constants/paym
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { differenceInDays } from 'date-fns';
-import { and, eq, isNull, ne, notInArray } from 'drizzle-orm';
+import { and, eq, gte, isNull, lt, ne, notInArray } from 'drizzle-orm';
 
 @Injectable()
 export class PaymentRequestsNotificationService {
@@ -1527,7 +1527,10 @@ export class PaymentRequestsNotificationService {
                 continue;
             }
 
-            const tenderTeamId = await this.getTenderTeamId(cheque.request.tenderId || 0, cheque.request.requestedBy || 0);
+            const dayStart = new Date();
+            dayStart.setHours(0, 0, 0, 0);
+            const dayEnd = new Date(dayStart);
+            dayEnd.setDate(dayEnd.getDate() + 1);
 
             const data = {
                 purpose: cheque.chequeDetails.chequeReason || cheque.request.purpose || '',
@@ -1537,6 +1540,25 @@ export class PaymentRequestsNotificationService {
                 dueDate: this.formatDateDDMMYYYY(cheque.chequeDetails.dueDate),
                 daysLeft: daysUntilDue,
             };
+            const subject = `Cheque Due Date Reminder - ${data.chequeNo} (${data.daysLeft} days left)`;
+
+            const [existingReminder] = await this.db
+                .select({ id: emailLogs.id })
+                .from(emailLogs)
+                .where(and(
+                    eq(emailLogs.eventType, 'CHEQUE_DUE_DATE_REMINDER'),
+                    gte(emailLogs.createdAt, dayStart),
+                    lt(emailLogs.createdAt, dayEnd),
+                    eq(emailLogs.subject, subject),
+                ))
+                .limit(1);
+
+            if (existingReminder) {
+                this.logger.log(`Cheque due date reminder already logged today for Cheque #${cheque.instrument.id}, skipping`);
+                continue;
+            }
+
+            const tenderTeamId = await this.getTenderTeamId(cheque.request.tenderId || 0, cheque.request.requestedBy || 0);
 
             this.logger.log(`Sending cheque due date reminder for Cheque #${cheque.instrument.id}, ${daysUntilDue} days before due date`);
 
@@ -1546,7 +1568,7 @@ export class PaymentRequestsNotificationService {
                     tenderId: cheque.request.tenderId || undefined,
                     eventType: 'CHEQUE_DUE_DATE_REMINDER',
                     fromUserId: 8,
-                    subject: `Cheque Due Date Reminder - ${data.chequeNo} (${data.daysLeft} days left)`,
+                    subject,
                     template: 'cheque-due-date-reminder',
                     data,
                     to: [{ type: 'emails', emails: ['kailash@volksenergie.in'] }],

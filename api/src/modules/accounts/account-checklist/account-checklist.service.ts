@@ -892,6 +892,7 @@ export class AccountChecklistService {
      */
     async enqueueEodMails(queue: import("bullmq").Queue) {
         const dateStr = format(new Date(), "dd/MM/yy");
+        const jobDate = format(new Date(), "yyyy-MM-dd");
         this.logger.info("[MAIL-ENQUEUE] ▶ Starting EOD checklist mail enqueue", {
             date: dateStr,
         });
@@ -994,6 +995,7 @@ export class AccountChecklistService {
                         date: dateStr,
                     },
                     {
+                        jobId: `checklist-mail-${accountableUserId}-${jobDate}`,
                         attempts: 3,
                         backoff: { type: "exponential", delay: 10000 },
                     }
@@ -1028,6 +1030,7 @@ export class AccountChecklistService {
                     date: dateStr,
                 },
                 {
+                    jobId: `checklist-admin-mail-${jobDate}`,
                     attempts: 3,
                     backoff: { type: "exponential", delay: 10000 },
                 }

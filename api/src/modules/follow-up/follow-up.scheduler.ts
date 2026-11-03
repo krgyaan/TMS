@@ -3,7 +3,7 @@ import { Cron } from "@nestjs/schedule";
 import { FollowUpService } from "./follow-up.service";
 import { FOLLOWUP_WINDOWS } from "./follow-up.windows";
 import { Queue } from "bullmq";
-import { QueueModule } from "@/infra/queue/queue.module";
+import { getIstDateKey, getIstTimeKey } from "@/utils/ist-date";
 
 @Injectable()
 export class FollowupScheduler {
@@ -19,7 +19,9 @@ export class FollowupScheduler {
 
         const window = this.getCurrentWindow(now);
         if (!window) return;
-        
+
+        const slot = `${getIstDateKey(now)}T${getIstTimeKey(now)}`;
+
         console.log("Window:", window);
         console.log("Cron tick at", now);
 
@@ -41,6 +43,7 @@ export class FollowupScheduler {
                 "send-followup",
                 { followupId: fu.id },
                 {
+                    jobId: `followup-${fu.id}-${window.frequency}-${slot}`,
                     attempts: 5,
                     backoff: { type: "exponential", delay: 30000 },
                 }
