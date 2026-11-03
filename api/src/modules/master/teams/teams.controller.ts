@@ -1,18 +1,6 @@
-import {
-    Body,
-    Controller,
-    Get,
-    Param,
-    ParseIntPipe,
-    Patch,
-    Post,
-    Query,
-    HttpCode,
-    HttpStatus,
-    NotFoundException,
-    Delete,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus, NotFoundException, Delete, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
+import { MasterWriteGuard } from '@/modules/master/common/master-write.guard';
 import { TeamsService } from '@/modules/master/teams/teams.service';
 
 const CreateTeamSchema = z.object({
@@ -24,6 +12,7 @@ const CreateTeamSchema = z.object({
 const UpdateTeamSchema = CreateTeamSchema.partial();
 
 @Controller('teams')
+@UseGuards(MasterWriteGuard)
 export class TeamsController {
     constructor(private readonly teamsService: TeamsService) { }
 
