@@ -112,6 +112,7 @@ export default function UserCreateForm({ mode = "create", user }: UserCreateForm
             form.setError("password", { type: "manual", message: "Password is required" });
             return;
         }
+
         const payload: Record<string, unknown> = {
             firstName: values.firstName.trim(),
             lastName: values.lastName.trim(),
@@ -329,4 +330,3 @@ export default function UserCreateForm({ mode = "create", user }: UserCreateForm
         </Card>
     );
 }
- 
