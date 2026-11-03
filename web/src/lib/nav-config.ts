@@ -58,6 +58,7 @@ export const navMain: NavGroup[] = [
             { title: "Vendor Work Orders", url: paths.operations.vendorWorkOrders, permission: "ops.vendor-work-orders" },
             { title: "Sale Invoices", url: paths.operations.saleInvoices, permission: "ops.sale-invoices" },
             { title: "Payment Requests", url: paths.operations.paymentRequests, permission: "ops.payment-requests" },
+            { title: "Item", url: paths.accounts.inventoryItems, permission: "accounts.inventory-items" },
         ],
     },
     {

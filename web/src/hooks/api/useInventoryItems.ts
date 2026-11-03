@@ -5,10 +5,10 @@ import { inventoryItemsService } from "@/services/api";
 
 export const inventoryItemsKey = ["inventory-items"] as const;
 
-export const useInventoryItems = (search = "") =>
+export const useInventoryItems = (filters: { search?: string; itemGroup?: string; itemName?: string; unit?: string; isActive?: string } = {}) =>
     useQuery({
-        queryKey: [...inventoryItemsKey, { search }],
-        queryFn: () => inventoryItemsService.getAll({ search, limit: 100 }),
+        queryKey: [...inventoryItemsKey, filters],
+        queryFn: () => inventoryItemsService.getAll({ ...filters, limit: 100 }),
     });
 
 export const useInventoryItem = (id: number) =>
