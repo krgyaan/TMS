@@ -6,8 +6,10 @@ import { CanCreate, CanDelete, CanRead, CanUpdate } from "@/modules/auth/decorat
 import { InventoryItemsService } from "./inventory-items.service";
 
 const itemSchema = z.object({
+    itemGroup: z.enum(["Raw Materials", "Finished Goods", "Supplies"]),
     itemName: z.string().trim().min(1).max(120),
     itemType: z.string().trim().max(80).nullable().optional(),
+    description: z.string().trim().max(500).nullable().optional(),
     specifications: z.record(z.string().trim().max(200)).default({}),
     unit: z.string().trim().min(1).max(80),
     conversion: z.record(z.string().trim().max(200)).default({}),
@@ -25,12 +27,15 @@ export class InventoryItemsController {
 
     @Get()
     @CanRead("accounts.inventory-items")
-    list(@Query("search") search?: string, @Query("page") page?: string, @Query("limit") limit?: string, @Query("isActive") isActive?: string) {
+    list(@Query("search") search?: string, @Query("page") page?: string, @Query("limit") limit?: string, @Query("itemGroup") itemGroup?: string, @Query("itemName") itemName?: string, @Query("unit") unit?: string, @Query("isActive") isActive?: string) {
         return this.service.findAll({
             search,
             page: page ? Number(page) : undefined,
             limit: limit ? Number(limit) : undefined,
-            isActive: isActive === undefined ? undefined : isActive === "true",
+            itemGroup,
+            itemName,
+            unit,
+            isActive: isActive === undefined || isActive === "" ? undefined : isActive === "true",
         });
     }
 

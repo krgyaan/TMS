@@ -6,16 +6,19 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SelectField } from "@/components/form/SelectField";
 import { Form } from "@/components/ui/form";
 import { useCreateInventoryItem, useUpdateInventoryItem } from "@/hooks/api/useInventoryItems";
 import type { InventoryItem } from "@/types/inventory-item.types";
-import { categoryOptions, getCategory } from "./item-config";
+import { getCategory, getFamiliesForGroup, groupOptions } from "./item-config";
 
 const schema = z.object({
+    itemGroup: z.enum(["Raw Materials", "Finished Goods", "Supplies"]),
     itemName: z.string().min(1, "Item name is required"),
     itemType: z.string().optional(),
     specifications: z.record(z.string()),
+    description: z.string().optional(),
     unit: z.string().min(1, "Unit is required"),
     conversion: z.string().min(1, "Conversion is required"),
     hsnCode: z.string().optional(),
@@ -28,31 +31,52 @@ type Props = { open: boolean; onOpenChange: (open: boolean) => void; item?: Inve
 export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
     const createItem = useCreateInventoryItem();
     const updateItem = useUpdateInventoryItem();
+    const resetCreate = createItem.reset;
+    const resetUpdate = updateItem.reset;
     const form = useForm<FormValues>({
-        resolver: zodResolver(schema),
-        defaultValues: { itemName: "", itemType: "", specifications: {}, unit: "", conversion: "", hsnCode: "", isActive: true },
+        resolver: zodResolver(schema) as any,
+        defaultValues: { itemGroup: "Raw Materials", itemName: "", itemType: "", specifications: {}, description: "", unit: "", conversion: "", hsnCode: "", isActive: true },
     });
     const itemName = form.watch("itemName");
+    const itemGroup = form.watch("itemGroup");
     const selectedType = form.watch("itemType");
     const category = getCategory(itemName);
     const saving = createItem.isPending || updateItem.isPending;
+    const mutationError = createItem.error || updateItem.error;
     const previousCategory = useRef(itemName);
+    const previousGroup = useRef(itemGroup);
     const unitOptions = useMemo(() => itemName === "Copper" && selectedType ? [selectedType === "Pipe" ? "Kgs." : "Nos."] : category?.unitOptions, [category?.unitOptions, itemName, selectedType]);
     const conversionOptions = useMemo(() => itemName === "Copper" && selectedType ? [selectedType === "Pipe" ? "Kg to Mtr." : "NA"] : category?.conversionOptions, [category?.conversionOptions, itemName, selectedType]);
 
     useEffect(() => {
         if (!open) return;
         previousCategory.current = item?.itemName || "";
+        previousGroup.current = item?.itemGroup || "Raw Materials";
         form.reset(item ? {
+            itemGroup: item.itemGroup,
             itemName: item.itemName,
             itemType: item.itemType || "",
             specifications: item.specifications || {},
+            description: item.description || "",
             unit: item.unit,
             conversion: item.conversion?.value || Object.values(item.conversion || {})[0] || "",
             hsnCode: item.hsnCode || "",
             isActive: item.isActive,
-        } : { itemName: "", itemType: "", specifications: {}, unit: "", conversion: "", hsnCode: "", isActive: true });
-    }, [open, item, form]);
+        } : { itemGroup: "Raw Materials", itemName: "", itemType: "", specifications: {}, description: "", unit: "", conversion: "", hsnCode: "", isActive: true });
+        resetCreate();
+        resetUpdate();
+    }, [open, item, form, resetCreate, resetUpdate]);
+
+    useEffect(() => {
+        if (previousGroup.current !== itemGroup) {
+            form.setValue("itemName", "");
+            form.setValue("itemType", "");
+            form.setValue("specifications", {});
+            form.setValue("unit", "");
+            form.setValue("conversion", "");
+        }
+        previousGroup.current = itemGroup;
+    }, [itemGroup, form]);
 
     useEffect(() => {
         if (previousCategory.current && previousCategory.current !== itemName) {
@@ -72,9 +96,11 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
 
     const submit = async (values: FormValues) => {
         const payload = {
+            itemGroup: values.itemGroup,
             itemName: values.itemName,
             itemType: values.itemType || null,
             specifications: values.specifications,
+            description: values.description?.trim() || null,
             unit: values.unit,
             conversion: { value: values.conversion },
             hsnCode: values.hsnCode?.trim() || null,
@@ -94,19 +120,22 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
                 </DialogHeader>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(submit)} className="space-y-5">
-                        <SelectField control={form.control} name="itemName" label="Item Name" options={categoryOptions} placeholder="Select item category" valueType="string" />
+                        {mutationError && <Alert variant="destructive"><AlertDescription>{mutationError instanceof Error ? mutationError.message : "Unable to save item. Check for duplicate item details."}</AlertDescription></Alert>}
+                        <SelectField control={form.control} name="itemGroup" label="Item Group" options={groupOptions} placeholder="Select item group" valueType="string" />
+                        <SelectField control={form.control} name="itemName" label="Item Name" options={getFamiliesForGroup(itemGroup)} placeholder="Select item family" valueType="string" />
                         {category?.types && <SelectField control={form.control} name="itemType" label="Item Type" options={category.types.map(value => ({ id: value, name: value }))} placeholder="Select item type" valueType="string" />}
                         {category?.fields.map(field => (
                             <div key={field.key} className="space-y-2">
                                 <Label>{field.label}</Label>
                                 {field.options ? (
-                                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" {...form.register(`specifications.${field.key}`)}>
+                                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" {...form.register(`specifications.${field.key}` as any)}>
                                         <option value="">Select {field.label}</option>
                                         {field.options.map(option => <option key={option} value={option}>{option}</option>)}
                                     </select>
-                                ) : <Input {...form.register(`specifications.${field.key}`)} placeholder={field.label} />}
+                                ) : <Input {...form.register(`specifications.${field.key}` as any)} placeholder={field.label} />}
                             </div>
                         ))}
+                        <div className="space-y-2"><Label>Description <span className="text-muted-foreground">(optional)</span></Label><textarea className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" {...form.register("description")} placeholder="Optional item description" /></div>
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
                                 <Label>Unit</Label>
@@ -128,6 +157,7 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
                             </div>
                         </div>
                         <div className="space-y-2"><Label>HSN Code</Label><Input {...form.register("hsnCode")} placeholder="HSN code" /></div>
+                        <p className="text-xs text-muted-foreground">Stock quantity and price are maintained in Inventory/Purchase, not Item Master.</p>
                         <div className="flex items-center gap-2"><input type="checkbox" {...form.register("isActive")} /><Label>Active</Label></div>
                         <DialogFooter>
                             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
