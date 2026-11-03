@@ -95,6 +95,7 @@ export interface LocationSummary {
     tender_results_awaited: SummaryItem;
     tenders_won: SummaryItem;
     tenders_lost: SummaryItem;
+    tenders_cancelled: SummaryItem;
 }
 
 export interface MetricEntry {

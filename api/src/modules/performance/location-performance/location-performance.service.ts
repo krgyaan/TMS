@@ -51,6 +51,7 @@ const STATUS = {
     RESULTS_AWAITED: [17],
     LOST: [24],
     WON: [25, 26, 27, 28],
+    CANCELLED: [18],
 } as const;
 
 const DATE_FORMAT = "dd-MM-yyyy hh:mm a";
@@ -64,9 +65,11 @@ const STATUS_LABEL = (s: number): string =>
             ? "Lost"
             : (STATUS.DISQUALIFIED as readonly number[]).includes(s)
               ? "Disqualified"
-              : (STATUS.RESULTS_AWAITED as readonly number[]).includes(s)
-                ? "Results Awaited"
-                : "Assigned";
+              : (STATUS.CANCELLED as readonly number[]).includes(s)
+                ? "Cancelled"
+                : (STATUS.RESULTS_AWAITED as readonly number[]).includes(s)
+                  ? "Results Awaited"
+                  : "Assigned";
 
 @Injectable()
 export class LocationPerformanceService {
@@ -350,6 +353,7 @@ export class LocationPerformanceService {
             else if ((STATUS.RESULTS_AWAITED as readonly number[]).includes(s)) categories.push("tender_results_awaited");
             else if ((STATUS.LOST as readonly number[]).includes(s)) categories.push("tenders_lost");
             else if ((STATUS.WON as readonly number[]).includes(s)) categories.push("tenders_won");
+            else if ((STATUS.CANCELLED as readonly number[]).includes(s)) categories.push("tenders_cancelled");
 
             if (row.bidStatus === "Bid Submitted") categories.push("tenders_bid");
             else categories.push("tenders_not_bid");
@@ -404,6 +408,7 @@ export class LocationPerformanceService {
             tender_results_awaited: this.empty(),
             tenders_won: this.empty(),
             tenders_lost: this.empty(),
+            tenders_cancelled: this.empty(),
         };
 
         for (const tender of tenders) {
@@ -414,6 +419,7 @@ export class LocationPerformanceService {
             else if ((STATUS.RESULTS_AWAITED as readonly number[]).includes(s)) this.add(summary.tender_results_awaited, tender);
             else if ((STATUS.LOST as readonly number[]).includes(s)) this.add(summary.tenders_lost, tender);
             else if ((STATUS.WON as readonly number[]).includes(s)) this.add(summary.tenders_won, tender);
+            else if ((STATUS.CANCELLED as readonly number[]).includes(s)) this.add(summary.tenders_cancelled, tender);
 
             if (tender.bidStatus === "Bid Submitted") this.add(summary.tenders_bid, tender);
         }

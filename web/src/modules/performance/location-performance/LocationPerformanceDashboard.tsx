@@ -5,6 +5,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 /* Icons */
 import { Filter, Download, Calendar as CalendarIcon } from "lucide-react";
@@ -16,9 +18,12 @@ import { useTeams } from "@/hooks/api/useTeams";
 import { Combobox } from "@/components/form/SelectField";
 
 /* Components */
-import LocationCategoryTable from "./components/LocationCategoryTable";
+import LocationTenderTable from "./components/LocationTenderTable";
 import LocationBarChart from "./components/LocationBarChart";
 import LocationDonutChart from "./components/LocationDonutChart";
+
+/* Helpers */
+import { LOCATION_TABS, DEFAULT_LOCATION_TAB } from "./helpers/location-tabs";
 
 /* ================================
    HELPERS
@@ -32,6 +37,7 @@ type LocationPerformanceFilters = {
     selectedTeam: number;
     fromDate: string;
     toDate: string;
+    tab: string;
 };
 
 const isValidDate = (value: string): boolean => /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -42,9 +48,11 @@ const parseNumber = (value: string | null, fallback: number): number => {
     return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const VALID_TAB_KEYS: ReadonlySet<string> = new Set<string>(LOCATION_TABS.map(t => t.key));
+
 const getInitialFilters = (search: string): LocationPerformanceFilters => {
     const urlParams = new URLSearchParams(search);
-    const hasUrlFilters = ["item", "state", "region", "team", "fromDate", "toDate", "year"].some(key => urlParams.has(key));
+    const hasUrlFilters = ["item", "state", "region", "team", "fromDate", "toDate", "year", "tab"].some(key => urlParams.has(key));
     const source = hasUrlFilters ? urlParams : new URLSearchParams(localStorage.getItem(LOCATION_PERFORMANCE_STORAGE_KEY) ?? "");
 
     let fromDate = source.get("fromDate") ?? "";
@@ -61,6 +69,8 @@ const getInitialFilters = (search: string): LocationPerformanceFilters => {
 
     const validRange = isValidDate(fromDate) && isValidDate(toDate) && fromDate <= toDate;
 
+    const rawTab = source.get("tab");
+
     return {
         selectedHeadingId: parseNumber(source.get("item"), 0),
         selectedState: source.get("state") || null,
@@ -68,6 +78,7 @@ const getInitialFilters = (search: string): LocationPerformanceFilters => {
         selectedTeam: parseNumber(source.get("team"), 0),
         fromDate: validRange ? fromDate : "",
         toDate: validRange ? toDate : "",
+        tab: rawTab && VALID_TAB_KEYS.has(rawTab) ? rawTab : DEFAULT_LOCATION_TAB,
     };
 };
 
@@ -81,6 +92,7 @@ const toAppliedParams = (filters: LocationPerformanceFilters): LocationPerforman
         team: filters.selectedTeam > 0 ? filters.selectedTeam : undefined,
         fromDate: filters.fromDate,
         toDate: filters.toDate,
+        tab: filters.tab,
     };
 };
 
@@ -90,6 +102,7 @@ const buildSearchFromParams = (params: LocationPerformanceParams): URLSearchPara
     if (params.state) search.set("state", params.state);
     if (params.region) search.set("region", params.region);
     if (params.team) search.set("team", String(params.team));
+    if (params.tab) search.set("tab", params.tab);
     search.set("fromDate", params.fromDate);
     search.set("toDate", params.toDate);
     return search;
@@ -177,6 +190,16 @@ export default function LocationPerformanceDashboard() {
     // Fetch location performance data
     const { data, isLoading: dataLoading } = useLocationPerformance(appliedParams);
 
+    // Tab counts — how many tenders fall into each category
+    const tabCounts = useMemo(() => {
+        if (!data?.tenderList) return {} as Record<string, number>;
+        const counts: Record<string, number> = {};
+        LOCATION_TABS.forEach(tab => {
+            counts[tab.key] = data.tenderList.filter(t => t.category.includes(tab.key)).length;
+        });
+        return counts;
+    }, [data]);
+
     const dateError = fromDate && toDate && fromDate > toDate ? "From Date must be on or before To Date" : null;
 
     // Build params for submission
@@ -189,8 +212,9 @@ export default function LocationPerformanceDashboard() {
             team: selectedTeam > 0 ? selectedTeam : undefined,
             fromDate,
             toDate,
+            tab: appliedParams?.tab ?? DEFAULT_LOCATION_TAB,
         };
-    }, [dateError, fromDate, toDate, selectedHeadingId, selectedState, selectedRegion, selectedTeam]);
+    }, [dateError, fromDate, toDate, selectedHeadingId, selectedState, selectedRegion, selectedTeam, appliedParams?.tab]);
 
     // Handle State change — clear dependent Region
     const handleStateChange = (value: string | null) => {
@@ -201,6 +225,21 @@ export default function LocationPerformanceDashboard() {
     // Handle Region change
     const handleRegionChange = (value: string | null) => {
         setSelectedRegion(value);
+    };
+
+    // Handle Tab change — UI-only, keep applied params in sync for URL
+    const handleTabChange = (value: string) => {
+        const next = appliedParams ? { ...appliedParams, tab: value } : null;
+        if (next) {
+            setAppliedParams(next);
+            const search = buildSearchFromParams(next);
+            try {
+                localStorage.setItem(LOCATION_PERFORMANCE_STORAGE_KEY, search.toString());
+            } catch (error) {
+                void error;
+            }
+            navigate({ search: `?${search.toString()}` }, { replace: true });
+        }
     };
 
     // Handle form submission
@@ -379,28 +418,27 @@ export default function LocationPerformanceDashboard() {
                     </div>
                 ) : (
                     <>
-                        {/* ===== CATEGORY TABLES ===== */}
-                        <LocationCategoryTable params={appliedParams} categoryKey="tenders_assigned" title="Tenders Assigned" description="All tenders assigned in this period." />
-                        <LocationCategoryTable params={appliedParams} categoryKey="tenders_approved" title="Tenders Approved" description="Tenders approved by the team lead." />
-                        <LocationCategoryTable params={appliedParams} categoryKey="tenders_missed" title="Tenders Missed" description="Tenders that were missed for submission." />
-                        <LocationCategoryTable params={appliedParams} categoryKey="tenders_not_bid" title="Tenders Did Not Bid" description="Tenders assigned but not bid on." />
-                        <LocationCategoryTable params={appliedParams} categoryKey="tenders_bid" title="Tenders Bid" description="Tenders where a bid has been submitted." />
-                        <LocationCategoryTable
-                            params={appliedParams}
-                            categoryKey="tender_results_awaited"
-                            title="Tender Results Awaited"
-                            description="Tenders awaiting final results."
-                        />
-                        <LocationCategoryTable
-                            params={appliedParams}
-                            categoryKey="tenders_disqualified"
-                            title="Tenders Disqualified"
-                            description="Tenders that were disqualified."
-                        />
-                        <LocationCategoryTable params={appliedParams} categoryKey="tenders_won" title="Tenders Won" description="Tenders that were won." />
-                        <LocationCategoryTable params={appliedParams} categoryKey="tenders_lost" title="Tenders Lost" description="Tenders that were lost." />
-                        <LocationCategoryTable params={appliedParams} categoryKey="emd_paid" title="EMD Paid" description="Tenders where the EMD has been paid." />
-                        <LocationCategoryTable params={appliedParams} categoryKey="emd_returned" title="EMD Returned" description="Tenders where the EMD has been returned." />
+                        {/* ===== CATEGORY TABS + TABLE ===== */}
+                        <Card className="shadow-sm">
+                            <CardContent className="space-y-6 p-6">
+                                <div className="flex justify-center">
+                                    <Tabs value={appliedParams.tab ?? DEFAULT_LOCATION_TAB} onValueChange={handleTabChange}>
+                                        <TabsList className="h-auto flex-wrap justify-center">
+                                            {LOCATION_TABS.map(tab => (
+                                                <TabsTrigger key={tab.key} value={tab.key} className="text-xs flex items-center gap-1.5">
+                                                    {tab.label}
+                                                    <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                                                        {tabCounts[tab.key] ?? 0}
+                                                    </Badge>
+                                                </TabsTrigger>
+                                            ))}
+                                        </TabsList>
+                                    </Tabs>
+                                </div>
+
+                                <LocationTenderTable params={appliedParams} tab={appliedParams.tab ?? DEFAULT_LOCATION_TAB} data={data} isLoading={dataLoading} />
+                            </CardContent>
+                        </Card>
 
                         {/* ===== AVERAGE GP CARD ===== */}
                         <Card className="shadow-sm">
