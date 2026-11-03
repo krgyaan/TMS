@@ -296,6 +296,7 @@ export const paths = {
         vwoClosure: (id: number) => `/accounts/vendor-work-orders/${id}/closure`,
         paymentRequests: "/accounts/payment-requests",
         inventory: "/accounts/inventory",
+        inventoryItems: "/accounts/item",
         inventoryProject: (projectId: number) => `/accounts/inventory?projectId=${projectId}`,
         vendorMaster: "/accounts/vendor-master",
         vendorMasterCreate: "/accounts/vendor-master/create",

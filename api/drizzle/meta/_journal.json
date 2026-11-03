@@ -596,6 +596,41 @@
       "when": 1795100000000,
       "tag": "0146_create_bidding_requirements_jobs",
       "breakpoints": true
+    },
+    {
+      "idx": 109,
+      "version": "7",
+      "when": 1796000000000,
+      "tag": "0163_create_inventory_items",
+      "breakpoints": true
+    },
+    {
+      "idx": 110,
+      "version": "7",
+      "when": 1796001000000,
+      "tag": "0164_add_inventory_item_master_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 111,
+      "version": "7",
+      "when": 1796002000000,
+      "tag": "0165_inventory_item_permissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 112,
+      "version": "7",
+      "when": 1796003000000,
+      "tag": "0166_harden_inventory_items",
+      "breakpoints": true
+    },
+    {
+      "idx": 113,
+      "version": "7",
+      "when": 1796004000000,
+      "tag": "0167_reconcile_inventory_item_groups_and_codes",
+      "breakpoints": true
     }
   ]
 }
