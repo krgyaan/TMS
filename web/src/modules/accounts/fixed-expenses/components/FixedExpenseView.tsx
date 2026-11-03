@@ -81,7 +81,18 @@ const FixedExpenseView = ({ fixedExpense }: FixedExpenseViewProps) => {
                             </TableCell>
                             <TableCell className={labelClass}>Status</TableCell>
                             <TableCell className={valueClass}>
-                                <Badge variant="outline">{fixedExpense.status || '—'}</Badge>
+                                <Badge
+                                    variant="outline"
+                                    className={
+                                        fixedExpense.status === 'Done'
+                                            ? 'bg-emerald-100 text-emerald-800 border-transparent'
+                                            : fixedExpense.status === 'Pending'
+                                              ? 'bg-amber-100 text-amber-800 border-transparent'
+                                              : undefined
+                                    }
+                                >
+                                    {fixedExpense.status || '—'}
+                                </Badge>
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">

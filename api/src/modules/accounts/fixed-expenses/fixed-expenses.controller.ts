@@ -23,6 +23,7 @@ export class FixedExpensesController {
         @Query("paymentFrequency") paymentFrequency?: string,
         @Query("paymentMode") paymentMode?: string,
         @Query("amountType") amountType?: string,
+        @Query("status") status?: string,
         @Query("deleteStatus") deleteStatus?: string,
         @Query("sortBy") sortBy?: string,
         @Query("sortOrder") sortOrder?: "asc" | "desc"
@@ -35,6 +36,7 @@ export class FixedExpensesController {
             paymentFrequency,
             paymentMode,
             amountType,
+            status,
             deleteStatus,
             sortBy,
             sortOrder,

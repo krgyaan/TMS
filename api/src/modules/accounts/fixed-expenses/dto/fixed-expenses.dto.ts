@@ -18,7 +18,7 @@ const optionalString = (max: number) => z.string().trim().max(max).optional().nu
 
 export const FIXED_EXPENSE_TYPES = ["electricity", "rent", "salary", "communication", "software", "admin"] as const;
 
-export const FIXED_EXPENSE_STATUSES = ["New"] as const;
+export const FIXED_EXPENSE_STATUSES = ["Pending", "Done"] as const;
 
 export const FIXED_EXPENSE_FREQUENCIES = ["monthly", "quarterly", "half_yearly", "annual"] as const;
 
@@ -39,7 +39,7 @@ const fixedExpenseBaseSchema = z.object({
     type: z.enum(FIXED_EXPENSE_TYPES),
     dueDate: dateString,
     paymentFrequency: z.enum(FIXED_EXPENSE_FREQUENCIES).default("monthly"),
-    status: z.enum(FIXED_EXPENSE_STATUSES).default("New"),
+    status: z.enum(FIXED_EXPENSE_STATUSES).default("Pending"),
     makerId: z.number().int().positive().optional().nullable(),
     deleteStatus: z.boolean().default(false),
 });
@@ -89,6 +89,7 @@ export const fixedExpenseQuerySchema = z.object({
     paymentFrequency: z.enum(FIXED_EXPENSE_FREQUENCIES).optional(),
     paymentMode: z.enum(FIXED_EXPENSE_PAYMENT_MODES).optional(),
     amountType: z.enum(FIXED_EXPENSE_AMOUNT_TYPES).optional(),
+    status: z.enum(FIXED_EXPENSE_STATUSES).optional(),
     deleteStatus: z
         .union([z.boolean(), z.enum(["true", "false"])])
         .transform(value => value === true || value === "true")

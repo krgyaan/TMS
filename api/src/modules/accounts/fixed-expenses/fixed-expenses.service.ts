@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, asc, desc, eq, ilike, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
@@ -171,6 +171,12 @@ export class FixedExpensesService {
             conditions.push(eq(fixedExpenses.amountType, filters.amountType));
         }
 
+        if (filters?.status) {
+            // Existing rows created before the Pending/Done flow were stored as
+            // "New"; treat those as Pending so nothing disappears from the list.
+            conditions.push(filters.status === "Pending" ? inArray(fixedExpenses.status, ["Pending", "New"]) : eq(fixedExpenses.status, filters.status));
+        }
+
         // Archived rows are hidden unless explicitly requested
         conditions.push(eq(fixedExpenses.deleteStatus, filters?.deleteStatus ?? false));
 
@@ -256,7 +262,7 @@ export class FixedExpensesService {
                 type: data.type,
                 dueDate: data.dueDate,
                 paymentFrequency: data.paymentFrequency,
-                status: "New",
+                status: "Pending",
                 deleteStatus: false,
                 makerId: data.makerId ?? null,
                 createdBy,

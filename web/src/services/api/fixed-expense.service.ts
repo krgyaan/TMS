@@ -22,6 +22,7 @@ class FixedExpenseApiService extends BaseApiService {
         if (params?.paymentFrequency) search.set('paymentFrequency', params.paymentFrequency);
         if (params?.paymentMode) search.set('paymentMode', params.paymentMode);
         if (params?.amountType) search.set('amountType', params.amountType);
+        if (params?.status) search.set('status', params.status);
         if (params?.deleteStatus !== undefined) {
             search.set('deleteStatus', String(params.deleteStatus));
         }

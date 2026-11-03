@@ -16,7 +16,7 @@ export type FixedExpensePaymentMode = 'auto_debit' | 'bank_transfer';
 
 export type FixedExpenseAmountType = 'fixed' | 'variable';
 
-export type FixedExpenseStatus = 'New';
+export type FixedExpenseStatus = 'Pending' | 'Done';
 
 // ===================== API TYPES =====================
 
@@ -52,6 +52,7 @@ export interface FixedExpenseListParams {
     paymentFrequency?: FixedExpenseFrequency;
     paymentMode?: FixedExpensePaymentMode;
     amountType?: FixedExpenseAmountType;
+    status?: FixedExpenseStatus;
     deleteStatus?: boolean;
     sortBy?: 'partyName' | 'amount' | 'type' | 'dueDate' | 'createdAt';
     sortOrder?: 'asc' | 'desc';
@@ -110,7 +111,8 @@ export const FIXED_EXPENSE_AMOUNT_TYPE_OPTIONS: FixedExpenseSelectOption[] = [
 ];
 
 export const FIXED_EXPENSE_STATUS_OPTIONS: FixedExpenseSelectOption[] = [
-    { value: 'New', label: 'New' },
+    { value: 'Pending', label: 'Pending' },
+    { value: 'Done', label: 'Done' },
 ];
 
 // ===================== LABEL MAPS =====================
@@ -142,5 +144,6 @@ export const FIXED_EXPENSE_AMOUNT_TYPE_LABELS: Record<FixedExpenseAmountType, st
 };
 
 export const FIXED_EXPENSE_STATUS_LABELS: Record<FixedExpenseStatus, string> = {
-    New: 'New',
+    Pending: 'Pending',
+    Done: 'Done',
 };

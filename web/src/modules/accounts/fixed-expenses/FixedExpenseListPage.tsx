@@ -34,9 +34,9 @@ const SORTABLE_FIELDS: FixedExpenseListParams['sortBy'][] = [
     'createdAt',
 ];
 
-const AMOUNT_TYPE_OPTIONS = [
-    { label: 'Fixed', value: 'fixed' },
-    { label: 'Variable', value: 'variable' },
+const STATUS_TAB_OPTIONS = [
+    { label: 'Pending', value: 'pending' },
+    { label: 'Done', value: 'done' },
 ];
 
 const FixedExpenseListSkeleton = () => (
@@ -70,9 +70,9 @@ const FixedExpenseListContent = () => {
         sortModel,
         handleSortChanged,
         handlePageSizeChange,
-    } = usePersistentTableState<'fixed' | 'variable'>({
+    } = usePersistentTableState<'pending' | 'done'>({
         storageKey: 'accounts-fixed-expenses',
-        defaultTab: 'fixed',
+        defaultTab: 'pending',
     });
 
     const navigate = useNavigate();
@@ -84,11 +84,13 @@ const FixedExpenseListContent = () => {
         ? (sort.colId as FixedExpenseListParams['sortBy'])
         : undefined;
 
+    const statusTab = activeTab === 'done' ? 'done' : 'pending';
+
     const { data: apiResponse, isLoading: loading, error } = useFixedExpenses({
         page: pagination.pageIndex + 1,
         limit: pagination.pageSize,
         search: debouncedSearch || undefined,
-        amountType: activeTab,
+        status: statusTab === 'done' ? 'Done' : 'Pending',
         ...(sortBy && sort ? { sortBy, sortOrder: sort.sort } : {}),
     });
 
@@ -248,9 +250,17 @@ const FixedExpenseListContent = () => {
                 minWidth: 100,
                 cellRenderer: (params: { data?: FixedExpenseListRow }) => {
                     if (!params.data) return '—';
+                    const status = params.data.status;
+                    const statusStyles: Record<string, string> = {
+                        Pending: 'bg-amber-100 text-amber-800 border-transparent',
+                        Done: 'bg-emerald-100 text-emerald-800 border-transparent',
+                    };
                     return (
-                        <Badge variant="outline" className="h-5 px-2">
-                            {params.data.status ?? '—'}
+                        <Badge
+                            variant="outline"
+                            className={`h-5 px-2 ${statusStyles[status] ?? ''}`}
+                        >
+                            {status ?? '—'}
                         </Badge>
                     );
                 },
@@ -329,9 +339,9 @@ const FixedExpenseListContent = () => {
             <CardContent className="px-0">
                 <div className="flex items-center gap-4 px-6 pb-4">
                     <QuickFilter
-                        options={AMOUNT_TYPE_OPTIONS}
-                        value={activeTab}
-                        onChange={(value) => setActiveTab(value as 'fixed' | 'variable')}
+                        options={STATUS_TAB_OPTIONS}
+                        value={statusTab}
+                        onChange={(value) => setActiveTab(value as 'pending' | 'done')}
                     />
                     <div className="flex-1 flex justify-end">
                         <div className="relative">
@@ -351,9 +361,9 @@ const FixedExpenseListContent = () => {
                         <FileX2 className="h-12 w-12 mb-4" />
                         <p className="text-lg font-medium">No Fixed Expenses found</p>
                         <p className="text-sm mt-2">
-                            {activeTab === 'variable'
-                                ? 'No variable expenses found. Switch to the Fixed tab or create a new expense.'
-                                : 'Create a new fixed expense using the "Add Fixed Expense" button above.'}
+                            {statusTab === 'done'
+                                ? 'No completed expenses found. Switch to the Pending tab to see open items.'
+                                : 'No pending expenses found. Create a new fixed expense using the "Add Fixed Expense" button above.'}
                         </p>
                     </div>
                 ) : (
@@ -387,52 +397,73 @@ const FixedExpenseListContent = () => {
 };
 
 
+const VALID_TABS = new Set(['pending', 'done']);
+
 const FixedExpenseListPage = () => {
     const [searchParams, setSearchParams] = useSearchParams();
-    const [initialHadRedundantSort] = useState(() => {
+
+    const [urlNeedsCleanup] = useState(() => {
         const params = new URLSearchParams(window.location.search);
-        return (
+        const tab = params.get('tab');
+        const hasRedundantDefaultSort =
             params.get('sortBy') === 'createdAt' &&
-            params.get('sortOrder') === 'desc'
-        );
+            params.get('sortOrder') === 'desc';
+        const hasLegacyTab = tab !== null && !VALID_TABS.has(tab);
+        return hasRedundantDefaultSort || hasLegacyTab;
     });
 
-    const [ready, setReady] = useState(() => {
+    // Drop legacy persisted state (default sort + the old fixed/variable tabs)
+    // before the table state hook reads it.
+    useState(() => {
         try {
             const key = 'tms:table-state:accounts-fixed-expenses';
             const raw = window.sessionStorage.getItem(key);
-            if (raw) {
-                const saved = JSON.parse(raw) as Record<string, unknown>;
-                if (saved.sortBy === 'createdAt' && saved.sortOrder === 'desc') {
-                    delete saved.sortBy;
-                    delete saved.sortOrder;
-                    window.sessionStorage.setItem(key, JSON.stringify(saved));
-                }
+            if (!raw) return;
+            const saved = JSON.parse(raw) as Record<string, unknown>;
+            let changed = false;
+            if (saved.sortBy === 'createdAt' && saved.sortOrder === 'desc') {
+                delete saved.sortBy;
+                delete saved.sortOrder;
+                changed = true;
+            }
+            if (typeof saved.activeTab === 'string' && !VALID_TABS.has(saved.activeTab)) {
+                delete saved.activeTab;
+                changed = true;
+            }
+            if (changed) {
+                window.sessionStorage.setItem(key, JSON.stringify(saved));
             }
         } catch {
             // Storage unavailable — nothing to sanitize.
         }
-
-        return !initialHadRedundantSort;
     });
+
+    const [ready, setReady] = useState(() => !urlNeedsCleanup);
 
     const hasRedundantDefaultSort =
         searchParams.get('sortBy') === 'createdAt' &&
         searchParams.get('sortOrder') === 'desc';
+    const tabParam = searchParams.get('tab');
+    const hasLegacyTab = tabParam !== null && !VALID_TABS.has(tabParam);
 
     useEffect(() => {
         if (ready) return;
 
-        if (hasRedundantDefaultSort) {
+        if (hasRedundantDefaultSort || hasLegacyTab) {
             const next = new URLSearchParams(searchParams);
-            next.delete('sortBy');
-            next.delete('sortOrder');
+            if (hasRedundantDefaultSort) {
+                next.delete('sortBy');
+                next.delete('sortOrder');
+            }
+            if (hasLegacyTab) {
+                next.delete('tab');
+            }
             setSearchParams(next, { replace: true });
             return;
         }
 
         setReady(true);
-    }, [ready, hasRedundantDefaultSort, searchParams, setSearchParams]);
+    }, [ready, hasRedundantDefaultSort, hasLegacyTab, searchParams, setSearchParams]);
 
     if (!ready) {
         return <FixedExpenseListSkeleton />;
