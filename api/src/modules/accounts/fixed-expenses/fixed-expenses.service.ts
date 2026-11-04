@@ -227,7 +227,9 @@ export class FixedExpensesService {
             // The Pending tab groups every open state. Legacy rows created before
             // the Pending/Done flow were stored as "New", so treat those as Pending.
             conditions.push(
-                filters.status === "Pending" ? inArray(fixedExpenses.status, ["Pending", "New", "Maker Created", "Maker Rejected"]) : eq(fixedExpenses.status, filters.status)
+                filters.status === "Pending"
+                    ? inArray(fixedExpenses.status, ["Pending", "New", "Maker Created", "Maker Done", "Maker Rejected"])
+                    : eq(fixedExpenses.status, filters.status)
             );
         }
 

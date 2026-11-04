@@ -8,7 +8,7 @@ export type FixedExpensePaymentMode = 'auto_debit' | 'bank_transfer';
 
 export type FixedExpenseAmountType = 'fixed' | 'variable';
 
-export type FixedExpenseStatus = 'Pending' | 'Maker Created' | 'Maker Rejected' | 'Done';
+export type FixedExpenseStatus = 'Pending' | 'Maker Created' | 'Maker Done' | 'Maker Rejected' | 'Done';
 
 // ===================== API TYPES =====================
 
@@ -97,6 +97,7 @@ export const FIXED_EXPENSE_AMOUNT_TYPE_OPTIONS: FixedExpenseSelectOption[] = [
 export const FIXED_EXPENSE_STATUS_OPTIONS: FixedExpenseSelectOption[] = [
     { value: 'Pending', label: 'Pending' },
     { value: 'Maker Created', label: 'Maker Created' },
+    { value: 'Maker Done', label: 'Maker Done' },
     { value: 'Maker Rejected', label: 'Maker Rejected' },
     { value: 'Done', label: 'Done' },
 ];

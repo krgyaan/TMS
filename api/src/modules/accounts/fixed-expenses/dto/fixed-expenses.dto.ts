@@ -16,7 +16,7 @@ const optionalString = (max: number) => z.string().trim().max(max).optional().nu
 
 // ===================== ENUM VALUES =====================
 
-export const FIXED_EXPENSE_STATUSES = ["Pending", "Maker Created", "Maker Rejected", "Done"] as const;
+export const FIXED_EXPENSE_STATUSES = ["Pending", "Maker Created", "Maker Done", "Maker Rejected", "Done"] as const;
 
 export const FIXED_EXPENSE_FREQUENCIES = ["monthly", "quarterly", "half_yearly", "annual"] as const;
 

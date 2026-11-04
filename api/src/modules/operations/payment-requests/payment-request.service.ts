@@ -3,6 +3,7 @@ import { DRIZZLE } from "@/db/database.module";
 import { users } from "@/db/schemas/";
 import { projects } from "@/db/schemas/master/projects.schema";
 import { beneficiaries } from "@/db/schemas/operations/beneficiaries.schema";
+import { fixedExpenses } from "@/db/schemas/accounts/fixed-expense.schema";
 import { paymentRequests, type PaymentRequest as OperationPaymentRequest } from "@/db/schemas/operations/payment-requests.schema";
 import { tdsReturns } from "@/db/schemas/operations/tds-returns.schema";
 import { employeeImprestTransactions } from "@/db/schemas/shared/employee-imprest-transaction.schema";
@@ -443,6 +444,17 @@ export class PaymentRequestService {
 
             this.logger.info(`Payment Request #${id} status updated to "${body.status}"`);
 
+            // Keep the fixed expense linked to this request in sync.
+            const expenseStatusByRequestStatus: Record<string, string> = {
+                maker_done: "Maker Done",
+                payment_done: "Done",
+                rejected: "Maker Rejected",
+            };
+            const nextExpenseStatus = expenseStatusByRequestStatus[body.status];
+            if (nextExpenseStatus) {
+                await this.syncFixedExpenseStatus(tx, id, nextExpenseStatus);
+            }
+
             if (body.status === "payment_done") {
                 this.notifications
                     .notifyPaymentDone({
@@ -613,8 +625,30 @@ export class PaymentRequestService {
 
             this.logger.info(`Payment Request #${id} reverted from "${existing.status}" to "${body.status}"`);
 
+            const expenseStatusByRequestStatus: Record<string, string> = {
+                pending: "Maker Created",
+                po_approval_pending: "Maker Created",
+                maker_done: "Maker Done",
+                payment_done: "Done",
+                rejected: "Maker Rejected",
+            };
+            const nextExpenseStatus = expenseStatusByRequestStatus[body.status];
+            if (nextExpenseStatus) {
+                await this.syncFixedExpenseStatus(tx, id, nextExpenseStatus);
+            }
+
             return updated;
         });
+    }
+
+    
+    private async syncFixedExpenseStatus(tx: DbInstance, makerRequestId: number, status: string) {
+        const [linked] = await tx.select({ id: fixedExpenses.id }).from(fixedExpenses).where(eq(fixedExpenses.makerId, makerRequestId)).limit(1);
+
+        if (!linked) return;
+
+        await tx.update(fixedExpenses).set({ status, updatedAt: new Date() }).where(eq(fixedExpenses.id, linked.id));
+        this.logger.info(`Fixed expense #${linked.id} marked ${status} from Payment Request #${makerRequestId}`);
     }
 
     async uploadInvoiceAfterPayment(id: number, files: string[]) {

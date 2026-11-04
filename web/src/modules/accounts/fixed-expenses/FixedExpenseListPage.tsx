@@ -254,6 +254,7 @@ const FixedExpenseListContent = () => {
                     const statusStyles: Record<string, string> = {
                         Pending: 'bg-amber-100 text-amber-800 border-transparent',
                         'Maker Created': 'bg-blue-100 text-blue-800 border-transparent',
+                        'Maker Done': 'bg-indigo-100 text-indigo-800 border-transparent',
                         'Maker Rejected': 'bg-red-100 text-red-800 border-transparent',
                         Done: 'bg-emerald-100 text-emerald-800 border-transparent',
                     };

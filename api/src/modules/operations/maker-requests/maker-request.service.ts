@@ -151,8 +151,8 @@ export class MakerRequestService {
         this.logger.info(`Maker Request #${id} status updated to "${body.status}"`);
 
         // Keep a fixed expense linked to this request in sync with its outcome.
-        if (body.status === "payment_done" || body.status === "rejected") {
-            const nextExpenseStatus = body.status === "payment_done" ? "Done" : "Maker Rejected";
+        if (body.status === "payment_done" || body.status === "rejected" || body.status === "maker_done") {
+            const nextExpenseStatus = body.status === "payment_done" ? "Done" : body.status === "rejected" ? "Maker Rejected" : "Maker Done";
             const [linkedExpense] = await this.db
                 .select({ id: fixedExpenses.id })
                 .from(fixedExpenses)
