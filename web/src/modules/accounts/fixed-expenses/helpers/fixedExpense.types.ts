@@ -2,14 +2,6 @@ import type { FixedExpenseFormValues } from './fixedExpense.schema';
 
 // ===================== ENUM TYPES =====================
 
-export type FixedExpenseType =
-    | 'electricity'
-    | 'rent'
-    | 'salary'
-    | 'communication'
-    | 'software'
-    | 'admin';
-
 export type FixedExpenseFrequency = 'monthly' | 'quarterly' | 'half_yearly' | 'annual';
 
 export type FixedExpensePaymentMode = 'auto_debit' | 'bank_transfer';
@@ -29,7 +21,9 @@ export interface FixedExpenseResponse {
     accountName: string | null;
     accountNumber: string | null;
     ifscCode: string | null;
-    type: FixedExpenseType;
+    type: string;
+    categoryId: number | null;
+    subCategory: string | null;
     dueDate: string;
     paymentFrequency: FixedExpenseFrequency;
     status: FixedExpenseStatus;
@@ -48,7 +42,7 @@ export interface FixedExpenseListParams {
     page?: number;
     limit?: number;
     search?: string;
-    type?: FixedExpenseType;
+    type?: string;
     paymentFrequency?: FixedExpenseFrequency;
     paymentMode?: FixedExpensePaymentMode;
     amountType?: FixedExpenseAmountType;
@@ -66,7 +60,8 @@ export interface CreateFixedExpenseDto {
     accountName?: string | null;
     accountNumber?: string | null;
     ifscCode?: string | null;
-    type: FixedExpenseType;
+    categoryId: number;
+    type?: string;
     dueDate: string;
     paymentFrequency: FixedExpenseFrequency;
     status?: FixedExpenseStatus;
@@ -80,18 +75,6 @@ export type { FixedExpenseFormValues };
 // ===================== OPTION CONSTANTS =====================
 
 export type FixedExpenseSelectOption = { value: string; label: string };
-
-/**
- * Expense categories available for fixed expenses.
- */
-export const FIXED_EXPENSE_TYPE_OPTIONS: FixedExpenseSelectOption[] = [
-    { value: 'electricity', label: 'Electricity' },
-    { value: 'rent', label: 'Rent' },
-    { value: 'salary', label: 'Salary' },
-    { value: 'communication', label: 'Communication' },
-    { value: 'software', label: 'Software' },
-    { value: 'admin', label: 'Admin' },
-];
 
 export const FIXED_EXPENSE_FREQUENCY_OPTIONS: FixedExpenseSelectOption[] = [
     { value: 'monthly', label: 'Monthly' },
@@ -117,7 +100,7 @@ export const FIXED_EXPENSE_STATUS_OPTIONS: FixedExpenseSelectOption[] = [
 
 // ===================== LABEL MAPS =====================
 
-export const FIXED_EXPENSE_TYPE_LABELS: Record<FixedExpenseType, string> = {
+export const FIXED_EXPENSE_TYPE_LABELS: Record<string, string> = {
     electricity: 'Electricity',
     rent: 'Rent',
     salary: 'Salary',
