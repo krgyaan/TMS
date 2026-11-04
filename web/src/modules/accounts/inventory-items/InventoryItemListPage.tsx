@@ -39,7 +39,7 @@ export default function InventoryItemListPage({ team }: { team: "accounts" | "op
     ];
     const columns: ColDef<InventoryItem>[] = [
         { field: "itemCode", headerName: "Item Code", flex: 0.9 },
-        { headerName: "Team", valueGetter: () => team === "accounts" ? "Accounts" : "Operations", flex: 0.8 },
+        { headerName: "Team", valueGetter: () => team === "accounts" ? "AC" : "DC", flex: 0.8 },
         { field: "itemName", headerName: "Item Name", flex: 1.2 },
         { field: "itemType", headerName: "Type", flex: 0.9, valueGetter: p => p.data?.itemType || "—" },
         { headerName: "Key Specification", flex: 1.5, valueGetter: p => Object.values(p.data?.specifications || {}).filter(Boolean).join(" · ") || "—" },
@@ -56,13 +56,13 @@ export default function InventoryItemListPage({ team }: { team: "accounts" | "op
     if (error) return <Card><CardHeader><CardTitle>Item Master</CardTitle></CardHeader><CardContent><Alert variant="destructive"><AlertDescription>Unable to load items: {error.message} <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button></AlertDescription></Alert></CardContent></Card>;
     return <>
         <Card>
-            <CardHeader><CardTitle>{team === "accounts" ? "Accounts" : "Operations"} Item Master</CardTitle><CardDescription>Manage team-scoped inventory items, specifications, units, conversions and HSN codes.</CardDescription><CardAction>{canCreate(permissionModule) && <Button onClick={() => setEditing(null)}><Plus className="mr-2 h-4 w-4" />Add New Item</Button>}</CardAction></CardHeader>
+            <CardHeader><CardTitle>{team === "accounts" ? "Accounts" : "Operations"} Item Master</CardTitle><CardDescription>Manage AC/DC team items for the {team === "accounts" ? "Accounts" : "Operations"} dashboard.</CardDescription><CardAction>{canCreate(permissionModule) && <Button onClick={() => setEditing(null)}><Plus className="mr-2 h-4 w-4" />Add New Item</Button>}</CardAction></CardHeader>
             <CardContent>
                 <div className="mb-4 grid gap-3 md:grid-cols-2 lg:grid-cols-5">
                     <div className="relative lg:col-span-2"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input className="pl-9" placeholder="Search items by code, name, type, HSN..." value={filters.search} onChange={event => setFilter("search", event.target.value)} /></div>
                     <select className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={filters.itemName} onChange={event => setFilter("itemName", event.target.value)}><option value="">All item names</option>{categoryOptions.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}</select>
                     <select className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={filters.unit} onChange={event => setFilter("unit", event.target.value)}><option value="">All units</option>{units.map(unit => <option key={unit} value={unit}>{unit}</option>)}</select>
-                    <select className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={team} disabled><option value={team}>{team === "accounts" ? "Accounts" : "Operations"}</option></select>
+                    <select className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={team} disabled><option value={team}>{team === "accounts" ? "AC" : "DC"}</option></select>
                     <select className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={filters.isActive} onChange={event => setFilter("isActive", event.target.value)}><option value="">All statuses</option><option value="true">Active</option><option value="false">Inactive</option></select>
                 </div>
                 {selectedRows.length > 0 && <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-2 text-sm"><span>{selectedRows.length} selected</span><Button variant="outline" size="sm" disabled={!canUpdate(permissionModule)} onClick={async () => { await Promise.all(selectedRows.map(row => updateItem.mutateAsync({ id: row.id, data: { isActive: true } }))); toast.success("Selected items activated"); }}>Activate</Button><Button variant="outline" size="sm" disabled={!canUpdate(permissionModule)} onClick={async () => { await Promise.all(selectedRows.map(row => updateItem.mutateAsync({ id: row.id, data: { isActive: false } }))); toast.success("Selected items deactivated"); }}>Deactivate</Button><Button variant="outline" size="sm" className="text-red-600" disabled={!canDelete(permissionModule)} onClick={async () => { if (confirm(`Delete ${selectedRows.length} selected items?`)) { await Promise.all(selectedRows.map(row => deleteItem.mutateAsync(row.id))); setSelectedRows([]); } }}>Delete</Button></div>}

@@ -19,7 +19,7 @@ export const itemSchema = z.object({
 });
 
 const updateSchema = itemSchema.partial();
-const teamId = 5;
+const teamId = 1;
 
 @Controller("accounts/item-master")
 @UseGuards(JwtAuthGuard, PermissionGuard)

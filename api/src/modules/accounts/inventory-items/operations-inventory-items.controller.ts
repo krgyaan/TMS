@@ -6,7 +6,7 @@ import { InventoryItemsService } from "./inventory-items.service";
 import { itemSchema } from "./inventory-items.controller";
 
 const updateSchema = itemSchema.partial();
-const teamId = 3;
+const teamId = 2;
 
 @Controller("operations/item-master")
 @UseGuards(JwtAuthGuard, PermissionGuard)

@@ -14,7 +14,7 @@ import type { InventoryItem } from "@/types/inventory-item.types";
 import { UNIT_OPTIONS, categoryOptions, getCategory, getConversionRules } from "./item-config";
 
 const schema = z.object({
-    teamId: z.enum(["3", "5"]),
+    teamId: z.enum(["1", "2"]),
     itemName: z.string().min(1, "Item name is required"),
     itemType: z.string().optional(),
     specifications: z.record(z.string()),
@@ -37,7 +37,7 @@ export function InventoryItemFormDialog({ open, onOpenChange, item, routeTeam }:
     const updateItem = useUpdateInventoryItem(routeTeam);
     const form = useForm<FormValues>({
         resolver: zodResolver(schema),
-        defaultValues: { teamId: routeTeam === "accounts" ? "5" : "3", itemName: "", itemType: "", specifications: {}, description: "", unit: "Nos.", conversionUnit: "", conversionFactor: "", hsnCode: "", isActive: true },
+        defaultValues: {         teamId: routeTeam === "accounts" ? "1" : "2", itemName: "", itemType: "", specifications: {}, description: "", unit: "Nos.", conversionUnit: "", conversionFactor: "", hsnCode: "", isActive: true },
     });
     const itemName = form.watch("itemName");
     const unit = form.watch("unit");
@@ -51,7 +51,7 @@ export function InventoryItemFormDialog({ open, onOpenChange, item, routeTeam }:
     useEffect(() => {
         if (!open) return;
         form.reset(item ? {
-            teamId: String(item.teamId) as "3" | "5",
+            teamId: String(item.teamId) as "1" | "2",
             itemName: item.itemName,
             itemType: item.itemType || "",
             specifications: item.specifications || {},
@@ -61,7 +61,7 @@ export function InventoryItemFormDialog({ open, onOpenChange, item, routeTeam }:
             conversionFactor: item.conversionFactor || "",
             hsnCode: item.hsnCode || "",
             isActive: item.isActive,
-        } : { teamId: routeTeam === "accounts" ? "5" : "3", itemName: "", itemType: "", specifications: {}, description: "", unit: "Nos.", conversionUnit: "", conversionFactor: "", hsnCode: "", isActive: true });
+        } : { teamId: routeTeam === "accounts" ? "1" : "2", itemName: "", itemType: "", specifications: {}, description: "", unit: "Nos.", conversionUnit: "", conversionFactor: "", hsnCode: "", isActive: true });
         createItem.reset();
         updateItem.reset();
     }, [open, item, routeTeam]);
@@ -105,7 +105,7 @@ export function InventoryItemFormDialog({ open, onOpenChange, item, routeTeam }:
             <DialogHeader><DialogTitle>{item ? "Edit Item" : "Add New Item"}</DialogTitle><DialogDescription>Manage team-scoped item specifications, units, conversions and HSN codes.</DialogDescription></DialogHeader>
             <Form {...form}><form onSubmit={form.handleSubmit(submit)} className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {mutationError && <Alert variant="destructive" className="md:col-span-2"><AlertDescription>{mutationError instanceof Error ? mutationError.message : "Unable to save item."}</AlertDescription></Alert>}
-                <div className="space-y-2"><Label>Team</Label><select className={inputClass} disabled={!canCreateBoth} {...form.register("teamId")}><option value="5">Accounts</option><option value="3">Operations</option></select></div>
+                <div className="space-y-2"><Label>Team</Label><select className={inputClass} disabled={!canCreateBoth} {...form.register("teamId")}><option value="1">AC</option><option value="2">DC</option></select></div>
                 <div className="space-y-2"><Label>Item Name</Label><select className={inputClass} {...form.register("itemName")}><option value="">Select item family</option>{categoryOptions.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}</select>{form.formState.errors.itemName && <p className="text-sm text-destructive">{form.formState.errors.itemName.message}</p>}</div>
                 {category?.types && <div className="space-y-2"><Label>Item Type</Label><select className={inputClass} {...form.register("itemType")}><option value="">Select item type</option>{category.types.map(value => <option key={value} value={value}>{value}</option>)}</select></div>}
                 {category?.fields.map(field => <div key={field.key} className="space-y-2"><Label>{field.label}</Label>{field.options ? <select className={inputClass} {...form.register(`specifications.${field.key}` as const)}><option value="">Select {field.label}</option>{field.options.map(option => <option key={option} value={option}>{option}</option>)}</select> : <Input {...form.register(`specifications.${field.key}` as const)} placeholder={field.label} />}</div>)}

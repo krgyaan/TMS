@@ -10,7 +10,7 @@ export function InventoryItemViewDialog({ item, onOpenChange }: { item: Inventor
             <DialogHeader><DialogTitle>{item?.itemName}</DialogTitle><DialogDescription>Complete item details</DialogDescription></DialogHeader>
             {item && <div className="grid gap-4 sm:grid-cols-2 text-sm">
                 <div><span className="text-muted-foreground">Item Code</span><p>{item.itemCode}</p></div>
-                <div><span className="text-muted-foreground">Team</span><p>{item.teamId === 5 ? "Accounts" : "Operations"}</p></div>
+                <div><span className="text-muted-foreground">Team</span><p>{item.teamId === 1 ? "AC" : item.teamId === 2 ? "DC" : "—"}</p></div>
                 <div><span className="text-muted-foreground">Item Type</span><p>{item.itemType || "—"}</p></div>
                 <div><span className="text-muted-foreground">Status</span><p><Badge variant={item.isActive ? "default" : "secondary"}>{item.isActive ? "Active" : "Inactive"}</Badge></p></div>
                 {category?.fields.map(field => <div key={field.key}><span className="text-muted-foreground">{field.label}</span><p>{item.specifications?.[field.key] || "—"}</p></div>)}
