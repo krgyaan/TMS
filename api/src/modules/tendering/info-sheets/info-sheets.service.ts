@@ -1142,16 +1142,13 @@ export class TenderInfoSheetsService {
             )) as TenderInfoSheetWithRelations;
 
             const prevStatus = tender?.status ?? null;
-            // A re-fill should be treated as completing an incomplete sheet if the
-            // tender status is 29 or the TL still has it flagged incomplete (3).
-            const wasIncomplete = prevStatus === 29 || tender?.tlStatus === 3;
             let newStatus = prevStatus ?? 2;
 
-            if (wasIncomplete) {
+            if (prevStatus === 29) {
                 newStatus = 2;
                 await this.db
                     .update(tenderInfos)
-                    .set({ status: newStatus, tlStatus: 0, updatedAt: new Date() })
+                    .set({ status: newStatus, updatedAt: new Date() })
                     .where(eq(tenderInfos.id, tenderId));
             }
 
@@ -1162,7 +1159,7 @@ export class TenderInfoSheetsService {
                 newStatus,
                 changedBy,
                 prevStatus,
-                wasIncomplete
+                prevStatus === 29
                     ? isRejection
                         ? 'Tender info sheet re-filled (not recommended)'
                         : 'Tender info sheet re-filled (was incomplete)'
@@ -1171,20 +1168,11 @@ export class TenderInfoSheetsService {
                         : 'Tender info sheet updated',
             );
 
-            // Timer transition: stop any active info-sheet timer whenever the sheet is
-            // saved (idempotent), and when completing an incomplete sheet, resume the
-            // TL approval timer with its remaining time.
-            try {
-                const activeInfoSheetTimer = await this.timersService.getTimer(
-                    'TENDER',
-                    tenderId,
-                    'tender_info_sheet'
-                );
-
-                if (
-                    activeInfoSheetTimer &&
-                    ['running', 'paused'].includes(activeInfoSheetTimer.status)
-                ) {
+            // Timer transition: when re-filling after TL marked the sheet incomplete,
+            // stop the resumed info-sheet timer and resume the TL approval timer with
+            // its remaining time.
+            if (prevStatus === 29) {
+                try {
                     try {
                         await this.timersService.stopTimer({
                             entityType: 'TENDER',
@@ -1203,9 +1191,6 @@ export class TenderInfoSheetsService {
                             );
                         }
                     }
-                }
-
-                if (wasIncomplete) {
                     try {
                         const prevApprovalTimer = await this.timersService.getTimer(
                             'TENDER',
@@ -1233,12 +1218,12 @@ export class TenderInfoSheetsService {
                             );
                         }
                     }
+                } catch (error) {
+                    this.logger.error(
+                        `Failed to transition timers for tender ${tenderId}:`,
+                        error
+                    );
                 }
-            } catch (error) {
-                this.logger.error(
-                    `Failed to transition timers for tender ${tenderId}:`,
-                    error
-                );
             }
 
             try {

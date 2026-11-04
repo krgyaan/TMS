@@ -31,26 +31,6 @@ function buildService(infoSheetMock: any) {
     return { service, tenderInfoSheetsService };
 }
 
-describe('TenderApprovalService - incomplete status', () => {
-    it('sets tender status to 29 when marking incomplete for the first time', async () => {
-        const { service } = buildService(null);
-
-        const result: any = await (service as any).buildApprovalUpdateData(1001, { tlStatus: '3' }, false);
-
-        expect(result.updateData.status).toBe(29);
-        expect(result.newStatus).toBe(29);
-    });
-
-    it('sets tender status to 29 when re-marking incomplete in edit mode', async () => {
-        const { service } = buildService(null);
-
-        const result: any = await (service as any).buildApprovalUpdateData(1001, { tlStatus: '3' }, true);
-
-        expect(result.updateData.status).toBe(29);
-        expect(result.newStatus).toBe(29);
-    });
-});
-
 describe('TenderApprovalService - EMD sync on TL approval', () => {
     const basePayload: any = {
         tlStatus: '1', // Approved

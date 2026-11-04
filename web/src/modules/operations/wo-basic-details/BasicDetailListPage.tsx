@@ -52,7 +52,7 @@ const BasicDetailListPage = () => {
 
     // Fetch data
     const { data: dashboardSummary } = useWoBasicDetailsDashboardSummary();
-    const { data: apiResponse, isLoading: loading, isFetching, error } = useWoBasicDetails(filters);
+    const { data: apiResponse, isLoading: loading, error } = useWoBasicDetails(filters);
 
     const tableData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
@@ -292,8 +292,8 @@ const BasicDetailListPage = () => {
         [rowActions]
     );
 
-    // Loading state (initial load only; keep the page mounted on subsequent searches)
-    if (loading && !apiResponse) {
+    // Loading state
+    if (loading && !tableData.length) {
         return (
             <Card>
                 <CardHeader>
@@ -417,7 +417,7 @@ const BasicDetailListPage = () => {
                                         <DataTable
                                             data={tableData}
                                             columnDefs={colDefs as ColDef<any>[]}
-                                            loading={isFetching}
+                                            loading={loading}
                                             manualPagination={true}
                                             rowCount={totalRows}
                                             paginationState={pagination}

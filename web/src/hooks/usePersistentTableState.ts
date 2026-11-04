@@ -75,7 +75,7 @@ export function usePersistentTableState<Tab extends string>({
     const syncUrl = useCallback(() => {
         const params: Record<string, string | undefined> = {
             [tabParam]: activeTab !== defaultTab ? activeTab as string : undefined,
-            q: debouncedSearch || undefined,
+            q: search || undefined,
             page: pagination.pageIndex > 0 ? String(pagination.pageIndex + 1) : undefined,
             size: pagination.pageSize !== defaultPageSize ? String(pagination.pageSize) : undefined,
             sortBy: sortModel[0]?.colId,
@@ -94,7 +94,7 @@ export function usePersistentTableState<Tab extends string>({
         if (nextStr !== currentStr) {
             setSearchParams(next, { replace: true });
         }
-    }, [activeTab, debouncedSearch, pagination, sortModel, searchParams, tabParam, defaultTab, defaultPageSize, setSearchParams]);
+    }, [activeTab, search, pagination, sortModel, searchParams, tabParam, defaultTab, defaultPageSize, setSearchParams]);
 
     useEffect(() => {
         syncUrl();

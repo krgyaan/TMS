@@ -6,7 +6,6 @@ import { Receipt, Eye } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDate, formatDateTime } from '@/hooks/useFormatedDate';
 import { fileUploadService } from '@/services/api/file-upload.service';
-import { paymentRequestsService } from '@/services/api/payment-requests.service';
 
 interface ChequeViewProps {
     data: any;
@@ -17,43 +16,20 @@ interface ChequeViewProps {
 const FileLink = ({ file, instrumentId }: { file?: string; instrumentId?: number }) => {
     if (!file) return <span className="text-muted-foreground">Not Uploaded</span>;
 
-    if (instrumentId) {
-        return (
-            <div className="flex gap-3 items-center">
-                <a
-                    href={paymentRequestsService.getInstrumentPdfUrl(instrumentId)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-primary hover:underline"
-                >
-                    <Eye className="h-4 w-4" />
-                    {'View'}
-                </a>
-            </div>
-        );
-    }
-
-    const values = file.split(',').map((value) => value.trim()).filter(Boolean);
-    const filePaths = values.filter((value) => value.includes('/'));
-
-    if (filePaths.length === 0) {
-        return <span className="text-sm">{file}</span>;
-    }
+    const href = instrumentId
+        ? `/payment-requests/instruments/${instrumentId}/pdf`
+        : fileUploadService.getFileUrl(file);
 
     return (
-        <div className="flex flex-wrap gap-3 items-center">
-            {filePaths.map((filePath, index) => (
-                <a
-                    key={filePath}
-                    href={fileUploadService.getFileUrl(filePath)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-primary hover:underline"
-                >
-                    <Eye className="h-4 w-4" />
-                    {filePaths.length > 1 ? `View ${index + 1}` : 'View'}
-                </a>
-            ))}
+        <div className="flex gap-3 items-center">
+            <a
+                href={href}
+                target="_blank"
+                className="flex items-center gap-1 text-primary hover:underline"
+            >
+                <Eye className="h-4 w-4" />
+                {'View'}
+            </a>
         </div>
     );
 };
@@ -63,6 +39,7 @@ export function ChequeView({
     isLoading = false,
     className = '',
 }: ChequeViewProps) {
+    console.log("Cheque: ", data);
     if (isLoading) {
         return (
             <Card className={className}>

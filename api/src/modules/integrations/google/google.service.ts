@@ -83,14 +83,14 @@ export class GoogleService {
         return this.createAuthUrlWithState(String(userId), redirectUri);
     }
 
-    createAuthUrlWithState(state: string, redirectUri?: string, prompt: string = "consent"): { url: string } {
+    createAuthUrlWithState(state: string, redirectUri?: string): { url: string } {
         const client = this.createClient(redirectUri);
         const authOptions: any = {
             access_type: "offline",
             include_granted_scopes: true,
             scope: this.config.scopes,
             state,
-            prompt,
+            prompt: "consent",
         };
 
         const url = client.generateAuthUrl(authOptions);

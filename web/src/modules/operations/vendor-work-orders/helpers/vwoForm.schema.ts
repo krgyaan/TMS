@@ -26,7 +26,6 @@ export const vendorWorkOrderFormSchema = z.object({
     category: z.string(),
 
     sellerId: z.string(),
-    sellerGstId: z.string(),
     sellerName: z.string().min(1, "Vendor name is required"),
     sellerEmail: z.string(),
     sellerAddress: z.string(),

@@ -272,9 +272,6 @@ export const paths = {
         accountChecklists: "/accounts/account-checklists",
         gstChecklists: "/accounts/gst-checklists",
         fixedExpenses: "/accounts/fixed-expenses",
-        fixedExpenseCreate: "/accounts/fixed-expenses/create",
-        fixedExpenseEdit: (id: number) => `/accounts/fixed-expenses/${id}/edit`,
-        fixedExpenseView: (id: number) => `/accounts/fixed-expenses/${id}`,
         projects: "/projects",
         tdsChecklists: "/accounts/tds-checklists",
 

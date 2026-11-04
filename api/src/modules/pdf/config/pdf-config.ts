@@ -79,7 +79,6 @@ export const PDF_CONFIG = {
             directory: 'letters',
             templates: ['req-ext-letter'],
             storagePath: 'reqext',
-            baseDir: 'bi-dashboard/bank-guarantee/reqext',
             margin: {
                 top: '0mm',
                 right: '0mm',
@@ -91,19 +90,6 @@ export const PDF_CONFIG = {
             directory: 'letters',
             templates: ['req-cancel-letter'],
             storagePath: 'reqcancel',
-            baseDir: 'bi-dashboard/bank-guarantee/reqcancel',
-            margin: {
-                top: '0mm',
-                right: '0mm',
-                bottom: '0mm',
-                left: '0mm',
-            },
-        },
-        bgCoveringLetter: {
-            directory: 'letters',
-            templates: ['bg-covering-letter'],
-            storagePath: 'bgcovletter',
-            baseDir: 'bi-dashboard/bank-guarantee/bgcovletter',
             margin: {
                 top: '0mm',
                 right: '0mm',
@@ -143,14 +129,15 @@ export const PDF_CONFIG = {
         },
         si: {
             directory: '.',
-            templates: ['si-portrait'],
+            templates: ['si-template'],
             storagePath: 'si',
             baseDir: 'operations/si',
+            landscape: true,
             margin: {
-                top: '8mm',
-                right: '8mm',
-                bottom: '8mm',
-                left: '8mm',
+                top: '5mm',
+                right: '7.5mm',
+                bottom: '5mm',
+                left: '7.5mm',
             },
         },
     },

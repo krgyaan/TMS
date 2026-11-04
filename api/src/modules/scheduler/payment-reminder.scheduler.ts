@@ -1,7 +1,6 @@
 import { Injectable, Logger, Inject } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { Queue } from "bullmq";
-import { getIstDateKey } from "@/utils/ist-date";
 
 @Injectable()
 export class PaymentReminderScheduler {
@@ -16,7 +15,6 @@ export class PaymentReminderScheduler {
     @Cron("10 17 * * 1-5")
     async handleChequeDueDateReminder() {
         await this.queue.add("cheque_due_date", { type: "cheque_due_date" }, {
-            jobId: `cheque-due-date-${getIstDateKey()}`,
             attempts: 3,
             backoff: { type: "exponential", delay: 30000 },
         });
@@ -26,7 +24,6 @@ export class PaymentReminderScheduler {
     @Cron("20 16 * * 1-5")
     async handleBgClaimPeriod() {
         await this.queue.add("bg_claim_period", { type: "bg_claim_period" }, {
-            jobId: `bg-claim-period-${getIstDateKey()}`,
             attempts: 3,
             backoff: { type: "exponential", delay: 30000 },
         });
@@ -36,7 +33,6 @@ export class PaymentReminderScheduler {
     @Cron("20 17 * * 1-5")
     async handleBgExpiryReminder() {
         await this.queue.add("bg_expiry", { type: "bg_expiry" }, {
-            jobId: `bg-expiry-${getIstDateKey()}`,
             attempts: 3,
             backoff: { type: "exponential", delay: 30000 },
         });

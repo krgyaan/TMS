@@ -22,10 +22,7 @@ const Accounts_Insurance_Edit = lazy(() => import("@/modules/insurance/pages/Ins
 const Accounts_Insurance_View = lazy(() => import("@/modules/insurance/pages/InsuranceViewPage"));
 const Accounts_GSTChecklists = lazy(() => import("@/modules/accounts/gst-checklists/GstChecklistListPage"));
 const Accounts_TDSChecklists = lazy(() => import("@/modules/accounts/tds-checklists/TdsChecklistListPage"));
-const Accounts_FixedExpenses = lazy(() => import("@/modules/accounts/fixed-expenses/FixedExpenseListPage"));
-const Accounts_FixedExpenses_Create = lazy(() => import("@/modules/accounts/fixed-expenses/FixedExpenseCreatePage"));
-const Accounts_FixedExpenses_Edit = lazy(() => import("@/modules/accounts/fixed-expenses/FixedExpenseEditPage"));
-const Accounts_FixedExpenses_View = lazy(() => import("@/modules/accounts/fixed-expenses/FixedExpenseShowPage"));
+const Accounts_FixedExpenses = lazy(() => import("@/modules/accounts/fixed-expenses"));
 
 const TaskChecklistDashboard = lazy(() => import("@/modules/accounts/task-checklist/ChecklistDashboard"));
 const TaskChecklistCreate = lazy(() => import("@/modules/accounts/task-checklist/ChecklistCreate"));
@@ -79,9 +76,6 @@ export default function AccountsRoutes() {
             <Route path="gst-checklists" element={<RouteWrapper><Accounts_GSTChecklists /></RouteWrapper>} />
             <Route path="tds-checklists" element={<RouteWrapper><Accounts_TDSChecklists /></RouteWrapper>} />
             <Route path="fixed-expenses" element={<RouteWrapper><Accounts_FixedExpenses /></RouteWrapper>} />
-            <Route path="fixed-expenses/create" element={<RouteWrapper><Accounts_FixedExpenses_Create /></RouteWrapper>} />
-            <Route path="fixed-expenses/:id/edit" element={<RouteWrapper><Accounts_FixedExpenses_Edit /></RouteWrapper>} />
-            <Route path="fixed-expenses/:id" element={<RouteWrapper><Accounts_FixedExpenses_View /></RouteWrapper>} />
 
             <Route path="task-checklists" element={<RouteWrapper><TaskChecklistDashboard /></RouteWrapper>} />
             <Route path="task-checklists/create" element={<RouteWrapper><TaskChecklistCreate /></RouteWrapper>} />

@@ -7,7 +7,6 @@ import type {
     SetTdsDTO,
     SellerOption,
     SellerPersonOption,
-    SellerGstOption,
     ShipToOption,
 } from '@/modules/operations/purchase-orders/helpers/purchaseOrder.types';
 import type { ProjectInventoryItem } from '@/modules/operations/sale-invoices/helpers/saleInvoice.types';
@@ -49,10 +48,6 @@ class PurchaseOrderApiService extends BaseApiService {
 
     async getSellerPersons(orgId: number): Promise<SellerPersonOption[]> {
         return this.get(`/parties/sellers/${orgId}/persons`);
-    }
-
-    async getSellerGsts(orgId: number): Promise<SellerGstOption[]> {
-        return this.get(`/parties/sellers/${orgId}/gsts`);
     }
 
     async getShipToOptions(q?: string, ids?: number[], limit?: number): Promise<ShipToOption[]> {
@@ -141,10 +136,6 @@ class PurchaseOrderApiService extends BaseApiService {
 
     async getPurchaseOrderPdfVersions(id: number): Promise<Record<string, { path: string; hash: string }>> {
         return this.get(`/${id}/pdf/versions`);
-    }
-
-    async retryPdfGeneration(id: number): Promise<{ status: "generated" | "unchanged"; version?: string }> {
-        return this.post(`/${id}/pdf/retry`, {});
     }
 
     async deletePdfVersion(id: number, version: string): Promise<void> {

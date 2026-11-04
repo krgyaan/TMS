@@ -108,7 +108,7 @@ export class AuthService {
         }
 
         const state = await this.jwtService.signAsync({ purpose: "google-login" }, { secret: this.config.stateSecret, expiresIn: "5m" });
-        return this.googleService.createAuthUrlWithState(state, this.config.googleRedirect, "select_account");
+        return this.googleService.createAuthUrlWithState(state, this.config.googleRedirect);
     }
 
     async handleGoogleLoginCallback(code: string, state?: string): Promise<SessionWithToken> {

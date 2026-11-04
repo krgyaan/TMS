@@ -22,7 +22,6 @@ import {
 import path from "path";
 
 import { MailerService } from "@/mailer/mailer.service";
-import { getIstDateKey } from "@/utils/ist-date";
 import { GoogleService } from "@/modules/integrations/google/google.service";
 
 import { FollowupMailTemplates } from "./follow-up.mail";
@@ -294,7 +293,7 @@ export class FollowUpService {
                 );
             }
 
-            const today = getIstDateKey();
+            const today = new Date().toLocaleDateString("en-CA");
 
             if (tab === "ongoing") {
                 conditions.push(ne(followUps.frequency, 6));
@@ -982,7 +981,7 @@ export class FollowUpService {
     }
 
     async getDueFollowupsForCurrentWindow(frequency: number) {
-        const today = getIstDateKey();
+        const today = new Date().toLocaleDateString("en-CA");
 
         this.logger.debug("Fetching due follow-ups", {
             frequency,

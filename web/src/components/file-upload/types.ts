@@ -48,7 +48,6 @@ export const KNOWN_CONTEXTS = [
 
     // master
     'vendor-documents',
-    'circulars',
 ] as const;
 
 export type FileContext = (typeof KNOWN_CONTEXTS)[number] | (string & {});

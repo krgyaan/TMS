@@ -362,7 +362,6 @@ export const useWoDetails = (filters?: WoDetailsFilters) => {
   return useQuery({
     queryKey: woDetailsKeys.list(combinedFilters),
     queryFn: () => woDetailsService.getAll(combinedFilters),
-    placeholderData: (previousData) => previousData,
   });
 };
 

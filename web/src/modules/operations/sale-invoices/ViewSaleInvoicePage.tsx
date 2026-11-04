@@ -69,10 +69,9 @@ const ViewSaleInvoicePage = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const siId = Number(siIdParam);
-    const { user, hasPermission } = useAuth();
+    const { hasPermission } = useAuth();
     const canManagePdf =
         hasPermission("ops.sale-invoices", "update") || hasPermission("accounts.sale-invoices", "update");
-    const canRetryPdf = user?.id === 13;
 
     const { data: si, isLoading, isError, error } = useSaleInvoice(siId);
     const { data: pdfVersions, isLoading: isPdfVersionsLoading } = useSaleInvoicePdfVersions(siId);
@@ -405,7 +404,7 @@ const ViewSaleInvoicePage = () => {
                                         </a>
                                     </Button>
                                 )}
-                                {canRetryPdf && (
+                                {canManagePdf && (
                                     <Button size="sm" variant="outline" onClick={handleRetryPdf} disabled={retryPdfMutation.isPending}>
                                         <RefreshCw className={`mr-2 h-4 w-4 ${retryPdfMutation.isPending ? "animate-spin" : ""}`} />
                                         {retryPdfMutation.isPending ? "Generating..." : "Generate / Retry PDF"}

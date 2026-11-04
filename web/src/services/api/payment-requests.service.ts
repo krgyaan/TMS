@@ -1,4 +1,3 @@
-import axiosInstance from '@/lib/axios';
 import { BaseApiService } from './base.service';
 import type {
     EmdDashboardResponse,
@@ -91,12 +90,6 @@ class PaymentRequestsService extends BaseApiService {
 
     async getInstrumentMomRemarks(requestId: number, instrumentId: number) {
         return this.get<any[]>(`/${requestId}/mom/instruments/${instrumentId}`);
-    }
-
-    // Generated instrument PDF (e.g. cheque receiving PDF) — served directly by the API
-    getInstrumentPdfUrl(instrumentId: number): string {
-        const baseUrl = axiosInstance.defaults.baseURL || '';
-        return `${baseUrl}/payment-requests/instruments/${instrumentId}/pdf`;
     }
 }
 

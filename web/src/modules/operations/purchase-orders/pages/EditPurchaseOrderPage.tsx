@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { usePurchaseOrderDetails, useUpdatePurchaseOrder, useCreatePoParty } from "@/hooks/api/usePurchaseOrders";
 import { useSellerSelectOptions, useShipToSelectOptions } from "@/hooks/useSelectOptions";
-import { VendorSellerSection } from "@/modules/operations/components/VendorSellerSection";
+import { useSellerContactPerson } from "@/hooks/useSellerContactPerson";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -37,7 +37,6 @@ const defaultFormValues: PurchaseOrderFormValues = {
     category: "",
     poDate: "",
     sellerId: "",
-    sellerGstId: "",
     sellerName: "",
     sellerEmail: "",
     sellerAddress: "",
@@ -141,6 +140,25 @@ export default function EditPurchaseOrderPage() {
     const selectedUserId = form.watch("selectedUserId");
     const activeTeamMembers = useMemo(() => (teamMembers || []).filter((u: any) => u.isActive), [teamMembers]);
 
+    const { sellerPersons } = useSellerContactPerson(form, { autoSelectFirstOnLoad: false });
+
+    const sellerPersonOptions = useMemo(() => sellerPersons.map(p => ({ id: String(p.id), name: p.name || "Unnamed person" })), [sellerPersons]);
+
+    useEffect(() => {
+        if (!selectedSellerId || selectedSellerId === "__create_new__") return;
+        const party = sellerRows.find(p => String(p.id) === selectedSellerId);
+        if (!party) return;
+        form.setValue("sellerName", party.name || "");
+        form.setValue("sellerAddress", party.address || "");
+        form.setValue("sellerGstNo", party.gstNo || "");
+        form.setValue("sellerPanNo", party.pan || "");
+        form.setValue("sellerMsmeNo", party.msme || "");
+        // Contact person is deliberately not written here: the seller effect used
+        // to fill the same fields as "Quick Fill from Team Member", and whichever
+        // ran last won. Vendor-side contact now lives in vendorContactPerson* and
+        // is handled by useSellerContactPerson.
+    }, [selectedSellerId, sellerRows, form]);
+
     useEffect(() => {
         if (!selectedPartyId || selectedPartyId === "__create_new__") return;
         const party = shipToRows.find(p => String(p.id) === selectedPartyId);
@@ -168,7 +186,6 @@ export default function EditPurchaseOrderPage() {
             category: poData.category || "",
             poDate: formatDateForInput(poData.poDate),
             sellerId: poData.sellerOrganizationId ? String(poData.sellerOrganizationId) : "",
-            sellerGstId: "",
             sellerName: poData.sellerName || "",
             sellerEmail: poData.sellerEmail || "",
             sellerAddress: poData.sellerAddress || "",
@@ -423,33 +440,134 @@ export default function EditPurchaseOrderPage() {
 
                         <div className="flex flex-col md:flex-row gap-6 mt-6">
                             {/* ── Seller Information ── */}
-                            <VendorSellerSection
-                                form={form}
-                                mode="po"
-                                sellerOptions={sellerOptions}
-                                sellerRows={sellerRows}
-                                onSellerSearch={onSellerSearch}
-                                isSellerLoading={isSellerLoading}
-                                onAddSeller={() => {
-                                    setPartyCreationType("seller");
-                                    setIsAddPartyOpen(true);
-                                }}
-                                isCreatingSeller={createPartyMutation.isPending}
-                                autoSelectFirst={false}
-                                addSellerDialog={
-                                    <PartyFormDialog
-                                        title="Add New Seller"
-                                        description="Add a new party to use as a seller."
-                                        open={isAddPartyOpen}
-                                        onOpenChange={open => {
-                                            setIsAddPartyOpen(open);
-                                            if (open) setPartyCreationType("seller");
+                            <div className="border rounded-lg border-primary border-dashed p-2 my-3 w-full md:w-1/2">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                                        <Building2 className="h-5 w-5" />
+                                        Seller Information
+                                    </h3>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        type="button"
+                                        onClick={() => {
+                                            setPartyCreationType("seller");
+                                            setIsAddPartyOpen(true);
                                         }}
-                                        onSubmit={handleAddNewParty}
-                                        isLoading={createPartyMutation.isPending}
-                                    />
-                                }
-                            />
+                                    >
+                                        <UserPlus className="mr-2 h-4 w-4" />
+                                        Add New Seller
+                                    </Button>
+                                </div>
+                                <PartyFormDialog
+                                    title="Add New Seller"
+                                    description="Add a new party to use as a seller."
+                                    open={isAddPartyOpen}
+                                    onOpenChange={open => {
+                                        setIsAddPartyOpen(open);
+                                        if (open) setPartyCreationType("seller");
+                                    }}
+                                    onSubmit={handleAddNewParty}
+                                    isLoading={createPartyMutation.isPending}
+                                />
+                                <AsyncSelectField
+                                    control={form.control}
+                                    name="sellerId"
+                                    label="Select Existing Seller"
+                                    options={sellerOptions}
+                                    placeholder="Choose a seller..."
+                                    onSearch={onSellerSearch}
+                                    isLoading={isSellerLoading}
+                                />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name="sellerName"
+                                        label={
+                                            <>
+                                                Seller Name <span className="text-destructive">*</span>
+                                            </>
+                                        }
+                                    >
+                                        {field => <Input {...field} placeholder="Enter seller name" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name="sellerEmail"
+                                        label={
+                                            <>
+                                                <Mail className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />
+                                                Seller Email
+                                            </>
+                                        }
+                                    >
+                                        {field => <Input {...field} type="email" placeholder="seller@example.com" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="sellerGstNo" label="GST Number">
+                                        {field => (
+                                            <Input
+                                                {...field}
+                                                placeholder="e.g. 27ABCDE1234F1Z5"
+                                                className="font-mono"
+                                                maxLength={15}
+                                                onChange={e => field.onChange(e.target.value.toUpperCase())}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name="sellerAddress"
+                                        label={
+                                            <>
+                                                <MapPin className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />
+                                                Seller Address
+                                            </>
+                                        }
+                                    >
+                                        {field => <Textarea {...field} placeholder="Enter complete address" rows={2} />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="sellerPanNo" label="PAN Number">
+                                        {field => (
+                                            <Input
+                                                {...field}
+                                                placeholder="e.g. ABCDE1234F"
+                                                className="font-mono"
+                                                maxLength={10}
+                                                onChange={e => field.onChange(e.target.value.toUpperCase())}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="sellerMsmeNo" label="MSME Number">
+                                        {field => (
+                                            <Input
+                                                {...field}
+                                                placeholder="e.g. UDYAM-XX-00-0000000"
+                                                className="font-mono"
+                                                onChange={e => field.onChange(e.target.value.toUpperCase())}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name="sellerCinNo"
+                                        label={
+                                            <>
+                                                <Building2 className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />
+                                                Seller CIN Number
+                                            </>
+                                        }
+                                    >
+                                        {field => (
+                                            <Input
+                                                {...field}
+                                                placeholder="e.g. U74999KA2020PTC123456"
+                                                className="font-mono"
+                                                onChange={e => field.onChange(e.target.value.toUpperCase())}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                </div>
+                            </div>
                             {/* ── Ship To Details ── */}
                             <div className="border rounded-lg border-sidebar-primary-foreground border-dashed p-2 my-3 w-full md:w-1/2">
                                 <div className="flex items-center justify-between mb-4">
@@ -542,6 +660,51 @@ export default function EditPurchaseOrderPage() {
                         </div>
 
                         <div className="space-y-6 my-6">
+                            <div>
+                                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">Vendor Contact Person</p>
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                    <SelectField
+                                        control={form.control}
+                                        name="vendorPersonId"
+                                        label={
+                                            <>
+                                                <Building2 className="h-3.5 w-3.5 inline mr-1" />
+                                                Vendor Contact Person
+                                            </>
+                                        }
+                                        options={sellerPersonOptions}
+                                        placeholder={sellerPersons.length ? "Select vendor contact person..." : "No persons saved for this vendor"}
+                                    />
+                                    <FieldWrapper control={form.control} name="vendorContactPersonName" label="Vendor Contact Name">
+                                        {field => <Input {...field} placeholder="Enter vendor contact name" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name="vendorContactPersonPhone"
+                                        label={
+                                            <>
+                                                <Phone className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />
+                                                Vendor Contact Phone
+                                            </>
+                                        }
+                                    >
+                                        {field => <Input {...field} placeholder="e.g. +91-9876543210" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name="vendorContactPersonEmail"
+                                        label={
+                                            <>
+                                                <Mail className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />
+                                                Vendor Contact Email
+                                            </>
+                                        }
+                                    >
+                                        {field => <Input {...field} type="email" placeholder="contact@example.com" />}
+                                    </FieldWrapper>
+                                </div>
+                            </div>
+
                             <div>
                                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">Our Contact Person (printed on the PO)</p>
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

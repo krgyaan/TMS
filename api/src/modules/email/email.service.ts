@@ -308,7 +308,6 @@ export class EmailService {
         referenceType: string;
         referenceId: number;
         isNewThread: boolean;
-        skipClaim?: boolean;
     }): Promise<void> {
         if (this.isSandbox) {
             try {
@@ -327,16 +326,14 @@ export class EmailService {
             return;
         }
 
-        const { emailLogId, fromUserId, resolved, referenceType, referenceId, isNewThread, skipClaim } = params as { emailLogId: number; fromUserId: number; resolved: ResolvedEmail; referenceType: string; referenceId: number; isNewThread: boolean; skipClaim?: boolean };
+        const { emailLogId, fromUserId, resolved, referenceType, referenceId, isNewThread } = params as { emailLogId: number; fromUserId: number; resolved: ResolvedEmail; referenceType: string; referenceId: number; isNewThread: boolean };
 
         try {
-            // Update status to sending unless the caller has already atomically claimed the row
-            if (!skipClaim) {
-                await this.db
-                    .update(emailLogs)
-                    .set({ status: 'sending', attempts: sql`${emailLogs.attempts} + 1`, lastAttemptAt: new Date() })
-                    .where(eq(emailLogs.id, emailLogId));
-            }
+            // Update status to sending
+            await this.db
+                .update(emailLogs)
+                .set({ status: 'sending', attempts: sql`${emailLogs.attempts} + 1`, lastAttemptAt: new Date() })
+                .where(eq(emailLogs.id, emailLogId));
 
             // Send via Gmail
             const result = await this.gmail.send(fromUserId, resolved);
@@ -526,28 +523,6 @@ export class EmailService {
 
         for (const log of failedEmails) {
             try {
-                // Atomically claim the failed row so only one retry worker sends it.
-                const claimed = await this.db
-                    .update(emailLogs)
-                    .set({
-                        status: 'sending',
-                        attempts: sql`${emailLogs.attempts} + 1`,
-                        lastAttemptAt: new Date(),
-                    })
-                    .where(
-                        and(
-                            eq(emailLogs.id, log.id || 0),
-                            eq(emailLogs.status, 'failed'),
-                            lt(sql`COALESCE(${emailLogs.attempts}, 0)`, this.maxRetries),
-                        ),
-                    )
-                    .returning({ id: emailLogs.id });
-
-                if (claimed.length === 0) {
-                    this.logger.debug(`Email ${log.id} was already claimed by another retry worker, skipping`);
-                    continue;
-                }
-
                 // Get thread info
                 const threadInfo = await this.gmail.getThreadInfo(log.referenceType || '', log.referenceId || 0);
                 const messageId = this.gmail.generateMessageId() || '';
@@ -571,7 +546,6 @@ export class EmailService {
                     referenceType: log.referenceType || '',
                     referenceId: log.referenceId || 0,
                     isNewThread: threadInfo.isNew,
-                    skipClaim: true,
                 });
 
                 retried++;

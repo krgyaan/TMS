@@ -7,7 +7,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Info, Loader2, Phone, UserPlus, User } from "lucide-react";
 import { type NewPartyForm } from "./vendor-master.types";
-import { formatVendorName } from "@/lib/vendorName";
 
 interface PartyFormDialogProps {
     open: boolean;
@@ -106,7 +105,6 @@ export function PartyFormDialog({
                             <Input
                                 value={form.name}
                                 onChange={(e) => handleChange("name", e.target.value)}
-                                onBlur={() => handleChange("name", formatVendorName(form.name))}
                                 placeholder="Enter party name"
                             />
                         </div>
