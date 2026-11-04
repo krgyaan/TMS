@@ -328,13 +328,19 @@ export class PaymentRequestService {
         return updated;
     }
 
-    async updateStatus(id: number, body: { status: string; utrNumber?: string; rejectionReason?: string }) {
+    async updateStatus(id: number, body: { status: string; utrNumber?: string; rejectionReason?: string; amount?: number | string }) {
         const existing = await this.db
             .select()
             .from(paymentRequests)
             .where(eq(paymentRequests.id, id))
             .then(rows => rows[0]);
         if (!existing) throw new NotFoundException("Payment Request not found");
+
+        const hasAmount = body.amount !== undefined && body.amount !== null && String(body.amount).trim() !== "";
+        const parsedAmount = hasAmount ? Number(body.amount) : undefined;
+        if (hasAmount && (!Number.isFinite(parsedAmount) || (parsedAmount as number) < 0)) {
+            throw new BadRequestException("Amount must be a non-negative number");
+        }
 
         const validTransitions: Record<string, string[]> = {
             pending: ["maker_done", "rejected"],
@@ -425,11 +431,21 @@ export class PaymentRequestService {
                         utrNumber: body.utrNumber || null,
                         rejectionReason: body.rejectionReason || null,
                         updatedAt: new Date(),
+                        ...(hasAmount ? { amount: (parsedAmount as number).toFixed(2) } : {}),
                         ...tdsCapSet,
                     })
                     .where(eq(paymentRequests.id, id))
                     .returning()
             )[0];
+
+            if (hasAmount) {
+                // Fixed expenses are created with amount 0 when variable; the amount
+                // is filled in when the maker confirms. Keep the expense in sync.
+                await tx
+                    .update(fixedExpenses)
+                    .set({ amount: (parsedAmount as number).toFixed(2), updatedAt: new Date() })
+                    .where(eq(fixedExpenses.makerId, id));
+            }
 
             if (tdsReturn) {
                 await tx
@@ -641,7 +657,6 @@ export class PaymentRequestService {
         });
     }
 
-    
     private async syncFixedExpenseStatus(tx: DbInstance, makerRequestId: number, status: string) {
         const [linked] = await tx.select({ id: fixedExpenses.id }).from(fixedExpenses).where(eq(fixedExpenses.makerId, makerRequestId)).limit(1);
 
@@ -739,6 +754,9 @@ export class PaymentRequestService {
                 vwoTotalPaymentRequested: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE vendor_work_order_id = ${vendorWorkOrders.id} AND status != 'rejected'), 0)`,
                 vwoTotalMakerDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE vendor_work_order_id = ${vendorWorkOrders.id} AND status = 'maker_done'), 0)`,
                 vwoTotalPaymentDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE vendor_work_order_id = ${vendorWorkOrders.id} AND status = 'payment_done'), 0)`,
+                fixedExpenseId: fixedExpenses.id,
+                fixedExpenseAmountType: fixedExpenses.amountType,
+                fixedExpenseStatus: fixedExpenses.status,
             })
             .from(paymentRequests)
             .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
@@ -746,6 +764,7 @@ export class PaymentRequestService {
             .leftJoin(purchaseOrders, eq(paymentRequests.purchaseOrderId, purchaseOrders.id))
             .leftJoin(vendorWorkOrders, eq(paymentRequests.vendorWorkOrderId, vendorWorkOrders.id))
             .leftJoin(purchaseInvoices, eq(paymentRequests.purchaseInvoiceId, purchaseInvoices.id))
+            .leftJoin(fixedExpenses, eq(fixedExpenses.makerId, paymentRequests.id))
             .where(eq(paymentRequests.id, id));
 
         const pr = rows[0];
@@ -771,6 +790,9 @@ export class PaymentRequestService {
                 projectName: projects.projectName,
                 poNumber: purchaseOrders.poNumber,
                 vwoNumber: vendorWorkOrders.woNumber,
+                fixedExpenseId: fixedExpenses.id,
+                fixedExpenseAmountType: fixedExpenses.amountType,
+                fixedExpenseStatus: fixedExpenses.status,
             })
             .from(paymentRequests)
             .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
@@ -778,6 +800,7 @@ export class PaymentRequestService {
             .leftJoin(purchaseOrders, eq(paymentRequests.purchaseOrderId, purchaseOrders.id))
             .leftJoin(vendorWorkOrders, eq(paymentRequests.vendorWorkOrderId, vendorWorkOrders.id))
             .leftJoin(purchaseInvoices, eq(paymentRequests.purchaseInvoiceId, purchaseInvoices.id))
+            .leftJoin(fixedExpenses, eq(fixedExpenses.makerId, paymentRequests.id))
             .where(conditions.length > 0 ? and(...conditions) : undefined)
             .orderBy(desc(paymentRequests.id));
     }

@@ -49,6 +49,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
     const [viewingId, setViewingId] = useState<number | null>(null);
 
     const [makerDoneRow, setMakerDoneRow] = useState<PaymentRequestRow | null>(null);
+    const [makerDoneAmount, setMakerDoneAmount] = useState("");
     const [paymentDoneRow, setPaymentDoneRow] = useState<PaymentRequestRow | null>(null);
     const [utrNumber, setUtrNumber] = useState("");
     const [rejectRow, setRejectRow] = useState<PaymentRequestRow | null>(null);
@@ -138,7 +139,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
     }, [debouncedSearch, gridApi]);
 
     const handleView = useCallback((row: PaymentRequestRow) => setViewingId(row.id), []);
-    const handleMakerDone = useCallback((row: PaymentRequestRow) => setMakerDoneRow(row), []);
+    const handleMakerDone = useCallback((row: PaymentRequestRow) => { setMakerDoneRow(row); setMakerDoneAmount(""); }, []);
     const handlePaymentDone = useCallback((row: PaymentRequestRow) => { setPaymentDoneRow(row); setUtrNumber(""); }, []);
     const handleReject = useCallback((row: PaymentRequestRow) => { setRejectRow(row); setRejectionReason(""); }, []);
 
@@ -178,8 +179,22 @@ const CombinedPaymentRequestListPage: React.FC = () => {
 
     const confirmMakerDone = useCallback(async () => {
         if (!makerDoneRow) return;
-        try { await updateStatusMutation.mutateAsync({ id: makerDoneRow.id, data: { status: "maker_done" } }); setMakerDoneRow(null); } catch {}
-    }, [makerDoneRow, updateStatusMutation]);
+        const isVariableAmount = makerDoneRow.fixedExpenseAmountType === "variable";
+        const amountValue = makerDoneAmount.trim();
+        if (isVariableAmount && (!amountValue || Number(amountValue) <= 0)) return;
+
+        try {
+            await updateStatusMutation.mutateAsync({
+                id: makerDoneRow.id,
+                data: {
+                    status: "maker_done",
+                    ...(isVariableAmount ? { amount: Number(amountValue) } : {}),
+                },
+            });
+            setMakerDoneRow(null);
+            setMakerDoneAmount("");
+        } catch {}
+    }, [makerDoneRow, makerDoneAmount, updateStatusMutation]);
 
     const confirmPaymentDone = useCallback(async () => {
         if (!paymentDoneRow || !utrNumber.trim()) return;
@@ -226,7 +241,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
             label: "Upload Invoice",
             icon: <Upload className="h-4 w-4" />,
             onClick: handleUploadInvoice,
-            visible: (row) => row.status !== "rejected" && row.status !== "po_approval_pending" && CATEGORIES_NEED_INVOICE_AFTER_PAYMENT.has(row.paymentAgainst),
+            visible: (row) => row.status !== "rejected" && row.status !== "po_approval_pending" && (row.fixedExpenseId != null || CATEGORIES_NEED_INVOICE_AFTER_PAYMENT.has(row.paymentAgainst)),
         },
         { label: "Reject", icon: <Ban className="h-4 w-4" />, onClick: handleReject, className: "text-red-600", visible: (row) => row.status === "pending" || row.status === "maker_done" },
         {
@@ -417,7 +432,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
 
 
             {/* Maker Done Dialog */}
-            <Dialog open={makerDoneRow !== null} onOpenChange={(open) => { if (!open) setMakerDoneRow(null); }}>
+            <Dialog open={makerDoneRow !== null} onOpenChange={(open) => { if (!open) { setMakerDoneRow(null); setMakerDoneAmount(""); } }}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle>Confirm Maker Done</DialogTitle>
@@ -428,11 +443,39 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                             <p><strong>Request No:</strong> {makerDoneRow.requestNo}</p>
                             <p><strong>Party:</strong> {makerDoneRow.partyName}</p>
                             <p><strong>Amount:</strong> {formatINR(makerDoneRow.amount)}</p>
+                            {makerDoneRow.fixedExpenseAmountType === "variable" && (
+                                <div className="space-y-1 pt-2">
+                                    <Label htmlFor="maker-done-amount">
+                                        Amount (₹) <span className="text-destructive">*</span>
+                                    </Label>
+                                    <Input
+                                        id="maker-done-amount"
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={makerDoneAmount}
+                                        onChange={(e) => setMakerDoneAmount(e.target.value)}
+                                        placeholder="Enter the actual amount"
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        This fixed expense has a variable amount.
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     }
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setMakerDoneRow(null)}>Cancel</Button>
-                        <Button onClick={confirmMakerDone} disabled={updateStatusMutation.isPending}>{updateStatusMutation.isPending ? "Updating..." : "Confirm"}</Button>
+                        <Button variant="outline" onClick={() => { setMakerDoneRow(null); setMakerDoneAmount(""); }}>Cancel</Button>
+                        <Button
+                            onClick={confirmMakerDone}
+                            disabled={
+                                updateStatusMutation.isPending ||
+                                (makerDoneRow?.fixedExpenseAmountType === "variable" &&
+                                    (!makerDoneAmount.trim() || Number(makerDoneAmount) <= 0))
+                            }
+                        >
+                            {updateStatusMutation.isPending ? "Updating..." : "Confirm"}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

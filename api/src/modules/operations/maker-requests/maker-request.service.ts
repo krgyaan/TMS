@@ -118,13 +118,19 @@ export class MakerRequestService {
         return parsed.data;
     }
 
-    async updateStatus(id: number, body: { status: string; utrNumber?: string; rejectionReason?: string }) {
+    async updateStatus(id: number, body: { status: string; utrNumber?: string; rejectionReason?: string; amount?: number | string }) {
         const existing = await this.db
             .select()
             .from(paymentRequests)
             .where(and(eq(paymentRequests.id, id), sql`${paymentRequests.projectId} IS NULL`))
             .then(rows => rows[0]);
         if (!existing) throw new NotFoundException("Maker Request not found");
+
+        const hasAmount = body.amount !== undefined && body.amount !== null && String(body.amount).trim() !== "";
+        const parsedAmount = hasAmount ? Number(body.amount) : undefined;
+        if (hasAmount && (!Number.isFinite(parsedAmount) || (parsedAmount as number) < 0)) {
+            throw new BadRequestException("Amount must be a non-negative number");
+        }
 
         const validTransitions: Record<string, string[]> = {
             pending: ["maker_done", "rejected"],
@@ -143,6 +149,7 @@ export class MakerRequestService {
                     utrNumber: body.utrNumber || null,
                     rejectionReason: body.rejectionReason || null,
                     updatedAt: new Date(),
+                    ...(hasAmount ? { amount: (parsedAmount as number).toFixed(2) } : {}),
                 })
                 .where(and(eq(paymentRequests.id, id), sql`${paymentRequests.projectId} IS NULL`))
                 .returning()
@@ -163,6 +170,15 @@ export class MakerRequestService {
                 await this.db.update(fixedExpenses).set({ status: nextExpenseStatus, updatedAt: new Date() }).where(eq(fixedExpenses.id, linkedExpense.id));
                 this.logger.info(`Fixed expense #${linkedExpense.id} marked ${nextExpenseStatus} from Maker Request #${id}`);
             }
+        }
+
+        if (hasAmount) {
+            // Variable fixed expenses start at 0; the maker fills the real amount
+            // on confirmation. Mirror it onto the linked expense.
+            await this.db
+                .update(fixedExpenses)
+                .set({ amount: (parsedAmount as number).toFixed(2), updatedAt: new Date() })
+                .where(eq(fixedExpenses.makerId, id));
         }
 
         if (body.status === "payment_done") {
@@ -258,6 +274,7 @@ export class MakerRequestService {
         purchaseOrderId: paymentRequests.purchaseOrderId,
         poFile: paymentRequests.poFile,
         vendorWorkOrderId: paymentRequests.vendorWorkOrderId,
+        fixedExpenseId: fixedExpenses.id,
     };
 
     async getById(id: number) {
@@ -290,6 +307,7 @@ export class MakerRequestService {
             .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
             .leftJoin(purchaseOrders, eq(paymentRequests.purchaseOrderId, purchaseOrders.id))
             .leftJoin(vendorWorkOrders, eq(paymentRequests.vendorWorkOrderId, vendorWorkOrders.id))
+            .leftJoin(fixedExpenses, eq(fixedExpenses.makerId, paymentRequests.id))
             .where(and(eq(paymentRequests.id, id), sql`${paymentRequests.projectId} IS NULL`));
 
         const mr = rows[0];
@@ -309,6 +327,7 @@ export class MakerRequestService {
             .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
             .leftJoin(purchaseOrders, eq(paymentRequests.purchaseOrderId, purchaseOrders.id))
             .leftJoin(vendorWorkOrders, eq(paymentRequests.vendorWorkOrderId, vendorWorkOrders.id))
+            .leftJoin(fixedExpenses, eq(fixedExpenses.makerId, paymentRequests.id))
             .where(and(eq(paymentRequests.requestedBy, userId), sql`${paymentRequests.projectId} IS NULL`))
             .orderBy(desc(paymentRequests.id));
     }
@@ -325,6 +344,7 @@ export class MakerRequestService {
             .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
             .leftJoin(purchaseOrders, eq(paymentRequests.purchaseOrderId, purchaseOrders.id))
             .leftJoin(vendorWorkOrders, eq(paymentRequests.vendorWorkOrderId, vendorWorkOrders.id))
+            .leftJoin(fixedExpenses, eq(fixedExpenses.makerId, paymentRequests.id))
             .where(sql`${paymentRequests.projectId} IS NULL`)
             .orderBy(desc(paymentRequests.id));
     }
