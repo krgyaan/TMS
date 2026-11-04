@@ -16,8 +16,6 @@ const optionalString = (max: number) => z.string().trim().max(max).optional().nu
 
 // ===================== ENUM VALUES =====================
 
-export const FIXED_EXPENSE_TYPES = ["electricity", "rent", "salary", "communication", "software", "admin"] as const;
-
 export const FIXED_EXPENSE_STATUSES = ["Pending", "Done"] as const;
 
 export const FIXED_EXPENSE_FREQUENCIES = ["monthly", "quarterly", "half_yearly", "annual"] as const;
@@ -36,13 +34,26 @@ const fixedExpenseBaseSchema = z.object({
     accountName: optionalString(255),
     accountNumber: optionalString(100),
     ifscCode: optionalString(50),
-    type: z.enum(FIXED_EXPENSE_TYPES),
+    // Preferred: payment_category row (purpose = 'fixed'). The server derives `type`
+    // from it. `type` is kept as a transitional fallback for older clients.
+    categoryId: z.number().int().positive().optional().nullable(),
+    type: z.string().trim().min(1).max(100).optional(),
     dueDate: dateString,
     paymentFrequency: z.enum(FIXED_EXPENSE_FREQUENCIES).default("monthly"),
     status: z.enum(FIXED_EXPENSE_STATUSES).default("Pending"),
     makerId: z.number().int().positive().optional().nullable(),
     deleteStatus: z.boolean().default(false),
 });
+
+const requireCategory = (data: { categoryId?: number | null; type?: string }, ctx: z.RefinementCtx) => {
+    if (!data.categoryId && !data.type) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Category is required",
+            path: ["categoryId"],
+        });
+    }
+};
 
 const requireBankDetailsWhenBankTransfer = (
     data: {
@@ -73,7 +84,7 @@ const requireBankDetailsWhenBankTransfer = (
     }
 };
 
-export const createFixedExpenseSchema = fixedExpenseBaseSchema.superRefine(requireBankDetailsWhenBankTransfer);
+export const createFixedExpenseSchema = fixedExpenseBaseSchema.superRefine(requireBankDetailsWhenBankTransfer).superRefine(requireCategory);
 
 export const updateFixedExpenseSchema = fixedExpenseBaseSchema.partial();
 
@@ -85,7 +96,7 @@ export const fixedExpenseQuerySchema = z.object({
     page: z.coerce.number().min(1).default(1),
     limit: z.coerce.number().min(1).max(100).default(10),
     search: z.string().optional(),
-    type: z.enum(FIXED_EXPENSE_TYPES).optional(),
+    type: z.string().trim().max(100).optional(),
     paymentFrequency: z.enum(FIXED_EXPENSE_FREQUENCIES).optional(),
     paymentMode: z.enum(FIXED_EXPENSE_PAYMENT_MODES).optional(),
     amountType: z.enum(FIXED_EXPENSE_AMOUNT_TYPES).optional(),
@@ -105,7 +116,6 @@ export type UpdateFixedExpenseDto = z.infer<typeof updateFixedExpenseSchema>;
 export type ArchiveFixedExpenseDto = z.infer<typeof archiveFixedExpenseSchema>;
 export type FixedExpenseQuery = z.infer<typeof fixedExpenseQuerySchema>;
 
-export type FixedExpenseType = (typeof FIXED_EXPENSE_TYPES)[number];
 export type FixedExpenseFrequency = (typeof FIXED_EXPENSE_FREQUENCIES)[number];
 export type FixedExpensePaymentMode = (typeof FIXED_EXPENSE_PAYMENT_MODES)[number];
 export type FixedExpenseAmountType = (typeof FIXED_EXPENSE_AMOUNT_TYPES)[number];
@@ -120,7 +130,9 @@ export interface FixedExpenseResponse {
     accountName: string | null;
     accountNumber: string | null;
     ifscCode: string | null;
-    type: FixedExpenseType;
+    type: string;
+    categoryId: number | null;
+    subCategory: string | null;
     dueDate: string;
     paymentFrequency: FixedExpenseFrequency;
     status: FixedExpenseStatus;

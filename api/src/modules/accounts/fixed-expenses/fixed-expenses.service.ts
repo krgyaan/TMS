@@ -5,6 +5,7 @@ import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import { users } from "@db/schemas/auth";
 import { fixedExpenses, type NewFixedExpense } from "@db/schemas/accounts/fixed-expense.schema";
+import { paymentCategory } from "@db/schemas/master/payment-category.schema";
 import { wrapPaginatedResponse } from "@/utils/responseWrapper";
 import type {
     CreateFixedExpenseDto,
@@ -14,7 +15,6 @@ import type {
     FixedExpenseQuery,
     FixedExpenseResponse,
     FixedExpenseStatus,
-    FixedExpenseType,
     UpdateFixedExpenseDto,
 } from "./dto/fixed-expenses.dto";
 
@@ -31,6 +31,8 @@ const fixedExpenseSelection = {
     accountNumber: fixedExpenses.accountNumber,
     ifscCode: fixedExpenses.ifscCode,
     type: fixedExpenses.type,
+    categoryId: fixedExpenses.categoryId,
+    subCategory: fixedExpenses.subCategory,
     dueDate: fixedExpenses.dueDate,
     paymentFrequency: fixedExpenses.paymentFrequency,
     status: fixedExpenses.status,
@@ -53,6 +55,8 @@ type FixedExpenseRow = {
     accountNumber: string | null;
     ifscCode: string | null;
     type: string;
+    categoryId: number | null;
+    subCategory: string | null;
     dueDate: string;
     paymentFrequency: string;
     status: string;
@@ -81,7 +85,9 @@ export class FixedExpensesService {
             accountName: row.accountName ?? null,
             accountNumber: row.accountNumber ?? null,
             ifscCode: row.ifscCode ?? null,
-            type: row.type as FixedExpenseType,
+            type: row.type,
+            categoryId: row.categoryId ?? null,
+            subCategory: row.subCategory ?? null,
             dueDate: row.dueDate ?? "",
             paymentFrequency: row.paymentFrequency as FixedExpenseFrequency,
             status: row.status as FixedExpenseStatus,
@@ -116,6 +122,43 @@ export class FixedExpensesService {
         }
     }
 
+    /**
+     * Resolve the display `type` and `subCategory` from a payment_category row.
+     * The row must exist, belong to the fixed-expense purpose and be active.
+     * Falls back to a legacy client-supplied `type` when no category is given.
+     */
+    private async resolveCategory(categoryId: number | null | undefined, fallbackType?: string): Promise<{ type: string; subCategory: string | null }> {
+        if (!categoryId) {
+            if (fallbackType) return { type: fallbackType, subCategory: null };
+            throw new BadRequestException("Category is required");
+        }
+
+        const [row] = await this.db
+            .select({
+                category: paymentCategory.category,
+                subCategory: paymentCategory.subCategory,
+                purpose: paymentCategory.purpose,
+                status: paymentCategory.status,
+            })
+            .from(paymentCategory)
+            .where(eq(paymentCategory.id, categoryId))
+            .limit(1);
+
+        if (!row) {
+            throw new BadRequestException(`Payment category with ID ${categoryId} not found`);
+        }
+
+        if (row.purpose !== "fixed") {
+            throw new BadRequestException("Selected category does not belong to fixed expenses");
+        }
+
+        if (row.status !== "active") {
+            throw new BadRequestException("Selected category is inactive");
+        }
+
+        return { type: row.category, subCategory: row.subCategory ?? null };
+    }
+
     private buildWhereClause(filters?: FixedExpenseQuery): SQL<unknown> | undefined {
         const conditions: (SQL<unknown> | undefined)[] = [];
         const search = filters?.search?.trim();
@@ -136,6 +179,7 @@ export class FixedExpensesService {
                 or(
                     ilike(fixedExpenses.partyName, term),
                     ilike(fixedExpenses.type, term),
+                    ilike(fixedExpenses.subCategory, term),
                     ilike(fixedExpenses.status, term),
                     ilike(fixedExpenses.amountType, term),
                     ilike(fixedExpenses.amountType, slugTerm),
@@ -247,6 +291,7 @@ export class FixedExpensesService {
     async create(data: CreateFixedExpenseDto, createdBy: number): Promise<FixedExpenseResponse> {
         this.assertBankDetails(data.paymentMode, data.accountName, data.accountNumber, data.ifscCode);
 
+        const { type, subCategory } = await this.resolveCategory(data.categoryId, data.type);
         const now = new Date();
 
         const [inserted] = await this.db
@@ -259,7 +304,9 @@ export class FixedExpensesService {
                 accountName: data.accountName ?? null,
                 accountNumber: data.accountNumber ?? null,
                 ifscCode: data.ifscCode ?? null,
-                type: data.type,
+                type,
+                subCategory,
+                categoryId: data.categoryId ?? null,
                 dueDate: data.dueDate,
                 paymentFrequency: data.paymentFrequency,
                 status: "Pending",
@@ -294,7 +341,14 @@ export class FixedExpensesService {
         if (data.accountName !== undefined) updateData.accountName = data.accountName;
         if (data.accountNumber !== undefined) updateData.accountNumber = data.accountNumber;
         if (data.ifscCode !== undefined) updateData.ifscCode = data.ifscCode;
-        if (data.type !== undefined) updateData.type = data.type;
+        if (data.categoryId) {
+            const resolved = await this.resolveCategory(data.categoryId);
+            updateData.categoryId = data.categoryId;
+            updateData.type = resolved.type;
+            updateData.subCategory = resolved.subCategory;
+        } else if (data.type !== undefined) {
+            updateData.type = data.type;
+        }
         if (data.dueDate !== undefined) updateData.dueDate = data.dueDate;
         if (data.paymentFrequency !== undefined) updateData.paymentFrequency = data.paymentFrequency;
         if (data.status !== undefined) updateData.status = data.status;

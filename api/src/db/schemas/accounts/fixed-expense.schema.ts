@@ -1,6 +1,7 @@
 import { pgTable, bigserial, bigint, boolean, varchar, numeric, date, timestamp, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { users } from "@db/schemas/auth";
+import { paymentCategory } from "@db/schemas/master/payment-category.schema";
 
 // ===================== TABLES =====================
 
@@ -25,7 +26,9 @@ export const fixedExpenses = pgTable(
         ifscCode: varchar("ifsc_code", { length: 50 }),
 
         // Classification & schedule
-        type: varchar("type", { length: 50 }).notNull(),
+        type: varchar("type", { length: 100 }).notNull(),
+        subCategory: varchar("sub_category", { length: 100 }),
+        categoryId: bigint("category_id", { mode: "number" }).references(() => paymentCategory.id),
         dueDate: date("due_date").notNull(),
         paymentFrequency: varchar("payment_frequency", { length: 20 }).notNull().default("monthly"),
 
@@ -60,6 +63,11 @@ export const fixedExpensesRelations = relations(fixedExpenses, ({ one }) => ({
         fields: [fixedExpenses.makerId],
         references: [users.id],
         relationName: "fixedExpenseMaker",
+    }),
+    category: one(paymentCategory, {
+        fields: [fixedExpenses.categoryId],
+        references: [paymentCategory.id],
+        relationName: "fixedExpenseCategory",
     }),
 }));
 
