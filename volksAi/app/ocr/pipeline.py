@@ -1,5 +1,5 @@
 from typing import Optional, List, Dict, Any
-from PIL.Image import logger
+import logging
 import time
 from pathlib import Path
 from PIL import Image
@@ -10,6 +10,8 @@ from app.ocr.ocr_engine import OcrEngine
 from app.ocr.extractors.field_extractor import FieldExtractor, is_contained
 import re
 from app.ocr.extractors.gem_field_extractor import GemFieldExtractor
+
+logger = logging.getLogger(__name__)
 
 # Stripped infrastructure: LayoutDetector and LayoutLmStage from ocr.layout are excluded (Neo4j sync out of scope)
 class LayoutDetector:

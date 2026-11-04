@@ -18,6 +18,7 @@ from app.services.tender_mapper import (
     FIELD_STATUS_OK,
     FIELD_STATUS_OK_FALLBACK,
 )
+from app.core.logging import request_id_ctx_var
 
 router = APIRouter(tags=["Extract"])
 logger = logging.getLogger(__name__)
@@ -908,6 +909,7 @@ async def extract_tender(
         )
 
     job_id = f"job_{uuid.uuid4().hex[:12]}"
+    request_id_token = request_id_ctx_var.set(job_id)
     start_time = time.time()
     logger.info(
         f"[EXTRACT_API] Starting extraction request for '{filename}' "
@@ -1038,11 +1040,12 @@ async def extract_tender(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error(
+        logger.exception(
             f"[EXTRACT_API_ERROR] Extraction pipeline failed for file '{filename}' (job_id: {job_id}): {exc}",
-            exc_info=True
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Extraction pipeline failed for '{filename}': {str(exc)}"
         )
+    finally:
+        request_id_ctx_var.reset(request_id_token)
