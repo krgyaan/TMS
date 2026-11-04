@@ -27,9 +27,8 @@ export class FixedExpenseMakerRequestScheduler {
         @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger
     ) {}
 
-    // PROD: @Cron("0 6 * * *") — daily 06:00 server time.
-    // TEMP (testing): every minute so the job can be triggered on demand.
-    @Cron("* * * * *")
+    // Daily at 06:00 server time (production schedule).
+    @Cron("0 6 * * *")
     async handleUpcomingFixedExpenses() {
         this.logger.info("Cron tick at fixedExpenseMakerRequests", { timestamp: new Date() });
 
