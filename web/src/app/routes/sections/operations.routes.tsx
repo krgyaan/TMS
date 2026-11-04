@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { RouteWrapper } from "../components/RouteWrapper";
 
 const Basic_Details = lazy(() => import("@/modules/operations/wo-basic-details/BasicDetailListPage"));
@@ -50,10 +50,13 @@ const Operations_CreatePaymentRequest = lazy(() => import("@/modules/operations/
 const Operations_EditPaymentRequest = lazy(() => import("@/modules/operations/payment-requests/EditPaymentRequestPage"));
 const Operations_PaymentRequestTabs = lazy(() => import("@/modules/operations/payment-requests/PaymentRequestTabsPage"));
 const Operations_CreateProjectInsurance = lazy(() => import("@/modules/operations/project-dashboard/pages/CreateProjectInsurancePage"));
+const Operations_ItemMaster = lazy(() => import("@/modules/accounts/inventory-items/InventoryItemListPage"));
 
 export default function OperationsRoutes() {
     return (
         <Routes>
+            <Route path="item-master" element={<RouteWrapper permission={{ module: "operations.item-master", action: "read" }}><Operations_ItemMaster team="operations" /></RouteWrapper>} />
+            <Route path="item" element={<Navigate to="/operations/item-master" replace />} />
             <Route path="work-order/details/basic" element={<RouteWrapper><Basic_Details /></RouteWrapper>} />
             <Route path="work-order/details/basic/create" element={<RouteWrapper><Basic_Details_Create /></RouteWrapper>} />
             <Route path="work-order/details/basic/:id/edit" element={<RouteWrapper><Basic_Details_Edit /></RouteWrapper>} />

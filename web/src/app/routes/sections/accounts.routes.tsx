@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { RouteWrapper } from "../components/RouteWrapper";
 
 const Accounts_Imprests = lazy(() => import("@/modules/imprest/UsersImpresstListPage"));
@@ -104,7 +104,8 @@ export default function AccountsRoutes() {
             <Route path="vendor-work-orders/:id/closure" element={<RouteWrapper><Accounts_VwoClosure /></RouteWrapper>} />
             <Route path="payment-requests" element={<RouteWrapper><Accounts_PaymentRequestTabs /></RouteWrapper>} />
             <Route path="inventory" element={<RouteWrapper><Accounts_InventoryPage /></RouteWrapper>} />
-            <Route path="item" element={<RouteWrapper permission={{ module: "accounts.inventory-items", action: "read" }}><Accounts_ItemMaster /></RouteWrapper>} />
+            <Route path="item-master" element={<RouteWrapper permission={{ module: "accounts.item-master", action: "read" }}><Accounts_ItemMaster team="accounts" /></RouteWrapper>} />
+            <Route path="item" element={<Navigate to="/accounts/item-master" replace />} />
             <Route path="delegation/add" element={<RouteWrapper><AddTask /></RouteWrapper>} />
             <Route path="delegation/:id" element={<RouteWrapper><TaskDetail /></RouteWrapper>} />
             <Route path="delegation/:id/update" element={<RouteWrapper><TaskStatusUpdate /></RouteWrapper>} />

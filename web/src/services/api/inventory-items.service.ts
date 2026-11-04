@@ -2,9 +2,9 @@ import { BaseApiService } from "./base.service";
 import type { InventoryItem, InventoryItemPayload, InventoryItemsResponse } from "@/types/inventory-item.types";
 
 class InventoryItemsService extends BaseApiService {
-    constructor() { super("/inventory-items"); }
+    constructor(team: "accounts" | "operations") { super(`/${team}/item-master`); }
 
-    getAll(params?: { search?: string; page?: number; limit?: number; itemGroup?: string; itemName?: string; unit?: string; isActive?: string }): Promise<InventoryItemsResponse> {
+    getAll(params?: { search?: string; page?: number; limit?: number; itemName?: string; unit?: string; isActive?: string }): Promise<InventoryItemsResponse> {
         return this.get<InventoryItemsResponse>("", { params });
     }
     getById(id: number): Promise<InventoryItem> { return this.get<InventoryItem>(`/${id}`); }
@@ -13,4 +13,7 @@ class InventoryItemsService extends BaseApiService {
     deleteItem(id: number): Promise<void> { return this.delete<void>(`/${id}`); }
 }
 
-export const inventoryItemsService = new InventoryItemsService();
+export const inventoryItemsService = {
+    accounts: new InventoryItemsService("accounts"),
+    operations: new InventoryItemsService("operations"),
+};

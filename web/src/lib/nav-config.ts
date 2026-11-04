@@ -58,7 +58,7 @@ export const navMain: NavGroup[] = [
             { title: "Vendor Work Orders", url: paths.operations.vendorWorkOrders, permission: "ops.vendor-work-orders" },
             { title: "Sale Invoices", url: paths.operations.saleInvoices, permission: "ops.sale-invoices" },
             { title: "Payment Requests", url: paths.operations.paymentRequests, permission: "ops.payment-requests" },
-            { title: "Item", url: paths.accounts.inventoryItems, permission: "accounts.inventory-items" },
+            { title: "Item Master", url: paths.operations.itemMaster, permission: "operations.item-master" },
         ],
     },
     {
@@ -105,7 +105,7 @@ export const navMain: NavGroup[] = [
             { title: "Payment Requests", url: paths.accounts.paymentRequests, permission: "accounts.payment-requests" },
             { title: "Sale Invoices", url: paths.accounts.saleInvoices, permission: "accounts.sale-invoices" },
             { title: "Inventory", url: paths.accounts.inventory, permission: "accounts.inventory" },
-            { title: "Item", url: paths.accounts.inventoryItems, permission: "accounts.inventory-items" },
+            { title: "Item Master", url: paths.accounts.itemMaster, permission: "accounts.item-master" },
             { title: "Vendor Master", url: paths.accounts.vendorMaster, permission: "master.vendors" },
             { title: "Parties & Beneficiaries", url: paths.accounts.parties, permission: "master.vendors" },
         ],

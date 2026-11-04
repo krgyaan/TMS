@@ -125,6 +125,7 @@ export const paths = {
 
     // ==================== OPERATIONS ====================
     operations: {
+        itemMaster: "/operations/item-master",
         woBasicDetailListPage: "/operations/work-order/details/basic",
         woBasicDetailCreatePage: "/operations/work-order/details/basic/create",
         woBasicDetailEditPage: (id: number) => `/operations/work-order/details/basic/${id}/edit`,
@@ -293,6 +294,7 @@ export const paths = {
         vwoClosure: (id: number) => `/accounts/vendor-work-orders/${id}/closure`,
         paymentRequests: "/accounts/payment-requests",
         inventory: "/accounts/inventory",
+        itemMaster: "/accounts/item-master",
         inventoryItems: "/accounts/item",
         inventoryProject: (projectId: number) => `/accounts/inventory?projectId=${projectId}`,
         vendorMaster: "/accounts/vendor-master",

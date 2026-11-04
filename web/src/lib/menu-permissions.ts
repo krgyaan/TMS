@@ -64,6 +64,10 @@ function getPermissionModule(title: string, parentMenuTitle?: string): string | 
         if (parentMenuTitle === 'Accounts') {
             return 'accounts.inventory';
         }
+        if (title === 'Item Master') {
+            if (parentMenuTitle === 'Accounts') return 'accounts.item-master';
+            if (parentMenuTitle === 'Operations') return 'operations.item-master';
+        }
     }
 
     // Standard mapping for unique titles
