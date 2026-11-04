@@ -84,11 +84,12 @@ const FixedExpenseView = ({ fixedExpense }: FixedExpenseViewProps) => {
                                 <Badge
                                     variant="outline"
                                     className={
-                                        fixedExpense.status === 'Done'
-                                            ? 'bg-emerald-100 text-emerald-800 border-transparent'
-                                            : fixedExpense.status === 'Pending'
-                                              ? 'bg-amber-100 text-amber-800 border-transparent'
-                                              : undefined
+                                        {
+                                            Done: 'bg-emerald-100 text-emerald-800 border-transparent',
+                                            Pending: 'bg-amber-100 text-amber-800 border-transparent',
+                                            'Maker Created': 'bg-blue-100 text-blue-800 border-transparent',
+                                            'Maker Rejected': 'bg-red-100 text-red-800 border-transparent',
+                                        }[fixedExpense.status]
                                     }
                                 >
                                     {fixedExpense.status || '—'}
@@ -107,6 +108,24 @@ const FixedExpenseView = ({ fixedExpense }: FixedExpenseViewProps) => {
                                         fixedExpense.paymentFrequency
                                     ] ?? fixedExpense.paymentFrequency}
                                 </Badge>
+                            </TableCell>
+                        </TableRow>
+
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className={labelClass}>Maker Request</TableCell>
+                            <TableCell className="text-sm" colSpan={3}>
+                                {fixedExpense.makerRequestNo ? (
+                                    <span className="flex items-center gap-2">
+                                        <span className="font-mono">
+                                            {fixedExpense.makerRequestNo}
+                                        </span>
+                                        <Badge variant="outline">
+                                            {fixedExpense.makerRequestStatus ?? '—'}
+                                        </Badge>
+                                    </span>
+                                ) : (
+                                    '—'
+                                )}
                             </TableCell>
                         </TableRow>
 
@@ -159,13 +178,8 @@ const FixedExpenseView = ({ fixedExpense }: FixedExpenseViewProps) => {
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className={labelClass}>Last Updated</TableCell>
-                            <TableCell className="text-sm">
+                            <TableCell className="text-sm" colSpan={3}>
                                 {formatDateTime(fixedExpense.updatedAt)}
-                            </TableCell>
-                            <TableCell className={labelClass}>Maker</TableCell>
-                            <TableCell className="text-sm">
-                                {fixedExpense.makerName ??
-                                    (fixedExpense.makerId ? `#${fixedExpense.makerId}` : '—')}
                             </TableCell>
                         </TableRow>
                     </TableBody>

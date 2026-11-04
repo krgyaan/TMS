@@ -1,8 +1,9 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
-import { and, eq, like, desc, sql } from "drizzle-orm";
+import { and, eq, inArray, like, desc, sql } from "drizzle-orm";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { paymentRequests } from "@/db/schemas/operations/payment-requests.schema";
+import { fixedExpenses } from "@/db/schemas/accounts/fixed-expense.schema";
 import { users } from "@/db/schemas/";
 import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
 import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.schema";
@@ -71,6 +72,7 @@ export class MakerRequestService {
                     uploadPI: body.uploadPI || [],
                     uploadInvoiceAfterPayment: body.uploadInvoiceAfterPayment || [],
                     requestedBy: userId,
+                    remark: body.remark || null,
                 })
                 .returning();
 
@@ -147,6 +149,21 @@ export class MakerRequestService {
         )[0];
 
         this.logger.info(`Maker Request #${id} status updated to "${body.status}"`);
+
+        // Keep a fixed expense linked to this request in sync with its outcome.
+        if (body.status === "payment_done" || body.status === "rejected") {
+            const nextExpenseStatus = body.status === "payment_done" ? "Done" : "Maker Rejected";
+            const [linkedExpense] = await this.db
+                .select({ id: fixedExpenses.id })
+                .from(fixedExpenses)
+                .where(and(eq(fixedExpenses.makerId, id), inArray(fixedExpenses.status, ["Pending", "New", "Maker Created"])))
+                .limit(1);
+
+            if (linkedExpense) {
+                await this.db.update(fixedExpenses).set({ status: nextExpenseStatus, updatedAt: new Date() }).where(eq(fixedExpenses.id, linkedExpense.id));
+                this.logger.info(`Fixed expense #${linkedExpense.id} marked ${nextExpenseStatus} from Maker Request #${id}`);
+            }
+        }
 
         if (body.status === "payment_done") {
             this.notifications

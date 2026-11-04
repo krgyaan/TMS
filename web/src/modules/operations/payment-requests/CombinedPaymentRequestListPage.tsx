@@ -37,7 +37,7 @@ type SubTab = "all" | "pending" | "payment_done" | "rejected";
 const CombinedPaymentRequestListPage: React.FC = () => {
     const location = useLocation();
     const { teamId } = useTeamFilter();
-    const { user } = useAuth();
+    const { user, isSuperUser, isAdmin } = useAuth();
     const isOperationsSection = location.pathname.includes("/operations/");
     const effectiveTeamId = isOperationsSection ? teamId : undefined;
     const { data, isLoading } = useAllPaymentRequests(effectiveTeamId ?? undefined);
@@ -87,6 +87,11 @@ const CombinedPaymentRequestListPage: React.FC = () => {
             if (!isOperationsSection && row.status === "po_approval_pending") {
                 return false;
             }
+            // Admins and Super Users always see every request, including
+            // restricted fixed-expense categories (electricity, rent, salary...).
+            if (isSuperUser || isAdmin) {
+                return true;
+            }
             const category = row.paymentAgainst;
             if (team5Categories.has(category)) {
                 return currentTeamId === 5 || currentUserId === 7 || currentUserId === 21 || currentUserId === 13;
@@ -97,7 +102,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
             }
             return true;
         });
-    }, [rows, user?.team?.id, user?.id, isOperationsSection]);
+    }, [rows, user?.team?.id, user?.id, isOperationsSection, isSuperUser, isAdmin]);
 
     const { activeTab: activeSubTab, setActiveTab: setActiveSubTab } = usePersistentTableState<SubTab>({
         storageKey: "payment-requests-combined-subtab",

@@ -1,11 +1,13 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, asc, desc, eq, ilike, inArray, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, isNull, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import { users } from "@db/schemas/auth";
 import { fixedExpenses, type NewFixedExpense } from "@db/schemas/accounts/fixed-expense.schema";
+import { paymentRequests } from "@db/schemas/operations/payment-requests.schema";
 import { paymentCategory } from "@db/schemas/master/payment-category.schema";
+import { MakerRequestService } from "@/modules/operations/maker-requests/maker-request.service";
 import { wrapPaginatedResponse } from "@/utils/responseWrapper";
 import type {
     CreateFixedExpenseDto,
@@ -19,7 +21,7 @@ import type {
 } from "./dto/fixed-expenses.dto";
 
 const creatorUser = alias(users, "fixed_expense_creator");
-const makerUser = alias(users, "fixed_expense_maker");
+const fixedExpenseMakerRequest = alias(paymentRequests, "fixed_expense_maker_request");
 
 const fixedExpenseSelection = {
     id: fixedExpenses.id,
@@ -38,7 +40,8 @@ const fixedExpenseSelection = {
     status: fixedExpenses.status,
     deleteStatus: fixedExpenses.deleteStatus,
     makerId: fixedExpenses.makerId,
-    makerName: makerUser.name,
+    makerRequestNo: fixedExpenseMakerRequest.requestNo,
+    makerRequestStatus: fixedExpenseMakerRequest.status,
     createdBy: fixedExpenses.createdBy,
     createdByName: creatorUser.name,
     createdAt: fixedExpenses.createdAt,
@@ -62,7 +65,8 @@ type FixedExpenseRow = {
     status: string;
     deleteStatus: boolean;
     makerId: number | null;
-    makerName: string | null;
+    makerRequestNo: string | null;
+    makerRequestStatus: string | null;
     createdBy: number;
     createdByName: string | null;
     createdAt: Date;
@@ -71,7 +75,10 @@ type FixedExpenseRow = {
 
 @Injectable()
 export class FixedExpensesService {
-    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
+    constructor(
+        @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly makerRequests: MakerRequestService
+    ) {}
 
     // ===================== HELPERS =====================
 
@@ -93,7 +100,8 @@ export class FixedExpensesService {
             status: row.status as FixedExpenseStatus,
             deleteStatus: row.deleteStatus,
             makerId: row.makerId ?? null,
-            makerName: row.makerName ?? null,
+            makerRequestNo: row.makerRequestNo ?? null,
+            makerRequestStatus: row.makerRequestStatus ?? null,
             createdBy: row.createdBy,
             createdByName: row.createdByName ?? null,
             createdAt: row.createdAt,
@@ -216,9 +224,11 @@ export class FixedExpensesService {
         }
 
         if (filters?.status) {
-            // Existing rows created before the Pending/Done flow were stored as
-            // "New"; treat those as Pending so nothing disappears from the list.
-            conditions.push(filters.status === "Pending" ? inArray(fixedExpenses.status, ["Pending", "New"]) : eq(fixedExpenses.status, filters.status));
+            // The Pending tab groups every open state. Legacy rows created before
+            // the Pending/Done flow were stored as "New", so treat those as Pending.
+            conditions.push(
+                filters.status === "Pending" ? inArray(fixedExpenses.status, ["Pending", "New", "Maker Created", "Maker Rejected"]) : eq(fixedExpenses.status, filters.status)
+            );
         }
 
         // Archived rows are hidden unless explicitly requested
@@ -260,7 +270,7 @@ export class FixedExpensesService {
                 .select(fixedExpenseSelection)
                 .from(fixedExpenses)
                 .leftJoin(creatorUser, eq(creatorUser.id, fixedExpenses.createdBy))
-                .leftJoin(makerUser, eq(makerUser.id, fixedExpenses.makerId))
+                .leftJoin(fixedExpenseMakerRequest, eq(fixedExpenseMakerRequest.id, fixedExpenses.makerId))
                 .where(whereClause)
                 .orderBy(orderFn(orderColumn))
                 .limit(limit)
@@ -277,7 +287,7 @@ export class FixedExpensesService {
             .select(fixedExpenseSelection)
             .from(fixedExpenses)
             .leftJoin(creatorUser, eq(creatorUser.id, fixedExpenses.createdBy))
-            .leftJoin(makerUser, eq(makerUser.id, fixedExpenses.makerId))
+            .leftJoin(fixedExpenseMakerRequest, eq(fixedExpenseMakerRequest.id, fixedExpenses.makerId))
             .where(eq(fixedExpenses.id, id))
             .limit(1);
 
@@ -372,5 +382,85 @@ export class FixedExpensesService {
         await this.findById(id);
 
         await this.db.delete(fixedExpenses).where(eq(fixedExpenses.id, id));
+    }
+
+    // ===================== MAKER REQUEST CRON =====================
+
+    /** "Printing & Stationary" -> "printing_stationary" (matches maker-request category slugs). */
+    private slugifyCategory(value: string): string {
+        return value
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "_")
+            .replace(/^_+|_+$/g, "");
+    }
+
+    /**
+     * Daily cron: for every Pending fixed expense due within the next 3 days
+     * (including today) that has no maker request yet, create one and store its
+     * id in fixed_expenses.maker_id. That column is the idempotency key, so
+     * re-running the job never duplicates requests.
+     *
+     * Concurrency is handled by the scheduler, which holds a Postgres advisory
+     * lock for the duration of the run.
+     */
+    async createMakerRequestsForUpcomingDueDates(): Promise<{
+        created: string[];
+        failed: Array<{ id: number; error: string }>;
+    }> {
+        const candidates = await this.db
+            .select({
+                id: fixedExpenses.id,
+                partyName: fixedExpenses.partyName,
+                amount: fixedExpenses.amount,
+                accountNumber: fixedExpenses.accountNumber,
+                ifscCode: fixedExpenses.ifscCode,
+                type: fixedExpenses.type,
+                dueDate: fixedExpenses.dueDate,
+                createdBy: fixedExpenses.createdBy,
+            })
+            .from(fixedExpenses)
+            .where(
+                and(
+                    inArray(fixedExpenses.status, ["Pending", "New"]),
+                    eq(fixedExpenses.deleteStatus, false),
+                    isNull(fixedExpenses.makerId),
+                    sql`${fixedExpenses.dueDate} BETWEEN CURRENT_DATE AND CURRENT_DATE + 3`
+                )
+            )
+            .orderBy(asc(fixedExpenses.dueDate));
+
+        const created: string[] = [];
+        const failed: Array<{ id: number; error: string }> = [];
+
+        for (const expense of candidates) {
+            try {
+                const makerRequest = await this.makerRequests.create(
+                    {
+                        partyName: expense.partyName,
+                        accountNumber: expense.accountNumber ?? undefined,
+                        ifsc: expense.ifscCode ?? undefined,
+                        amount: expense.amount,
+                        category: this.slugifyCategory(expense.type),
+                        paymentMode: "BANK_TRANSFER",
+                        remark: `Auto-created from fixed expense #${expense.id}, due ${expense.dueDate}`,
+                    },
+                    expense.createdBy
+                );
+
+                // Link the request back to the expense; this is the idempotency
+                // key that stops the next cron run from creating a duplicate.
+                await this.db.update(fixedExpenses).set({ makerId: makerRequest.id, status: "Maker Created", updatedAt: new Date() }).where(eq(fixedExpenses.id, expense.id));
+
+                created.push(makerRequest.requestNo ?? `#${makerRequest.id}`);
+            } catch (error) {
+                failed.push({
+                    id: expense.id,
+                    error: error instanceof Error ? error.message : String(error),
+                });
+            }
+        }
+
+        return { created, failed };
     }
 }

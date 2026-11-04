@@ -253,6 +253,8 @@ const FixedExpenseListContent = () => {
                     const status = params.data.status;
                     const statusStyles: Record<string, string> = {
                         Pending: 'bg-amber-100 text-amber-800 border-transparent',
+                        'Maker Created': 'bg-blue-100 text-blue-800 border-transparent',
+                        'Maker Rejected': 'bg-red-100 text-red-800 border-transparent',
                         Done: 'bg-emerald-100 text-emerald-800 border-transparent',
                     };
                     return (
@@ -262,6 +264,27 @@ const FixedExpenseListContent = () => {
                         >
                             {status ?? '—'}
                         </Badge>
+                    );
+                },
+                sortable: false,
+                filter: false,
+            },
+            {
+                field: 'makerRequestNo',
+                colId: 'makerRequestNo',
+                headerName: 'Maker Request',
+                flex: 1,
+                minWidth: 150,
+                cellRenderer: (params: { data?: FixedExpenseListRow }) => {
+                    const requestNo = params.data?.makerRequestNo;
+                    if (!requestNo) return '—';
+                    return (
+                        <span className="flex items-center gap-2">
+                            <span className="font-mono text-xs">{requestNo}</span>
+                            <Badge variant="outline" className="h-5 px-2">
+                                {params.data?.makerRequestStatus ?? '—'}
+                            </Badge>
+                        </span>
                     );
                 },
                 sortable: false,
