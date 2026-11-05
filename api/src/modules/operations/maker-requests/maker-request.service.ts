@@ -214,7 +214,7 @@ export class MakerRequestService {
     }
 
     /** Mirror a maker request status onto the linked fixed expense's workflow row. */
-    private async syncFixedExpenseHistory(makerRequestId: number, requestStatus: string, updatedBy?: number, amount?: string) {
+    private async syncFixedExpenseHistory(makerRequestId: number, requestStatus: string, actorId?: number, amount?: string) {
         const historyStatus = MR_STATUS_TO_HISTORY_STATUS[requestStatus];
         if (!historyStatus) return;
 
@@ -239,7 +239,8 @@ export class MakerRequestService {
             .update(fixedExpensesHistory)
             .set({
                 status: historyStatus,
-                updatedBy: updatedBy ?? null,
+                // Workflow actions record the approver; `updated_by` stays edit-only.
+                approvedBy: actorId ?? null,
                 updatedAt: new Date(),
                 ...(amount ? { amount } : {}),
             })

@@ -23,7 +23,6 @@ export const fixedExpensesHistory = pgTable(
     {
         id: bigserial("id", { mode: "number" }).primaryKey(),
 
-        
         expenseId: bigint("expense_id", { mode: "number" })
             .notNull()
             .references(() => fixedExpenses.id, { onDelete: "cascade" }),
@@ -44,6 +43,8 @@ export const fixedExpensesHistory = pgTable(
         // Workflow
         status: varchar("status", { length: 30 }).notNull().default("Awaited Maker"),
         updatedBy: bigint("updated_by", { mode: "number" }).references(() => users.id),
+        // Acting user for workflow status changes (set by approvals/rejections).
+        approvedBy: bigint("approved_by", { mode: "number" }).references(() => users.id),
 
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
         updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

@@ -45,6 +45,12 @@ const FREQUENCY_MONTHS: Record<string, number> = {
     annual: 12,
 };
 
+/** Fixed-expense payment mode -> project_payment_requests.payment_mode value. */
+const FIXED_EXPENSE_PAYMENT_MODE_TO_MR: Record<string, string> = {
+    auto_debit: "AUTO_DEBIT",
+    bank_transfer: "BANK_TRANSFER",
+};
+
 const fixedExpenseSelection = {
     id: fixedExpenses.id,
     partyName: fixedExpenses.partyName,
@@ -501,6 +507,7 @@ export class FixedExpensesService {
                 accountNumber: fixedExpenses.accountNumber,
                 ifscCode: fixedExpenses.ifscCode,
                 type: fixedExpenses.type,
+                paymentMode: fixedExpenses.paymentMode,
                 dueDate: fixedExpensesHistory.dueDate,
                 createdBy: fixedExpenses.createdBy,
             })
@@ -529,7 +536,7 @@ export class FixedExpensesService {
                         ifsc: expense.ifscCode ?? undefined,
                         amount: expense.amount,
                         category: this.slugifyCategory(expense.type),
-                        paymentMode: "BANK_TRANSFER",
+                        paymentMode: FIXED_EXPENSE_PAYMENT_MODE_TO_MR[expense.paymentMode] ?? "BANK_TRANSFER",
                         remark: `Auto-created from fixed expense #${expense.id}, due ${expense.dueDate}`,
                     },
                     expense.createdBy

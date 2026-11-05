@@ -341,7 +341,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
             filter: true,
             maxWidth: 80,
             cellRenderer: (p: CustomCellRendererProps<PaymentRequestRow>) => {
-                const mode = p.value == 'BANK_TRANSFER' ? "NEFT" : p.value?.toLowerCase();
+                const mode = p.value === 'BANK_TRANSFER' ? "NEFT" : p.value === 'AUTO_DEBIT' ? "Auto Debit" : p.value?.toLowerCase();
                 return <span className="capitalize">{mode}</span>;
             },
         },

@@ -643,7 +643,7 @@ export class PaymentRequestService {
      * Mirror a payment request status onto the linked fixed expense's workflow
      * row. Project payment requests have no linked expense, so they are skipped.
      */
-    private async syncFixedExpenseHistory(tx: DbInstance, makerRequestId: number, requestStatus: string, updatedBy?: number, amount?: string) {
+    private async syncFixedExpenseHistory(tx: DbInstance, makerRequestId: number, requestStatus: string, actorId?: number, amount?: string) {
         const historyStatus = MR_STATUS_TO_HISTORY_STATUS[requestStatus];
         if (!historyStatus) return;
 
@@ -668,7 +668,8 @@ export class PaymentRequestService {
             .update(fixedExpensesHistory)
             .set({
                 status: historyStatus,
-                updatedBy: updatedBy ?? null,
+                // Workflow actions record the approver; `updated_by` stays edit-only.
+                approvedBy: actorId ?? null,
                 updatedAt: new Date(),
                 ...(amount ? { amount } : {}),
             })
