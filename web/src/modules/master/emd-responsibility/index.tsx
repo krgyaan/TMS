@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Plus } from "lucide-react";
 import { EmdResponsibilityModal } from "./components/EmdResponsibilityModal";
 import { EmdResponsibilityViewModal } from "./components/EmdResponsibilityViewModal";
+import { useAuth } from "@/contexts/AuthContext";
 
 const rowSelection: RowSelectionOptions = {
     mode: "multiRow",
@@ -20,11 +21,12 @@ const rowSelection: RowSelectionOptions = {
 
 const EmdResponsibilityPage = () => {
     const { data: emdResponsibilities, isLoading, error, refetch } = useEmdResponsibilities();
+    const { canWriteMasterData } = useAuth();
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [viewModalOpen, setViewModalOpen] = useState(false);
     const [selectedEmdResponsibility, setSelectedEmdResponsibility] = useState<EmdResponsibility | null>(null);
 
-    const emdResponsibilityActions: ActionItem<EmdResponsibility>[] = [
+    const emdResponsibilityActions = ([
         {
             label: "View",
             onClick: row => {
@@ -52,7 +54,7 @@ const EmdResponsibilityPage = () => {
                 }
             },
         },
-    ];
+    ] as ActionItem<EmdResponsibility>[]).filter(action => canWriteMasterData || action.label === "View");
 
     const [colDefs] = useState<ColDef<EmdResponsibility>[]>([
         {
@@ -160,18 +162,20 @@ const EmdResponsibilityPage = () => {
                 <CardHeader>
                     <CardTitle>EMD Responsibility</CardTitle>
                     <CardDescription>Manage EMD responsibility types</CardDescription>
-                    <CardAction>
-                        <Button
-                            variant="default"
-                            onClick={() => {
-                                setSelectedEmdResponsibility(null);
-                                setDrawerOpen(true);
-                            }}
-                        >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add EMD Responsibility
-                        </Button>
-                    </CardAction>
+                    {canWriteMasterData && (
+                        <CardAction>
+                            <Button
+                                variant="default"
+                                onClick={() => {
+                                    setSelectedEmdResponsibility(null);
+                                    setDrawerOpen(true);
+                                }}
+                            >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add EMD Responsibility
+                            </Button>
+                        </CardAction>
+                    )}
                 </CardHeader>
                 <CardContent className="px-3">
                     <DataTable
