@@ -2,9 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fixedExpenseService } from '@/services/api/fixed-expense.service';
 import type {
     CreateFixedExpenseDto,
+    FixedExpenseHistoryRow,
     FixedExpenseListParams,
     FixedExpenseListRow,
     FixedExpenseResponse,
+    FixedExpenseTabCounts,
     UpdateFixedExpenseDto,
 } from '@/modules/accounts/fixed-expenses/helpers/fixedExpense.types';
 import type { PaginatedResult } from '@/types/api.types';
@@ -18,6 +20,8 @@ export const fixedExpenseKeys = {
     lists: () => [...fixedExpenseKeys.all, 'list'] as const,
     list: (filters?: Record<string, unknown>) => [...fixedExpenseKeys.lists(), { filters }] as const,
     detail: (id: number) => [...fixedExpenseKeys.all, 'detail', id] as const,
+    history: (id: number) => [...fixedExpenseKeys.all, 'history', id] as const,
+    counts: (search?: string) => [...fixedExpenseKeys.lists(), 'counts', search ?? ''] as const,
 };
 
 // ===================== FIXED EXPENSE HOOKS =====================
@@ -40,6 +44,27 @@ export const useFixedExpense = (id: number | null) => {
     return useQuery<FixedExpenseResponse>({
         queryKey: fixedExpenseKeys.detail(id ?? 0),
         queryFn: () => fixedExpenseService.getById(id!),
+        enabled: !!id,
+    });
+};
+
+/**
+ * Hook to fetch Pending / Done / Archived tab counts
+ */
+export const useFixedExpenseTabCounts = (search?: string) => {
+    return useQuery<FixedExpenseTabCounts>({
+        queryKey: fixedExpenseKeys.counts(search),
+        queryFn: () => fixedExpenseService.getCounts(search),
+    });
+};
+
+/**
+ * Hook to fetch the payment-cycle history of a fixed expense
+ */
+export const useFixedExpenseHistory = (id: number | null) => {
+    return useQuery<FixedExpenseHistoryRow[]>({
+        queryKey: fixedExpenseKeys.history(id ?? 0),
+        queryFn: () => fixedExpenseService.getHistory(id!),
         enabled: !!id,
     });
 };

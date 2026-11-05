@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { type SubmitHandler, useForm, type Resolver, useWatch } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
@@ -26,7 +26,6 @@ import {
     type FixedExpenseFormValues,
     type FixedExpenseResponse,
     type FixedExpenseListRow,
-    FIXED_EXPENSE_TYPE_OPTIONS,
     FIXED_EXPENSE_AMOUNT_TYPE_OPTIONS,
     FIXED_EXPENSE_FREQUENCY_OPTIONS,
 } from '../helpers/fixedExpense.types';
@@ -38,6 +37,9 @@ import {
 } from '../helpers/fixedExpense.mappers';
 import { useCreateFixedExpense, useUpdateFixedExpense } from '@/hooks/api/useFixedExpense';
 import { useBeneficiaries, useCreateBeneficiary } from '@/hooks/api/useProjectPaymentRequests';
+import { usePaymentCategories } from '@/hooks/api/usePaymentCategories';
+import type { PaymentCategory } from '@/services/api/payment-category.api';
+import { AddSubTypeDialog, AddTypeDialog } from './PaymentCategoryDialogs';
 import { SelectField } from '@/components/form/SelectField';
 import { DateInput } from '@/components/form/DateInput';
 
@@ -71,6 +73,18 @@ export function FixedExpenseForm({ mode, existingData }: FixedExpenseFormProps) 
 
     const { data: beneficiaries } = useBeneficiaries();
     const createBeneficiaryMutation = useCreateBeneficiary();
+
+    // Types / sub types come from the payment_category master table.
+    const { data: paymentCategories } = usePaymentCategories({
+        purpose: 'fixed',
+        status: 'active',
+    });
+    const [isAddTypeOpen, setIsAddTypeOpen] = useState(false);
+    const [isAddSubTypeOpen, setIsAddSubTypeOpen] = useState(false);
+    const didResolveCategory = useRef(false);
+    // Rows created from the dialogs, shown until the list refetch catches up.
+    const [optimisticCategories, setOptimisticCategories] = useState<PaymentCategory[]>([]);
+
     const [isAddBeneficiaryOpen, setIsAddBeneficiaryOpen] = useState(false);
     const [newBeneficiary, setNewBeneficiary] = useState({
         name: '',
@@ -91,6 +105,51 @@ export function FixedExpenseForm({ mode, existingData }: FixedExpenseFormProps) 
             })),
         [beneficiaries]
     );
+
+    const categoryRows = useMemo(() => {
+        const base = paymentCategories ?? [];
+        if (optimisticCategories.length === 0) return base;
+
+        const existingIds = new Set(base.map((row) => row.id));
+        const pending = optimisticCategories.filter((row) => !existingIds.has(row.id));
+        return pending.length > 0 ? [...base, ...pending] : base;
+    }, [paymentCategories, optimisticCategories]);
+
+    /** One option per distinct category; prefer the row that represents the type itself. */
+    const typeOptions = useMemo(() => {
+        const byCategory = new Map<string, PaymentCategory>();
+
+        for (const row of categoryRows) {
+            const key = row.category.trim().toLowerCase();
+            const current = byCategory.get(key);
+
+            if (!current || (current.subCategory && !row.subCategory)) {
+                byCategory.set(key, row);
+            }
+        }
+
+        return Array.from(byCategory.values())
+            .sort((a, b) => a.category.localeCompare(b.category))
+            .map((row) => ({ id: String(row.id), name: row.category }));
+    }, [categoryRows]);
+
+    const selectedTypeId = useWatch({ control: form.control, name: 'categoryId' });
+    const selectedCategory = useMemo(() => {
+        const row = categoryRows.find((r) => String(r.id) === selectedTypeId);
+        return row?.category ?? '';
+    }, [categoryRows, selectedTypeId]);
+
+    /** Sub types belonging to the selected type. */
+    const subTypeOptions = useMemo(() => {
+        if (!selectedCategory) return [];
+
+        const key = selectedCategory.trim().toLowerCase();
+        return categoryRows
+            .filter(
+                (row) => row.subCategory && row.category.trim().toLowerCase() === key
+            )
+            .map((row) => ({ id: String(row.id), name: row.subCategory as string }));
+    }, [categoryRows, selectedCategory]);
 
     // Selecting a beneficiary copies its bank details into the (editable) fields.
     useEffect(() => {
@@ -142,6 +201,49 @@ export function FixedExpenseForm({ mode, existingData }: FixedExpenseFormProps) 
         form.reset(initialValues);
     }, [form, initialValues]);
 
+    // Edit mode: once categories load, translate the stored category row into the
+    // Type / Sub Type select values. Legacy rows only have `type` text.
+    useEffect(() => {
+        if (mode !== 'edit' || !existingData || categoryRows.length === 0) return;
+        if (didResolveCategory.current) return;
+        didResolveCategory.current = true;
+
+        const stored = existingData.categoryId
+            ? categoryRows.find((row) => row.id === existingData.categoryId)
+            : undefined;
+
+        let typeRow: PaymentCategory | undefined;
+        let subTypeRow: PaymentCategory | undefined;
+
+        if (stored?.subCategory) {
+            subTypeRow = stored;
+            typeRow = categoryRows.find(
+                (row) =>
+                    !row.subCategory &&
+                    row.category.trim().toLowerCase() === stored.category.trim().toLowerCase()
+            );
+        } else if (stored) {
+            typeRow = stored;
+        } else if (existingData.type) {
+            const key = existingData.type.trim().toLowerCase();
+            typeRow = categoryRows.find(
+                (row) => !row.subCategory && row.category.trim().toLowerCase() === key
+            );
+        }
+
+        if (typeRow) form.setValue('categoryId', String(typeRow.id));
+        if (subTypeRow) form.setValue('subCategoryId', String(subTypeRow.id));
+    }, [mode, existingData, categoryRows, form]);
+
+    // Drop a selected sub type when it no longer belongs to the chosen type.
+    const selectedSubTypeId = useWatch({ control: form.control, name: 'subCategoryId' });
+    useEffect(() => {
+        if (!selectedSubTypeId) return;
+        if (subTypeOptions.some((option) => option.id === selectedSubTypeId)) return;
+
+        form.setValue('subCategoryId', '');
+    }, [selectedSubTypeId, subTypeOptions, form]);
+
     const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
     const handleSubmit: SubmitHandler<FixedExpenseFormValues> = async (values) => {
@@ -158,6 +260,19 @@ export function FixedExpenseForm({ mode, existingData }: FixedExpenseFormProps) 
         } catch (error) {
             console.error('Error submitting fixed expense form:', error);
         }
+    };
+
+    const handleTypeCreated = (created: PaymentCategory) => {
+        setOptimisticCategories((prev) => [...prev.filter((row) => row.id !== created.id), created]);
+        form.setValue('categoryId', String(created.id), { shouldValidate: true });
+        form.setValue('subCategoryId', '');
+        toast.success('Type added successfully');
+    };
+
+    const handleSubTypeCreated = (created: PaymentCategory) => {
+        setOptimisticCategories((prev) => [...prev.filter((row) => row.id !== created.id), created]);
+        form.setValue('subCategoryId', String(created.id));
+        toast.success('Sub type added successfully');
     };
 
     return (
@@ -218,13 +333,63 @@ export function FixedExpenseForm({ mode, existingData }: FixedExpenseFormProps) 
                                     </FieldWrapper>
                                 </div>
 
-                                <SelectField
-                                    control={form.control}
-                                    name="type"
-                                    label="Type"
-                                    options={FIXED_EXPENSE_TYPE_OPTIONS}
-                                    placeholder="Select expense type"
-                                />
+                                <div className="flex items-end gap-2">
+                                    <div className="min-w-0 flex-1">
+                                        <SelectField
+                                            control={form.control}
+                                            name="categoryId"
+                                            label="Type"
+                                            options={typeOptions}
+                                            placeholder="Select expense type"
+                                            valueType="string"
+                                        />
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        className="mb-0.5 shrink-0"
+                                        aria-label="Add Type"
+                                        title="Add Type"
+                                        onClick={() => setIsAddTypeOpen(true)}
+                                    >
+                                        <Plus className="h-4 w-4" />
+                                    </Button>
+                                </div>
+
+                                <div className="flex items-end gap-2">
+                                    <div className="min-w-0 flex-1">
+                                        <SelectField
+                                            control={form.control}
+                                            name="subCategoryId"
+                                            label="Sub Type"
+                                            options={subTypeOptions}
+                                            placeholder={
+                                                selectedCategory
+                                                    ? 'Select sub type (optional)'
+                                                    : 'Select a type first'
+                                            }
+                                            valueType="string"
+                                            disabled={!selectedCategory}
+                                        />
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        className="mb-0.5 shrink-0"
+                                        aria-label="Add Sub Type"
+                                        title={
+                                            selectedCategory
+                                                ? 'Add Sub Type'
+                                                : 'Select a type first'
+                                        }
+                                        disabled={!selectedCategory}
+                                        onClick={() => setIsAddSubTypeOpen(true)}
+                                    >
+                                        <Plus className="h-4 w-4" />
+                                    </Button>
+                                </div>
 
                                 <FieldWrapper control={form.control} name="dueDate" label="Due Date">
                                     {(field) => (
@@ -495,6 +660,19 @@ export function FixedExpenseForm({ mode, existingData }: FixedExpenseFormProps) 
                         </div>
                     </form>
                 </Form>
+
+                <AddTypeDialog
+                    open={isAddTypeOpen}
+                    onOpenChange={setIsAddTypeOpen}
+                    onCreated={handleTypeCreated}
+                />
+
+                <AddSubTypeDialog
+                    open={isAddSubTypeOpen}
+                    onOpenChange={setIsAddSubTypeOpen}
+                    onCreated={handleSubTypeCreated}
+                    typeName={selectedCategory}
+                />
             </CardContent>
         </Card>
     );

@@ -109,7 +109,7 @@ const MyMakerRequests: React.FC = () => {
             label: "Upload Invoice",
             icon: <Upload className="h-4 w-4" />,
             onClick: handleUploadInvoice,
-            visible: (row) => row.status !== "rejected" && !!row.category && CATEGORIES_NEED_INVOICE_AFTER_PAYMENT.has(row.category),
+            visible: (row) => row.status !== "rejected" && !!row.category && (row.fixedExpenseId != null || CATEGORIES_NEED_INVOICE_AFTER_PAYMENT.has(row.category)),
         },
     ], [handleView, handleUploadInvoice, CATEGORIES_NEED_INVOICE_AFTER_PAYMENT]);
 

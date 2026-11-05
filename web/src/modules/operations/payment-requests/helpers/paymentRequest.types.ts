@@ -31,6 +31,8 @@ export interface PaymentRequestRow {
     projectName?: string;
     poNumber?: string;
     vwoNumber?: string;
+    fixedExpenseId?: number | null;
+    fixedExpenseAmountType?: string | null;
     createdAt: string;
     piCategory?: string;
     piPartyName?: string;
