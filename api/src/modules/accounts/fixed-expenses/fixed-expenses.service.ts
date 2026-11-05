@@ -14,6 +14,7 @@ import type {
     CreateFixedExpenseDto,
     FixedExpenseAmountType,
     FixedExpenseFrequency,
+    FixedExpenseHistoryRow,
     FixedExpensePaymentMode,
     FixedExpenseQuery,
     FixedExpenseResponse,
@@ -22,6 +23,9 @@ import type {
 
 const creatorUser = alias(users, "fixed_expense_creator");
 const fixedExpenseMakerRequest = alias(paymentRequests, "fixed_expense_maker_request");
+const historyMakerRequest = alias(paymentRequests, "history_maker_request");
+const historyUpdatedByUser = alias(users, "history_updated_by_user");
+const historyApprovedByUser = alias(users, "history_approved_by_user");
 
 /**
  * Keeps only the current (latest) workflow row per expense. History now holds
@@ -359,6 +363,60 @@ export class FixedExpensesService {
         }
 
         return this.mapToResponse(row);
+    }
+
+    /** Full payment-cycle history for one expense, oldest cycle first. */
+    async getHistory(id: number): Promise<FixedExpenseHistoryRow[]> {
+        // Throws NotFound when the expense doesn't exist.
+        await this.findById(id);
+
+        const rows = await this.db
+            .select({
+                id: fixedExpensesHistory.id,
+                dueDate: fixedExpensesHistory.dueDate,
+                amount: fixedExpensesHistory.amount,
+                amountType: fixedExpensesHistory.amountType,
+                paymentFrequency: fixedExpensesHistory.paymentFrequency,
+                status: fixedExpensesHistory.status,
+                makerId: fixedExpensesHistory.makerId,
+                makerRequestNo: historyMakerRequest.requestNo,
+                makerRequestStatus: historyMakerRequest.status,
+                makerRequestAmount: historyMakerRequest.amount,
+                utrNumber: historyMakerRequest.utrNumber,
+                updatedAt: fixedExpensesHistory.updatedAt,
+                approvedBy: fixedExpensesHistory.approvedBy,
+                approvedByName: historyApprovedByUser.name,
+                updatedBy: fixedExpensesHistory.updatedBy,
+                updatedByName: historyUpdatedByUser.name,
+                createdAt: fixedExpensesHistory.createdAt,
+            })
+            .from(fixedExpensesHistory)
+            .leftJoin(historyMakerRequest, eq(historyMakerRequest.id, fixedExpensesHistory.makerId))
+            .leftJoin(historyUpdatedByUser, eq(historyUpdatedByUser.id, fixedExpensesHistory.updatedBy))
+            .leftJoin(historyApprovedByUser, eq(historyApprovedByUser.id, fixedExpensesHistory.approvedBy))
+            .where(eq(fixedExpensesHistory.expenseId, id))
+            .orderBy(asc(fixedExpensesHistory.id));
+
+        return rows.map((row, index) => ({
+            id: row.id,
+            cycle: index + 1,
+            dueDate: row.dueDate,
+            amount: row.amount,
+            amountType: row.amountType as FixedExpenseAmountType,
+            paymentFrequency: row.paymentFrequency as FixedExpenseFrequency,
+            status: row.status,
+            makerId: row.makerId ?? null,
+            makerRequestNo: row.makerRequestNo ?? null,
+            makerRequestStatus: row.makerRequestStatus ?? null,
+            makerRequestAmount: row.makerRequestAmount ?? null,
+            utrNumber: row.utrNumber ?? null,
+            updatedAt: row.updatedAt,
+            approvedBy: row.approvedBy ?? null,
+            approvedByName: row.approvedByName ?? null,
+            updatedBy: row.updatedBy ?? null,
+            updatedByName: row.updatedByName ?? null,
+            createdAt: row.createdAt,
+        }));
     }
 
     async create(data: CreateFixedExpenseDto, createdBy: number): Promise<FixedExpenseResponse> {

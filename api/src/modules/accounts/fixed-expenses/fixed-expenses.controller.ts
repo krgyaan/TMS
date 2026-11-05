@@ -45,6 +45,12 @@ export class FixedExpensesController {
         return this.fixedExpensesService.findAll(filters);
     }
 
+    @Get(":id/history")
+    @CanRead(PERMISSION_MODULE)
+    async getHistory(@Param("id", ParseIntPipe) id: number) {
+        return this.fixedExpensesService.getHistory(id);
+    }
+
     @Get(":id")
     @CanRead(PERMISSION_MODULE)
     async getById(@Param("id", ParseIntPipe) id: number) {

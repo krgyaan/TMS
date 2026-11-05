@@ -1,6 +1,7 @@
 import { BaseApiService } from './base.service';
 import type {
     CreateFixedExpenseDto,
+    FixedExpenseHistoryRow,
     FixedExpenseListParams,
     FixedExpenseListRow,
     FixedExpenseResponse,
@@ -35,6 +36,10 @@ class FixedExpenseApiService extends BaseApiService {
 
     async getById(id: number): Promise<FixedExpenseResponse> {
         return this.get<FixedExpenseResponse>(`/${id}`);
+    }
+
+    async getHistory(id: number): Promise<FixedExpenseHistoryRow[]> {
+        return this.get<FixedExpenseHistoryRow[]>(`/${id}/history`);
     }
 
     async create(data: CreateFixedExpenseDto): Promise<FixedExpenseResponse> {

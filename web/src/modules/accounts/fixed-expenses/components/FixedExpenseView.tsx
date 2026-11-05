@@ -2,11 +2,11 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardAction } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Receipt } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ArrowLeft, History, Receipt } from 'lucide-react';
 import { formatDate, formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
-import type { FixedExpenseResponse } from '../helpers/fixedExpense.types';
+import type { FixedExpenseHistoryRow, FixedExpenseResponse } from '../helpers/fixedExpense.types';
 import {
     FIXED_EXPENSE_TYPE_LABELS,
     FIXED_EXPENSE_FREQUENCY_LABELS,
@@ -17,17 +17,20 @@ import {
 
 interface FixedExpenseViewProps {
     fixedExpense: FixedExpenseResponse;
+    history: FixedExpenseHistoryRow[];
+    isHistoryLoading?: boolean;
 }
 
 const labelClass = 'text-sm font-medium text-muted-foreground w-1/4';
 const valueClass = 'text-sm w-1/4';
 
-const FixedExpenseView = ({ fixedExpense }: FixedExpenseViewProps) => {
+const FixedExpenseView = ({ fixedExpense, history, isHistoryLoading = false }: FixedExpenseViewProps) => {
     const navigate = useNavigate();
     const isBankTransfer = fixedExpense.paymentMode === 'bank_transfer';
     const statusDisplay = getFixedExpenseDisplayStatus(fixedExpense);
 
     return (
+        <div className="space-y-4">
         <Card>
             <CardHeader>
                 <div className="flex items-center justify-between">
@@ -129,15 +132,6 @@ const FixedExpenseView = ({ fixedExpense }: FixedExpenseViewProps) => {
                             </TableCell>
                         </TableRow>
 
-                        {fixedExpense.lastPaymentDoneAt && (
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className={labelClass}>Last Paid</TableCell>
-                                <TableCell className="text-sm" colSpan={3}>
-                                    {formatDate(fixedExpense.lastPaymentDoneAt)}
-                                </TableCell>
-                            </TableRow>
-                        )}
-
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className={labelClass}>Payment Mode</TableCell>
                             <TableCell className="text-sm" colSpan={isBankTransfer ? 1 : 3}>
@@ -195,6 +189,77 @@ const FixedExpenseView = ({ fixedExpense }: FixedExpenseViewProps) => {
                 </Table>
             </CardContent>
         </Card>
+
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <History className="h-5 w-5" />
+                    Payment History
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+                {isHistoryLoading ? (
+                    <p className="py-6 text-center text-sm text-muted-foreground">Loading history…</p>
+                ) : history.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-muted-foreground">No payment history yet.</p>
+                ) : (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="w-12">#</TableHead>
+                                <TableHead>Due Date</TableHead>
+                                <TableHead>Amount</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Maker Request</TableHead>
+                                <TableHead>MR Status</TableHead>
+                                <TableHead>Last Activity</TableHead>
+                                <TableHead>Approved By</TableHead>
+                                <TableHead>Updated By</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {history.map((row) => {
+                                const cycleStatus = getFixedExpenseDisplayStatus({ status: row.status });
+                                const isZeroVariable = row.amountType === 'variable' && Number(row.amount) === 0;
+
+                                return (
+                                    <TableRow key={row.id}>
+                                        <TableCell className="text-sm font-medium">{row.cycle}</TableCell>
+                                        <TableCell className="text-sm whitespace-nowrap">{formatDate(row.dueDate)}</TableCell>
+                                        <TableCell className="text-sm whitespace-nowrap">
+                                            {isZeroVariable ? '—' : formatINR(row.amount)}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant="outline" className={`h-5 px-2 ${cycleStatus.className}`}>
+                                                {cycleStatus.label}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-sm font-mono whitespace-nowrap">
+                                            {row.makerRequestNo ?? '—'}
+                                        </TableCell>
+                                        <TableCell className="text-sm capitalize whitespace-nowrap">
+                                            {row.makerRequestStatus
+                                                ? row.makerRequestStatus.replaceAll('_', ' ')
+                                                : '—'}
+                                        </TableCell>
+                                        <TableCell className="text-sm whitespace-nowrap">
+                                            {formatDateTime(row.updatedAt)}
+                                        </TableCell>
+                                        <TableCell className="text-sm whitespace-nowrap">
+                                            {row.approvedByName ?? (row.approvedBy ? `#${row.approvedBy}` : '—')}
+                                        </TableCell>
+                                        <TableCell className="text-sm whitespace-nowrap">
+                                            {row.updatedByName ?? (row.updatedBy ? `#${row.updatedBy}` : '—')}
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                )}
+            </CardContent>
+        </Card>
+        </div>
     );
 };
 

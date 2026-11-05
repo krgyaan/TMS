@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fixedExpenseService } from '@/services/api/fixed-expense.service';
 import type {
     CreateFixedExpenseDto,
+    FixedExpenseHistoryRow,
     FixedExpenseListParams,
     FixedExpenseListRow,
     FixedExpenseResponse,
@@ -18,6 +19,7 @@ export const fixedExpenseKeys = {
     lists: () => [...fixedExpenseKeys.all, 'list'] as const,
     list: (filters?: Record<string, unknown>) => [...fixedExpenseKeys.lists(), { filters }] as const,
     detail: (id: number) => [...fixedExpenseKeys.all, 'detail', id] as const,
+    history: (id: number) => [...fixedExpenseKeys.all, 'history', id] as const,
 };
 
 // ===================== FIXED EXPENSE HOOKS =====================
@@ -40,6 +42,17 @@ export const useFixedExpense = (id: number | null) => {
     return useQuery<FixedExpenseResponse>({
         queryKey: fixedExpenseKeys.detail(id ?? 0),
         queryFn: () => fixedExpenseService.getById(id!),
+        enabled: !!id,
+    });
+};
+
+/**
+ * Hook to fetch the payment-cycle history of a fixed expense
+ */
+export const useFixedExpenseHistory = (id: number | null) => {
+    return useQuery<FixedExpenseHistoryRow[]>({
+        queryKey: fixedExpenseKeys.history(id ?? 0),
+        queryFn: () => fixedExpenseService.getHistory(id!),
         enabled: !!id,
     });
 };

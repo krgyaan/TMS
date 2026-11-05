@@ -147,6 +147,27 @@ export interface FixedExpenseResponse {
     updatedAt: Date | string;
 }
 
+export interface FixedExpenseHistoryRow {
+    id: number;
+    cycle: number;
+    dueDate: string;
+    amount: string;
+    amountType: FixedExpenseAmountType;
+    paymentFrequency: FixedExpenseFrequency;
+    status: string;
+    makerId: number | null;
+    makerRequestNo: string | null;
+    makerRequestStatus: string | null;
+    makerRequestAmount: string | null;
+    utrNumber: string | null;
+    updatedAt: Date | string;
+    approvedBy: number | null;
+    approvedByName: string | null;
+    updatedBy: number | null;
+    updatedByName: string | null;
+    createdAt: Date | string;
+}
+
 export interface FixedExpenseListMeta {
     total: number;
     page: number;

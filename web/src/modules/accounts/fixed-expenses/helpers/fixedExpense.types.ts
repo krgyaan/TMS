@@ -41,6 +41,27 @@ export interface FixedExpenseResponse {
 
 export type FixedExpenseListRow = FixedExpenseResponse;
 
+export interface FixedExpenseHistoryRow {
+    id: number;
+    cycle: number;
+    dueDate: string;
+    amount: string;
+    amountType: FixedExpenseAmountType;
+    paymentFrequency: FixedExpenseFrequency;
+    status: string;
+    makerId: number | null;
+    makerRequestNo: string | null;
+    makerRequestStatus: string | null;
+    makerRequestAmount: string | null;
+    utrNumber: string | null;
+    updatedAt: string;
+    approvedBy: number | null;
+    approvedByName: string | null;
+    updatedBy: number | null;
+    updatedByName: string | null;
+    createdAt: string;
+}
+
 export interface FixedExpenseListParams {
     page?: number;
     limit?: number;

@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom';
-import { useFixedExpense } from '@/hooks/api/useFixedExpense';
+import { useFixedExpense, useFixedExpenseHistory } from '@/hooks/api/useFixedExpense';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardTitle } from '@/components/ui/card';
@@ -13,6 +13,7 @@ const FixedExpenseShowPage = () => {
     const { canRead } = useAuth();
 
     const { data: fixedExpense, isLoading, error } = useFixedExpense(expenseId);
+    const { data: history = [], isLoading: isHistoryLoading } = useFixedExpenseHistory(expenseId);
 
     if (!canRead('accounts.fixed-expenses')) {
         return (
@@ -50,7 +51,7 @@ const FixedExpenseShowPage = () => {
         );
     }
 
-    return <FixedExpenseView fixedExpense={fixedExpense} />;
+    return <FixedExpenseView fixedExpense={fixedExpense} history={history} isHistoryLoading={isHistoryLoading} />;
 };
 
 export default FixedExpenseShowPage;
