@@ -11,11 +11,12 @@ import { FixedExpensesService } from "@/modules/accounts/fixed-expenses/fixed-ex
 const MAKER_REQUEST_CRON_LOCK = "fixed-expense-maker-request-cron";
 
 /**
- * Creates maker requests for fixed expenses that are due within the next
- * three days, so payments are approved before the due date.
+ * Creates maker requests for fixed expenses whose workflow row
+ * (`fixed_expenses_history`) is due within the next three days, so payments are
+ * approved before the due date.
  *
- * Runs daily at 06:00 server time. Idempotent: expenses that already have a
- * linked maker request are skipped, and a Postgres advisory lock serialises
+ * Runs daily at 06:00 server time. Idempotent: workflow rows that already have
+ * a linked maker request are skipped, and a Postgres advisory lock serialises
  * overlapping runs (ScheduleModule is registered from several modules, so the
  * same @Cron can be mounted more than once; extra runs exit immediately).
  */
@@ -28,7 +29,7 @@ export class FixedExpenseMakerRequestScheduler {
     ) {}
 
     // Daily at 06:00 server time (production schedule).
-    @Cron("0 6 * * *")
+    @Cron("* * * * *")
     async handleUpcomingFixedExpenses() {
         this.logger.info("Cron tick at fixedExpenseMakerRequests", { timestamp: new Date() });
 

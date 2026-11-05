@@ -450,10 +450,14 @@ export class FixedExpensesService {
 
     /**
      * Daily cron: for every fixed expense whose workflow status is "Awaited
-     * Maker" and that is due within the next 3 days (including today), create a
-     * maker request and store its id in fixed_expenses.maker_id. Both the
-     * history status and maker_id act as idempotency keys, so re-running the job
-     * never duplicates requests.
+     * Maker" and whose workflow row (`fixed_expenses_history`) is due within the
+     * next 3 days (including today), create a maker request and store its id in
+     * fixed_expenses.maker_id / fixed_expenses_history.maker_id. The history
+     * status and maker id act as idempotency keys, so re-running the job never
+     * duplicates requests.
+     *
+     * The due date, status and maker link are read from the history snapshot,
+     * which is refreshed whenever the expense is edited.
      *
      * Concurrency is handled by the scheduler, which holds a Postgres advisory
      * lock for the duration of the run.
@@ -470,7 +474,7 @@ export class FixedExpensesService {
                 accountNumber: fixedExpenses.accountNumber,
                 ifscCode: fixedExpenses.ifscCode,
                 type: fixedExpenses.type,
-                dueDate: fixedExpenses.dueDate,
+                dueDate: fixedExpensesHistory.dueDate,
                 createdBy: fixedExpenses.createdBy,
             })
             .from(fixedExpenses)
@@ -479,11 +483,11 @@ export class FixedExpensesService {
                 and(
                     eq(fixedExpensesHistory.status, "Awaited Maker"),
                     eq(fixedExpenses.deleteStatus, false),
-                    isNull(fixedExpenses.makerId),
-                    sql`${fixedExpenses.dueDate} BETWEEN CURRENT_DATE AND CURRENT_DATE + 3`
+                    isNull(fixedExpensesHistory.makerId),
+                    sql`${fixedExpensesHistory.dueDate} BETWEEN CURRENT_DATE AND CURRENT_DATE + 3`
                 )
             )
-            .orderBy(asc(fixedExpenses.dueDate));
+            .orderBy(asc(fixedExpensesHistory.dueDate));
 
         const created: string[] = [];
         const failed: Array<{ id: number; error: string }> = [];
