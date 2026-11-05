@@ -23,6 +23,28 @@ import type {
 const creatorUser = alias(users, "fixed_expense_creator");
 const fixedExpenseMakerRequest = alias(paymentRequests, "fixed_expense_maker_request");
 
+/**
+ * Keeps only the current (latest) workflow row per expense. History now holds
+ * one row per payment cycle, so list/view/update must look at the newest one.
+ */
+const currentHistoryJoin = sql`${fixedExpensesHistory.id} = (
+    SELECT max(h2.id) FROM fixed_expenses_history h2 WHERE h2.expense_id = ${fixedExpenses.id}
+)`;
+
+/** Same as `currentHistoryJoin`, but for a single expense id (update path). */
+const currentHistoryForExpense = (expenseId: number) =>
+    sql`${fixedExpensesHistory.id} = (
+        SELECT max(h2.id) FROM fixed_expenses_history h2 WHERE h2.expense_id = ${expenseId}
+    )`;
+
+/** Months added per payment frequency when rolling a paid cycle forward. */
+const FREQUENCY_MONTHS: Record<string, number> = {
+    monthly: 1,
+    quarterly: 3,
+    half_yearly: 6,
+    annual: 12,
+};
+
 const fixedExpenseSelection = {
     id: fixedExpenses.id,
     partyName: fixedExpenses.partyName,
@@ -269,16 +291,16 @@ export class FixedExpensesService {
                 .select({ count: sql<number>`count(*)::int` })
                 .from(fixedExpenses)
                 .leftJoin(creatorUser, eq(creatorUser.id, fixedExpenses.createdBy))
-                .leftJoin(fixedExpenseMakerRequest, eq(fixedExpenseMakerRequest.id, fixedExpenses.makerId))
-                .leftJoin(fixedExpensesHistory, eq(fixedExpensesHistory.expenseId, fixedExpenses.id))
+                .leftJoin(fixedExpensesHistory, currentHistoryJoin)
+                .leftJoin(fixedExpenseMakerRequest, eq(fixedExpenseMakerRequest.id, fixedExpensesHistory.makerId))
                 .where(whereClause)
                 .then(([r]) => Number(r?.count ?? 0)),
             this.db
                 .select(fixedExpenseSelection)
                 .from(fixedExpenses)
                 .leftJoin(creatorUser, eq(creatorUser.id, fixedExpenses.createdBy))
-                .leftJoin(fixedExpenseMakerRequest, eq(fixedExpenseMakerRequest.id, fixedExpenses.makerId))
-                .leftJoin(fixedExpensesHistory, eq(fixedExpensesHistory.expenseId, fixedExpenses.id))
+                .leftJoin(fixedExpensesHistory, currentHistoryJoin)
+                .leftJoin(fixedExpenseMakerRequest, eq(fixedExpenseMakerRequest.id, fixedExpensesHistory.makerId))
                 .where(whereClause)
                 .orderBy(orderFn(orderColumn))
                 .limit(limit)
@@ -295,8 +317,8 @@ export class FixedExpensesService {
             .select(fixedExpenseSelection)
             .from(fixedExpenses)
             .leftJoin(creatorUser, eq(creatorUser.id, fixedExpenses.createdBy))
-            .leftJoin(fixedExpenseMakerRequest, eq(fixedExpenseMakerRequest.id, fixedExpenses.makerId))
-            .leftJoin(fixedExpensesHistory, eq(fixedExpensesHistory.expenseId, fixedExpenses.id))
+            .leftJoin(fixedExpensesHistory, currentHistoryJoin)
+            .leftJoin(fixedExpenseMakerRequest, eq(fixedExpenseMakerRequest.id, fixedExpensesHistory.makerId))
             .where(eq(fixedExpenses.id, id))
             .limit(1);
 
@@ -418,7 +440,12 @@ export class FixedExpensesService {
         if (data.paymentFrequency !== undefined) historyUpdate.paymentFrequency = data.paymentFrequency;
         if (data.makerId !== undefined) historyUpdate.makerId = data.makerId;
 
-        await this.db.update(fixedExpensesHistory).set(historyUpdate).where(eq(fixedExpensesHistory.expenseId, id));
+        // Only the current cycle's row is refreshed; completed cycles keep their
+        // historical snapshot.
+        await this.db
+            .update(fixedExpensesHistory)
+            .set(historyUpdate)
+            .where(and(eq(fixedExpensesHistory.expenseId, id), currentHistoryForExpense(id)));
 
         return this.findById(id);
     }
@@ -484,6 +511,7 @@ export class FixedExpensesService {
                     eq(fixedExpensesHistory.status, "Awaited Maker"),
                     eq(fixedExpenses.deleteStatus, false),
                     isNull(fixedExpensesHistory.makerId),
+                    currentHistoryJoin,
                     sql`${fixedExpensesHistory.dueDate} BETWEEN CURRENT_DATE AND CURRENT_DATE + 3`
                 )
             )
@@ -513,7 +541,7 @@ export class FixedExpensesService {
                 await this.db
                     .update(fixedExpensesHistory)
                     .set({ status: "Maker Created", makerId: makerRequest.id, updatedBy: null, updatedAt: new Date() })
-                    .where(eq(fixedExpensesHistory.expenseId, expense.id));
+                    .where(and(eq(fixedExpensesHistory.expenseId, expense.id), currentHistoryForExpense(expense.id)));
 
                 created.push(makerRequest.requestNo ?? `#${makerRequest.id}`);
             } catch (error) {
@@ -525,5 +553,107 @@ export class FixedExpensesService {
         }
 
         return { created, failed };
+    }
+
+    // ===================== PAYMENT DONE ROLLOVER CRON =====================
+
+    /** Adds `months` to an ISO date, clipping to the last day of the month. */
+    private addMonths(isoDate: string, months: number): string {
+        const [year, month, day] = isoDate.split("-").map(Number);
+        const target = new Date(Date.UTC(year, month - 1 + months, 1));
+        const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+        target.setUTCDate(Math.min(day, lastDay));
+        return target.toISOString().slice(0, 10);
+    }
+
+    /** Next due date at or after today for the given payment frequency. */
+    private nextDueDate(from: string, frequency: string): string {
+        const months = FREQUENCY_MONTHS[frequency] ?? FREQUENCY_MONTHS.monthly;
+        const today = new Date().toISOString().slice(0, 10);
+        let next = this.addMonths(from, months);
+        // If the paid cycle was overdue, keep stepping so the new cycle is never
+        // created with a due date in the past.
+        for (let i = 0; next < today && i < 120; i += 1) {
+            next = this.addMonths(next, months);
+        }
+        return next;
+    }
+
+    /**
+     * Daily cron: for every expense whose current workflow row is "Payment
+     * Done", start the next cycle by inserting a new history row with the same
+     * snapshot, the next due date derived from payment_frequency, and status
+     * "Awaited Maker". The maker-request cron then picks the new row up and
+     * creates its request.
+     *
+     * Idempotent: after the insert the latest row is "Awaited Maker", so the
+     * next run no longer sees the paid row as current.
+     */
+    async rolloverPaidFixedExpenses(): Promise<{
+        rolled: number[];
+        failed: Array<{ id: number; error: string }>;
+    }> {
+        const paidRows = await this.db
+            .select({
+                expenseId: fixedExpensesHistory.expenseId,
+                partyName: fixedExpensesHistory.partyName,
+                amountType: fixedExpensesHistory.amountType,
+                amount: fixedExpensesHistory.amount,
+                paymentMode: fixedExpensesHistory.paymentMode,
+                accountName: fixedExpensesHistory.accountName,
+                accountNumber: fixedExpensesHistory.accountNumber,
+                ifscCode: fixedExpensesHistory.ifscCode,
+                categoryId: fixedExpensesHistory.categoryId,
+                dueDate: fixedExpensesHistory.dueDate,
+                paymentFrequency: fixedExpensesHistory.paymentFrequency,
+            })
+            .from(fixedExpensesHistory)
+            .innerJoin(fixedExpenses, eq(fixedExpenses.id, fixedExpensesHistory.expenseId))
+            .where(and(eq(fixedExpensesHistory.status, "Payment Done"), eq(fixedExpenses.deleteStatus, false), currentHistoryJoin));
+
+        const rolled: number[] = [];
+        const failed: Array<{ id: number; error: string }> = [];
+
+        for (const row of paidRows) {
+            try {
+                const dueDate = this.nextDueDate(row.dueDate, row.paymentFrequency);
+                const now = new Date();
+
+                await this.db.transaction(async tx => {
+                    await tx.insert(fixedExpensesHistory).values({
+                        expenseId: row.expenseId,
+                        partyName: row.partyName,
+                        amountType: row.amountType,
+                        amount: row.amount,
+                        paymentMode: row.paymentMode,
+                        accountName: row.accountName,
+                        accountNumber: row.accountNumber,
+                        ifscCode: row.ifscCode,
+                        categoryId: row.categoryId,
+                        dueDate,
+                        paymentFrequency: row.paymentFrequency,
+                        status: "Awaited Maker",
+                        makerId: null,
+                        updatedBy: null,
+                        createdAt: now,
+                        updatedAt: now,
+                    });
+
+                    // Keep the expense's own due date in step with the new cycle.
+                    // maker_id keeps pointing at the completed request so payment
+                    // history links stay intact until the next request is created.
+                    await tx.update(fixedExpenses).set({ dueDate, updatedAt: now }).where(eq(fixedExpenses.id, row.expenseId));
+                });
+
+                rolled.push(row.expenseId);
+            } catch (error) {
+                failed.push({
+                    id: row.expenseId,
+                    error: error instanceof Error ? error.message : String(error),
+                });
+            }
+        }
+
+        return { rolled, failed };
     }
 }

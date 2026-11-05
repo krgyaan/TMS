@@ -9,6 +9,7 @@ import { FollowupScheduler } from "./follow-up.scheduler";
 import { AccountChecklistScheduler } from "./account-checklist.scheduler";
 import { PaymentReminderScheduler } from "./payment-reminder.scheduler";
 import { FixedExpenseMakerRequestScheduler } from "./fixed-expense-maker-request.scheduler";
+import { FixedExpenseHistoryRolloverScheduler } from "./fixed-expense-history-rollover.scheduler";
 
 @Module({
     imports: [
@@ -24,6 +25,7 @@ import { FixedExpenseMakerRequestScheduler } from "./fixed-expense-maker-request
         AccountChecklistScheduler,
         PaymentReminderScheduler,
         FixedExpenseMakerRequestScheduler,
+        FixedExpenseHistoryRolloverScheduler,
     ],
 })
 export class SchedulerModule {}

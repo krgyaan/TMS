@@ -23,10 +23,9 @@ export const fixedExpensesHistory = pgTable(
     {
         id: bigserial("id", { mode: "number" }).primaryKey(),
 
-        // One workflow row per fixed expense.
+        
         expenseId: bigint("expense_id", { mode: "number" })
             .notNull()
-            .unique()
             .references(() => fixedExpenses.id, { onDelete: "cascade" }),
 
         // Snapshot of the fixed expense
@@ -49,7 +48,7 @@ export const fixedExpensesHistory = pgTable(
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
         updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     },
-    table => [index("idx_fixed_expenses_history_status").on(table.status)]
+    table => [index("idx_fixed_expenses_history_status").on(table.status), index("idx_fixed_expenses_history_expense_id").on(table.expenseId, table.id)]
 );
 
 // ===================== TYPES =====================

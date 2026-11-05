@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
-import { and, eq, like, desc, sql } from "drizzle-orm";
+import { and, desc, eq, gt, like, sql } from "drizzle-orm";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { paymentRequests } from "@/db/schemas/operations/payment-requests.schema";
@@ -218,8 +218,22 @@ export class MakerRequestService {
         const historyStatus = MR_STATUS_TO_HISTORY_STATUS[requestStatus];
         if (!historyStatus) return;
 
-        const [linked] = await this.db.select({ id: fixedExpenses.id }).from(fixedExpenses).where(eq(fixedExpenses.makerId, makerRequestId)).limit(1);
+        // The request is linked to the workflow row of its own payment cycle.
+        const [linked] = await this.db
+            .select({ id: fixedExpensesHistory.id, expenseId: fixedExpensesHistory.expenseId })
+            .from(fixedExpensesHistory)
+            .where(eq(fixedExpensesHistory.makerId, makerRequestId))
+            .limit(1);
         if (!linked) return;
+
+        // Completed cycles are immutable once the rollover cron has opened a
+        // newer one, so a late edit/revert cannot reopen them.
+        const [newer] = await this.db
+            .select({ id: fixedExpensesHistory.id })
+            .from(fixedExpensesHistory)
+            .where(and(eq(fixedExpensesHistory.expenseId, linked.expenseId), gt(fixedExpensesHistory.id, linked.id)))
+            .limit(1);
+        if (newer) return;
 
         await this.db
             .update(fixedExpensesHistory)
@@ -229,7 +243,7 @@ export class MakerRequestService {
                 updatedAt: new Date(),
                 ...(amount ? { amount } : {}),
             })
-            .where(eq(fixedExpensesHistory.expenseId, linked.id));
+            .where(eq(fixedExpensesHistory.id, linked.id));
     }
 
     async uploadInvoiceAfterPayment(id: number, files: string[]) {

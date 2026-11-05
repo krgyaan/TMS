@@ -15,7 +15,7 @@ import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.sch
 import { vendorWorkOrderItems } from "@/db/schemas/operations/vendor-work-order-items.schema";
 import { orderExtraCharges } from "@/db/schemas/operations/order-extra-charges.schema";
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, desc, eq, like, ne, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, gt, like, ne, sql, type SQL } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 import { InsurancePolicyService } from "@/modules/insurance/insurance-policy.service";
@@ -647,8 +647,22 @@ export class PaymentRequestService {
         const historyStatus = MR_STATUS_TO_HISTORY_STATUS[requestStatus];
         if (!historyStatus) return;
 
-        const [linked] = await tx.select({ id: fixedExpenses.id }).from(fixedExpenses).where(eq(fixedExpenses.makerId, makerRequestId)).limit(1);
+        // The request is linked to the workflow row of its own payment cycle.
+        const [linked] = await tx
+            .select({ id: fixedExpensesHistory.id, expenseId: fixedExpensesHistory.expenseId })
+            .from(fixedExpensesHistory)
+            .where(eq(fixedExpensesHistory.makerId, makerRequestId))
+            .limit(1);
         if (!linked) return;
+
+        // Completed cycles are immutable once the rollover cron has opened a
+        // newer one, so a late edit/revert cannot reopen them.
+        const [newer] = await tx
+            .select({ id: fixedExpensesHistory.id })
+            .from(fixedExpensesHistory)
+            .where(and(eq(fixedExpensesHistory.expenseId, linked.expenseId), gt(fixedExpensesHistory.id, linked.id)))
+            .limit(1);
+        if (newer) return;
 
         await tx
             .update(fixedExpensesHistory)
@@ -658,7 +672,7 @@ export class PaymentRequestService {
                 updatedAt: new Date(),
                 ...(amount ? { amount } : {}),
             })
-            .where(eq(fixedExpensesHistory.expenseId, linked.id));
+            .where(eq(fixedExpensesHistory.id, linked.id));
     }
 
     async uploadInvoiceAfterPayment(id: number, files: string[]) {
