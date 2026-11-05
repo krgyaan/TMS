@@ -5,9 +5,9 @@ import { AccountChecklistModule } from "@/modules/accounts/account-checklist/acc
 import { FixedExpensesModule } from "@/modules/accounts/fixed-expenses/fixed-expenses.module";
 import { LoggerModule } from "@/logger/logger.module";
 import { PaymentRequestsModule } from "@/modules/tendering/payment-requests/payment-requests.module";
-import { FollowupScheduler } from "./follow-up.scheduler";
+import { FollowupSchedulerModule } from "@/modules/follow-up/follow-up-scheduler.module";
 import { EmailModule } from "@/modules/email/email.module";
-import { EmailRetryCron } from "./email-retry.scheduler";
+import { EmailRetryCron } from "@/modules/email/cron/email-retry.cron";
 import { AccountChecklistScheduler } from "./account-checklist.scheduler";
 import { PaymentReminderScheduler } from "./payment-reminder.scheduler";
 import { FixedExpenseMakerRequestScheduler } from "./fixed-expense-maker-request.scheduler";
