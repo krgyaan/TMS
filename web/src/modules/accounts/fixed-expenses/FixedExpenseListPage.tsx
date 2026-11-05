@@ -219,11 +219,18 @@ const FixedExpenseListContent = () => {
             dateCol<FixedExpenseListRow>('dueDate', { includeTime: false }, {
                 field: 'dueDate',
                 colId: 'dueDate',
-                headerName: 'Due Date',
+                headerName: statusTab === 'done' ? 'Last Paid' : 'Due Date',
                 flex: 1,
                 minWidth: 120,
                 sortable: true,
                 filter: true,
+                // On the Done tab show when the last payment happened instead.
+                valueGetter: (params) => {
+                    const value = statusTab === 'done' ? params.data?.lastPaymentDoneAt : params.data?.dueDate;
+                    if (!value) return null;
+                    const date = new Date(value);
+                    return isNaN(date.getTime()) ? null : date;
+                },
             }),
             {
                 field: 'paymentFrequency',
@@ -251,8 +258,10 @@ const FixedExpenseListContent = () => {
                 minWidth: 120,
                 cellRenderer: (params: { data?: FixedExpenseListRow }) => {
                     if (!params.data) return '—';
-                    // Driven by the linked payment request, not by the expense itself.
-                    const display = getFixedExpenseDisplayStatus(params.data);
+                    // Done tab shows the last completed payment, Pending the current cycle.
+                    const display = statusTab === 'done'
+                        ? getFixedExpenseDisplayStatus({ status: 'Payment Done' })
+                        : getFixedExpenseDisplayStatus(params.data);
                     return (
                         <Badge
                             variant="outline"
@@ -268,13 +277,28 @@ const FixedExpenseListContent = () => {
             {
                 field: 'makerRequestNo',
                 colId: 'makerRequestNo',
-                headerName: 'Maker Request',
+                headerName: 'Maker Requests',
                 flex: 1,
-                minWidth: 150,
+                minWidth: 130,
                 cellRenderer: (params: { data?: FixedExpenseListRow }) => {
-                    const requestNo = params.data?.makerRequestNo;
-                    if (!requestNo) return '—';
-                    return <span className="font-mono text-xs">{requestNo}</span>;
+                    const row = params.data;
+                    const total = row?.cyclesTotal ?? 0;
+                    if (!total) return '—';
+
+                    const paid = row?.cyclesPaid ?? 0;
+                    const requestNos = row?.cycleRequestNos ?? [];
+                    const title = requestNos.length ? requestNos.join(', ') : undefined;
+
+                    return (
+                        <span
+                            title={title}
+                            className={`inline-flex items-center rounded-md px-2 py-0.5 font-mono text-xs font-semibold ${
+                                paid === total ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                            }`}
+                        >
+                            {paid}/{total}
+                        </span>
+                    );
                 },
                 sortable: false,
                 filter: false,
@@ -288,7 +312,7 @@ const FixedExpenseListContent = () => {
                 width: 80,
             },
         ],
-        [fixedExpenseActions]
+        [fixedExpenseActions, statusTab]
     );
 
     if (!canRead('accounts.fixed-expenses')) {

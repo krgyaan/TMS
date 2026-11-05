@@ -137,6 +137,10 @@ export interface FixedExpenseResponse {
     status: string | null;
     makerRequestNo?: string | null;
     makerRequestStatus?: string | null;
+    cyclesTotal: number;
+    cyclesPaid: number;
+    cycleRequestNos: string[];
+    lastPaymentDoneAt?: Date | string | null;
     createdBy: number;
     createdByName?: string | null;
     createdAt: Date | string;

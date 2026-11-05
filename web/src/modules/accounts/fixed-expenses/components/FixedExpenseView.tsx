@@ -104,17 +104,39 @@ const FixedExpenseView = ({ fixedExpense }: FixedExpenseViewProps) => {
                         </TableRow>
 
                         <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className={labelClass}>Maker Request</TableCell>
+                            <TableCell className={labelClass}>Maker Requests</TableCell>
                             <TableCell className="text-sm" colSpan={3}>
-                                {fixedExpense.makerRequestNo ? (
-                                    <span className="font-mono">
-                                        {fixedExpense.makerRequestNo}
-                                    </span>
+                                {fixedExpense.cyclesTotal > 0 ? (
+                                    <div className="space-y-1">
+                                        <span
+                                            className={`inline-flex items-center rounded-md px-2 py-0.5 font-mono font-semibold ${
+                                                fixedExpense.cyclesPaid === fixedExpense.cyclesTotal
+                                                    ? 'bg-emerald-100 text-emerald-700'
+                                                    : 'bg-amber-100 text-amber-700'
+                                            }`}
+                                        >
+                                            {fixedExpense.cyclesPaid}/{fixedExpense.cyclesTotal}
+                                        </span>
+                                        {fixedExpense.cycleRequestNos.length > 0 && (
+                                            <div className="text-xs text-muted-foreground font-mono">
+                                                {fixedExpense.cycleRequestNos.join(', ')}
+                                            </div>
+                                        )}
+                                    </div>
                                 ) : (
                                     '—'
                                 )}
                             </TableCell>
                         </TableRow>
+
+                        {fixedExpense.lastPaymentDoneAt && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className={labelClass}>Last Paid</TableCell>
+                                <TableCell className="text-sm" colSpan={3}>
+                                    {formatDate(fixedExpense.lastPaymentDoneAt)}
+                                </TableCell>
+                            </TableRow>
+                        )}
 
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className={labelClass}>Payment Mode</TableCell>

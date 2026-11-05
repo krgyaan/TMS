@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, asc, desc, eq, ilike, inArray, isNull, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, isNull, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
@@ -51,6 +51,12 @@ const FIXED_EXPENSE_PAYMENT_MODE_TO_MR: Record<string, string> = {
     bank_transfer: "BANK_TRANSFER",
 };
 
+/** Payment cycles that actually got a maker request. */
+const cyclesTotalExpr = sql<number>`(SELECT count(*)::int FROM fixed_expenses_history h WHERE h.expense_id = ${fixedExpenses.id} AND h.maker_id IS NOT NULL)`;
+
+/** Cycles whose payment is done. */
+const cyclesPaidExpr = sql<number>`(SELECT count(*)::int FROM fixed_expenses_history h WHERE h.expense_id = ${fixedExpenses.id} AND h.maker_id IS NOT NULL AND h.status = 'Payment Done')`;
+
 const fixedExpenseSelection = {
     id: fixedExpenses.id,
     partyName: fixedExpenses.partyName,
@@ -70,6 +76,17 @@ const fixedExpenseSelection = {
     status: fixedExpensesHistory.status,
     makerRequestNo: fixedExpenseMakerRequest.requestNo,
     makerRequestStatus: fixedExpenseMakerRequest.status,
+    // Cycle counters for the list/view: paid cycles / cycles that got a maker request.
+    cyclesTotal: cyclesTotalExpr,
+    cyclesPaid: cyclesPaidExpr,
+    cycleRequestNos: sql<string[]>`COALESCE((
+        SELECT array_agg(pr.request_no ORDER BY h.id)
+        FROM fixed_expenses_history h
+        JOIN project_payment_requests pr ON pr.id = h.maker_id
+        WHERE h.expense_id = ${fixedExpenses.id} AND h.maker_id IS NOT NULL
+    ), ARRAY[]::varchar[])`,
+    // When the latest cycle's payment was completed.
+    lastPaymentDoneAt: sql<Date | null>`(SELECT max(h.updated_at) FROM fixed_expenses_history h WHERE h.expense_id = ${fixedExpenses.id} AND h.status = 'Payment Done')`,
     createdBy: fixedExpenses.createdBy,
     createdByName: creatorUser.name,
     createdAt: fixedExpenses.createdAt,
@@ -95,6 +112,10 @@ type FixedExpenseRow = {
     status: string | null;
     makerRequestNo: string | null;
     makerRequestStatus: string | null;
+    cyclesTotal: number;
+    cyclesPaid: number;
+    cycleRequestNos: string[];
+    lastPaymentDoneAt: Date | null;
     createdBy: number;
     createdByName: string | null;
     createdAt: Date;
@@ -130,6 +151,10 @@ export class FixedExpensesService {
             status: row.status ?? null,
             makerRequestNo: row.makerRequestNo ?? null,
             makerRequestStatus: row.makerRequestStatus ?? null,
+            cyclesTotal: Number(row.cyclesTotal ?? 0),
+            cyclesPaid: Number(row.cyclesPaid ?? 0),
+            cycleRequestNos: row.cycleRequestNos ?? [],
+            lastPaymentDoneAt: row.lastPaymentDoneAt ?? null,
             createdBy: row.createdBy,
             createdByName: row.createdByName ?? null,
             createdAt: row.createdAt,
@@ -254,14 +279,15 @@ export class FixedExpensesService {
         }
 
         if (filters?.status) {
-            // Driven by the fixed expense workflow row. Rows created before the
-            // history table existed have no workflow row yet (status NULL) and
-            // stay in Pending so they don't disappear from the list.
-            conditions.push(
-                filters.status === "Pending"
-                    ? or(isNull(fixedExpensesHistory.status), inArray(fixedExpensesHistory.status, ["Awaited Maker", "Maker Created", "Maker Done", "Maker Rejected"]))
-                    : eq(fixedExpensesHistory.status, "Payment Done")
-            );
+            // Done = at least one payment has happened AND either the current
+            // cycle is paid or its due date is more than 30 days away (nothing
+            // to act on soon). Everything else stays in Pending, including
+            // expenses that have never been paid.
+            const doneCondition = sql`${cyclesPaidExpr} > 0 AND (
+                COALESCE(${fixedExpensesHistory.status}, '') = 'Payment Done'
+                OR ${fixedExpenses.dueDate} > CURRENT_DATE + 30
+            )`;
+            conditions.push(filters.status === "Done" ? sql`(${doneCondition})` : sql`NOT (${doneCondition})`);
         }
 
         // Archived rows are hidden unless explicitly requested
