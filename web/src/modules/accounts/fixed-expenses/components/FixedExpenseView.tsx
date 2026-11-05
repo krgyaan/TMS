@@ -12,6 +12,7 @@ import {
     FIXED_EXPENSE_FREQUENCY_LABELS,
     FIXED_EXPENSE_PAYMENT_MODE_LABELS,
     FIXED_EXPENSE_AMOUNT_TYPE_LABELS,
+    getFixedExpenseDisplayStatus,
 } from '../helpers/fixedExpense.types';
 
 interface FixedExpenseViewProps {
@@ -24,6 +25,7 @@ const valueClass = 'text-sm w-1/4';
 const FixedExpenseView = ({ fixedExpense }: FixedExpenseViewProps) => {
     const navigate = useNavigate();
     const isBankTransfer = fixedExpense.paymentMode === 'bank_transfer';
+    const statusDisplay = getFixedExpenseDisplayStatus(fixedExpense);
 
     return (
         <Card>
@@ -81,19 +83,8 @@ const FixedExpenseView = ({ fixedExpense }: FixedExpenseViewProps) => {
                             </TableCell>
                             <TableCell className={labelClass}>Status</TableCell>
                             <TableCell className={valueClass}>
-                                <Badge
-                                    variant="outline"
-                                    className={
-                                        {
-                                            Done: 'bg-emerald-100 text-emerald-800 border-transparent',
-                                            Pending: 'bg-amber-100 text-amber-800 border-transparent',
-                                            'Maker Created': 'bg-blue-100 text-blue-800 border-transparent',
-                                            'Maker Done': 'bg-indigo-100 text-indigo-800 border-transparent',
-                                            'Maker Rejected': 'bg-red-100 text-red-800 border-transparent',
-                                        }[fixedExpense.status]
-                                    }
-                                >
-                                    {fixedExpense.status || '—'}
+                                <Badge variant="outline" className={statusDisplay.className}>
+                                    {statusDisplay.label}
                                 </Badge>
                             </TableCell>
                         </TableRow>
@@ -116,13 +107,8 @@ const FixedExpenseView = ({ fixedExpense }: FixedExpenseViewProps) => {
                             <TableCell className={labelClass}>Maker Request</TableCell>
                             <TableCell className="text-sm" colSpan={3}>
                                 {fixedExpense.makerRequestNo ? (
-                                    <span className="flex items-center gap-2">
-                                        <span className="font-mono">
-                                            {fixedExpense.makerRequestNo}
-                                        </span>
-                                        <Badge variant="outline">
-                                            {fixedExpense.makerRequestStatus ?? '—'}
-                                        </Badge>
+                                    <span className="font-mono">
+                                        {fixedExpense.makerRequestNo}
                                     </span>
                                 ) : (
                                     '—'

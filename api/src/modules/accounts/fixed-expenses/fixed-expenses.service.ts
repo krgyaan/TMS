@@ -16,7 +16,6 @@ import type {
     FixedExpensePaymentMode,
     FixedExpenseQuery,
     FixedExpenseResponse,
-    FixedExpenseStatus,
     UpdateFixedExpenseDto,
 } from "./dto/fixed-expenses.dto";
 
@@ -37,7 +36,6 @@ const fixedExpenseSelection = {
     subCategory: fixedExpenses.subCategory,
     dueDate: fixedExpenses.dueDate,
     paymentFrequency: fixedExpenses.paymentFrequency,
-    status: fixedExpenses.status,
     deleteStatus: fixedExpenses.deleteStatus,
     makerId: fixedExpenses.makerId,
     makerRequestNo: fixedExpenseMakerRequest.requestNo,
@@ -62,7 +60,6 @@ type FixedExpenseRow = {
     subCategory: string | null;
     dueDate: string;
     paymentFrequency: string;
-    status: string;
     deleteStatus: boolean;
     makerId: number | null;
     makerRequestNo: string | null;
@@ -97,7 +94,6 @@ export class FixedExpensesService {
             subCategory: row.subCategory ?? null,
             dueDate: row.dueDate ?? "",
             paymentFrequency: row.paymentFrequency as FixedExpenseFrequency,
-            status: row.status as FixedExpenseStatus,
             deleteStatus: row.deleteStatus,
             makerId: row.makerId ?? null,
             makerRequestNo: row.makerRequestNo ?? null,
@@ -188,7 +184,11 @@ export class FixedExpensesService {
                     ilike(fixedExpenses.partyName, term),
                     ilike(fixedExpenses.type, term),
                     ilike(fixedExpenses.subCategory, term),
-                    ilike(fixedExpenses.status, term),
+                    ilike(fixedExpenseMakerRequest.requestNo, term),
+                    ilike(fixedExpenseMakerRequest.status, term),
+                    ilike(fixedExpenseMakerRequest.status, slugTerm),
+                    // "Awaited Maker" is the display label for rows without a request.
+                    and(isNull(fixedExpenses.makerId), sql`'Awaited Maker' ilike ${term}`),
                     ilike(fixedExpenses.amountType, term),
                     ilike(fixedExpenses.amountType, slugTerm),
                     ilike(fixedExpenses.paymentMode, term),
@@ -224,12 +224,13 @@ export class FixedExpensesService {
         }
 
         if (filters?.status) {
-            // The Pending tab groups every open state. Legacy rows created before
-            // the Pending/Done flow were stored as "New", so treat those as Pending.
+            // The status shown on the list is the linked payment request's status.
+            // "Awaited Maker" rows (no request yet) and open requests are Pending;
+            // only a completed payment moves a row to Done.
             conditions.push(
                 filters.status === "Pending"
-                    ? inArray(fixedExpenses.status, ["Pending", "New", "Maker Created", "Maker Done", "Maker Rejected"])
-                    : eq(fixedExpenses.status, filters.status)
+                    ? or(isNull(fixedExpenses.makerId), isNull(fixedExpenseMakerRequest.status), inArray(fixedExpenseMakerRequest.status, ["pending", "maker_done", "rejected"]))
+                    : eq(fixedExpenseMakerRequest.status, "payment_done")
             );
         }
 
@@ -266,6 +267,7 @@ export class FixedExpensesService {
                 .select({ count: sql<number>`count(*)::int` })
                 .from(fixedExpenses)
                 .leftJoin(creatorUser, eq(creatorUser.id, fixedExpenses.createdBy))
+                .leftJoin(fixedExpenseMakerRequest, eq(fixedExpenseMakerRequest.id, fixedExpenses.makerId))
                 .where(whereClause)
                 .then(([r]) => Number(r?.count ?? 0)),
             this.db
@@ -321,7 +323,6 @@ export class FixedExpensesService {
                 categoryId: data.categoryId ?? null,
                 dueDate: data.dueDate,
                 paymentFrequency: data.paymentFrequency,
-                status: "Pending",
                 deleteStatus: false,
                 makerId: data.makerId ?? null,
                 createdBy,
@@ -363,7 +364,6 @@ export class FixedExpensesService {
         }
         if (data.dueDate !== undefined) updateData.dueDate = data.dueDate;
         if (data.paymentFrequency !== undefined) updateData.paymentFrequency = data.paymentFrequency;
-        if (data.status !== undefined) updateData.status = data.status;
         if (data.makerId !== undefined) updateData.makerId = data.makerId;
         if (data.deleteStatus !== undefined) updateData.deleteStatus = data.deleteStatus;
 
@@ -398,10 +398,10 @@ export class FixedExpensesService {
     }
 
     /**
-     * Daily cron: for every Pending fixed expense due within the next 3 days
-     * (including today) that has no maker request yet, create one and store its
-     * id in fixed_expenses.maker_id. That column is the idempotency key, so
-     * re-running the job never duplicates requests.
+     * Daily cron: for every fixed expense due within the next 3 days (including
+     * today) that has no maker request yet, create one and store its id in
+     * fixed_expenses.maker_id. That column is the idempotency key, so re-running
+     * the job never duplicates requests.
      *
      * Concurrency is handled by the scheduler, which holds a Postgres advisory
      * lock for the duration of the run.
@@ -422,14 +422,7 @@ export class FixedExpensesService {
                 createdBy: fixedExpenses.createdBy,
             })
             .from(fixedExpenses)
-            .where(
-                and(
-                    inArray(fixedExpenses.status, ["Pending", "New"]),
-                    eq(fixedExpenses.deleteStatus, false),
-                    isNull(fixedExpenses.makerId),
-                    sql`${fixedExpenses.dueDate} BETWEEN CURRENT_DATE AND CURRENT_DATE + 3`
-                )
-            )
+            .where(and(eq(fixedExpenses.deleteStatus, false), isNull(fixedExpenses.makerId), sql`${fixedExpenses.dueDate} BETWEEN CURRENT_DATE AND CURRENT_DATE + 3`))
             .orderBy(asc(fixedExpenses.dueDate));
 
         const created: string[] = [];
@@ -452,7 +445,7 @@ export class FixedExpensesService {
 
                 // Link the request back to the expense; this is the idempotency
                 // key that stops the next cron run from creating a duplicate.
-                await this.db.update(fixedExpenses).set({ makerId: makerRequest.id, status: "Maker Created", updatedAt: new Date() }).where(eq(fixedExpenses.id, expense.id));
+                await this.db.update(fixedExpenses).set({ makerId: makerRequest.id, updatedAt: new Date() }).where(eq(fixedExpenses.id, expense.id));
 
                 created.push(makerRequest.requestNo ?? `#${makerRequest.id}`);
             } catch (error) {

@@ -460,17 +460,6 @@ export class PaymentRequestService {
 
             this.logger.info(`Payment Request #${id} status updated to "${body.status}"`);
 
-            // Keep the fixed expense linked to this request in sync.
-            const expenseStatusByRequestStatus: Record<string, string> = {
-                maker_done: "Maker Done",
-                payment_done: "Done",
-                rejected: "Maker Rejected",
-            };
-            const nextExpenseStatus = expenseStatusByRequestStatus[body.status];
-            if (nextExpenseStatus) {
-                await this.syncFixedExpenseStatus(tx, id, nextExpenseStatus);
-            }
-
             if (body.status === "payment_done") {
                 this.notifications
                     .notifyPaymentDone({
@@ -641,29 +630,8 @@ export class PaymentRequestService {
 
             this.logger.info(`Payment Request #${id} reverted from "${existing.status}" to "${body.status}"`);
 
-            const expenseStatusByRequestStatus: Record<string, string> = {
-                pending: "Maker Created",
-                po_approval_pending: "Maker Created",
-                maker_done: "Maker Done",
-                payment_done: "Done",
-                rejected: "Maker Rejected",
-            };
-            const nextExpenseStatus = expenseStatusByRequestStatus[body.status];
-            if (nextExpenseStatus) {
-                await this.syncFixedExpenseStatus(tx, id, nextExpenseStatus);
-            }
-
             return updated;
         });
-    }
-
-    private async syncFixedExpenseStatus(tx: DbInstance, makerRequestId: number, status: string) {
-        const [linked] = await tx.select({ id: fixedExpenses.id }).from(fixedExpenses).where(eq(fixedExpenses.makerId, makerRequestId)).limit(1);
-
-        if (!linked) return;
-
-        await tx.update(fixedExpenses).set({ status, updatedAt: new Date() }).where(eq(fixedExpenses.id, linked.id));
-        this.logger.info(`Fixed expense #${linked.id} marked ${status} from Payment Request #${makerRequestId}`);
     }
 
     async uploadInvoiceAfterPayment(id: number, files: string[]) {
@@ -756,7 +724,6 @@ export class PaymentRequestService {
                 vwoTotalPaymentDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE vendor_work_order_id = ${vendorWorkOrders.id} AND status = 'payment_done'), 0)`,
                 fixedExpenseId: fixedExpenses.id,
                 fixedExpenseAmountType: fixedExpenses.amountType,
-                fixedExpenseStatus: fixedExpenses.status,
             })
             .from(paymentRequests)
             .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
@@ -792,7 +759,6 @@ export class PaymentRequestService {
                 vwoNumber: vendorWorkOrders.woNumber,
                 fixedExpenseId: fixedExpenses.id,
                 fixedExpenseAmountType: fixedExpenses.amountType,
-                fixedExpenseStatus: fixedExpenses.status,
             })
             .from(paymentRequests)
             .leftJoin(users, eq(paymentRequests.requestedBy, users.id))

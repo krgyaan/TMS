@@ -24,6 +24,7 @@ import {
     FIXED_EXPENSE_FREQUENCY_LABELS,
     FIXED_EXPENSE_PAYMENT_MODE_LABELS,
     FIXED_EXPENSE_AMOUNT_TYPE_LABELS,
+    getFixedExpenseDisplayStatus,
 } from './helpers/fixedExpense.types';
 
 const SORTABLE_FIELDS: FixedExpenseListParams['sortBy'][] = [
@@ -247,23 +248,17 @@ const FixedExpenseListContent = () => {
                 colId: 'status',
                 headerName: 'Status',
                 flex: 0.7,
-                minWidth: 100,
+                minWidth: 120,
                 cellRenderer: (params: { data?: FixedExpenseListRow }) => {
                     if (!params.data) return '—';
-                    const status = params.data.status;
-                    const statusStyles: Record<string, string> = {
-                        Pending: 'bg-amber-100 text-amber-800 border-transparent',
-                        'Maker Created': 'bg-blue-100 text-blue-800 border-transparent',
-                        'Maker Done': 'bg-indigo-100 text-indigo-800 border-transparent',
-                        'Maker Rejected': 'bg-red-100 text-red-800 border-transparent',
-                        Done: 'bg-emerald-100 text-emerald-800 border-transparent',
-                    };
+                    // Driven by the linked payment request, not by the expense itself.
+                    const display = getFixedExpenseDisplayStatus(params.data);
                     return (
                         <Badge
                             variant="outline"
-                            className={`h-5 px-2 ${statusStyles[status] ?? ''}`}
+                            className={`h-5 px-2 ${display.className}`}
                         >
-                            {status ?? '—'}
+                            {display.label}
                         </Badge>
                     );
                 },
@@ -279,14 +274,7 @@ const FixedExpenseListContent = () => {
                 cellRenderer: (params: { data?: FixedExpenseListRow }) => {
                     const requestNo = params.data?.makerRequestNo;
                     if (!requestNo) return '—';
-                    return (
-                        <span className="flex items-center gap-2">
-                            <span className="font-mono text-xs">{requestNo}</span>
-                            <Badge variant="outline" className="h-5 px-2">
-                                {params.data?.makerRequestStatus ?? '—'}
-                            </Badge>
-                        </span>
-                    );
+                    return <span className="font-mono text-xs">{requestNo}</span>;
                 },
                 sortable: false,
                 filter: false,

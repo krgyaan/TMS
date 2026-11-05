@@ -16,8 +16,6 @@ const optionalString = (max: number) => z.string().trim().max(max).optional().nu
 
 // ===================== ENUM VALUES =====================
 
-export const FIXED_EXPENSE_STATUSES = ["Pending", "Maker Created", "Maker Done", "Maker Rejected", "Done"] as const;
-
 export const FIXED_EXPENSE_FREQUENCIES = ["monthly", "quarterly", "half_yearly", "annual"] as const;
 
 export const FIXED_EXPENSE_PAYMENT_MODES = ["auto_debit", "bank_transfer"] as const;
@@ -40,7 +38,6 @@ const fixedExpenseBaseSchema = z.object({
     type: z.string().trim().min(1).max(100).optional(),
     dueDate: dateString,
     paymentFrequency: z.enum(FIXED_EXPENSE_FREQUENCIES).default("monthly"),
-    status: z.enum(FIXED_EXPENSE_STATUSES).default("Pending"),
     makerId: z.number().int().positive().optional().nullable(),
     deleteStatus: z.boolean().default(false),
 });
@@ -100,7 +97,8 @@ export const fixedExpenseQuerySchema = z.object({
     paymentFrequency: z.enum(FIXED_EXPENSE_FREQUENCIES).optional(),
     paymentMode: z.enum(FIXED_EXPENSE_PAYMENT_MODES).optional(),
     amountType: z.enum(FIXED_EXPENSE_AMOUNT_TYPES).optional(),
-    status: z.enum(FIXED_EXPENSE_STATUSES).optional(),
+    // Tab selector: Pending groups every open request, Done is payment_done.
+    status: z.enum(["Pending", "Done"]).optional(),
     deleteStatus: z
         .union([z.boolean(), z.enum(["true", "false"])])
         .transform(value => value === true || value === "true")
@@ -119,7 +117,6 @@ export type FixedExpenseQuery = z.infer<typeof fixedExpenseQuerySchema>;
 export type FixedExpenseFrequency = (typeof FIXED_EXPENSE_FREQUENCIES)[number];
 export type FixedExpensePaymentMode = (typeof FIXED_EXPENSE_PAYMENT_MODES)[number];
 export type FixedExpenseAmountType = (typeof FIXED_EXPENSE_AMOUNT_TYPES)[number];
-export type FixedExpenseStatus = (typeof FIXED_EXPENSE_STATUSES)[number];
 
 export interface FixedExpenseResponse {
     id: number;
@@ -135,7 +132,6 @@ export interface FixedExpenseResponse {
     subCategory: string | null;
     dueDate: string;
     paymentFrequency: FixedExpenseFrequency;
-    status: FixedExpenseStatus;
     deleteStatus: boolean;
     makerId: number | null;
     makerRequestNo?: string | null;

@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
-import { and, eq, inArray, like, desc, sql } from "drizzle-orm";
+import { and, eq, like, desc, sql } from "drizzle-orm";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { paymentRequests } from "@/db/schemas/operations/payment-requests.schema";
@@ -156,21 +156,6 @@ export class MakerRequestService {
         )[0];
 
         this.logger.info(`Maker Request #${id} status updated to "${body.status}"`);
-
-        // Keep a fixed expense linked to this request in sync with its outcome.
-        if (body.status === "payment_done" || body.status === "rejected" || body.status === "maker_done") {
-            const nextExpenseStatus = body.status === "payment_done" ? "Done" : body.status === "rejected" ? "Maker Rejected" : "Maker Done";
-            const [linkedExpense] = await this.db
-                .select({ id: fixedExpenses.id })
-                .from(fixedExpenses)
-                .where(and(eq(fixedExpenses.makerId, id), inArray(fixedExpenses.status, ["Pending", "New", "Maker Created"])))
-                .limit(1);
-
-            if (linkedExpense) {
-                await this.db.update(fixedExpenses).set({ status: nextExpenseStatus, updatedAt: new Date() }).where(eq(fixedExpenses.id, linkedExpense.id));
-                this.logger.info(`Fixed expense #${linkedExpense.id} marked ${nextExpenseStatus} from Maker Request #${id}`);
-            }
-        }
 
         if (hasAmount) {
             // Variable fixed expenses start at 0; the maker fills the real amount

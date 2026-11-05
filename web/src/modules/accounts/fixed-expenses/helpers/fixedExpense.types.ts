@@ -8,8 +8,6 @@ export type FixedExpensePaymentMode = 'auto_debit' | 'bank_transfer';
 
 export type FixedExpenseAmountType = 'fixed' | 'variable';
 
-export type FixedExpenseStatus = 'Pending' | 'Maker Created' | 'Maker Done' | 'Maker Rejected' | 'Done';
-
 // ===================== API TYPES =====================
 
 export interface FixedExpenseResponse {
@@ -26,7 +24,6 @@ export interface FixedExpenseResponse {
     subCategory: string | null;
     dueDate: string;
     paymentFrequency: FixedExpenseFrequency;
-    status: FixedExpenseStatus;
     deleteStatus: boolean;
     makerId: number | null;
     makerRequestNo?: string | null;
@@ -47,7 +44,7 @@ export interface FixedExpenseListParams {
     paymentFrequency?: FixedExpenseFrequency;
     paymentMode?: FixedExpensePaymentMode;
     amountType?: FixedExpenseAmountType;
-    status?: FixedExpenseStatus;
+    status?: 'Pending' | 'Done';
     deleteStatus?: boolean;
     sortBy?: 'partyName' | 'amount' | 'type' | 'dueDate' | 'createdAt';
     sortOrder?: 'asc' | 'desc';
@@ -65,7 +62,6 @@ export interface CreateFixedExpenseDto {
     type?: string;
     dueDate: string;
     paymentFrequency: FixedExpenseFrequency;
-    status?: FixedExpenseStatus;
     makerId?: number | null;
 }
 
@@ -95,11 +91,10 @@ export const FIXED_EXPENSE_AMOUNT_TYPE_OPTIONS: FixedExpenseSelectOption[] = [
 ];
 
 export const FIXED_EXPENSE_STATUS_OPTIONS: FixedExpenseSelectOption[] = [
-    { value: 'Pending', label: 'Pending' },
-    { value: 'Maker Created', label: 'Maker Created' },
-    { value: 'Maker Done', label: 'Maker Done' },
-    { value: 'Maker Rejected', label: 'Maker Rejected' },
-    { value: 'Done', label: 'Done' },
+    { value: 'pending', label: 'Pending' },
+    { value: 'maker_done', label: 'Maker Done' },
+    { value: 'payment_done', label: 'Payment Done' },
+    { value: 'rejected', label: 'Rejected' },
 ];
 
 // ===================== LABEL MAPS =====================
@@ -130,7 +125,36 @@ export const FIXED_EXPENSE_AMOUNT_TYPE_LABELS: Record<FixedExpenseAmountType, st
     variable: 'Variable',
 };
 
-export const FIXED_EXPENSE_STATUS_LABELS: Record<FixedExpenseStatus, string> = {
-    Pending: 'Pending',
-    Done: 'Done',
+export const FIXED_EXPENSE_STATUS_LABELS: Record<string, string> = {
+    pending: 'Pending',
+    maker_done: 'Maker Done',
+    payment_done: 'Payment Done',
+    rejected: 'Rejected',
+};
+
+// Status shown on the list/view. A fixed expense has no status of its own:
+// until the cron links a maker request it is "Awaited Maker", afterwards the
+// linked payment request's status is shown.
+export const AWAITED_MAKER_STATUS = {
+    label: 'Awaited Maker',
+    className: 'bg-slate-100 text-slate-700 border-transparent',
+};
+
+export const FIXED_EXPENSE_STATUS_STYLES: Record<string, string> = {
+    pending: 'bg-amber-100 text-amber-800 border-transparent',
+    maker_done: 'bg-indigo-100 text-indigo-800 border-transparent',
+    payment_done: 'bg-emerald-100 text-emerald-800 border-transparent',
+    rejected: 'bg-red-100 text-red-800 border-transparent',
+};
+
+export const getFixedExpenseDisplayStatus = (row: {
+    makerRequestStatus?: string | null;
+}): { label: string; className: string } => {
+    const status = row.makerRequestStatus;
+    if (!status) return AWAITED_MAKER_STATUS;
+
+    return {
+        label: FIXED_EXPENSE_STATUS_LABELS[status] ?? status,
+        className: FIXED_EXPENSE_STATUS_STYLES[status] ?? '',
+    };
 };
