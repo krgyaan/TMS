@@ -45,6 +45,12 @@ export class FixedExpensesController {
         return this.fixedExpensesService.findAll(filters);
     }
 
+    @Get("counts")
+    @CanRead(PERMISSION_MODULE)
+    async getTabCounts(@Query("search") search?: string) {
+        return this.fixedExpensesService.getTabCounts(search);
+    }
+
     @Get(":id/history")
     @CanRead(PERMISSION_MODULE)
     async getHistory(@Param("id", ParseIntPipe) id: number) {

@@ -41,6 +41,12 @@ export interface FixedExpenseResponse {
 
 export type FixedExpenseListRow = FixedExpenseResponse;
 
+export interface FixedExpenseTabCounts {
+    pending: number;
+    done: number;
+    archived: number;
+}
+
 export interface FixedExpenseHistoryRow {
     id: number;
     cycle: number;

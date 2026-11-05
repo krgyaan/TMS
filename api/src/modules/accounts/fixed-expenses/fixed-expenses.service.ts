@@ -224,7 +224,7 @@ export class FixedExpensesService {
         return { type: row.category, subCategory: row.subCategory ?? null };
     }
 
-    private buildWhereClause(filters?: FixedExpenseQuery): SQL<unknown> | undefined {
+    private buildWhereClause(filters?: Partial<FixedExpenseQuery>): SQL<unknown> | undefined {
         const conditions: (SQL<unknown> | undefined)[] = [];
         const search = filters?.search?.trim();
 
@@ -346,6 +346,27 @@ export class FixedExpensesService {
         const data = rows.map(row => this.mapToResponse(row));
 
         return wrapPaginatedResponse(data, countResult, page, limit);
+    }
+
+    /** Counts for the Pending / Done / Archived tabs (optionally filtered by search). */
+    async getTabCounts(search?: string): Promise<{ pending: number; done: number; archived: number }> {
+        const countFor = (filters: Partial<FixedExpenseQuery>) =>
+            this.db
+                .select({ count: sql<number>`count(*)::int` })
+                .from(fixedExpenses)
+                .leftJoin(creatorUser, eq(creatorUser.id, fixedExpenses.createdBy))
+                .leftJoin(fixedExpensesHistory, currentHistoryJoin)
+                .leftJoin(fixedExpenseMakerRequest, eq(fixedExpenseMakerRequest.id, fixedExpensesHistory.makerId))
+                .where(this.buildWhereClause({ search, ...filters }))
+                .then(([row]) => Number(row?.count ?? 0));
+
+        const [pending, done, archived] = await Promise.all([
+            countFor({ status: "Pending", deleteStatus: false }),
+            countFor({ status: "Done", deleteStatus: false }),
+            countFor({ deleteStatus: true }),
+        ]);
+
+        return { pending, done, archived };
     }
 
     async findById(id: number): Promise<FixedExpenseResponse> {

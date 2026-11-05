@@ -5,6 +5,7 @@ import type {
     FixedExpenseListParams,
     FixedExpenseListRow,
     FixedExpenseResponse,
+    FixedExpenseTabCounts,
     UpdateFixedExpenseDto,
 } from '@/modules/accounts/fixed-expenses/helpers/fixedExpense.types';
 import type { PaginatedResult } from '@/types/api.types';
@@ -36,6 +37,11 @@ class FixedExpenseApiService extends BaseApiService {
 
     async getById(id: number): Promise<FixedExpenseResponse> {
         return this.get<FixedExpenseResponse>(`/${id}`);
+    }
+
+    async getCounts(search?: string): Promise<FixedExpenseTabCounts> {
+        const params = search ? `?search=${encodeURIComponent(search)}` : '';
+        return this.get<FixedExpenseTabCounts>(`/counts${params}`);
     }
 
     async getHistory(id: number): Promise<FixedExpenseHistoryRow[]> {
