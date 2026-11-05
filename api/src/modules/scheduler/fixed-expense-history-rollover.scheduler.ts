@@ -29,7 +29,7 @@ export class FixedExpenseHistoryRolloverScheduler {
         @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger
     ) {}
 
-    @Cron("* * * * *")
+    @Cron("0 5 * * *")
     async handlePaidFixedExpenses() {
         this.logger.info("Cron tick at fixedExpenseHistoryRollover", { timestamp: new Date() });
 

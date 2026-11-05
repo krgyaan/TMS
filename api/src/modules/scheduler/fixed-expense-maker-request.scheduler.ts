@@ -29,7 +29,7 @@ export class FixedExpenseMakerRequestScheduler {
     ) {}
 
     // Daily at 06:00 server time (production schedule).
-    @Cron("* * * * *")
+    @Cron("0 6 * * *")
     async handleUpcomingFixedExpenses() {
         this.logger.info("Cron tick at fixedExpenseMakerRequests", { timestamp: new Date() });
 
