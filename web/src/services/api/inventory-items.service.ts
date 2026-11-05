@@ -4,7 +4,7 @@ import type { InventoryItem, InventoryItemPayload, InventoryItemsResponse } from
 class InventoryItemsService extends BaseApiService {
     constructor(team: "accounts" | "operations") { super(`/${team}/item-master`); }
 
-    getAll(params?: { search?: string; page?: number; limit?: number; itemName?: string; unit?: string; isActive?: string }): Promise<InventoryItemsResponse> {
+    getAll(params?: { search?: string; page?: number; limit?: number; teamId?: number; itemName?: string; unit?: string; isActive?: string }): Promise<InventoryItemsResponse> {
         return this.get<InventoryItemsResponse>("", { params });
     }
     getById(id: number): Promise<InventoryItem> { return this.get<InventoryItem>(`/${id}`); }

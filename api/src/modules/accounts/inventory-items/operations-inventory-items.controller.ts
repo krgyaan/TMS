@@ -3,10 +3,7 @@ import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
 import { PermissionGuard } from "@/modules/auth/guards/permission.guard";
 import { CanCreate, CanDelete, CanRead, CanUpdate } from "@/modules/auth/decorators/permissions.decorator";
 import { InventoryItemsService } from "./inventory-items.service";
-import { itemSchema } from "./inventory-items.controller";
-
-const updateSchema = itemSchema.partial();
-const teamId = 2;
+import { itemSchema, parseItemBody, updateItemSchema } from "./inventory-items.controller";
 
 @Controller("operations/item-master")
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -15,25 +12,31 @@ export class OperationsInventoryItemsController {
 
     @Get()
     @CanRead("operations.item-master")
-    list(@Query("search") search?: string, @Query("page") page?: string, @Query("limit") limit?: string, @Query("itemName") itemName?: string, @Query("unit") unit?: string, @Query("isActive") isActive?: string) {
-        return this.service.findAll({ teamId, search, page: page ? Number(page) : undefined, limit: limit ? Number(limit) : undefined, itemName, unit, isActive: isActive === undefined || isActive === "" ? undefined : isActive === "true" });
+    list(@Query("search") search?: string, @Query("page") page?: string, @Query("limit") limit?: string, @Query("teamId") teamId?: string, @Query("itemName") itemName?: string, @Query("unit") unit?: string, @Query("isActive") isActive?: string) {
+        return this.service.findAll({ teamId: teamId ? Number(teamId) : undefined, search, page: page ? Number(page) : undefined, limit: limit ? Number(limit) : undefined, itemName, unit, isActive: isActive === undefined || isActive === "" ? undefined : isActive === "true" });
     }
 
     @Get(":id")
     @CanRead("operations.item-master")
-    get(@Param("id", ParseIntPipe) id: number) { return this.service.findById(id, teamId); }
+    get(@Param("id", ParseIntPipe) id: number) { return this.service.findById(id); }
 
     @Post()
     @CanCreate("operations.item-master")
     @HttpCode(HttpStatus.CREATED)
-    create(@Body() body: unknown) { return this.service.create(itemSchema.parse(body), teamId); }
+    create(@Body() body: unknown) {
+        const { teamId, ...data } = parseItemBody(itemSchema, body);
+        return this.service.create(data, teamId);
+    }
 
     @Patch(":id")
     @CanUpdate("operations.item-master")
-    update(@Param("id", ParseIntPipe) id: number, @Body() body: unknown) { return this.service.update(id, updateSchema.parse(body), teamId); }
+    update(@Param("id", ParseIntPipe) id: number, @Body() body: unknown) {
+        const { teamId, ...data } = parseItemBody(updateItemSchema, body);
+        return this.service.update(id, data, teamId);
+    }
 
     @Delete(":id")
     @CanDelete("operations.item-master")
     @HttpCode(HttpStatus.NO_CONTENT)
-    async delete(@Param("id", ParseIntPipe) id: number) { await this.service.softDelete(id, teamId); }
+    async delete(@Param("id", ParseIntPipe) id: number) { await this.service.softDelete(id); }
 }

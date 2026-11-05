@@ -1,6 +1,6 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { Loader2, Plus } from "lucide-react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -8,115 +8,131 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Form } from "@/components/ui/form";
-import { useAuth } from "@/contexts/AuthContext";
+import { SelectField } from "@/components/form/SelectField";
+import { toast } from "sonner";
+import { useTeams } from "@/hooks/api/useTeams";
+import { handleQueryError } from "@/lib/react-query";
 import { useCreateInventoryItem, useUpdateInventoryItem, type ItemMasterTeam } from "@/hooks/api/useInventoryItems";
 import type { InventoryItem } from "@/types/inventory-item.types";
-import { UNIT_OPTIONS, categoryOptions, getCategory, getConversionRules } from "./item-config";
+import { UNIT_OPTIONS, categoryOptions, getCategory } from "./item-config";
+import { inventoryItemFormSchema, type InventoryItemFormValues } from "./item-form-schema";
 
-const schema = z.object({
-    teamId: z.enum(["1", "2"]),
-    itemName: z.string().min(1, "Item name is required"),
-    itemType: z.string().optional(),
-    specifications: z.record(z.string()),
-    description: z.string().optional(),
-    unit: z.enum(UNIT_OPTIONS, { message: "Unit is required" }),
-    conversionUnit: z.string().optional(),
-    conversionFactor: z.string().optional(),
-    hsnCode: z.string().optional(),
-    isActive: z.boolean(),
-});
-type FormValues = z.infer<typeof schema>;
+type FormValues = InventoryItemFormValues;
 type Props = { open: boolean; onOpenChange: (open: boolean) => void; item?: InventoryItem | null; routeTeam: ItemMasterTeam };
-
-const inputClass = "flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm";
+const inputClass = "h-9 w-full rounded-md border border-input bg-background px-3 text-sm";
 
 export function InventoryItemFormDialog({ open, onOpenChange, item, routeTeam }: Props) {
-    const { canCreate } = useAuth();
-    const canCreateBoth = canCreate("accounts.item-master") && canCreate("operations.item-master");
+    const [submitError, setSubmitError] = useState<string | null>(null);
+    const [descriptionOpen, setDescriptionOpen] = useState(false);
+    const { data: allTeams = [] } = useTeams({ enabled: open });
+    const teamOptions = useMemo(() => allTeams
+        .filter(team => team.name === "AC" || team.name === "DC")
+        .map(team => ({ id: String(team.id), name: team.name })), [allTeams]);
     const createItem = useCreateInventoryItem(routeTeam);
     const updateItem = useUpdateInventoryItem(routeTeam);
     const form = useForm<FormValues>({
-        resolver: zodResolver(schema),
-        defaultValues: {         teamId: routeTeam === "accounts" ? "1" : "2", itemName: "", itemType: "", specifications: {}, description: "", unit: "Nos.", conversionUnit: "", conversionFactor: "", hsnCode: "", isActive: true },
+        resolver: zodResolver(inventoryItemFormSchema),
+        defaultValues: { teamId: "", itemName: "", itemType: "", specifications: {}, description: "", unit: "Nos.", hsnCode: "", isActive: true },
     });
     const itemName = form.watch("itemName");
-    const unit = form.watch("unit");
-    const conversionUnit = form.watch("conversionUnit");
     const category = getCategory(itemName);
-    const conversionRules = useMemo(() => getConversionRules(unit), [unit]);
-    const selectedRule = conversionRules.find(rule => rule.to === conversionUnit);
     const saving = createItem.isPending || updateItem.isPending;
     const mutationError = createItem.error || updateItem.error;
 
     useEffect(() => {
         if (!open) return;
+        setSubmitError(null);
+        setDescriptionOpen(Boolean(item?.description));
         form.reset(item ? {
-            teamId: String(item.teamId) as "1" | "2",
-            itemName: item.itemName,
-            itemType: item.itemType || "",
-            specifications: item.specifications || {},
-            description: item.description || "",
-            unit: item.unit as FormValues["unit"],
-            conversionUnit: item.conversionUnit || "",
-            conversionFactor: item.conversionFactor || "",
-            hsnCode: item.hsnCode || "",
-            isActive: item.isActive,
-        } : { teamId: routeTeam === "accounts" ? "1" : "2", itemName: "", itemType: "", specifications: {}, description: "", unit: "Nos.", conversionUnit: "", conversionFactor: "", hsnCode: "", isActive: true });
+            teamId: String(item.teamId), itemName: item.itemName, itemType: item.itemType || "",
+            specifications: item.specifications || {}, description: item.description || "",
+            unit: item.unit as FormValues["unit"], hsnCode: item.hsnCode || "", isActive: item.isActive,
+        } : {
+            teamId: teamOptions.find(team => team.name === "AC")?.id || "", itemName: "", itemType: "",
+            specifications: {}, description: "", unit: "Nos.", hsnCode: "", isActive: true,
+        });
         createItem.reset();
         updateItem.reset();
+        const focusTimer = window.setTimeout(() => form.setFocus("teamId"), 0);
+        return () => window.clearTimeout(focusTimer);
     }, [open, item, routeTeam]);
 
     useEffect(() => {
-        if (unit === "Nos.") {
-            form.setValue("conversionUnit", "");
-            form.setValue("conversionFactor", "");
-        } else if (conversionUnit && !conversionRules.some(rule => rule.to === conversionUnit)) {
-            form.setValue("conversionUnit", "");
-            form.setValue("conversionFactor", "");
+        if (open && !item && !form.getValues("teamId")) {
+            form.setValue("teamId", teamOptions.find(team => team.name === "AC")?.id || "");
         }
-    }, [unit, conversionUnit, conversionRules, form]);
-
-    useEffect(() => {
-        if (selectedRule?.factor !== null && selectedRule?.factor !== undefined) {
-            form.setValue("conversionFactor", String(selectedRule.factor));
-        }
-    }, [selectedRule, form]);
+    }, [open, item, teamOptions, form]);
 
     const submit = async (values: FormValues) => {
+        setSubmitError(null);
         const payload = {
-            teamId: Number(values.teamId),
-            itemName: values.itemName,
-            itemType: values.itemType || null,
-            specifications: values.specifications,
-            description: values.description?.trim() || null,
+            teamId: Number(values.teamId), itemName: values.itemName, itemType: values.itemType || null,
+            specifications: values.specifications, description: values.description?.trim() || null,
             unit: values.unit,
-            conversionUnit: values.unit === "Nos." ? null : values.conversionUnit || null,
-            conversionFactor: values.unit === "Nos." ? null : values.conversionFactor || null,
-            hsnCode: values.hsnCode?.trim() || null,
-            isActive: values.isActive,
+            hsnCode: values.hsnCode?.trim() || null, isActive: values.isActive,
         };
         if (item) await updateItem.mutateAsync({ id: item.id, data: payload });
         else await createItem.mutateAsync(payload);
         onOpenChange(false);
     };
 
-    return <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
-            <DialogHeader><DialogTitle>{item ? "Edit Item" : "Add New Item"}</DialogTitle><DialogDescription>Manage team-scoped item specifications, units, conversions and HSN codes.</DialogDescription></DialogHeader>
-            <Form {...form}><form onSubmit={form.handleSubmit(submit)} className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                {mutationError && <Alert variant="destructive" className="md:col-span-2"><AlertDescription>{mutationError instanceof Error ? mutationError.message : "Unable to save item."}</AlertDescription></Alert>}
-                <div className="space-y-2"><Label>Team</Label><select className={inputClass} disabled={!canCreateBoth} {...form.register("teamId")}><option value="1">AC</option><option value="2">DC</option></select></div>
-                <div className="space-y-2"><Label>Item Name</Label><select className={inputClass} {...form.register("itemName")}><option value="">Select item family</option>{categoryOptions.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}</select>{form.formState.errors.itemName && <p className="text-sm text-destructive">{form.formState.errors.itemName.message}</p>}</div>
-                {category?.types && <div className="space-y-2"><Label>Item Type</Label><select className={inputClass} {...form.register("itemType")}><option value="">Select item type</option>{category.types.map(value => <option key={value} value={value}>{value}</option>)}</select></div>}
-                {category?.fields.map(field => <div key={field.key} className="space-y-2"><Label>{field.label}</Label>{field.options ? <select className={inputClass} {...form.register(`specifications.${field.key}` as const)}><option value="">Select {field.label}</option>{field.options.map(option => <option key={option} value={option}>{option}</option>)}</select> : <Input {...form.register(`specifications.${field.key}` as const)} placeholder={field.label} />}</div>)}
-                <div className="space-y-2 md:col-span-2"><Label>Description <span className="text-muted-foreground">(optional)</span></Label><textarea className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" {...form.register("description")} placeholder="Optional item description" /></div>
-                <div className="space-y-2"><Label>Unit</Label><select className={inputClass} {...form.register("unit")}><option value="">Select unit</option>{UNIT_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}</select></div>
-                <div className="space-y-2"><Label>Conversion</Label>{unit === "Nos." ? <Input value="NA" readOnly /> : <select className={inputClass} {...form.register("conversionUnit")}><option value="">Select conversion</option>{conversionRules.map(rule => <option key={rule.to} value={rule.to}>{rule.from} -&gt; {rule.to}</option>)}</select>}</div>
-                {unit !== "Nos." && conversionUnit && <div className="space-y-2"><Label>Factor</Label><Input type="number" step="any" min="0.000001" readOnly={selectedRule?.factor !== null} placeholder={`1 ${unit} = ___ ${conversionUnit}`} {...form.register("conversionFactor")} />{selectedRule?.factor === null && <p className="text-xs text-muted-foreground">Required and must be greater than zero.</p>}</div>}
-                <div className="space-y-2"><Label>HSN Code</Label><Input {...form.register("hsnCode")} placeholder="HSN code" /></div>
-                <p className="text-xs text-muted-foreground md:col-span-2">Stock quantity and price are maintained in Inventory/Purchase, not Item Master.</p>
-                <label className="flex items-center gap-2"><input type="checkbox" {...form.register("isActive")} /><span className="text-sm">Active</span></label>
-                <DialogFooter className="md:col-span-2"><Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><Button type="submit" disabled={saving}>{saving ? "Saving..." : item ? "Save Changes" : "Create Item"}</Button></DialogFooter>
+    const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        setSubmitError(null);
+        void form.handleSubmit(submit)(event).catch(error => {
+            const message = handleQueryError(error);
+            setSubmitError(message);
+            toast.error(message);
+        });
+    };
+
+    const requestClose = (nextOpen: boolean) => {
+        if (!nextOpen && form.formState.isDirty && !saving && !window.confirm("Discard unsaved item changes?")) return;
+        onOpenChange(nextOpen);
+    };
+    const fieldError = (name: keyof FormValues) => form.formState.errors[name]?.message as string | undefined;
+
+    return <Dialog open={open} onOpenChange={requestClose}>
+        <DialogContent className="max-h-[calc(100dvh-4rem)] overflow-hidden p-0 sm:max-w-3xl [&>div:first-child]:max-h-[calc(100dvh-4rem)] [&>div:first-child]:overflow-y-auto [&>div:first-child]:px-0">
+            <Form {...form}><form onSubmit={handleSubmit} className="grid grid-cols-1 gap-0 md:grid-cols-2">
+                <DialogHeader className="sticky top-0 z-10 col-span-full border-b bg-background px-5 py-3 text-left sm:px-6">
+                    <DialogTitle>{item ? "Edit Item" : "Add New Item"}</DialogTitle>
+                    <DialogDescription>Item details and specifications.</DialogDescription>
+                </DialogHeader>
+                <div className="col-span-full space-y-3 px-5 py-4 sm:px-6">
+                    {(submitError || mutationError) && <Alert variant="destructive"><AlertDescription>{submitError || (mutationError instanceof Error ? handleQueryError(mutationError) : "Unable to save item.")}</AlertDescription></Alert>}
+                    <section className="space-y-2">
+                        <div className="grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-2">
+                            <SelectField control={form.control} name="teamId" label="Team" placeholder="Select team" options={teamOptions} valueType="string" />
+                            <SelectField control={form.control} name="itemName" label="Item Name" placeholder="Select item family" options={categoryOptions.map(option => ({ id: option.id, name: option.name }))} valueType="string" />
+                            {category?.types && <div className="space-y-1"><Label className="text-xs">Type</Label><select className={inputClass} {...form.register("itemType")}><option value="">Select type</option>{category.types.map(type => <option key={type} value={type}>{type}</option>)}</select>{fieldError("itemType") && <p className="text-xs text-destructive">{fieldError("itemType")}</p>}</div>}
+                            <div className="space-y-1"><Label className="text-xs">HSN</Label><Input className="h-9" {...form.register("hsnCode")} placeholder="HSN code" />{fieldError("hsnCode") && <p className="text-xs text-destructive">{fieldError("hsnCode")}</p>}</div>
+                        </div>
+                    </section>
+
+                    {category && <section className="space-y-2">
+                        <div className="grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-3">
+                            {category.fields.map(field => <div key={field.key} className="space-y-1"><Label className="text-xs">{field.label}</Label>{field.options
+                                ? <select className={inputClass} {...form.register(`specifications.${field.key}` as const)}><option value="">Select {field.label}</option>{field.options.map(option => <option key={option} value={option}>{option}</option>)}</select>
+                                : <Input className="h-9" {...form.register(`specifications.${field.key}` as const)} placeholder={field.label} />}</div>)}
+                        </div>
+                    </section>}
+
+                    <section className="space-y-2">
+                        <div className="grid grid-cols-1 items-end gap-x-4 gap-y-3 md:grid-cols-2">
+                            <div className="space-y-1"><Label className="text-xs">Unit</Label><select className={inputClass} {...form.register("unit")}>{UNIT_OPTIONS.map(value => <option key={value} value={value}>{value}</option>)}</select>{fieldError("unit") && <p className="text-xs text-destructive">{fieldError("unit")}</p>}</div>
+                            <label className="flex h-9 items-center gap-2 text-sm"><input type="checkbox" className="h-4 w-4" {...form.register("isActive")} />Active</label>
+                        </div>
+                    </section>
+                    <section className="space-y-2">
+                        {descriptionOpen ? <div className="space-y-1"><Label className="text-xs">Description</Label><textarea rows={2} className="w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm" {...form.register("description")} placeholder="Optional item description" /></div>
+                            : <button type="button" onClick={() => setDescriptionOpen(true)} className="inline-flex items-center gap-1 text-xs text-primary"><Plus className="h-3 w-3" />Add description</button>}
+                    </section>
+                </div>
+                <DialogFooter className="sticky bottom-0 z-10 col-span-full flex-row items-center justify-between border-t bg-background px-5 py-3 sm:px-6">
+                    <p className="hidden text-xs text-muted-foreground sm:block">Stock and price are managed in Inventory/Purchase.</p>
+                    <div className="flex gap-2"><Button type="button" variant="outline" onClick={() => requestClose(false)} disabled={saving}>Cancel</Button><Button type="submit" disabled={saving || teamOptions.length === 0}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{item ? "Save Changes" : "Create Item"}</Button></div>
+                </DialogFooter>
             </form></Form>
         </DialogContent>
     </Dialog>;

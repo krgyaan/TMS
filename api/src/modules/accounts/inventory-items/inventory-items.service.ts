@@ -1,23 +1,26 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { and, desc, eq, ilike, isNull, or, sql, type SQL } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import { inventoryItems, type InventoryItem, type NewInventoryItem } from "@db/schemas/accounts/inventory-items.schema";
-import { conversionLabel, getConversionRule, type Unit } from "./conversion-rules";
+import { teams } from "@db/schemas/master/teams.schema";
 
-type ListOptions = { teamId: number; search?: string; page?: number; limit?: number; itemName?: string; unit?: string; isActive?: boolean };
-type ItemInput = Omit<NewInventoryItem, "id" | "itemCode" | "teamId" | "createdAt" | "updatedAt" | "deletedAt">;
+type ListOptions = { teamId?: number; search?: string; page?: number; limit?: number; itemName?: string; unit?: string; isActive?: boolean };
+type ItemInput = Pick<NewInventoryItem, "itemName" | "itemType" | "description" | "specifications" | "unit" | "hsnCode" | "isActive">;
 
 @Injectable()
 export class InventoryItemsService {
+    private readonly logger = new Logger(InventoryItemsService.name);
+
     constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
 
     async findAll(options: ListOptions) {
         const page = Math.max(1, options.page || 1);
         const limit = Math.min(100, Math.max(1, options.limit || 25));
         const search = options.search?.trim();
+        if (options.teamId !== undefined) await this.validateTeamId(options.teamId);
         const filters: SQL[] = [
-            eq(inventoryItems.teamId, options.teamId),
+            options.teamId === undefined ? undefined : eq(inventoryItems.teamId, options.teamId),
             isNull(inventoryItems.deletedAt),
             search ? or(ilike(inventoryItems.itemCode, `%${search}%`), ilike(inventoryItems.itemName, `%${search}%`), ilike(inventoryItems.itemType, `%${search}%`), ilike(inventoryItems.hsnCode, `%${search}%`)) : undefined,
             options.itemName ? eq(inventoryItems.itemName, options.itemName) : undefined,
@@ -33,30 +36,50 @@ export class InventoryItemsService {
         return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
     }
 
-    async findById(id: number, teamId: number): Promise<InventoryItem> {
-        const [item] = await this.db.select().from(inventoryItems).where(and(eq(inventoryItems.id, id), eq(inventoryItems.teamId, teamId), isNull(inventoryItems.deletedAt))).limit(1);
+    async findById(id: number): Promise<InventoryItem> {
+        const [item] = await this.db.select().from(inventoryItems).where(and(eq(inventoryItems.id, id), isNull(inventoryItems.deletedAt))).limit(1);
         if (!item) throw new NotFoundException(`Inventory item with ID ${id} not found`);
         return item;
     }
 
     async create(data: ItemInput, teamId: number): Promise<InventoryItem> {
-        const normalized = this.normalizeConversion(data);
-        await this.ensureUnique(normalized, teamId, undefined);
-        const [item] = await this.db.insert(inventoryItems).values({ ...normalized, teamId, itemCode: await this.nextItemCode() }).returning();
+        await this.validateTeamId(teamId);
+        await this.ensureUnique(data, teamId, undefined);
+        const [item] = await this.db.insert(inventoryItems).values({ ...data, teamId, itemCode: await this.nextItemCode() }).returning();
         return item;
     }
 
-    async update(id: number, data: Partial<ItemInput>, teamId: number): Promise<InventoryItem> {
-        const current = await this.findById(id, teamId);
-        const normalized = this.normalizeConversion({ ...current, ...data });
-        await this.ensureUnique(normalized, teamId, id);
-        const [item] = await this.db.update(inventoryItems).set({ ...normalized, updatedAt: new Date() }).where(and(eq(inventoryItems.id, id), eq(inventoryItems.teamId, teamId))).returning();
+    async update(id: number, data: Partial<ItemInput>, requestedTeamId?: number): Promise<InventoryItem> {
+        const current = await this.findById(id);
+        const teamId = requestedTeamId ?? current.teamId;
+        await this.validateTeamId(teamId);
+        const updatedValues = { ...current, ...data };
+        await this.ensureUnique(updatedValues, teamId, id);
+        const values: Partial<ItemInput> & { teamId: number; updatedAt: Date; itemGroup?: string | null } = {
+            itemName: updatedValues.itemName, itemType: updatedValues.itemType, description: updatedValues.description,
+            specifications: updatedValues.specifications, unit: updatedValues.unit, hsnCode: updatedValues.hsnCode,
+            isActive: updatedValues.isActive, itemGroup: current.itemGroup, teamId, updatedAt: new Date(),
+        };
+        const [item] = await this.db.update(inventoryItems).set(values).where(eq(inventoryItems.id, id)).returning();
         return item;
     }
 
-    async softDelete(id: number, teamId: number): Promise<void> {
-        await this.findById(id, teamId);
-        await this.db.update(inventoryItems).set({ isActive: false, deletedAt: new Date(), updatedAt: new Date() }).where(and(eq(inventoryItems.id, id), eq(inventoryItems.teamId, teamId)));
+    async softDelete(id: number): Promise<void> {
+        await this.findById(id);
+        await this.db.update(inventoryItems).set({ isActive: false, deletedAt: new Date(), updatedAt: new Date() }).where(eq(inventoryItems.id, id));
+    }
+
+    async validateTeamId(teamId: number): Promise<void> {
+        try {
+            const [team] = await this.db.select({ name: teams.name }).from(teams).where(eq(teams.id, teamId)).limit(1);
+            if (!team || (team.name !== "AC" && team.name !== "DC")) {
+                throw new BadRequestException("Team must be AC or DC");
+            }
+        } catch (error) {
+            if (error instanceof BadRequestException) throw error;
+            this.logger.error(`Failed to validate Item Master team ${teamId}`, error instanceof Error ? error.stack : undefined);
+            throw error;
+        }
     }
 
     private async nextItemCode() {
@@ -84,17 +107,4 @@ export class InventoryItemsService {
         }
     }
 
-    private normalizeConversion(data: ItemInput): ItemInput {
-                const unit = data.unit as Unit;
-                const conversionUnit = data.conversionUnit || null;
-                const rule = conversionUnit ? getConversionRule(unit, conversionUnit) : undefined;
-                if (unit === "Nos.") {
-                    return { ...data, conversion: { value: "NA" }, conversionUnit: null, conversionFactor: null };
-                }
-                if (!rule) throw new BadRequestException(`Invalid conversion pair: ${unit} -> ${conversionUnit || "none"}`);
-                const factor = rule.factor ?? Number(data.conversionFactor);
-                if (!Number.isFinite(factor) || factor <= 0) throw new BadRequestException("Conversion factor must be greater than zero");
-                if (rule.factor !== null && Math.abs(factor - rule.factor) > 0.000001) throw new BadRequestException("The Mtr/Ft conversion factor is fixed");
-                return { ...data, conversion: { value: conversionLabel(unit, conversionUnit as Unit) }, conversionUnit, conversionFactor: String(rule.factor ?? factor) };
-    }
 }

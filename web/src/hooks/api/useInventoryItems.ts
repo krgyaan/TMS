@@ -8,18 +8,20 @@ export type ItemMasterTeam = "accounts" | "operations";
 export const inventoryItemsKey = ["inventory-items"] as const;
 const serviceFor = (team: ItemMasterTeam) => inventoryItemsService[team];
 
-export const useInventoryItems = (team: ItemMasterTeam, filters: { search?: string; itemName?: string; unit?: string; isActive?: string } = {}) =>
-    useQuery({ queryKey: [...inventoryItemsKey, team, filters], queryFn: () => serviceFor(team).getAll({ ...filters, limit: 100 }) });
+export type InventoryItemFilters = { search?: string; teamId?: number; itemName?: string; unit?: string; isActive?: string; page?: number; limit?: number };
+export const itemListKey = [...inventoryItemsKey, "list"] as const;
+
+export const useInventoryItems = (team: ItemMasterTeam, filters: InventoryItemFilters = {}) =>
+    useQuery({ queryKey: [...itemListKey, filters], queryFn: () => serviceFor(team).getAll(filters), placeholderData: previous => previous });
 
 export const useInventoryItem = (team: ItemMasterTeam, id: number) =>
-    useQuery({ queryKey: [...inventoryItemsKey, team, id], queryFn: () => serviceFor(team).getById(id), enabled: !!id });
+    useQuery({ queryKey: [...inventoryItemsKey, "detail", team, id], queryFn: () => serviceFor(team).getById(id), enabled: !!id });
 
 const useItemMutation = (team: ItemMasterTeam, action: (data: InventoryItemPayload) => Promise<unknown>, message: string) => {
     const client = useQueryClient();
     return useMutation({
         mutationFn: action,
-        onSuccess: () => { void client.invalidateQueries({ queryKey: [...inventoryItemsKey, team] }); toast.success(message); },
-        onError: error => toast.error(handleQueryError(error)),
+        onSuccess: () => { void client.invalidateQueries({ queryKey: itemListKey }); toast.success(message); },
     });
 };
 
@@ -28,15 +30,14 @@ export const useUpdateInventoryItem = (team: ItemMasterTeam) => {
     const client = useQueryClient();
     return useMutation({
         mutationFn: ({ id, data }: { id: number; data: Partial<InventoryItemPayload> }) => serviceFor(team).update(id, data),
-        onSuccess: () => { void client.invalidateQueries({ queryKey: [...inventoryItemsKey, team] }); toast.success("Item updated successfully"); },
-        onError: error => toast.error(handleQueryError(error)),
+        onSuccess: () => { void client.invalidateQueries({ queryKey: itemListKey }); toast.success("Item updated successfully"); },
     });
 };
 export const useDeleteInventoryItem = (team: ItemMasterTeam) => {
     const client = useQueryClient();
     return useMutation({
         mutationFn: (id: number) => serviceFor(team).deleteItem(id),
-        onSuccess: () => { void client.invalidateQueries({ queryKey: [...inventoryItemsKey, team] }); toast.success("Item deleted successfully"); },
+        onSuccess: () => { void client.invalidateQueries({ queryKey: itemListKey }); toast.success("Item deleted successfully"); },
         onError: error => toast.error(handleQueryError(error)),
     });
 };

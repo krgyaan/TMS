@@ -15,8 +15,6 @@ export function InventoryItemViewDialog({ item, onOpenChange }: { item: Inventor
                 <div><span className="text-muted-foreground">Status</span><p><Badge variant={item.isActive ? "default" : "secondary"}>{item.isActive ? "Active" : "Inactive"}</Badge></p></div>
                 {category?.fields.map(field => <div key={field.key}><span className="text-muted-foreground">{field.label}</span><p>{item.specifications?.[field.key] || "—"}</p></div>)}
                 <div><span className="text-muted-foreground">Unit</span><p>{item.unit}</p></div>
-                <div><span className="text-muted-foreground">Conversion</span><p>{item.conversion?.value || "NA"}</p></div>
-                {item.conversionFactor && <div><span className="text-muted-foreground">Factor</span><p>{item.conversionFactor}</p></div>}
                 <div><span className="text-muted-foreground">HSN Code</span><p>{item.hsnCode || "—"}</p></div>
                 <div className="sm:col-span-2"><span className="text-muted-foreground">Description</span><p>{item.description || "—"}</p></div>
                 <div><span className="text-muted-foreground">Created At</span><p>{new Date(item.createdAt).toLocaleString("en-IN")}</p></div>
