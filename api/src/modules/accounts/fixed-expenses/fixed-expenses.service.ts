@@ -542,12 +542,10 @@ export class FixedExpensesService {
                     expense.createdBy
                 );
 
-                // Link the request back to the expense; this is the idempotency
-                // key that stops the next cron run from creating a duplicate.
                 await this.db.update(fixedExpenses).set({ makerId: makerRequest.id, updatedAt: new Date() }).where(eq(fixedExpenses.id, expense.id));
                 await this.db
                     .update(fixedExpensesHistory)
-                    .set({ status: "Maker Created", makerId: makerRequest.id, updatedBy: null, updatedAt: new Date() })
+                    .set({ status: "Maker Created", makerId: makerRequest.id, updatedAt: new Date() })
                     .where(and(eq(fixedExpensesHistory.expenseId, expense.id), currentHistoryForExpense(expense.id)));
 
                 created.push(makerRequest.requestNo ?? `#${makerRequest.id}`);
