@@ -2,15 +2,6 @@ import { z } from 'zod';
 
 // ===================== ENUM VALUES =====================
 
-export const FIXED_EXPENSE_TYPES = [
-    'electricity',
-    'rent',
-    'salary',
-    'communication',
-    'software',
-    'admin',
-] as const;
-
 export const FIXED_EXPENSE_FREQUENCIES = [
     'monthly',
     'quarterly',
@@ -34,7 +25,8 @@ export const FixedExpenseFormSchema = z
         accountName: z.string().max(255).optional(),
         accountNumber: z.string().max(100).optional(),
         ifscCode: z.string().max(50).optional(),
-        type: z.enum(FIXED_EXPENSE_TYPES),
+        categoryId: z.string().min(1, 'Type is required'),
+        subCategoryId: z.string().optional(),
         dueDate: z.string().min(1, 'Due date is required'),
         paymentFrequency: z.enum(FIXED_EXPENSE_FREQUENCIES).default('monthly'),
     })

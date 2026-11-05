@@ -1,25 +1,65 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, asc, desc, eq, ilike, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, isNull, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import { users } from "@db/schemas/auth";
 import { fixedExpenses, type NewFixedExpense } from "@db/schemas/accounts/fixed-expense.schema";
+import { fixedExpensesHistory, type NewFixedExpenseHistory } from "@db/schemas/accounts/fixed-expense-history.schema";
+import { paymentRequests } from "@db/schemas/operations/payment-requests.schema";
+import { paymentCategory } from "@db/schemas/master/payment-category.schema";
+import { MakerRequestService } from "@/modules/operations/maker-requests/maker-request.service";
 import { wrapPaginatedResponse } from "@/utils/responseWrapper";
 import type {
     CreateFixedExpenseDto,
     FixedExpenseAmountType,
     FixedExpenseFrequency,
+    FixedExpenseHistoryRow,
     FixedExpensePaymentMode,
     FixedExpenseQuery,
     FixedExpenseResponse,
-    FixedExpenseStatus,
-    FixedExpenseType,
     UpdateFixedExpenseDto,
 } from "./dto/fixed-expenses.dto";
 
 const creatorUser = alias(users, "fixed_expense_creator");
-const makerUser = alias(users, "fixed_expense_maker");
+const fixedExpenseMakerRequest = alias(paymentRequests, "fixed_expense_maker_request");
+const historyMakerRequest = alias(paymentRequests, "history_maker_request");
+const historyUpdatedByUser = alias(users, "history_updated_by_user");
+const historyApprovedByUser = alias(users, "history_approved_by_user");
+
+/**
+ * Keeps only the current (latest) workflow row per expense. History now holds
+ * one row per payment cycle, so list/view/update must look at the newest one.
+ */
+const currentHistoryJoin = sql`${fixedExpensesHistory.id} = (
+    SELECT max(h2.id) FROM fixed_expenses_history h2 WHERE h2.expense_id = ${fixedExpenses.id}
+)`;
+
+/** Same as `currentHistoryJoin`, but for a single expense id (update path). */
+const currentHistoryForExpense = (expenseId: number) =>
+    sql`${fixedExpensesHistory.id} = (
+        SELECT max(h2.id) FROM fixed_expenses_history h2 WHERE h2.expense_id = ${expenseId}
+    )`;
+
+/** Months added per payment frequency when rolling a paid cycle forward. */
+const FREQUENCY_MONTHS: Record<string, number> = {
+    monthly: 1,
+    quarterly: 3,
+    half_yearly: 6,
+    annual: 12,
+};
+
+/** Fixed-expense payment mode -> project_payment_requests.payment_mode value. */
+const FIXED_EXPENSE_PAYMENT_MODE_TO_MR: Record<string, string> = {
+    auto_debit: "AUTO_DEBIT",
+    bank_transfer: "BANK_TRANSFER",
+};
+
+/** Payment cycles that actually got a maker request. */
+const cyclesTotalExpr = sql<number>`(SELECT count(*)::int FROM fixed_expenses_history h WHERE h.expense_id = ${fixedExpenses.id} AND h.maker_id IS NOT NULL)`;
+
+/** Cycles whose payment is done. */
+const cyclesPaidExpr = sql<number>`(SELECT count(*)::int FROM fixed_expenses_history h WHERE h.expense_id = ${fixedExpenses.id} AND h.maker_id IS NOT NULL AND h.status = 'Payment Done')`;
 
 const fixedExpenseSelection = {
     id: fixedExpenses.id,
@@ -31,12 +71,26 @@ const fixedExpenseSelection = {
     accountNumber: fixedExpenses.accountNumber,
     ifscCode: fixedExpenses.ifscCode,
     type: fixedExpenses.type,
+    categoryId: fixedExpenses.categoryId,
+    subCategory: fixedExpenses.subCategory,
     dueDate: fixedExpenses.dueDate,
     paymentFrequency: fixedExpenses.paymentFrequency,
-    status: fixedExpenses.status,
     deleteStatus: fixedExpenses.deleteStatus,
     makerId: fixedExpenses.makerId,
-    makerName: makerUser.name,
+    status: fixedExpensesHistory.status,
+    makerRequestNo: fixedExpenseMakerRequest.requestNo,
+    makerRequestStatus: fixedExpenseMakerRequest.status,
+    // Cycle counters for the list/view: paid cycles / cycles that got a maker request.
+    cyclesTotal: cyclesTotalExpr,
+    cyclesPaid: cyclesPaidExpr,
+    cycleRequestNos: sql<string[]>`COALESCE((
+        SELECT array_agg(pr.request_no ORDER BY h.id)
+        FROM fixed_expenses_history h
+        JOIN project_payment_requests pr ON pr.id = h.maker_id
+        WHERE h.expense_id = ${fixedExpenses.id} AND h.maker_id IS NOT NULL
+    ), ARRAY[]::varchar[])`,
+    // When the latest cycle's payment was completed.
+    lastPaymentDoneAt: sql<Date | null>`(SELECT max(h.updated_at) FROM fixed_expenses_history h WHERE h.expense_id = ${fixedExpenses.id} AND h.status = 'Payment Done')`,
     createdBy: fixedExpenses.createdBy,
     createdByName: creatorUser.name,
     createdAt: fixedExpenses.createdAt,
@@ -53,12 +107,19 @@ type FixedExpenseRow = {
     accountNumber: string | null;
     ifscCode: string | null;
     type: string;
+    categoryId: number | null;
+    subCategory: string | null;
     dueDate: string;
     paymentFrequency: string;
-    status: string;
     deleteStatus: boolean;
     makerId: number | null;
-    makerName: string | null;
+    status: string | null;
+    makerRequestNo: string | null;
+    makerRequestStatus: string | null;
+    cyclesTotal: number;
+    cyclesPaid: number;
+    cycleRequestNos: string[];
+    lastPaymentDoneAt: Date | null;
     createdBy: number;
     createdByName: string | null;
     createdAt: Date;
@@ -67,7 +128,10 @@ type FixedExpenseRow = {
 
 @Injectable()
 export class FixedExpensesService {
-    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
+    constructor(
+        @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly makerRequests: MakerRequestService
+    ) {}
 
     // ===================== HELPERS =====================
 
@@ -81,13 +145,20 @@ export class FixedExpensesService {
             accountName: row.accountName ?? null,
             accountNumber: row.accountNumber ?? null,
             ifscCode: row.ifscCode ?? null,
-            type: row.type as FixedExpenseType,
+            type: row.type,
+            categoryId: row.categoryId ?? null,
+            subCategory: row.subCategory ?? null,
             dueDate: row.dueDate ?? "",
             paymentFrequency: row.paymentFrequency as FixedExpenseFrequency,
-            status: row.status as FixedExpenseStatus,
             deleteStatus: row.deleteStatus,
             makerId: row.makerId ?? null,
-            makerName: row.makerName ?? null,
+            status: row.status ?? null,
+            makerRequestNo: row.makerRequestNo ?? null,
+            makerRequestStatus: row.makerRequestStatus ?? null,
+            cyclesTotal: Number(row.cyclesTotal ?? 0),
+            cyclesPaid: Number(row.cyclesPaid ?? 0),
+            cycleRequestNos: row.cycleRequestNos ?? [],
+            lastPaymentDoneAt: row.lastPaymentDoneAt ?? null,
             createdBy: row.createdBy,
             createdByName: row.createdByName ?? null,
             createdAt: row.createdAt,
@@ -116,7 +187,44 @@ export class FixedExpensesService {
         }
     }
 
-    private buildWhereClause(filters?: FixedExpenseQuery): SQL<unknown> | undefined {
+    /**
+     * Resolve the display `type` and `subCategory` from a payment_category row.
+     * The row must exist, belong to the fixed-expense purpose and be active.
+     * Falls back to a legacy client-supplied `type` when no category is given.
+     */
+    private async resolveCategory(categoryId: number | null | undefined, fallbackType?: string): Promise<{ type: string; subCategory: string | null }> {
+        if (!categoryId) {
+            if (fallbackType) return { type: fallbackType, subCategory: null };
+            throw new BadRequestException("Category is required");
+        }
+
+        const [row] = await this.db
+            .select({
+                category: paymentCategory.category,
+                subCategory: paymentCategory.subCategory,
+                purpose: paymentCategory.purpose,
+                status: paymentCategory.status,
+            })
+            .from(paymentCategory)
+            .where(eq(paymentCategory.id, categoryId))
+            .limit(1);
+
+        if (!row) {
+            throw new BadRequestException(`Payment category with ID ${categoryId} not found`);
+        }
+
+        if (row.purpose !== "fixed") {
+            throw new BadRequestException("Selected category does not belong to fixed expenses");
+        }
+
+        if (row.status !== "active") {
+            throw new BadRequestException("Selected category is inactive");
+        }
+
+        return { type: row.category, subCategory: row.subCategory ?? null };
+    }
+
+    private buildWhereClause(filters?: Partial<FixedExpenseQuery>): SQL<unknown> | undefined {
         const conditions: (SQL<unknown> | undefined)[] = [];
         const search = filters?.search?.trim();
 
@@ -136,7 +244,10 @@ export class FixedExpensesService {
                 or(
                     ilike(fixedExpenses.partyName, term),
                     ilike(fixedExpenses.type, term),
-                    ilike(fixedExpenses.status, term),
+                    ilike(fixedExpenses.subCategory, term),
+                    ilike(fixedExpenseMakerRequest.requestNo, term),
+                    ilike(fixedExpensesHistory.status, term),
+                    ilike(fixedExpensesHistory.status, slugTerm),
                     ilike(fixedExpenses.amountType, term),
                     ilike(fixedExpenses.amountType, slugTerm),
                     ilike(fixedExpenses.paymentMode, term),
@@ -169,6 +280,18 @@ export class FixedExpensesService {
 
         if (filters?.amountType) {
             conditions.push(eq(fixedExpenses.amountType, filters.amountType));
+        }
+
+        if (filters?.status) {
+            // Done = at least one payment has happened AND either the current
+            // cycle is paid or its due date is more than 30 days away (nothing
+            // to act on soon). Everything else stays in Pending, including
+            // expenses that have never been paid.
+            const doneCondition = sql`${cyclesPaidExpr} > 0 AND (
+                COALESCE(${fixedExpensesHistory.status}, '') = 'Payment Done'
+                OR ${fixedExpenses.dueDate} > CURRENT_DATE + 30
+            )`;
+            conditions.push(filters.status === "Done" ? sql`(${doneCondition})` : sql`NOT (${doneCondition})`);
         }
 
         // Archived rows are hidden unless explicitly requested
@@ -204,13 +327,16 @@ export class FixedExpensesService {
                 .select({ count: sql<number>`count(*)::int` })
                 .from(fixedExpenses)
                 .leftJoin(creatorUser, eq(creatorUser.id, fixedExpenses.createdBy))
+                .leftJoin(fixedExpensesHistory, currentHistoryJoin)
+                .leftJoin(fixedExpenseMakerRequest, eq(fixedExpenseMakerRequest.id, fixedExpensesHistory.makerId))
                 .where(whereClause)
                 .then(([r]) => Number(r?.count ?? 0)),
             this.db
                 .select(fixedExpenseSelection)
                 .from(fixedExpenses)
                 .leftJoin(creatorUser, eq(creatorUser.id, fixedExpenses.createdBy))
-                .leftJoin(makerUser, eq(makerUser.id, fixedExpenses.makerId))
+                .leftJoin(fixedExpensesHistory, currentHistoryJoin)
+                .leftJoin(fixedExpenseMakerRequest, eq(fixedExpenseMakerRequest.id, fixedExpensesHistory.makerId))
                 .where(whereClause)
                 .orderBy(orderFn(orderColumn))
                 .limit(limit)
@@ -222,12 +348,34 @@ export class FixedExpensesService {
         return wrapPaginatedResponse(data, countResult, page, limit);
     }
 
+    /** Counts for the Pending / Done / Archived tabs (optionally filtered by search). */
+    async getTabCounts(search?: string): Promise<{ pending: number; done: number; archived: number }> {
+        const countFor = (filters: Partial<FixedExpenseQuery>) =>
+            this.db
+                .select({ count: sql<number>`count(*)::int` })
+                .from(fixedExpenses)
+                .leftJoin(creatorUser, eq(creatorUser.id, fixedExpenses.createdBy))
+                .leftJoin(fixedExpensesHistory, currentHistoryJoin)
+                .leftJoin(fixedExpenseMakerRequest, eq(fixedExpenseMakerRequest.id, fixedExpensesHistory.makerId))
+                .where(this.buildWhereClause({ search, ...filters }))
+                .then(([row]) => Number(row?.count ?? 0));
+
+        const [pending, done, archived] = await Promise.all([
+            countFor({ status: "Pending", deleteStatus: false }),
+            countFor({ status: "Done", deleteStatus: false }),
+            countFor({ deleteStatus: true }),
+        ]);
+
+        return { pending, done, archived };
+    }
+
     async findById(id: number): Promise<FixedExpenseResponse> {
         const [row] = await this.db
             .select(fixedExpenseSelection)
             .from(fixedExpenses)
             .leftJoin(creatorUser, eq(creatorUser.id, fixedExpenses.createdBy))
-            .leftJoin(makerUser, eq(makerUser.id, fixedExpenses.makerId))
+            .leftJoin(fixedExpensesHistory, currentHistoryJoin)
+            .leftJoin(fixedExpenseMakerRequest, eq(fixedExpenseMakerRequest.id, fixedExpensesHistory.makerId))
             .where(eq(fixedExpenses.id, id))
             .limit(1);
 
@@ -238,37 +386,122 @@ export class FixedExpensesService {
         return this.mapToResponse(row);
     }
 
+    /** Full payment-cycle history for one expense, oldest cycle first. */
+    async getHistory(id: number): Promise<FixedExpenseHistoryRow[]> {
+        // Throws NotFound when the expense doesn't exist.
+        await this.findById(id);
+
+        const rows = await this.db
+            .select({
+                id: fixedExpensesHistory.id,
+                dueDate: fixedExpensesHistory.dueDate,
+                amount: fixedExpensesHistory.amount,
+                amountType: fixedExpensesHistory.amountType,
+                paymentFrequency: fixedExpensesHistory.paymentFrequency,
+                status: fixedExpensesHistory.status,
+                makerId: fixedExpensesHistory.makerId,
+                makerRequestNo: historyMakerRequest.requestNo,
+                makerRequestStatus: historyMakerRequest.status,
+                makerRequestAmount: historyMakerRequest.amount,
+                utrNumber: historyMakerRequest.utrNumber,
+                updatedAt: fixedExpensesHistory.updatedAt,
+                approvedBy: fixedExpensesHistory.approvedBy,
+                approvedByName: historyApprovedByUser.name,
+                updatedBy: fixedExpensesHistory.updatedBy,
+                updatedByName: historyUpdatedByUser.name,
+                createdAt: fixedExpensesHistory.createdAt,
+            })
+            .from(fixedExpensesHistory)
+            .leftJoin(historyMakerRequest, eq(historyMakerRequest.id, fixedExpensesHistory.makerId))
+            .leftJoin(historyUpdatedByUser, eq(historyUpdatedByUser.id, fixedExpensesHistory.updatedBy))
+            .leftJoin(historyApprovedByUser, eq(historyApprovedByUser.id, fixedExpensesHistory.approvedBy))
+            .where(eq(fixedExpensesHistory.expenseId, id))
+            .orderBy(asc(fixedExpensesHistory.id));
+
+        return rows.map((row, index) => ({
+            id: row.id,
+            cycle: index + 1,
+            dueDate: row.dueDate,
+            amount: row.amount,
+            amountType: row.amountType as FixedExpenseAmountType,
+            paymentFrequency: row.paymentFrequency as FixedExpenseFrequency,
+            status: row.status,
+            makerId: row.makerId ?? null,
+            makerRequestNo: row.makerRequestNo ?? null,
+            makerRequestStatus: row.makerRequestStatus ?? null,
+            makerRequestAmount: row.makerRequestAmount ?? null,
+            utrNumber: row.utrNumber ?? null,
+            updatedAt: row.updatedAt,
+            approvedBy: row.approvedBy ?? null,
+            approvedByName: row.approvedByName ?? null,
+            updatedBy: row.updatedBy ?? null,
+            updatedByName: row.updatedByName ?? null,
+            createdAt: row.createdAt,
+        }));
+    }
+
     async create(data: CreateFixedExpenseDto, createdBy: number): Promise<FixedExpenseResponse> {
         this.assertBankDetails(data.paymentMode, data.accountName, data.accountNumber, data.ifscCode);
 
+        const { type, subCategory } = await this.resolveCategory(data.categoryId, data.type);
         const now = new Date();
 
-        const [inserted] = await this.db
-            .insert(fixedExpenses)
-            .values({
-                partyName: data.partyName,
-                amountType: data.amountType,
-                amount: data.amount,
-                paymentMode: data.paymentMode,
-                accountName: data.accountName ?? null,
-                accountNumber: data.accountNumber ?? null,
-                ifscCode: data.ifscCode ?? null,
-                type: data.type,
-                dueDate: data.dueDate,
-                paymentFrequency: data.paymentFrequency,
-                status: "New",
-                deleteStatus: false,
-                makerId: data.makerId ?? null,
-                createdBy,
+        const snapshot = {
+            partyName: data.partyName,
+            amountType: data.amountType,
+            amount: data.amount,
+            paymentMode: data.paymentMode,
+            accountName: data.accountName ?? null,
+            accountNumber: data.accountNumber ?? null,
+            ifscCode: data.ifscCode ?? null,
+            categoryId: data.categoryId ?? null,
+            dueDate: data.dueDate,
+            paymentFrequency: data.paymentFrequency,
+            deleteStatus: false,
+            makerId: data.makerId ?? null,
+        };
+
+        // The expense and its workflow row are created together.
+        const inserted = await this.db.transaction(async tx => {
+            const [expense] = await tx
+                .insert(fixedExpenses)
+                .values({
+                    ...snapshot,
+                    type,
+                    subCategory,
+                    createdBy,
+                    createdAt: now,
+                    updatedAt: now,
+                })
+                .returning({ id: fixedExpenses.id });
+
+            await tx.insert(fixedExpensesHistory).values({
+                expenseId: expense.id,
+                partyName: snapshot.partyName,
+                amountType: snapshot.amountType,
+                amount: snapshot.amount,
+                paymentMode: snapshot.paymentMode,
+                accountName: snapshot.accountName,
+                accountNumber: snapshot.accountNumber,
+                ifscCode: snapshot.ifscCode,
+                categoryId: snapshot.categoryId,
+                dueDate: snapshot.dueDate,
+                paymentFrequency: snapshot.paymentFrequency,
+                makerId: snapshot.makerId,
+                status: "Awaited Maker",
+                // Left NULL at creation; set only when someone edits/changes status.
+                updatedBy: null,
                 createdAt: now,
                 updatedAt: now,
-            })
-            .returning({ id: fixedExpenses.id });
+            });
+
+            return expense;
+        });
 
         return this.findById(inserted.id);
     }
 
-    async update(id: number, data: UpdateFixedExpenseDto): Promise<FixedExpenseResponse> {
+    async update(id: number, data: UpdateFixedExpenseDto, updatedBy?: number): Promise<FixedExpenseResponse> {
         const existing = await this.findById(id);
 
         const paymentMode = data.paymentMode ?? existing.paymentMode;
@@ -288,14 +521,42 @@ export class FixedExpensesService {
         if (data.accountName !== undefined) updateData.accountName = data.accountName;
         if (data.accountNumber !== undefined) updateData.accountNumber = data.accountNumber;
         if (data.ifscCode !== undefined) updateData.ifscCode = data.ifscCode;
-        if (data.type !== undefined) updateData.type = data.type;
+        if (data.categoryId) {
+            const resolved = await this.resolveCategory(data.categoryId);
+            updateData.categoryId = data.categoryId;
+            updateData.type = resolved.type;
+            updateData.subCategory = resolved.subCategory;
+        } else if (data.type !== undefined) {
+            updateData.type = data.type;
+        }
         if (data.dueDate !== undefined) updateData.dueDate = data.dueDate;
         if (data.paymentFrequency !== undefined) updateData.paymentFrequency = data.paymentFrequency;
-        if (data.status !== undefined) updateData.status = data.status;
         if (data.makerId !== undefined) updateData.makerId = data.makerId;
         if (data.deleteStatus !== undefined) updateData.deleteStatus = data.deleteStatus;
 
         await this.db.update(fixedExpenses).set(updateData).where(eq(fixedExpenses.id, id));
+
+        // Keep the workflow row's snapshot in step with the expense. The history
+        // row only stores category_id (type/sub_category are derived from it).
+        const historyUpdate: Partial<NewFixedExpenseHistory> = { updatedAt: updateData.updatedAt, updatedBy: updatedBy ?? null };
+        if (data.partyName !== undefined) historyUpdate.partyName = data.partyName;
+        if (data.amountType !== undefined) historyUpdate.amountType = data.amountType;
+        if (data.amount !== undefined) historyUpdate.amount = data.amount;
+        if (data.paymentMode !== undefined) historyUpdate.paymentMode = data.paymentMode;
+        if (data.accountName !== undefined) historyUpdate.accountName = data.accountName;
+        if (data.accountNumber !== undefined) historyUpdate.accountNumber = data.accountNumber;
+        if (data.ifscCode !== undefined) historyUpdate.ifscCode = data.ifscCode;
+        if (data.categoryId) historyUpdate.categoryId = data.categoryId;
+        if (data.dueDate !== undefined) historyUpdate.dueDate = data.dueDate;
+        if (data.paymentFrequency !== undefined) historyUpdate.paymentFrequency = data.paymentFrequency;
+        if (data.makerId !== undefined) historyUpdate.makerId = data.makerId;
+
+        // Only the current cycle's row is refreshed; completed cycles keep their
+        // historical snapshot.
+        await this.db
+            .update(fixedExpensesHistory)
+            .set(historyUpdate)
+            .where(and(eq(fixedExpensesHistory.expenseId, id), currentHistoryForExpense(id)));
 
         return this.findById(id);
     }
@@ -312,5 +573,197 @@ export class FixedExpensesService {
         await this.findById(id);
 
         await this.db.delete(fixedExpenses).where(eq(fixedExpenses.id, id));
+    }
+
+    // ===================== MAKER REQUEST CRON =====================
+
+    /** "Printing & Stationary" -> "printing_stationary" (matches maker-request category slugs). */
+    private slugifyCategory(value: string): string {
+        return value
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "_")
+            .replace(/^_+|_+$/g, "");
+    }
+
+    /**
+     * Daily cron: for every fixed expense whose workflow status is "Awaited
+     * Maker" and whose workflow row (`fixed_expenses_history`) is due within the
+     * next 3 days (including today), create a maker request and store its id in
+     * fixed_expenses.maker_id / fixed_expenses_history.maker_id. The history
+     * status and maker id act as idempotency keys, so re-running the job never
+     * duplicates requests.
+     *
+     * The due date, status and maker link are read from the history snapshot,
+     * which is refreshed whenever the expense is edited.
+     *
+     * Concurrency is handled by the scheduler, which holds a Postgres advisory
+     * lock for the duration of the run.
+     */
+    async createMakerRequestsForUpcomingDueDates(): Promise<{
+        created: string[];
+        failed: Array<{ id: number; error: string }>;
+    }> {
+        const candidates = await this.db
+            .select({
+                id: fixedExpenses.id,
+                partyName: fixedExpenses.partyName,
+                amount: fixedExpenses.amount,
+                accountNumber: fixedExpenses.accountNumber,
+                ifscCode: fixedExpenses.ifscCode,
+                type: fixedExpenses.type,
+                paymentMode: fixedExpenses.paymentMode,
+                dueDate: fixedExpensesHistory.dueDate,
+                createdBy: fixedExpenses.createdBy,
+            })
+            .from(fixedExpenses)
+            .innerJoin(fixedExpensesHistory, eq(fixedExpensesHistory.expenseId, fixedExpenses.id))
+            .where(
+                and(
+                    eq(fixedExpensesHistory.status, "Awaited Maker"),
+                    eq(fixedExpenses.deleteStatus, false),
+                    isNull(fixedExpensesHistory.makerId),
+                    currentHistoryJoin,
+                    sql`${fixedExpensesHistory.dueDate} BETWEEN CURRENT_DATE AND CURRENT_DATE + 3`
+                )
+            )
+            .orderBy(asc(fixedExpensesHistory.dueDate));
+
+        const created: string[] = [];
+        const failed: Array<{ id: number; error: string }> = [];
+
+        for (const expense of candidates) {
+            try {
+                const makerRequest = await this.makerRequests.create(
+                    {
+                        partyName: expense.partyName,
+                        accountNumber: expense.accountNumber ?? undefined,
+                        ifsc: expense.ifscCode ?? undefined,
+                        amount: expense.amount,
+                        category: this.slugifyCategory(expense.type),
+                        paymentMode: FIXED_EXPENSE_PAYMENT_MODE_TO_MR[expense.paymentMode] ?? "BANK_TRANSFER",
+                        remark: `Auto-created from fixed expense #${expense.id}, due ${expense.dueDate}`,
+                    },
+                    expense.createdBy
+                );
+
+                await this.db.update(fixedExpenses).set({ makerId: makerRequest.id, updatedAt: new Date() }).where(eq(fixedExpenses.id, expense.id));
+                await this.db
+                    .update(fixedExpensesHistory)
+                    .set({ status: "Maker Created", makerId: makerRequest.id, updatedAt: new Date() })
+                    .where(and(eq(fixedExpensesHistory.expenseId, expense.id), currentHistoryForExpense(expense.id)));
+
+                created.push(makerRequest.requestNo ?? `#${makerRequest.id}`);
+            } catch (error) {
+                failed.push({
+                    id: expense.id,
+                    error: error instanceof Error ? error.message : String(error),
+                });
+            }
+        }
+
+        return { created, failed };
+    }
+
+    // ===================== PAYMENT DONE ROLLOVER CRON =====================
+
+    /** Adds `months` to an ISO date, clipping to the last day of the month. */
+    private addMonths(isoDate: string, months: number): string {
+        const [year, month, day] = isoDate.split("-").map(Number);
+        const target = new Date(Date.UTC(year, month - 1 + months, 1));
+        const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+        target.setUTCDate(Math.min(day, lastDay));
+        return target.toISOString().slice(0, 10);
+    }
+
+    /** Next due date at or after today for the given payment frequency. */
+    private nextDueDate(from: string, frequency: string): string {
+        const months = FREQUENCY_MONTHS[frequency] ?? FREQUENCY_MONTHS.monthly;
+        const today = new Date().toISOString().slice(0, 10);
+        let next = this.addMonths(from, months);
+        // If the paid cycle was overdue, keep stepping so the new cycle is never
+        // created with a due date in the past.
+        for (let i = 0; next < today && i < 120; i += 1) {
+            next = this.addMonths(next, months);
+        }
+        return next;
+    }
+
+    /**
+     * Daily cron: for every expense whose current workflow row is "Payment
+     * Done", start the next cycle by inserting a new history row with the same
+     * snapshot, the next due date derived from payment_frequency, and status
+     * "Awaited Maker". The maker-request cron then picks the new row up and
+     * creates its request.
+     *
+     * Idempotent: after the insert the latest row is "Awaited Maker", so the
+     * next run no longer sees the paid row as current.
+     */
+    async rolloverPaidFixedExpenses(): Promise<{
+        rolled: number[];
+        failed: Array<{ id: number; error: string }>;
+    }> {
+        const paidRows = await this.db
+            .select({
+                expenseId: fixedExpensesHistory.expenseId,
+                partyName: fixedExpensesHistory.partyName,
+                amountType: fixedExpensesHistory.amountType,
+                amount: fixedExpensesHistory.amount,
+                paymentMode: fixedExpensesHistory.paymentMode,
+                accountName: fixedExpensesHistory.accountName,
+                accountNumber: fixedExpensesHistory.accountNumber,
+                ifscCode: fixedExpensesHistory.ifscCode,
+                categoryId: fixedExpensesHistory.categoryId,
+                dueDate: fixedExpensesHistory.dueDate,
+                paymentFrequency: fixedExpensesHistory.paymentFrequency,
+            })
+            .from(fixedExpensesHistory)
+            .innerJoin(fixedExpenses, eq(fixedExpenses.id, fixedExpensesHistory.expenseId))
+            .where(and(eq(fixedExpensesHistory.status, "Payment Done"), eq(fixedExpenses.deleteStatus, false), currentHistoryJoin));
+
+        const rolled: number[] = [];
+        const failed: Array<{ id: number; error: string }> = [];
+
+        for (const row of paidRows) {
+            try {
+                const dueDate = this.nextDueDate(row.dueDate, row.paymentFrequency);
+                const now = new Date();
+
+                await this.db.transaction(async tx => {
+                    await tx.insert(fixedExpensesHistory).values({
+                        expenseId: row.expenseId,
+                        partyName: row.partyName,
+                        amountType: row.amountType,
+                        amount: row.amount,
+                        paymentMode: row.paymentMode,
+                        accountName: row.accountName,
+                        accountNumber: row.accountNumber,
+                        ifscCode: row.ifscCode,
+                        categoryId: row.categoryId,
+                        dueDate,
+                        paymentFrequency: row.paymentFrequency,
+                        status: "Awaited Maker",
+                        makerId: null,
+                        updatedBy: null,
+                        createdAt: now,
+                        updatedAt: now,
+                    });
+
+                    // Keep the expense's own due date in step with the new cycle.
+                    // maker_id keeps pointing at the completed request so payment
+                    // history links stay intact until the next request is created.
+                    await tx.update(fixedExpenses).set({ dueDate, updatedAt: now }).where(eq(fixedExpenses.id, row.expenseId));
+                });
+
+                rolled.push(row.expenseId);
+            } catch (error) {
+                failed.push({
+                    id: row.expenseId,
+                    error: error instanceof Error ? error.message : String(error),
+                });
+            }
+        }
+
+        return { rolled, failed };
     }
 }

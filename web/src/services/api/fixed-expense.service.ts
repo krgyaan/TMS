@@ -1,9 +1,11 @@
 import { BaseApiService } from './base.service';
 import type {
     CreateFixedExpenseDto,
+    FixedExpenseHistoryRow,
     FixedExpenseListParams,
     FixedExpenseListRow,
     FixedExpenseResponse,
+    FixedExpenseTabCounts,
     UpdateFixedExpenseDto,
 } from '@/modules/accounts/fixed-expenses/helpers/fixedExpense.types';
 import type { PaginatedResult } from '@/types/api.types';
@@ -22,6 +24,7 @@ class FixedExpenseApiService extends BaseApiService {
         if (params?.paymentFrequency) search.set('paymentFrequency', params.paymentFrequency);
         if (params?.paymentMode) search.set('paymentMode', params.paymentMode);
         if (params?.amountType) search.set('amountType', params.amountType);
+        if (params?.status) search.set('status', params.status);
         if (params?.deleteStatus !== undefined) {
             search.set('deleteStatus', String(params.deleteStatus));
         }
@@ -34,6 +37,15 @@ class FixedExpenseApiService extends BaseApiService {
 
     async getById(id: number): Promise<FixedExpenseResponse> {
         return this.get<FixedExpenseResponse>(`/${id}`);
+    }
+
+    async getCounts(search?: string): Promise<FixedExpenseTabCounts> {
+        const params = search ? `?search=${encodeURIComponent(search)}` : '';
+        return this.get<FixedExpenseTabCounts>(`/counts${params}`);
+    }
+
+    async getHistory(id: number): Promise<FixedExpenseHistoryRow[]> {
+        return this.get<FixedExpenseHistoryRow[]>(`/${id}/history`);
     }
 
     async create(data: CreateFixedExpenseDto): Promise<FixedExpenseResponse> {

@@ -15,10 +15,7 @@ export class PaymentRequestController {
 
     @Put(":id")
     @HttpCode(HttpStatus.OK)
-    update(
-        @Param("id", ParseIntPipe) id: number,
-        @Body() body: any,
-    ) {
+    update(@Param("id", ParseIntPipe) id: number, @Body() body: any) {
         return this.service.update(id, body);
     }
 
@@ -33,34 +30,25 @@ export class PaymentRequestController {
     }
 
     @Get()
-    getAll(@Query("teamId") teamId?: string, @Query("type") type?: 'project' | 'maker') {
+    getAll(@Query("teamId") teamId?: string, @Query("type") type?: "project" | "maker") {
         return this.service.getAll(teamId ? Number(teamId) : undefined, type);
     }
 
     @Patch(":id/status")
     @HttpCode(HttpStatus.OK)
-    updateStatus(
-        @Param("id", ParseIntPipe) id: number,
-        @Body() body: any,
-    ) {
-        return this.service.updateStatus(id, body);
+    updateStatus(@Param("id", ParseIntPipe) id: number, @Body() body: any, @CurrentUser() user: ValidatedUser) {
+        return this.service.updateStatus(id, body, user.id);
     }
 
     @Patch(":id/revert")
     @HttpCode(HttpStatus.OK)
-    revertStatus(
-        @Param("id", ParseIntPipe) id: number,
-        @Body() body: { status: string; remark: string },
-    ) {
-        return this.service.revertStatus(id, body);
+    revertStatus(@Param("id", ParseIntPipe) id: number, @Body() body: { status: string; remark: string }, @CurrentUser() user: ValidatedUser) {
+        return this.service.revertStatus(id, body, user.id);
     }
 
     @Patch(":id/upload-invoice-after-payment")
     @HttpCode(HttpStatus.OK)
-    uploadInvoiceAfterPayment(
-        @Param("id", ParseIntPipe) id: number,
-        @Body() body: { files: string[] },
-    ) {
+    uploadInvoiceAfterPayment(@Param("id", ParseIntPipe) id: number, @Body() body: { files: string[] }) {
         return this.service.uploadInvoiceAfterPayment(id, body.files);
     }
 
@@ -83,10 +71,7 @@ export class PaymentRequestController {
     }
 
     @Put("beneficiaries/:id")
-    updateBeneficiary(
-        @Param("id", ParseIntPipe) id: number,
-        @Body() body: any,
-    ) {
+    updateBeneficiary(@Param("id", ParseIntPipe) id: number, @Body() body: any) {
         return this.service.updateBeneficiary(id, body);
     }
 

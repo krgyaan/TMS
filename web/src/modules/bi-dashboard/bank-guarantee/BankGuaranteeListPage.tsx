@@ -51,6 +51,12 @@ const TABS_CONFIG: Array<{ key: BankGuaranteeDashboardTab; name: string; icon: R
         description: 'Live bank guarantees from SBI',
     },
     {
+        key: 'live-yes',
+        name: 'Live YES',
+        icon: <Shield className="h-4 w-4" />,
+        description: 'Live bank guarantees from YES Bank',
+    },
+    {
         key: 'cancelled',
         name: 'Cancelled',
         icon: <XCircle className="h-4 w-4" />,
@@ -118,7 +124,7 @@ const BankGuaranteeListPage = () => {
         getExportDataFn: (params) => bankGuaranteesService.getExportData(params),
         tabsConfig: TABS_CONFIG,
         pendingTabKey: 'new-requests',
-        tabsWithForm: ['live-pnb', 'live-bg-limit', 'live-sbi', 'cancelled', 'rejected'],
+        tabsWithForm: ['live-pnb', 'live-bg-limit', 'live-sbi', 'live-yes', 'cancelled', 'rejected'],
         filenamePrefix: 'bank-guarantees',
         flattenFormData,
         mapPendingRow: (r: any) => ({
