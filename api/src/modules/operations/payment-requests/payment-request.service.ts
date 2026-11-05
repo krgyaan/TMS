@@ -4,6 +4,7 @@ import { users } from "@/db/schemas/";
 import { projects } from "@/db/schemas/master/projects.schema";
 import { beneficiaries } from "@/db/schemas/operations/beneficiaries.schema";
 import { fixedExpenses } from "@/db/schemas/accounts/fixed-expense.schema";
+import { fixedExpensesHistory, MR_STATUS_TO_HISTORY_STATUS } from "@/db/schemas/accounts/fixed-expense-history.schema";
 import { paymentRequests, type PaymentRequest as OperationPaymentRequest } from "@/db/schemas/operations/payment-requests.schema";
 import { tdsReturns } from "@/db/schemas/operations/tds-returns.schema";
 import { employeeImprestTransactions } from "@/db/schemas/shared/employee-imprest-transaction.schema";
@@ -328,7 +329,7 @@ export class PaymentRequestService {
         return updated;
     }
 
-    async updateStatus(id: number, body: { status: string; utrNumber?: string; rejectionReason?: string; amount?: number | string }) {
+    async updateStatus(id: number, body: { status: string; utrNumber?: string; rejectionReason?: string; amount?: number | string }, updatedBy?: number) {
         const existing = await this.db
             .select()
             .from(paymentRequests)
@@ -446,6 +447,8 @@ export class PaymentRequestService {
                     .set({ amount: (parsedAmount as number).toFixed(2), updatedAt: new Date() })
                     .where(eq(fixedExpenses.makerId, id));
             }
+
+            await this.syncFixedExpenseHistory(tx, id, body.status, updatedBy, hasAmount ? (parsedAmount as number).toFixed(2) : undefined);
 
             if (tdsReturn) {
                 await tx
@@ -594,7 +597,7 @@ export class PaymentRequestService {
         return ben.userId;
     }
 
-    async revertStatus(id: number, body: { status: string; remark: string }) {
+    async revertStatus(id: number, body: { status: string; remark: string }, updatedBy?: number) {
         const existing = await this.db
             .select()
             .from(paymentRequests)
@@ -630,8 +633,32 @@ export class PaymentRequestService {
 
             this.logger.info(`Payment Request #${id} reverted from "${existing.status}" to "${body.status}"`);
 
+            await this.syncFixedExpenseHistory(tx, id, body.status, updatedBy);
+
             return updated;
         });
+    }
+
+    /**
+     * Mirror a payment request status onto the linked fixed expense's workflow
+     * row. Project payment requests have no linked expense, so they are skipped.
+     */
+    private async syncFixedExpenseHistory(tx: DbInstance, makerRequestId: number, requestStatus: string, updatedBy?: number, amount?: string) {
+        const historyStatus = MR_STATUS_TO_HISTORY_STATUS[requestStatus];
+        if (!historyStatus) return;
+
+        const [linked] = await tx.select({ id: fixedExpenses.id }).from(fixedExpenses).where(eq(fixedExpenses.makerId, makerRequestId)).limit(1);
+        if (!linked) return;
+
+        await tx
+            .update(fixedExpensesHistory)
+            .set({
+                status: historyStatus,
+                updatedBy: updatedBy ?? null,
+                updatedAt: new Date(),
+                ...(amount ? { amount } : {}),
+            })
+            .where(eq(fixedExpensesHistory.expenseId, linked.id));
     }
 
     async uploadInvoiceAfterPayment(id: number, files: string[]) {

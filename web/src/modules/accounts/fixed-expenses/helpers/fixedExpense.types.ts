@@ -26,6 +26,7 @@ export interface FixedExpenseResponse {
     paymentFrequency: FixedExpenseFrequency;
     deleteStatus: boolean;
     makerId: number | null;
+    status: string | null;
     makerRequestNo?: string | null;
     makerRequestStatus?: string | null;
     createdBy: number;
@@ -91,10 +92,11 @@ export const FIXED_EXPENSE_AMOUNT_TYPE_OPTIONS: FixedExpenseSelectOption[] = [
 ];
 
 export const FIXED_EXPENSE_STATUS_OPTIONS: FixedExpenseSelectOption[] = [
-    { value: 'pending', label: 'Pending' },
-    { value: 'maker_done', label: 'Maker Done' },
-    { value: 'payment_done', label: 'Payment Done' },
-    { value: 'rejected', label: 'Rejected' },
+    { value: 'Awaited Maker', label: 'Awaited Maker' },
+    { value: 'Maker Created', label: 'Maker Created' },
+    { value: 'Maker Done', label: 'Maker Done' },
+    { value: 'Payment Done', label: 'Payment Done' },
+    { value: 'Maker Rejected', label: 'Maker Rejected' },
 ];
 
 // ===================== LABEL MAPS =====================
@@ -126,32 +128,28 @@ export const FIXED_EXPENSE_AMOUNT_TYPE_LABELS: Record<FixedExpenseAmountType, st
 };
 
 export const FIXED_EXPENSE_STATUS_LABELS: Record<string, string> = {
-    pending: 'Pending',
-    maker_done: 'Maker Done',
-    payment_done: 'Payment Done',
-    rejected: 'Rejected',
-};
-
-// Status shown on the list/view. A fixed expense has no status of its own:
-// until the cron links a maker request it is "Awaited Maker", afterwards the
-// linked payment request's status is shown.
-export const AWAITED_MAKER_STATUS = {
-    label: 'Awaited Maker',
-    className: 'bg-slate-100 text-slate-700 border-transparent',
+    'Awaited Maker': 'Awaited Maker',
+    'Maker Created': 'Maker Created',
+    'Maker Done': 'Maker Done',
+    'Payment Done': 'Payment Done',
+    'Maker Rejected': 'Maker Rejected',
 };
 
 export const FIXED_EXPENSE_STATUS_STYLES: Record<string, string> = {
-    pending: 'bg-amber-100 text-amber-800 border-transparent',
-    maker_done: 'bg-indigo-100 text-indigo-800 border-transparent',
-    payment_done: 'bg-emerald-100 text-emerald-800 border-transparent',
-    rejected: 'bg-red-100 text-red-800 border-transparent',
+    'Awaited Maker': 'bg-slate-100 text-slate-700 border-transparent',
+    'Maker Created': 'bg-blue-100 text-blue-800 border-transparent',
+    'Maker Done': 'bg-indigo-100 text-indigo-800 border-transparent',
+    'Payment Done': 'bg-emerald-100 text-emerald-800 border-transparent',
+    'Maker Rejected': 'bg-red-100 text-red-800 border-transparent',
 };
 
+// The status comes from the expense's workflow row (fixed_expenses_history),
+// which is "Awaited Maker" until the cron creates a maker request.
 export const getFixedExpenseDisplayStatus = (row: {
-    makerRequestStatus?: string | null;
+    status?: string | null;
 }): { label: string; className: string } => {
-    const status = row.makerRequestStatus;
-    if (!status) return AWAITED_MAKER_STATUS;
+    const status = row.status;
+    if (!status) return { label: '—', className: '' };
 
     return {
         label: FIXED_EXPENSE_STATUS_LABELS[status] ?? status,

@@ -61,9 +61,9 @@ export class FixedExpensesController {
 
     @Patch(":id")
     @CanUpdate(PERMISSION_MODULE)
-    async update(@Param("id", ParseIntPipe) id: number, @Body() body: unknown) {
+    async update(@Param("id", ParseIntPipe) id: number, @Body() body: unknown, @CurrentUser("id") userId: number) {
         const parsed = updateFixedExpenseSchema.parse(body);
-        return this.fixedExpensesService.update(id, parsed);
+        return this.fixedExpensesService.update(id, parsed, userId);
     }
 
     @Patch(":id/archive")

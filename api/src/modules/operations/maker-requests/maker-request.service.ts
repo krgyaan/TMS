@@ -4,6 +4,7 @@ import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { paymentRequests } from "@/db/schemas/operations/payment-requests.schema";
 import { fixedExpenses } from "@/db/schemas/accounts/fixed-expense.schema";
+import { fixedExpensesHistory, MR_STATUS_TO_HISTORY_STATUS } from "@/db/schemas/accounts/fixed-expense-history.schema";
 import { users } from "@/db/schemas/";
 import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
 import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.schema";
@@ -118,7 +119,7 @@ export class MakerRequestService {
         return parsed.data;
     }
 
-    async updateStatus(id: number, body: { status: string; utrNumber?: string; rejectionReason?: string; amount?: number | string }) {
+    async updateStatus(id: number, body: { status: string; utrNumber?: string; rejectionReason?: string; amount?: number | string }, updatedBy?: number) {
         const existing = await this.db
             .select()
             .from(paymentRequests)
@@ -166,6 +167,8 @@ export class MakerRequestService {
                 .where(eq(fixedExpenses.makerId, id));
         }
 
+        await this.syncFixedExpenseHistory(id, body.status, updatedBy, hasAmount ? (parsedAmount as number).toFixed(2) : undefined);
+
         if (body.status === "payment_done") {
             this.notifications
                 .notifyPaymentDone({
@@ -208,6 +211,25 @@ export class MakerRequestService {
         }
 
         return updated;
+    }
+
+    /** Mirror a maker request status onto the linked fixed expense's workflow row. */
+    private async syncFixedExpenseHistory(makerRequestId: number, requestStatus: string, updatedBy?: number, amount?: string) {
+        const historyStatus = MR_STATUS_TO_HISTORY_STATUS[requestStatus];
+        if (!historyStatus) return;
+
+        const [linked] = await this.db.select({ id: fixedExpenses.id }).from(fixedExpenses).where(eq(fixedExpenses.makerId, makerRequestId)).limit(1);
+        if (!linked) return;
+
+        await this.db
+            .update(fixedExpensesHistory)
+            .set({
+                status: historyStatus,
+                updatedBy: updatedBy ?? null,
+                updatedAt: new Date(),
+                ...(amount ? { amount } : {}),
+            })
+            .where(eq(fixedExpensesHistory.expenseId, linked.id));
     }
 
     async uploadInvoiceAfterPayment(id: number, files: string[]) {

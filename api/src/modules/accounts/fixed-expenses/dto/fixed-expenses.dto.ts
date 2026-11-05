@@ -134,6 +134,7 @@ export interface FixedExpenseResponse {
     paymentFrequency: FixedExpenseFrequency;
     deleteStatus: boolean;
     makerId: number | null;
+    status: string | null;
     makerRequestNo?: string | null;
     makerRequestStatus?: string | null;
     createdBy: number;
