@@ -9,6 +9,7 @@ import { useLoanParties } from "@/hooks/api/useLoanParties";
 import type { LoanParty } from "@/types/api.types";
 import { LoanPartyModal } from "./components/LoanPartyModal";
 import { LoanPartyViewModal } from "./components/LoanPartyViewModal";
+import { useAuth } from "@/contexts/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Plus } from "lucide-react";
@@ -21,12 +22,13 @@ const rowSelection: RowSelectionOptions = {
 
 const LoanPartyPage = () => {
     const { data: loanParties, isLoading, error, refetch } = useLoanParties();
+    const { canWriteMasterData } = useAuth();
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [viewModalOpen, setViewModalOpen] = useState(false);
     const [selectedLoanParty, setSelectedLoanParty] = useState<LoanParty | null>(null);
 
     // Loan Party actions
-    const loanPartyActions: ActionItem<LoanParty>[] = [
+    const loanPartyActions = ([
         {
             label: "View",
             onClick: row => {
@@ -55,7 +57,7 @@ const LoanPartyPage = () => {
         //         }
         //     },
         // },
-    ];
+    ] as ActionItem<LoanParty>[]).filter(action => canWriteMasterData || action.label === "View");
 
     const [colDefs] = useState<ColDef<LoanParty>[]>([
         {
@@ -141,18 +143,20 @@ const LoanPartyPage = () => {
                 <CardHeader>
                     <CardTitle>Loan Parties</CardTitle>
                     <CardDescription>Manage loan parties</CardDescription>
-                    <CardAction>
-                        <Button
-                            variant="default"
-                            onClick={() => {
-                                setSelectedLoanParty(null);
-                                setDrawerOpen(true);
-                            }}
-                        >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Loan Party
-                        </Button>
-                    </CardAction>
+                    {canWriteMasterData && (
+                        <CardAction>
+                            <Button
+                                variant="default"
+                                onClick={() => {
+                                    setSelectedLoanParty(null);
+                                    setDrawerOpen(true);
+                                }}
+                            >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add Loan Party
+                            </Button>
+                        </CardAction>
+                    )}
                 </CardHeader>
                 <CardContent className="px-3">
                     <DataTable
