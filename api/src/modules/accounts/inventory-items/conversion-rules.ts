@@ -22,3 +22,62 @@ export const getConversionRule = (from: string, to: string) =>
     CONVERSION_RULES.find(rule => rule.from === from && rule.to === to);
 
 export const conversionLabel = (from: Unit, to: Unit) => `${from} -> ${to}`;
+
+export type ConversionResolution = {
+    conversionUnit: Unit | null;
+    conversionFactor: string | null;
+    conversion: Record<string, string>;
+};
+
+const parseWidthMillimetres = (specifications: Record<string, string>) => {
+    const width = specifications.width?.trim().match(/^(\d+(?:\.\d+)?)\s*mm$/i);
+    if (!width) return undefined;
+    const parsed = Number(width[1]);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+};
+
+const parseManualFactor = (value: unknown) => {
+    if (typeof value !== "number" && typeof value !== "string") return undefined;
+    const raw = String(value).trim();
+    if (!/^\d+(?:\.\d{1,6})?$/.test(raw)) return undefined;
+    const factor = Number(raw);
+    return Number.isFinite(factor) && factor > 0 ? factor : undefined;
+};
+
+export const resolveConversion = (
+    from: string,
+    to: string | null | undefined,
+    factor: unknown,
+    specifications: Record<string, string>,
+): ConversionResolution => {
+    if (!to) {
+        if (factor !== undefined && factor !== null && factor !== "") {
+            throw new Error("Conversion factor requires a conversion unit");
+        }
+        return { conversionUnit: null, conversionFactor: null, conversion: {} };
+    }
+
+    if (from === to) throw new Error("Unit and conversion unit must differ");
+    const rule = getConversionRule(from, to);
+    if (!rule) throw new Error("This unit conversion is not allowed");
+
+    let resolvedFactor = rule.factor;
+    if (from === "RMtr" || from === "Sq. Mtr.") {
+        const width = parseWidthMillimetres(specifications);
+        if (width !== undefined) {
+            resolvedFactor = from === "RMtr" ? width / 1000 : 1000 / width;
+        }
+    }
+    if (resolvedFactor === null) {
+        resolvedFactor = parseManualFactor(factor) ?? null;
+        if (resolvedFactor === null) {
+            throw new Error("A positive conversion factor with up to 6 decimals is required");
+        }
+    }
+
+    return {
+        conversionUnit: to as Unit,
+        conversionFactor: String(resolvedFactor),
+        conversion: { value: conversionLabel(from as Unit, to as Unit) },
+    };
+};

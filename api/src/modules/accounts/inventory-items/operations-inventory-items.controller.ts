@@ -1,9 +1,8 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { Controller, Get, Param, ParseIntPipe, Query, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
 import { PermissionGuard } from "@/modules/auth/guards/permission.guard";
-import { CanCreate, CanDelete, CanRead, CanUpdate } from "@/modules/auth/decorators/permissions.decorator";
+import { CanRead } from "@/modules/auth/decorators/permissions.decorator";
 import { InventoryItemsService } from "./inventory-items.service";
-import { itemSchema, parseItemBody, updateItemSchema } from "./inventory-items.controller";
 
 @Controller("operations/item-master")
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -20,23 +19,4 @@ export class OperationsInventoryItemsController {
     @CanRead("operations.item-master")
     get(@Param("id", ParseIntPipe) id: number) { return this.service.findById(id); }
 
-    @Post()
-    @CanCreate("operations.item-master")
-    @HttpCode(HttpStatus.CREATED)
-    create(@Body() body: unknown) {
-        const { teamId, ...data } = parseItemBody(itemSchema, body);
-        return this.service.create(data, teamId);
-    }
-
-    @Patch(":id")
-    @CanUpdate("operations.item-master")
-    update(@Param("id", ParseIntPipe) id: number, @Body() body: unknown) {
-        const { teamId, ...data } = parseItemBody(updateItemSchema, body);
-        return this.service.update(id, data, teamId);
-    }
-
-    @Delete(":id")
-    @CanDelete("operations.item-master")
-    @HttpCode(HttpStatus.NO_CONTENT)
-    async delete(@Param("id", ParseIntPipe) id: number) { await this.service.softDelete(id); }
 }

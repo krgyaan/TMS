@@ -4,9 +4,11 @@ import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import { inventoryItems, type InventoryItem, type NewInventoryItem } from "@db/schemas/accounts/inventory-items.schema";
 import { teams } from "@db/schemas/master/teams.schema";
+import { resolveConversion } from "./conversion-rules";
 
 type ListOptions = { teamId?: number; search?: string; page?: number; limit?: number; itemName?: string; unit?: string; isActive?: boolean };
-type ItemInput = Pick<NewInventoryItem, "itemName" | "itemType" | "description" | "specifications" | "unit" | "hsnCode" | "isActive">;
+type ItemInput = Pick<NewInventoryItem, "itemName" | "itemType" | "description" | "specifications" | "unit" | "hsnCode" | "isActive">
+    & { conversionUnit?: string | null; conversionFactor?: string | number | null };
 
 @Injectable()
 export class InventoryItemsService {
@@ -45,7 +47,10 @@ export class InventoryItemsService {
     async create(data: ItemInput, teamId: number): Promise<InventoryItem> {
         await this.validateTeamId(teamId);
         await this.ensureUnique(data, teamId, undefined);
-        const [item] = await this.db.insert(inventoryItems).values({ ...data, teamId, itemCode: await this.nextItemCode() }).returning();
+        const conversion = this.resolveItemConversion(data.unit, data.conversionUnit, data.conversionFactor, data.specifications || {});
+        const [item] = await this.db.insert(inventoryItems).values({
+            ...data, ...conversion, teamId, itemCode: await this.nextItemCode(),
+        }).returning();
         return item;
     }
 
@@ -55,10 +60,16 @@ export class InventoryItemsService {
         await this.validateTeamId(teamId);
         const updatedValues = { ...current, ...data };
         await this.ensureUnique(updatedValues, teamId, id);
-        const values: Partial<ItemInput> & { teamId: number; updatedAt: Date; itemGroup?: string | null } = {
+        const conversion = this.resolveItemConversion(
+            updatedValues.unit,
+            updatedValues.conversionUnit,
+            updatedValues.conversionFactor,
+            updatedValues.specifications || {},
+        );
+        const values = {
             itemName: updatedValues.itemName, itemType: updatedValues.itemType, description: updatedValues.description,
             specifications: updatedValues.specifications, unit: updatedValues.unit, hsnCode: updatedValues.hsnCode,
-            isActive: updatedValues.isActive, itemGroup: current.itemGroup, teamId, updatedAt: new Date(),
+            isActive: updatedValues.isActive, ...conversion, itemGroup: current.itemGroup, teamId, updatedAt: new Date(),
         };
         const [item] = await this.db.update(inventoryItems).set(values).where(eq(inventoryItems.id, id)).returning();
         return item;
@@ -79,6 +90,14 @@ export class InventoryItemsService {
             if (error instanceof BadRequestException) throw error;
             this.logger.error(`Failed to validate Item Master team ${teamId}`, error instanceof Error ? error.stack : undefined);
             throw error;
+        }
+    }
+
+    private resolveItemConversion(unit: string, conversionUnit: string | null | undefined, factor: unknown, specifications: Record<string, string>) {
+        try {
+            return resolveConversion(unit, conversionUnit, factor, specifications);
+        } catch (error) {
+            throw new BadRequestException(error instanceof Error ? error.message : "Invalid item conversion");
         }
     }
 

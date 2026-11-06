@@ -23,14 +23,14 @@ describe("InventoryItemsService.validateTeamId", () => {
     });
 });
 
-describe("Item Master create and update without unit conversion behavior", () => {
+describe("Item Master create and update conversion behavior", () => {
     it("accepts an item payload that contains no conversion fields", () => {
         const parsed = itemSchema.parse({ teamId: 1, itemName: "Copper", unit: "Kg", specifications: {} });
         expect(parsed).not.toHaveProperty("conversionUnit");
         expect(parsed).not.toHaveProperty("conversionFactor");
     });
 
-    it("leaves legacy conversion column values out of the PATCH update", async () => {
+    it("preserves and validates a stored conversion when an unrelated field is patched", async () => {
         const existing = {
             id: 1, itemCode: "ITM-0001", itemGroup: null, teamId: 1, itemName: "Copper", itemType: "Pipe",
             description: null, specifications: { diameter: "12" }, unit: "Mtr", conversion: { value: "Mtr -> Ft" },
@@ -55,8 +55,10 @@ describe("Item Master create and update without unit conversion behavior", () =>
         const service = new InventoryItemsService(db as never);
         await service.update(1, { itemName: "Copper Pipe Updated" });
         expect(updateValues).toBeDefined();
-        expect(updateValues).not.toHaveProperty("conversion");
-        expect(updateValues).not.toHaveProperty("conversionUnit");
-        expect(updateValues).not.toHaveProperty("conversionFactor");
+        expect(updateValues).toMatchObject({
+            conversion: { value: "Mtr -> Ft" },
+            conversionUnit: "Ft",
+            conversionFactor: "3.28084",
+        });
     });
 });
