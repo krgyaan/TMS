@@ -164,6 +164,7 @@ export const navMain: NavGroup[] = [
             { title: "Permissions", url: paths.master.permissions, permission: "master.permissions" },
             { title: "Status", url: paths.master.statuses, permission: "master.statuses" },
             { title: "Items", url: paths.master.items, permission: "master.items" },
+            { title: "Item Master", url: paths.master.itemMaster, permission: "master.item-master" },
             { title: "Locations", url: paths.master.locations, permission: "master.locations" },
             { title: "Organizations", url: paths.master.organizations, permission: "master.organizations" },
             { title: "Vendors", url: paths.master.vendors, permission: "master.vendors" },

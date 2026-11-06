@@ -23,7 +23,8 @@ describe("Item Master API permission separation", () => {
     });
 
     it.each([
-        ["list", "read"], ["get", "read"], ["create", "create"], ["update", "update"], ["delete", "delete"],
+        ["list", "read"], ["conversionOptions", "read"], ["get", "read"],
+        ["create", "create"], ["update", "update"], ["delete", "delete"],
     ])("protects Settings %s with master.item-master:%s", (method, action) => {
         expect(methodPermission(SettingsInventoryItemsController, method)).toEqual([{ module: "master.item-master", action }]);
     });

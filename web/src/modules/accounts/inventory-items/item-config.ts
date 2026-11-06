@@ -1,15 +1,6 @@
 export type ItemField = { key: string; label: string; options?: string[] };
 export const UNIT_OPTIONS = ["Kg", "Mtr", "Ft", "Nos.", "RMtr", "Sq. Mtr."] as const;
 export type Unit = typeof UNIT_OPTIONS[number];
-export type ConversionRule = { from: Unit; to: Unit; factor: number | null };
-export const CONVERSION_RULES: ConversionRule[] = [
-    { from: "Kg", to: "Mtr", factor: null }, { from: "Mtr", to: "Kg", factor: null },
-    { from: "Kg", to: "Ft", factor: null }, { from: "Ft", to: "Kg", factor: null },
-    { from: "Mtr", to: "Ft", factor: 3.28084 }, { from: "Ft", to: "Mtr", factor: 0.3048 },
-    { from: "RMtr", to: "Sq. Mtr.", factor: null }, { from: "Sq. Mtr.", to: "RMtr", factor: null },
-];
-export const getConversionRules = (unit?: string) =>
-    CONVERSION_RULES.filter(rule => rule.from === unit);
 
 export type ItemCategory = {
     name: string;

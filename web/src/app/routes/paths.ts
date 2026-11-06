@@ -126,6 +126,7 @@ export const paths = {
     // ==================== OPERATIONS ====================
     operations: {
         itemMaster: "/operations/item-master",
+        itemMasterView: (id: number | string) => `/operations/item-master/${id}`,
         woBasicDetailListPage: "/operations/work-order/details/basic",
         woBasicDetailCreatePage: "/operations/work-order/details/basic/create",
         woBasicDetailEditPage: (id: number) => `/operations/work-order/details/basic/${id}/edit`,
@@ -295,6 +296,7 @@ export const paths = {
         paymentRequests: "/accounts/payment-requests",
         inventory: "/accounts/inventory",
         itemMaster: "/accounts/item-master",
+        itemMasterView: (id: number | string) => `/accounts/item-master/${id}`,
         inventoryItems: "/accounts/item",
         inventoryProject: (projectId: number) => `/accounts/inventory?projectId=${projectId}`,
         vendorMaster: "/accounts/vendor-master",
@@ -341,6 +343,9 @@ export const paths = {
 
     // ==================== MASTER ====================
     master: {
+        itemMaster: "/master/item-master",
+        itemMasterNew: "/master/item-master/new",
+        itemMasterEdit: (id: number | string) => `/master/item-master/${id}/edit`,
         users: "/master/users",
         users_create: "/master/users/create",
         users_edit: (id: number | string) => `/master/users/${id}/edit`,

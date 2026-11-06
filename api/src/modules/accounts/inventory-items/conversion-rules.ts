@@ -29,6 +29,12 @@ export type ConversionResolution = {
     conversion: Record<string, string>;
 };
 
+export type ConversionOption = {
+    to: Unit;
+    factor: number | null;
+    factorMode: "fixed" | "width" | "manual";
+};
+
 const parseWidthMillimetres = (specifications: Record<string, string>) => {
     const width = specifications.width?.trim().match(/^(\d+(?:\.\d+)?)\s*mm$/i);
     if (!width) return undefined;
@@ -36,10 +42,26 @@ const parseWidthMillimetres = (specifications: Record<string, string>) => {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 };
 
+export const getConversionOptions = (from: string, specifications: Record<string, string>): ConversionOption[] => {
+    const width = (from === "RMtr" || from === "Sq. Mtr.") ? parseWidthMillimetres(specifications) : undefined;
+    return CONVERSION_RULES.filter(rule => rule.from === from).map(rule => {
+        if (rule.factor !== null) return { to: rule.to, factor: rule.factor, factorMode: "fixed" };
+        if (width !== undefined) {
+            return {
+                to: rule.to,
+                factor: from === "RMtr" ? width / 1000 : 1000 / width,
+                factorMode: "width",
+            };
+        }
+        return { to: rule.to, factor: null, factorMode: "manual" };
+    });
+};
+
 const parseManualFactor = (value: unknown) => {
     if (typeof value !== "number" && typeof value !== "string") return undefined;
-    const raw = String(value).trim();
-    if (!/^\d+(?:\.\d{1,6})?$/.test(raw)) return undefined;
+    const rawValue = String(value).trim();
+    const raw = rawValue.includes(".") ? rawValue.replace(/0+$/, "").replace(/\.$/, "") : rawValue;
+    if (!/^(?:\d+(?:\.\d{0,6})?|\.\d{1,6})$/.test(raw)) return undefined;
     const factor = Number(raw);
     return Number.isFinite(factor) && factor > 0 ? factor : undefined;
 };
@@ -58,17 +80,11 @@ export const resolveConversion = (
     }
 
     if (from === to) throw new Error("Unit and conversion unit must differ");
-    const rule = getConversionRule(from, to);
-    if (!rule) throw new Error("This unit conversion is not allowed");
+    const option = getConversionOptions(from, specifications).find(candidate => candidate.to === to);
+    if (!option) throw new Error("This unit conversion is not allowed");
 
-    let resolvedFactor = rule.factor;
-    if (from === "RMtr" || from === "Sq. Mtr.") {
-        const width = parseWidthMillimetres(specifications);
-        if (width !== undefined) {
-            resolvedFactor = from === "RMtr" ? width / 1000 : 1000 / width;
-        }
-    }
-    if (resolvedFactor === null) {
+    let resolvedFactor = option.factor;
+    if (option.factorMode === "manual") {
         resolvedFactor = parseManualFactor(factor) ?? null;
         if (resolvedFactor === null) {
             throw new Error("A positive conversion factor with up to 6 decimals is required");

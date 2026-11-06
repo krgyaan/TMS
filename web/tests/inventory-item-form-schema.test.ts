@@ -16,6 +16,8 @@ test("form schema parses every item family and every available Type option", () 
                 specifications: Object.fromEntries(category.fields.map(field => [field.key, field.options?.[0] ?? "sample"])),
                 description: "sample description",
                 unit: "Nos.",
+                conversionUnit: "",
+                conversionFactor: "",
                 hsnCode: "1234",
                 isActive: true,
             };
@@ -39,10 +41,25 @@ test("form schema parses every supported unit", () => {
             specifications: { diameter: "12", thickness: "sample", strength: "Hard" },
             description: "",
             unit,
+            conversionUnit: "",
+            conversionFactor: "",
             hsnCode: "",
             isActive: true,
         });
         assert.equal(parsed.unit, unit);
         assert.equal(parsed.unit, unit);
     }
+});
+
+test("conversion fields must be complete with a positive factor", () => {
+    const schema = buildInventoryItemFormSchema();
+    const base = {
+        teamId: "1", itemName: ITEM_CATEGORIES[0].name, itemType: "Pipe", specifications: {},
+        description: "", unit: "Kg" as const, hsnCode: "", isActive: true,
+    };
+    assert.equal(schema.safeParse({ ...base, conversionUnit: "Mtr", conversionFactor: "0.5" }).success, true);
+    assert.equal(schema.safeParse({ ...base, conversionUnit: "Mtr", conversionFactor: "" }).success, false);
+    assert.equal(schema.safeParse({ ...base, conversionUnit: "Mtr", conversionFactor: "1.1234567" }).success, true);
+    assert.equal(schema.safeParse({ ...base, conversionUnit: "Mtr", conversionFactor: "0" }).success, false);
+    assert.equal(schema.safeParse({ ...base, conversionUnit: "", conversionFactor: "1" }).success, false);
 });

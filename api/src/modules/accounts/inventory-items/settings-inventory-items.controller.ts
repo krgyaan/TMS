@@ -4,6 +4,7 @@ import { PermissionGuard } from "@/modules/auth/guards/permission.guard";
 import { CanCreate, CanDelete, CanRead, CanUpdate } from "@/modules/auth/decorators/permissions.decorator";
 import { InventoryItemsService } from "./inventory-items.service";
 import { itemSchema, parseItemBody, updateItemSchema } from "./inventory-items.controller";
+import { getConversionOptions } from "./conversion-rules";
 
 @Controller("master/item-master")
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -14,6 +15,12 @@ export class SettingsInventoryItemsController {
     @CanRead("master.item-master")
     list(@Query("search") search?: string, @Query("page") page?: string, @Query("limit") limit?: string, @Query("teamId") teamId?: string, @Query("itemName") itemName?: string, @Query("unit") unit?: string, @Query("isActive") isActive?: string) {
         return this.service.findAll({ teamId: teamId ? Number(teamId) : undefined, search, page: page ? Number(page) : undefined, limit: limit ? Number(limit) : undefined, itemName, unit, isActive: isActive === undefined || isActive === "" ? undefined : isActive === "true" });
+    }
+
+    @Get("conversion-options")
+    @CanRead("master.item-master")
+    conversionOptions(@Query("unit") unit?: string, @Query("width") width?: string) {
+        return getConversionOptions(unit || "", width ? { width } : {});
     }
 
     @Get(":id")

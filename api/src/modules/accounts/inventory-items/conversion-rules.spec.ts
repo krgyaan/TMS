@@ -1,4 +1,4 @@
-import { CONVERSION_RULES, getConversionRule, resolveConversion } from "./conversion-rules";
+import { CONVERSION_RULES, getConversionOptions, getConversionRule, resolveConversion } from "./conversion-rules";
 
 describe("inventory item conversion rules", () => {
     it("allows only configured pairs", () => {
@@ -16,9 +16,20 @@ describe("inventory item conversion rules", () => {
         expect(resolveConversion("Sq. Mtr.", "RMtr", "77", { width: "1200 mm" }).conversionFactor).toBe(String(1000 / 1200));
     });
 
+    it("returns valid targets and factor modes for the Settings form", () => {
+        expect(getConversionOptions("Mtr", {})).toEqual([
+            { to: "Kg", factor: null, factorMode: "manual" },
+            { to: "Ft", factor: 3.28084, factorMode: "fixed" },
+        ]);
+        expect(getConversionOptions("RMtr", { width: "1000 mm" })).toEqual([
+            { to: "Sq. Mtr.", factor: 1, factorMode: "width" },
+        ]);
+    });
+
     it("uses the submitted factor if Width is missing or malformed", () => {
         expect(resolveConversion("RMtr", "Sq. Mtr.", "1.25", {}).conversionFactor).toBe("1.25");
         expect(resolveConversion("RMtr", "Sq. Mtr.", "1.25", { width: "wide" }).conversionFactor).toBe("1.25");
+        expect(resolveConversion("RMtr", "Sq. Mtr.", "1.0000000000", {}).conversionFactor).toBe("1");
     });
 
     it.each(["0", "-1", "1.1234567", "1e-3"]) ("rejects invalid manual factor %s", factor => {

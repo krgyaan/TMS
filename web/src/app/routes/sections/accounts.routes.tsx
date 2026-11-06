@@ -49,6 +49,7 @@ const Accounts_VendorMaster_View = lazy(() => import("@/modules/master/vendor-ma
 const Accounts_Parties = lazy(() => import("@/modules/master/vendor-master/PartyListPage"));
 const Accounts_InventoryPage = lazy(() => import("@/modules/operations/inventory/pages/InventoryPage"));
 const Accounts_ItemMaster = lazy(() => import("@/modules/accounts/inventory-items/InventoryItemListPage"));
+const Accounts_ItemMaster_Detail = lazy(() => import("@/modules/accounts/inventory-items/InventoryItemDetailPage"));
 
 export default function AccountsRoutes() {
     return (
@@ -105,6 +106,7 @@ export default function AccountsRoutes() {
             <Route path="payment-requests" element={<RouteWrapper><Accounts_PaymentRequestTabs /></RouteWrapper>} />
             <Route path="inventory" element={<RouteWrapper><Accounts_InventoryPage /></RouteWrapper>} />
             <Route path="item-master" element={<RouteWrapper permission={{ module: "accounts.item-master", action: "read" }}><Accounts_ItemMaster team="accounts" /></RouteWrapper>} />
+            <Route path="item-master/:id" element={<RouteWrapper permission={{ module: "accounts.item-master", action: "read" }}><Accounts_ItemMaster_Detail team="accounts" /></RouteWrapper>} />
             <Route path="item" element={<Navigate to="/accounts/item-master" replace />} />
             <Route path="delegation/add" element={<RouteWrapper><AddTask /></RouteWrapper>} />
             <Route path="delegation/:id" element={<RouteWrapper><TaskDetail /></RouteWrapper>} />
