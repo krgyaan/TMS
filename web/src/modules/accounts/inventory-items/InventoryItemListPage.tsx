@@ -12,12 +12,12 @@ import { createActionColumnRenderer } from "@/components/data-grid/renderers/Act
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import type { ColDef } from "ag-grid-community";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTeams } from "@/hooks/api/useTeams";
-import { useDeleteInventoryItem, useInventoryItems, useUpdateInventoryItem, type ItemMasterTeam } from "@/hooks/api/useInventoryItems";
+import { useDeleteInventoryItem, useInventoryItems, useUpdateInventoryItem, type ItemMasterScope } from "@/hooks/api/useInventoryItems";
 import type { InventoryItem } from "@/types/inventory-item.types";
 import { UNIT_OPTIONS, categoryOptions } from "./item-config";
 import { toast } from "sonner";
 import { paths } from "@/app/routes/paths";
+import { formatKeySpecification, itemMasterColumnsForViewport } from "./item-master-display";
 
 const formatFactor = (value: string | number | null | undefined) => {
     if (value === null || value === undefined || value === "") return "";
@@ -31,28 +31,28 @@ const conversionDisplay = (item?: InventoryItem) => {
     return `1 ${from} = ${formatFactor(item.conversionFactor)} ${item.conversionUnit}`;
 };
 
-export default function InventoryItemListPage({ team }: { team: ItemMasterTeam }) {
-    const isSettings = team === "master";
-    const permissionModule = isSettings ? "master.item-master" : `${team}.item-master`;
+export default function InventoryItemListPage({ team: scope }: { team: ItemMasterScope }) {
+    const isSettings = scope === "master";
+    const permissionModule = isSettings ? "master.item-master" : `${scope}.item-master`;
     const navigate = useNavigate();
     const { canCreate, canUpdate, canDelete } = useAuth();
-    const { data: allTeams = [] } = useTeams();
-    const teamOptions = useMemo(() => allTeams.filter(option => option.name === "AC" || option.name === "DC"), [allTeams]);
-    const teamNames = useMemo(() => new Map(teamOptions.map(option => [option.id, option.name])), [teamOptions]);
-    const [filters, setFilters] = useState({ search: "", teamId: "", itemName: "", unit: "", isActive: "" });
+    const [viewportWidth, setViewportWidth] = useState(() => typeof window === "undefined" ? 1920 : window.innerWidth);
+    const visibility = itemMasterColumnsForViewport(viewportWidth, isSettings);
+    const [filters, setFilters] = useState({ search: "", itemName: "", unit: "", isActive: "" });
     const [search, setSearch] = useState("");
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 });
     const [selectedRows, setSelectedRows] = useState<InventoryItem[]>([]);
+    useEffect(() => { const resize = () => setViewportWidth(window.innerWidth); window.addEventListener("resize", resize); return () => window.removeEventListener("resize", resize); }, []);
     useEffect(() => {
         const timer = window.setTimeout(() => setSearch(filters.search.trim()), 300);
         return () => window.clearTimeout(timer);
     }, [filters.search]);
     const queryFilters = useMemo(() => ({
-        search, teamId: filters.teamId ? Number(filters.teamId) : undefined,
+        search,
         itemName: filters.itemName || undefined, unit: filters.unit || undefined,
         isActive: filters.isActive || undefined, page: pagination.pageIndex + 1, limit: pagination.pageSize,
     }), [search, filters, pagination]);
-    const { data, isLoading, isFetching, error, refetch } = useInventoryItems(team, queryFilters);
+    const { data, isLoading, isFetching, error, refetch } = useInventoryItems(scope, queryFilters);
     const deleteItem = useDeleteInventoryItem();
     const updateItem = useUpdateInventoryItem();
 
@@ -62,22 +62,20 @@ export default function InventoryItemListPage({ team }: { team: ItemMasterTeam }
             if (window.confirm(`Delete item "${row.itemName}"?`)) await deleteItem.mutateAsync(row.id);
         } },
     ] : [
-        { label: "View", onClick: row => navigate(team === "accounts" ? paths.accounts.itemMasterView(row.id) : paths.operations.itemMasterView(row.id)) },
-    ], [isSettings, canUpdate, permissionModule, canDelete, deleteItem, navigate, team]);
+        { label: "View", onClick: row => navigate(scope === "accounts" ? paths.accounts.itemMasterView(row.id) : paths.operations.itemMasterView(row.id)) },
+    ], [isSettings, canUpdate, permissionModule, canDelete, deleteItem, navigate, scope]);
 
     const columns = useMemo<ColDef<InventoryItem>[]>(() => [
-        { field: "itemCode", headerName: "Item Code", width: 120, tooltipField: "itemCode" },
-        { field: "teamId", headerName: "Team", width: 80, valueGetter: p => teamNames.get(Number(p.data?.teamId)) || "—" },
-        { field: "itemName", headerName: "Item Name", flex: 1, minWidth: 200, tooltipField: "itemName" },
-        { field: "itemType", headerName: "Type", width: 140, valueGetter: p => p.data?.itemType || "—", tooltipValueGetter: p => p.value },
-        { headerName: "Key Specification", flex: 1, minWidth: 240, valueGetter: p => Object.entries(p.data?.specifications || {}).filter(([, value]) => value).map(([key, value]) => `${key}: ${value}`).join(" · ") || "—", tooltipValueGetter: p => p.value },
-        { field: "unit", headerName: "Unit", width: 90, tooltipField: "unit" },
-        { headerName: "Conversion", width: 180, valueGetter: p => conversionDisplay(p.data), tooltipValueGetter: p => p.value },
-        { field: "hsnCode", headerName: "HSN", width: 110, valueGetter: p => p.data?.hsnCode || "—", tooltipValueGetter: p => p.value },
-        { field: "isActive", headerName: "Status", width: 100, cellRenderer: (p: { value: boolean }) => <Badge variant={p.value ? "default" : "secondary"}>{p.value ? "Active" : "Inactive"}</Badge> },
-        { headerName: "Created on", field: "createdAt", width: 130, valueGetter: p => p.data?.createdAt ? new Date(p.data.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—", tooltipValueGetter: p => p.value },
-        { headerName: "Actions", filter: false, sortable: false, pinned: "right", width: 80, cellRenderer: createActionColumnRenderer(actions) },
-    ], [teamNames, actions]);
+        { headerName: "Item", flex: 2, minWidth: 200, valueGetter: p => p.data?.itemName || "—", tooltipValueGetter: p => `${p.data?.itemName || "—"} · ${p.data?.itemCode || ""}`, cellRenderer: (p: { data?: InventoryItem }) => <div className="flex h-full min-w-0 flex-col justify-center leading-tight"><span className="truncate font-semibold">{p.data?.itemName || "—"}</span><span className="truncate text-xs text-muted-foreground">{p.data?.itemCode}</span></div> },
+        ...(!visibility.compact ? [{ field: "itemType", headerName: "Type", width: 110, minWidth: 110, valueGetter: (p: { data?: InventoryItem }) => p.data?.itemType || "—", tooltipValueGetter: (p: { value: string }) => p.value } as ColDef<InventoryItem>] : []),
+        { headerName: "Key Specification", flex: 3, minWidth: 220, valueGetter: p => formatKeySpecification(p.data?.itemName || "", p.data?.specifications || {}), tooltipValueGetter: p => p.value, cellRenderer: (p: { value?: string }) => <div className="line-clamp-2 whitespace-normal leading-tight" title={p.value}>{p.value}</div> },
+        ...(!visibility.compact ? [{ field: "unit", headerName: "Unit", width: 70, minWidth: 70, tooltipField: "unit" } as ColDef<InventoryItem>] : []),
+        ...(!visibility.compact ? [{ headerName: "Conversion", width: 150, minWidth: 150, valueGetter: (p: { data?: InventoryItem }) => conversionDisplay(p.data), tooltipValueGetter: (p: { value: string }) => p.value } as ColDef<InventoryItem>] : []),
+        ...(visibility.hsn ? [{ field: "hsnCode", headerName: "HSN", width: 90, minWidth: 90, valueGetter: (p: { data?: InventoryItem }) => p.data?.hsnCode || "—", tooltipValueGetter: (p: { value: string }) => p.value } as ColDef<InventoryItem>] : []),
+        { field: "isActive", headerName: "Status", width: 90, minWidth: 90, cellRenderer: (p: { value: boolean }) => <Badge variant={p.value ? "default" : "secondary"}>{p.value ? "Active" : "Inactive"}</Badge> },
+        ...(visibility.createdAt ? [{ headerName: "Created on", field: "createdAt", width: 120, minWidth: 120, valueGetter: (p: { data?: InventoryItem }) => p.data?.createdAt ? new Date(p.data.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—" } as ColDef<InventoryItem>] : []),
+        { headerName: "Actions", filter: false, sortable: false, pinned: "right", width: 60, minWidth: 60, cellRenderer: createActionColumnRenderer(actions) },
+    ], [visibility.hsn, visibility.compact, visibility.createdAt, actions]);
 
     const setFilter = (key: keyof typeof filters, value: string) => {
         setFilters(current => ({ ...current, [key]: value }));
@@ -105,15 +103,14 @@ export default function InventoryItemListPage({ team }: { team: ItemMasterTeam }
 
     return <Card>
         <CardHeader>
-            <CardTitle>{isSettings ? "Item Master" : `${team === "accounts" ? "Accounts" : "Operations"} Item Master`}</CardTitle>
-            <CardDescription>{isSettings ? "Manage shared AC and DC items." : "View items shared across AC and DC. Items are added and edited in Settings by authorized users."}</CardDescription>
+            <CardTitle>{isSettings ? "Item Master" : `${scope === "accounts" ? "Accounts" : "Operations"} Item Master`}</CardTitle>
+            <CardDescription>{isSettings ? "Manage shared items." : "View shared items. Items are added and edited in Settings by authorized users."}</CardDescription>
             {isSettings && <CardAction>{canCreate(permissionModule) && <Button onClick={() => navigate(paths.master.itemMasterNew)} className="min-h-11"><Plus className="mr-2 h-4 w-4" />Add New Item</Button>}</CardAction>}
         </CardHeader>
         <CardContent>
             {error && <Alert variant="destructive" className="mb-3"><AlertDescription>Unable to refresh items: {error.message}</AlertDescription></Alert>}
             <div className="mb-4 grid gap-3 md:grid-cols-2 lg:grid-cols-6">
                 <div className="relative lg:col-span-2"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input className="h-11 pl-9 md:h-10" placeholder="Search code, name, type, HSN..." value={filters.search} onChange={event => setFilter("search", event.target.value)} /></div>
-                <select aria-label="Team filter" className="h-11 rounded-md border border-slate-400 bg-background px-3 text-sm dark:border-slate-600 md:h-10" value={filters.teamId} onChange={event => setFilter("teamId", event.target.value)}><option value="">All teams</option>{teamOptions.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}</select>
                 <select aria-label="Item name filter" className="h-11 rounded-md border border-slate-400 bg-background px-3 text-sm dark:border-slate-600 md:h-10" value={filters.itemName} onChange={event => setFilter("itemName", event.target.value)}><option value="">All item names</option>{categoryOptions.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}</select>
                 <select aria-label="Unit filter" className="h-11 rounded-md border border-slate-400 bg-background px-3 text-sm dark:border-slate-600 md:h-10" value={filters.unit} onChange={event => setFilter("unit", event.target.value)}><option value="">All units</option>{UNIT_OPTIONS.map(unit => <option key={unit} value={unit}>{unit}</option>)}</select>
                 <select aria-label="Status filter" className="h-11 rounded-md border border-slate-400 bg-background px-3 text-sm dark:border-slate-600 md:h-10" value={filters.isActive} onChange={event => setFilter("isActive", event.target.value)}><option value="">All statuses</option><option value="true">Active</option><option value="false">Inactive</option></select>
@@ -123,9 +120,20 @@ export default function InventoryItemListPage({ team }: { team: ItemMasterTeam }
                 {canUpdate(permissionModule) && <><Button variant="outline" size="sm" className="min-h-11" onClick={() => void setBulkStatus(true)}>Activate</Button><Button variant="outline" size="sm" className="min-h-11" onClick={() => void setBulkStatus(false)}>Deactivate</Button></>}
                 {canDelete(permissionModule) && <Button variant="outline" size="sm" className="min-h-11 text-red-600" onClick={() => void deleteSelected()}>Delete</Button>}
             </div>}
-            <div className="w-full overflow-x-auto">
-                <DataTable data={data?.data || []} columnDefs={columns} gridOptions={{ defaultColDef: { filter: false, sortable: true, resizable: true }, tooltipShowDelay: 350 }} loading={isFetching} manualPagination rowCount={data?.meta.total || 0} paginationState={pagination} onPaginationChange={updatePagination} onPageSizeChange={pageSize => setPagination({ pageIndex: 0, pageSize })} enableRowSelection={isSettings && (canUpdate(permissionModule) || canDelete(permissionModule))} selectionType="multiple" onSelectionChanged={isSettings ? setSelectedRows : undefined} />
-            </div>
+            {visibility.mobile ? <div className="space-y-3">
+                {(data?.data || []).map(item => <article key={item.id} className="space-y-3 rounded-md border p-3">
+                    <div className="flex items-start justify-between gap-2"><div className="min-w-0"><div className="break-words font-semibold">{item.itemName}</div><div className="text-xs text-muted-foreground">{item.itemCode}</div></div><Badge variant={item.isActive ? "default" : "secondary"}>{item.isActive ? "Active" : "Inactive"}</Badge></div>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm"><div><span className="text-muted-foreground">Type</span><div>{item.itemType || "—"}</div></div><div><span className="text-muted-foreground">Unit</span><div>{item.unit}</div></div><div className="col-span-2"><span className="text-muted-foreground">Key Specification</span><div className="break-words">{formatKeySpecification(item.itemName, item.specifications)}</div></div><div className="col-span-2"><span className="text-muted-foreground">Conversion</span><div className="break-words">{conversionDisplay(item)}</div></div><div><span className="text-muted-foreground">HSN</span><div>{item.hsnCode || "—"}</div></div></div>
+                    {isSettings && (canUpdate(permissionModule) || canDelete(permissionModule)) && <input type="checkbox" aria-label={`Select ${item.itemName}`} checked={selectedRows.some(row => row.id === item.id)} onChange={event => setSelectedRows(current => event.target.checked ? [...current.filter(row => row.id !== item.id), item] : current.filter(row => row.id !== item.id))} />}
+                    <div className="flex justify-end">{actions.filter(action => action.visible?.(item) ?? true).map(action => <Button key={action.label} className={action.className} size="sm" variant="ghost" onClick={() => void action.onClick(item)}>{action.label}</Button>)}</div>
+                </article>)}
+            </div> : <div className="w-full min-w-0">
+                <DataTable data={data?.data || []} columnDefs={columns} gridOptions={{ rowHeight: 52, headerHeight: 40, defaultColDef: { filter: false, sortable: true, resizable: true, cellStyle: { paddingLeft: "4px", paddingRight: "4px" } }, tooltipShowDelay: 350 }} loading={isFetching} manualPagination rowCount={data?.meta.total || 0} paginationState={pagination} onPaginationChange={updatePagination} onPageSizeChange={pageSize => setPagination({ pageIndex: 0, pageSize })} enableRowSelection={isSettings && (canUpdate(permissionModule) || canDelete(permissionModule))} selectionType="multiple" onSelectionChanged={isSettings ? setSelectedRows : undefined} />
+            </div>}
+            {visibility.mobile && <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm">
+                <span>{data?.meta.total ? `${pagination.pageIndex * pagination.pageSize + 1}–${Math.min((pagination.pageIndex + 1) * pagination.pageSize, data.meta.total)} of ${data.meta.total}` : "0 items"}</span>
+                <div className="flex items-center gap-2"><select aria-label="Items per page" className="h-9 rounded-md border bg-background px-2" value={pagination.pageSize} onChange={event => setPagination({ pageIndex: 0, pageSize: Number(event.target.value) })}><option value={10}>10</option><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select><Button size="sm" variant="outline" disabled={pagination.pageIndex === 0} onClick={() => setPagination(current => ({ ...current, pageIndex: current.pageIndex - 1 }))}>Previous</Button><Button size="sm" variant="outline" disabled={pagination.pageIndex + 1 >= (data?.meta.totalPages || 0)} onClick={() => setPagination(current => ({ ...current, pageIndex: current.pageIndex + 1 }))}>Next</Button></div>
+            </div>}
         </CardContent>
     </Card>;
 }

@@ -3,20 +3,20 @@ import { toast } from "sonner";
 import { handleQueryError } from "@/lib/react-query";
 import { inventoryItemsService } from "@/services/api";
 import type { InventoryItemPayload } from "@/types/inventory-item.types";
-import type { ItemMasterApi } from "@/services/api/inventory-items.service";
+import type { ItemMasterScope as ServiceScope } from "@/services/api/inventory-items.service";
 
-export type ItemMasterTeam = ItemMasterApi;
+export type ItemMasterScope = ServiceScope;
 export const inventoryItemsKey = ["inventory-items"] as const;
-const serviceFor = (team: ItemMasterTeam) => inventoryItemsService[team];
+const serviceFor = (scope: ItemMasterScope) => inventoryItemsService[scope];
 
-export type InventoryItemFilters = { search?: string; teamId?: number; itemName?: string; unit?: string; isActive?: string; page?: number; limit?: number };
+export type InventoryItemFilters = { search?: string; itemName?: string; unit?: string; isActive?: string; page?: number; limit?: number };
 export const itemListKey = [...inventoryItemsKey, "list"] as const;
 
-export const useInventoryItems = (team: ItemMasterTeam, filters: InventoryItemFilters = {}) =>
-    useQuery({ queryKey: [...itemListKey, team, filters], queryFn: () => serviceFor(team).getAll(filters), placeholderData: previous => previous });
+export const useInventoryItems = (scope: ItemMasterScope, filters: InventoryItemFilters = {}) =>
+    useQuery({ queryKey: [...itemListKey, scope, filters], queryFn: () => serviceFor(scope).getAll(filters), placeholderData: previous => previous });
 
-export const useInventoryItem = (team: ItemMasterTeam, id: number) =>
-    useQuery({ queryKey: [...inventoryItemsKey, "detail", team, id], queryFn: () => serviceFor(team).getById(id), enabled: !!id });
+export const useInventoryItem = (scope: ItemMasterScope, id: number) =>
+    useQuery({ queryKey: [...inventoryItemsKey, "detail", scope, id], queryFn: () => serviceFor(scope).getById(id), enabled: !!id });
 
 export const useItemConversionOptions = (unit: string, width?: string) =>
     useQuery({

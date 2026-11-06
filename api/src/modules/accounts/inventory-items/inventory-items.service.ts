@@ -1,28 +1,23 @@
-import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, desc, eq, ilike, isNull, or, sql, type SQL } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import { inventoryItems, type InventoryItem, type NewInventoryItem } from "@db/schemas/accounts/inventory-items.schema";
-import { teams } from "@db/schemas/master/teams.schema";
 import { resolveConversion } from "./conversion-rules";
 
-type ListOptions = { teamId?: number; search?: string; page?: number; limit?: number; itemName?: string; unit?: string; isActive?: boolean };
+type ListOptions = { search?: string; page?: number; limit?: number; itemName?: string; unit?: string; isActive?: boolean };
 type ItemInput = Pick<NewInventoryItem, "itemName" | "itemType" | "description" | "specifications" | "unit" | "hsnCode" | "isActive">
     & { conversionUnit?: string | null; conversionFactor?: string | number | null };
 
 @Injectable()
 export class InventoryItemsService {
-    private readonly logger = new Logger(InventoryItemsService.name);
-
     constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
 
     async findAll(options: ListOptions) {
         const page = Math.max(1, options.page || 1);
         const limit = Math.min(100, Math.max(1, options.limit || 25));
         const search = options.search?.trim();
-        if (options.teamId !== undefined) await this.validateTeamId(options.teamId);
         const filters: SQL[] = [
-            options.teamId === undefined ? undefined : eq(inventoryItems.teamId, options.teamId),
             isNull(inventoryItems.deletedAt),
             search ? or(ilike(inventoryItems.itemCode, `%${search}%`), ilike(inventoryItems.itemName, `%${search}%`), ilike(inventoryItems.itemType, `%${search}%`), ilike(inventoryItems.hsnCode, `%${search}%`)) : undefined,
             options.itemName ? eq(inventoryItems.itemName, options.itemName) : undefined,
@@ -44,22 +39,19 @@ export class InventoryItemsService {
         return item;
     }
 
-    async create(data: ItemInput, teamId: number): Promise<InventoryItem> {
-        await this.validateTeamId(teamId);
-        await this.ensureUnique(data, teamId, undefined);
+    async create(data: ItemInput): Promise<InventoryItem> {
+        await this.ensureUnique(data);
         const conversion = this.resolveItemConversion(data.unit, data.conversionUnit, data.conversionFactor, data.specifications || {});
         const [item] = await this.db.insert(inventoryItems).values({
-            ...data, ...conversion, teamId, itemCode: await this.nextItemCode(),
+            ...data, ...conversion, itemCode: await this.nextItemCode(),
         }).returning();
         return item;
     }
 
-    async update(id: number, data: Partial<ItemInput>, requestedTeamId?: number): Promise<InventoryItem> {
+    async update(id: number, data: Partial<ItemInput>): Promise<InventoryItem> {
         const current = await this.findById(id);
-        const teamId = requestedTeamId ?? current.teamId;
-        await this.validateTeamId(teamId);
         const updatedValues = { ...current, ...data };
-        await this.ensureUnique(updatedValues, teamId, id);
+        await this.ensureUnique(updatedValues, id);
         const conversion = this.resolveItemConversion(
             updatedValues.unit,
             updatedValues.conversionUnit,
@@ -69,7 +61,7 @@ export class InventoryItemsService {
         const values = {
             itemName: updatedValues.itemName, itemType: updatedValues.itemType, description: updatedValues.description,
             specifications: updatedValues.specifications, unit: updatedValues.unit, hsnCode: updatedValues.hsnCode,
-            isActive: updatedValues.isActive, ...conversion, itemGroup: current.itemGroup, teamId, updatedAt: new Date(),
+            isActive: updatedValues.isActive, ...conversion, itemGroup: current.itemGroup, updatedAt: new Date(),
         };
         const [item] = await this.db.update(inventoryItems).set(values).where(eq(inventoryItems.id, id)).returning();
         return item;
@@ -78,19 +70,6 @@ export class InventoryItemsService {
     async softDelete(id: number): Promise<void> {
         await this.findById(id);
         await this.db.update(inventoryItems).set({ isActive: false, deletedAt: new Date(), updatedAt: new Date() }).where(eq(inventoryItems.id, id));
-    }
-
-    async validateTeamId(teamId: number): Promise<void> {
-        try {
-            const [team] = await this.db.select({ name: teams.name }).from(teams).where(eq(teams.id, teamId)).limit(1);
-            if (!team || (team.name !== "AC" && team.name !== "DC")) {
-                throw new BadRequestException("Team must be AC or DC");
-            }
-        } catch (error) {
-            if (error instanceof BadRequestException) throw error;
-            this.logger.error(`Failed to validate Item Master team ${teamId}`, error instanceof Error ? error.stack : undefined);
-            throw error;
-        }
     }
 
     private resolveItemConversion(unit: string, conversionUnit: string | null | undefined, factor: unknown, specifications: Record<string, string>) {
@@ -108,22 +87,21 @@ export class InventoryItemsService {
         return `ITM-${String(nextValue).padStart(4, "0")}`;
     }
 
-    private async ensureUnique(data: Pick<ItemInput, "itemName" | "itemType" | "specifications">, teamId: number, excludeId?: number) {
-        const candidates = await this.db.select({ id: inventoryItems.id }).from(inventoryItems).where(
+    private async ensureUnique(data: Pick<ItemInput, "itemName" | "itemType" | "specifications" | "unit">, excludeId?: number) {
+        const candidates = await this.db.select().from(inventoryItems).where(
             and(
                 isNull(inventoryItems.deletedAt),
-                eq(inventoryItems.teamId, teamId),
                 eq(inventoryItems.itemName, data.itemName),
+                eq(inventoryItems.unit, data.unit),
                 data.itemType ? eq(inventoryItems.itemType, data.itemType) : sql`${inventoryItems.itemType} is null`,
             ),
         );
-        const duplicate = candidates.find(candidate => candidate.id !== excludeId);
-        if (duplicate) {
-            const [existing] = await this.db.select().from(inventoryItems).where(eq(inventoryItems.id, duplicate.id));
-            if (JSON.stringify(existing?.specifications || {}) === JSON.stringify(data.specifications || {})) {
-                throw new ConflictException("An item with the same name, type and specifications already exists");
-            }
-        }
+        const sameSpecifications = (left: Record<string, string> = {}, right: Record<string, string> = {}) => {
+            const keys = Object.keys(left).sort();
+            return keys.length === Object.keys(right).length && keys.every(key => left[key] === right[key]);
+        };
+        const duplicate = candidates.find(candidate => candidate.id !== excludeId && candidate.unit === data.unit && sameSpecifications(candidate.specifications || {}, data.specifications || {}));
+        if (duplicate) throw new ConflictException("An item with the same name, type, specifications and unit already exists");
     }
 
 }

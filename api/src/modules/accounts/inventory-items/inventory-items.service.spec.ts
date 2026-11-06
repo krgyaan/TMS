@@ -1,64 +1,56 @@
-import { BadRequestException } from "@nestjs/common";
+import { ConflictException } from "@nestjs/common";
 import { InventoryItemsService } from "./inventory-items.service";
 import { itemSchema } from "./inventory-items.controller";
 
-const serviceForTeam = (name?: string) => {
-    const db = {
-        select: () => ({
-            from: () => ({
-                where: () => ({ limit: async () => name ? [{ name }] : [] }),
-            }),
-        }),
-    };
-    return new InventoryItemsService(db as never);
+const item = {
+    id: 5, itemCode: "ITM-0005", itemGroup: null, teamId: 1, itemName: "Copper", itemType: "Pipe",
+    description: null, specifications: { diameter: "12" }, unit: "Mtr", conversion: { value: "Mtr -> Ft" },
+    conversionUnit: "Ft", conversionFactor: "3.2808400000", hsnCode: null, isActive: true,
+    deletedAt: null, createdAt: new Date(), updatedAt: new Date(),
 };
 
-describe("InventoryItemsService.validateTeamId", () => {
-    it.each(["AC", "DC"])("accepts supported team %s", async name => {
-        await expect(serviceForTeam(name).validateTeamId(1)).resolves.toBeUndefined();
+describe("Item Master without item-team assignment", () => {
+    it("accepts create data without a team", () => {
+        const parsed = itemSchema.parse({ itemName: "Copper", itemType: "Pipe", unit: "Mtr", specifications: {} });
+        expect(parsed).not.toHaveProperty("teamId");
     });
 
-    it.each(["Accounts", "Operations", "Other", undefined])("rejects unsupported team %s", async name => {
-        await expect(serviceForTeam(name).validateTeamId(1)).rejects.toBeInstanceOf(BadRequestException);
-    });
-});
-
-describe("Item Master create and update conversion behavior", () => {
-    it("accepts an item payload that contains no conversion fields", () => {
-        const parsed = itemSchema.parse({ teamId: 1, itemName: "Copper", unit: "Kg", specifications: {} });
-        expect(parsed).not.toHaveProperty("conversionUnit");
-        expect(parsed).not.toHaveProperty("conversionFactor");
-    });
-
-    it("preserves and validates a stored conversion when an unrelated field is patched", async () => {
-        const existing = {
-            id: 1, itemCode: "ITM-0001", itemGroup: null, teamId: 1, itemName: "Copper", itemType: "Pipe",
-            description: null, specifications: { diameter: "12" }, unit: "Mtr", conversion: { value: "Mtr -> Ft" },
-            conversionUnit: "Ft", conversionFactor: "3.2808400000", hsnCode: null, isActive: true,
-            deletedAt: null, createdAt: new Date(), updatedAt: new Date(),
+    it("creates an item without writing team_id", async () => {
+        let inserted: Record<string, unknown> | undefined;
+        const db = {
+            select: () => ({ from: () => ({ where: async () => [] }) }),
+            execute: async () => ({ rows: [{ nextval: "6" }] }),
+            insert: () => ({ values: (values: Record<string, unknown>) => { inserted = values; return { returning: async () => [{ ...item, ...values }] }; } }),
         };
-        let selectCount = 0;
+        await new InventoryItemsService(db as never).create({ itemName: "New item", itemType: null, description: null, specifications: {}, unit: "Kg", hsnCode: null, isActive: true });
+        expect(inserted).toBeDefined();
+        expect(inserted).not.toHaveProperty("teamId");
+    });
+
+    it("rejects matching name, type, specifications and unit regardless of team", async () => {
+        const db = { select: () => ({ from: () => ({ where: async () => [item] }) }) };
+        await expect(new InventoryItemsService(db as never).create({ itemName: "Copper", itemType: "Pipe", description: null, specifications: { diameter: "12" }, unit: "Mtr", hsnCode: null, isActive: true })).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it("allows the same item attributes with a different unit", async () => {
+        let inserted = false;
+        const db = {
+            select: () => ({ from: () => ({ where: async () => [item] }) }),
+            execute: async () => ({ rows: [{ nextval: "6" }] }),
+            insert: () => ({ values: () => ({ returning: async () => { inserted = true; return [item]; } }) }),
+        };
+        await new InventoryItemsService(db as never).create({ itemName: "Copper", itemType: "Pipe", description: null, specifications: { diameter: "12" }, unit: "Kg", hsnCode: null, isActive: true });
+        expect(inserted).toBe(true);
+    });
+
+    it("keeps existing items editable without rewriting their team assignment", async () => {
         let updateValues: Record<string, unknown> | undefined;
         const db = {
-            select: () => {
-                selectCount += 1;
-                return { from: () => ({ where: () => ({
-                    limit: async () => selectCount === 1 ? [existing] : [{ name: "AC" }],
-                    then: (resolve: (value: unknown[]) => unknown, reject: (reason: unknown) => unknown) => Promise.resolve([]).then(resolve, reject),
-                }) }) };
-            },
-            update: () => ({ set: (values: Record<string, unknown>) => {
-                updateValues = values;
-                return { where: () => ({ returning: async () => [{ ...existing, ...values }] }) };
-            } }),
+            select: () => ({ from: () => ({ where: () => ({ limit: async () => [item], then: (resolve: (items: unknown[]) => unknown) => Promise.resolve([]).then(resolve) }) }) }),
+            update: () => ({ set: (values: Record<string, unknown>) => { updateValues = values; return { where: () => ({ returning: async () => [{ ...item, ...values }] }) }; } }),
         };
         const service = new InventoryItemsService(db as never);
-        await service.update(1, { itemName: "Copper Pipe Updated" });
-        expect(updateValues).toBeDefined();
-        expect(updateValues).toMatchObject({
-            conversion: { value: "Mtr -> Ft" },
-            conversionUnit: "Ft",
-            conversionFactor: "3.28084",
-        });
+        await service.update(item.id, { itemName: "Copper edited" });
+        expect(updateValues).not.toHaveProperty("teamId");
     });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
@@ -9,7 +9,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useTeams } from "@/hooks/api/useTeams";
 import { useCreateInventoryItem, useInventoryItem, useItemConversionOptions, useUpdateInventoryItem } from "@/hooks/api/useInventoryItems";
 import { handleQueryError } from "@/lib/react-query";
 import { paths } from "@/app/routes/paths";
@@ -29,11 +28,9 @@ export default function InventoryItemFormPage() {
     const navigate = useNavigate();
     const form = useForm<InventoryItemFormValues>({
         resolver: zodResolver(inventoryItemFormSchema) as never,
-        defaultValues: { teamId: "", itemName: "", itemType: "", specifications: {}, description: "", unit: "Nos.", conversionUnit: "", conversionFactor: "", hsnCode: "", isActive: true },
+        defaultValues: { itemName: "", itemType: "", specifications: {}, description: "", unit: "Nos.", conversionUnit: "", conversionFactor: "", hsnCode: "", isActive: true },
     });
     const { data: item, isLoading: itemLoading, error: itemError, refetch } = useInventoryItem("master", itemId);
-    const { data: teams = [], isLoading: teamsLoading } = useTeams();
-    const teamOptions = useMemo(() => teams.filter(team => team.name === "AC" || team.name === "DC"), [teams]);
     const createItem = useCreateInventoryItem();
     const updateItem = useUpdateInventoryItem();
     const submissionLock = useRef(false);
@@ -59,7 +56,7 @@ export default function InventoryItemFormPage() {
         if (isEdit) {
             if (!item || initializedForm.current === `edit-${itemId}`) return;
             form.reset({
-                teamId: String(item.teamId), itemName: item.itemName, itemType: item.itemType || "",
+                itemName: item.itemName, itemType: item.itemType || "",
                 specifications: item.specifications || {}, description: item.description || "",
                 unit: item.unit as Unit, conversionUnit: item.conversionUnit || "",
                 conversionFactor: item.conversionFactor || "", hsnCode: item.hsnCode || "", isActive: item.isActive,
@@ -68,10 +65,9 @@ export default function InventoryItemFormPage() {
             initializedForm.current = `edit-${itemId}`;
             formUrl.current = window.location.href;
             setUnitChangedNotice(false);
-        } else if (teamOptions.length && initializedForm.current !== "new") {
+        } else if (initializedForm.current !== "new") {
             form.reset({
-                teamId: String(teamOptions.find(team => team.name === "AC")?.id || teamOptions[0].id),
-                itemName: "", itemType: "", specifications: {}, description: "", unit: "Nos.",
+                                itemName: "", itemType: "", specifications: {}, description: "", unit: "Nos.",
                 conversionUnit: "", conversionFactor: "", hsnCode: "", isActive: true,
             });
             lastWidth.current = "";
@@ -79,7 +75,7 @@ export default function InventoryItemFormPage() {
             formUrl.current = window.location.href;
             setUnitChangedNotice(false);
         }
-    }, [isEdit, itemId, item, teamOptions, form]);
+    }, [isEdit, itemId, item, form]);
 
     useEffect(() => {
         if (width !== (form.getValues("specifications.width") || "") || width === lastWidth.current) return;
@@ -161,7 +157,7 @@ export default function InventoryItemFormPage() {
                 return;
             }
             const payload: InventoryItemPayload = {
-                teamId: Number(values.teamId), itemName: values.itemName, itemType: values.itemType.trim() || null,
+                itemName: values.itemName, itemType: values.itemType.trim() || null,
                 specifications: values.specifications, description: values.description.trim() || null,
                 unit: values.unit, conversionUnit: values.conversionUnit || null,
                 conversionFactor: values.conversionUnit ? values.conversionFactor : null,
@@ -200,7 +196,7 @@ export default function InventoryItemFormPage() {
 
     return <div className="space-y-4 pb-28">
         <div className="flex flex-wrap items-center justify-between gap-3">
-            <div><p className="text-sm text-muted-foreground">Settings / Item Master</p><h1 className="text-2xl font-semibold">{isEdit ? "Edit Item" : "Add Item"}</h1><p className="text-sm text-muted-foreground">{isEdit && item ? item.itemCode : "Create a shared item for AC or DC."}</p></div>
+            <div><p className="text-sm text-muted-foreground">Settings / Item Master</p><h1 className="text-2xl font-semibold">{isEdit ? "Edit Item" : "Add Item"}</h1><p className="text-sm text-muted-foreground">{isEdit && item ? item.itemCode : "Create a shared item."}</p></div>
             <Button type="button" variant="outline" className="min-h-11" onClick={leavePage}><ArrowLeft className="mr-2 h-4 w-4" />Back</Button>
         </div>
         {(errorMessage || (isEdit && itemError)) && <Alert variant="destructive"><AlertDescription>{errorMessage || (itemError instanceof Error ? itemError.message : "Unable to save item.")}</AlertDescription></Alert>}
@@ -213,11 +209,8 @@ export default function InventoryItemFormPage() {
             className="space-y-4"
         >
             <section className={sectionClass}>
-                <div><h2 className="font-semibold">Item details</h2><p className="text-sm text-muted-foreground">Choose the shared item family and the team that uses it.</p></div>
+                <div><h2 className="font-semibold">Item details</h2><p className="text-sm text-muted-foreground">Choose the item family.</p></div>
                 <div className="grid gap-4 md:grid-cols-2">
-                    <FormField label="Team" required helper="Select AC or DC." error={errors.teamId?.message}>
-                        <select className={formControlClass} aria-invalid={Boolean(errors.teamId)} disabled={teamsLoading} {...form.register("teamId")}><option value="">Select team</option>{teamOptions.map(team => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
-                    </FormField>
                     <FormField label="Item name" required helper="Select the item family." error={errors.itemName?.message}>
                         <select className={formControlClass} aria-invalid={Boolean(errors.itemName)} {...form.register("itemName", { onChange: event => {
                             if (event.target.value !== itemName) {
@@ -293,7 +286,7 @@ export default function InventoryItemFormPage() {
 
             <div className="sticky bottom-0 z-10 -mx-4 flex items-center justify-end gap-3 border-t bg-background/95 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-lg backdrop-blur sm:-mx-6 sm:px-6">
                 <Button type="button" variant="outline" className="min-h-11" disabled={saving} onClick={leavePage}>Cancel</Button>
-                <Button type="button" className="min-h-11 min-w-28" onClick={() => void form.handleSubmit(onValid, onInvalid)()} disabled={saving || submissionLock.current || (isEdit && itemLoading) || (isEdit && !item) || teamOptions.length === 0}>
+                <Button type="button" className="min-h-11 min-w-28" onClick={() => void form.handleSubmit(onValid, onInvalid)()} disabled={saving || submissionLock.current || (isEdit && itemLoading) || (isEdit && !item)}>
                     {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{isEdit ? "Save changes" : "Save item"}
                 </Button>
             </div>

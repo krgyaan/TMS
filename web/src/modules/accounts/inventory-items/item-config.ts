@@ -25,7 +25,7 @@ export const ITEM_CATEGORIES: ItemCategory[] = [
     { name: "Underdeck Insulation", fields: [common("Type", "type", ["Nitrile", "PUF", "Glasswool (Roll)", "Glasswool (Bag)", "Rigid Board", "Sheet"]), common("Thickness (in mm)", "thickness")] },
     { name: "Aluminium Perforated Sheet", fields: [common("Thickness (in Gauge)", "thickness")] },
     { name: "Tissue Paper", fields: [common("Thickness (in Mil)", "thickness")] },
-    { name: "AC Stand", fields: [common("Type", "type", ["Powder Coated", "MS"]), common("Mounting", "mounting", ["Wall", "Floor"]), common("Size", "size", ["18", "24", "26"])] },
+    { name: "Equipment Stand", fields: [common("Type", "type", ["Powder Coated", "MS"]), common("Mounting", "mounting", ["Wall", "Floor"]), common("Size", "size", ["18", "24", "26"])] },
     { name: "Rubber Pad", fields: [common("Thickness (in mm)", "thickness"), common("Size (in Inches)", "size")] },
 ];
 

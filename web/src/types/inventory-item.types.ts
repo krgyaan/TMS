@@ -2,7 +2,6 @@ export interface InventoryItem {
     id: number;
     itemCode: string;
     itemGroup?: string | null;
-    teamId: number;
     itemName: string;
     itemType: string | null;
     description: string | null;

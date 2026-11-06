@@ -13,8 +13,8 @@ export class SettingsInventoryItemsController {
 
     @Get()
     @CanRead("master.item-master")
-    list(@Query("search") search?: string, @Query("page") page?: string, @Query("limit") limit?: string, @Query("teamId") teamId?: string, @Query("itemName") itemName?: string, @Query("unit") unit?: string, @Query("isActive") isActive?: string) {
-        return this.service.findAll({ teamId: teamId ? Number(teamId) : undefined, search, page: page ? Number(page) : undefined, limit: limit ? Number(limit) : undefined, itemName, unit, isActive: isActive === undefined || isActive === "" ? undefined : isActive === "true" });
+    list(@Query("search") search?: string, @Query("page") page?: string, @Query("limit") limit?: string, @Query("itemName") itemName?: string, @Query("unit") unit?: string, @Query("isActive") isActive?: string) {
+        return this.service.findAll({ search, page: page ? Number(page) : undefined, limit: limit ? Number(limit) : undefined, itemName, unit, isActive: isActive === undefined || isActive === "" ? undefined : isActive === "true" });
     }
 
     @Get("conversion-options")
@@ -31,15 +31,15 @@ export class SettingsInventoryItemsController {
     @CanCreate("master.item-master")
     @HttpCode(HttpStatus.CREATED)
     create(@Body() body: unknown) {
-        const { teamId, ...data } = parseItemBody(itemSchema, body);
-        return this.service.create(data, teamId);
+        const data = parseItemBody(itemSchema, body);
+        return this.service.create(data);
     }
 
     @Patch(":id")
     @CanUpdate("master.item-master")
     update(@Param("id", ParseIntPipe) id: number, @Body() body: unknown) {
-        const { teamId, ...data } = parseItemBody(updateItemSchema, body);
-        return this.service.update(id, data, teamId);
+        const data = parseItemBody(updateItemSchema, body);
+        return this.service.update(id, data);
     }
 
     @Delete(":id")
