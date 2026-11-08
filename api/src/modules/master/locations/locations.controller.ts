@@ -1,5 +1,6 @@
-﻿import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query } from "@nestjs/common";
+﻿import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { z } from "zod";
+import { MasterWriteGuard } from "@/modules/master/common/master-write.guard";
 import { LocationsService } from "@/modules/master/locations/locations.service";
 
 const CreateLocationSchema = z.object({
@@ -16,6 +17,7 @@ type CreateLocationDto = z.infer<typeof CreateLocationSchema>;
 type UpdateLocationDto = z.infer<typeof UpdateLocationSchema>;
 
 @Controller("locations")
+@UseGuards(MasterWriteGuard)
 export class LocationsController {
     constructor(private readonly locationsService: LocationsService) {}
 
