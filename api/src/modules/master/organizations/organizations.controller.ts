@@ -1,5 +1,6 @@
-﻿import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query } from "@nestjs/common";
+﻿import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { z } from "zod";
+import { MasterWriteGuard } from "@/modules/master/common/master-write.guard";
 import { OrganizationsService } from "@/modules/master/organizations/organizations.service";
 
 const CreateOrganizationSchema = z.object({
@@ -15,6 +16,7 @@ type CreateOrganizationDto = z.infer<typeof CreateOrganizationSchema>;
 type UpdateOrganizationDto = z.infer<typeof UpdateOrganizationSchema>;
 
 @Controller("organizations")
+@UseGuards(MasterWriteGuard)
 export class OrganizationsController {
     constructor(private readonly organizationsService: OrganizationsService) {}
 

@@ -13,6 +13,7 @@ import { AlertCircle, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { OrganizationModal } from "./components/OrganizationModal";
 import { OrganizationViewModal } from "./components/OrganizationViewModal";
+import { useAuth } from "@/contexts/AuthContext";
 
 const rowSelection: RowSelectionOptions = {
     mode: "multiRow",
@@ -21,6 +22,7 @@ const rowSelection: RowSelectionOptions = {
 
 const OrganizationPage = () => {
     const { data: organizations, isLoading, error, refetch } = useOrganizations();
+    const { canWriteMasterData } = useAuth();
     const deleteOrganization = useDeleteOrganization();
     const [drawerState, setDrawerState] = useState<{ open: boolean; organization: Organization | null }>({
         open: false,
@@ -31,7 +33,7 @@ const OrganizationPage = () => {
         organization: null,
     });
 
-    const organizationActions: ActionItem<Organization>[] = [
+    const organizationActions = ([
         {
             label: "View",
             onClick: row => setViewState({ open: true, organization: row }),
@@ -54,7 +56,7 @@ const OrganizationPage = () => {
                 }
             },
         },
-    ];
+    ] as ActionItem<Organization>[]).filter(action => canWriteMasterData || action.label === "View");
 
     const colDefs: ColDef<Organization>[] = [
         { field: "acronym", headerName: "Acronym", width: 120 },
@@ -123,12 +125,14 @@ const OrganizationPage = () => {
                 <CardHeader>
                     <CardTitle>Organizations</CardTitle>
                     <CardDescription>Manage all organizations and their industries</CardDescription>
-                    <CardAction>
-                        <Button variant="default" onClick={() => setDrawerState({ open: true, organization: null })}>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add New Organization
-                        </Button>
-                    </CardAction>
+                    {canWriteMasterData && (
+                        <CardAction>
+                            <Button variant="default" onClick={() => setDrawerState({ open: true, organization: null })}>
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add New Organization
+                            </Button>
+                        </CardAction>
+                    )}
                 </CardHeader>
                 <CardContent className="px-3">
                     <DataTable
