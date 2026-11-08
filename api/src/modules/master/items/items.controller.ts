@@ -1,16 +1,6 @@
-﻿import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Param,
-  ParseIntPipe,
-  Patch,
-  Post,
-} from '@nestjs/common';
+﻿import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
+import { MasterWriteGuard } from '@/modules/master/common/master-write.guard';
 import { ItemsService } from '@/modules/master/items/items.service';
 
 const CreateItemSchema = z.object({
@@ -39,6 +29,7 @@ const UpdateItemSchema = CreateItemSchema.partial();
 type UpdateItemDto = z.infer<typeof UpdateItemSchema>;
 
 @Controller('items')
+@UseGuards(MasterWriteGuard)
 export class ItemsController {
   constructor(private readonly itemsService: ItemsService) {}
 
