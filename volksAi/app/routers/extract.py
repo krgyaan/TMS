@@ -1038,9 +1038,15 @@ async def extract_tender(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error(
-            f"[EXTRACT_API_ERROR] Extraction pipeline failed for file '{filename}' (job_id: {job_id}): {exc}",
-            exc_info=True
+        logger.exception(
+            "[EXTRACT_API_ERROR] Extraction pipeline failed",
+            extra={
+                "custom_fields": {
+                    "uploaded_filename": filename,
+                    "request_id": job_id,
+                    "error_type": type(exc).__name__,
+                }
+            },
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
