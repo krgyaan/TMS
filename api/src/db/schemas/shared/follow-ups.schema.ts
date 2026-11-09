@@ -68,6 +68,8 @@ export const followUps = pgTable(
 
         attachments: jsonb("attachments").$type<string[]>().notNull().default([]),
 
+        lastReminderSentAt: timestamp("last_reminder_sent_at", { withTimezone: true }),
+
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
         updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
         deletedAt: timestamp("deleted_at", { withTimezone: true }),

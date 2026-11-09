@@ -24,6 +24,7 @@ import path from "path";
 
 import { MailerService } from "@/mailer/mailer.service";
 import { getIstDateKey } from "@/utils/ist-date";
+import { isAlternateDayDue, isMailBodyEmpty } from "./follow-up.helpers";
 import { GoogleService } from "@/modules/integrations/google/google.service";
 
 import { FollowupMailTemplates } from "./follow-up.mail";
@@ -922,12 +923,57 @@ export class FollowUpService {
     // ==========================
     // MAILING BEGINS HERE
     // ==========================
-    async processFollowupMail(id: number) {
-        this.logger.info("Processing follow-up mail", { followUpId: id });
+    async processFollowupMail(id: number, expectedFrequency?: number) {
+        this.logger.info("Processing follow-up mail", { followUpId: id, expectedFrequency });
 
         try {
-            const builder = new FollowupMailDataBuilder(this.db, this.mailAudience);
+            const [current] = await this.db
+                .select()
+                .from(followUps)
+                .where(and(eq(followUps.id, id), isNull(followUps.deletedAt)))
+                .limit(1);
 
+            if (!current) {
+                this.logger.warn("Follow-up not found or deleted, mail skipped", { followUpId: id });
+                return;
+            }
+
+            if (expectedFrequency !== undefined && current.frequency !== expectedFrequency) {
+                this.logger.warn("Follow-up frequency changed since enqueue, mail skipped", {
+                    followUpId: id,
+                    expectedFrequency,
+                    currentFrequency: current.frequency,
+                });
+                return;
+            }
+
+            if (current.assignmentStatus !== "initiated") {
+                this.logger.warn("Follow-up is not initiated, mail skipped", {
+                    followUpId: id,
+                    assignmentStatus: current.assignmentStatus,
+                });
+                return;
+            }
+
+            if (current.frequency === 6) {
+                this.logger.warn("Follow-up is stopped, mail skipped", { followUpId: id });
+                return;
+            }
+
+            if (!current.startFrom || current.startFrom > getIstDateKey()) {
+                this.logger.warn("Follow-up is not due yet, mail skipped", {
+                    followUpId: id,
+                    startFrom: current.startFrom,
+                });
+                return;
+            }
+
+            if (isMailBodyEmpty(current.details)) {
+                this.logger.warn("Follow-up mail body is empty, mail skipped", { followUpId: id });
+                return;
+            }
+
+            const builder = new FollowupMailDataBuilder(this.db, this.mailAudience);
             const payload = await builder.build(id);
 
             if (!payload) {
@@ -935,18 +981,12 @@ export class FollowUpService {
                 return;
             }
 
-            this.logger.debug("Mail Payload", {
-                followUpId: id,
-                payload,
-            });
-
             this.logger.debug("Mail payload built", {
                 followUpId: id,
                 toCount: payload.to?.length ?? 0,
                 ccCount: payload.cc?.length ?? 0,
             });
 
-            //  attempt google connection
             const googleConnection = await this.resolveGoogleConnection(payload.assignedToUserId, {
                 action: "process_followup_mail",
                 followUpId: id,
@@ -959,10 +999,9 @@ export class FollowUpService {
                 return;
             }
 
-            this.logger.debug("Entering mailer Service", {
-                followUpId: id,
-                googleConnection: googleConnection,
-            });
+            if (!googleConnection.hasRefreshToken) {
+                throw new Error(`Google connection for user ${googleConnection.userId} is missing a refresh token`);
+            }
 
             await this.mailerService.sendMail(
                 payload.template,
@@ -976,8 +1015,14 @@ export class FollowUpService {
                 googleConnection
             );
 
-            // incrementing reminder count
-            this.incrementReminderCount(id);
+            try {
+                await this.markReminderSent(id);
+            } catch (markError: any) {
+                this.logger.error("Follow-up mail sent but reminder count could not be updated", {
+                    followUpId: id,
+                    error: markError.message,
+                });
+            }
 
             this.logger.info("Follow-up mail sent successfully", {
                 followUpId: id,
@@ -989,6 +1034,7 @@ export class FollowUpService {
                 error: error.message,
                 stack: error.stack,
             });
+            throw error;
         }
     }
 
@@ -1036,12 +1082,25 @@ export class FollowUpService {
                     )
                 );
 
-            this.logger.debug("Due follow-ups fetched", {
+            if (frequency !== 2) {
+                this.logger.debug("Due follow-ups fetched", {
+                    frequency,
+                    count: result.length,
+                });
+                return result;
+            }
+
+            const alternateDayDue = result.filter(fu =>
+                isAlternateDayDue({ startFrom: fu.startFrom, lastReminderSentAt: fu.lastReminderSentAt })
+            );
+
+            this.logger.debug("Due alternate-day follow-ups fetched", {
                 frequency,
-                count: result.length,
+                fetched: result.length,
+                due: alternateDayDue.length,
             });
 
-            return result;
+            return alternateDayDue;
         } catch (error: any) {
             this.logger.error("Error fetching due follow-ups", {
                 frequency,
@@ -1051,21 +1110,22 @@ export class FollowUpService {
         }
     }
 
-    async incrementReminderCount(id: number) {
-        this.logger.debug("Incrementing reminder count", { followUpId: id });
+    async markReminderSent(id: number) {
+        this.logger.debug("Marking follow-up reminder as sent", { followUpId: id });
 
         try {
             await this.db
                 .update(followUps)
                 .set({
                     reminderCount: sql`${followUps.reminderCount} + 1`,
+                    lastReminderSentAt: new Date(),
                     updatedAt: new Date(),
                 })
                 .where(eq(followUps.id, id));
 
-            this.logger.debug("Reminder count incremented", { followUpId: id });
+            this.logger.debug("Follow-up reminder count incremented", { followUpId: id });
         } catch (error: any) {
-            this.logger.error("Failed to increment reminder count", {
+            this.logger.error("Failed to mark follow-up reminder as sent", {
                 followUpId: id,
                 error: error.message,
             });

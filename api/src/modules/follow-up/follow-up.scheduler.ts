@@ -1,7 +1,7 @@
 import { Injectable, Inject } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { FollowUpService } from "./follow-up.service";
-import { FOLLOWUP_WINDOWS } from "./follow-up.windows";
+import { getFollowupWindow } from "./follow-up.windows";
 import { Queue } from "bullmq";
 import { AppLogger } from "@/logger/app-logger.service";
 import { getIstDateKey, getIstTimeKey } from "@/utils/ist-date";
@@ -9,6 +9,7 @@ import { getIstDateKey, getIstTimeKey } from "@/utils/ist-date";
 @Injectable()
 export class FollowupScheduler {
     private readonly logger;
+    private running = false;
 
     constructor(
         @Inject("FOLLOWUP_QUEUE")
@@ -21,14 +22,20 @@ export class FollowupScheduler {
 
     @Cron("* * * * *")
     async handleFollowups() {
-        const now = new Date();
+        if (this.running) {
+            this.logger.warn("Previous follow-up scheduler run still in progress, skipping this minute");
+            return;
+        }
 
-        const window = this.getCurrentWindow(now);
-        if (!window) return;
-
-        const slot = `${getIstDateKey(now)}T${getIstTimeKey(now)}`;
+        this.running = true;
 
         try {
+            const now = new Date();
+            const window = getFollowupWindow(now);
+            if (!window) return;
+
+            const slot = `${getIstDateKey(now)}T${getIstTimeKey(now)}`;
+
             this.logger.info("Follow-up window matched", {
                 frequency: window.frequency,
                 slot,
@@ -62,7 +69,7 @@ export class FollowupScheduler {
 
                 await this.queue.add(
                     "send-followup",
-                    { followupId: fu.id },
+                    { followupId: fu.id, frequency: window.frequency, slot },
                     {
                         jobId,
                         attempts: 5,
@@ -74,23 +81,10 @@ export class FollowupScheduler {
             this.logger.error("Failed to enqueue follow-up mails", {
                 error: error instanceof Error ? error.message : String(error),
                 stack: error instanceof Error ? error.stack : undefined,
-                frequency: window.frequency,
-                slot,
             });
             throw error;
+        } finally {
+            this.running = false;
         }
-    }
-
-    private getCurrentWindow(date: Date) {
-        const day = date.getDay(); // 0-6
-        const hour = date.getHours();
-        const minute = date.getMinutes();
-
-        return FOLLOWUP_WINDOWS.find(w => {
-            const basicMatch = w.hour === hour && w.minute === minute && w.days.includes(day);
-            if (!basicMatch) return false;
-            if (w.customCheck && !w.customCheck(date)) return false;
-            return true;
-        });
     }
 }

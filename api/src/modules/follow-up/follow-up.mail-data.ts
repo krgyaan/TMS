@@ -4,6 +4,7 @@ import { FollowupMailBase, FollowupMailPayload } from "./dto/mail.dto";
 import { FollowupMailTemplates } from "./follow-up.mail";
 import sanitizeHtml from "sanitize-html";
 import { MailAudienceService } from "@/core/mail/mail-audience.service";
+import { resolveUploadRelativePath } from "@/modules/file-upload/path-resolver";
 
 type InstrumentType = "DD" | "FDR" | "BG" | "Cheque" | "Bank Transfer" | "Portal Payment" | "Surety Bond";
 
@@ -15,10 +16,12 @@ export class FollowupMailDataBuilder {
 
     async build(followupId: number): Promise<FollowupMailPayload | null> {
         const fu = await this.getBaseFollowup(followupId);
-        const to = await this.getRecipients(followupId);
+        const to = this.uniqueEmails(await this.getRecipients(followupId));
         if (!to.length || !fu.assignedToId) return null;
 
-        const cc = await this.resolveCc(fu.area);
+        const cc = this.uniqueEmails(await this.resolveCc(fu.area)).filter(
+            email => !to.some(recipient => recipient.toLowerCase() === email.toLowerCase())
+        );
 
         const since = this.computeSince(fu.startFrom);
 
@@ -53,7 +56,9 @@ export class FollowupMailDataBuilder {
             to,
             cc,
             subject: `Follow Up for ${fu.followupFor ?? fu.partyName}`,
-            attachments: fu.attachments?.length ? { files: fu.attachments.map(a => `accounts/${a}`), baseDir: "" } : undefined,
+            attachments: fu.attachments?.length
+                ? { files: fu.attachments.map(attachment => resolveUploadRelativePath(attachment, "follow-ups")), baseDir: "" }
+                : undefined,
             assignedToUserId: fu.assignedToId,
         };
     }
@@ -114,9 +119,28 @@ export class FollowupMailDataBuilder {
             FROM follow_up_persons
             WHERE follow_up_id = ${id}
             AND email IS NOT NULL
+            AND TRIM(email) <> ''
         `);
 
         return rows.rows.map((r: any) => r.email as string);
+    }
+
+    private uniqueEmails(emails: string[]): string[] {
+        const seen = new Set<string>();
+        const result: string[] = [];
+
+        for (const raw of emails) {
+            const email = String(raw ?? "").trim();
+            if (!email) continue;
+
+            const key = email.toLowerCase();
+            if (seen.has(key)) continue;
+
+            seen.add(key);
+            result.push(email);
+        }
+
+        return result;
     }
 
     private async resolveInstrumentData(instrumentId: number) {

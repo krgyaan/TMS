@@ -659,6 +659,13 @@
       "when": 1796007000001,
       "tag": "0171_master_item_master_permissions",
       "breakpoints": true
+    },
+    {
+      "idx": 118,
+      "version": "7",
+      "when": 1797000000000,
+      "tag": "0172_add_last_reminder_sent_at_to_follow_ups",
+      "breakpoints": true
     }
   ]
 }
