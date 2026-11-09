@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { RouteWrapper } from "../components/RouteWrapper";
 
 // Follow-ups
@@ -30,9 +30,9 @@ const MakerRequestCreatePage = lazy(() => import("@/modules/shared/maker-request
 export default function SharedRoutes() {
     return (
         <Routes>
-            {/* Follow-ups Routes */}
+            {/* Follow-up Routes */}
             <Route
-                path="follow-ups"
+                path="follow-up"
                 element={
                     <RouteWrapper>
                         <Shared_FollowUps />
@@ -42,6 +42,7 @@ export default function SharedRoutes() {
             <Route path="follow-up/create" element={<FollowUpCreatePage />} />
             <Route path="follow-up/edit/:id" element={<FollowUpEditPage />} />
             <Route path="follow-up/show/:id" element={<FollowUpShowPage />} />
+            <Route path="follow-ups" element={<Navigate to="/shared/follow-up" replace />} />
             {/* Courier Routes */}
             <Route
                 path="couriers"
