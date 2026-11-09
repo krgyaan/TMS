@@ -3,10 +3,10 @@ import { Routes, Route } from "react-router-dom";
 import { RouteWrapper } from "../components/RouteWrapper";
 
 // Follow-ups
-const Shared_FollowUps = lazy(() => import("@/modules/shared/follow-up/FollowUpPage"));
+const Shared_FollowUps = lazy(() => import("@/modules/shared/follow-up/FollowUpListPage"));
 const FollowUpCreatePage = lazy(() => import("@/modules/shared/follow-up/FollowUpCreatePage"));
 const FollowUpEditPage = lazy(() => import("@/modules/shared/follow-up/FollowUpEditPage"));
-const FollowUpShowPage = lazy(() => import("@/modules/shared/follow-up/FollowUpViewPage"));
+const FollowUpShowPage = lazy(() => import("@/modules/shared/follow-up/FollowUpShowPage"));
 
 // Courier
 const Shared_Courier = lazy(() => import("@/modules/shared/courier"));
