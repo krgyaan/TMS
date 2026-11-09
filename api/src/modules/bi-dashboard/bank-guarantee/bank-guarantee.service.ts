@@ -5,7 +5,7 @@ import { AppLogger } from '@/logger/app-logger.service';
 import { PaymentRequestsNotificationService } from '@/modules/tendering/payment-requests/services/payment-requests-notification.service';
 import type { BankGuaranteeDashboardCounts, BankGuaranteeDashboardRow } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
-import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
+import type { CreateFollowUpDto } from '@/modules/follow-up/dto';
 import { BG_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
