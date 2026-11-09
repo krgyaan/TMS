@@ -1,7 +1,6 @@
 import { DbInstance } from "@/db";
 import { sql } from "drizzle-orm";
-import { FollowUpDetailsDto } from "./zod/update-follow-up.dto";
-import { FollowupMailBase, FollowupMailPayload } from "./zod/mail.dto";
+import { FollowupMailBase, FollowupMailPayload } from "./dto/mail.dto";
 import { FollowupMailTemplates } from "./follow-up.mail";
 import sanitizeHtml from "sanitize-html";
 import { MailAudienceService } from "@/core/mail/mail-audience.service";

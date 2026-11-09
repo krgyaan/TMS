@@ -18,7 +18,8 @@ import {
     type FollowUpQueryDto,
     updateFollowUpSchema,
     updateFollowUpStatusSchema
-} from "@/modules/follow-up/zod";
+} from "@/modules/follow-up/dto";
+import { wrapPaginatedResponse } from "@/utils/responseWrapper";
 import path from "path";
 
 import { MailerService } from "@/mailer/mailer.service";
@@ -266,15 +267,15 @@ export class FollowUpService {
     // ========================
 
     async findAll(query: FollowUpQueryDto, currentUser: any) {
-        const { tab, search, page, limit, sortBy, sortOrder } = query;
+        const { tab, search, sortBy, sortOrder } = query;
+        const page = Math.max(1, query.page ?? 1);
+        const limit = Math.min(Math.max(query.limit ?? 50, 1), 100);
+        const offset = (page - 1) * limit;
 
         try {
-            const offset = (page - 1) * limit;
             const conditions: SQL[] = [isNull(followUps.deletedAt)];
 
             if (currentUser.roleId != "1" && currentUser.roleId != "2") {
-                this.logger.debug({ message: "Is not admin" });
-
                 conditions.push(or(eq(followUps.assignedToId, currentUser.id), eq(followUps.createdById, currentUser.id))!);
             }
 
@@ -298,9 +299,7 @@ export class FollowUpService {
 
             if (tab === "ongoing") {
                 conditions.push(ne(followUps.frequency, 6));
-                if (followUps.startFrom) {
-                    conditions.push(lte(followUps.startFrom, today));
-                }
+                conditions.push(lte(followUps.startFrom, today));
             } else if (tab === "achieved") {
                 conditions.push(eq(followUps.frequency, 6));
                 conditions.push(eq(followUps.stopReason, 2));
@@ -315,39 +314,62 @@ export class FollowUpService {
             const orderDirection = sortOrder === "asc" ? asc : desc;
             const orderColumn = this.getOrderColumn(sortBy);
 
-            const results = await this.db.query.followUps.findMany({
-                where: and(...conditions),
-                with: { contacts: true, assignee: true, creator: true },
-                orderBy: orderDirection(orderColumn),
-                limit,
-                offset,
-            });
-
-            const [{ count }] = await this.db
-                .select({ count: sql<number>`count(*)` })
-                .from(followUps)
-                .where(and(...conditions));
-
-            return {
-                data: results.map(fu => ({
-                    ...this.transformFollowUp(fu),
-                    contacts: fu.contacts,
-                    creator: fu.creator,
-                    assignee: fu.assignee,
-                })),
-                meta: {
-                    total: Number(count),
-                    page,
+            const [results, [{ count }]] = await Promise.all([
+                this.db.query.followUps.findMany({
+                    where: and(...conditions),
+                    with: { contacts: true, assignee: true, creator: true },
+                    orderBy: orderDirection(orderColumn),
                     limit,
-                    totalPages: Math.ceil(Number(count) / limit),
-                },
-            };
+                    offset,
+                }),
+                this.db
+                    .select({ count: sql<number>`count(*)::int` })
+                    .from(followUps)
+                    .where(and(...conditions)),
+            ]);
+
+            return wrapPaginatedResponse(
+                results.map(fu => this.transformFollowUp(fu)),
+                Number(count),
+                page,
+                limit
+            );
         } catch (error: any) {
             this.logger.error("Error fetching follow-ups", {
                 error: error.message,
             });
             throw error;
         }
+    }
+
+    // ========================
+    // DASHBOARD COUNTS
+    // ========================
+    async getCounts(currentUser: any) {
+        const conditions: SQL[] = [isNull(followUps.deletedAt)];
+
+        if (currentUser.roleId != "1" && currentUser.roleId != "2") {
+            conditions.push(or(eq(followUps.assignedToId, currentUser.id), eq(followUps.createdById, currentUser.id))!);
+        }
+
+        const today = getIstDateKey();
+
+        const [counts] = await this.db
+            .select({
+                ongoing: sql<number>`count(*) filter (where ${ne(followUps.frequency, 6)} and ${lte(followUps.startFrom, today)})`,
+                achieved: sql<number>`count(*) filter (where ${eq(followUps.frequency, 6)} and ${eq(followUps.stopReason, 2)})`,
+                angry: sql<number>`count(*) filter (where ${eq(followUps.frequency, 6)} and ${inArray(followUps.stopReason, [1, 3, 4])})`,
+                future: sql<number>`count(*) filter (where ${gt(followUps.startFrom, today)} and ${ne(followUps.frequency, 6)})`,
+            })
+            .from(followUps)
+            .where(and(...conditions));
+
+        return {
+            ongoing: Number(counts?.ongoing ?? 0),
+            achieved: Number(counts?.achieved ?? 0),
+            angry: Number(counts?.angry ?? 0),
+            future: Number(counts?.future ?? 0),
+        };
     }
 
     // ========================
@@ -359,7 +381,8 @@ export class FollowUpService {
         const result = await this.db.query.followUps.findFirst({
             where: and(eq(followUps.id, id), isNull(followUps.deletedAt)),
             with: {
-                contacts: true, // ✅ THIS IS THE MISSING PIECE
+                assignee: true,
+                creator: true,
             },
         });
 
@@ -367,6 +390,8 @@ export class FollowUpService {
             this.logger.warn("Follow-up not found", { followUpId: id });
             throw new NotFoundException(`Follow-up with ID ${id} not found`);
         }
+
+        const persons = await this.db.select().from(followUpPersons).where(eq(followUpPersons.followUpId, id));
 
         const formatDateTime = (d?: Date | null) => (d ? d.toISOString() : null);
 
@@ -379,7 +404,7 @@ export class FollowUpService {
 
         this.logger.debug("Follow-up details loaded", {
             followUpId: result.id,
-            contactsCount: result.contacts?.length ?? 0,
+            contactsCount: persons.length,
         });
 
         return {
@@ -392,6 +417,7 @@ export class FollowUpService {
             followupFor: result.followupFor ?? null,
 
             assignedToId: result.assignedToId ?? null,
+            createdById: result.createdById ?? null,
             details: result.details ?? null,
 
             status: result.assignmentStatus ?? "assigned",
@@ -406,16 +432,19 @@ export class FollowUpService {
             proofImagePath: result.proofImagePath ?? null,
             stopRemarks: result.stopRemarks ?? null,
 
-            // ✅ CORRECT SOURCE
-            contacts: (result.contacts ?? []).map(c => ({
+            contacts: persons.map(c => ({
+                id: c.id,
                 name: c.name ?? null,
                 email: c.email ?? null,
                 phone: c.phone ?? null,
-                org: c.org ?? null,
+                org: c.organization ?? null,
             })),
 
             attachments: Array.isArray(result.attachments) ? result.attachments : [],
             followUpHistory: Array.isArray(result.followUpHistory) ? result.followUpHistory : [],
+
+            assignee: result.assignee ?? null,
+            creator: result.creator ?? null,
 
             createdAt: formatDateTime(result.createdAt),
             updatedAt: formatDateTime(result.updatedAt),
@@ -574,6 +603,7 @@ export class FollowUpService {
                         name: c.name ?? "",
                         email: c.email ?? null,
                         phone: c.phone ?? null,
+                        organization: c.org ?? null,
                     }))
                 );
 
@@ -669,27 +699,30 @@ export class FollowUpService {
     // ========================
 
     async delete(id: number, userId: number) {
-        this.logger.warn("Hard deleting follow-up", { followUpId: id, userId });
+        this.logger.info("Soft deleting follow-up", { followUpId: id, userId });
 
         try {
-            const existing = await this.findOne(id);
+            const existing = await this.db
+                .select({ id: followUps.id })
+                .from(followUps)
+                .where(and(eq(followUps.id, id), isNull(followUps.deletedAt)))
+                .limit(1)
+                .then(r => r[0] ?? null);
+
             if (!existing) {
-                throw new NotFoundException("Follow-up not found");
+                throw new NotFoundException(`Follow-up with ID ${id} not found`);
             }
 
-            await this.db.transaction(async tx => {
-                // 1️⃣ Delete child records first (FK safety)
-                await tx.delete(followUpPersons).where(eq(followUpPersons.followUpId, id));
+            await this.db
+                .update(followUps)
+                .set({ deletedAt: new Date(), updatedAt: new Date() })
+                .where(eq(followUps.id, id));
 
-                // 2️⃣ Delete follow_up
-                await tx.delete(followUps).where(eq(followUps.id, id));
-            });
+            this.logger.info("Follow-up soft deleted successfully", { followUpId: id });
 
-            this.logger.warn("Follow-up hard deleted successfully", { followUpId: id });
-
-            return { message: "Follow-up and related persons deleted successfully" };
+            return { message: "Follow-up deleted successfully" };
         } catch (error: any) {
-            this.logger.error("Failed to hard delete follow-up", {
+            this.logger.error("Failed to soft delete follow-up", {
                 followUpId: id,
                 userId,
                 error: error.message,
@@ -703,7 +736,7 @@ export class FollowUpService {
     // AMOUNT SUMMARY
     // ========================
 
-    async getAmountSummary(currentUser: { id: number; role: string }) {
+    async getAmountSummary(currentUser: { id: number; role: string | null }) {
         const baseConditions: SQL[] = [isNull(followUps.deletedAt)];
 
         if (currentUser.role !== "admin") {
@@ -1040,7 +1073,7 @@ export class FollowUpService {
         }
     }
 
-    private getOrderColumn(sortBy: string) {
+    private getOrderColumn(sortBy?: string) {
         const columnMap: Record<string, any> = {
             id: followUps.id,
             startFrom: followUps.startFrom,
@@ -1052,53 +1085,56 @@ export class FollowUpService {
             amount: followUps.amount,
             partyName: followUps.partyName,
             party_name: followUps.partyName,
+            latestComment: followUps.latestComment,
+            latest_comment: followUps.latestComment,
+            nextFollowUpDate: followUps.nextFollowUpDate,
             status: followUps.assignmentStatus,
             assignmentStatus: followUps.assignmentStatus,
             assignment_status: followUps.assignmentStatus,
             frequency: followUps.frequency,
         };
 
-        if (!columnMap[sortBy]) {
+        const key = sortBy ?? "startFrom";
+
+        if (!columnMap[key]) {
             this.logger.warn("Invalid sortBy received, defaulting to startFrom", {
                 sortBy,
             });
         }
 
-        return columnMap[sortBy] || followUps.startFrom;
+        return columnMap[key] || followUps.startFrom;
     }
 
     private transformFollowUp(f: any, includeHistory = false) {
         if (!f) {
-            // this.logger.warn("transformFollowUp called with empty object");
             return {};
         }
 
         const result: any = {
             id: f.id,
             area: f.area,
-            party_name: f.partyName,
+            partyName: f.partyName,
             amount: parseFloat(f.amount || "0"),
             frequency: f.frequency,
             frequencyLabel: FREQUENCY_LABELS[f.frequency] || f.frequency,
             status: f.assignmentStatus,
-            latest_comment: f.latestComment,
-            updated_at: f.updatedAt,
-            created_at: f.createdAt,
-            start_from: f.startFrom,
-            assigned_to_id: f.assignedToId,
-            followPerson: f.contacts || [],
-            stop_reason: f.stopReason,
+            latestComment: f.latestComment,
+            updatedAt: f.updatedAt,
+            createdAt: f.createdAt,
+            startFrom: f.startFrom,
+            nextFollowUpDate: f.nextFollowUpDate,
+            assignedToId: f.assignedToId,
+            createdById: f.createdById,
+            contacts: f.contacts || [],
+            assignee: f.assignee ?? null,
+            creator: f.creator ?? null,
+            stopReason: f.stopReason,
             stopReasonLabel: f.stopReason ? STOP_REASON_LABELS[f.stopReason] : null,
         };
 
         if (includeHistory) {
-            result.follow_up_history = f.followUpsHistory || [];
+            result.followUpHistory = f.followUpHistory || [];
         }
-
-        // this.logger.debug("Follow-up transformed for response", {
-        //     followUpId: f.id,
-        //     contactsCount: result.followPerson.length,
-        // });
 
         return result;
     }
