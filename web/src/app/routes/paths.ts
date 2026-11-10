@@ -450,7 +450,7 @@ export const paths = {
         followUpShow: (id: number) => `/shared/follow-up/show/${id}`,
 
         couriers: "/shared/couriers",
-        courierDispatch: "/shared/couriers/dispatch",
+        courierDispatch: (id: number) => `/shared/couriers/dispatch/${id}`,
         courierCreate: "/shared/couriers/create",
         courierView: (id: number) => `/shared/couriers/show/${id}`,
         courierEdit: (id: number) => `/shared/couriers/edit/${id}`,

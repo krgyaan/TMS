@@ -13,6 +13,7 @@ export { imprestCategoriesService } from "./imprest-category.service";
 export { imprestService } from "./imprest.service";
 export { followupCategoriesService } from "./followup-category.service";
 export { followUpService } from "./follow-up.service";
+export { courierService, courierApi } from "./courier.service";
 export { documentsSubmittedService } from "./document-submitted.service";
 export { industriesService } from "./industry.service";
 export { teamService } from "./team.service";
