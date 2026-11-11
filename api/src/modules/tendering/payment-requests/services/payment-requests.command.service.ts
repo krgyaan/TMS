@@ -14,7 +14,7 @@ import { and, desc, eq, like } from 'drizzle-orm';
 import type { CreateMomRemarkDto } from '../dto/payment-mom.dto';
 import type { CreatePaymentRequestDto, PaymentPurpose, UpdatePaymentRequestDto, UpdateStatusDto } from '../dto/payment-requests.dto';
 import { PaymentRequestsNotificationService } from './payment-requests-notification.service';
-import { extractAmountFromDetails, extractPurposeFromDetails } from './payment-requests.shared';
+import { extractAmountFromDetails, extractPurposeFromDetails, extractProjectBgPurpose } from './payment-requests.shared';
 
 @Injectable()
 export class PaymentRequestsCommandService {
@@ -90,10 +90,16 @@ export class PaymentRequestsCommandService {
                 const isBlankNonTmsCheque = isNonTmsRequest && payload.EMD.mode === 'CHEQUE';
 
                 if (emdAmount > 0 || isBlankNonTmsCheque) {
+                    // Project dashboard BI requests keep the exact BG purpose
+                    // chosen in the form (Advance Payment / Security Bond/Deposit /
+                    // Performance BG) instead of the generic EMD bucketing.
+                    const emdPurpose = payload.projectId && payload.EMD.mode === 'BG'
+                        ? extractProjectBgPurpose(payload.EMD.details)
+                        : extractPurposeFromDetails(payload.EMD.mode, payload.EMD.details, 'EMD');
                     const request = await this.createPaymentRequest(
                         tx,
                         tenderId,
-                        extractPurposeFromDetails(payload.EMD.mode, payload.EMD.details, 'EMD'),
+                        emdPurpose,
                         emdAmount,
                         tender,
                         userId,

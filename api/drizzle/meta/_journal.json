@@ -680,6 +680,13 @@
       "when": 1797000000002,
       "tag": "0174_drop_project_id_from_payment_instruments",
       "breakpoints": true
+    },
+    {
+      "idx": 121,
+      "version": "7",
+      "when": 1797000000003,
+      "tag": "0175_add_project_bg_purposes_to_payment_purpose_enum",
+      "breakpoints": true
     }
   ]
 }

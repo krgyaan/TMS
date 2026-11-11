@@ -10,6 +10,8 @@ export const paymentPurposeEnum = pgEnum('payment_purpose', [
     'Processing Fee',    // Corresponds to MySQL emds.purpose = 'Processing Fee'
     'Security Deposit',  // Corresponds to MySQL emds.purpose = 'Security Deposit'
     'Performance BG',    // Corresponds to MySQL emds.purpose = 'Performance BG'
+    'Advance Payment',   // Project dashboard BG purpose
+    'Security Bond/Deposit', // Project dashboard BG purpose
     'Surety Bond',       // Corresponds to MySQL emds.purpose = 'Surety Bond'
     'Other Payment',     // Corresponds to MySQL emds.purpose = 'Other Payment'
     'DD',

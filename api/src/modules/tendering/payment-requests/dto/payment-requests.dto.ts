@@ -352,7 +352,7 @@ export type DashboardQueryDto = z.infer<typeof DashboardQuerySchema>;
 // Dashboard Response Types
 // ============================================================================
 
-export type PaymentPurpose = "EMD" | "Tender Fee" | "Processing Fee" | "Security Deposit" | "Performance BG" | "Surety Bond" | "Other Payment" | "DD" | "FDR";
+export type PaymentPurpose = "EMD" | "Tender Fee" | "Processing Fee" | "Security Deposit" | "Performance BG" | "Surety Bond" | "Other Payment" | "Advance Payment" | "Security Bond/Deposit" | "DD" | "FDR";
 
 export type InstrumentType =
     | "DD"
