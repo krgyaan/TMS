@@ -1,6 +1,7 @@
-import { pgTable, varchar, text, decimal, timestamp, date, pgEnum, serial, index, integer, jsonb, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, varchar, text, decimal, timestamp, date, pgEnum, serial, index, integer, jsonb, boolean, bigint } from 'drizzle-orm/pg-core';
 import { teams } from '@/db/schemas/master/teams.schema';
 import { users } from '@/db/schemas/auth/users.schema';
+import { projects } from '@/db/schemas/master/projects.schema';
 
 // Enums
 export const paymentPurposeEnum = pgEnum('payment_purpose', [
@@ -41,6 +42,7 @@ export const paymentRequests = pgTable('payment_requests', {
 
     // Direct mappings from MySQL emds table
     tenderId: integer('tender_id').notNull().default(0), // emds.tender_id
+    projectId: bigint('project_id', { mode: 'number' }).references(() => projects.id, { onDelete: 'set null' }), // Links request to a project (Request BI from project dashboard)
     type: paymentRequestTypeEnum('type').default('TMS'), // emds.type
     team: integer('team').references(() => teams.id),
     tenderNo: varchar('tender_no', { length: 500 }).default('NA'), // emds.tender_no (equal to tender.tenderNo)
@@ -63,6 +65,7 @@ export const paymentRequests = pgTable('payment_requests', {
     return [
         { purposeIdx: index('payment_requests_purpose_idx').on(table.purpose) },
         { legacyEmdIdx: index('payment_requests_legacy_emd_id_idx').on(table.legacyEmdId) },
+        { projectIdx: index('payment_requests_project_id_idx').on(table.projectId) },
     ];
 });
 
@@ -73,6 +76,7 @@ export const paymentRequests = pgTable('payment_requests', {
 export const paymentInstruments = pgTable('payment_instruments', {
     id: serial('id').primaryKey(),
     requestId: integer('request_id').notNull(), // Links to payment_requests.id
+    projectId: bigint('project_id', { mode: 'number' }).references(() => projects.id, { onDelete: 'set null' }), // Links instrument to a project (Request BI from project dashboard)
 
     instrumentType: instrumentTypeEnum('instrument_type').notNull(),
     purpose: varchar('purpose', { length: 255 }),
@@ -140,6 +144,7 @@ export const paymentInstruments = pgTable('payment_instruments', {
         { typeIdx: index('instruments_type_idx').on(table.instrumentType) },
         { statusIdx: index('instruments_status_idx').on(table.status) },
         { utrIdx: index('instruments_utr_idx').on(table.utr) },
+        { projectIdx: index('payment_instruments_project_id_idx').on(table.projectId) },
         { legacyDdIdx: index('instruments_legacy_dd_id_idx').on(table.legacyDdId) },
         { legacyFdrIdx: index('instruments_legacy_fdr_id_idx').on(table.legacyFdrId) },
         { legacyBgIdx: index('instruments_legacy_bg_id_idx').on(table.legacyBgId) },

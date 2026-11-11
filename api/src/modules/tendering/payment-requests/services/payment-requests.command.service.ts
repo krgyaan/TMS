@@ -102,7 +102,8 @@ export class PaymentRequestsCommandService {
                         payload.tenderName,
                         payload.dueDate,
                         emdRemarks,
-                        payload.team
+                        payload.team,
+                        payload.projectId
                     );
                     createdRequests.push(request);
 
@@ -112,7 +113,8 @@ export class PaymentRequestsCommandService {
                         payload.EMD.mode,
                         payload.EMD.details,
                         emdAmount,
-                        userId
+                        userId,
+                        payload.projectId
                     );
                     results.push({ request, instrument });
 
@@ -167,7 +169,8 @@ export class PaymentRequestsCommandService {
                         payload.tenderName,
                         payload.dueDate,
                         tfRemarks,
-                        payload.team
+                        payload.team,
+                        payload.projectId
                     );
                     createdRequests.push(request);
 
@@ -177,7 +180,8 @@ export class PaymentRequestsCommandService {
                         payload.TENDER_FEES.mode,
                         payload.TENDER_FEES.details,
                         tfAmount,
-                        userId
+                        userId,
+                        payload.projectId
                     );
                     results.push({ request, instrument });
 
@@ -236,7 +240,8 @@ export class PaymentRequestsCommandService {
                         payload.tenderName,
                         payload.dueDate,
                         pfRemarks,
-                        payload.team
+                        payload.team,
+                        payload.projectId
                     );
                     createdRequests.push(request);
 
@@ -246,7 +251,8 @@ export class PaymentRequestsCommandService {
                         payload.PROCESSING_FEES.mode,
                         payload.PROCESSING_FEES.details,
                         pfAmount,
-                        userId
+                        userId,
+                        payload.projectId
                     );
                     results.push({ request, instrument });
 
@@ -516,7 +522,8 @@ export class PaymentRequestsCommandService {
         tenderName?: string,
         dueDate?: string,
         remarks?: string,
-        team?: number
+        team?: number,
+        projectId?: number
     ) {
         this.logger.log(`Creating payment request: ${purpose} - Amount: ${amount}`);
         const effectiveDueDate = tender?.dueDate 
@@ -539,6 +546,7 @@ export class PaymentRequestsCommandService {
                 status: 'Pending',
                 remarks: remarks || 'Payment Request',
                 team: team || null,
+                projectId: projectId ?? null,
             })
             .returning()
             .execute();
@@ -553,7 +561,8 @@ export class PaymentRequestsCommandService {
         mode: string,
         details: any,
         amount: number,
-        userId?: number
+        userId?: number,
+        projectId?: number
     ) {
         this.logger.log(`Creating instrument with details: ${JSON.stringify(details)}`);
         const instrumentTypeMap: Record<string, string> = {
@@ -583,6 +592,7 @@ export class PaymentRequestsCommandService {
             .insert(paymentInstruments)
             .values({
                 requestId: requestId,
+                projectId: projectId ?? null,
                 instrumentType: instrumentTypeMap[mode] || mode,
                 purpose: details[`${shorthand}Purpose`] || null,
                 amount: amount.toString(),
@@ -711,6 +721,7 @@ export class PaymentRequestsCommandService {
             .insert(paymentInstruments)
             .values({
                 requestId: ddFdrRequest.id,
+                projectId: ddFdrInstrument.projectId ?? null,
                 instrumentType: 'Cheque',
                 purpose: ddFdrInstrument.purpose,
                 amount: ddFdrInstrument.amount,
