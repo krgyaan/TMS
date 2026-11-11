@@ -51,6 +51,7 @@ const Operations_EditPaymentRequest = lazy(() => import("@/modules/operations/pa
 const Operations_PaymentRequestTabs = lazy(() => import("@/modules/operations/payment-requests/PaymentRequestTabsPage"));
 const Operations_CreateProjectInsurance = lazy(() => import("@/modules/operations/project-dashboard/pages/CreateProjectInsurancePage"));
 const Operations_CreateBiBankGuarantee = lazy(() => import("@/modules/operations/project-dashboard/pages/CreateBiBankGuaranteePage"));
+const Operations_BiRequestView = lazy(() => import("@/modules/operations/project-dashboard/pages/BiRequestViewPage"));
 const Operations_ItemMaster = lazy(() => import("@/modules/accounts/inventory-items/InventoryItemListPage"));
 const Operations_ItemMaster_Detail = lazy(() => import("@/modules/accounts/inventory-items/InventoryItemDetailPage"));
 
@@ -105,6 +106,7 @@ export default function OperationsRoutes() {
             <Route path="project-dashboard/:projectId/project-payment-request/:prId/edit" element={<RouteWrapper><Operations_EditPaymentRequest /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/insurance/create" element={<RouteWrapper><Operations_CreateProjectInsurance /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/bi-request/bank-guarantee/create" element={<RouteWrapper><Operations_CreateBiBankGuarantee /></RouteWrapper>} />
+            <Route path="project-dashboard/:projectId/bi-request/:requestId" element={<RouteWrapper><Operations_BiRequestView /></RouteWrapper>} />
             <Route path="payment-requests" element={<RouteWrapper><Operations_PaymentRequestTabs /></RouteWrapper>} />
         </Routes>
     );

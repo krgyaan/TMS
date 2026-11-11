@@ -1,4 +1,6 @@
 import { paths } from "@/app/routes/paths";
+import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
+import type { ActionItem } from "@/components/ui/ActionMenu";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import DataTable from "@/components/ui/data-table";
@@ -14,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useProjectBiRequests } from "@/hooks/api/usePaymentRequests";
 import { formatINR } from "@/hooks/useINRFormatter";
 import type { ColDef, ValueFormatterParams } from "ag-grid-community";
-import { Banknote, ChevronDown, Plus } from "lucide-react";
+import { Banknote, ChevronDown, Eye, Plus } from "lucide-react";
 import React, { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -49,6 +51,14 @@ export const BiRequestsSection: React.FC<BiRequestsSectionProps> = ({ projectId 
         () => (data?.requests ?? []) as BiRequestRow[],
         [data],
     );
+
+    const actions = useMemo<ActionItem<BiRequestRow>[]>(() => [
+        {
+            label: "View Details",
+            icon: <Eye className="h-4 w-4" />,
+            onClick: (row) => navigate(paths.operations.biRequestView(projectId!, row.id)),
+        },
+    ], [navigate]);
 
     const columns = useMemo<ColDef<BiRequestRow>[]>(() => [
         {
@@ -107,7 +117,15 @@ export const BiRequestsSection: React.FC<BiRequestsSectionProps> = ({ projectId 
             valueFormatter: (p: ValueFormatterParams<BiRequestRow>) =>
                 p.value ? new Date(p.value).toLocaleDateString() : "-",
         },
-    ], []);
+        {
+            headerName: "Actions",
+            filter: false,
+            sortable: false,
+            cellRenderer: createActionColumnRenderer<BiRequestRow>(actions),
+            width: 80,
+            pinned: "right" as "right" | "left",
+        },
+    ], [actions]);
 
     if (!projectId) return null;
 
