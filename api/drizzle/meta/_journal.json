@@ -673,6 +673,13 @@
       "when": 1797000000001,
       "tag": "0173_add_project_id_to_payment_requests_and_instruments",
       "breakpoints": true
+    },
+    {
+      "idx": 120,
+      "version": "7",
+      "when": 1797000000002,
+      "tag": "0174_drop_project_id_from_payment_instruments",
+      "breakpoints": true
     }
   ]
 }

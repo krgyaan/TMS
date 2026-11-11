@@ -687,7 +687,6 @@ export class PaymentRequestsQueryService {
             .select({
                 id: paymentInstruments.id,
                 requestId: paymentInstruments.requestId,
-                projectId: paymentInstruments.projectId,
                 instrumentType: paymentInstruments.instrumentType,
                 purpose: paymentInstruments.purpose,
                 amount: paymentInstruments.amount,
@@ -712,7 +711,7 @@ export class PaymentRequestsQueryService {
                 projectId: req.projectId,
                 instruments: prInstruments
                     .filter(i => i.requestId === req.id)
-                    .map(i => ({ ...this.mapInstrumentBase(i), projectId: i.projectId })),
+                    .map(i => this.mapInstrumentBase(i)),
             })),
         };
     }
