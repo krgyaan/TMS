@@ -1,17 +1,24 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, FormProvider, type Resolver } from 'react-hook-form';
+import { useForm, FormProvider, useWatch, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Save } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useCreatePaymentRequest } from '@/hooks/api/usePaymentRequests';
-import { PaymentSection } from '@/modules/tendering/emds-tenderfees/components/PaymentSection';
+import { useProjectOverview } from '@/hooks/api/useProjectDashboard';
+import { useWoContactsByBasicDetail } from '@/hooks/api/useWoContacts';
+import { infoSheetsService } from '@/services/api/info-sheet.service';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import DateInput from '@/components/form/DateInput';
 import FieldWrapper from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
-import { parseAllowedModes } from '@/modules/tendering/emds-tenderfees/constants';
+import { Textarea } from '@/components/ui/textarea';
+import { SelectField } from '@/components/form/SelectField';
+import { NumberInput } from '@/components/form/NumberInput';
+import { FileUploader } from '@/components/file-upload';
+import { BANKS, BG_NEEDED_IN_OPTIONS } from '@/modules/tendering/emds-tenderfees/constants';
 import {
     BiOtherThanTenderRequestSchema,
     type BiOtherThanTenderRequestFormValues,
@@ -19,8 +26,19 @@ import {
 
 type FormValues = BiOtherThanTenderRequestFormValues;
 
-// Stable reference — a new array each render makes PaymentSection's defaultMode effect loop.
-const BG_ONLY_MODES = parseAllowedModes('BG');
+const BG_PREFIX = 'EMD.details';
+
+// Project-specific purpose options (does not affect the EMD BG form).
+const PROJECT_BG_PURPOSE_OPTIONS = [
+    { value: 'ADVANCE_PAYMENT', label: 'Advance Payment' },
+    { value: 'SECURITY_BOND_DEPOSIT', label: 'Security Bond/Deposit' },
+    { value: 'PERFORMANCE_BG', label: 'Performance BG' },
+];
+
+// Project BG requests do not offer the 48-hour option.
+const PROJECT_BG_NEEDED_IN_OPTIONS = BG_NEEDED_IN_OPTIONS.filter(option => option.value !== '48');
+
+const PROJECT_BG_BANK = 'AU_8316';
 
 interface BiBankGuaranteeRequestFormProps {
     projectId: number;
@@ -34,29 +52,74 @@ interface BiBankGuaranteeRequestFormProps {
 export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequestFormProps) {
     const navigate = useNavigate();
     const createRequest = useCreatePaymentRequest();
+    const { data: overview } = useProjectOverview(projectId);
+
+    const projectName = overview?.project?.projectName ?? '';
+    const poNo = overview?.project?.poNo ?? '';
+    const tenderId = overview?.tender?.id ?? 0;
+    const woBasicDetailId = overview?.woBasicDetail?.id ?? 0;
+
+    // Emails connected to this project's tender info sheet + WO contacts.
+    const { data: woContacts } = useWoContactsByBasicDetail(woBasicDetailId);
+    const { data: tenderContacts } = useQuery({
+        queryKey: ['tender-contacts', tenderId],
+        queryFn: () => infoSheetsService.getTenderContacts(tenderId),
+        enabled: tenderId > 0,
+    });
+
+    const emailOptions = useMemo(() => {
+        const rawEmails = [
+            ...(woContacts ?? []).map(contact => contact.email),
+            ...(tenderContacts?.contacts ?? []).map(contact => contact.email),
+        ];
+        const seen = new Set<string>();
+        return rawEmails
+            .map(email => (email ?? '').trim())
+            .filter(email => email.includes('@'))
+            .filter(email => {
+                const key = email.toLowerCase();
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            })
+            .sort((a, b) => a.localeCompare(b))
+            .map(email => ({ value: email, label: email }));
+    }, [woContacts, tenderContacts]);
+
+    const emailPlaceholder = emailOptions.length > 0 ? 'Select Email' : 'No emails available';
 
     const form = useForm<FormValues>({
         resolver: zodResolver(BiOtherThanTenderRequestSchema) as Resolver<FormValues>,
         defaultValues: {
             tenderName: '',
             tenderNo: '',
-            tenderDueDate: '',
-            EMD: { mode: 'BG', details: {} },
+            EMD: { mode: 'BG', details: { bgBank: PROJECT_BG_BANK } },
         },
     });
 
-    const handleSubmit = async (values: FormValues) => {
-        const details = values.EMD?.details || {};
+    // Prefill project name + work no. once, when the overview loads.
+    const prefilledRef = useRef(false);
+    useEffect(() => {
+        if (prefilledRef.current) return;
+        if (!projectName && !poNo) return;
+        prefilledRef.current = true;
+        form.setValue('tenderName', projectName);
+        form.setValue('tenderNo', poNo);
+    }, [projectName, poNo, form]);
 
+    const bgFormatFiles = useWatch({ control: form.control, name: `${BG_PREFIX}.bgFormatFiles` });
+    const bgPoFiles = useWatch({ control: form.control, name: `${BG_PREFIX}.bgPoFiles` });
+
+    const handleSubmit = async (values: FormValues) => {
         const payload: any = {
             type: 'Other Than Tender',
-            tenderNo: values.tenderNo || '',
-            tenderName: values.tenderName || '',
+            tenderNo: poNo || values.tenderNo || '',
+            tenderName: projectName || values.tenderName || '',
             dueDate: values.tenderDueDate || '',
             projectId,
             EMD: {
                 mode: 'BG',
-                details,
+                details: values.EMD?.details || {},
             },
         };
 
@@ -71,9 +134,6 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
             console.error(error);
         }
     };
-
-    const allowedModes = BG_ONLY_MODES;
-    const type = 'OTHER_THAN_TENDER';
 
     return (
         <Card>
@@ -93,12 +153,6 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
             </CardHeader>
 
             <CardContent>
-                <Alert variant="warning" className="mb-6">
-                    <AlertDescription>
-                        This request is raised from the project dashboard and is not linked to a tender on TMS.
-                    </AlertDescription>
-                </Alert>
-
                 <FormProvider {...form}>
                     <form
                         onSubmit={form.handleSubmit(handleSubmit, (errors) => {
@@ -107,27 +161,126 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
                         })}
                         className="space-y-8"
                     >
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start mb-4">
-                            <FieldWrapper control={form.control} name="tenderName" label="Project / Work Name">
-                                {(field) => <Input {...field} />}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start mb-4">
+                            <FieldWrapper control={form.control} name="tenderName" label="Project Name">
+                                {(field) => <Input {...field} disabled className="bg-muted text-muted-foreground disabled:opacity-100 disabled:cursor-not-allowed" />}
                             </FieldWrapper>
-                            <FieldWrapper control={form.control} name="tenderNo" label="Work Order / Reference No.">
-                                {(field) => <Input {...field} />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="tenderDueDate" label="Bank Guarantee Due Date">
-                                {(field) => <DateInput value={field.value || null} onChange={field.onChange} />}
+                            <FieldWrapper control={form.control} name="tenderNo" label="Work No.">
+                                {(field) => <Input {...field} disabled className="bg-muted text-muted-foreground disabled:opacity-100 disabled:cursor-not-allowed" />}
                             </FieldWrapper>
                         </div>
 
-                        <PaymentSection
-                            purpose="EMD"
-                            allowedModes={allowedModes}
-                            amount={0}
-                            type={type}
-                            courierAddress={''}
-                            defaultPurpose=""
-                            defaultMode="BG"
-                        />
+                        <div className="border rounded-lg p-6 bg-muted/20">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-lg font-semibold">Bank Guarantee Details</h3>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
+                                    <SelectField
+                                        control={form.control}
+                                        name={`${BG_PREFIX}.bgPurpose`}
+                                        label="Purpose *"
+                                        options={PROJECT_BG_PURPOSE_OPTIONS}
+                                        placeholder="Select Purpose"
+                                    />
+                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgAmount`} label="Amount *">
+                                        {(field) => <NumberInput value={field.value} onChange={field.onChange} />}
+                                    </FieldWrapper>
+                                    <SelectField
+                                        control={form.control}
+                                        name={`${BG_PREFIX}.bgNeededIn`}
+                                        label="BG Needed In *"
+                                        options={PROJECT_BG_NEEDED_IN_OPTIONS}
+                                        placeholder="Select"
+                                    />
+                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgFavouring`} label="BG in Favour of *">
+                                        {(field) => <Input {...field} placeholder="e.g., Individual or Company Name" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgAddress`} label="BG Address (Client Address to be written in BG) *">
+                                        {(field) => <Textarea rows={2} {...field} placeholder="e.g., Bank Name or Address" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgExpiryDate`} label="BG Expiry Date *">
+                                        {(field) => <DateInput value={field.value || null} onChange={field.onChange} />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgClaimPeriod`} label="BG Claim Period *">
+                                        {(field) => <DateInput value={field.value || null} onChange={field.onChange} />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgStampValue`} label="Stamp Paper Value">
+                                        {(field) => <NumberInput min={0} {...field} />}
+                                    </FieldWrapper>
+                                    <SelectField control={form.control} name={`${BG_PREFIX}.bgBank`} label="Bank *" options={BANKS} placeholder="Select Bank" disabled />
+                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgCourierAddress`} label="Courier Address *">
+                                        {(field) => <Textarea rows={2} {...field} placeholder="e.g., Bank Name or Address" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name={`${BG_PREFIX}.bgCourierDays`}
+                                        label={
+                                            <span>
+                                                Courier Time{' '}
+                                                <span className="text-muted-foreground font-normal text-xs">
+                                                    (Number of days required for the courier to deliver the BG)
+                                                </span>
+                                            </span>
+                                        }
+                                    >
+                                        {(field) => <NumberInput min={1} max={10} {...field} />}
+                                    </FieldWrapper>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgBankAccountName`} label="Customer Account Name">
+                                        {(field) => <Input {...field} placeholder="e.g., Individual or Company Name" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgBankAccountNo`} label="Customer Account Number">
+                                        {(field) => <Input {...field} placeholder="e.g., 1234567890" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgBankIfsc`} label="Customer IFSC Code">
+                                        {(field) => <Input {...field} placeholder="e.g., SBIN0001234" />}
+                                    </FieldWrapper>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <SelectField
+                                        control={form.control}
+                                        name={`${BG_PREFIX}.bgClientUserEmail`}
+                                        label="User Dept. Email"
+                                        options={emailOptions}
+                                        placeholder={emailPlaceholder}
+                                    />
+                                    <SelectField
+                                        control={form.control}
+                                        name={`${BG_PREFIX}.bgClientCpEmail`}
+                                        label="C&P Dept. Email"
+                                        options={emailOptions}
+                                        placeholder={emailPlaceholder}
+                                    />
+                                    <SelectField
+                                        control={form.control}
+                                        name={`${BG_PREFIX}.bgClientFinanceEmail`}
+                                        label="Finance Dept. Email"
+                                        options={emailOptions}
+                                        placeholder={emailPlaceholder}
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <FileUploader
+                                        context="bg-format-files"
+                                        label="BG Format (Max 5 files)"
+                                        value={bgFormatFiles}
+                                        onChange={(paths) => form.setValue(`${BG_PREFIX}.bgFormatFiles`, paths)}
+                                    />
+                                    <FileUploader
+                                        context="bg-po-files"
+                                        label="PO/Tender/Request Letter"
+                                        value={bgPoFiles}
+                                        onChange={(paths) => form.setValue(`${BG_PREFIX}.bgPoFiles`, paths)}
+                                    />
+                                </div>
+                            </div>
+                        </div>
 
                         <div className="flex items-center justify-end gap-4 pt-6 border-t">
                             <Button
