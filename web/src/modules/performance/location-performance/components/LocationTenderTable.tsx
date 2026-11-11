@@ -91,27 +91,6 @@ export default function LocationTenderTable({ params, tab, data, isLoading }: Lo
                     </Badge>
                 ),
             },
-            {
-                field: "bidStatus",
-                headerName: "Bid Status",
-                sortable: true,
-                filter: true,
-                width: 150,
-                cellRenderer: (p: CustomCellRendererProps<BusinessTenderListItem>) => (
-                    <Badge variant="secondary" className="h-5 px-2 font-normal">
-                        {p.value}
-                    </Badge>
-                ),
-            },
-            {
-                field: "avgGrossMargin",
-                headerName: "GP %",
-                sortable: true,
-                filter: false,
-                width: 100,
-                type: ["numericColumn"],
-                cellRenderer: (p: CustomCellRendererProps<BusinessTenderListItem>) => <span className="tabular-nums">{p.value ? `${p.value}%` : "—"}</span>,
-            },
             { headerName: "", filter: false, sortable: false, width: 80, pinned: "right", cellRenderer: createActionColumnRenderer(actions) },
         ],
         [actions]
