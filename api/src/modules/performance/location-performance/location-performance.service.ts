@@ -32,6 +32,15 @@ const yearToDateRange = (year: string): { fromDate: string; toDate: string } => 
     const endYear = 2000 + Number(match[2]);
     return { fromDate: `${startYear}-04-01`, toDate: `${endYear}-03-31` };
 };
+
+/**
+ * Day boundaries in IST, matching the OEM dashboard report so that every
+ * tender is scoped by `tender_infos.created_at` within the selected range.
+ */
+const dateRange = (fromDate: string, toDate: string): { from: Date; to: Date } => ({
+    from: new Date(`${fromDate}T00:00:00+05:30`),
+    to: new Date(`${toDate}T23:59:59.999+05:30`),
+});
 import type {
     AssignedTenderRow,
     BusinessTenderListItem,
@@ -171,10 +180,8 @@ export class LocationPerformanceService {
         if (filters.heading) conditions.push(eq(itemHeadings.id, filters.heading));
 
         if (filters.fromDate && filters.toDate) {
-            const from = new Date(filters.fromDate);
-            const to = new Date(filters.toDate);
-            to.setHours(23, 59, 59, 999);
-            conditions.push(between(bidSubmissions.submissionDatetime, from, to));
+            const { from, to } = dateRange(filters.fromDate, filters.toDate);
+            conditions.push(between(tenderInfos.createdAt, from, to));
         }
 
         return this.db
@@ -212,10 +219,8 @@ export class LocationPerformanceService {
         if (filters.heading) conditions.push(eq(itemHeadings.id, filters.heading));
 
         if (filters.fromDate && filters.toDate) {
-            const from = new Date(filters.fromDate);
-            const to = new Date(filters.toDate);
-            to.setHours(23, 59, 59, 999);
-            conditions.push(between(tenderInfos.dueDate, from, to));
+            const { from, to } = dateRange(filters.fromDate, filters.toDate);
+            conditions.push(between(tenderInfos.createdAt, from, to));
         }
 
         return this.db
@@ -294,11 +299,9 @@ export class LocationPerformanceService {
     // ─── Query 4: flat tender list (for category tables) ─────────────
 
     private async getTenderList(filters: LocationFilters, locationIds: number[] | null): Promise<BusinessTenderRow[]> {
-        const from = new Date(filters.fromDate);
-        const to = new Date(filters.toDate);
-        to.setHours(23, 59, 59, 999);
+        const { from, to } = dateRange(filters.fromDate, filters.toDate);
 
-        const conditions = [eq(tenderInfos.deleteStatus, 0), between(tenderInfos.dueDate, from, to)];
+        const conditions = [eq(tenderInfos.deleteStatus, 0), between(tenderInfos.createdAt, from, to)];
         if (filters.heading) conditions.push(eq(itemHeadings.id, filters.heading));
 
         const locationCondition = this.buildLocationCondition(locationIds);
