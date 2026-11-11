@@ -23,6 +23,7 @@ export class FixedExpensesController {
         @Query("paymentFrequency") paymentFrequency?: string,
         @Query("paymentMode") paymentMode?: string,
         @Query("amountType") amountType?: string,
+        @Query("status") status?: string,
         @Query("deleteStatus") deleteStatus?: string,
         @Query("sortBy") sortBy?: string,
         @Query("sortOrder") sortOrder?: "asc" | "desc"
@@ -35,12 +36,25 @@ export class FixedExpensesController {
             paymentFrequency,
             paymentMode,
             amountType,
+            status,
             deleteStatus,
             sortBy,
             sortOrder,
         });
 
         return this.fixedExpensesService.findAll(filters);
+    }
+
+    @Get("counts")
+    @CanRead(PERMISSION_MODULE)
+    async getTabCounts(@Query("search") search?: string) {
+        return this.fixedExpensesService.getTabCounts(search);
+    }
+
+    @Get(":id/history")
+    @CanRead(PERMISSION_MODULE)
+    async getHistory(@Param("id", ParseIntPipe) id: number) {
+        return this.fixedExpensesService.getHistory(id);
     }
 
     @Get(":id")
@@ -59,9 +73,9 @@ export class FixedExpensesController {
 
     @Patch(":id")
     @CanUpdate(PERMISSION_MODULE)
-    async update(@Param("id", ParseIntPipe) id: number, @Body() body: unknown) {
+    async update(@Param("id", ParseIntPipe) id: number, @Body() body: unknown, @CurrentUser("id") userId: number) {
         const parsed = updateFixedExpenseSchema.parse(body);
-        return this.fixedExpensesService.update(id, parsed);
+        return this.fixedExpensesService.update(id, parsed, userId);
     }
 
     @Patch(":id/archive")

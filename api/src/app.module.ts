@@ -99,6 +99,7 @@ import { TimersModule } from "@/modules/timers/timers.module";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { APP_FILTER, APP_GUARD } from "@nestjs/core";
+import { ScheduleModule } from "@nestjs/schedule";
 import { ServeStaticModule } from "@nestjs/serve-static";
 import { SentryGlobalFilter, SentryModule } from "@sentry/nestjs/setup";
 import { join } from "path";
@@ -111,6 +112,7 @@ import { EmployeeOnboardingModule } from "./modules/hrms/employee-onboarding/emp
 import { OnboardingModule } from "./modules/hrms/onboarding/onboarding.module";
 import { TrainingModule } from "./modules/hrms/training/training.module";
 import { CircularsModule } from "./modules/master/circulars/circulars.module";
+import { PaymentCategoriesModule } from "./modules/master/payment-categories/payment-categories.module";
 import { ProjectsMasterModule } from "./modules/master/projects-master/projects-master.module";
 import { ContractAgreementModule } from "./modules/operations/contract-agreement/contract-agreement.module";
 import { KickOffMeetingModule } from "./modules/operations/kick-off-meeting/kick-off-meeting.module";
@@ -169,6 +171,7 @@ import { QueueMonitoringModule } from "./modules/queue-monitoring/queue-monitori
                 ...validateCurrencyEnv(env),
             }),
         }),
+        ScheduleModule.forRoot(),
         LoggerModule,
         DatabaseModule,
         UsersModule,
@@ -261,6 +264,7 @@ import { QueueMonitoringModule } from "./modules/queue-monitoring/queue-monitori
         SubmitQueriesModule,
         LoanAdvanceModule,
         FixedExpensesModule,
+        PaymentCategoriesModule,
         TdsGstChecklistsModule,
         CustomerPerformanceModule,
         LocationPerformanceModule,

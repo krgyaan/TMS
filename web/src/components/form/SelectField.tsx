@@ -18,6 +18,8 @@ type SelectFieldProps<TFieldValues extends FieldValues, TName extends FieldPath<
     placeholder: string;
     disabled?: boolean;
     valueType?: 'auto' | 'string' | 'number';
+    /** Where an option's `description` renders. Defaults to inline on the right. */
+    descriptionPlacement?: 'inline' | 'below';
 };
 
 export function SelectField<TFieldValues extends FieldValues, TName extends FieldPath<TFieldValues>>({
@@ -28,6 +30,7 @@ export function SelectField<TFieldValues extends FieldValues, TName extends Fiel
     placeholder,
     disabled,
     valueType = 'auto',
+    descriptionPlacement = 'inline',
 }: SelectFieldProps<TFieldValues, TName>) {
     const indicators = React.useContext(AiIndicatorsContext);
     const indicator = indicators?.[name as string];
@@ -65,6 +68,7 @@ export function SelectField<TFieldValues extends FieldValues, TName extends Fiel
                     placeholder={placeholder}
                     disabled={disabled}
                     aiIndicator={indicator}
+                    descriptionPlacement={descriptionPlacement}
                 />
             )}
         </FieldWrapper>
@@ -78,6 +82,7 @@ export function Combobox({
     placeholder,
     disabled,
     aiIndicator,
+    descriptionPlacement = 'inline',
 }: {
     value: string;
     onChange: (v: string) => void;
@@ -85,6 +90,7 @@ export function Combobox({
     placeholder: string;
     disabled?: boolean;
     aiIndicator?: FieldIndicator | null;
+    descriptionPlacement?: 'inline' | 'below';
 }) {
     const [open, setOpen] = React.useState(false);
     const [query, setQuery] = React.useState("");
@@ -93,7 +99,7 @@ export function Combobox({
     const filtered = React.useMemo(() => {
         const q = query.trim().toLowerCase();
         if (!q) return options;
-        return options.filter(o => (o.name ?? "").toLowerCase().includes(q));
+        return options.filter(o => (o.name ?? "").toLowerCase().includes(q) || (o.description ?? "").toLowerCase().includes(q));
     }, [options, query]);
 
     React.useEffect(() => {
@@ -172,10 +178,17 @@ export function Combobox({
                                             clipRule="evenodd"
                                         />
                                     </svg>
-                                    <span className="flex-1 min-w-0 truncate text-foreground">{o.name}</span>
+                                    {descriptionPlacement === "below" ? (
+                                        <div className="flex min-w-0 flex-1 flex-col">
+                                            <span className="truncate text-foreground">{o.name}</span>
+                                            {o.description && <span className="truncate text-xs text-muted-foreground">{o.description}</span>}
+                                        </div>
+                                    ) : (
+                                        <span className="flex-1 min-w-0 truncate text-foreground">{o.name}</span>
+                                    )}
                                 </div>
 
-                                {o.description && (
+                                {descriptionPlacement === "inline" && o.description && (
                                     <span className="shrink-0 max-w-[45%] truncate text-xs text-muted-foreground">
                                         {o.description}
                                     </span>

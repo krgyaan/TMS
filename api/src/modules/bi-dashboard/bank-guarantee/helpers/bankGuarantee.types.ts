@@ -27,6 +27,7 @@ export interface BankGuaranteeDashboardCounts {
     'live-pnb': number;
     'live-bg-limit': number;
     'live-sbi': number;
+    'live-yes': number;
     cancelled: number;
     rejected: number;
     total: number;

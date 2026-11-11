@@ -21,7 +21,7 @@ class MakerRequestApiService extends BaseApiService {
         return this.post<any>("/", data);
     }
 
-    async updateStatus(id: number, data: { status: string; utrNumber?: string; rejectionReason?: string }) {
+    async updateStatus(id: number, data: { status: string; utrNumber?: string; rejectionReason?: string; amount?: number | string }) {
         return this.patch<any>(`/${id}/status`, data);
     }
 

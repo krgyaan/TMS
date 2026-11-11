@@ -33,7 +33,8 @@ export const buildFixedExpenseDefaultValues = (): FixedExpenseFormValues => ({
     accountName: '',
     accountNumber: '',
     ifscCode: '',
-    type: 'electricity',
+    categoryId: '',
+    subCategoryId: '',
     dueDate: '',
     paymentFrequency: 'monthly',
 });
@@ -49,7 +50,8 @@ export const mapFixedExpenseResponseToForm = (
     accountName: response.accountName ?? '',
     accountNumber: response.accountNumber ?? '',
     ifscCode: response.ifscCode ?? '',
-    type: response.type,
+    categoryId: response.categoryId ? String(response.categoryId) : '',
+    subCategoryId: '',
     dueDate: formatDateString(response.dueDate),
     paymentFrequency: response.paymentFrequency ?? 'monthly',
 });
@@ -64,7 +66,9 @@ export const mapFixedExpenseFormToCreateDto = (
     accountName: emptyToNull(values.accountName),
     accountNumber: emptyToNull(values.accountNumber),
     ifscCode: emptyToNull(values.ifscCode),
-    type: values.type,
+    // The subtype row carries the same category, so either id resolves both
+    // `type` and `sub_category` on the server.
+    categoryId: Number(values.subCategoryId || values.categoryId),
     dueDate: values.dueDate,
     paymentFrequency: values.paymentFrequency,
 });
