@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 /* UI Components */
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -303,23 +303,20 @@ export default function LocationPerformanceDashboard() {
 
     return (
         <div className="min-h-screen bg-muted/10 pb-12">
-            <div className="mx-auto max-w-7xl p-6 space-y-8">
-                {/* ===== HEADER ===== */}
-                <div className="flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight">Location Performance</h1>
-                        <p className="text-muted-foreground mt-1">Analyze location performance metrics by state, region, item heading, team and date range.</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" onClick={handleExportReport} disabled={!appliedParams || !data}>
-                            <Download className="mr-2 h-4 w-4" /> Export Report
-                        </Button>
-                    </div>
-                </div>
-
-                {/* ===== FILTER CARD ===== */}
+            <div className="mx-auto max-w-7xl p-6 space-y-6">
                 <Card className="shadow-sm">
-                    <CardContent className="p-6">
+                    <CardHeader className="border-b">
+                        <div>
+                            <CardTitle>Location Performance</CardTitle>
+                            <CardDescription>Analyze location performance metrics by state, region, item heading, team and date range.</CardDescription>
+                        </div>
+                        <CardAction>
+                            <Button variant="outline" onClick={handleExportReport} disabled={!appliedParams || !data}>
+                                <Download className="mr-2 h-4 w-4" /> Export Report
+                            </Button>
+                        </CardAction>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 w-full gap-4 items-end">
                             {/* State */}
                             <div className="space-y-2">
@@ -404,29 +401,19 @@ export default function LocationPerformanceDashboard() {
                             </Button>
                         </div>
                         {dateError && <p className="mt-2 text-sm text-destructive">{dateError}</p>}
-                    </CardContent>
-                </Card>
 
-                {/* ===== CONDITIONAL CONTENT ===== */}
-                {!appliedParams ? (
-                    <div className="bg-muted rounded-lg p-6 text-center">
-                        <span className="text-muted-foreground">Please select a State, From Date and To Date to view the report.</span>
-                    </div>
-                ) : dataLoading ? (
-                    <div className="bg-muted rounded-lg p-6 text-center">
-                        <span className="text-muted-foreground">Loading...</span>
-                    </div>
-                ) : (
-                    <>
-                        {/* ===== CATEGORY TABS + TABLE ===== */}
-                        <Card className="shadow-sm">
-                            <CardContent className="space-y-6 p-6">
+                        {appliedParams ? (
+                            <>
                                 <Tabs value={appliedParams.tab ?? DEFAULT_LOCATION_TAB} onValueChange={handleTabChange}>
-                                    <TabsList className="m-auto mb-4">
+                                    <TabsList className="mx-auto mb-4 h-auto max-w-full flex-wrap justify-center">
                                         {LOCATION_TABS.map(tab => (
-                                            <TabsTrigger key={tab.key} value={tab.key} className="data-[state=active]:shadow-md flex items-center gap-1 px-1.5">
-                                                <span className="font-semibold text-xs whitespace-nowrap">{tab.label}</span>
-                                                <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                                            <TabsTrigger
+                                                key={tab.key}
+                                                value={tab.key}
+                                                className="data-[state=active]:shadow-md flex flex-none items-center gap-1 px-1"
+                                            >
+                                                <span className="font-semibold text-[11px] whitespace-nowrap">{tab.label}</span>
+                                                <Badge variant="secondary" className="h-5 px-1 text-[10px]">
                                                     {tabCounts[tab.key] ?? 0}
                                                 </Badge>
                                             </TabsTrigger>
@@ -435,28 +422,28 @@ export default function LocationPerformanceDashboard() {
                                 </Tabs>
 
                                 <LocationTenderTable params={appliedParams} tab={appliedParams.tab ?? DEFAULT_LOCATION_TAB} data={data} isLoading={dataLoading} />
-                            </CardContent>
-                        </Card>
 
-                        {/* ===== AVERAGE GP CARD ===== */}
-                        <Card className="shadow-sm">
-                            <CardContent className="p-5">
-                                <div className="flex flex-wrap items-center gap-6">
+                                <div className="flex flex-wrap items-center gap-6 rounded-lg border px-4 py-3">
                                     <p className="text-sm text-muted-foreground">Average GP</p>
-                                    <p className={`text-3xl font-bold ${getGpColor(data?.avgGrossMargin)}`}>
+                                    <p className={`text-2xl font-bold ${getGpColor(data?.avgGrossMargin)}`}>
                                         {data?.avgGrossMargin !== null && data?.avgGrossMargin !== undefined ? `${data.avgGrossMargin.toFixed(2)}%` : "—"}
                                     </p>
                                     <p className="text-xs text-muted-foreground">Average approved gross margin across tenders.</p>
                                 </div>
-                            </CardContent>
-                        </Card>
+                            </>
+                        ) : (
+                            <div className="bg-muted rounded-lg p-6 text-center">
+                                <span className="text-muted-foreground">Please select a State, From Date and To Date to view the report.</span>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
 
-                        {/* ===== CHARTS ===== */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                            <LocationBarChart params={appliedParams} />
-                            <LocationDonutChart params={appliedParams} />
-                        </div>
-                    </>
+                {appliedParams && (
+                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                        <LocationBarChart params={appliedParams} />
+                        <LocationDonutChart params={appliedParams} />
+                    </div>
                 )}
             </div>
         </div>
