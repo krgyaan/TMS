@@ -17,7 +17,7 @@ import { Separator } from '@/components/ui/separator';
 import { BG_PURPOSE_OPTIONS, BG_NEEDED_IN_OPTIONS, BANKS } from '@/modules/tendering/emds-tenderfees/constants';
 import { BankGuaranteeEditFormSchema, type BankGuaranteeEditFormValues } from '../helpers/bankGuaranteeEditForm.schema';
 import { useUpdateBankGuarantee, useBGFollowupData } from '@/hooks/api/useBankGuarantees';
-import { useCreateCourier, useCourier } from '@/modules/shared/courier/courier.hooks';
+import { useCreateCourier, useCourier } from '@/hooks/api/useCourier';
 import { useUsers } from '@/hooks/api/useUsers';
 import { toast } from 'sonner';
 import { AccountsForm1Fields } from './steps/AccountsForm1Fields';

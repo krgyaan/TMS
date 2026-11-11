@@ -24,7 +24,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { FileText, Users, Package, Banknote, CheckCircle2, XCircle, CheckSquare, Info, Truck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ALL_FDR_ACTION_OPTIONS, type FDRActionFormProps } from '../helpers/fdr.types';
-import { useCreateCourier } from '@/modules/shared/courier/courier.hooks';
+import { useCreateCourier } from '@/hooks/api/useCourier';
 import { FileUploader } from '@/components/file-upload';
 
 export function FdrActionForm({ instrumentId, action: propAction, tenderId, formHistory, instrumentData, linkedCheque, linkedBg }: FDRActionFormProps) {

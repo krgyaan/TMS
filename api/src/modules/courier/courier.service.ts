@@ -1,21 +1,26 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 import type { DbInstance } from "@/db";
 import { DRIZZLE } from "@/db/database.module";
 import { users } from "@/db/schemas/auth/users.schema";
 import { couriers } from "@/db/schemas/shared/couriers.schema";
-import type { CreateCourierDto } from "@/modules/courier/zod/create-courier.schema";
-import type { CreateDispatchInput, DispatchCourierDto } from "@/modules/courier/zod/dispatch-courier.schema";
-import type { UpdateCourierInput } from "@/modules/courier/zod/update-courier.schema";
+import type {
+    CourierDashboardQuery,
+    CreateCourierDto,
+    CreateDispatchInput,
+    DispatchCourierDto,
+    UpdateCourierInput,
+    UpdateCourierStatusInput,
+} from "@/modules/courier/dto";
 import { MailerService } from "@/mailer/mailer.service";
 import { GoogleService } from "@/modules/integrations/google/google.service";
 import { format } from "date-fns";
 import { CourierMailTemplates } from "./courier.mail";
 import { MailAudienceService } from "@/core/mail/mail-audience.service";
-import { UpdateCourierStatusInput } from "./zod/update-courier-status.schema";
+import { wrapPaginatedResponse } from "@/utils/responseWrapper";
 
 // Status constants
 export const COURIER_STATUS = {
@@ -120,6 +125,135 @@ export class CourierService {
             });
             throw error;
         }
+    }
+
+    private getDashboardOrderBy(sortBy?: string, sortOrder?: "asc" | "desc"): SQL<unknown> {
+        const direction = sortOrder === "asc" ? asc : desc;
+
+        switch (sortBy) {
+            case "id":
+                return direction(couriers.id);
+            case "toOrg":
+                return direction(couriers.toOrg);
+            case "toName":
+                return direction(couriers.toName);
+            case "delDate":
+                return direction(couriers.delDate);
+            case "courierProvider":
+                return direction(couriers.courierProvider);
+            case "pickupDate":
+                return direction(couriers.pickupDate);
+            case "docketNo":
+                return direction(couriers.docketNo);
+            case "deliveryDate":
+                return direction(couriers.deliveryDate);
+            case "status":
+                return direction(couriers.status);
+            case "createdAt":
+            default:
+                return direction(couriers.createdAt);
+        }
+    }
+
+    // Paginated dashboard rows with search + sort
+    async getDashboard(query: CourierDashboardQuery) {
+        const page = Math.max(1, query.page ?? 1);
+        const limit = Math.min(Math.max(query.limit ?? 50, 1), 100);
+        const offset = (page - 1) * limit;
+
+        const statusByTab: Record<string, number> = {
+            pending: COURIER_STATUS.PENDING,
+            dispatched: COURIER_STATUS.DISPATCHED,
+            not_delivered: COURIER_STATUS.NOT_DELIVERED,
+            delivered: COURIER_STATUS.DELIVERED,
+            rejected: COURIER_STATUS.REJECTED,
+        };
+
+        const conditions: SQL[] = [];
+
+        if (query.tab) {
+            conditions.push(eq(couriers.status, statusByTab[query.tab]));
+        }
+
+        if (query.search?.trim()) {
+            const pattern = `%${query.search.trim()}%`;
+            const matchingUserIds = this.db.select({ id: users.id }).from(users).where(ilike(users.name, pattern));
+
+            conditions.push(
+                or(
+                    ilike(couriers.toOrg, pattern),
+                    ilike(couriers.toName, pattern),
+                    ilike(couriers.toAddr, pattern),
+                    ilike(couriers.toPin, pattern),
+                    ilike(couriers.toMobile, pattern),
+                    ilike(couriers.courierProvider, pattern),
+                    ilike(couriers.docketNo, pattern),
+                    ilike(couriers.trackingNumber, pattern),
+                    inArray(couriers.empFrom, matchingUserIds)
+                )!
+            );
+        }
+
+        const whereClause = conditions.length ? and(...conditions) : undefined;
+        const orderBy = this.getDashboardOrderBy(query.sortBy, query.sortOrder);
+        const courierColumns = getTableColumns(couriers);
+
+        const [rows, [{ count }]] = await Promise.all([
+            this.db
+                .select({
+                    ...courierColumns,
+                    empFromUserName: users.name,
+                    empFromUserEmail: users.email,
+                })
+                .from(couriers)
+                .leftJoin(users, eq(users.id, couriers.empFrom))
+                .where(whereClause)
+                .orderBy(orderBy)
+                .limit(limit)
+                .offset(offset),
+            this.db
+                .select({ count: sql<number>`count(*)::int` })
+                .from(couriers)
+                .where(whereClause),
+        ]);
+
+        const data = rows.map(({ empFromUserName, empFromUserEmail, ...row }) => ({
+            ...row,
+            empFromUser:
+                empFromUserName || empFromUserEmail
+                    ? { id: row.empFrom, name: empFromUserName ?? "", email: empFromUserEmail ?? "" }
+                    : null,
+        }));
+
+        return wrapPaginatedResponse(data, Number(count ?? 0), page, limit);
+    }
+
+    // Counts per dashboard tab
+    async getDashboardCounts() {
+        const [counts] = await this.db
+            .select({
+                pending: sql<number>`count(*) filter (where ${couriers.status} = ${COURIER_STATUS.PENDING})::int`,
+                dispatched: sql<number>`count(*) filter (where ${couriers.status} = ${COURIER_STATUS.DISPATCHED})::int`,
+                not_delivered: sql<number>`count(*) filter (where ${couriers.status} = ${COURIER_STATUS.NOT_DELIVERED})::int`,
+                delivered: sql<number>`count(*) filter (where ${couriers.status} = ${COURIER_STATUS.DELIVERED})::int`,
+                rejected: sql<number>`count(*) filter (where ${couriers.status} = ${COURIER_STATUS.REJECTED})::int`,
+            })
+            .from(couriers);
+
+        const pending = Number(counts?.pending ?? 0);
+        const dispatched = Number(counts?.dispatched ?? 0);
+        const notDelivered = Number(counts?.not_delivered ?? 0);
+        const delivered = Number(counts?.delivered ?? 0);
+        const rejected = Number(counts?.rejected ?? 0);
+
+        return {
+            pending,
+            dispatched,
+            not_delivered: notDelivered,
+            delivered,
+            rejected,
+            total: pending + dispatched + notDelivered + delivered + rejected,
+        };
     }
 
     async findAllByUser(userId: number) {
@@ -430,8 +564,8 @@ export class CourierService {
 
             if (statusData.status === COURIER_STATUS.DELIVERED) {
                 if (statusData.podDoc) updateData.deliveryPod = statusData.podDoc;
-                if (statusData.delivery_date) updateData.deliveryDate = statusData.delivery_date;
-                if (statusData.within_time !== undefined) updateData.withinTime = statusData.within_time;
+                if (statusData.deliveryDate) updateData.deliveryDate = statusData.deliveryDate;
+                if (statusData.withinTime !== undefined) updateData.withinTime = statusData.withinTime;
             }
 
             const [updated] = await this.db.update(couriers).set(updateData).where(eq(couriers.id, id)).returning();

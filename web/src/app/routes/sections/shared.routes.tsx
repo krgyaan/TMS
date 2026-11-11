@@ -9,11 +9,11 @@ const FollowUpEditPage = lazy(() => import("@/modules/shared/follow-up/FollowUpE
 const FollowUpShowPage = lazy(() => import("@/modules/shared/follow-up/FollowUpShowPage"));
 
 // Courier
-const Shared_Courier = lazy(() => import("@/modules/shared/courier"));
-const CourierCreatePage = lazy(() => import("@/modules/shared/courier/create"));
-const CourierDispatchPage = lazy(() => import("@/modules/shared/courier/dispatch"));
+const Shared_Courier = lazy(() => import("@/modules/shared/courier/CourierListPage"));
+const CourierCreatePage = lazy(() => import("@/modules/shared/courier/CourierCreatePage"));
+const CourierDispatchPage = lazy(() => import("@/modules/shared/courier/CourierDispatchPage"));
 const CourierViewPage = lazy(() => import("@/modules/shared/courier/CourierView"));
-const CourierEditPage = lazy(() => import("@/modules/shared/courier/CourierEdit"));
+const CourierEditPage = lazy(() => import("@/modules/shared/courier/CourierEditPage"));
 
 // Imprests
 const Shared_Imprest = lazy(() => import("@/modules/imprest/UserImprestsPage"));

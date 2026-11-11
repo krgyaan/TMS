@@ -1,14 +1,19 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Put, Req } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Put, Query, Req } from "@nestjs/common";
 
 import { CurrentUser } from "@/decorators/current-user.decorator";
 import { CourierService } from "@/modules/courier/courier.service";
-import { CreateCourierSchema, type CreateCourierDto } from "@/modules/courier/zod/create-courier.schema";
-import { UpdateCourierSchema, type UpdateCourierInput } from "@/modules/courier/zod/update-courier.schema";
+import {
+    CourierDashboardQuerySchema,
+    CreateCourierSchema,
+    CreateDispatchSchema,
+    UpdateCourierSchema,
+    UpdateCourierStatusSchema,
+    type CreateCourierDto,
+    type UpdateCourierInput,
+} from "@/modules/courier/dto";
 
 import { ZodValidationPipe } from "nestjs-zod";
 import { CanDelete } from "../auth/decorators";
-import { CreateDispatchSchema } from "./zod/dispatch-courier.schema";
-import { UpdateCourierStatusSchema } from "./zod/update-courier-status.schema";
 
 // $statusMap = [
 //     'dispatched' => ['1'],
@@ -41,20 +46,12 @@ export class CourierController {
 
     // Update dispatch info
     @Patch(":id/dispatch")
-    updateDispatch(
-        @Param("id", ParseIntPipe) id: number,
-        @Body()
-        @Req()
-        req: Request,
-        @CurrentUser("id") userId: number
-    ) {
+    updateDispatch(@Param("id", ParseIntPipe) id: number, @Req() req: Request, @CurrentUser("id") userId: number) {
         const parsed = CreateDispatchSchema.safeParse(req.body);
 
         if (!parsed.success) {
             throw new BadRequestException(parsed.error.flatten());
         }
-
-        console.log("createDispatch parsed body:", parsed.data);
 
         return this.service.updateDispatch(id, parsed.data, userId);
     }
@@ -73,10 +70,17 @@ export class CourierController {
         return this.service.findAll();
     }
 
-    // Get couriers grouped by status (for dashboard tabs)
+    // Get paginated couriers for the dashboard (search + sort + tab)
     @Get("dashboard")
-    getDashboardData() {
-        return this.service.findAllGroupedByStatus();
+    getDashboardData(@Query() query: Record<string, string>) {
+        const parsed = CourierDashboardQuerySchema.parse(query);
+        return this.service.getDashboard(parsed);
+    }
+
+    // Get dashboard counts grouped by tab status
+    @Get("dashboard/counts")
+    getDashboardCounts() {
+        return this.service.getDashboardCounts();
     }
 
     // Get couriers by status
