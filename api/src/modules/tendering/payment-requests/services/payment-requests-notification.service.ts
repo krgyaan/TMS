@@ -1005,6 +1005,13 @@ export class PaymentRequestsNotificationService {
                         .where(eq(tenderInfos.id, paymentReq.tenderId))
                         .limit(1);
                     tenderTeamId = tenderData[0]?.team || 1;
+                } else {
+                    const requesterData = await this.db
+                        .select({ team: users.team })
+                        .from(users)
+                        .where(eq(users.id, paymentReq.requestedBy))
+                        .limit(1);
+                    tenderTeamId = requesterData[0]?.team || 1;
                 }
 
                 // Get TL user
@@ -1019,45 +1026,59 @@ export class PaymentRequestsNotificationService {
                     )
                     .limit(1);
 
-                // Generate covering letter PDF
-                const coveringLetterData = {
-                    date: new Date().toISOString().split('T')[0],
-                    beneficiaryName: bgDetails?.beneficiaryName || '',
-                    beneficiaryAddress: bgDetails?.beneficiaryAddress || '',
-                    amount: instrument.amount || 0,
-                    bgExpiryDate: bgDetails?.bgExpiryDate ? this.formatDateDDMMYYYY(bgDetails.bgExpiryDate) : '',
-                    claimDate: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',
-                    purpose: bgDetails?.bgPurpose || 'Financial security',
-                    stampPaperValue: bgDetails?.stampCharges || 300,
-                    courierAddress: instrument.courierAddress || '',
-                    bgPurpose: bgDetails?.bgPurpose || '',
-                    actionLink: `${this.getFrontendUrl()}/bi-dashboard/bank-guarantee/action/${instrumentId}`,
-                    actionLinkText: 'Accounts Form (BG) Stage 2: After BG Creation',
-                    recipientName: 'Imran',
-                    teamLeaderName: tlUser?.name || 'Team Leader',
-                };
-
-                const coveringLetterPaths = await this.pdfGenerator.generatePdfs(
-                    'bgCoveringLetter',
-                    coveringLetterData,
-                    instrumentId,
-                    'BG'
-                );
-
-                // Get PO copy file path
-                const [bgPo] = await this.db
-                    .select({ bgPo: instrumentBgDetails.bgPo })
-                    .from(instrumentBgDetails)
-                    .where(eq(instrumentBgDetails.instrumentId, instrumentId))
-                    .limit(1);
-
-                // Build attachment paths
+                // Build attachments. A PDF/file failure must never block the
+                // create-request mail — send without the missing attachment instead.
                 const attachmentFiles: string[] = [];
-                if (coveringLetterPaths && coveringLetterPaths.length > 0) {
-                    attachmentFiles.push(coveringLetterPaths[0]);
+
+                try {
+                    // Generate covering letter PDF
+                    const coveringLetterData = {
+                        date: new Date().toISOString().split('T')[0],
+                        beneficiaryName: bgDetails?.beneficiaryName || '',
+                        beneficiaryAddress: bgDetails?.beneficiaryAddress || '',
+                        amount: instrument.amount || 0,
+                        bgExpiryDate: bgDetails?.bgExpiryDate ? this.formatDateDDMMYYYY(bgDetails.bgExpiryDate) : '',
+                        claimDate: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',
+                        purpose: bgDetails?.bgPurpose || 'Financial security',
+                        stampPaperValue: bgDetails?.stampCharges || 300,
+                        courierAddress: instrument.courierAddress || '',
+                        bgPurpose: bgDetails?.bgPurpose || '',
+                        actionLink: `${this.getFrontendUrl()}/bi-dashboard/bank-guarantee/action/${instrumentId}`,
+                        actionLinkText: 'Accounts Form (BG) Stage 2: After BG Creation',
+                        recipientName: 'Imran',
+                        teamLeaderName: tlUser?.name || 'Team Leader',
+                    };
+
+                    const coveringLetterPaths = await this.pdfGenerator.generatePdfs(
+                        'bgCoveringLetter',
+                        coveringLetterData,
+                        instrumentId,
+                        'BG'
+                    );
+                    if (coveringLetterPaths && coveringLetterPaths.length > 0) {
+                        attachmentFiles.push(coveringLetterPaths[0]);
+                    }
+                } catch (error) {
+                    this.logger.warn(
+                        `BG covering letter generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
+                    );
                 }
-                if (bgPo?.bgPo) {
-                    attachmentFiles.push(...this.toAttachmentPaths(bgPo.bgPo));
+
+                try {
+                    // Get PO copy file path
+                    const [bgPo] = await this.db
+                        .select({ bgPo: instrumentBgDetails.bgPo })
+                        .from(instrumentBgDetails)
+                        .where(eq(instrumentBgDetails.instrumentId, instrumentId))
+                        .limit(1);
+
+                    if (bgPo?.bgPo) {
+                        attachmentFiles.push(...this.toAttachmentPaths(bgPo.bgPo));
+                    }
+                } catch (error) {
+                    this.logger.warn(
+                        `Failed to resolve BG PO attachments for instrument ${instrumentId} — sending create mail without them: ${error instanceof Error ? error.message : String(error)}`
+                    );
                 }
 
                 // Get recipient email - use Imran (Accounts Leader) as specified
@@ -1079,6 +1100,9 @@ export class PaymentRequestsNotificationService {
                 ];
 
                 try {
+                    this.logger.log(
+                        `BG create mail for instrument ${instrumentId}: to=imran@volksenergie.in, teamId=${tenderTeamId}, attachments=${attachmentFiles.length}`
+                    );
                     const result = await this.emailService.sendPaymentEmail({
                         requestId: instrument.requestId,
                         tenderId: paymentReq.tenderId || undefined,
