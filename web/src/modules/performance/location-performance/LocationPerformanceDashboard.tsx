@@ -421,20 +421,18 @@ export default function LocationPerformanceDashboard() {
                         {/* ===== CATEGORY TABS + TABLE ===== */}
                         <Card className="shadow-sm">
                             <CardContent className="space-y-6 p-6">
-                                <div className="flex justify-center">
-                                    <Tabs value={appliedParams.tab ?? DEFAULT_LOCATION_TAB} onValueChange={handleTabChange}>
-                                        <TabsList className="h-auto flex-wrap justify-center">
-                                            {LOCATION_TABS.map(tab => (
-                                                <TabsTrigger key={tab.key} value={tab.key} className="text-xs flex items-center gap-1.5">
-                                                    {tab.label}
-                                                    <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
-                                                        {tabCounts[tab.key] ?? 0}
-                                                    </Badge>
-                                                </TabsTrigger>
-                                            ))}
-                                        </TabsList>
-                                    </Tabs>
-                                </div>
+                                <Tabs value={appliedParams.tab ?? DEFAULT_LOCATION_TAB} onValueChange={handleTabChange}>
+                                    <TabsList className="m-auto mb-4">
+                                        {LOCATION_TABS.map(tab => (
+                                            <TabsTrigger key={tab.key} value={tab.key} className="data-[state=active]:shadow-md flex items-center gap-1 px-1.5">
+                                                <span className="font-semibold text-xs whitespace-nowrap">{tab.label}</span>
+                                                <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                                                    {tabCounts[tab.key] ?? 0}
+                                                </Badge>
+                                            </TabsTrigger>
+                                        ))}
+                                    </TabsList>
+                                </Tabs>
 
                                 <LocationTenderTable params={appliedParams} tab={appliedParams.tab ?? DEFAULT_LOCATION_TAB} data={data} isLoading={dataLoading} />
                             </CardContent>
