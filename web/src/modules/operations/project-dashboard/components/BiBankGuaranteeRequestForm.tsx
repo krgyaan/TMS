@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, FormProvider, useWatch, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Save } from 'lucide-react';
@@ -15,7 +15,7 @@ import DateInput from '@/components/form/DateInput';
 import FieldWrapper from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { SelectField } from '@/components/form/SelectField';
+import { SelectField, Combobox } from '@/components/form/SelectField';
 import { NumberInput } from '@/components/form/NumberInput';
 import { FileUploader } from '@/components/file-upload';
 import { BANKS, BG_NEEDED_IN_OPTIONS } from '@/modules/tendering/emds-tenderfees/constants';
@@ -39,6 +39,11 @@ const PROJECT_BG_PURPOSE_OPTIONS = [
 const PROJECT_BG_NEEDED_IN_OPTIONS = BG_NEEDED_IN_OPTIONS.filter(option => option.value !== '48');
 
 const PROJECT_BG_BANK = 'AU_8316';
+
+const ADD_EMAIL_OPTION = '__add_email__';
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+type EmailFieldKey = 'user' | 'cp' | 'finance';
 
 interface BiBankGuaranteeRequestFormProps {
     projectId: number;
@@ -67,13 +72,26 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
         enabled: tenderId > 0,
     });
 
+    // Emails typed through "+ Add new email" — kept for this form session only.
+    const [customEmails, setCustomEmails] = useState<string[]>([]);
+    const [addingFor, setAddingFor] = useState<EmailFieldKey | null>(null);
+    const [draftEmail, setDraftEmail] = useState('');
+    const [addEmailError, setAddEmailError] = useState<string | null>(null);
+
+    const emailFieldNames = {
+        user: `${BG_PREFIX}.bgClientUserEmail`,
+        cp: `${BG_PREFIX}.bgClientCpEmail`,
+        finance: `${BG_PREFIX}.bgClientFinanceEmail`,
+    } as const;
+
     const emailOptions = useMemo(() => {
         const rawEmails = [
             ...(woContacts ?? []).map(contact => contact.email),
             ...(tenderContacts?.contacts ?? []).map(contact => contact.email),
+            ...customEmails,
         ];
         const seen = new Set<string>();
-        return rawEmails
+        const options = rawEmails
             .map(email => (email ?? '').trim())
             .filter(email => email.includes('@'))
             .filter(email => {
@@ -83,10 +101,90 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
                 return true;
             })
             .sort((a, b) => a.localeCompare(b))
-            .map(email => ({ value: email, label: email }));
-    }, [woContacts, tenderContacts]);
+            .map(email => ({ id: email, name: email }));
 
-    const emailPlaceholder = emailOptions.length > 0 ? 'Select Email' : 'No emails available';
+        options.push({ id: ADD_EMAIL_OPTION, name: '+ Add new email' });
+        return options;
+    }, [woContacts, tenderContacts, customEmails]);
+
+    const emailPlaceholder = emailOptions.length > 1 ? 'Select Email' : '+ Add new email';
+
+    const handleEmailChange = (key: EmailFieldKey) => (value: string) => {
+        if (value === ADD_EMAIL_OPTION) {
+            setAddingFor(key);
+            setDraftEmail('');
+            setAddEmailError(null);
+            return;
+        }
+        form.setValue(emailFieldNames[key], value || undefined, { shouldValidate: true, shouldDirty: true });
+    };
+
+    const cancelDraftEmail = () => {
+        setAddingFor(null);
+        setDraftEmail('');
+        setAddEmailError(null);
+    };
+
+    const commitDraftEmail = () => {
+        if (!addingFor) return;
+        const email = draftEmail.trim();
+        if (!EMAIL_PATTERN.test(email)) {
+            setAddEmailError('Enter a valid email address');
+            return;
+        }
+        setCustomEmails(prev =>
+            prev.some(existing => existing.toLowerCase() === email.toLowerCase()) ? prev : [...prev, email],
+        );
+        form.setValue(emailFieldNames[addingFor], email, { shouldValidate: true, shouldDirty: true });
+        cancelDraftEmail();
+    };
+
+    const renderEmailField = (key: EmailFieldKey, label: string) => (
+        <FieldWrapper control={form.control} name={emailFieldNames[key]} label={label}>
+            {(field) => (
+                <div className="space-y-2">
+                    <Combobox
+                        value={String(field.value ?? '')}
+                        onChange={handleEmailChange(key)}
+                        options={emailOptions}
+                        placeholder={emailPlaceholder}
+                    />
+                    {addingFor === key && (
+                        <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                                <Input
+                                    autoFocus
+                                    type="email"
+                                    value={draftEmail}
+                                    placeholder="name@example.com"
+                                    onChange={(e) => {
+                                        setDraftEmail(e.target.value);
+                                        setAddEmailError(null);
+                                    }}
+                                    onKeyDown={(e) => {
+                                        e.stopPropagation();
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            commitDraftEmail();
+                                        } else if (e.key === 'Escape') {
+                                            cancelDraftEmail();
+                                        }
+                                    }}
+                                />
+                                <Button type="button" size="sm" onClick={commitDraftEmail}>
+                                    Add
+                                </Button>
+                                <Button type="button" size="sm" variant="ghost" onClick={cancelDraftEmail}>
+                                    Cancel
+                                </Button>
+                            </div>
+                            {addEmailError && <p className="text-xs text-destructive">{addEmailError}</p>}
+                        </div>
+                    )}
+                </div>
+            )}
+        </FieldWrapper>
+    );
 
     const form = useForm<FormValues>({
         resolver: zodResolver(BiOtherThanTenderRequestSchema) as Resolver<FormValues>,
@@ -242,27 +340,9 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <SelectField
-                                        control={form.control}
-                                        name={`${BG_PREFIX}.bgClientUserEmail`}
-                                        label="User Dept. Email"
-                                        options={emailOptions}
-                                        placeholder={emailPlaceholder}
-                                    />
-                                    <SelectField
-                                        control={form.control}
-                                        name={`${BG_PREFIX}.bgClientCpEmail`}
-                                        label="C&P Dept. Email"
-                                        options={emailOptions}
-                                        placeholder={emailPlaceholder}
-                                    />
-                                    <SelectField
-                                        control={form.control}
-                                        name={`${BG_PREFIX}.bgClientFinanceEmail`}
-                                        label="Finance Dept. Email"
-                                        options={emailOptions}
-                                        placeholder={emailPlaceholder}
-                                    />
+                                    {renderEmailField('user', 'User Dept. Email')}
+                                    {renderEmailField('cp', 'C&P Dept. Email')}
+                                    {renderEmailField('finance', 'Finance Dept. Email')}
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
