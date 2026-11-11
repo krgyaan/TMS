@@ -8,7 +8,7 @@ import type { PhysicalDocs } from '../helpers/physicalDocs.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { usePhysicalDocByTenderId } from '@/hooks/api/usePhysicalDocs';
 import { useInfoSheet } from '@/hooks/api/useInfoSheets';
-import { CourierCard } from '@/modules/shared/courier/CourierCard';
+import { CourierCard } from '@/modules/shared/courier/components/CourierCard';
 import { PaymentRequestCourierInfo } from './PaymentRequestCourierInfo';
 
 interface PhysicalDocsViewProps {

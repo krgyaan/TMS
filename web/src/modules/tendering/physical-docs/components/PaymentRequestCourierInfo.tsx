@@ -1,5 +1,5 @@
 import { usePaymentRequestsByTender } from "@/hooks/api/usePaymentRequests";
-import { CourierCard } from "@/modules/shared/courier/CourierCard";
+import { CourierCard } from "@/modules/shared/courier/components/CourierCard";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
