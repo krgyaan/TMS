@@ -86,6 +86,11 @@ export class PaymentRequestsController {
         return this.queryService.findByTenderId(tenderId);
     }
 
+    @Get('project/:projectId')
+    async findByProject(@Param('projectId', ParseIntPipe) projectId: number) {
+        return this.queryService.getByProject(projectId);
+    }
+
     @Get('tenders/:tenderId/with-details')
     async findByTenderWithDetails(
         @Param('tenderId', ParseIntPipe) tenderId: number,

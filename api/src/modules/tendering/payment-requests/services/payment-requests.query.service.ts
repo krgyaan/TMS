@@ -653,6 +653,70 @@ export class PaymentRequestsQueryService {
     // Find Methods
     // ============================================================================
 
+    /**
+     * List BI (payment) requests raised from a project dashboard.
+     * Requests are linked via payment_requests.project_id.
+     */
+    async getByProject(projectId: number) {
+        const requests = await this.db
+            .select({
+                id: paymentRequests.id,
+                tenderId: paymentRequests.tenderId,
+                projectId: paymentRequests.projectId,
+                type: paymentRequests.type,
+                tenderNo: paymentRequests.tenderNo,
+                projectName: paymentRequests.projectName,
+                dueDate: paymentRequests.dueDate,
+                requestedBy: paymentRequests.requestedBy,
+                requestedByName: users.name,
+                purpose: paymentRequests.purpose,
+                amountRequired: paymentRequests.amountRequired,
+                status: paymentRequests.status,
+                remarks: paymentRequests.remarks,
+                createdAt: paymentRequests.createdAt,
+                updatedAt: paymentRequests.updatedAt,
+            })
+            .from(paymentRequests)
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .where(eq(paymentRequests.projectId, projectId))
+            .orderBy(desc(paymentRequests.createdAt));
+
+        if (requests.length === 0) return { requests: [] };
+
+        const prInstruments = await this.db
+            .select({
+                id: paymentInstruments.id,
+                requestId: paymentInstruments.requestId,
+                projectId: paymentInstruments.projectId,
+                instrumentType: paymentInstruments.instrumentType,
+                purpose: paymentInstruments.purpose,
+                amount: paymentInstruments.amount,
+                favouring: paymentInstruments.favouring,
+                payableAt: paymentInstruments.payableAt,
+                courierAddress: paymentInstruments.courierAddress,
+                courierAddressJson: paymentInstruments.courierAddressJson,
+                courierDeadline: paymentInstruments.courierDeadline,
+                status: paymentInstruments.status,
+                isActive: paymentInstruments.isActive,
+                reqNo: paymentInstruments.reqNo,
+            })
+            .from(paymentInstruments)
+            .where(and(
+                inArray(paymentInstruments.requestId, requests.map(r => r.id)),
+                eq(paymentInstruments.isActive, true)
+            ));
+
+        return {
+            requests: requests.map((req: any) => ({
+                ...this.mapPaymentRequest(req),
+                projectId: req.projectId,
+                instruments: prInstruments
+                    .filter(i => i.requestId === req.id)
+                    .map(i => ({ ...this.mapInstrumentBase(i), projectId: i.projectId })),
+            })),
+        };
+    }
+
     async findByTenderId(tenderId: number) {
         const requests = await this.db
             .select({
