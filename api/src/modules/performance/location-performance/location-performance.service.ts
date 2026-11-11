@@ -6,6 +6,7 @@ import { Logger } from "winston";
 
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
+import { StatusCache } from "@/utils/status-cache";
 
 import { tenderInfos } from "@/db/schemas/tendering/tenders.schema";
 import { bidSubmissions } from "@/db/schemas/tendering/bid-submissions.schema";
@@ -15,6 +16,7 @@ import { tenderCostingDetails } from "@/db/schemas/tendering/tender-costing-deta
 import { locations } from "@/db/schemas/master/locations.schema";
 import { items } from "@/db/schemas/master/items.schema";
 import { itemHeadings } from "@/db/schemas/master/item-headings.schema";
+import { statuses } from "@/db/schemas/master/statuses.schema";
 import { teams } from "@/db/schemas/master/teams.schema";
 import { users } from "@/db/schemas/auth/users.schema";
 
@@ -201,8 +203,8 @@ export class LocationPerformanceService {
             })
             .from(bidSubmissions)
             .innerJoin(tenderInfos, eq(tenderInfos.id, bidSubmissions.tenderId))
-            .innerJoin(locations, eq(locations.id, tenderInfos.location))
-            .innerJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(locations, eq(locations.id, tenderInfos.location))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(itemHeadings, eq(itemHeadings.id, items.headingId))
             .where(and(...conditions)) as unknown as TenderRow[];
     }
@@ -236,8 +238,8 @@ export class LocationPerformanceService {
                 itemName: items.name,
             })
             .from(tenderInfos)
-            .innerJoin(locations, eq(locations.id, tenderInfos.location))
-            .innerJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(locations, eq(locations.id, tenderInfos.location))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(itemHeadings, eq(itemHeadings.id, items.headingId))
             .where(and(...conditions)) as unknown as AssignedTenderRow[];
     }
@@ -321,6 +323,7 @@ export class LocationPerformanceService {
                 itemName: items.name,
                 state: locations.name,
                 status: tenderInfos.status,
+                statusName: statuses.name,
                 tlStatus: tenderInfos.tlStatus,
                 bidStatus: bidSubmissions.status,
                 hasEmdPaid: this.emdPaidSubquery(),
@@ -336,17 +339,22 @@ export class LocationPerformanceService {
             .from(tenderInfos)
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .leftJoin(teams, eq(teams.id, tenderInfos.team))
-            .innerJoin(items, eq(items.id, tenderInfos.item))
-            .innerJoin(itemHeadings, eq(itemHeadings.id, items.headingId))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(itemHeadings, eq(itemHeadings.id, items.headingId))
             .leftJoin(locations, eq(locations.id, tenderInfos.location))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .where(and(...conditions))
-            .groupBy(tenderInfos.id, users.name, teams.name, items.name, locations.name, bidSubmissions.status)
+            .groupBy(tenderInfos.id, users.name, teams.name, items.name, locations.name, statuses.name, bidSubmissions.status)
             .orderBy(tenderInfos.dueDate)
             .execute()) as unknown as BusinessTenderRow[];
     }
 
     private buildTenderList(rows: BusinessTenderRow[]): BusinessTenderListItem[] {
+        // "Not Bid" mirrors the Tender List's "Did Not Bid" tab: tenders whose
+        // status belongs to the `dnb` category in the statuses master table.
+        const dnbStatusIds = StatusCache.getIds("dnb");
+
         return rows.map(row => {
             const s = Number(row.status);
             const categories: string[] = ["tenders_assigned"];
@@ -359,7 +367,7 @@ export class LocationPerformanceService {
             else if ((STATUS.CANCELLED as readonly number[]).includes(s)) categories.push("tenders_cancelled");
 
             if (row.bidStatus === "Bid Submitted") categories.push("tenders_bid");
-            else categories.push("tenders_not_bid");
+            if (dnbStatusIds.includes(s)) categories.push("tenders_not_bid");
 
             if (row.tlStatus === 1) categories.push("tenders_approved");
 
@@ -376,7 +384,7 @@ export class LocationPerformanceService {
                 team: row.team ?? "—",
                 item: row.itemName ?? "—",
                 state: row.state ?? "—",
-                status: STATUS_LABEL(s),
+                status: row.statusName ?? STATUS_LABEL(s),
                 bidStatus: row.bidStatus ?? "—",
                 avgGrossMargin: row.avgGrossMargin !== null && row.avgGrossMargin !== undefined ? row.avgGrossMargin.toFixed(2) : null,
                 category: categories,

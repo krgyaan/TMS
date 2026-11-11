@@ -1,6 +1,7 @@
 export const LOCATION_TABS = [
     { key: "tenders_assigned", label: "Assigned", description: "All tenders assigned in this period." },
     { key: "tenders_approved", label: "Approved", description: "Tenders approved by the team lead." },
+    { key: "tenders_not_bid", label: "Not Bid", description: "Tenders whose status falls under the DNB category." },
     { key: "tenders_bid", label: "Bid", description: "Tenders where a bid has been submitted." },
     { key: "tenders_missed", label: "Missed", description: "Tenders that were missed for submission." },
     { key: "tenders_disqualified", label: "Disqualified", description: "Tenders that were disqualified." },
