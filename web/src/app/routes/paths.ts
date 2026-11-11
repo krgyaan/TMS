@@ -179,6 +179,10 @@ export const paths = {
         raiseProjectInsuranceForm: (projectId: number) => `/operations/project-dashboard/${projectId}/insurance/create`,
         raiseProjectInsuranceRenewalForm: (projectId: number, policyId: number) =>
             `/operations/project-dashboard/${projectId}/insurance/create?policyId=${policyId}`,
+        biRequestBgCreate: (projectId: number) =>
+            `/operations/project-dashboard/${projectId}/bi-request/bank-guarantee/create`,
+        biRequestView: (projectId: number, requestId: number) =>
+            `/operations/project-dashboard/${projectId}/bi-request/${requestId}`,
         paymentRequests: "/operations/payment-requests",
     },
 

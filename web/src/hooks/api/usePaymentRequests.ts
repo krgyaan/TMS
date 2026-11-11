@@ -39,6 +39,8 @@ export const paymentRequestsKey = {
     detail: (id: number) => [...paymentRequestsKey.details(), id] as const,
     byTender: () => [...paymentRequestsKey.all, 'by-tender'] as const,
     byTenderId: (tenderId: number) => [...paymentRequestsKey.byTender(), tenderId] as const,
+    byProject: () => [...paymentRequestsKey.all, 'by-project'] as const,
+    byProjectId: (projectId: number) => [...paymentRequestsKey.byProject(), projectId] as const,
     tenderPaymentDetails: (tenderId: number) => ['tender', 'payment-details', tenderId] as const,
     instrumentDetails: (id: number) => [...paymentRequestsKey.all, 'instrument-details', id] as const,
 };
@@ -139,6 +141,14 @@ export const usePaymentRequestForEdit = (id: number | null) => {
     });
 };
 
+export const useProjectBiRequests = (projectId: number) => {
+    return useQuery({
+        queryKey: paymentRequestsKey.byProjectId(projectId),
+        queryFn: () => paymentRequestsService.getByProjectId(projectId),
+        enabled: !!projectId,
+    });
+};
+
 export const useCreatePaymentRequest = () => {
     const queryClient = useQueryClient();
 
@@ -149,6 +159,9 @@ export const useCreatePaymentRequest = () => {
             // Invalidate all dashboard queries
             queryClient.invalidateQueries({ queryKey: paymentRequestsKey.dashboard() });
             queryClient.invalidateQueries({ queryKey: paymentRequestsKey.byTenderId(variables.tenderId) });
+            if (variables.data?.projectId) {
+                queryClient.invalidateQueries({ queryKey: paymentRequestsKey.byProjectId(Number(variables.data.projectId)) });
+            }
             toast.success('Payment request(s) created successfully');
         },
         onError: (error) => {

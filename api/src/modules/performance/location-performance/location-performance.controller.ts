@@ -19,6 +19,10 @@ export class LocationPerformanceController {
             team: query.team,
             location: query.location,
             heading: query.heading,
+            state: query.state,
+            region: query.region,
+            fromDate: query.fromDate,
+            toDate: query.toDate,
             year: query.year,
         });
 
