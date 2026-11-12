@@ -1,8 +1,10 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
-import { and, eq, like, desc, sql } from "drizzle-orm";
+import { and, desc, eq, gt, like, sql } from "drizzle-orm";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { paymentRequests } from "@/db/schemas/operations/payment-requests.schema";
+import { fixedExpenses } from "@/db/schemas/accounts/fixed-expense.schema";
+import { fixedExpensesHistory, MR_STATUS_TO_HISTORY_STATUS } from "@/db/schemas/accounts/fixed-expense-history.schema";
 import { users } from "@/db/schemas/";
 import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
 import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.schema";
@@ -71,6 +73,7 @@ export class MakerRequestService {
                     uploadPI: body.uploadPI || [],
                     uploadInvoiceAfterPayment: body.uploadInvoiceAfterPayment || [],
                     requestedBy: userId,
+                    remark: body.remark || null,
                 })
                 .returning();
 
@@ -116,13 +119,19 @@ export class MakerRequestService {
         return parsed.data;
     }
 
-    async updateStatus(id: number, body: { status: string; utrNumber?: string; rejectionReason?: string }) {
+    async updateStatus(id: number, body: { status: string; utrNumber?: string; rejectionReason?: string; amount?: number | string }, updatedBy?: number) {
         const existing = await this.db
             .select()
             .from(paymentRequests)
             .where(and(eq(paymentRequests.id, id), sql`${paymentRequests.projectId} IS NULL`))
             .then(rows => rows[0]);
         if (!existing) throw new NotFoundException("Maker Request not found");
+
+        const hasAmount = body.amount !== undefined && body.amount !== null && String(body.amount).trim() !== "";
+        const parsedAmount = hasAmount ? Number(body.amount) : undefined;
+        if (hasAmount && (!Number.isFinite(parsedAmount) || (parsedAmount as number) < 0)) {
+            throw new BadRequestException("Amount must be a non-negative number");
+        }
 
         const validTransitions: Record<string, string[]> = {
             pending: ["maker_done", "rejected"],
@@ -141,12 +150,24 @@ export class MakerRequestService {
                     utrNumber: body.utrNumber || null,
                     rejectionReason: body.rejectionReason || null,
                     updatedAt: new Date(),
+                    ...(hasAmount ? { amount: (parsedAmount as number).toFixed(2) } : {}),
                 })
                 .where(and(eq(paymentRequests.id, id), sql`${paymentRequests.projectId} IS NULL`))
                 .returning()
         )[0];
 
         this.logger.info(`Maker Request #${id} status updated to "${body.status}"`);
+
+        if (hasAmount) {
+            // Variable fixed expenses start at 0; the maker fills the real amount
+            // on confirmation. Mirror it onto the linked expense.
+            await this.db
+                .update(fixedExpenses)
+                .set({ amount: (parsedAmount as number).toFixed(2), updatedAt: new Date() })
+                .where(eq(fixedExpenses.makerId, id));
+        }
+
+        await this.syncFixedExpenseHistory(id, body.status, updatedBy, hasAmount ? (parsedAmount as number).toFixed(2) : undefined);
 
         if (body.status === "payment_done") {
             this.notifications
@@ -190,6 +211,40 @@ export class MakerRequestService {
         }
 
         return updated;
+    }
+
+    /** Mirror a maker request status onto the linked fixed expense's workflow row. */
+    private async syncFixedExpenseHistory(makerRequestId: number, requestStatus: string, actorId?: number, amount?: string) {
+        const historyStatus = MR_STATUS_TO_HISTORY_STATUS[requestStatus];
+        if (!historyStatus) return;
+
+        // The request is linked to the workflow row of its own payment cycle.
+        const [linked] = await this.db
+            .select({ id: fixedExpensesHistory.id, expenseId: fixedExpensesHistory.expenseId })
+            .from(fixedExpensesHistory)
+            .where(eq(fixedExpensesHistory.makerId, makerRequestId))
+            .limit(1);
+        if (!linked) return;
+
+        // Completed cycles are immutable once the rollover cron has opened a
+        // newer one, so a late edit/revert cannot reopen them.
+        const [newer] = await this.db
+            .select({ id: fixedExpensesHistory.id })
+            .from(fixedExpensesHistory)
+            .where(and(eq(fixedExpensesHistory.expenseId, linked.expenseId), gt(fixedExpensesHistory.id, linked.id)))
+            .limit(1);
+        if (newer) return;
+
+        await this.db
+            .update(fixedExpensesHistory)
+            .set({
+                status: historyStatus,
+                // Workflow actions record the approver; `updated_by` stays edit-only.
+                approvedBy: actorId ?? null,
+                updatedAt: new Date(),
+                ...(amount ? { amount } : {}),
+            })
+            .where(eq(fixedExpensesHistory.id, linked.id));
     }
 
     async uploadInvoiceAfterPayment(id: number, files: string[]) {
@@ -241,6 +296,7 @@ export class MakerRequestService {
         purchaseOrderId: paymentRequests.purchaseOrderId,
         poFile: paymentRequests.poFile,
         vendorWorkOrderId: paymentRequests.vendorWorkOrderId,
+        fixedExpenseId: fixedExpenses.id,
     };
 
     async getById(id: number) {
@@ -273,6 +329,7 @@ export class MakerRequestService {
             .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
             .leftJoin(purchaseOrders, eq(paymentRequests.purchaseOrderId, purchaseOrders.id))
             .leftJoin(vendorWorkOrders, eq(paymentRequests.vendorWorkOrderId, vendorWorkOrders.id))
+            .leftJoin(fixedExpenses, eq(fixedExpenses.makerId, paymentRequests.id))
             .where(and(eq(paymentRequests.id, id), sql`${paymentRequests.projectId} IS NULL`));
 
         const mr = rows[0];
@@ -292,6 +349,7 @@ export class MakerRequestService {
             .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
             .leftJoin(purchaseOrders, eq(paymentRequests.purchaseOrderId, purchaseOrders.id))
             .leftJoin(vendorWorkOrders, eq(paymentRequests.vendorWorkOrderId, vendorWorkOrders.id))
+            .leftJoin(fixedExpenses, eq(fixedExpenses.makerId, paymentRequests.id))
             .where(and(eq(paymentRequests.requestedBy, userId), sql`${paymentRequests.projectId} IS NULL`))
             .orderBy(desc(paymentRequests.id));
     }
@@ -308,6 +366,7 @@ export class MakerRequestService {
             .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
             .leftJoin(purchaseOrders, eq(paymentRequests.purchaseOrderId, purchaseOrders.id))
             .leftJoin(vendorWorkOrders, eq(paymentRequests.vendorWorkOrderId, vendorWorkOrders.id))
+            .leftJoin(fixedExpenses, eq(fixedExpenses.makerId, paymentRequests.id))
             .where(sql`${paymentRequests.projectId} IS NULL`)
             .orderBy(desc(paymentRequests.id));
     }

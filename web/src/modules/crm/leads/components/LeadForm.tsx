@@ -15,16 +15,22 @@ import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { ArrowLeft, Loader2, MapPin, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { paths } from "@/app/routes/paths";
 import { useCreateLead, useUpdateLead } from "@/hooks/api/useLeads";
-import { useUsers } from "@/hooks/api/useUsers";
+import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import { useAuth } from "@/contexts/AuthContext";
 import axiosInstance from "@/lib/axios";
-import type { LeadWithNames, LiveLocation } from "../helpers/leads.type";
+import type {
+    CreateLeadRequest,
+    LeadWithNames,
+    LiveLocation,
+    UpdateLeadRequest,
+} from "../helpers/leads.type";
 import { LocationPickerModal } from "./LocationPickerModal";
 
 type Option = { value: string; label: string };
@@ -56,6 +62,14 @@ const COUNTRY_OPTIONS: Option[] = [
     { label: "United Kingdom", value: "United Kingdom" },
 ];
 
+const FIRST_INTERACTION_OPTIONS = [
+    { value: "call", label: "Call" },
+    { value: "mail", label: "Mail" },
+    { value: "visit", label: "Visit" },
+    { value: "letter", label: "Letter" },
+    { value: "whatsapp", label: "WhatsApp" },
+];
+
 const LeadFormSchema = z.object({
     companyName: z.string().min(1, { message: "Company name is required" }),
     name: z.string().min(1, { message: "Person name is required" }),
@@ -68,8 +82,8 @@ const LeadFormSchema = z.object({
     type: z.string().optional(),
     industry: z.string().optional(),
     allocatedTe: z.string().optional(),
-    pointsDiscussed: z.string().max(2000).optional(),
-    veResponsibility: z.string().max(2000).optional(),
+    addFirstInteraction: z.boolean().optional(),
+    firstInteractionType: z.enum(["call", "mail", "visit", "letter", "whatsapp"]).optional(),
 });
 
 type LeadFormValues = z.infer<typeof LeadFormSchema>;
@@ -120,7 +134,7 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
         (location.state as { from?: string } | null)?.from ?? paths.crm.happyCalling;
     const createLead = useCreateLead();
     const updateLead = useUpdateLead();
-    const { user, roleId } = useAuth();
+    const { user, roleId, effectiveTeamId } = useAuth();
 
     const isInitialLoad = useRef(true);
     const previousCountry = useRef<string>("");
@@ -140,11 +154,13 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
         queryFn: fetchIndustries,
     });
 
-    const { data: allUsers = [], isLoading: teLoading } = useUsers();
+    const { data: teamMembers = [], isLoading: teamMembersLoading } = useGetTeamMembers(
+        effectiveTeamId ?? 0
+    );
 
-    const teOptions = allUsers.map((u: { id: number; name: string; team?: { name?: string } | null }) => ({
-        value: u.id.toString(),
-        label: u.team?.name ? `${u.name} (${u.team.name})` : (u.name ?? ""),
+    const teamMemberOptions = teamMembers.map((member) => ({
+        value: member.id.toString(),
+        label: member.name ?? "",
     }));
 
     const canChangeTE = roleId != null && [1, 2, 4].includes(roleId);
@@ -154,7 +170,7 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
         defaultValues: {
             companyName: lead?.companyName || "",
             name: lead?.name || "",
-            designation: lead?.designation || "Not Available",
+            designation: lead?.designation || "",
             phone: lead?.phone || "",
             email: lead?.email || "",
             address: lead?.address || "",
@@ -163,13 +179,14 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
             type: lead?.type || "",
             industry: lead?.industry || "",
             allocatedTe: mode === "create" ? (user?.id?.toString() ?? "") : (lead?.allocatedTe?.toString() ?? ""),
-            pointsDiscussed: lead?.pointsDiscussed || "",
-            veResponsibility: lead?.veResponsibility || "",
+            addFirstInteraction: false,
+            firstInteractionType: "call",
         },
     });
 
     const country = useWatch({ control: form.control, name: "country" });
     const isIndia = country === "India";
+    const addFirstInteraction = form.watch("addFirstInteraction") ?? false;
 
     const [locationBlocked, setLocationBlocked] = useState(false);
     const [locationModal, setLocationModal] = useState<{ open: boolean; lat?: number; lng?: number }>({ open: false });
@@ -201,9 +218,16 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
 
     useEffect(() => {
         if (mode !== "create") return;
+        if (!addFirstInteraction) return;
+        if (liveLocation) return;
         requestLocation();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [mode]);
+    }, [mode, addFirstInteraction, liveLocation, requestLocation]);
+
+    useEffect(() => {
+        if (mode !== "create") return;
+        if (addFirstInteraction) return;
+        setLocationBlocked(false);
+    }, [mode, addFirstInteraction]);
 
     // Auto-select current user as TE in create mode (until the async user loads)
     useEffect(() => {
@@ -218,7 +242,7 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
         setLocationModal({ open: false });
     }, []);
 
-    const isLocationRequired = mode === "create";
+    const isLocationRequired = mode === "create" && addFirstInteraction;
     const formDisabled = isLocationRequired && locationBlocked;
 
     useEffect(() => {
@@ -236,27 +260,49 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
 
     const handleSubmit: SubmitHandler<LeadFormValues> = async (values) => {
         try {
-            const payload = {
+            const basePayload = {
                 companyName: values.companyName,
                 name: values.name,
-                designation: values.designation || "Not Available",
                 phone: values.phone,
-                email: values.email || null,
                 address: values.address,
                 country: values.country,
                 state: values.state,
-                type: values.type || null,
-                industry: values.industry || null,
-                team: null,
-                allocatedTe: values.allocatedTe ? Number(values.allocatedTe) : null,
-                pointsDiscussed: values.pointsDiscussed || null,
-                veResponsibility: values.veResponsibility || null,
-                liveLocation,
             };
 
             if (mode === "create") {
-                await createLead.mutateAsync(payload);
+                const payload: CreateLeadRequest = {
+                    ...basePayload,
+                    ...(values.designation?.trim()
+                        ? { designation: values.designation.trim() }
+                        : {}),
+                    ...(values.email?.trim() ? { email: values.email.trim() } : {}),
+                    ...(values.type ? { type: values.type } : {}),
+                    ...(values.industry ? { industry: values.industry } : {}),
+                    ...(values.allocatedTe
+                        ? { allocatedTe: Number(values.allocatedTe) }
+                        : {}),
+                    ...(liveLocation ? { liveLocation } : {}),
+                };
+
+                const created = await createLead.mutateAsync(payload);
+                if (values.addFirstInteraction && created?.id) {
+                    const tab = values.firstInteractionType ?? "call";
+                    navigate(`${paths.crm.leadFollowup(created.id)}?tab=${tab}&step=2`);
+                    return;
+                }
             } else if (mode === "edit" && lead) {
+                const payload: UpdateLeadRequest = {
+                    ...basePayload,
+                    designation: values.designation?.trim() || null,
+                    email: values.email?.trim() || null,
+                    type: values.type || null,
+                    industry: values.industry || null,
+                    allocatedTe: values.allocatedTe
+                        ? Number(values.allocatedTe)
+                        : null,
+                    liveLocation,
+                };
+
                 await updateLead.mutateAsync({
                     id: lead.id,
                     data: payload,
@@ -289,6 +335,24 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
             </CardHeader>
 
             <CardContent>
+                {mode === "create" && (
+                    <div className="mb-6 flex items-center gap-3 text-sm">
+                        <div className="flex items-center gap-2">
+                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                                1
+                            </span>
+                            <span className="font-medium">Basic Details</span>
+                        </div>
+                        <div className="h-px w-10 bg-border" />
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                            <span className="flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold">
+                                2
+                            </span>
+                            <span>First Interaction</span>
+                        </div>
+                    </div>
+                )}
+
                 <Form {...form}>
                     <form
                         onSubmit={form.handleSubmit(handleSubmit)}
@@ -302,8 +366,8 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
                                     <div className="flex items-start justify-between gap-4">
                                         <div className="space-y-1">
                                             <p>
-                                                Location access is required to create a lead. Please allow
-                                                location access to continue.
+                                                Location access is required when adding first interaction
+                                                details. Please allow location access to continue.
                                             </p>
                                             <p className="text-xs text-muted-foreground">
                                                 To allow location: click the lock icon in the browser
@@ -340,7 +404,7 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
                                         {liveLocation.longitude?.toFixed(6) ?? "—"}
                                     </p>
                                 </div>
-                                {isLocationRequired && (
+                                {mode === "create" && (
                                     <Button
                                         type="button"
                                         size="sm"
@@ -488,49 +552,49 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
                                 <SelectField<LeadFormValues, "allocatedTe">
                                     control={form.control}
                                     name="allocatedTe"
-                                    label="Allocate TE"
-                                    options={teOptions}
-                                    placeholder={teLoading ? "Loading TEs..." : "-- Select TE --"}
+                                    label="Allocate Team Member"
+                                    options={teamMemberOptions}
+                                    placeholder={
+                                        teamMembersLoading
+                                            ? "Loading team members..."
+                                            : "-- Select Team Member --"
+                                    }
                                     disabled={!canChangeTE}
                                 />
 
-                                <SectionSeparator text="Additional Details" />
-
-                                <div className="col-span-full">
-                                    <FieldWrapper<LeadFormValues, "pointsDiscussed">
-                                        control={form.control}
-                                        name="pointsDiscussed"
-                                        label="Points Discussed"
-                                    >
-                                        {(field) => (
-                                            <textarea
-                                                className="border-input placeholder:text-muted-foreground dark:bg-input/30 h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                                placeholder="Enter discussion points..."
-                                                maxLength={2000}
-                                                {...field}
-                                            />
-                                        )}
-                                    </FieldWrapper>
-                                </div>
-
-                                <div className="col-span-full">
-                                    <FieldWrapper<LeadFormValues, "veResponsibility">
-                                        control={form.control}
-                                        name="veResponsibility"
-                                        label="VE Responsibility"
-                                    >
-                                        {(field) => (
-                                            <textarea
-                                                className="border-input placeholder:text-muted-foreground dark:bg-input/30 h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                                placeholder="Enter VE responsibilities..."
-                                                maxLength={2000}
-                                                {...field}
-                                            />
-                                        )}
-                                    </FieldWrapper>
-                                </div>
-
                             </div>
+
+                            {mode === "create" && (
+                                <div className="rounded-lg border bg-muted/30 p-4">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div>
+                                            <h3 className="text-sm font-medium">First Interaction</h3>
+                                            <p className="text-sm text-muted-foreground">
+                                                Want to add first interaction details?
+                                            </p>
+                                        </div>
+                                        <Switch
+                                            checked={form.watch("addFirstInteraction") ?? false}
+                                            onCheckedChange={(checked) =>
+                                                form.setValue("addFirstInteraction", checked)
+                                            }
+                                            disabled={saving || formDisabled}
+                                        />
+                                    </div>
+
+                                    {form.watch("addFirstInteraction") && (
+                                        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            <SelectField<LeadFormValues, "firstInteractionType">
+                                                control={form.control}
+                                                name="firstInteractionType"
+                                                label="Interaction Type"
+                                                options={FIRST_INTERACTION_OPTIONS}
+                                                placeholder="Select Interaction Type"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             <div className="w-full flex items-center justify-center gap-2 pt-2">
                                 <Button type="submit" disabled={saving || formDisabled}>
@@ -540,7 +604,9 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
                                             Saving...
                                         </>
                                     ) : mode === "create" ? (
-                                        "Create Lead"
+                                        form.watch("addFirstInteraction")
+                                            ? "Save & Add First Interaction"
+                                            : "Create Lead"
                                     ) : (
                                         "Update Lead"
                                     )}

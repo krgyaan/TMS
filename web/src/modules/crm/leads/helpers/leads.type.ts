@@ -64,9 +64,9 @@ export interface LeadWithNames extends Lead {
 export interface CreateLeadRequest {
     companyName: string;
     name: string;
-    designation: string;
+    designation?: string | null;
     phone: string;
-    email: string | null;
+    email?: string | null;
     address: string;
     liveLocation?: LiveLocation | null;
     country: string;
@@ -96,7 +96,7 @@ export interface LeadListParams {
     search?: string;
     priority?: string;
     status?: string;
-    team?: string;          // ✅ NEW
+    team?: string;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
     includeHappyCalling?: boolean;

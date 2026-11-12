@@ -125,6 +125,8 @@ export const paths = {
 
     // ==================== OPERATIONS ====================
     operations: {
+        itemMaster: "/operations/item-master",
+        itemMasterView: (id: number | string) => `/operations/item-master/${id}`,
         woBasicDetailListPage: "/operations/work-order/details/basic",
         woBasicDetailCreatePage: "/operations/work-order/details/basic/create",
         woBasicDetailEditPage: (id: number) => `/operations/work-order/details/basic/${id}/edit`,
@@ -177,6 +179,10 @@ export const paths = {
         raiseProjectInsuranceForm: (projectId: number) => `/operations/project-dashboard/${projectId}/insurance/create`,
         raiseProjectInsuranceRenewalForm: (projectId: number, policyId: number) =>
             `/operations/project-dashboard/${projectId}/insurance/create?policyId=${policyId}`,
+        biRequestBgCreate: (projectId: number) =>
+            `/operations/project-dashboard/${projectId}/bi-request/bank-guarantee/create`,
+        biRequestView: (projectId: number, requestId: number) =>
+            `/operations/project-dashboard/${projectId}/bi-request/${requestId}`,
         paymentRequests: "/operations/payment-requests",
     },
 
@@ -272,6 +278,9 @@ export const paths = {
         accountChecklists: "/accounts/account-checklists",
         gstChecklists: "/accounts/gst-checklists",
         fixedExpenses: "/accounts/fixed-expenses",
+        fixedExpenseCreate: "/accounts/fixed-expenses/create",
+        fixedExpenseEdit: (id: number) => `/accounts/fixed-expenses/${id}/edit`,
+        fixedExpenseView: (id: number) => `/accounts/fixed-expenses/${id}`,
         projects: "/projects",
         tdsChecklists: "/accounts/tds-checklists",
 
@@ -293,6 +302,8 @@ export const paths = {
         vwoClosure: (id: number) => `/accounts/vendor-work-orders/${id}/closure`,
         paymentRequests: "/accounts/payment-requests",
         inventory: "/accounts/inventory",
+        itemMaster: "/accounts/item-master",
+        itemMasterView: (id: number | string) => `/accounts/item-master/${id}`,
         inventoryItems: "/accounts/item",
         inventoryProject: (projectId: number) => `/accounts/inventory?projectId=${projectId}`,
         vendorMaster: "/accounts/vendor-master",
@@ -339,6 +350,9 @@ export const paths = {
 
     // ==================== MASTER ====================
     master: {
+        itemMaster: "/master/item-master",
+        itemMasterNew: "/master/item-master/new",
+        itemMasterEdit: (id: number | string) => `/master/item-master/${id}/edit`,
         users: "/master/users",
         users_create: "/master/users/create",
         users_edit: (id: number | string) => `/master/users/${id}/edit`,
@@ -434,13 +448,13 @@ export const paths = {
 
     // ==================== SHARED ====================
     shared: {
-        followUp: "/shared/follow-ups",
+        followUp: "/shared/follow-up",
         followUpCreate: "/shared/follow-up/create",
         followUpEdit: (id: number) => `/shared/follow-up/edit/${id}`,
         followUpShow: (id: number) => `/shared/follow-up/show/${id}`,
 
         couriers: "/shared/couriers",
-        courierDispatch: "/shared/couriers/dispatch",
+        courierDispatch: (id: number) => `/shared/couriers/dispatch/${id}`,
         courierCreate: "/shared/couriers/create",
         courierView: (id: number) => `/shared/couriers/show/${id}`,
         courierEdit: (id: number) => `/shared/couriers/edit/${id}`,

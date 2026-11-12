@@ -15,6 +15,7 @@ import type { AccountabilityRemarkDto, CreateChecklistDto, GetTasksDto, Responsi
 import { MailAudienceService } from "@/core/mail/mail-audience.service";
 import { MailerService } from "@/mailer/mailer.service";
 import { GoogleService } from "@/modules/integrations/google/google.service";
+import { getIstDateKey } from "@/utils/ist-date";
 
 
 // Helper types
@@ -892,6 +893,7 @@ export class AccountChecklistService {
      */
     async enqueueEodMails(queue: import("bullmq").Queue) {
         const dateStr = format(new Date(), "dd/MM/yy");
+        const jobDate = getIstDateKey();
         this.logger.info("[MAIL-ENQUEUE] ▶ Starting EOD checklist mail enqueue", {
             date: dateStr,
         });
@@ -994,6 +996,7 @@ export class AccountChecklistService {
                         date: dateStr,
                     },
                     {
+                        jobId: `checklist-mail-${accountableUserId}-${jobDate}`,
                         attempts: 3,
                         backoff: { type: "exponential", delay: 10000 },
                     }
@@ -1028,6 +1031,7 @@ export class AccountChecklistService {
                     date: dateStr,
                 },
                 {
+                    jobId: `checklist-admin-mail-${jobDate}`,
                     attempts: 3,
                     backoff: { type: "exponential", delay: 10000 },
                 }

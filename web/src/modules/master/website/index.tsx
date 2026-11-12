@@ -13,6 +13,7 @@ import { AlertCircle, Plus, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { WebsiteModal } from "./components/WebsiteModal";
 import { WebsiteViewModal } from "./components/WebsiteViewModal";
+import { useAuth } from "@/contexts/AuthContext";
 
 const rowSelection: RowSelectionOptions = {
     mode: "multiRow",
@@ -21,12 +22,13 @@ const rowSelection: RowSelectionOptions = {
 
 const WebsitesPage = () => {
     const { data: websites, isLoading, error, refetch } = useWebsites();
+    const { canWriteMasterData } = useAuth();
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [viewModalOpen, setViewModalOpen] = useState(false);
     const [selectedWebsite, setSelectedWebsite] = useState<Website | null>(null);
 
     // Website actions
-    const websiteActions: ActionItem<Website>[] = [
+    const websiteActions = ([
         {
             label: "View",
             onClick: row => {
@@ -55,7 +57,7 @@ const WebsitesPage = () => {
                 }
             },
         },
-    ];
+    ] as ActionItem<Website>[]).filter(action => canWriteMasterData || action.label === "View");
 
     const [colDefs] = useState<ColDef<Website>[]>([
         {
@@ -169,18 +171,20 @@ const WebsitesPage = () => {
                 <CardHeader>
                     <CardTitle>Websites</CardTitle>
                     <CardDescription>Manage all website links and URLs</CardDescription>
-                    <CardAction>
-                        <Button
-                            variant="default"
-                            onClick={() => {
-                                setSelectedWebsite(null);
-                                setDrawerOpen(true);
-                            }}
-                        >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add New Website
-                        </Button>
-                    </CardAction>
+                    {canWriteMasterData && (
+                        <CardAction>
+                            <Button
+                                variant="default"
+                                onClick={() => {
+                                    setSelectedWebsite(null);
+                                    setDrawerOpen(true);
+                                }}
+                            >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add New Website
+                            </Button>
+                        </CardAction>
+                    )}
                 </CardHeader>
                 <CardContent className="px-3">
                     <DataTable

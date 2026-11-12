@@ -39,6 +39,7 @@ export const useTqManagement = (
         queryFn: async () => {
             return tqManagementService.getDashboard(tabKey, effectiveFilters);
         },
+        placeholderData: (previousData) => previousData,
     });
 };
 

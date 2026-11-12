@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { RouteWrapper } from "../components/RouteWrapper";
 
 const Accounts_Imprests = lazy(() => import("@/modules/imprest/UsersImpresstListPage"));
@@ -22,7 +22,10 @@ const Accounts_Insurance_Edit = lazy(() => import("@/modules/insurance/pages/Ins
 const Accounts_Insurance_View = lazy(() => import("@/modules/insurance/pages/InsuranceViewPage"));
 const Accounts_GSTChecklists = lazy(() => import("@/modules/accounts/gst-checklists/GstChecklistListPage"));
 const Accounts_TDSChecklists = lazy(() => import("@/modules/accounts/tds-checklists/TdsChecklistListPage"));
-const Accounts_FixedExpenses = lazy(() => import("@/modules/accounts/fixed-expenses"));
+const Accounts_FixedExpenses = lazy(() => import("@/modules/accounts/fixed-expenses/FixedExpenseListPage"));
+const Accounts_FixedExpenses_Create = lazy(() => import("@/modules/accounts/fixed-expenses/FixedExpenseCreatePage"));
+const Accounts_FixedExpenses_Edit = lazy(() => import("@/modules/accounts/fixed-expenses/FixedExpenseEditPage"));
+const Accounts_FixedExpenses_View = lazy(() => import("@/modules/accounts/fixed-expenses/FixedExpenseShowPage"));
 
 const TaskChecklistDashboard = lazy(() => import("@/modules/accounts/task-checklist/ChecklistDashboard"));
 const TaskChecklistCreate = lazy(() => import("@/modules/accounts/task-checklist/ChecklistCreate"));
@@ -49,6 +52,7 @@ const Accounts_VendorMaster_View = lazy(() => import("@/modules/master/vendor-ma
 const Accounts_Parties = lazy(() => import("@/modules/master/vendor-master/PartyListPage"));
 const Accounts_InventoryPage = lazy(() => import("@/modules/operations/inventory/pages/InventoryPage"));
 const Accounts_ItemMaster = lazy(() => import("@/modules/accounts/inventory-items/InventoryItemListPage"));
+const Accounts_ItemMaster_Detail = lazy(() => import("@/modules/accounts/inventory-items/InventoryItemDetailPage"));
 
 export default function AccountsRoutes() {
     return (
@@ -77,6 +81,9 @@ export default function AccountsRoutes() {
             <Route path="gst-checklists" element={<RouteWrapper><Accounts_GSTChecklists /></RouteWrapper>} />
             <Route path="tds-checklists" element={<RouteWrapper><Accounts_TDSChecklists /></RouteWrapper>} />
             <Route path="fixed-expenses" element={<RouteWrapper><Accounts_FixedExpenses /></RouteWrapper>} />
+            <Route path="fixed-expenses/create" element={<RouteWrapper><Accounts_FixedExpenses_Create /></RouteWrapper>} />
+            <Route path="fixed-expenses/:id/edit" element={<RouteWrapper><Accounts_FixedExpenses_Edit /></RouteWrapper>} />
+            <Route path="fixed-expenses/:id" element={<RouteWrapper><Accounts_FixedExpenses_View /></RouteWrapper>} />
 
             <Route path="task-checklists" element={<RouteWrapper><TaskChecklistDashboard /></RouteWrapper>} />
             <Route path="task-checklists/create" element={<RouteWrapper><TaskChecklistCreate /></RouteWrapper>} />
@@ -104,7 +111,9 @@ export default function AccountsRoutes() {
             <Route path="vendor-work-orders/:id/closure" element={<RouteWrapper><Accounts_VwoClosure /></RouteWrapper>} />
             <Route path="payment-requests" element={<RouteWrapper><Accounts_PaymentRequestTabs /></RouteWrapper>} />
             <Route path="inventory" element={<RouteWrapper><Accounts_InventoryPage /></RouteWrapper>} />
-            <Route path="item" element={<RouteWrapper permission={{ module: "accounts.inventory-items", action: "read" }}><Accounts_ItemMaster /></RouteWrapper>} />
+            <Route path="item-master" element={<RouteWrapper permission={{ module: "accounts.item-master", action: "read" }}><Accounts_ItemMaster team="accounts" /></RouteWrapper>} />
+            <Route path="item-master/:id" element={<RouteWrapper permission={{ module: "accounts.item-master", action: "read" }}><Accounts_ItemMaster_Detail team="accounts" /></RouteWrapper>} />
+            <Route path="item" element={<Navigate to="/accounts/item-master" replace />} />
             <Route path="delegation/add" element={<RouteWrapper><AddTask /></RouteWrapper>} />
             <Route path="delegation/:id" element={<RouteWrapper><TaskDetail /></RouteWrapper>} />
             <Route path="delegation/:id/update" element={<RouteWrapper><TaskStatusUpdate /></RouteWrapper>} />

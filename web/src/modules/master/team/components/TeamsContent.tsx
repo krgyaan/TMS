@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { TeamModal } from './TeamModal';
+import { useAuth } from '@/contexts/AuthContext';
 
 const rowSelection: RowSelectionOptions = {
     mode: 'multiRow',
@@ -29,11 +30,12 @@ export type TeamsContentHandle = {
 export const TeamsContent = forwardRef<TeamsContentHandle, TeamsContentProps>(
     ({ showHeader = true, onAddClick }, ref) => {
     const { data: teams, isLoading, error, refetch } = useTeams();
+    const { canWriteMasterData } = useAuth();
     const deleteTeam = useDeleteTeam();
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
 
-    const teamActions: ActionItem<Team>[] = [
+    const teamActions = ([
         {
             label: 'Edit',
             onClick: (row) => {
@@ -54,7 +56,7 @@ export const TeamsContent = forwardRef<TeamsContentHandle, TeamsContentProps>(
                 }
             },
         },
-    ];
+    ] as ActionItem<Team>[]).filter(() => canWriteMasterData);
 
     const [colDefs] = useState<ColDef<Team>[]>([
         {
@@ -160,10 +162,12 @@ export const TeamsContent = forwardRef<TeamsContentHandle, TeamsContentProps>(
                         <h2 className="text-2xl font-semibold">Teams</h2>
                         <p className="text-muted-foreground">Manage organizational teams</p>
                     </div>
-                    <Button variant="default" onClick={handleAddClick}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Team
-                    </Button>
+                    {canWriteMasterData && (
+                        <Button variant="default" onClick={handleAddClick}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Team
+                        </Button>
+                    )}
                 </div>
             )}
             <div className="flex-1 min-h-0">

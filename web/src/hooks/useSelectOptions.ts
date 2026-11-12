@@ -12,6 +12,7 @@ import { useProjectsMaster } from './api/useProjects';
 import { useLoanParties } from './api/useLoanParties';
 import { useSellerOptions, useShipToOptions } from './api/usePurchaseOrders';
 import { useDebouncedSearch } from './useDebouncedSearch';
+import { formatVendorName } from '@/lib/vendorName';
 
 const toSearchableIds = (selectedId?: string): number[] => {
     if (!selectedId || selectedId === '__create_new__') return [];
@@ -187,13 +188,16 @@ export function useSellerSelectOptions(selectedId?: string) {
 
     const options = useMemo(
         () =>
-            rows.map((p) => ({
-                id: String(p.id),
-                name: p.alias ? `${p.name} (${p.alias})` : p.name,
-                keywords: [p.name, p.alias, p.gstNo, p.pan, p.msme, p.address]
-                    .filter(Boolean)
-                    .join(' '),
-            })),
+            rows.map((p) => {
+                const displayName = formatVendorName(p.name);
+                return {
+                    id: String(p.id),
+                    name: p.alias ? `${displayName} (${p.alias})` : displayName,
+                    keywords: [p.name, p.alias, p.gstNo, p.pan, p.msme, p.address]
+                        .filter(Boolean)
+                        .join(' '),
+                };
+            }),
         [rows]
     );
 

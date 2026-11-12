@@ -3,6 +3,8 @@ import { DRIZZLE } from "@/db/database.module";
 import { users } from "@/db/schemas/";
 import { projects } from "@/db/schemas/master/projects.schema";
 import { beneficiaries } from "@/db/schemas/operations/beneficiaries.schema";
+import { fixedExpenses } from "@/db/schemas/accounts/fixed-expense.schema";
+import { fixedExpensesHistory, MR_STATUS_TO_HISTORY_STATUS } from "@/db/schemas/accounts/fixed-expense-history.schema";
 import { paymentRequests, type PaymentRequest as OperationPaymentRequest } from "@/db/schemas/operations/payment-requests.schema";
 import { tdsReturns } from "@/db/schemas/operations/tds-returns.schema";
 import { employeeImprestTransactions } from "@/db/schemas/shared/employee-imprest-transaction.schema";
@@ -13,7 +15,7 @@ import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.sch
 import { vendorWorkOrderItems } from "@/db/schemas/operations/vendor-work-order-items.schema";
 import { orderExtraCharges } from "@/db/schemas/operations/order-extra-charges.schema";
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, desc, eq, like, ne, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, gt, like, ne, sql, type SQL } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 import { InsurancePolicyService } from "@/modules/insurance/insurance-policy.service";
@@ -327,13 +329,19 @@ export class PaymentRequestService {
         return updated;
     }
 
-    async updateStatus(id: number, body: { status: string; utrNumber?: string; rejectionReason?: string }) {
+    async updateStatus(id: number, body: { status: string; utrNumber?: string; rejectionReason?: string; amount?: number | string }, updatedBy?: number) {
         const existing = await this.db
             .select()
             .from(paymentRequests)
             .where(eq(paymentRequests.id, id))
             .then(rows => rows[0]);
         if (!existing) throw new NotFoundException("Payment Request not found");
+
+        const hasAmount = body.amount !== undefined && body.amount !== null && String(body.amount).trim() !== "";
+        const parsedAmount = hasAmount ? Number(body.amount) : undefined;
+        if (hasAmount && (!Number.isFinite(parsedAmount) || (parsedAmount as number) < 0)) {
+            throw new BadRequestException("Amount must be a non-negative number");
+        }
 
         const validTransitions: Record<string, string[]> = {
             pending: ["maker_done", "rejected"],
@@ -424,11 +432,23 @@ export class PaymentRequestService {
                         utrNumber: body.utrNumber || null,
                         rejectionReason: body.rejectionReason || null,
                         updatedAt: new Date(),
+                        ...(hasAmount ? { amount: (parsedAmount as number).toFixed(2) } : {}),
                         ...tdsCapSet,
                     })
                     .where(eq(paymentRequests.id, id))
                     .returning()
             )[0];
+
+            if (hasAmount) {
+                // Fixed expenses are created with amount 0 when variable; the amount
+                // is filled in when the maker confirms. Keep the expense in sync.
+                await tx
+                    .update(fixedExpenses)
+                    .set({ amount: (parsedAmount as number).toFixed(2), updatedAt: new Date() })
+                    .where(eq(fixedExpenses.makerId, id));
+            }
+
+            await this.syncFixedExpenseHistory(tx, id, body.status, updatedBy, hasAmount ? (parsedAmount as number).toFixed(2) : undefined);
 
             if (tdsReturn) {
                 await tx
@@ -577,7 +597,7 @@ export class PaymentRequestService {
         return ben.userId;
     }
 
-    async revertStatus(id: number, body: { status: string; remark: string }) {
+    async revertStatus(id: number, body: { status: string; remark: string }, updatedBy?: number) {
         const existing = await this.db
             .select()
             .from(paymentRequests)
@@ -613,8 +633,47 @@ export class PaymentRequestService {
 
             this.logger.info(`Payment Request #${id} reverted from "${existing.status}" to "${body.status}"`);
 
+            await this.syncFixedExpenseHistory(tx, id, body.status, updatedBy);
+
             return updated;
         });
+    }
+
+    /**
+     * Mirror a payment request status onto the linked fixed expense's workflow
+     * row. Project payment requests have no linked expense, so they are skipped.
+     */
+    private async syncFixedExpenseHistory(tx: DbInstance, makerRequestId: number, requestStatus: string, actorId?: number, amount?: string) {
+        const historyStatus = MR_STATUS_TO_HISTORY_STATUS[requestStatus];
+        if (!historyStatus) return;
+
+        // The request is linked to the workflow row of its own payment cycle.
+        const [linked] = await tx
+            .select({ id: fixedExpensesHistory.id, expenseId: fixedExpensesHistory.expenseId })
+            .from(fixedExpensesHistory)
+            .where(eq(fixedExpensesHistory.makerId, makerRequestId))
+            .limit(1);
+        if (!linked) return;
+
+        // Completed cycles are immutable once the rollover cron has opened a
+        // newer one, so a late edit/revert cannot reopen them.
+        const [newer] = await tx
+            .select({ id: fixedExpensesHistory.id })
+            .from(fixedExpensesHistory)
+            .where(and(eq(fixedExpensesHistory.expenseId, linked.expenseId), gt(fixedExpensesHistory.id, linked.id)))
+            .limit(1);
+        if (newer) return;
+
+        await tx
+            .update(fixedExpensesHistory)
+            .set({
+                status: historyStatus,
+                // Workflow actions record the approver; `updated_by` stays edit-only.
+                approvedBy: actorId ?? null,
+                updatedAt: new Date(),
+                ...(amount ? { amount } : {}),
+            })
+            .where(eq(fixedExpensesHistory.id, linked.id));
     }
 
     async uploadInvoiceAfterPayment(id: number, files: string[]) {
@@ -705,6 +764,8 @@ export class PaymentRequestService {
                 vwoTotalPaymentRequested: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE vendor_work_order_id = ${vendorWorkOrders.id} AND status != 'rejected'), 0)`,
                 vwoTotalMakerDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE vendor_work_order_id = ${vendorWorkOrders.id} AND status = 'maker_done'), 0)`,
                 vwoTotalPaymentDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE vendor_work_order_id = ${vendorWorkOrders.id} AND status = 'payment_done'), 0)`,
+                fixedExpenseId: fixedExpenses.id,
+                fixedExpenseAmountType: fixedExpenses.amountType,
             })
             .from(paymentRequests)
             .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
@@ -712,6 +773,7 @@ export class PaymentRequestService {
             .leftJoin(purchaseOrders, eq(paymentRequests.purchaseOrderId, purchaseOrders.id))
             .leftJoin(vendorWorkOrders, eq(paymentRequests.vendorWorkOrderId, vendorWorkOrders.id))
             .leftJoin(purchaseInvoices, eq(paymentRequests.purchaseInvoiceId, purchaseInvoices.id))
+            .leftJoin(fixedExpenses, eq(fixedExpenses.makerId, paymentRequests.id))
             .where(eq(paymentRequests.id, id));
 
         const pr = rows[0];
@@ -737,6 +799,8 @@ export class PaymentRequestService {
                 projectName: projects.projectName,
                 poNumber: purchaseOrders.poNumber,
                 vwoNumber: vendorWorkOrders.woNumber,
+                fixedExpenseId: fixedExpenses.id,
+                fixedExpenseAmountType: fixedExpenses.amountType,
             })
             .from(paymentRequests)
             .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
@@ -744,6 +808,7 @@ export class PaymentRequestService {
             .leftJoin(purchaseOrders, eq(paymentRequests.purchaseOrderId, purchaseOrders.id))
             .leftJoin(vendorWorkOrders, eq(paymentRequests.vendorWorkOrderId, vendorWorkOrders.id))
             .leftJoin(purchaseInvoices, eq(paymentRequests.purchaseInvoiceId, purchaseInvoices.id))
+            .leftJoin(fixedExpenses, eq(fixedExpenses.makerId, paymentRequests.id))
             .where(conditions.length > 0 ? and(...conditions) : undefined)
             .orderBy(desc(paymentRequests.id));
     }

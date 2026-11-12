@@ -13,6 +13,7 @@ import { AlertCircle, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ItemModal } from "./components/ItemModal";
 import { ItemViewModal } from "./components/ItemViewModal";
+import { useAuth } from "@/contexts/AuthContext";
 
 const rowSelection: RowSelectionOptions = {
     mode: "multiRow",
@@ -21,6 +22,7 @@ const rowSelection: RowSelectionOptions = {
 
 const ItemPage = () => {
     const { data: items, isLoading, error, refetch } = useItems();
+    const { canWriteMasterData } = useAuth();
     const deleteItem = useDeleteItem();
     const [drawerState, setDrawerState] = useState<{ open: boolean; item: Item | null }>({
         open: false,
@@ -31,7 +33,7 @@ const ItemPage = () => {
         item: null,
     });
 
-    const itemActions: ActionItem<Item>[] = [
+    const itemActions = ([
         {
             label: "View",
             onClick: row => setViewState({ open: true, item: row }),
@@ -54,7 +56,7 @@ const ItemPage = () => {
                 }
             },
         },
-    ];
+    ] as ActionItem<Item>[]).filter(action => canWriteMasterData || action.label === "View");
 
     const colDefs: ColDef<Item>[] = [
         { field: "id", headerName: "ID", width: 80 },
@@ -129,12 +131,14 @@ const ItemPage = () => {
                 <CardHeader>
                     <CardTitle>Items</CardTitle>
                     <CardDescription>List of all Item</CardDescription>
-                    <CardAction>
-                        <Button variant="default" onClick={() => setDrawerState({ open: true, item: null })}>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add New Item
-                        </Button>
-                    </CardAction>
+                    {canWriteMasterData && (
+                        <CardAction>
+                            <Button variant="default" onClick={() => setDrawerState({ open: true, item: null })}>
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add New Item
+                            </Button>
+                        </CardAction>
+                    )}
                 </CardHeader>
                 <CardContent className="px-3">
                     <DataTable

@@ -43,6 +43,7 @@ export const useWoBasicDetails = (filters?: WoBasicDetailsFilters) => {
   return useQuery({
     queryKey: woBasicDetailsKeys.list(mergedFilters),
     queryFn: () => woBasicDetailsService.getAll(mergedFilters),
+    placeholderData: (previousData) => previousData,
   });
 };
 

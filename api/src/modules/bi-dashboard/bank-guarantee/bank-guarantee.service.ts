@@ -5,7 +5,7 @@ import { AppLogger } from '@/logger/app-logger.service';
 import { PaymentRequestsNotificationService } from '@/modules/tendering/payment-requests/services/payment-requests-notification.service';
 import type { BankGuaranteeDashboardCounts, BankGuaranteeDashboardRow } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
-import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
+import type { CreateFollowUpDto } from '@/modules/follow-up/dto';
 import { BG_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
@@ -83,6 +83,11 @@ export class BankGuaranteeService {
             conditions.push(
                 inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
                 eq(instrumentBgDetails.bankName, 'SBI')
+            );
+        } else if (tab === 'live-yes') {
+            conditions.push(
+                inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
+                inArray(instrumentBgDetails.bankName, ['YESBANK_2011', 'YESBANK_0771'])
             );
         } else if (tab === 'cancelled') {
             conditions.push(
@@ -427,6 +432,11 @@ export class BankGuaranteeService {
             eq(instrumentBgDetails.bankName, 'SBI'),
         );
 
+        const liveYesFilter = and(
+            inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
+            inArray(instrumentBgDetails.bankName, ['YESBANK_2011', 'YESBANK_0771']),
+        );
+
         const cancelledFilter = inArray(paymentInstruments.action, [8, 9]);
 
         const rejectedFilter = and(
@@ -439,6 +449,7 @@ export class BankGuaranteeService {
             livePnb: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${livePnbFilter})`,
             liveBgLimit: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${liveBgLimitFilter})`,
             liveSbi: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${liveSbiFilter})`,
+            liveYes: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${liveYesFilter})`,
             cancelled: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${cancelledFilter})`,
             rejected: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${rejectedFilter})`,
         })
@@ -454,6 +465,7 @@ export class BankGuaranteeService {
         const livePnb = Number(counts?.livePnb ?? 0);
         const liveBgLimit = Number(counts?.liveBgLimit ?? 0);
         const liveSbi = Number(counts?.liveSbi ?? 0);
+        const liveYes = Number(counts?.liveYes ?? 0);
         const cancelled = Number(counts?.cancelled ?? 0);
         const rejected = Number(counts?.rejected ?? 0);
 
@@ -462,9 +474,10 @@ export class BankGuaranteeService {
             'live-pnb': livePnb,
             'live-bg-limit': liveBgLimit,
             'live-sbi': liveSbi,
+            'live-yes': liveYes,
             cancelled,
             rejected,
-            total: newRequests + livePnb + liveBgLimit + liveSbi + cancelled + rejected,
+            total: newRequests + livePnb + liveBgLimit + liveSbi + liveYes + cancelled + rejected,
         };
     }
 

@@ -13,6 +13,7 @@ import { AlertCircle, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { StatusModal } from "./components/StatusModal";
 import { StatusViewModal } from "./components/StatusViewModal";
+import { useAuth } from "@/contexts/AuthContext";
 
 const rowSelection: RowSelectionOptions = {
     mode: "multiRow",
@@ -21,6 +22,7 @@ const rowSelection: RowSelectionOptions = {
 
 const StatusPage = () => {
     const { data: statuses, isLoading, error, refetch } = useStatuses();
+    const { canWriteMasterData } = useAuth();
     const deleteStatus = useDeleteStatus();
     const [drawerState, setDrawerState] = useState<{ open: boolean; status: Status | null }>({
         open: false,
@@ -31,7 +33,7 @@ const StatusPage = () => {
         status: null,
     });
 
-    const statusActions: ActionItem<Status>[] = [
+    const statusActions = ([
         {
             label: "View",
             onClick: row => setViewState({ open: true, status: row }),
@@ -54,7 +56,7 @@ const StatusPage = () => {
                 }
             },
         },
-    ];
+    ] as ActionItem<Status>[]).filter(action => canWriteMasterData || action.label === "View");
 
     const colDefs: ColDef<Status>[] = [
         { field: "id", headerName: "ID", width: 80 },
@@ -123,12 +125,14 @@ const StatusPage = () => {
                 <CardHeader>
                     <CardTitle>Status</CardTitle>
                     <CardDescription>Manage tender statuses and their categories</CardDescription>
-                    <CardAction>
-                        <Button variant="default" onClick={() => setDrawerState({ open: true, status: null })}>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add New Status
-                        </Button>
-                    </CardAction>
+                    {canWriteMasterData && (
+                        <CardAction>
+                            <Button variant="default" onClick={() => setDrawerState({ open: true, status: null })}>
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add New Status
+                            </Button>
+                        </CardAction>
+                    )}
                 </CardHeader>
                 <CardContent className="px-3">
                     <DataTable
