@@ -4,10 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, Truck } from 'lucide-react';
 import { useCreatePaymentRequest } from '@/hooks/api/usePaymentRequests';
 import { useProjectOverview } from '@/hooks/api/useProjectDashboard';
 import { useWoContactsByBasicDetail } from '@/hooks/api/useWoContacts';
+import { useUsers } from '@/hooks/api/useUsers';
 import { infoSheetsService } from '@/services/api/info-sheet.service';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -20,11 +21,11 @@ import { NumberInput } from '@/components/form/NumberInput';
 import { FileUploader } from '@/components/file-upload';
 import { BANKS, BG_NEEDED_IN_OPTIONS } from '@/modules/tendering/emds-tenderfees/constants';
 import {
-    BiOtherThanTenderRequestSchema,
-    type BiOtherThanTenderRequestFormValues,
+    ProjectBgRequestSchema,
+    type ProjectBgRequestFormValues,
 } from '@/modules/tendering/emds-tenderfees/helpers/payment-request.schema';
 
-type FormValues = BiOtherThanTenderRequestFormValues;
+type FormValues = ProjectBgRequestFormValues;
 
 const BG_PREFIX = 'EMD.details';
 
@@ -66,6 +67,7 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
 
     // Emails connected to this project's tender info sheet + WO contacts.
     const { data: woContacts } = useWoContactsByBasicDetail(woBasicDetailId);
+    const { data: employees = [] } = useUsers();
     const { data: tenderContacts } = useQuery({
         queryKey: ['tender-contacts', tenderId],
         queryFn: () => infoSheetsService.getTenderContacts(tenderId),
@@ -187,7 +189,7 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
     );
 
     const form = useForm<FormValues>({
-        resolver: zodResolver(BiOtherThanTenderRequestSchema) as Resolver<FormValues>,
+        resolver: zodResolver(ProjectBgRequestSchema) as Resolver<FormValues>,
         defaultValues: {
             tenderName: '',
             tenderNo: '',
@@ -307,33 +309,16 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
                                         {(field) => <NumberInput min={0} {...field} />}
                                     </FieldWrapper>
                                     <SelectField control={form.control} name={`${BG_PREFIX}.bgBank`} label="Bank *" options={BANKS} placeholder="Select Bank" disabled />
-                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgCourierAddress`} label="Courier Address *">
-                                        {(field) => <Textarea rows={2} {...field} placeholder="e.g., Bank Name or Address" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper
-                                        control={form.control}
-                                        name={`${BG_PREFIX}.bgCourierDays`}
-                                        label={
-                                            <span>
-                                                Courier Time{' '}
-                                                <span className="text-muted-foreground font-normal text-xs">
-                                                    (Number of days required for the courier to deliver the BG)
-                                                </span>
-                                            </span>
-                                        }
-                                    >
-                                        {(field) => <NumberInput min={1} max={10} {...field} />}
-                                    </FieldWrapper>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgBankAccountName`} label="Customer Account Name">
+                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgBankAccountName`} label="Customer Account Name *">
                                         {(field) => <Input {...field} placeholder="e.g., Individual or Company Name" />}
                                     </FieldWrapper>
-                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgBankAccountNo`} label="Customer Account Number">
+                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgBankAccountNo`} label="Customer Account Number *">
                                         {(field) => <Input {...field} placeholder="e.g., 1234567890" />}
                                     </FieldWrapper>
-                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgBankIfsc`} label="Customer IFSC Code">
+                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgBankIfsc`} label="Customer IFSC Code *">
                                         {(field) => <Input {...field} placeholder="e.g., SBIN0001234" />}
                                     </FieldWrapper>
                                 </div>
@@ -342,6 +327,74 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
                                     {renderEmailField('user', 'User Dept. Email')}
                                     {renderEmailField('cp', 'C&P Dept. Email')}
                                     {renderEmailField('finance', 'Finance Dept. Email')}
+                                </div>
+
+                                <div className="space-y-3">
+                                    <div className="flex items-center gap-2 pt-2 border-t">
+                                        <Truck className="h-4 w-4 text-primary" />
+                                        <h5 className="font-medium text-sm">Courier Dispatch</h5>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgCourierOrg`} label="Organization Name *">
+                                            {(field) => <Input {...field} placeholder="Enter organization name" />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgCourierName`} label="Recipient Name *">
+                                            {(field) => <Input {...field} placeholder="Enter recipient name" />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgCourierPhone`} label="Phone *">
+                                            {(field) => <Input {...field} placeholder="Enter phone number" maxLength={10} />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgCourierAddrLine1`} label="Address Line 1 *">
+                                            {(field) => <Input {...field} placeholder="Building, Street" />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgCourierAddrLine2`} label="Address Line 2 *">
+                                            {(field) => <Input {...field} placeholder="Area, Locality" />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgCourierCity`} label="City *">
+                                            {(field) => <Input {...field} placeholder="Enter city" />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgCourierState`} label="State *">
+                                            {(field) => <Input {...field} placeholder="Enter state" />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgCourierPincode`} label="Pin Code *">
+                                            {(field) => <Input {...field} placeholder="Enter 6-digit pin code" maxLength={6} />}
+                                        </FieldWrapper>
+                                        <SelectField
+                                            control={form.control}
+                                            name={`${BG_PREFIX}.bgCourierEmpFrom`}
+                                            label="Courier From *"
+                                            options={employees.map((employee: { id: number | string; name: string }) => ({
+                                                value: String(employee.id),
+                                                label: employee.name,
+                                            }))}
+                                            placeholder="Select Employee"
+                                            valueType="string"
+                                        />
+                                        <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgCourierDelDate`} label="Delivery Date *">
+                                            {(field) => <DateInput value={field.value || null} onChange={field.onChange} />}
+                                        </FieldWrapper>
+                                        <SelectField
+                                            control={form.control}
+                                            name={`${BG_PREFIX}.bgCourierUrgency`}
+                                            label="Dispatch Urgency *"
+                                            options={[
+                                                { value: '1', label: 'Same Day (Urgent)' },
+                                                { value: '2', label: 'Next Day' },
+                                            ]}
+                                            placeholder="Select Urgency"
+                                            valueType="string"
+                                        />
+                                    </div>
+
+                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgCourierDocs`} label="Soft Copy of the documents">
+                                        {(field) => (
+                                            <FileUploader
+                                                context="courier"
+                                                value={field.value ?? []}
+                                                onChange={field.onChange}
+                                            />
+                                        )}
+                                    </FieldWrapper>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
