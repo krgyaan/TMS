@@ -5,7 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useFormContext, useWatch } from 'react-hook-form';
-import { useMemo, useState } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { BG_PURPOSE_OPTIONS, BG_NEEDED_IN_OPTIONS, BANKS } from '../constants';
 import DateInput from '@/components/form/DateInput';
@@ -25,6 +25,8 @@ type EmailFieldKey = 'user' | 'cp' | 'finance';
 
 const ADD_CONTACT_OPTION = '__add_contact__';
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// EMD BG requests always use this bank; the field is pre-selected and read-only.
+const DEFAULT_BG_BANK = 'AU_8316';
 const EMPTY_CONTACT_DRAFT = { name: '', designation: '', email: '', phone: '' };
 type ContactDraft = typeof EMPTY_CONTACT_DRAFT;
 
@@ -34,6 +36,14 @@ export function BankGuaranteeForm({ amount, prefix = 'emd.details', readOnly = f
     const { data: tenderContacts } = useTenderContacts(tenderId);
     const addTenderClient = useAddTenderClient();
     const bgFormatFiles = useWatch({ control, name: `${prefix}.bgFormatFiles` });
+    const bgBank = useWatch({ control, name: `${prefix}.bgBank` });
+
+    // The bank is fixed for EMD BG requests: pre-select it and keep it read-only.
+    useEffect(() => {
+        if (!bgBank) {
+            setValue(`${prefix}.bgBank`, DEFAULT_BG_BANK, { shouldValidate: false });
+        }
+    }, [bgBank, setValue, prefix]);
 
     // "Add contact person" saves into tender_clients for this tender.
     const [addingFor, setAddingFor] = useState<EmailFieldKey | null>(null);
@@ -292,7 +302,7 @@ export function BankGuaranteeForm({ amount, prefix = 'emd.details', readOnly = f
                 <FieldWrapper control={control} name={`${prefix}.bgStampValue`} label="Stamp Paper Value">
                     {(field) => <NumberInput min={0} {...field} />}
                 </FieldWrapper>
-                <SelectField control={control} name={`${prefix}.bgBank`} label="Bank *" options={BANKS} placeholder="Select Bank" />
+                <SelectField control={control} name={`${prefix}.bgBank`} label="Bank *" options={BANKS} placeholder="Select Bank" disabled />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
