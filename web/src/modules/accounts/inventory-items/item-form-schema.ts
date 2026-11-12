@@ -2,7 +2,6 @@ import { z } from "zod";
 import { ITEM_GROUPS, UNIT_OPTIONS } from "./item-config.ts";
 
 export const buildInventoryItemFormSchema = () => z.object({
-    teamId: z.string().min(1, "Team is required"),
     itemGroup: z.enum(ITEM_GROUPS).or(z.literal("")).optional(),
     itemName: z.string().min(1, "Item name is required"),
     itemType: z.string().optional(),
