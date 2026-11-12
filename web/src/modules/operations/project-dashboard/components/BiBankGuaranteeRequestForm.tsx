@@ -459,7 +459,7 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
                                             placeholder="Select Employee"
                                             valueType="string"
                                         />
-                                        <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgCourierDelDate`} label="Delivery Date *">
+                                        <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgCourierDelDate`} label="Expected Delivery Date *">
                                             {(field) => <DateInput value={field.value || null} onChange={field.onChange} />}
                                         </FieldWrapper>
                                         <SelectField
@@ -474,16 +474,6 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
                                             valueType="string"
                                         />
                                     </div>
-
-                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgCourierDocs`} label="Soft Copy of the documents">
-                                        {(field) => (
-                                            <FileUploader
-                                                context="courier"
-                                                value={field.value ?? []}
-                                                onChange={field.onChange}
-                                            />
-                                        )}
-                                    </FieldWrapper>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

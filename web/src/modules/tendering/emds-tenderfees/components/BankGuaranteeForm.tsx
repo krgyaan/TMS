@@ -34,8 +34,6 @@ export function BankGuaranteeForm({ amount, prefix = 'emd.details', readOnly = f
     const { data: tenderContacts } = useTenderContacts(tenderId);
     const addTenderClient = useAddTenderClient();
     const bgFormatFiles = useWatch({ control, name: `${prefix}.bgFormatFiles` });
-    const bgPoFiles = useWatch({ control, name: `${prefix}.bgPoFiles` });
-    const bgCourierDocs = useWatch({ control, name: `${prefix}.bgCourierDocs` });
 
     // "Add contact person" saves into tender_clients for this tender.
     const [addingFor, setAddingFor] = useState<EmailFieldKey | null>(null);
@@ -355,7 +353,7 @@ export function BankGuaranteeForm({ amount, prefix = 'emd.details', readOnly = f
                         placeholder="Select Employee"
                         valueType="string"
                     />
-                    <FieldWrapper control={control} name={`${prefix}.bgCourierDelDate`} label="Delivery Date *">
+                    <FieldWrapper control={control} name={`${prefix}.bgCourierDelDate`} label="Expected Delivery Date *">
                         {(field) => <DateInput value={field.value || null} onChange={field.onChange} />}
                     </FieldWrapper>
                     <SelectField
@@ -370,27 +368,14 @@ export function BankGuaranteeForm({ amount, prefix = 'emd.details', readOnly = f
                         valueType="string"
                     />
                 </div>
-
-                <FileUploader
-                    context="courier"
-                    label="Soft Copy of the documents"
-                    value={bgCourierDocs ?? []}
-                    onChange={(paths) => setValue(`${prefix}.bgCourierDocs`, paths)}
-                />
             </div>
 
-            <div className="grid grid-cols-3 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FileUploader
                     context="bg-format-files"
                     label="BG Format (Max 5 files)"
                     value={bgFormatFiles}
                     onChange={(paths) => setValue(`${prefix}.bgFormatFiles`, paths)}
-                />
-                <FileUploader
-                    context="bg-po-files"
-                    label="PO/Tender/Request Letter"
-                    value={bgPoFiles}
-                    onChange={(paths) => setValue(`${prefix}.bgPoFiles`, paths)}
                 />
             </div>
         </div>
