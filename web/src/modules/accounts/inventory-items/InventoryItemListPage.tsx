@@ -35,22 +35,12 @@ export default function InventoryItemListPage({ team: scope }: { team: ItemMaste
     const navigate = useNavigate();
     const { canCreate, canUpdate, canDelete } = useAuth();
     const [gridWidth, setGridWidth] = useState(0);
-    const gridContainerRef = useRef<HTMLDivElement>(null);
+    const layoutContainerRef = useRef<HTMLDivElement>(null);
     const visibility = itemMasterColumnsForViewport(gridWidth, isSettings);
     const [searchInput, setSearchInput] = useState("");
     const [search, setSearch] = useState("");
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 });
     const [selectedRows, setSelectedRows] = useState<InventoryItem[]>([]);
-    useEffect(() => {
-        const container = gridContainerRef.current;
-        if (!container) return;
-        const observer = new ResizeObserver(entries => {
-            const width = Math.floor(entries[0]?.contentRect.width || 0);
-            setGridWidth(current => current === width ? current : width);
-        });
-        observer.observe(container);
-        return () => observer.disconnect();
-    }, []);
     useEffect(() => {
         const timer = window.setTimeout(() => setSearch(searchInput.trim()), 300);
         return () => window.clearTimeout(timer);
@@ -62,6 +52,17 @@ export default function InventoryItemListPage({ team: scope }: { team: ItemMaste
     const { data, isLoading, isFetching, error, refetch } = useInventoryItems(scope, queryFilters);
     const deleteItem = useDeleteInventoryItem();
     const updateItem = useUpdateInventoryItem();
+
+    useEffect(() => {
+        const container = layoutContainerRef.current;
+        if (!container || isLoading) return;
+        const observer = new ResizeObserver(entries => {
+            const width = Math.floor(entries[0]?.contentRect.width || 0);
+            setGridWidth(current => current === width ? current : width);
+        });
+        observer.observe(container);
+        return () => observer.disconnect();
+    }, [isLoading]);
 
     const actions = useMemo<ActionItem<InventoryItem>[]>(() => isSettings ? [
         { label: "Edit", visible: () => canUpdate(permissionModule), onClick: row => navigate(paths.master.itemMasterEdit(row.id)) },
@@ -125,15 +126,17 @@ export default function InventoryItemListPage({ team: scope }: { team: ItemMaste
                 {canUpdate(permissionModule) && <><Button variant="outline" size="sm" className="min-h-11" onClick={() => void setBulkStatus(true)}>Activate</Button><Button variant="outline" size="sm" className="min-h-11" onClick={() => void setBulkStatus(false)}>Deactivate</Button></>}
                 {canDelete(permissionModule) && <Button variant="outline" size="sm" className="min-h-11 text-red-600" onClick={() => void deleteSelected()}>Delete</Button>}
             </div>}
+            <div ref={layoutContainerRef} className="w-full min-w-0">
             {visibility.mobile ? <div className="space-y-3">
                 {(data?.data || []).map(item => <article key={item.id} className="space-y-3 rounded-md border p-3">
                     <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm"><div><span className="text-muted-foreground">Item Code</span><div className="break-words">{item.itemCode}</div></div><div><span className="text-muted-foreground">Item Name</span><div className="break-words font-medium">{item.itemName}</div></div><div><span className="text-muted-foreground">HSN Code</span><div>{item.hsnCode || "—"}</div></div><div><span className="text-muted-foreground">Unit</span><div>{item.unit || "—"}</div></div><div><span className="text-muted-foreground">Status</span><div>{item.isActive ? "Active" : "Inactive"}</div></div></div>
                     {isSettings && (canUpdate(permissionModule) || canDelete(permissionModule)) && <input type="checkbox" aria-label={`Select ${item.itemName}`} checked={selectedRows.some(row => row.id === item.id)} onChange={event => setSelectedRows(current => event.target.checked ? [...current.filter(row => row.id !== item.id), item] : current.filter(row => row.id !== item.id))} />}
                     <div className="flex justify-end">{actions.filter(action => action.visible?.(item) ?? true).map(action => <Button key={action.label} className={action.className} size="sm" variant="ghost" onClick={() => void action.onClick(item)}>{action.label}</Button>)}</div>
                 </article>)}
-            </div> : <div ref={gridContainerRef} className="w-full min-w-0 overflow-hidden">
+            </div> : <div className="w-full min-w-0 overflow-hidden">
                 <DataTable data={data?.data || []} columnDefs={columns} gridOptions={{ rowHeight: 52, headerHeight: 40, selectionColumnDef: { width: 48, minWidth: 48, maxWidth: 48, pinned: "left" }, defaultColDef: { filter: false, sortable: true, resizable: true, cellStyle: { paddingLeft: "4px", paddingRight: "4px", display: "flex", alignItems: "center" } }, tooltipShowDelay: 350 }} loading={isFetching} manualPagination rowCount={data?.meta.total || 0} paginationState={pagination} onPaginationChange={updatePagination} onPageSizeChange={pageSize => setPagination({ pageIndex: 0, pageSize })} enableRowSelection={isSettings && (canUpdate(permissionModule) || canDelete(permissionModule))} selectionType="multiple" onSelectionChanged={isSettings ? setSelectedRows : undefined} />
             </div>}
+            </div>
             {visibility.mobile && <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm">
                 <span>{data?.meta.total ? `${pagination.pageIndex * pagination.pageSize + 1}–${Math.min((pagination.pageIndex + 1) * pagination.pageSize, data.meta.total)} of ${data.meta.total}` : "0 items"}</span>
                 <div className="flex items-center gap-2"><select aria-label="Items per page" className="h-9 rounded-md border bg-background px-2" value={pagination.pageSize} onChange={event => setPagination({ pageIndex: 0, pageSize: Number(event.target.value) })}><option value={10}>10</option><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select><Button size="sm" variant="outline" disabled={pagination.pageIndex === 0} onClick={() => setPagination(current => ({ ...current, pageIndex: current.pageIndex - 1 }))}>Previous</Button><Button size="sm" variant="outline" disabled={pagination.pageIndex + 1 >= (data?.meta.totalPages || 0)} onClick={() => setPagination(current => ({ ...current, pageIndex: current.pageIndex + 1 }))}>Next</Button></div>

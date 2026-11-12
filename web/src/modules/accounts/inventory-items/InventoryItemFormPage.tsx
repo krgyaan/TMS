@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { cloneElement, isValidElement, useEffect, useId, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
@@ -20,6 +20,7 @@ const formControlClass = "h-11 w-full rounded-md border border-slate-400 bg-back
 const sectionClass = "space-y-4 rounded-lg border bg-card p-4 sm:p-5";
 const formatPreview = (value: number) => value.toLocaleString("en-IN", { maximumFractionDigits: 6 });
 const normalizeFactorText = (value: string) => value.includes(".") ? value.replace(/0+$/, "").replace(/\.$/, "") : value;
+const storedScaleFactor = (value: string | number | null | undefined) => Number(value || 0).toFixed(10);
 
 export default function InventoryItemFormPage() {
     const { id: rawId } = useParams<{ id: string }>();
@@ -38,6 +39,7 @@ export default function InventoryItemFormPage() {
     const historyGuardAdded = useRef(false);
     const formUrl = useRef(window.location.href);
     const lastWidth = useRef("");
+    const previousConversionMode = useRef<"fixed" | "width" | "manual" | undefined>(undefined);
     const initializedForm = useRef("");
     const [unitChangedNotice, setUnitChangedNotice] = useState(false);
     const unit = useWatch({ control: form.control, name: "unit" });
@@ -82,7 +84,10 @@ export default function InventoryItemFormPage() {
         if (conversionUnit && conversionOptionsQuery.isLoading) return;
         if (selectedConversion?.factorMode === "width" && selectedConversion.factor !== null) {
             form.setValue("conversionFactor", String(selectedConversion.factor), { shouldDirty: true, shouldValidate: true });
+        } else if (previousConversionMode.current === "width" && selectedConversion?.factorMode === "manual") {
+            form.setValue("conversionFactor", "", { shouldDirty: true, shouldValidate: true });
         }
+        previousConversionMode.current = selectedConversion?.factorMode;
         lastWidth.current = width;
     }, [width, conversionUnit, selectedConversion, conversionOptionsQuery.isLoading, form]);
 
@@ -108,6 +113,25 @@ export default function InventoryItemFormPage() {
         };
         window.addEventListener("popstate", handlePopState, true);
         return () => window.removeEventListener("popstate", handlePopState, true);
+    }, [isDirty]);
+
+    useEffect(() => {
+        const handleInternalLink = (event: MouseEvent) => {
+            if (!isDirty || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            if (!(event.target instanceof Element)) return;
+            const link = event.target.closest<HTMLAnchorElement>("a[href]");
+            if (!link || link.target === "_blank" || link.hasAttribute("download")) return;
+            const destination = new URL(link.href, window.location.href);
+            if (destination.origin !== window.location.origin || destination.href === window.location.href) return;
+            if (!window.confirm("Discard unsaved item changes?")) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+            } else {
+                allowNavigation.current = true;
+            }
+        };
+        document.addEventListener("click", handleInternalLink, true);
+        return () => document.removeEventListener("click", handleInternalLink, true);
     }, [isDirty]);
 
     useEffect(() => {
@@ -188,7 +212,7 @@ export default function InventoryItemFormPage() {
 
     const errors = form.formState.errors;
     const errorMessage = errors.root?.server?.message;
-    const storedWidthMismatch = Boolean(item && item.conversionUnit === conversionUnit && unit === item.unit && item.specifications?.width === width && selectedConversion?.factorMode === "width" && Number(item.conversionFactor) !== Number(selectedConversion.factor));
+    const storedWidthMismatch = Boolean(item && item.conversionUnit === conversionUnit && unit === item.unit && item.specifications?.width === width && selectedConversion?.factorMode === "width" && storedScaleFactor(item.conversionFactor) !== storedScaleFactor(selectedConversion.factor));
     const storedFixedMismatch = Boolean(item && item.conversionUnit === conversionUnit && selectedConversion?.factorMode === "fixed" && Number(item.conversionFactor) !== Number(selectedConversion.factor));
     const storedPairInvalid = Boolean(item?.conversionUnit && conversionUnit === item.conversionUnit && unit === item.unit && !conversionOptions.some(option => option.to === conversionUnit) && !conversionOptionsQuery.isLoading);
     const factorNumber = Number(conversionFactor);
@@ -295,9 +319,11 @@ export default function InventoryItemFormPage() {
 }
 
 function FormField({ label, required, helper, error, children }: { label: string; required?: boolean; helper: string; error?: string; children: ReactNode }) {
+    const id = useId();
+    const control = isValidElement(children) ? cloneElement(children as ReactElement<{ id?: string }>, { id }) : children;
     return <div className="min-w-0 space-y-1.5">
-        <Label className="text-sm font-medium">{label}{required && <span className="ml-1 text-destructive" aria-hidden="true">*</span>}</Label>
-        {children}
+        <Label htmlFor={id} className="text-sm font-medium">{label}{required && <span className="ml-1 text-destructive" aria-hidden="true">*</span>}</Label>
+        {control}
         {error ? <p className="text-sm text-red-600 dark:text-red-400" role="alert">{error}</p> : null}
         <p className="text-xs text-muted-foreground">{helper}</p>
     </div>;

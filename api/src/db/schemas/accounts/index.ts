@@ -1,6 +1,6 @@
 // Loan Parties
 export * from "./loan-parties.schema";
-export * from "./inventory-items.schema";
+export * from "./inventoryItems.schema";
 export * from "./loan-parties.relations";
 
 // Imprest Categories

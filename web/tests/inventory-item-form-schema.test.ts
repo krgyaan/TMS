@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildInventoryItemFormSchema } from "../src/modules/accounts/inventory-items/item-form-schema.ts";
-import { ITEM_CATEGORIES, UNIT_OPTIONS } from "../src/modules/accounts/inventory-items/item-config.ts";
+import { getCategory, ITEM_CATEGORIES, UNIT_OPTIONS } from "../src/modules/accounts/inventory-items/item-config.ts";
 
 test("form schema parses every item family and every available Type option", () => {
     let cases = 0;
@@ -60,4 +60,13 @@ test("conversion fields must be complete with a positive factor", () => {
     assert.equal(schema.safeParse({ ...base, conversionUnit: "Mtr", conversionFactor: "1.1234567" }).success, true);
     assert.equal(schema.safeParse({ ...base, conversionUnit: "Mtr", conversionFactor: "0" }).success, false);
     assert.equal(schema.safeParse({ ...base, conversionUnit: "", conversionFactor: "1" }).success, false);
+});
+
+test("form limits match the API and legacy AC Stand resolves to Equipment Stand fields", () => {
+    const schema = buildInventoryItemFormSchema();
+    const base = { itemName: "Copper", itemType: "Pipe", specifications: {}, description: "", unit: "Kg" as const, conversionUnit: "", conversionFactor: "", hsnCode: "", isActive: true };
+    assert.equal(schema.safeParse({ ...base, itemType: "x".repeat(81) }).success, false);
+    assert.equal(schema.safeParse({ ...base, hsnCode: "x".repeat(31) }).success, false);
+    assert.equal(schema.safeParse({ ...base, specifications: { note: "x".repeat(201) } }).success, false);
+    assert.equal(getCategory("AC Stand")?.name, "Equipment Stand");
 });
