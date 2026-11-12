@@ -13,7 +13,7 @@ import { useCreateInventoryItem, useInventoryItem, useItemConversionOptions, use
 import { handleQueryError } from "@/lib/react-query";
 import { paths } from "@/app/routes/paths";
 import type { InventoryItemPayload } from "@/types/inventory-item.types";
-import { categoryOptions, getCategory, groupOptions, UNIT_OPTIONS, type Unit } from "./item-config";
+import { categoryOptions, getCategory, UNIT_OPTIONS, type Unit } from "./item-config";
 import { inventoryItemFormSchema, type InventoryItemFormValues } from "./item-form-schema";
 
 const formControlClass = "h-11 w-full rounded-md border border-slate-400 bg-background px-3 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:border-slate-600 md:h-10";
@@ -28,7 +28,7 @@ export default function InventoryItemFormPage() {
     const navigate = useNavigate();
     const form = useForm<InventoryItemFormValues>({
         resolver: zodResolver(inventoryItemFormSchema) as never,
-        defaultValues: { itemGroup: "", itemName: "", itemType: "", specifications: {}, description: "", unit: "Nos.", conversionUnit: "", conversionFactor: "", hsnCode: "", isActive: true },
+        defaultValues: { itemName: "", itemType: "", specifications: {}, description: "", unit: "Nos.", conversionUnit: "", conversionFactor: "", hsnCode: "", isActive: true },
     });
     const { data: item, isLoading: itemLoading, error: itemError, refetch } = useInventoryItem("master", itemId);
     const createItem = useCreateInventoryItem();
@@ -56,7 +56,7 @@ export default function InventoryItemFormPage() {
         if (isEdit) {
             if (!item || initializedForm.current === `edit-${itemId}`) return;
             form.reset({
-                itemGroup: item.itemGroup || "", itemName: item.itemName, itemType: item.itemType || "",
+                itemName: item.itemName, itemType: item.itemType || "",
                 specifications: item.specifications || {}, description: item.description || "",
                 unit: item.unit as Unit, conversionUnit: item.conversionUnit || "",
                 conversionFactor: item.conversionFactor || "", hsnCode: item.hsnCode || "", isActive: item.isActive,
@@ -67,7 +67,7 @@ export default function InventoryItemFormPage() {
             setUnitChangedNotice(false);
         } else if (initializedForm.current !== "new") {
             form.reset({
-                itemGroup: "", itemName: "", itemType: "", specifications: {}, description: "", unit: "Nos.",
+                itemName: "", itemType: "", specifications: {}, description: "", unit: "Nos.",
                 conversionUnit: "", conversionFactor: "", hsnCode: "", isActive: true,
             });
             lastWidth.current = "";
@@ -157,7 +157,7 @@ export default function InventoryItemFormPage() {
                 return;
             }
             const payload: InventoryItemPayload = {
-                itemGroup: values.itemGroup || null, itemName: values.itemName, itemType: values.itemType.trim() || null,
+                itemName: values.itemName, itemType: values.itemType.trim() || null,
                 specifications: values.specifications, description: values.description.trim() || null,
                 unit: values.unit, conversionUnit: values.conversionUnit || null,
                 conversionFactor: values.conversionUnit ? values.conversionFactor : null,
@@ -211,9 +211,6 @@ export default function InventoryItemFormPage() {
             <section className={sectionClass}>
                 <div><h2 className="font-semibold">Item details</h2><p className="text-sm text-muted-foreground">Choose the item family.</p></div>
                 <div className="grid gap-4 md:grid-cols-2">
-                    <FormField label="Item group" helper="Optional classification used by the item list filter." error={errors.itemGroup?.message}>
-                        <select className={formControlClass} aria-invalid={Boolean(errors.itemGroup)} {...form.register("itemGroup")}><option value="">No group</option>{groupOptions.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</select>
-                    </FormField>
                     <FormField label="Item name" required helper="Select the item family." error={errors.itemName?.message}>
                         <select className={formControlClass} aria-invalid={Boolean(errors.itemName)} {...form.register("itemName", { onChange: event => {
                             if (event.target.value !== itemName) {
@@ -224,8 +221,8 @@ export default function InventoryItemFormPage() {
                     </FormField>
                     {category?.types ? <FormField label="Type" helper="Select a type for this item." error={errors.itemType?.message}>
                         <select className={formControlClass} aria-invalid={Boolean(errors.itemType)} {...form.register("itemType")}><option value="">Select type</option>{category.types.map(type => <option key={type} value={type}>{type}</option>)}</select>
-                    </FormField> : <FormField label="Type" helper="Enter the item type if one applies." error={errors.itemType?.message}><Input className={formControlClass} aria-invalid={Boolean(errors.itemType)} {...form.register("itemType")} /></FormField>}
-                    <FormField label="HSN code" helper="Optional tax classification code." error={errors.hsnCode?.message}><Input className={formControlClass} aria-invalid={Boolean(errors.hsnCode)} {...form.register("hsnCode")} /></FormField>
+                    </FormField> : <FormField label="Type" helper="Enter the item type if one applies." error={errors.itemType?.message}><Input maxLength={80} className={formControlClass} aria-invalid={Boolean(errors.itemType)} {...form.register("itemType")} /></FormField>}
+                    <FormField label="HSN code" helper="Optional tax classification code." error={errors.hsnCode?.message}><Input maxLength={30} className={formControlClass} aria-invalid={Boolean(errors.hsnCode)} {...form.register("hsnCode")} /></FormField>
                 </div>
             </section>
 
@@ -238,7 +235,7 @@ export default function InventoryItemFormPage() {
                         return <FormField key={field.key} label={field.label} helper={`Optional ${field.label.toLowerCase()} value.`} error={error}>
                             {field.options
                                 ? <select className={formControlClass} aria-invalid={Boolean(error)} {...form.register(name)}><option value="">Select {field.label}</option>{field.options.map(option => <option key={option} value={option}>{option}</option>)}</select>
-                                : <Input className={formControlClass} aria-invalid={Boolean(error)} {...form.register(name)} />}
+                                : <Input maxLength={200} className={formControlClass} aria-invalid={Boolean(error)} {...form.register(name)} />}
                         </FormField>;
                     })}
                 </div> : <p className="text-sm text-muted-foreground">Choose an item family to see its specification fields.</p>}
