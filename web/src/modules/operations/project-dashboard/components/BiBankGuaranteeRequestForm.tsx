@@ -206,7 +206,6 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
     }, [projectName, poNo, form]);
 
     const bgFormatFiles = useWatch({ control: form.control, name: `${BG_PREFIX}.bgFormatFiles` });
-    const bgPoFiles = useWatch({ control: form.control, name: `${BG_PREFIX}.bgPoFiles` });
 
     const handleSubmit = async (values: FormValues) => {
         const payload: any = {
@@ -345,18 +344,12 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
                                     {renderEmailField('finance', 'Finance Dept. Email')}
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FileUploader
                                         context="bg-format-files"
                                         label="BG Format (Max 5 files)"
                                         value={bgFormatFiles}
                                         onChange={(paths) => form.setValue(`${BG_PREFIX}.bgFormatFiles`, paths)}
-                                    />
-                                    <FileUploader
-                                        context="bg-po-files"
-                                        label="PO/Tender/Request Letter"
-                                        value={bgPoFiles}
-                                        onChange={(paths) => form.setValue(`${BG_PREFIX}.bgPoFiles`, paths)}
                                     />
                                 </div>
                             </div>
