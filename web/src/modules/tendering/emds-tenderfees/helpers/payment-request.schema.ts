@@ -319,7 +319,7 @@ const BG_COURIER_REQUIRED_FIELDS = [
     ['bgCourierState', 'State'],
     ['bgCourierPincode', 'Pin Code'],
     ['bgCourierEmpFrom', 'Courier From'],
-    ['bgCourierDelDate', 'Delivery Date'],
+    ['bgCourierDelDate', 'Expected Delivery Date'],
     ['bgCourierUrgency', 'Dispatch Urgency'],
 ] as const;
 
