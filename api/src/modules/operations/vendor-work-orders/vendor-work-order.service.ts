@@ -7,7 +7,6 @@ import { rename, readFile } from "node:fs/promises";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { PdfGeneratorService } from "@/modules/pdf/pdf-generator.service";
-import { ClientDirectorySyncService } from "@/modules/shared/client-directory/client-directory-sync.service";
 import { InsurancePolicyService } from "@/modules/insurance/insurance-policy.service";
 import { CashFlowService } from "@/modules/operations/cash-flows/cash-flow.service";
 
@@ -37,7 +36,6 @@ export class VendorWorkOrderService {
         @Inject(DRIZZLE) private readonly db: DbInstance,
         @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
         private readonly pdfGenerator: PdfGeneratorService,
-        private readonly clientDirectorySyncService: ClientDirectorySyncService,
         private readonly insuranceService: InsurancePolicyService,
         private readonly notifications: OperationNotificationService,
         private readonly cashFlowService: CashFlowService
@@ -100,6 +98,8 @@ export class VendorWorkOrderService {
 
                     sellerName: normalizeVendorName(body.sellerName),
                     sellerOrganizationId: body.sellerOrganizationId || null,
+                    sellerGstId: body.sellerGstId || null,
+                    vendorPersonId: body.vendorPersonId || null,
                     sellerAddress: body.sellerAddress,
                     sellerEmail: body.sellerEmail,
                     sellerGstNo: body.sellerGstNo,
@@ -113,6 +113,7 @@ export class VendorWorkOrderService {
                     vendorContactPersonPhone: body.vendorContactPersonPhone,
                     vendorContactPersonEmail: body.vendorContactPersonEmail,
 
+                    shipToPartyId: body.shipToPartyId || null,
                     shipToName: body.shipToName,
                     shippingAddress: body.shippingAddress,
                     shipToGst: body.shipToGst,
@@ -226,6 +227,8 @@ export class VendorWorkOrderService {
                     woDate: body.woDate,
                     sellerName: normalizeVendorName(body.sellerName),
                     sellerOrganizationId: body.sellerOrganizationId || null,
+                    sellerGstId: body.sellerGstId || null,
+                    vendorPersonId: body.vendorPersonId || null,
                     sellerAddress: body.sellerAddress,
                     sellerEmail: body.sellerEmail,
                     sellerGstNo: body.sellerGstNo,
@@ -238,6 +241,7 @@ export class VendorWorkOrderService {
                     vendorContactPersonName: body.vendorContactPersonName,
                     vendorContactPersonPhone: body.vendorContactPersonPhone,
                     vendorContactPersonEmail: body.vendorContactPersonEmail,
+                    shipToPartyId: body.shipToPartyId || null,
                     shipToName: body.shipToName,
                     shippingAddress: body.shippingAddress,
                     shipToGst: body.shipToGst,
@@ -265,23 +269,6 @@ export class VendorWorkOrderService {
                 .where(eq(vendorWorkOrders.id, id))
                 .returning()
         )[0];
-
-        await this.clientDirectorySyncService.syncToClientDirectory(
-            [
-                {
-                    name: body.contactPersonName,
-                    email: body.contactPersonEmail,
-                    phone: body.contactPersonPhone,
-                    org: normalizeVendorName(body.sellerName),
-                },
-                {
-                    name: normalizeVendorName(body.sellerName),
-                    email: body.sellerEmail,
-                    phone: null,
-                    org: null,
-                },
-            ].filter(c => c.name)
-        );
 
         await this.syncParty(body);
 
@@ -1617,19 +1604,34 @@ export class VendorWorkOrderService {
         }
 
         if (body.shipToName) {
-            const shipExisting = await this.db
-                .select()
-                .from(projectParties)
-                .where(eq(projectParties.name, body.shipToName))
-                .then(rows => rows[0]);
+            // Prefer the selected id so an edited ship-to name updates the same
+            // party instead of inserting a duplicate. Fall back to a name match
+            // for older documents that have no id stored yet.
+            const shipToPartyId = Number(body.shipToPartyId) || null;
+            let shipExisting = shipToPartyId
+                ? await this.db
+                      .select()
+                      .from(projectParties)
+                      .where(eq(projectParties.id, shipToPartyId))
+                      .then(rows => rows[0])
+                : null;
+
+            if (!shipExisting) {
+                shipExisting = await this.db
+                    .select()
+                    .from(projectParties)
+                    .where(eq(projectParties.name, body.shipToName))
+                    .then(rows => rows[0]);
+            }
 
             if (shipExisting) {
                 await this.db
                     .update(projectParties)
                     .set({
-                        address: body.shippingAddress || shipExisting.address,
-                        gstNo: body.shipToGst || shipExisting.gstNo,
-                        pan: body.shipToPan || shipExisting.pan,
+                        name: body.shipToName,
+                        address: body.shippingAddress || null,
+                        gstNo: body.shipToGst || null,
+                        pan: body.shipToPan || null,
                     })
                     .where(eq(projectParties.id, shipExisting.id));
             } else {

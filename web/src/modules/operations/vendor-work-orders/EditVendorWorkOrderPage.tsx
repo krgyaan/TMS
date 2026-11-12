@@ -28,7 +28,7 @@ import { DEFAULT_VWO_TERMS_ROWS } from "./helpers/vwoForm.constants";
 import { VWOFormPreview } from "./components/VWOFormPreview";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Building2, Calendar, Eye, FileText, Hash, Mail, MapPin, Phone, UserCheck, UserPlus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -111,7 +111,7 @@ function mapVwoDataToFormValues(data: any): VendorWorkOrderFormValues {
             woDate: formatDateForInput(data.woDate) || formatDateForInput(new Date()),
             category: data.category || "",
             sellerId: data.sellerOrganizationId ? String(data.sellerOrganizationId) : "",
-            sellerGstId: "",
+            sellerGstId: data.sellerGstId ? String(data.sellerGstId) : "",
             sellerName: data.sellerName || "",
             sellerEmail: data.sellerEmail || "",
             sellerAddress: data.sellerAddress || "",
@@ -122,7 +122,7 @@ function mapVwoDataToFormValues(data: any): VendorWorkOrderFormValues {
             contactPersonName: data.contactPersonName || "",
             contactPersonPhone: data.contactPersonPhone || "",
             contactPersonEmail: data.contactPersonEmail || "",
-            vendorPersonId: "",
+            vendorPersonId: data.vendorPersonId ? String(data.vendorPersonId) : "",
             vendorContactPersonName: data.vendorContactPersonName || "",
             vendorContactPersonPhone: data.vendorContactPersonPhone || "",
             vendorContactPersonEmail: data.vendorContactPersonEmail || "",
@@ -176,17 +176,11 @@ export default function EditVendorWorkOrderPage() {
         defaultValues: defaultFormValues,
     });
 
-    useEffect(() => {
-        if (vwoData) {
-            try {
-                const formValues = mapVwoDataToFormValues(vwoData);
-                form.reset(formValues);
-                setVwoNumber(vwoData.woNumber || "");
-            } catch (err) {
-                console.error("[VWO Edit] Failed to reset form with VWO data:", err);
-            }
-        }
-    }, [vwoData, form]);
+    // The document's saved seller/ship-to snapshot must win over master data on
+    // Edit. These refs record which selection the master values were applied
+    // for, so a refetch (or the hydration reset) cannot overwrite user edits.
+    const autoFilledSellerRef = useRef<string | null>(null);
+    const autoFilledPartyRef = useRef<string | null>(null);
 
     const selectedSellerId = form.watch("sellerId");
     const selectedSellerGstId = form.watch("sellerGstId");
@@ -202,8 +196,24 @@ export default function EditVendorWorkOrderPage() {
     const selectedUserId = form.watch("selectedUserId");
     const activeTeamMembers = useMemo(() => (teamMembers || []).filter((u: any) => u.isActive), [teamMembers]);
 
-    const { sellerPersons } = useSellerContactPerson(form, { autoSelectFirstOnLoad: false });
-    const { sellerGsts, isLoading: isSellerGstsLoading } = useSellerGstSelection(form);
+    const { sellerPersons, seedInitialSelection: seedVendorPerson } = useSellerContactPerson(form, { autoSelectFirstOnLoad: false });
+    const { sellerGsts, isLoading: isSellerGstsLoading, seedInitialSelection: seedSellerGst } = useSellerGstSelection(form);
+
+    useEffect(() => {
+        if (vwoData) {
+            try {
+                const formValues = mapVwoDataToFormValues(vwoData);
+                autoFilledSellerRef.current = vwoData.sellerOrganizationId ? String(vwoData.sellerOrganizationId) : null;
+                autoFilledPartyRef.current = vwoData.shipToPartyId ? String(vwoData.shipToPartyId) : null;
+                seedSellerGst(vwoData.sellerGstId);
+                seedVendorPerson(vwoData.vendorPersonId);
+                form.reset(formValues);
+                setVwoNumber(vwoData.woNumber || "");
+            } catch (err) {
+                console.error("[VWO Edit] Failed to reset form with VWO data:", err);
+            }
+        }
+    }, [vwoData, form, seedSellerGst, seedVendorPerson]);
 
     const sellerPersonOptions = useMemo(() => sellerPersons.map(p => ({ id: String(p.id), name: p.name || "Unnamed person" })), [sellerPersons]);
     const sellerGstOptions = useMemo(
@@ -218,8 +228,10 @@ export default function EditVendorWorkOrderPage() {
 
     useEffect(() => {
         if (!selectedSellerId || selectedSellerId === "__create_new__") return;
+        if (autoFilledSellerRef.current === selectedSellerId) return;
         const party = sellerRows.find(p => String(p.id) === selectedSellerId);
         if (!party) return;
+        autoFilledSellerRef.current = selectedSellerId;
         form.setValue("sellerName", formatVendorName(party.name || ""));
         form.setValue("sellerAddress", party.address || "");
         form.setValue("sellerPanNo", party.pan || "");
@@ -232,8 +244,10 @@ export default function EditVendorWorkOrderPage() {
 
     useEffect(() => {
         if (!selectedPartyId || selectedPartyId === "__create_new__") return;
+        if (autoFilledPartyRef.current === selectedPartyId) return;
         const party = shipToRows.find(p => String(p.id) === selectedPartyId);
         if (!party) return;
+        autoFilledPartyRef.current = selectedPartyId;
         form.setValue("shipToName", party.name || "");
         form.setValue("shippingAddress", party.address || "");
         form.setValue("shipToGst", party.gstNo || "");

@@ -29,7 +29,7 @@ import { DEFAULT_VWO_TERMS_ROWS } from "./helpers/vwoForm.constants";
 import { VWOFormPreview } from "./components/VWOFormPreview";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertCircle, ArrowLeft, Building2, Calendar, Eye, FileText, Hash, Mail, MapPin, Phone, ShieldCheck, UserCheck, UserPlus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -122,6 +122,11 @@ export default function CreateVendorWorkOrderPage() {
     const selectedSellerGstId = form.watch("sellerGstId");
     const selectedPartyId = form.watch("partyId");
 
+    // Only fill master values when the user changes the selection. A refetch of
+    // the picker rows must not replace details the user has edited.
+    const autoFilledSellerRef = useRef<string | null>(null);
+    const autoFilledPartyRef = useRef<string | null>(null);
+
     // Server-searched pickers. Each owns its query (debounced inside), and pins
     // the current id so the row behind it is always in the response no matter
     // what is typed - otherwise the auto-fill effect below loses its row.
@@ -148,8 +153,10 @@ export default function CreateVendorWorkOrderPage() {
 
     useEffect(() => {
         if (!selectedSellerId || selectedSellerId === "__create_new__") return;
+        if (autoFilledSellerRef.current === selectedSellerId) return;
         const party = sellerRows.find(p => String(p.id) === selectedSellerId);
         if (!party) return;
+        autoFilledSellerRef.current = selectedSellerId;
         form.setValue("sellerName", formatVendorName(party.name || ""));
         form.setValue("sellerAddress", party.address || "");
         form.setValue("sellerPanNo", party.pan || "");
@@ -162,8 +169,10 @@ export default function CreateVendorWorkOrderPage() {
 
     useEffect(() => {
         if (!selectedPartyId || selectedPartyId === "__create_new__") return;
+        if (autoFilledPartyRef.current === selectedPartyId) return;
         const party = shipToRows.find(p => String(p.id) === selectedPartyId);
         if (!party) return;
+        autoFilledPartyRef.current = selectedPartyId;
         form.setValue("shipToName", party.name || "");
         form.setValue("shippingAddress", party.address || "");
         form.setValue("shipToGst", party.gstNo || "");
