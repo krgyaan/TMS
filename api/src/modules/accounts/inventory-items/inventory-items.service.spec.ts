@@ -62,14 +62,14 @@ describe("Item Master create and update conversion behavior", () => {
         const { service, inserted } = serviceForCrud();
         const data = itemSchema.parse({ itemName: "Copper", unit: "Kg", specifications: {} });
         await service.create(data);
-        expect(inserted()).toMatchObject({ teamId: null, itemName: "Copper" });
+        expect(inserted()).toMatchObject({ teamId: null, itemGroup: "", itemName: "Copper" });
     });
 
     it("accepts and ignores legacy teamId on create", async () => {
         const { service, inserted } = serviceForCrud();
-        const data = itemSchema.parse({ teamId: 5, itemName: "Copper", unit: "Kg", specifications: {} });
+        const data = itemSchema.parse({ teamId: 5, itemGroup: null, itemName: "Copper", unit: "Kg", specifications: {} });
         await service.create(data);
-        expect(inserted()).toMatchObject({ teamId: null });
+        expect(inserted()).toMatchObject({ teamId: null, itemGroup: "" });
     });
 
     it.each([null, 5])("updates an item whose existing teamId is %s without changing it", async teamId => {

@@ -49,10 +49,11 @@ export class InventoryItemsService {
     async create(data: ItemInput): Promise<InventoryItem> {
         const { teamId: _ignoredTeamId, ...itemData } = data;
         void _ignoredTeamId;
-        await this.ensureUnique(itemData, undefined);
-        const conversion = this.resolveItemConversion(itemData.unit, itemData.conversionUnit, itemData.conversionFactor, itemData.specifications || {});
+        const createData = { ...itemData, itemGroup: itemData.itemGroup ?? "" };
+        await this.ensureUnique(createData, undefined);
+        const conversion = this.resolveItemConversion(createData.unit, createData.conversionUnit, createData.conversionFactor, createData.specifications || {});
         const [item] = await this.db.insert(inventoryItems).values({
-            ...itemData, ...conversion,
+            ...createData, ...conversion,
             // The Drizzle schema still requires teamId; migration 0172 makes the database column nullable.
             teamId: null as unknown as number,
             itemCode: await this.nextItemCode(),
@@ -65,7 +66,8 @@ export class InventoryItemsService {
         const { teamId: _ignoredTeamId, ...itemData } = data;
         void _ignoredTeamId;
         const updatedValues = { ...current, ...itemData };
-        await this.ensureUnique(updatedValues, id);
+        const itemGroup = updatedValues.itemGroup ?? "";
+        await this.ensureUnique({ ...updatedValues, itemGroup }, id);
         const conversion = this.resolveItemConversion(
             updatedValues.unit,
             updatedValues.conversionUnit,
@@ -75,7 +77,7 @@ export class InventoryItemsService {
         const values = {
             itemName: updatedValues.itemName, itemType: updatedValues.itemType, description: updatedValues.description,
             specifications: updatedValues.specifications, unit: updatedValues.unit, hsnCode: updatedValues.hsnCode,
-            isActive: updatedValues.isActive, ...conversion, itemGroup: updatedValues.itemGroup, updatedAt: new Date(),
+            isActive: updatedValues.isActive, ...conversion, itemGroup, updatedAt: new Date(),
         };
         const [item] = await this.db.update(inventoryItems).set(values).where(eq(inventoryItems.id, id)).returning();
         return item;
@@ -118,7 +120,7 @@ export class InventoryItemsService {
         const candidates = await this.db.select({ id: inventoryItems.id }).from(inventoryItems).where(
             and(
                 isNull(inventoryItems.deletedAt),
-                data.itemGroup ? eq(inventoryItems.itemGroup, data.itemGroup) : isNull(inventoryItems.itemGroup),
+                data.itemGroup ? eq(inventoryItems.itemGroup, data.itemGroup) : or(isNull(inventoryItems.itemGroup), eq(inventoryItems.itemGroup, "")),
                 eq(inventoryItems.itemName, data.itemName),
                 data.itemType ? eq(inventoryItems.itemType, data.itemType) : sql`${inventoryItems.itemType} is null`,
             ),
