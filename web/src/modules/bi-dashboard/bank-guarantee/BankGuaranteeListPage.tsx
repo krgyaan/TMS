@@ -428,9 +428,9 @@ const BankGuaranteeListPage = () => {
                                     exporting={exporting}
                                     handleExport={handleExport}
                                 />
-                                <Button variant="outline" onClick={() => navigate(paths.tendering.oldEmdsForBG())}>
+                                <Button variant="outline" onClick={() => navigate(paths.bi.bankGuaranteeCreate())}>
                                     <Plus className="w-4 h-4" />
-                                    Add Old Entry
+                                    Add BG
                                 </Button>
                             </div>
                         </CardAction>

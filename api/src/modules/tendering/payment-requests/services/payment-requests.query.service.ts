@@ -1635,6 +1635,7 @@ export class PaymentRequestsQueryService {
     }
 
     private mapBgDetails(details: any, amount: string, instrument?: any) {
+        const addrJson = instrument?.courierAddressJson as Record<string, any> | null;
         return {
             bgNeededIn: details?.bgNeeds || '',
             bgAmount: amount,
@@ -1654,6 +1655,18 @@ export class PaymentRequestsQueryService {
             bgBankIfsc: details?.bgBankIfsc || '',
             bgCourierAddress: instrument?.courierAddress || '',
             bgCourierDays: instrument?.courierDeadline || null,
+            bgCourierOrg: addrJson?.org || '',
+            bgCourierName: addrJson?.name || '',
+            bgCourierPhone: addrJson?.phone || '',
+            bgCourierAddrLine1: addrJson?.line1 || instrument?.courierAddress || '',
+            bgCourierAddrLine2: addrJson?.line2 || '',
+            bgCourierCity: addrJson?.city || '',
+            bgCourierState: addrJson?.state || '',
+            bgCourierPincode: addrJson?.pincode || '',
+            bgCourierEmpFrom: addrJson?.empFrom ?? null,
+            bgCourierDelDate: addrJson?.delDate || null,
+            bgCourierUrgency: addrJson?.urgency ?? null,
+            bgCourierDocs: addrJson?.docs ?? [],
             bgBank: details?.bankName || instrument?.bankName || '',
         };
     }

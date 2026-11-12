@@ -252,6 +252,18 @@ export const PaymentRequestEditResponse = z.object({
   bgBankIfsc: nullishString,
   bgCourierAddress: nullishString,
   bgCourierDays: z.number().nullable().optional(),
+  bgCourierOrg: nullishString,
+  bgCourierName: nullishString,
+  bgCourierPhone: nullishString,
+  bgCourierAddrLine1: nullishString,
+  bgCourierAddrLine2: nullishString,
+  bgCourierCity: nullishString,
+  bgCourierState: nullishString,
+  bgCourierPincode: nullishString,
+  bgCourierEmpFrom: z.number().nullable().optional(),
+  bgCourierDelDate: nullishString,
+  bgCourierUrgency: z.number().nullable().optional(),
+  bgCourierDocs: z.array(z.string()).optional(),
   bgBank: nullishString,
 
   // Bank Transfer

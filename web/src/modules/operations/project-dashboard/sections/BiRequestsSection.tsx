@@ -4,19 +4,11 @@ import type { ActionItem } from "@/components/ui/ActionMenu";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import DataTable from "@/components/ui/data-table";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProjectBiRequests } from "@/hooks/api/usePaymentRequests";
 import { formatINR } from "@/hooks/useINRFormatter";
 import type { ColDef, ValueFormatterParams } from "ag-grid-community";
-import { Banknote, ChevronDown, Eye, Plus } from "lucide-react";
+import { Eye, Plus } from "lucide-react";
 import React, { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -152,33 +144,14 @@ export const BiRequestsSection: React.FC<BiRequestsSectionProps> = ({ projectId 
                             BI Requests
                         </CardTitle>
                         <CardAction>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button size="sm" variant="default">
-                                        <Plus className="mr-1.5 h-4 w-4" />
-                                        Request BI
-                                        <ChevronDown className="ml-1.5 h-4 w-4" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-52">
-                                    <DropdownMenuLabel>Select BI Type</DropdownMenuLabel>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem disabled>
-                                        <Banknote className="mr-2 h-4 w-4" />
-                                        FDR
-                                        <span className="ml-auto text-xs text-muted-foreground">Coming soon</span>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem disabled>
-                                        <Banknote className="mr-2 h-4 w-4" />
-                                        Cheque
-                                        <span className="ml-auto text-xs text-muted-foreground">Coming soon</span>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => navigate(paths.operations.biRequestBgCreate(projectId))}>
-                                        <Banknote className="mr-2 h-4 w-4" />
-                                        Bank Guarantee
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                            <Button
+                                size="sm"
+                                variant="default"
+                                onClick={() => navigate(paths.operations.biRequestBgCreate(projectId))}
+                            >
+                                <Plus className="mr-1.5 h-4 w-4" />
+                                Request BI
+                            </Button>
                         </CardAction>
                     </div>
                     <CardDescription>
