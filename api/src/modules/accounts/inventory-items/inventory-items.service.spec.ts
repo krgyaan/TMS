@@ -45,9 +45,16 @@ describe("Item Master without item-team assignment", () => {
 
     it("keeps existing items editable without rewriting their team assignment", async () => {
         let updateValues: Record<string, unknown> | undefined;
-        const db = {
-            select: () => ({ from: () => ({ where: () => ({ limit: async () => [item], then: (resolve: (items: unknown[]) => unknown) => Promise.resolve([]).then(resolve) }) }) }),
+        const query = {
+            limit: () => ({ for: async () => [item] }),
+            then: (resolve: (items: unknown[]) => unknown) => Promise.resolve([]).then(resolve),
+        };
+        const tx = {
+            select: () => ({ from: () => ({ where: () => query }) }),
             update: () => ({ set: (values: Record<string, unknown>) => { updateValues = values; return { where: () => ({ returning: async () => [{ ...item, ...values }] }) }; } }),
+        };
+        const db = {
+            transaction: (callback: (database: typeof tx) => Promise<unknown>) => callback(tx),
         };
         const service = new InventoryItemsService(db as never);
         await service.update(item.id, { itemName: "Copper edited" });

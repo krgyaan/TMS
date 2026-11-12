@@ -29,5 +29,8 @@ export const ITEM_CATEGORIES: ItemCategory[] = [
     { name: "Rubber Pad", fields: [common("Thickness (in mm)", "thickness"), common("Size (in Inches)", "size")] },
 ];
 
-export const categoryOptions = ITEM_CATEGORIES.map(category => ({ id: category.name, name: category.name }));
-export const getCategory = (name?: string) => ITEM_CATEGORIES.find(category => category.name === name);
+export const categoryOptions = [
+    ...ITEM_CATEGORIES.map(category => ({ id: category.name, name: category.name })),
+    { id: "AC Stand", name: "AC Stand" },
+];
+export const getCategory = (name?: string) => ITEM_CATEGORIES.find(category => category.name === (name === "AC Stand" ? "Equipment Stand" : name));

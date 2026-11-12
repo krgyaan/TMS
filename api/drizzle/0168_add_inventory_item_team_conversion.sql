@@ -8,11 +8,11 @@ ALTER TABLE "inventory_items"
 	USING NULLIF("conversion_factor"::text, '')::numeric;
 
 UPDATE "inventory_items"
-SET "team_id" = 5
-WHERE "team_id" IS NULL;
+SET "team_id" = (SELECT min("id") FROM "teams")
+WHERE "team_id" IS NULL
+	AND EXISTS (SELECT 1 FROM "teams");
 
 ALTER TABLE "inventory_items"
-	ALTER COLUMN "team_id" SET NOT NULL,
 	ALTER COLUMN "item_group" DROP NOT NULL;
 
 DO $$

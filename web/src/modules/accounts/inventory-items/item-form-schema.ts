@@ -3,13 +3,13 @@ import { UNIT_OPTIONS } from "./item-config.ts";
 
 export const buildInventoryItemFormSchema = () => z.object({
     itemName: z.string().min(1, "Item name is required"),
-    itemType: z.string().optional(),
-    specifications: z.record(z.string(), z.string()),
+    itemType: z.string().max(80).optional(),
+    specifications: z.record(z.string(), z.string().max(200)),
     description: z.string().optional(),
     unit: z.enum(UNIT_OPTIONS, { message: "Unit is required" }),
     conversionUnit: z.string(),
     conversionFactor: z.string(),
-    hsnCode: z.string().optional(),
+    hsnCode: z.string().max(30).optional(),
     isActive: z.boolean(),
 }).superRefine((values, context) => {
     if (!values.conversionUnit) {

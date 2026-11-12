@@ -5,7 +5,10 @@ ALTER TABLE "inventory_items"
 
 UPDATE "inventory_items"
 SET
-	"item_code" = COALESCE("item_code", 'ITM-' || LPAD("id"::text, 4, '0')),
+	"item_code" = COALESCE("item_code", 'ITM-' || CASE
+		WHEN length("id"::text) < 4 THEN LPAD("id"::text, 4, '0')
+		ELSE "id"::text
+	END),
 	"item_group" = COALESCE("item_group", 'Raw Materials');
 
 ALTER TABLE "inventory_items"

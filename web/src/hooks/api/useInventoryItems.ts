@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { handleQueryError } from "@/lib/react-query";
 import { inventoryItemsService } from "@/services/api";
-import type { InventoryItemPayload } from "@/types/inventory-item.types";
+import type { InventoryItem, InventoryItemPayload } from "@/types/inventory-item.types";
 import type { ItemMasterScope as ServiceScope } from "@/services/api/inventory-items.service";
 
 export type ItemMasterScope = ServiceScope;
@@ -38,7 +38,14 @@ export const useUpdateInventoryItem = () => {
     const client = useQueryClient();
     return useMutation({
         mutationFn: ({ id, data }: { id: number; data: Partial<InventoryItemPayload> }) => inventoryItemsService.master.update(id, data),
-        onSuccess: () => { void client.invalidateQueries({ queryKey: itemListKey }); toast.success("Item updated successfully"); },
+        onSuccess: updatedItem => {
+            const item = updatedItem as InventoryItem;
+            for (const [queryKey, cachedItem] of client.getQueriesData<InventoryItem>({ queryKey: [...inventoryItemsKey, "detail"] })) {
+                if (queryKey[3] === item.id && cachedItem !== undefined) client.setQueryData(queryKey, item);
+            }
+            void client.invalidateQueries({ queryKey: itemListKey });
+            toast.success("Item updated successfully");
+        },
     });
 };
 export const useDeleteInventoryItem = () => {

@@ -91,6 +91,10 @@ export const resolveConversion = (
         }
     }
 
+    if (resolvedFactor === null || !Number.isFinite(resolvedFactor) || resolvedFactor >= 1e10) {
+        throw new Error("Conversion factor must be less than 10000000000");
+    }
+
     return {
         conversionUnit: to as Unit,
         conversionFactor: String(resolvedFactor),

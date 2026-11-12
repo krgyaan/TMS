@@ -36,6 +36,11 @@ describe("inventory item conversion rules", () => {
         expect(() => resolveConversion("Kg", "Mtr", factor, {})).toThrow();
     });
 
+    it("rejects manual and width-derived factors outside the database numeric range", () => {
+        expect(() => resolveConversion("Kg", "Mtr", "10000000000", {})).toThrow(/less than 10000000000/);
+        expect(() => resolveConversion("Sq. Mtr.", "RMtr", null, { width: "0.00000001 mm" })).toThrow(/less than 10000000000/);
+    });
+
     it("rejects identical or unconfigured pairs and incomplete conversion data", () => {
         expect(() => resolveConversion("Mtr", "Mtr", null, {})).toThrow();
         expect(() => resolveConversion("Nos.", "Kg", "1", {})).toThrow();

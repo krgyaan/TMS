@@ -673,6 +673,20 @@
       "when": 1796007000003,
       "tag": "0173_reconcile_inventory_item_runtime_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 120,
+      "version": "7",
+      "when": 1796007000004,
+      "tag": "0174_copy_inventory_item_settings_permissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 121,
+      "version": "7",
+      "when": 1796007000005,
+      "tag": "0175_inventory_items_business_key_unique",
+      "breakpoints": true
     }
   ]
 }
