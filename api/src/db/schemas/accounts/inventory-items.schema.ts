@@ -1,11 +1,13 @@
 import { boolean, bigserial, bigint, jsonb, numeric, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
 import { teams } from "@db/schemas/master/teams.schema";
+import { boolean, bigserial, jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
 
 export const inventoryItems = pgTable("inventory_items", {
     id: bigserial("id", { mode: "number" }).primaryKey(),
     itemCode: varchar("item_code", { length: 30 }).notNull().unique(),
     itemGroup: varchar("item_group", { length: 40 }),
     teamId: bigint("team_id", { mode: "number" }).references(() => teams.id),
+    itemGroup: varchar("item_group", { length: 40 }).notNull(),
     itemName: varchar("item_name", { length: 120 }).notNull(),
     itemType: varchar("item_type", { length: 80 }),
     description: varchar("description", { length: 500 }),
