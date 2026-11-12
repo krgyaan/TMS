@@ -4,10 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Save, Truck } from 'lucide-react';
+import { ArrowLeft, Briefcase, Loader2, Mail, Phone, Save, Truck, User } from 'lucide-react';
 import { useCreatePaymentRequest } from '@/hooks/api/usePaymentRequests';
 import { useProjectOverview } from '@/hooks/api/useProjectDashboard';
-import { useWoContactsByBasicDetail } from '@/hooks/api/useWoContacts';
+import { useCreateWoContact, useWoContactsByBasicDetail } from '@/hooks/api/useWoContacts';
 import { useUsers } from '@/hooks/api/useUsers';
 import { infoSheetsService } from '@/services/api/info-sheet.service';
 import { Button } from '@/components/ui/button';
@@ -41,20 +41,19 @@ const PROJECT_BG_NEEDED_IN_OPTIONS = BG_NEEDED_IN_OPTIONS.filter(option => optio
 
 const PROJECT_BG_BANK = 'AU_8316';
 
-const ADD_EMAIL_OPTION = '__add_email__';
+const ADD_CONTACT_OPTION = '__add_contact__';
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type EmailFieldKey = 'user' | 'cp' | 'finance';
+
+const EMPTY_CONTACT_DRAFT = { name: '', designation: '', email: '', phone: '' };
+type ContactDraft = typeof EMPTY_CONTACT_DRAFT;
 
 interface BiBankGuaranteeRequestFormProps {
     projectId: number;
 }
 
-/**
- * Bank Guarantee request raised from a project dashboard ("Request BI").
- * Saves to the same payment_requests / payment_instruments tables as the
- * tendering EMD Bank Guarantee flow, with project_id set.
- */
+
 export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequestFormProps) {
     const navigate = useNavigate();
     const createRequest = useCreatePaymentRequest();
@@ -74,11 +73,10 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
         enabled: tenderId > 0,
     });
 
-    // Emails typed through "+ Add new email" — kept for this form session only.
-    const [customEmails, setCustomEmails] = useState<string[]>([]);
+    const createWoContact = useCreateWoContact();
     const [addingFor, setAddingFor] = useState<EmailFieldKey | null>(null);
-    const [draftEmail, setDraftEmail] = useState('');
-    const [addEmailError, setAddEmailError] = useState<string | null>(null);
+    const [contactDraft, setContactDraft] = useState<ContactDraft>(EMPTY_CONTACT_DRAFT);
+    const [contactError, setContactError] = useState<string | null>(null);
 
     const emailFieldNames = {
         user: `${BG_PREFIX}.bgClientUserEmail`,
@@ -90,7 +88,6 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
         const rawEmails = [
             ...(woContacts ?? []).map(contact => contact.email),
             ...(tenderContacts?.contacts ?? []).map(contact => contact.email),
-            ...customEmails,
         ];
         const seen = new Set<string>();
         const options = rawEmails
@@ -105,41 +102,69 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
             .sort((a, b) => a.localeCompare(b))
             .map(email => ({ id: email, name: email }));
 
-        options.push({ id: ADD_EMAIL_OPTION, name: '+ Add new email' });
+        options.push({ id: ADD_CONTACT_OPTION, name: '+ Add contact person' });
         return options;
-    }, [woContacts, tenderContacts, customEmails]);
+    }, [woContacts, tenderContacts]);
 
-    const emailPlaceholder = emailOptions.length > 1 ? 'Select Email' : '+ Add new email';
+    const emailPlaceholder = emailOptions.length > 1 ? 'Select Email' : '+ Add contact person';
 
     const handleEmailChange = (key: EmailFieldKey) => (value: string) => {
-        if (value === ADD_EMAIL_OPTION) {
+        if (value === ADD_CONTACT_OPTION) {
+            if (!woBasicDetailId) {
+                toast.error('Work order details not found for this project');
+                return;
+            }
             setAddingFor(key);
-            setDraftEmail('');
-            setAddEmailError(null);
+            setContactDraft(EMPTY_CONTACT_DRAFT);
+            setContactError(null);
             return;
         }
         form.setValue(emailFieldNames[key], value || undefined, { shouldValidate: true, shouldDirty: true });
     };
 
-    const cancelDraftEmail = () => {
-        setAddingFor(null);
-        setDraftEmail('');
-        setAddEmailError(null);
+    const setContactField = (field: keyof ContactDraft, value: string) => {
+        setContactDraft(prev => ({ ...prev, [field]: value }));
+        setContactError(null);
     };
 
-    const commitDraftEmail = () => {
+    const cancelContactDraft = () => {
+        setAddingFor(null);
+        setContactDraft(EMPTY_CONTACT_DRAFT);
+        setContactError(null);
+    };
+
+    const saveContactDraft = async () => {
         if (!addingFor) return;
-        const email = draftEmail.trim();
-        if (!EMAIL_PATTERN.test(email)) {
-            setAddEmailError('Enter a valid email address');
+        const name = contactDraft.name.trim();
+        const email = contactDraft.email.trim();
+
+        if (!name) {
+            setContactError('Full Name is required');
             return;
         }
-        setCustomEmails(prev =>
-            prev.some(existing => existing.toLowerCase() === email.toLowerCase()) ? prev : [...prev, email],
-        );
-        form.setValue(emailFieldNames[addingFor], email, { shouldValidate: true, shouldDirty: true });
-        cancelDraftEmail();
+        if (!EMAIL_PATTERN.test(email)) {
+            setContactError('Enter a valid email address');
+            return;
+        }
+
+        try {
+            // Saved into wo_contacts — the same table the WO basic details form uses.
+            await createWoContact.mutateAsync({
+                woBasicDetailId,
+                name,
+                designation: contactDraft.designation.trim() || undefined,
+                email,
+                phone: contactDraft.phone.trim() || undefined,
+            });
+            form.setValue(emailFieldNames[addingFor], email, { shouldValidate: true, shouldDirty: true });
+            cancelContactDraft();
+        } catch (error) {
+            console.error('Failed to add contact person', error);
+            setContactError('Could not save the contact person. Please try again.');
+        }
     };
+
+    const isSavingContact = createWoContact.isPending;
 
     const renderEmailField = (key: EmailFieldKey, label: string) => (
         <FieldWrapper control={form.control} name={emailFieldNames[key]} label={label}>
@@ -152,35 +177,100 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
                         placeholder={emailPlaceholder}
                     />
                     {addingFor === key && (
-                        <div className="space-y-1">
+                        <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium">Full Name *</label>
+                                    <div className="relative">
+                                        <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            autoFocus
+                                            className="pl-10"
+                                            placeholder="Enter full name"
+                                            value={contactDraft.name}
+                                            disabled={isSavingContact}
+                                            onChange={(e) => setContactField('name', e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium">Designation</label>
+                                    <div className="relative">
+                                        <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            className="pl-10"
+                                            placeholder="Enter designation"
+                                            value={contactDraft.designation}
+                                            disabled={isSavingContact}
+                                            onChange={(e) => setContactField('designation', e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium">Email Address *</label>
+                                    <div className="relative">
+                                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            type="email"
+                                            className="pl-10"
+                                            placeholder="email@example.com"
+                                            value={contactDraft.email}
+                                            disabled={isSavingContact}
+                                            onChange={(e) => setContactField('email', e.target.value)}
+                                            onKeyDown={(e) => {
+                                                e.stopPropagation();
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    void saveContactDraft();
+                                                } else if (e.key === 'Escape') {
+                                                    cancelContactDraft();
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium">Phone Number</label>
+                                    <div className="relative">
+                                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            className="pl-10"
+                                            placeholder="Enter phone number"
+                                            maxLength={10}
+                                            value={contactDraft.phone}
+                                            disabled={isSavingContact}
+                                            onChange={(e) => setContactField('phone', e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            {contactError && <p className="text-xs text-destructive">{contactError}</p>}
                             <div className="flex items-center gap-2">
-                                <Input
-                                    autoFocus
-                                    type="email"
-                                    value={draftEmail}
-                                    placeholder="name@example.com"
-                                    onChange={(e) => {
-                                        setDraftEmail(e.target.value);
-                                        setAddEmailError(null);
-                                    }}
-                                    onKeyDown={(e) => {
-                                        e.stopPropagation();
-                                        if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            commitDraftEmail();
-                                        } else if (e.key === 'Escape') {
-                                            cancelDraftEmail();
-                                        }
-                                    }}
-                                />
-                                <Button type="button" size="sm" onClick={commitDraftEmail}>
-                                    Add
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() => void saveContactDraft()}
+                                    disabled={isSavingContact}
+                                >
+                                    {isSavingContact ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Saving...
+                                        </>
+                                    ) : (
+                                        'Save Contact'
+                                    )}
                                 </Button>
-                                <Button type="button" size="sm" variant="ghost" onClick={cancelDraftEmail}>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={cancelContactDraft}
+                                    disabled={isSavingContact}
+                                >
                                     Cancel
                                 </Button>
                             </div>
-                            {addEmailError && <p className="text-xs text-destructive">{addEmailError}</p>}
                         </div>
                     )}
                 </div>
