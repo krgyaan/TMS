@@ -8,6 +8,7 @@ import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { instrumentBgDetails, instrumentChequeDetails, instrumentDdDetails, instrumentFdrDetails, instrumentStatusHistory, instrumentTransferDetails, paymentInstruments, paymentRequestMom, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
 import { paymentRequests as opsPaymentRequests } from '@db/schemas/operations/payment-requests.schema';
+import { couriers } from '@db/schemas/shared/couriers.schema';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
 import { PaymentRequestService } from '@/modules/operations/payment-requests/payment-request.service';
 import { and, desc, eq, like } from 'drizzle-orm';
@@ -90,10 +91,7 @@ export class PaymentRequestsCommandService {
                 const isBlankNonTmsCheque = isNonTmsRequest && payload.EMD.mode === 'CHEQUE';
 
                 if (emdAmount > 0 || isBlankNonTmsCheque) {
-                    // Project dashboard BI requests keep the exact BG purpose
-                    // chosen in the form (Advance Payment / Security Bond/Deposit /
-                    // Performance BG) instead of the generic EMD bucketing.
-                    const emdPurpose = payload.projectId && payload.EMD.mode === 'BG'
+                    const emdPurpose = (payload.projectId || payload.preserveBgPurpose) && payload.EMD.mode === 'BG'
                         ? extractProjectBgPurpose(payload.EMD.details)
                         : extractPurposeFromDetails(payload.EMD.mode, payload.EMD.details, 'EMD');
                     const request = await this.createPaymentRequest(
@@ -588,7 +586,58 @@ export class PaymentRequestsCommandService {
             city: details[`${shorthand}CourierCity`] || null,
             state: details[`${shorthand}CourierState`] || null,
             pincode: details[`${shorthand}CourierPincode`] || null,
+        } : mode === 'BG' ? {
+            // Mirrors the BG action form step 2 ("After BG Creation") payload.
+            org: details.bgCourierOrg || null,
+            name: details.bgCourierName || null,
+            phone: details.bgCourierPhone || null,
+            line1: details.bgCourierAddrLine1 || null,
+            line2: details.bgCourierAddrLine2 || null,
+            city: details.bgCourierCity || null,
+            state: details.bgCourierState || null,
+            pincode: details.bgCourierPincode || null,
+            empFrom: details.bgCourierEmpFrom ?? null,
+            delDate: details.bgCourierDelDate || null,
+            urgency: details.bgCourierUrgency ?? null,
+            docs: details.bgCourierDocs ?? [],
         } : null;
+
+        // Project BG requests create their courier dispatch row up-front; the
+        // instrument references it through req_no (same convention as step 2).
+        let courierId: number | null = null;
+        if (mode === 'BG' && details.bgCourierOrg) {
+            const [courierRow] = await tx
+                .insert(couriers)
+                .values({
+                    userId: userId ?? 0,
+                    toOrg: details.bgCourierOrg,
+                    toName: details.bgCourierName || '',
+                    toAddr: [
+                        details.bgCourierAddrLine1,
+                        details.bgCourierAddrLine2,
+                        details.bgCourierCity,
+                        details.bgCourierState,
+                    ].filter(Boolean).join(', '),
+                    toPin: details.bgCourierPincode || '',
+                    toMobile: details.bgCourierPhone || '',
+                    empFrom: Number(details.bgCourierEmpFrom) || userId || 0,
+                    delDate: details.bgCourierDelDate ? new Date(details.bgCourierDelDate) : new Date(),
+                    urgency: Number(details.bgCourierUrgency) || 1,
+                    courierDocs: details.bgCourierDocs ?? [],
+                    status: 0, // Courier status: Pending
+                })
+                .returning()
+                .execute();
+            courierId = courierRow?.id ?? null;
+        }
+
+        const structuredCourierAddress = [
+            details[`${shorthand}CourierAddressLine1`] || details.bgCourierAddrLine1,
+            details[`${shorthand}CourierAddressLine2`] || details.bgCourierAddrLine2,
+            details[`${shorthand}CourierCity`] || details.bgCourierCity,
+            details[`${shorthand}CourierState`] || details.bgCourierState,
+            details[`${shorthand}CourierPincode`] || details.bgCourierPincode,
+        ].filter(Boolean).join(', ');
 
         const [instrument] = await tx
             .insert(paymentInstruments)
@@ -601,9 +650,10 @@ export class PaymentRequestsCommandService {
                 payableAt: (details[`${shorthand}PayableAt`] || details.bgAddress) || null,
                 issueDate: (details[`${shorthand}Date`] || details.bgDate) || null,
                 expiryDate: (details[`${shorthand}ExpiryDate`] || details.bgExpiryDate || details.fdrExpiryDate) || null,
-                courierAddress: (details[`${shorthand}CourierAddress`] || details.bgCourierAddress || details.ddCourierAddress || details.fdrCourierAddress) || null,
+                courierAddress: (details[`${shorthand}CourierAddress`] || details.bgCourierAddress || structuredCourierAddress || details.ddCourierAddress || details.fdrCourierAddress) || null,
                 courierAddressJson,
                 courierDeadline: (details[`${shorthand}CourierHours`] || details.bgCourierDays || details.ddCourierHours || details.fdrCourierHours) || null,
+                reqNo: courierId ? String(courierId) : null,
                 status: 'PENDING',
                 isActive: true,
                 createdBy: userId,
@@ -889,7 +939,19 @@ export class PaymentRequestsCommandService {
                 payableAt: (details[`${shorthand}PayableAt`] || details.bgAddress || details.ddPayableAt || details.fdrPayableAt || details.btPayableAt || details.portalPayableAt || details.chequePayableAt) || null,
                 issueDate: (details[`${shorthand}Date`] || details.bgDate || details.ddDate || details.fdrDate || details.btDate || details.portalDate || details.chequeDate) || null,
                 expiryDate: (details[`${shorthand}ExpiryDate`] || details.bgExpiryDate || details.fdrExpiryDate) || null,
-                courierAddress: (details[`${shorthand}CourierAddress`] || details.bgCourierAddress || details.ddCourierAddress || details.fdrCourierAddress) || null,
+                courierAddress: (
+                    details[`${shorthand}CourierAddress`] ||
+                    details.bgCourierAddress ||
+                    [
+                        details.bgCourierAddrLine1,
+                        details.bgCourierAddrLine2,
+                        details.bgCourierCity,
+                        details.bgCourierState,
+                        details.bgCourierPincode,
+                    ].filter(Boolean).join(', ') ||
+                    details.ddCourierAddress ||
+                    details.fdrCourierAddress
+                ) || null,
                 courierAddressJson: (normalizedMode === 'DD' || normalizedMode === 'FDR') ? {
                     name: details[`${shorthand}CourierName`] || null,
                     phone: details[`${shorthand}CourierPhone`] || null,
@@ -898,6 +960,19 @@ export class PaymentRequestsCommandService {
                     city: details[`${shorthand}CourierCity`] || null,
                     state: details[`${shorthand}CourierState`] || null,
                     pincode: details[`${shorthand}CourierPincode`] || null,
+                } : normalizedMode === 'BG' ? {
+                    org: details.bgCourierOrg || null,
+                    name: details.bgCourierName || null,
+                    phone: details.bgCourierPhone || null,
+                    line1: details.bgCourierAddrLine1 || null,
+                    line2: details.bgCourierAddrLine2 || null,
+                    city: details.bgCourierCity || null,
+                    state: details.bgCourierState || null,
+                    pincode: details.bgCourierPincode || null,
+                    empFrom: details.bgCourierEmpFrom ?? null,
+                    delDate: details.bgCourierDelDate || null,
+                    urgency: details.bgCourierUrgency ?? null,
+                    docs: details.bgCourierDocs ?? [],
                 } : null,
                 courierDeadline: (details[`${shorthand}CourierHours`] || details.bgCourierDays || details.ddCourierHours || details.fdrCourierHours) || null,
             })

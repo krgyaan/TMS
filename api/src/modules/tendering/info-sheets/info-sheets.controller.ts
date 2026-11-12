@@ -1,6 +1,6 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Logger, Param, ParseIntPipe, Patch, Post } from '@nestjs/common';
 import { TenderInfoSheetsService } from '@/modules/tendering/info-sheets/info-sheets.service';
-import { TenderInfoSheetPayloadSchema } from '@/modules/tendering/info-sheets/dto/info-sheet.dto';
+import { TenderInfoSheetPayloadSchema, CreateTenderClientSchema } from '@/modules/tendering/info-sheets/dto/info-sheet.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
@@ -26,6 +26,20 @@ export class TenderInfoSheetsController {
     @Get(':tenderId/contacts')
     async getTenderContacts(@Param('tenderId', ParseIntPipe) tenderId: number) {
         return this.infoSheetsService.getTenderContacts(tenderId);
+    }
+
+    /**
+     * Adds one contact to tender_clients. Deliberately separate from
+     * POST/PATCH /:tenderId, which replace the full client list.
+     */
+    @Post(':tenderId/clients')
+    @HttpCode(HttpStatus.CREATED)
+    async addClient(
+        @Param('tenderId', ParseIntPipe) tenderId: number,
+        @Body() body: unknown,
+    ) {
+        const payload = CreateTenderClientSchema.parse(body);
+        return this.infoSheetsService.addClient(tenderId, payload);
     }
 
     @Get(':tenderId/extraction')

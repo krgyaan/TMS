@@ -234,6 +234,7 @@ export const paths = {
         chequeAction: (id: number) => `/bi-dashboard/cheque/action/${id}`,
         chequeMeetingRemarks: (id: number) => `/bi-dashboard/cheque/meeting-remarks/${id}`,
         bankGuarantee: "/bi-dashboard/bank-guarantee",
+        bankGuaranteeCreate: () => `/bi-dashboard/bank-guarantee/create`,
         bankGuaranteeView: (requestId: number) => `/bi-dashboard/bank-guarantee/details/${requestId}`,
         bankGuaranteeAction: (id: number) => `/bi-dashboard/bank-guarantee/action/${id}`,
         bankGuaranteeEdit: (id: number) => `/bi-dashboard/bank-guarantee/edit/${id}`,
