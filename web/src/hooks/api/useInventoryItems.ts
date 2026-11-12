@@ -9,7 +9,7 @@ export type ItemMasterScope = ServiceScope;
 export const inventoryItemsKey = ["inventory-items"] as const;
 const serviceFor = (scope: ItemMasterScope) => inventoryItemsService[scope];
 
-export type InventoryItemFilters = { search?: string; itemName?: string; unit?: string; isActive?: string; page?: number; limit?: number };
+export type InventoryItemFilters = { search?: string; page?: number; limit?: number };
 export const itemListKey = [...inventoryItemsKey, "list"] as const;
 
 export const useInventoryItems = (scope: ItemMasterScope, filters: InventoryItemFilters = {}) =>

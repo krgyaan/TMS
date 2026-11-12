@@ -5,7 +5,7 @@ import type { DbInstance } from "@db";
 import { inventoryItems, type InventoryItem, type NewInventoryItem } from "@db/schemas/accounts/inventory-items.schema";
 import { resolveConversion } from "./conversion-rules";
 
-type ListOptions = { search?: string; page?: number; limit?: number; itemName?: string; unit?: string; isActive?: boolean };
+type ListOptions = { search?: string; page?: number; limit?: number };
 type ItemInput = Pick<NewInventoryItem, "itemName" | "itemType" | "description" | "specifications" | "unit" | "hsnCode" | "isActive">
     & { conversionUnit?: string | null; conversionFactor?: string | number | null };
 
@@ -20,9 +20,6 @@ export class InventoryItemsService {
         const filters: SQL[] = [
             isNull(inventoryItems.deletedAt),
             search ? or(ilike(inventoryItems.itemCode, `%${search}%`), ilike(inventoryItems.itemName, `%${search}%`), ilike(inventoryItems.itemType, `%${search}%`), ilike(inventoryItems.hsnCode, `%${search}%`)) : undefined,
-            options.itemName ? eq(inventoryItems.itemName, options.itemName) : undefined,
-            options.unit ? eq(inventoryItems.unit, options.unit) : undefined,
-            options.isActive === undefined ? undefined : eq(inventoryItems.isActive, options.isActive),
         ].filter((filter): filter is SQL => Boolean(filter));
         const where = filters.length ? and(...filters) : undefined;
         const [data, count] = await Promise.all([

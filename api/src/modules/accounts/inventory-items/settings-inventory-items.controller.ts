@@ -13,8 +13,8 @@ export class SettingsInventoryItemsController {
 
     @Get()
     @CanRead("master.item-master")
-    list(@Query("search") search?: string, @Query("page") page?: string, @Query("limit") limit?: string, @Query("itemName") itemName?: string, @Query("unit") unit?: string, @Query("isActive") isActive?: string) {
-        return this.service.findAll({ search, page: page ? Number(page) : undefined, limit: limit ? Number(limit) : undefined, itemName, unit, isActive: isActive === undefined || isActive === "" ? undefined : isActive === "true" });
+    list(@Query("search") search?: string, @Query("page") page?: string, @Query("limit") limit?: string) {
+        return this.service.findAll({ search, page: page ? Number(page) : undefined, limit: limit ? Number(limit) : undefined });
     }
 
     @Get("conversion-options")
