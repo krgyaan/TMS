@@ -35,6 +35,7 @@ interface PaymentSectionProps {
     defaultPurpose?: string;
     isEditMode?: boolean;
     defaultMode?: string;
+    tenderId?: number;
 }
 
 const OLD_ENTRY_MODES = ['DD', 'FDR', 'BG', 'CHEQUE'];
@@ -49,6 +50,7 @@ export function PaymentSection({
     defaultPurpose = purpose,
     isEditMode = false,
     defaultMode,
+    tenderId = 0,
 }: PaymentSectionProps) {
     console.log("PaymentSection Props:", { purpose, allowedModes, amount, type, courierData, defaultPurpose, isEditMode, defaultMode });
     const { control, watch, setValue } = useFormContext();
@@ -175,7 +177,7 @@ export function PaymentSection({
                     {(selectedMode === 'PORTAL' || selectedMode === 'POP') && <PayOnPortalForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} />}
                     {(selectedMode === 'BANK_TRANSFER' || selectedMode === 'BT') && <BankTransferForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} />}
                     {selectedMode === 'DD' && <DemandDraftForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} />}
-                    {selectedMode === 'BG' && <BankGuaranteeForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} />}
+                    {selectedMode === 'BG' && <BankGuaranteeForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} tenderId={tenderId} />}
                     {selectedMode === 'FDR' && <FdrForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} />}
                     {selectedMode === 'CHEQUE' && <ChequeForm prefix={prefix} readOnly={!isEditMode && amount > 0} />}
                 </div>

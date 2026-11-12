@@ -229,6 +229,26 @@ export class TenderInfoSheetsService {
         };
     }
 
+    async addClient(tenderId: number, payload: { clientName: string; clientDesignation?: string | null; clientMobile?: string | null; clientEmail?: string | null }) {
+        const [client] = await this.db
+            .insert(tenderClients)
+            .values({
+                tenderId,
+                clientName: payload.clientName,
+                clientDesignation: payload.clientDesignation ?? null,
+                clientMobile: payload.clientMobile ?? null,
+                clientEmail: payload.clientEmail ?? null,
+            })
+            .returning();
+
+        return {
+            id: client.id,
+            name: client.clientName || "",
+            phone: client.clientMobile || null,
+            email: client.clientEmail || null,
+        };
+    }
+
     async findByTenderIdWithTender(tenderId: number) {
         const [infoSheet, tender] = await Promise.all([
             this.findByTenderId(tenderId),

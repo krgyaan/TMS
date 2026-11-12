@@ -342,3 +342,15 @@ export const TenderInfoSheetPayloadSchema = z
     });
 
 export type TenderInfoSheetPayload = z.infer<typeof TenderInfoSheetPayloadSchema>;
+
+
+export const CreateTenderClientSchema = z.object({
+    clientName: z.string().trim().min(1, 'Client name is required').max(255),
+    clientDesignation: optionalString.optional(),
+    clientMobile: optionalString.optional(),
+    clientEmail: z
+        .union([z.string().email('Invalid email address').max(255), z.literal(''), z.null(), z.undefined()])
+        .transform((v) => (v ? String(v).trim() : null)),
+});
+
+export type CreateTenderClientDto = z.infer<typeof CreateTenderClientSchema>;

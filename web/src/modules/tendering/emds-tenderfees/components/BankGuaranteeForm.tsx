@@ -1,27 +1,256 @@
 import { FieldWrapper } from '@/components/form/FieldWrapper';
-import { SelectField } from '@/components/form/SelectField';
+import { SelectField, Combobox } from '@/components/form/SelectField';
 import { NumberInput } from '@/components/form/NumberInput';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { useFormContext, useWatch } from 'react-hook-form';
+import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { BG_PURPOSE_OPTIONS, BG_NEEDED_IN_OPTIONS, BANKS } from '../constants';
 import DateInput from '@/components/form/DateInput';
 import { FileUploader } from '@/components/file-upload';
 import { useUsers } from '@/hooks/api/useUsers';
-import { Truck } from 'lucide-react';
+import { useAddTenderClient, useTenderContacts } from '@/hooks/api/useInfoSheets';
+import { Briefcase, Loader2, Mail, Phone, Truck, User } from 'lucide-react';
 
 interface PaymentFormBaseProps {
     amount?: number;
     prefix?: string;
     readOnly?: boolean;
+    tenderId?: number;
 }
 
-export function BankGuaranteeForm({ amount, prefix = 'emd.details', readOnly = false }: PaymentFormBaseProps) {
+type EmailFieldKey = 'user' | 'cp' | 'finance';
+
+const ADD_CONTACT_OPTION = '__add_contact__';
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMPTY_CONTACT_DRAFT = { name: '', designation: '', email: '', phone: '' };
+type ContactDraft = typeof EMPTY_CONTACT_DRAFT;
+
+export function BankGuaranteeForm({ amount, prefix = 'emd.details', readOnly = false, tenderId = 0 }: PaymentFormBaseProps) {
     const { control, setValue } = useFormContext();
     const { data: employees = [] } = useUsers();
+    const { data: tenderContacts } = useTenderContacts(tenderId);
+    const addTenderClient = useAddTenderClient();
     const bgFormatFiles = useWatch({ control, name: `${prefix}.bgFormatFiles` });
     const bgPoFiles = useWatch({ control, name: `${prefix}.bgPoFiles` });
     const bgCourierDocs = useWatch({ control, name: `${prefix}.bgCourierDocs` });
+
+    // "Add contact person" saves into tender_clients for this tender.
+    const [addingFor, setAddingFor] = useState<EmailFieldKey | null>(null);
+    const [contactDraft, setContactDraft] = useState<ContactDraft>(EMPTY_CONTACT_DRAFT);
+    const [contactError, setContactError] = useState<string | null>(null);
+
+    const emailFieldNames = {
+        user: `${prefix}.bgClientUserEmail`,
+        cp: `${prefix}.bgClientCpEmail`,
+        finance: `${prefix}.bgClientFinanceEmail`,
+    } as const;
+
+    const emailOptions = useMemo(() => {
+        const rawContacts = (tenderContacts?.contacts ?? []).map(contact => ({
+            name: (contact.name ?? '').trim(),
+            email: (contact.email ?? '').trim(),
+        }));
+        const seen = new Set<string>();
+        const options = rawContacts
+            .filter(contact => contact.email.includes('@'))
+            .filter(contact => {
+                const key = contact.email.toLowerCase();
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            })
+            .map(contact => ({
+                // Show the contact's name, store the email as the value.
+                id: contact.email,
+                name: contact.name || contact.email,
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+
+        options.push({ id: ADD_CONTACT_OPTION, name: '+ Add contact person' });
+        return options;
+    }, [tenderContacts]);
+
+    const handleEmailChange = (key: EmailFieldKey) => (value: string) => {
+        if (value === ADD_CONTACT_OPTION) {
+            if (!tenderId) {
+                toast.error('Tender not found for this request');
+                return;
+            }
+            setAddingFor(key);
+            setContactDraft(EMPTY_CONTACT_DRAFT);
+            setContactError(null);
+            return;
+        }
+        setValue(emailFieldNames[key], value || '', { shouldValidate: true, shouldDirty: true });
+    };
+
+    const setContactField = (field: keyof ContactDraft, value: string) => {
+        setContactDraft(prev => ({ ...prev, [field]: value }));
+        setContactError(null);
+    };
+
+    const cancelContactDraft = () => {
+        setAddingFor(null);
+        setContactDraft(EMPTY_CONTACT_DRAFT);
+        setContactError(null);
+    };
+
+    const saveContactDraft = async () => {
+        if (!addingFor) return;
+        const name = contactDraft.name.trim();
+        const email = contactDraft.email.trim();
+
+        if (!name) {
+            setContactError('Full Name is required');
+            return;
+        }
+        if (!EMAIL_PATTERN.test(email)) {
+            setContactError('Enter a valid email address');
+            return;
+        }
+
+        try {
+            await addTenderClient.mutateAsync({
+                tenderId,
+                data: {
+                    clientName: name,
+                    clientDesignation: contactDraft.designation.trim() || undefined,
+                    clientEmail: email,
+                    clientMobile: contactDraft.phone.trim() || undefined,
+                },
+            });
+            setValue(emailFieldNames[addingFor], email, { shouldValidate: true, shouldDirty: true });
+            cancelContactDraft();
+        } catch (error) {
+            console.error('Failed to add contact person', error);
+            setContactError('Could not save the contact person. Please try again.');
+        }
+    };
+
+    const isSavingContact = addTenderClient.isPending;
+
+    const renderEmailField = (key: EmailFieldKey, label: string) => (
+        <FieldWrapper control={control} name={emailFieldNames[key]} label={label}>
+            {(field) => {
+                const currentValue = String(field.value ?? '');
+                // Keep a legacy/typed email selectable even if it is not a saved contact.
+                const fieldOptions = currentValue && !emailOptions.some(option => option.id === currentValue)
+                    ? [{ id: currentValue, name: currentValue }, ...emailOptions]
+                    : emailOptions;
+
+                return (
+                <div className="space-y-2">
+                    <Combobox
+                        value={currentValue}
+                        onChange={handleEmailChange(key)}
+                        options={fieldOptions}
+                        placeholder="Select Email"
+                    />
+                    {addingFor === key && (
+                        <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
+                            <div className="grid grid-cols-1 gap-3">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium">Full Name *</label>
+                                    <div className="relative">
+                                        <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            autoFocus
+                                            className="pl-10"
+                                            placeholder="Enter full name"
+                                            value={contactDraft.name}
+                                            disabled={isSavingContact}
+                                            onChange={(e) => setContactField('name', e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium">Designation</label>
+                                    <div className="relative">
+                                        <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            className="pl-10"
+                                            placeholder="Enter designation"
+                                            value={contactDraft.designation}
+                                            disabled={isSavingContact}
+                                            onChange={(e) => setContactField('designation', e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium">Email Address *</label>
+                                    <div className="relative">
+                                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            type="email"
+                                            className="pl-10"
+                                            placeholder="email@example.com"
+                                            value={contactDraft.email}
+                                            disabled={isSavingContact}
+                                            onChange={(e) => setContactField('email', e.target.value)}
+                                            onKeyDown={(e) => {
+                                                e.stopPropagation();
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    void saveContactDraft();
+                                                } else if (e.key === 'Escape') {
+                                                    cancelContactDraft();
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium">Phone Number</label>
+                                    <div className="relative">
+                                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            className="pl-10"
+                                            placeholder="Enter phone number"
+                                            maxLength={10}
+                                            value={contactDraft.phone}
+                                            disabled={isSavingContact}
+                                            onChange={(e) => setContactField('phone', e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            {contactError && <p className="text-xs text-destructive">{contactError}</p>}
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() => void saveContactDraft()}
+                                    disabled={isSavingContact}
+                                >
+                                    {isSavingContact ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Saving...
+                                        </>
+                                    ) : (
+                                        'Save Contact'
+                                    )}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={cancelContactDraft}
+                                    disabled={isSavingContact}
+                                >
+                                    Cancel
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+                );
+            }}
+        </FieldWrapper>
+    );
 
     return (
         <div className="space-y-4">
@@ -80,15 +309,9 @@ export function BankGuaranteeForm({ amount, prefix = 'emd.details', readOnly = f
                 </FieldWrapper>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <FieldWrapper control={control} name={`${prefix}.bgClientUserEmail`} label="User Dept. Email">
-                    {(field) => <Input type="email" {...field} placeholder="e.g., user@company.com" />}
-                </FieldWrapper>
-                <FieldWrapper control={control} name={`${prefix}.bgClientCpEmail`} label="C&P Dept. Email">
-                    {(field) => <Input type="email" {...field} placeholder="e.g., cp@company.com" />}
-                </FieldWrapper>
-                <FieldWrapper control={control} name={`${prefix}.bgClientFinanceEmail`} label="Finance Dept. Email">
-                    {(field) => <Input type="email" {...field} placeholder="e.g., finance@company.com" />}
-                </FieldWrapper>
+                {renderEmailField('user', 'User Dept. Email')}
+                {renderEmailField('cp', 'C&P Dept. Email')}
+                {renderEmailField('finance', 'Finance Dept. Email')}
             </div>
 
             <div className="space-y-3">

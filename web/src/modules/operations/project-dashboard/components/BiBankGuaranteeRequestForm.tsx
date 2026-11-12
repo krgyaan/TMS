@@ -2,14 +2,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, FormProvider, useWatch, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Briefcase, Loader2, Mail, Phone, Save, Truck, User } from 'lucide-react';
 import { useCreatePaymentRequest } from '@/hooks/api/usePaymentRequests';
 import { useProjectOverview } from '@/hooks/api/useProjectDashboard';
 import { useCreateWoContact, useWoContactsByBasicDetail } from '@/hooks/api/useWoContacts';
+import { useTenderContacts } from '@/hooks/api/useInfoSheets';
 import { useUsers } from '@/hooks/api/useUsers';
-import { infoSheetsService } from '@/services/api/info-sheet.service';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import DateInput from '@/components/form/DateInput';
@@ -67,11 +66,7 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
     // Emails connected to this project's tender info sheet + WO contacts.
     const { data: woContacts } = useWoContactsByBasicDetail(woBasicDetailId);
     const { data: employees = [] } = useUsers();
-    const { data: tenderContacts } = useQuery({
-        queryKey: ['tender-contacts', tenderId],
-        queryFn: () => infoSheetsService.getTenderContacts(tenderId),
-        enabled: tenderId > 0,
-    });
+    const { data: tenderContacts } = useTenderContacts(tenderId);
 
     const createWoContact = useCreateWoContact();
     const [addingFor, setAddingFor] = useState<EmailFieldKey | null>(null);
