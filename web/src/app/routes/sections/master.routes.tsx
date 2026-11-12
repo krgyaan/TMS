@@ -25,6 +25,10 @@ const Master_Item = lazy(() => import("@/modules/master/item"));
 const Master_Item_Create = lazy(() => import("@/modules/master/item/create"));
 const Master_Item_Edit = lazy(() => import("@/modules/master/item/edit"));
 
+// New shared Item Master
+const Master_InventoryItem_List = lazy(() => import("@/modules/accounts/inventory-items/InventoryItemListPage"));
+const Master_InventoryItem_Form = lazy(() => import("@/modules/accounts/inventory-items/InventoryItemFormPage"));
+
 // Websites
 const Master_Website = lazy(() => import("@/modules/master/website"));
 const Master_Website_Create = lazy(() => import("@/modules/master/website/create"));
@@ -243,6 +247,34 @@ export default function MasterRoutes() {
                     element={
                         <RouteWrapper>
                             <Master_Item_Edit />
+                        </RouteWrapper>
+                    }
+                />
+            </Route>
+
+            {/* Item Master */}
+            <Route path="item-master">
+                <Route
+                    index
+                    element={
+                        <RouteWrapper permission={{ module: "master.item-master", action: "read" }}>
+                            <Master_InventoryItem_List team="master" />
+                        </RouteWrapper>
+                    }
+                />
+                <Route
+                    path="new"
+                    element={
+                        <RouteWrapper permission={{ module: "master.item-master", action: "create" }}>
+                            <Master_InventoryItem_Form />
+                        </RouteWrapper>
+                    }
+                />
+                <Route
+                    path=":id/edit"
+                    element={
+                        <RouteWrapper permission={{ module: "master.item-master", action: "update" }}>
+                            <Master_InventoryItem_Form />
                         </RouteWrapper>
                     }
                 />
