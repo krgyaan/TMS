@@ -85,6 +85,19 @@ export const PaymentDetailsSchema = z.object({
     bgClientFinanceEmail: z.email().optional().or(z.literal('')),
     bgCourierAddress: z.string().optional(),
     bgCourierDays: z.coerce.number().min(1).max(10).optional(),
+    // Courier Dispatch (mirrors BG action form step 2)
+    bgCourierOrg: z.string().optional(),
+    bgCourierName: z.string().optional(),
+    bgCourierPhone: z.string().optional(),
+    bgCourierAddrLine1: z.string().optional(),
+    bgCourierAddrLine2: z.string().optional(),
+    bgCourierCity: z.string().optional(),
+    bgCourierState: z.string().optional(),
+    bgCourierPincode: z.string().optional(),
+    bgCourierEmpFrom: z.coerce.number().optional(),
+    bgCourierDelDate: z.string().optional(),
+    bgCourierUrgency: z.coerce.number().optional(),
+    bgCourierDocs: z.array(z.string()).optional(),
     bgBank: z.string().optional(),
     bgBankAccountName: z.string().optional(),
     bgBankAccountNo: z.string().optional(),
@@ -296,6 +309,55 @@ export const DemandDraftSchema = z.object({
     }
 });
 
+const BG_COURIER_REQUIRED_FIELDS = [
+    ['bgCourierOrg', 'Organization Name'],
+    ['bgCourierName', 'Recipient Name'],
+    ['bgCourierPhone', 'Phone'],
+    ['bgCourierAddrLine1', 'Address Line 1'],
+    ['bgCourierAddrLine2', 'Address Line 2'],
+    ['bgCourierCity', 'City'],
+    ['bgCourierState', 'State'],
+    ['bgCourierPincode', 'Pin Code'],
+    ['bgCourierEmpFrom', 'Courier From'],
+    ['bgCourierDelDate', 'Delivery Date'],
+    ['bgCourierUrgency', 'Dispatch Urgency'],
+] as const;
+
+/**
+ * Shared BG Courier Dispatch validation — every BG form (EMD + project BI)
+ * renders the dispatch block, so these fields are mandatory for mode BG.
+ */
+const addBgCourierDispatchIssues = (
+    details: Record<string, any>,
+    ctx: z.RefinementCtx,
+    pathPrefix: (string | number)[] = [],
+) => {
+    for (const [key, label] of BG_COURIER_REQUIRED_FIELDS) {
+        const value = details[key];
+        const missing =
+            value === undefined ||
+            value === null ||
+            (typeof value === 'string' && value.trim() === '') ||
+            (typeof value === 'number' && isNaN(value));
+        if (missing) {
+            ctx.addIssue({
+                code: 'custom',
+                message: `${label} is required`,
+                path: [...pathPrefix, key],
+            });
+        }
+    }
+
+    const pincode = details.bgCourierPincode;
+    if (typeof pincode === 'string' && pincode.trim() !== '' && !/^\d{6}$/.test(pincode.trim())) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Pin Code must be 6 digits',
+            path: [...pathPrefix, 'bgCourierPincode'],
+        });
+    }
+};
+
 export const BankGuaranteeSchema = z.object({
     bgPurpose: z.string().optional(),
     bgAmount: z.coerce.number().optional(),
@@ -316,6 +378,19 @@ export const BankGuaranteeSchema = z.object({
     bgBankAccountName: z.string().optional(),
     bgBankAccountNo: z.string().optional(),
     bgBankIfsc: z.string().optional(),
+    // Courier Dispatch (project-dashboard BG requests)
+    bgCourierOrg: z.string().optional(),
+    bgCourierName: z.string().optional(),
+    bgCourierPhone: z.string().optional(),
+    bgCourierAddrLine1: z.string().optional(),
+    bgCourierAddrLine2: z.string().optional(),
+    bgCourierCity: z.string().optional(),
+    bgCourierState: z.string().optional(),
+    bgCourierPincode: z.string().optional(),
+    bgCourierEmpFrom: z.coerce.number().optional(),
+    bgCourierDelDate: z.string().optional(),
+    bgCourierUrgency: z.coerce.number().optional(),
+    bgCourierDocs: z.array(z.string()).optional(),
 }).superRefine((data, ctx) => {
     if (!data.bgNeededIn || (typeof data.bgNeededIn === 'string' && data.bgNeededIn.trim() === '')) {
         ctx.addIssue({
@@ -380,13 +455,8 @@ export const BankGuaranteeSchema = z.object({
             path: ['bgBank'],
         });
     }
-    if (!data.bgCourierAddress || (typeof data.bgCourierAddress === 'string' && data.bgCourierAddress.trim() === '')) {
-        ctx.addIssue({
-            code: 'custom',
-            message: 'Courier Address is required',
-            path: ['bgCourierAddress'],
-        });
-    }
+    // Courier Dispatch replaces the legacy single "Courier Address" field.
+    addBgCourierDispatchIssues(data as Record<string, any>, ctx);
 });
 
 export const FdrSchema = z.object({
@@ -651,9 +721,33 @@ export const BiOtherThanTenderRequestSchema = z.object({
     }).superRefine(validatePaymentMode).optional(),
 });
 
+
+export const ProjectBgRequestSchema = BiOtherThanTenderRequestSchema.superRefine((data, ctx) => {
+    if (data.EMD?.mode !== 'BG') return;
+    const details: Record<string, any> = data.EMD?.details ?? {};
+
+    const BG_BANK_REQUIRED_FIELDS = [
+        ['bgBankAccountName', 'Customer Account Name'],
+        ['bgBankAccountNo', 'Customer Account Number'],
+        ['bgBankIfsc', 'Customer IFSC Code'],
+    ] as const;
+
+    for (const [key, label] of BG_BANK_REQUIRED_FIELDS) {
+        const value = details[key];
+        if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) {
+            ctx.addIssue({
+                code: 'custom',
+                message: `${label} is required`,
+                path: ['EMD', 'details', key],
+            });
+        }
+    }
+});
+
 export type PaymentRequestFormValues = z.infer<typeof PaymentRequestSchema>;
 export type OldEntryPaymentRequestFormValues = z.infer<typeof OldEntryPaymentRequestSchema>;
 export type BiOtherThanTenderRequestFormValues = z.infer<typeof BiOtherThanTenderRequestSchema>;
+export type ProjectBgRequestFormValues = z.infer<typeof ProjectBgRequestSchema>;
 export type PaymentDetailsFormValues = z.infer<typeof PaymentDetailsSchema>;
 export type BankTransferFormValues = z.infer<typeof BankTransferSchema>;
 export type PayOnPortalFormValues = z.infer<typeof PayOnPortalSchema>;
