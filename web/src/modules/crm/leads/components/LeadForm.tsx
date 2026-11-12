@@ -25,7 +25,12 @@ import { useCreateLead, useUpdateLead } from "@/hooks/api/useLeads";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import { useAuth } from "@/contexts/AuthContext";
 import axiosInstance from "@/lib/axios";
-import type { LeadWithNames, LiveLocation } from "../helpers/leads.type";
+import type {
+    CreateLeadRequest,
+    LeadWithNames,
+    LiveLocation,
+    UpdateLeadRequest,
+} from "../helpers/leads.type";
 import { LocationPickerModal } from "./LocationPickerModal";
 
 type Option = { value: string; label: string };
@@ -165,7 +170,7 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
         defaultValues: {
             companyName: lead?.companyName || "",
             name: lead?.name || "",
-            designation: lead?.designation || "Not Available",
+            designation: lead?.designation || "",
             phone: lead?.phone || "",
             email: lead?.email || "",
             address: lead?.address || "",
@@ -255,23 +260,30 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
 
     const handleSubmit: SubmitHandler<LeadFormValues> = async (values) => {
         try {
-            const payload = {
+            const basePayload = {
                 companyName: values.companyName,
                 name: values.name,
-                designation: values.designation || "Not Available",
                 phone: values.phone,
-                email: values.email || null,
                 address: values.address,
                 country: values.country,
                 state: values.state,
-                type: values.type || null,
-                industry: values.industry || null,
-                team: null,
-                allocatedTe: values.allocatedTe ? Number(values.allocatedTe) : null,
-                liveLocation,
             };
 
             if (mode === "create") {
+                const payload: CreateLeadRequest = {
+                    ...basePayload,
+                    ...(values.designation?.trim()
+                        ? { designation: values.designation.trim() }
+                        : {}),
+                    ...(values.email?.trim() ? { email: values.email.trim() } : {}),
+                    ...(values.type ? { type: values.type } : {}),
+                    ...(values.industry ? { industry: values.industry } : {}),
+                    ...(values.allocatedTe
+                        ? { allocatedTe: Number(values.allocatedTe) }
+                        : {}),
+                    ...(liveLocation ? { liveLocation } : {}),
+                };
+
                 const created = await createLead.mutateAsync(payload);
                 if (values.addFirstInteraction && created?.id) {
                     const tab = values.firstInteractionType ?? "call";
@@ -279,6 +291,18 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
                     return;
                 }
             } else if (mode === "edit" && lead) {
+                const payload: UpdateLeadRequest = {
+                    ...basePayload,
+                    designation: values.designation?.trim() || null,
+                    email: values.email?.trim() || null,
+                    type: values.type || null,
+                    industry: values.industry || null,
+                    allocatedTe: values.allocatedTe
+                        ? Number(values.allocatedTe)
+                        : null,
+                    liveLocation,
+                };
+
                 await updateLead.mutateAsync({
                     id: lead.id,
                     data: payload,
