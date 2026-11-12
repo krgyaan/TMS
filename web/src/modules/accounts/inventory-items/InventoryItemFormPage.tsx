@@ -14,7 +14,7 @@ import { useCreateInventoryItem, useInventoryItem, useItemConversionOptions, use
 import { handleQueryError } from "@/lib/react-query";
 import { paths } from "@/app/routes/paths";
 import type { InventoryItemPayload } from "@/types/inventory-item.types";
-import { categoryOptions, getCategory, UNIT_OPTIONS, type Unit } from "./item-config";
+import { categoryOptions, getCategory, groupOptions, UNIT_OPTIONS, type Unit } from "./item-config";
 import { inventoryItemFormSchema, type InventoryItemFormValues } from "./item-form-schema";
 
 const formControlClass = "h-11 w-full rounded-md border border-slate-400 bg-background px-3 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:border-slate-600 md:h-10";
@@ -29,7 +29,7 @@ export default function InventoryItemFormPage() {
     const navigate = useNavigate();
     const form = useForm<InventoryItemFormValues>({
         resolver: zodResolver(inventoryItemFormSchema) as never,
-        defaultValues: { teamId: "", itemName: "", itemType: "", specifications: {}, description: "", unit: "Nos.", conversionUnit: "", conversionFactor: "", hsnCode: "", isActive: true },
+        defaultValues: { teamId: "", itemGroup: "", itemName: "", itemType: "", specifications: {}, description: "", unit: "Nos.", conversionUnit: "", conversionFactor: "", hsnCode: "", isActive: true },
     });
     const { data: item, isLoading: itemLoading, error: itemError, refetch } = useInventoryItem("master", itemId);
     const { data: teams = [], isLoading: teamsLoading } = useTeams();
@@ -59,7 +59,7 @@ export default function InventoryItemFormPage() {
         if (isEdit) {
             if (!item || initializedForm.current === `edit-${itemId}`) return;
             form.reset({
-                teamId: String(item.teamId), itemName: item.itemName, itemType: item.itemType || "",
+                teamId: String(item.teamId), itemGroup: item.itemGroup || "", itemName: item.itemName, itemType: item.itemType || "",
                 specifications: item.specifications || {}, description: item.description || "",
                 unit: item.unit as Unit, conversionUnit: item.conversionUnit || "",
                 conversionFactor: item.conversionFactor || "", hsnCode: item.hsnCode || "", isActive: item.isActive,
@@ -71,7 +71,7 @@ export default function InventoryItemFormPage() {
         } else if (teamOptions.length && initializedForm.current !== "new") {
             form.reset({
                 teamId: String(teamOptions.find(team => team.name === "AC")?.id || teamOptions[0].id),
-                itemName: "", itemType: "", specifications: {}, description: "", unit: "Nos.",
+                itemGroup: "", itemName: "", itemType: "", specifications: {}, description: "", unit: "Nos.",
                 conversionUnit: "", conversionFactor: "", hsnCode: "", isActive: true,
             });
             lastWidth.current = "";
@@ -161,7 +161,7 @@ export default function InventoryItemFormPage() {
                 return;
             }
             const payload: InventoryItemPayload = {
-                teamId: Number(values.teamId), itemName: values.itemName, itemType: values.itemType.trim() || null,
+                teamId: Number(values.teamId), itemGroup: values.itemGroup || null, itemName: values.itemName, itemType: values.itemType.trim() || null,
                 specifications: values.specifications, description: values.description.trim() || null,
                 unit: values.unit, conversionUnit: values.conversionUnit || null,
                 conversionFactor: values.conversionUnit ? values.conversionFactor : null,
@@ -217,6 +217,9 @@ export default function InventoryItemFormPage() {
                 <div className="grid gap-4 md:grid-cols-2">
                     <FormField label="Team" required helper="Select AC or DC." error={errors.teamId?.message}>
                         <select className={formControlClass} aria-invalid={Boolean(errors.teamId)} disabled={teamsLoading} {...form.register("teamId")}><option value="">Select team</option>{teamOptions.map(team => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
+                    </FormField>
+                    <FormField label="Item group" helper="Optional classification used by the item list filter." error={errors.itemGroup?.message}>
+                        <select className={formControlClass} aria-invalid={Boolean(errors.itemGroup)} {...form.register("itemGroup")}><option value="">No group</option>{groupOptions.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</select>
                     </FormField>
                     <FormField label="Item name" required helper="Select the item family." error={errors.itemName?.message}>
                         <select className={formControlClass} aria-invalid={Boolean(errors.itemName)} {...form.register("itemName", { onChange: event => {
