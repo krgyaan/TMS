@@ -27,6 +27,7 @@ export { timerDashboardService } from "./timer-dashboard.service";
 export { tenderInfosService } from "./tenders.service";
 export { tenderStatusHistoryService } from "./tender-status-history.service";
 export { infoSheetsService } from "./info-sheet.service";
+export { otherContactsService } from "./other-contacts.service";
 export { paymentRequestsService } from "./payment-requests.service";
 export { rfqsService } from "./rfqs.service";
 export { rfqResponseService } from "./rfqResponse.service";

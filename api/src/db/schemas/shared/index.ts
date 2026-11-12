@@ -4,6 +4,7 @@ export * from "./follow-ups.relations";
 
 export * from "./couriers.relations";
 export * from "./client-directory.schema";
+export * from "./other-contacts.schema";
 export * from "./couriers.schema";
 export * from "./enums.schema";
 

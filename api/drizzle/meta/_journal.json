@@ -694,6 +694,13 @@
       "when": 1797000000004,
       "tag": "0176_add_financial_and_counter_guarantee_to_payment_purpose_enum",
       "breakpoints": true
+    },
+    {
+      "idx": 123,
+      "version": "7",
+      "when": 1797000000005,
+      "tag": "0177_create_other_contacts",
+      "breakpoints": true
     }
   ]
 }
