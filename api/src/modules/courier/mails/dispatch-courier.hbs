@@ -9,9 +9,11 @@
         <li>Pickup date and time: {{pickupDateTime}}</li>
         <li>Docket No.: {{docketNo}}</li>
     </ul>
+    {{#if hasDocketSlip}}
     <p>The Docket slip against the tender has been attached with the mail.</p>
+    {{/if}}
     <p>
         <b>Regards,</b><br />
-        {{cooName}}
+        {{senderName}}
     </p>
 </div>

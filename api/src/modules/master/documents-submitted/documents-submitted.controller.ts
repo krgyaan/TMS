@@ -1,17 +1,6 @@
-﻿import {
-    Body,
-    Controller,
-    Get,
-    Param,
-    ParseIntPipe,
-    Patch,
-    Post,
-    Query,
-    HttpCode,
-    HttpStatus,
-    NotFoundException,
-} from '@nestjs/common';
+﻿import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus, NotFoundException, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
+import { MasterWriteGuard } from '@/modules/master/common/master-write.guard';
 import { DocumentsSubmittedService } from '@/modules/master/documents-submitted/documents-submitted.service';
 
 const CreateDocumentSubmittedSchema = z.object({
@@ -29,6 +18,7 @@ type UpdateDocumentSubmittedDto = z.infer<
 >;
 
 @Controller('documents-submitted')
+@UseGuards(MasterWriteGuard)
 export class DocumentsSubmittedController {
     constructor(
         private readonly documentsSubmittedService: DocumentsSubmittedService,

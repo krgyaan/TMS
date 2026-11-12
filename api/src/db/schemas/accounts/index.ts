@@ -16,3 +16,4 @@ export * from "./insurance-policy.schema";
 
 // Fixed Expenses
 export * from "./fixed-expense.schema";
+export * from "./fixed-expense-history.schema";

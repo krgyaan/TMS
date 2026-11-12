@@ -663,28 +663,56 @@
     {
       "idx": 118,
       "version": "7",
-      "when": 1796007000002,
-      "tag": "0172_make_inventory_item_team_nullable",
+      "when": 1797000000000,
+      "tag": "0172_add_last_reminder_sent_at_to_follow_ups",
       "breakpoints": true
     },
     {
       "idx": 119,
       "version": "7",
-      "when": 1796007000003,
-      "tag": "0173_reconcile_inventory_item_runtime_columns",
+      "when": 1797000000001,
+      "tag": "0173_add_project_id_to_payment_requests_and_instruments",
       "breakpoints": true
     },
     {
       "idx": 120,
       "version": "7",
-      "when": 1796007000004,
-      "tag": "0174_copy_inventory_item_settings_permissions",
+      "when": 1797000000002,
+      "tag": "0174_drop_project_id_from_payment_instruments",
       "breakpoints": true
     },
     {
       "idx": 121,
       "version": "7",
-      "when": 1796007000005,
+      "when": 1797000000003,
+      "tag": "0175_add_project_bg_purposes_to_payment_purpose_enum",
+      "breakpoints": true
+    },
+    {
+      "idx": 122,
+      "version": "7",
+      "when": 1797000000004,
+      "tag": "0172_make_inventory_item_team_nullable",
+      "breakpoints": true
+    },
+    {
+      "idx": 123,
+      "version": "7",
+      "when": 1797000000005,
+      "tag": "0173_reconcile_inventory_item_runtime_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 124,
+      "version": "7",
+      "when": 1797000000006,
+      "tag": "0174_copy_inventory_item_settings_permissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 125,
+      "version": "7",
+      "when": 1797000000007,
       "tag": "0175_inventory_items_business_key_unique",
       "breakpoints": true
     }

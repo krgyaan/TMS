@@ -1,17 +1,6 @@
-﻿import {
-    Body,
-    Controller,
-    Get,
-    Param,
-    ParseIntPipe,
-    Patch,
-    Post,
-    Query,
-    HttpCode,
-    HttpStatus,
-    NotFoundException,
-} from '@nestjs/common';
+﻿import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus, NotFoundException, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
+import { MasterWriteGuard } from '@/modules/master/common/master-write.guard';
 import { FollowupCategoriesService } from '@/modules/master/followup-categories/followup-categories.service';
 
 const CreateFollowupCategorySchema = z.object({
@@ -25,6 +14,7 @@ type CreateFollowupCategoryDto = z.infer<typeof CreateFollowupCategorySchema>;
 type UpdateFollowupCategoryDto = z.infer<typeof UpdateFollowupCategorySchema>;
 
 @Controller('followup-categories')
+@UseGuards(MasterWriteGuard)
 export class FollowupCategoriesController {
     constructor(
         private readonly followupCategoriesService: FollowupCategoriesService,

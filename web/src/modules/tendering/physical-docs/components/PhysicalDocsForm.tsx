@@ -19,7 +19,7 @@ import { useNavigate } from 'react-router-dom';
 // Import from helpers
 import { Label } from '@/components/ui/label';
 import { useUsers } from '@/hooks/api/useUsers';
-import { useCreateCourier, useCourierOptions } from '@/modules/shared/courier/courier.hooks';
+import { useCreateCourier, useCourierOptions } from '@/hooks/api/useCourier';
 import { FileUploader } from '@/components/file-upload';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';

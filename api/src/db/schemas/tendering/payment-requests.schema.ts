@@ -1,6 +1,7 @@
-import { pgTable, varchar, text, decimal, timestamp, date, pgEnum, serial, index, integer, jsonb, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, varchar, text, decimal, timestamp, date, pgEnum, serial, index, integer, jsonb, boolean, bigint } from 'drizzle-orm/pg-core';
 import { teams } from '@/db/schemas/master/teams.schema';
 import { users } from '@/db/schemas/auth/users.schema';
+import { projects } from '@/db/schemas/master/projects.schema';
 
 // Enums
 export const paymentPurposeEnum = pgEnum('payment_purpose', [
@@ -9,6 +10,8 @@ export const paymentPurposeEnum = pgEnum('payment_purpose', [
     'Processing Fee',    // Corresponds to MySQL emds.purpose = 'Processing Fee'
     'Security Deposit',  // Corresponds to MySQL emds.purpose = 'Security Deposit'
     'Performance BG',    // Corresponds to MySQL emds.purpose = 'Performance BG'
+    'Advance Payment',   // Project dashboard BG purpose
+    'Security Bond/Deposit', // Project dashboard BG purpose
     'Surety Bond',       // Corresponds to MySQL emds.purpose = 'Surety Bond'
     'Other Payment',     // Corresponds to MySQL emds.purpose = 'Other Payment'
     'DD',
@@ -41,6 +44,7 @@ export const paymentRequests = pgTable('payment_requests', {
 
     // Direct mappings from MySQL emds table
     tenderId: integer('tender_id').notNull().default(0), // emds.tender_id
+    projectId: bigint('project_id', { mode: 'number' }).references(() => projects.id, { onDelete: 'set null' }), // Links request to a project (Request BI from project dashboard)
     type: paymentRequestTypeEnum('type').default('TMS'), // emds.type
     team: integer('team').references(() => teams.id),
     tenderNo: varchar('tender_no', { length: 500 }).default('NA'), // emds.tender_no (equal to tender.tenderNo)
@@ -63,6 +67,7 @@ export const paymentRequests = pgTable('payment_requests', {
     return [
         { purposeIdx: index('payment_requests_purpose_idx').on(table.purpose) },
         { legacyEmdIdx: index('payment_requests_legacy_emd_id_idx').on(table.legacyEmdId) },
+        { projectIdx: index('payment_requests_project_id_idx').on(table.projectId) },
     ];
 });
 

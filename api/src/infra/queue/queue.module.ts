@@ -36,7 +36,13 @@ import { ConfigService } from "@nestjs/config";
                         },
                     } as unknown as Queue;
                 }
-                return new Queue("followup-mail-queue", { connection });
+                return new Queue("followup-mail-queue", {
+                    connection,
+                    defaultJobOptions: {
+                        removeOnComplete: { count: 1000, age: 7 * 24 * 3600 },
+                        removeOnFail: { count: 5000, age: 30 * 24 * 3600 },
+                    },
+                });
             },
         },
         {
