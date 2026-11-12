@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { eq, ilike, like, and } from "drizzle-orm";
+import { eq, ilike, like, and, isNotNull } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import { locations, type Location, type NewLocation } from "@db/schemas/master/locations.schema";
@@ -14,6 +14,28 @@ export class LocationsService {
 
     async findAllTrue(): Promise<Location[]> {
         return this.db.select().from(locations).where(eq(locations.status, true)).orderBy(locations.name);
+    }
+
+    async findDistinctStates(): Promise<string[]> {
+        const rows = await this.db
+            .select({ state: locations.state })
+            .from(locations)
+            .where(and(eq(locations.status, true), isNotNull(locations.state)))
+            .groupBy(locations.state)
+            .orderBy(locations.state);
+        return rows.map(r => r.state!).filter(Boolean);
+    }
+
+    async findDistinctRegions(state?: string): Promise<string[]> {
+        const conditions = [eq(locations.status, true), isNotNull(locations.region)];
+        if (state) conditions.push(eq(locations.state, state));
+        const rows = await this.db
+            .select({ region: locations.region })
+            .from(locations)
+            .where(and(...conditions))
+            .groupBy(locations.region)
+            .orderBy(locations.region);
+        return rows.map(r => r.region!).filter(Boolean);
     }
 
     async findById(id: number): Promise<Location | null> {

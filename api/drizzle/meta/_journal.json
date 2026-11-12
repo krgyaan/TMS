@@ -666,6 +666,27 @@
       "when": 1797000000000,
       "tag": "0172_add_last_reminder_sent_at_to_follow_ups",
       "breakpoints": true
+    },
+    {
+      "idx": 119,
+      "version": "7",
+      "when": 1797000000001,
+      "tag": "0173_add_project_id_to_payment_requests_and_instruments",
+      "breakpoints": true
+    },
+    {
+      "idx": 120,
+      "version": "7",
+      "when": 1797000000002,
+      "tag": "0174_drop_project_id_from_payment_instruments",
+      "breakpoints": true
+    },
+    {
+      "idx": 121,
+      "version": "7",
+      "when": 1797000000003,
+      "tag": "0175_add_project_bg_purposes_to_payment_purpose_enum",
+      "breakpoints": true
     }
   ]
 }

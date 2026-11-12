@@ -31,6 +31,16 @@ export class LocationsController {
         return this.locationsService.findAllTrue();
     }
 
+    @Get("states")
+    async getStates() {
+        return this.locationsService.findDistinctStates();
+    }
+
+    @Get("regions")
+    async getRegions(@Query("state") state?: string) {
+        return this.locationsService.findDistinctRegions(state);
+    }
+
     @Get("search")
     async search(@Query("q") query: string) {
         if (!query) {
