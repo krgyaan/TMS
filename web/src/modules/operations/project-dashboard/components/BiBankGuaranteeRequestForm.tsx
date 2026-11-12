@@ -85,22 +85,26 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
     } as const;
 
     const emailOptions = useMemo(() => {
-        const rawEmails = [
-            ...(woContacts ?? []).map(contact => contact.email),
-            ...(tenderContacts?.contacts ?? []).map(contact => contact.email),
+        const rawContacts = [
+            ...(woContacts ?? []).map(contact => ({ name: contact.name, email: contact.email })),
+            ...(tenderContacts?.contacts ?? []).map(contact => ({ name: contact.name, email: contact.email })),
         ];
         const seen = new Set<string>();
-        const options = rawEmails
-            .map(email => (email ?? '').trim())
-            .filter(email => email.includes('@'))
-            .filter(email => {
-                const key = email.toLowerCase();
+        const options = rawContacts
+            .map(contact => ({ name: (contact.name ?? '').trim(), email: (contact.email ?? '').trim() }))
+            .filter(contact => contact.email.includes('@'))
+            .filter(contact => {
+                const key = contact.email.toLowerCase();
                 if (seen.has(key)) return false;
                 seen.add(key);
                 return true;
             })
-            .sort((a, b) => a.localeCompare(b))
-            .map(email => ({ id: email, name: email }));
+            .map(contact => ({
+                // Show the contact's name in the dropdown, but the stored value stays the email.
+                id: contact.email,
+                name: contact.name || contact.email,
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name));
 
         options.push({ id: ADD_CONTACT_OPTION, name: '+ Add contact person' });
         return options;
