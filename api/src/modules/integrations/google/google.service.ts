@@ -46,6 +46,8 @@ export type GoogleConnection = {
     updatedAt: Date;
     hasRefreshToken: boolean;
     refreshToken: string | null;
+    /** Optional pre-fetched access token (used when no refresh token is stored). */
+    accessToken?: string | null;
 };
 
 @Injectable()
