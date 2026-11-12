@@ -1,11 +1,12 @@
 import { Injectable, Inject } from "@nestjs/common";
-import { and, between, eq, exists, inArray, or, sql } from "drizzle-orm";
+import { and, between, eq, exists, inArray, or, sql, type SQL } from "drizzle-orm";
 import { format } from "date-fns";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
+import { StatusCache } from "@/utils/status-cache";
 
 import { tenderInfos } from "@/db/schemas/tendering/tenders.schema";
 import { bidSubmissions } from "@/db/schemas/tendering/bid-submissions.schema";
@@ -15,6 +16,7 @@ import { tenderCostingDetails } from "@/db/schemas/tendering/tender-costing-deta
 import { locations } from "@/db/schemas/master/locations.schema";
 import { items } from "@/db/schemas/master/items.schema";
 import { itemHeadings } from "@/db/schemas/master/item-headings.schema";
+import { statuses } from "@/db/schemas/master/statuses.schema";
 import { teams } from "@/db/schemas/master/teams.schema";
 import { users } from "@/db/schemas/auth/users.schema";
 
@@ -32,6 +34,15 @@ const yearToDateRange = (year: string): { fromDate: string; toDate: string } => 
     const endYear = 2000 + Number(match[2]);
     return { fromDate: `${startYear}-04-01`, toDate: `${endYear}-03-31` };
 };
+
+/**
+ * Day boundaries in IST, matching the OEM dashboard report so that every
+ * tender is scoped by `tender_infos.created_at` within the selected range.
+ */
+const dateRange = (fromDate: string, toDate: string): { from: Date; to: Date } => ({
+    from: new Date(`${fromDate}T00:00:00+05:30`),
+    to: new Date(`${toDate}T23:59:59.999+05:30`),
+});
 import type {
     AssignedTenderRow,
     BusinessTenderListItem,
@@ -51,6 +62,7 @@ const STATUS = {
     RESULTS_AWAITED: [17],
     LOST: [24],
     WON: [25, 26, 27, 28],
+    CANCELLED: [18],
 } as const;
 
 const DATE_FORMAT = "dd-MM-yyyy hh:mm a";
@@ -64,9 +76,11 @@ const STATUS_LABEL = (s: number): string =>
             ? "Lost"
             : (STATUS.DISQUALIFIED as readonly number[]).includes(s)
               ? "Disqualified"
-              : (STATUS.RESULTS_AWAITED as readonly number[]).includes(s)
-                ? "Results Awaited"
-                : "Assigned";
+              : (STATUS.CANCELLED as readonly number[]).includes(s)
+                ? "Cancelled"
+                : (STATUS.RESULTS_AWAITED as readonly number[]).includes(s)
+                  ? "Results Awaited"
+                  : "Assigned";
 
 @Injectable()
 export class LocationPerformanceService {
@@ -82,18 +96,26 @@ export class LocationPerformanceService {
         this.logger.info("Fetching location performance", { query });
 
         try {
-            const range = yearToDateRange(query.year!);
+            let range: { fromDate: string; toDate: string };
+            if (query.fromDate && query.toDate) {
+                range = { fromDate: query.fromDate, toDate: query.toDate };
+            } else {
+                range = yearToDateRange(query.year!);
+            }
+
             const filters: LocationFilters = {
                 ...query,
                 fromDate: range.fromDate,
                 toDate: range.toDate,
             };
 
+            const locationIds = await this.getLocationIdsForFilters(filters);
+
             const [tenderRows, assignedRows, itemRows, tenderListRows] = await Promise.all([
-                this.getTenders(filters),
-                this.getAssignedTenders(filters),
+                this.getTenders(filters, locationIds),
+                this.getAssignedTenders(filters, locationIds),
                 filters.heading ? this.getItemsUnderHeading(filters.heading) : Promise.resolve([]),
-                this.getTenderList(filters),
+                this.getTenderList(filters, locationIds),
             ]);
 
             const assignedApproved = this.buildAssignedApprovedSummary(assignedRows);
@@ -120,24 +142,48 @@ export class LocationPerformanceService {
         }
     }
 
+    // ─── Location ID resolution from state / region / location ────────────
+
+    private async getLocationIdsForFilters(filters: LocationFilters): Promise<number[] | null> {
+        // If only a specific location is given (no state/region), use it directly
+        if (filters.location && !filters.state && !filters.region) {
+            return [filters.location];
+        }
+
+        // If no state/region/location at all, return null (no location filter)
+        if (!filters.state && !filters.region && !filters.location) {
+            return null;
+        }
+
+        // Resolve state/region → location IDs
+        const conditions = [eq(locations.status, true)];
+        if (filters.state) conditions.push(eq(locations.state, filters.state));
+        if (filters.region) conditions.push(eq(locations.region, filters.region));
+
+        const rows = await this.db.select({ id: locations.id }).from(locations).where(and(...conditions));
+        return rows.map(r => r.id);
+    }
+
+    private buildLocationCondition(locationIds: number[] | null): SQL | undefined {
+        if (locationIds === null) return undefined; // no filter
+        if (locationIds.length === 0) return sql`false`; // no matching locations → return nothing
+        return inArray(tenderInfos.location, locationIds);
+    }
+
     // ─── Query 1: bid submissions ─────────────────────────────────────
 
-    private async getTenders(filters: LocationFilters): Promise<TenderRow[]> {
+    private async getTenders(filters: LocationFilters, locationIds: number[] | null): Promise<TenderRow[]> {
         const conditions = [eq(tenderInfos.deleteStatus, 0)];
 
-        const locationConditions: ReturnType<typeof eq>[] = [];
-        if (filters.location) locationConditions.push(eq(locations.id, filters.location));
-        if (locationConditions.length === 1) conditions.push(locationConditions[0]);
-        if (locationConditions.length === 2) conditions.push(or(...locationConditions)!);
+        const locationCondition = this.buildLocationCondition(locationIds);
+        if (locationCondition) conditions.push(locationCondition);
 
         if (filters.team) conditions.push(eq(tenderInfos.team, filters.team));
         if (filters.heading) conditions.push(eq(itemHeadings.id, filters.heading));
 
         if (filters.fromDate && filters.toDate) {
-            const from = new Date(filters.fromDate);
-            const to = new Date(filters.toDate);
-            to.setHours(23, 59, 59, 999);
-            conditions.push(between(bidSubmissions.submissionDatetime, from, to));
+            const { from, to } = dateRange(filters.fromDate, filters.toDate);
+            conditions.push(between(tenderInfos.createdAt, from, to));
         }
 
         return this.db
@@ -157,30 +203,26 @@ export class LocationPerformanceService {
             })
             .from(bidSubmissions)
             .innerJoin(tenderInfos, eq(tenderInfos.id, bidSubmissions.tenderId))
-            .innerJoin(locations, eq(locations.id, tenderInfos.location))
-            .innerJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(locations, eq(locations.id, tenderInfos.location))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(itemHeadings, eq(itemHeadings.id, items.headingId))
             .where(and(...conditions)) as unknown as TenderRow[];
     }
 
     // ─── Query 2: assigned / approved ────────────────────────────────
 
-    private async getAssignedTenders(filters: LocationFilters): Promise<AssignedTenderRow[]> {
+    private async getAssignedTenders(filters: LocationFilters, locationIds: number[] | null): Promise<AssignedTenderRow[]> {
         const conditions = [eq(tenderInfos.deleteStatus, 0)];
 
-        const locationConditions: ReturnType<typeof eq>[] = [];
-        if (filters.location) locationConditions.push(eq(locations.id, filters.location));
-        if (locationConditions.length === 1) conditions.push(locationConditions[0]);
-        if (locationConditions.length === 2) conditions.push(or(...locationConditions)!);
+        const locationCondition = this.buildLocationCondition(locationIds);
+        if (locationCondition) conditions.push(locationCondition);
 
         if (filters.team) conditions.push(eq(tenderInfos.team, filters.team));
         if (filters.heading) conditions.push(eq(itemHeadings.id, filters.heading));
 
         if (filters.fromDate && filters.toDate) {
-            const from = new Date(filters.fromDate);
-            const to = new Date(filters.toDate);
-            to.setHours(23, 59, 59, 999);
-            conditions.push(between(tenderInfos.dueDate, from, to));
+            const { from, to } = dateRange(filters.fromDate, filters.toDate);
+            conditions.push(between(tenderInfos.createdAt, from, to));
         }
 
         return this.db
@@ -196,8 +238,8 @@ export class LocationPerformanceService {
                 itemName: items.name,
             })
             .from(tenderInfos)
-            .innerJoin(locations, eq(locations.id, tenderInfos.location))
-            .innerJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(locations, eq(locations.id, tenderInfos.location))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(itemHeadings, eq(itemHeadings.id, items.headingId))
             .where(and(...conditions)) as unknown as AssignedTenderRow[];
     }
@@ -258,14 +300,15 @@ export class LocationPerformanceService {
 
     // ─── Query 4: flat tender list (for category tables) ─────────────
 
-    private async getTenderList(filters: LocationFilters): Promise<BusinessTenderRow[]> {
-        const from = new Date(filters.fromDate);
-        const to = new Date(filters.toDate);
-        to.setHours(23, 59, 59, 999);
+    private async getTenderList(filters: LocationFilters, locationIds: number[] | null): Promise<BusinessTenderRow[]> {
+        const { from, to } = dateRange(filters.fromDate, filters.toDate);
 
-        const conditions = [eq(tenderInfos.deleteStatus, 0), between(tenderInfos.dueDate, from, to)];
+        const conditions = [eq(tenderInfos.deleteStatus, 0), between(tenderInfos.createdAt, from, to)];
         if (filters.heading) conditions.push(eq(itemHeadings.id, filters.heading));
-        if (filters.location) conditions.push(eq(locations.id, filters.location));
+
+        const locationCondition = this.buildLocationCondition(locationIds);
+        if (locationCondition) conditions.push(locationCondition);
+
         if (filters.team) conditions.push(eq(tenderInfos.team, filters.team));
 
         return (await this.db
@@ -280,6 +323,7 @@ export class LocationPerformanceService {
                 itemName: items.name,
                 state: locations.name,
                 status: tenderInfos.status,
+                statusName: statuses.name,
                 tlStatus: tenderInfos.tlStatus,
                 bidStatus: bidSubmissions.status,
                 hasEmdPaid: this.emdPaidSubquery(),
@@ -295,17 +339,22 @@ export class LocationPerformanceService {
             .from(tenderInfos)
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .leftJoin(teams, eq(teams.id, tenderInfos.team))
-            .innerJoin(items, eq(items.id, tenderInfos.item))
-            .innerJoin(itemHeadings, eq(itemHeadings.id, items.headingId))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(itemHeadings, eq(itemHeadings.id, items.headingId))
             .leftJoin(locations, eq(locations.id, tenderInfos.location))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .where(and(...conditions))
-            .groupBy(tenderInfos.id, users.name, teams.name, items.name, locations.name, bidSubmissions.status)
+            .groupBy(tenderInfos.id, users.name, teams.name, items.name, locations.name, statuses.name, bidSubmissions.status)
             .orderBy(tenderInfos.dueDate)
             .execute()) as unknown as BusinessTenderRow[];
     }
 
     private buildTenderList(rows: BusinessTenderRow[]): BusinessTenderListItem[] {
+        // "Not Bid" mirrors the Tender List's "Did Not Bid" tab: tenders whose
+        // status belongs to the `dnb` category in the statuses master table.
+        const dnbStatusIds = StatusCache.getIds("dnb");
+
         return rows.map(row => {
             const s = Number(row.status);
             const categories: string[] = ["tenders_assigned"];
@@ -315,9 +364,10 @@ export class LocationPerformanceService {
             else if ((STATUS.RESULTS_AWAITED as readonly number[]).includes(s)) categories.push("tender_results_awaited");
             else if ((STATUS.LOST as readonly number[]).includes(s)) categories.push("tenders_lost");
             else if ((STATUS.WON as readonly number[]).includes(s)) categories.push("tenders_won");
+            else if ((STATUS.CANCELLED as readonly number[]).includes(s)) categories.push("tenders_cancelled");
 
             if (row.bidStatus === "Bid Submitted") categories.push("tenders_bid");
-            else categories.push("tenders_not_bid");
+            if (dnbStatusIds.includes(s)) categories.push("tenders_not_bid");
 
             if (row.tlStatus === 1) categories.push("tenders_approved");
 
@@ -334,7 +384,7 @@ export class LocationPerformanceService {
                 team: row.team ?? "—",
                 item: row.itemName ?? "—",
                 state: row.state ?? "—",
-                status: STATUS_LABEL(s),
+                status: row.statusName ?? STATUS_LABEL(s),
                 bidStatus: row.bidStatus ?? "—",
                 avgGrossMargin: row.avgGrossMargin !== null && row.avgGrossMargin !== undefined ? row.avgGrossMargin.toFixed(2) : null,
                 category: categories,
@@ -369,6 +419,7 @@ export class LocationPerformanceService {
             tender_results_awaited: this.empty(),
             tenders_won: this.empty(),
             tenders_lost: this.empty(),
+            tenders_cancelled: this.empty(),
         };
 
         for (const tender of tenders) {
@@ -379,6 +430,7 @@ export class LocationPerformanceService {
             else if ((STATUS.RESULTS_AWAITED as readonly number[]).includes(s)) this.add(summary.tender_results_awaited, tender);
             else if ((STATUS.LOST as readonly number[]).includes(s)) this.add(summary.tenders_lost, tender);
             else if ((STATUS.WON as readonly number[]).includes(s)) this.add(summary.tenders_won, tender);
+            else if ((STATUS.CANCELLED as readonly number[]).includes(s)) this.add(summary.tenders_cancelled, tender);
 
             if (tender.bidStatus === "Bid Submitted") this.add(summary.tenders_bid, tender);
         }

@@ -682,11 +682,13 @@ export class TenderApprovalService {
                         tlApprovalTimestamp: new Date(),
                     });
 
-                    if (!isEditMode) {
-                        updateData.status = 3;
-                        newStatus = 3;
-                        statusComment = "Tender info approved";
-                    }
+                // Always reflect the incomplete state, even when re-marking an
+                // already-incomplete sheet (isEditMode). Otherwise the status
+                // stays at 2 and the info-sheet timer stop condition in
+                // TenderInfoSheetsService.update() (prevStatus === 29) is never met.
+                updateData.status = 29;
+                newStatus = 29;
+                statusComment = "Tender info sheet incomplete";
 
                     const infoSheet = await this.tenderInfoSheetsService.findByTenderId(tenderId);
                     if (infoSheet) {
@@ -721,11 +723,9 @@ export class TenderApprovalService {
                     oemNotAllowed: null,
                 });
 
-                if (!isEditMode) {
-                    updateData.status = 29;
-                    newStatus = 29;
-                    statusComment = "Tender info sheet incomplete";
-                }
+                updateData.status = 29;
+                newStatus = 29;
+                statusComment = "Tender info sheet incomplete";
 
                 await this.db.delete(tenderIncompleteFields).where(eq(tenderIncompleteFields.tenderId, tenderId));
 

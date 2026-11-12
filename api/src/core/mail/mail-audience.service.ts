@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql, type SQL } from "drizzle-orm";
 import { users } from "@db/schemas/auth/users.schema";
+import { roles } from "@db/schemas/auth/roles.schema";
 import type { DbInstance } from "@/db";
 import { DRIZZLE } from "@/db/database.module";
 
@@ -29,6 +30,41 @@ export class MailAudienceService {
         const [user] = await this.db.select().from(users).where(eq(users.id, 7));
 
         return user;
+    }
+
+    async getActiveUserById(userId: number): Promise<typeof users.$inferSelect | null> {
+        const [user] = await this.db
+            .select()
+            .from(users)
+            .where(and(eq(users.id, userId), eq(users.isActive, true), isNull(users.deletedAt)))
+            .limit(1);
+
+        return user ?? null;
+    }
+
+    /**
+     * Resolve active users for the given role names, optionally scoped to the
+     * team a user belongs to. Uses COALESCE(primary_team_id, team) so it stays
+     * consistent with team switching across the app.
+     */
+    async getActiveUsersByRoleNames(roleNames: string[], teamId?: number | null): Promise<(typeof users.$inferSelect)[]> {
+        const conditions: SQL[] = [
+            inArray(roles.name, roleNames),
+            eq(users.isActive, true),
+            isNull(users.deletedAt),
+        ];
+
+        if (teamId !== undefined && teamId !== null) {
+            conditions.push(eq(sql<number>`COALESCE(${users.primaryTeamId}, ${users.team})`, teamId));
+        }
+
+        const rows = await this.db
+            .select({ user: users })
+            .from(users)
+            .innerJoin(roles, eq(roles.id, users.roleId))
+            .where(and(...conditions));
+
+        return rows.map(row => row.user);
     }
 
     async getCoordinator(): Promise<typeof users.$inferSelect | null> {

@@ -179,6 +179,10 @@ export const paths = {
         raiseProjectInsuranceForm: (projectId: number) => `/operations/project-dashboard/${projectId}/insurance/create`,
         raiseProjectInsuranceRenewalForm: (projectId: number, policyId: number) =>
             `/operations/project-dashboard/${projectId}/insurance/create?policyId=${policyId}`,
+        biRequestBgCreate: (projectId: number) =>
+            `/operations/project-dashboard/${projectId}/bi-request/bank-guarantee/create`,
+        biRequestView: (projectId: number, requestId: number) =>
+            `/operations/project-dashboard/${projectId}/bi-request/${requestId}`,
         paymentRequests: "/operations/payment-requests",
     },
 
@@ -274,6 +278,9 @@ export const paths = {
         accountChecklists: "/accounts/account-checklists",
         gstChecklists: "/accounts/gst-checklists",
         fixedExpenses: "/accounts/fixed-expenses",
+        fixedExpenseCreate: "/accounts/fixed-expenses/create",
+        fixedExpenseEdit: (id: number) => `/accounts/fixed-expenses/${id}/edit`,
+        fixedExpenseView: (id: number) => `/accounts/fixed-expenses/${id}`,
         projects: "/projects",
         tdsChecklists: "/accounts/tds-checklists",
 
@@ -441,13 +448,13 @@ export const paths = {
 
     // ==================== SHARED ====================
     shared: {
-        followUp: "/shared/follow-ups",
+        followUp: "/shared/follow-up",
         followUpCreate: "/shared/follow-up/create",
         followUpEdit: (id: number) => `/shared/follow-up/edit/${id}`,
         followUpShow: (id: number) => `/shared/follow-up/show/${id}`,
 
         couriers: "/shared/couriers",
-        courierDispatch: "/shared/couriers/dispatch",
+        courierDispatch: (id: number) => `/shared/couriers/dispatch/${id}`,
         courierCreate: "/shared/couriers/create",
         courierView: (id: number) => `/shared/couriers/show/${id}`,
         courierEdit: (id: number) => `/shared/couriers/edit/${id}`,

@@ -1,17 +1,6 @@
-﻿import {
-    Body,
-    Controller,
-    Get,
-    Param,
-    ParseIntPipe,
-    Patch,
-    Post,
-    Query,
-    HttpCode,
-    HttpStatus,
-    NotFoundException,
-} from '@nestjs/common';
+﻿import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus, NotFoundException, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
+import { MasterWriteGuard } from '@/modules/master/common/master-write.guard';
 import { IndustriesService } from '@/modules/master/industries/industries.service';
 
 const CreateIndustrySchema = z.object({
@@ -23,6 +12,7 @@ const CreateIndustrySchema = z.object({
 const UpdateIndustrySchema = CreateIndustrySchema.partial();
 
 @Controller('industries')
+@UseGuards(MasterWriteGuard)
 export class IndustriesController {
     constructor(private readonly industriesService: IndustriesService) { }
 

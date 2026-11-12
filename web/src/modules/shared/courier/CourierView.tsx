@@ -26,7 +26,7 @@ import {
     Pencil,
 } from "lucide-react";
 import { paths } from "@/app/routes/paths";
-import { useCourier } from "@/modules/shared/courier/courier.hooks";
+import { useCourier } from "@/hooks/api/useCourier";
 import { fileUploadService } from "@/services/api/file-upload.service";
 
 const docUrl = (doc: string): string =>
@@ -257,13 +257,13 @@ const CourierViewPage: React.FC = () => {
                                 </div>
                             </div>
                         </div>
-                        {/* <Button
+                        <Button
                             onClick={() => navigate(paths.shared.courierEdit(courier.id))}
                             className="flex items-center gap-2 rounded-lg px-4 py-2 shadow-sm hover:shadow-md transition-all"
                         >
                             <Pencil className="h-4 w-4" />
                             Edit
-                        </Button> */}
+                        </Button>
                     </div>
 
                     <Separator className="my-4" />

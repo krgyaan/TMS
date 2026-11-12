@@ -3,7 +3,7 @@ import { followUps } from "@/db/schemas/shared/follow-ups.schema";
 import { AppLogger } from "@/logger/app-logger.service";
 import type { FdrDashboardCounts, FdrDashboardRow } from "@/modules/bi-dashboard/fdr/helpers/fdr.types";
 import { FollowUpService } from "@/modules/follow-up/follow-up.service";
-import type { CreateFollowUpDto } from "@/modules/follow-up/zod/create-follow-up.dto";
+import type { CreateFollowUpDto } from "@/modules/follow-up/dto";
 import { CHEQUE_STATUSES, FDR_STATUSES } from "@/modules/tendering/payment-requests/constants/payment-request-statuses";
 import { PaymentRequestsNotificationService } from "@/modules/tendering/payment-requests/services/payment-requests-notification.service";
 import type { PaginatedResult } from "@/modules/tendering/types/shared.types";

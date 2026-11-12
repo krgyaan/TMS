@@ -14,7 +14,7 @@ import { and, desc, eq, like } from 'drizzle-orm';
 import type { CreateMomRemarkDto } from '../dto/payment-mom.dto';
 import type { CreatePaymentRequestDto, PaymentPurpose, UpdatePaymentRequestDto, UpdateStatusDto } from '../dto/payment-requests.dto';
 import { PaymentRequestsNotificationService } from './payment-requests-notification.service';
-import { extractAmountFromDetails, extractPurposeFromDetails } from './payment-requests.shared';
+import { extractAmountFromDetails, extractPurposeFromDetails, extractProjectBgPurpose } from './payment-requests.shared';
 
 @Injectable()
 export class PaymentRequestsCommandService {
@@ -90,10 +90,16 @@ export class PaymentRequestsCommandService {
                 const isBlankNonTmsCheque = isNonTmsRequest && payload.EMD.mode === 'CHEQUE';
 
                 if (emdAmount > 0 || isBlankNonTmsCheque) {
+                    // Project dashboard BI requests keep the exact BG purpose
+                    // chosen in the form (Advance Payment / Security Bond/Deposit /
+                    // Performance BG) instead of the generic EMD bucketing.
+                    const emdPurpose = payload.projectId && payload.EMD.mode === 'BG'
+                        ? extractProjectBgPurpose(payload.EMD.details)
+                        : extractPurposeFromDetails(payload.EMD.mode, payload.EMD.details, 'EMD');
                     const request = await this.createPaymentRequest(
                         tx,
                         tenderId,
-                        extractPurposeFromDetails(payload.EMD.mode, payload.EMD.details, 'EMD'),
+                        emdPurpose,
                         emdAmount,
                         tender,
                         userId,
@@ -102,7 +108,8 @@ export class PaymentRequestsCommandService {
                         payload.tenderName,
                         payload.dueDate,
                         emdRemarks,
-                        payload.team
+                        payload.team,
+                        payload.projectId
                     );
                     createdRequests.push(request);
 
@@ -116,8 +123,8 @@ export class PaymentRequestsCommandService {
                     );
                     results.push({ request, instrument });
 
-                    // Auto-create Cheque after DD/FDR creation
-                    if ((payload.EMD.mode === 'DD' || payload.EMD.mode === 'FDR') && instrument) {
+                    // Auto-create Cheque after DD creation (FDR no longer auto-creates a Cheque)
+                    if (payload.EMD.mode === 'DD' && instrument) {
                         const chequeResult = await this.autoCreateChequeFromDdFdr(
                             tx,
                             request,
@@ -167,7 +174,8 @@ export class PaymentRequestsCommandService {
                         payload.tenderName,
                         payload.dueDate,
                         tfRemarks,
-                        payload.team
+                        payload.team,
+                        payload.projectId
                     );
                     createdRequests.push(request);
 
@@ -236,7 +244,8 @@ export class PaymentRequestsCommandService {
                         payload.tenderName,
                         payload.dueDate,
                         pfRemarks,
-                        payload.team
+                        payload.team,
+                        payload.projectId
                     );
                     createdRequests.push(request);
 
@@ -320,8 +329,9 @@ export class PaymentRequestsCommandService {
                 try {
                     const mode = instrument.instrumentType;
                     
-                    // Skip email for DD/FDR (auto-created Cheque will send its own email)
-                    if (!isAutoCreatedCheque && (mode === 'DD' || mode === 'FDR')) {
+                    // Skip email for DD (auto-created Cheque will send its own email).
+                    // FDR is sent via the dedicated FDR branch in sendPaymentInstrumentEmail().
+                    if (!isAutoCreatedCheque && mode === 'DD') {
                         continue;
                     }
                     
@@ -515,7 +525,8 @@ export class PaymentRequestsCommandService {
         tenderName?: string,
         dueDate?: string,
         remarks?: string,
-        team?: number
+        team?: number,
+        projectId?: number
     ) {
         this.logger.log(`Creating payment request: ${purpose} - Amount: ${amount}`);
         const effectiveDueDate = tender?.dueDate 
@@ -538,6 +549,7 @@ export class PaymentRequestsCommandService {
                 status: 'Pending',
                 remarks: remarks || 'Payment Request',
                 team: team || null,
+                projectId: projectId ?? null,
             })
             .returning()
             .execute();

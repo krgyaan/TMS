@@ -13,6 +13,7 @@ import { AlertCircle, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { StateDrawer } from './components/StateDrawer';
 import { StateViewModal } from './components/StateViewModal';
+import { useAuth } from '@/contexts/AuthContext';
 
 const rowSelection: RowSelectionOptions = {
     mode: 'multiRow',
@@ -21,11 +22,12 @@ const rowSelection: RowSelectionOptions = {
 
 const StatesPage = () => {
     const { data: states, isLoading, error, refetch } = useStates();
+    const { canWriteMasterData } = useAuth();
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [viewModalOpen, setViewModalOpen] = useState(false);
     const [selectedState, setSelectedState] = useState<State | null>(null);
 
-    const stateActions: ActionItem<State>[] = [
+    const stateActions = ([
         {
             label: 'View',
             onClick: (row) => {
@@ -54,7 +56,7 @@ const StatesPage = () => {
                 }
             },
         },
-    ];
+    ] as ActionItem<State>[]).filter(action => canWriteMasterData || action.label === 'View');
 
     const [colDefs] = useState<ColDef<State>[]>([
         {
@@ -156,18 +158,20 @@ const StatesPage = () => {
                 <CardHeader>
                     <CardTitle>States</CardTitle>
                     <CardDescription>Manage Indian states and territories</CardDescription>
-                    <CardAction>
-                        <Button
-                            variant="default"
-                            onClick={() => {
-                                setSelectedState(null);
-                                setDrawerOpen(true);
-                            }}
-                        >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add State
-                        </Button>
-                    </CardAction>
+                    {canWriteMasterData && (
+                        <CardAction>
+                            <Button
+                                variant="default"
+                                onClick={() => {
+                                    setSelectedState(null);
+                                    setDrawerOpen(true);
+                                }}
+                            >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add State
+                            </Button>
+                        </CardAction>
+                    )}
                 </CardHeader>
                 <CardContent className="h-screen px-0">
                     <DataTable
@@ -189,7 +193,6 @@ const StatesPage = () => {
                         enableRowSelection={true}
                         selectionType="multiple"
                         onSelectionChanged={(rows) => console.log('Selected rows:', rows)}
-                        height="100%"
                     />
                 </CardContent>
             </Card>

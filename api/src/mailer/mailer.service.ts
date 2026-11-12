@@ -104,8 +104,8 @@ export class MailerService {
             });
         }
 
-        if (!connection.hasRefreshToken) {
-            this.logger.warn("Google account missing refresh token — skipping mail send", {
+        if (!connection.hasRefreshToken && !connection.accessToken) {
+            this.logger.warn("Google account missing refresh token and access token — skipping mail send", {
                 userId: connection.userId,
             });
             return;
@@ -126,7 +126,8 @@ export class MailerService {
             const oauth2Client = new google.auth.OAuth2(googleConfig().clientId, googleConfig().clientSecret);
 
             oauth2Client.setCredentials({
-                refresh_token: (connection as any).refreshToken,
+                refresh_token: connection.refreshToken ?? undefined,
+                access_token: connection.accessToken ?? undefined,
             });
 
             const accessToken = await oauth2Client.getAccessToken();
@@ -149,7 +150,7 @@ export class MailerService {
                     user: connection.providerEmail,
                     clientId: googleConfig().clientId,
                     clientSecret: googleConfig().clientSecret,
-                    refreshToken: (connection as any).refreshToken,
+                    refreshToken: connection.refreshToken ?? undefined,
                     accessToken: accessToken.token,
                 },
             });
@@ -273,6 +274,7 @@ export class MailerService {
                     cc: finalMeta.cc,
                     bcc: finalMeta.bcc,
                     subject: finalMeta.subject,
+                    replyTo: finalMeta.replyTo,
                     html,
                     attachments: finalMeta.attachments,
                 },

@@ -74,7 +74,7 @@ export function useUpdateBeneficiary() {
 export function useUpdatePaymentRequestStatus() {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: { status: string; utrNumber?: string; rejectionReason?: string } }) =>
+        mutationFn: ({ id, data }: { id: number; data: { status: string; utrNumber?: string; rejectionReason?: string; amount?: number | string } }) =>
             paymentRequestApi.updateStatus(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["payment-requests"] });

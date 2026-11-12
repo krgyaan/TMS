@@ -1,5 +1,6 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { z } from "zod";
+import { MasterWriteGuard } from "@/modules/master/common/master-write.guard";
 import { TransportersService } from "@/modules/master/transporters/transporters.service";
 
 const CreateTransporterSchema = z.object({
@@ -24,6 +25,7 @@ function parseIds(raw?: string): number[] {
 }
 
 @Controller("transporters")
+@UseGuards(MasterWriteGuard)
 export class TransportersController {
     constructor(private readonly service: TransportersService) {}
 

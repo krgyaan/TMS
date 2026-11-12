@@ -1,18 +1,6 @@
-import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    ParseIntPipe,
-    Patch,
-    Post,
-    Query,
-    HttpCode,
-    HttpStatus,
-    NotFoundException,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus, NotFoundException, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
+import { MasterWriteGuard } from '@/modules/master/common/master-write.guard';
 import { LeadTypesService } from '@/modules/master/lead-types/lead-types.service';
 
 const CreateLeadTypeSchema = z.object({
@@ -27,6 +15,7 @@ type CreateLeadTypeDto = z.infer<typeof CreateLeadTypeSchema>;
 type UpdateLeadTypeDto = z.infer<typeof UpdateLeadTypeSchema>;
 
 @Controller('lead-types')
+@UseGuards(MasterWriteGuard)
 export class LeadTypesController {
     constructor(private readonly leadTypesService: LeadTypesService) { }
 

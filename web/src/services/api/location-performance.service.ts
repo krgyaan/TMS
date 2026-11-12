@@ -10,7 +10,8 @@ class LocationPerformanceApiService extends BaseApiService {
         return this.get<LocationPerformanceResponse>("", {
             params: {
                 heading: params.headingId,
-                location: params.location,
+                state: params.state,
+                region: params.region,
                 team: params.team,
                 fromDate: params.fromDate,
                 toDate: params.toDate,
