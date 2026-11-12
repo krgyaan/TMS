@@ -177,7 +177,7 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
                     />
                     {addingFor === key && (
                         <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 gap-3">
                                 <div className="space-y-1">
                                     <label className="text-xs font-medium">Full Name *</label>
                                     <div className="relative">
