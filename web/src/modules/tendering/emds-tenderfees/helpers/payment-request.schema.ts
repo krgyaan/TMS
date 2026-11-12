@@ -329,6 +329,19 @@ export const BankGuaranteeSchema = z.object({
     bgBankAccountName: z.string().optional(),
     bgBankAccountNo: z.string().optional(),
     bgBankIfsc: z.string().optional(),
+    // Courier Dispatch (project-dashboard BG requests)
+    bgCourierOrg: z.string().optional(),
+    bgCourierName: z.string().optional(),
+    bgCourierPhone: z.string().optional(),
+    bgCourierAddrLine1: z.string().optional(),
+    bgCourierAddrLine2: z.string().optional(),
+    bgCourierCity: z.string().optional(),
+    bgCourierState: z.string().optional(),
+    bgCourierPincode: z.string().optional(),
+    bgCourierEmpFrom: z.coerce.number().optional(),
+    bgCourierDelDate: z.string().optional(),
+    bgCourierUrgency: z.coerce.number().optional(),
+    bgCourierDocs: z.array(z.string()).optional(),
 }).superRefine((data, ctx) => {
     if (!data.bgNeededIn || (typeof data.bgNeededIn === 'string' && data.bgNeededIn.trim() === '')) {
         ctx.addIssue({
@@ -393,7 +406,11 @@ export const BankGuaranteeSchema = z.object({
             path: ['bgBank'],
         });
     }
-    if (!data.bgCourierAddress || (typeof data.bgCourierAddress === 'string' && data.bgCourierAddress.trim() === '')) {
+    const usesCourierDispatch = !!data.bgCourierOrg;
+    if (
+        !usesCourierDispatch &&
+        (!data.bgCourierAddress || (typeof data.bgCourierAddress === 'string' && data.bgCourierAddress.trim() === ''))
+    ) {
         ctx.addIssue({
             code: 'custom',
             message: 'Courier Address is required',
