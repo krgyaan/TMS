@@ -91,10 +91,7 @@ export class PaymentRequestsCommandService {
                 const isBlankNonTmsCheque = isNonTmsRequest && payload.EMD.mode === 'CHEQUE';
 
                 if (emdAmount > 0 || isBlankNonTmsCheque) {
-                    // Project dashboard BI requests keep the exact BG purpose
-                    // chosen in the form (Advance Payment / Security Bond/Deposit /
-                    // Performance BG) instead of the generic EMD bucketing.
-                    const emdPurpose = payload.projectId && payload.EMD.mode === 'BG'
+                    const emdPurpose = (payload.projectId || payload.preserveBgPurpose) && payload.EMD.mode === 'BG'
                         ? extractProjectBgPurpose(payload.EMD.details)
                         : extractPurposeFromDetails(payload.EMD.mode, payload.EMD.details, 'EMD');
                     const request = await this.createPaymentRequest(
