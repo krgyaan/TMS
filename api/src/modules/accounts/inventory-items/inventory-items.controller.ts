@@ -9,7 +9,7 @@ const ITEM_UNITS = ["Kg", "Mtr", "Ft", "Nos.", "RMtr", "Sq. Mtr."] as const;
 const ITEM_GROUPS = ["Raw Materials", "Finished Goods", "Supplies"] as const;
 
 export const itemSchema = z.object({
-    teamId: z.number().int().positive(),
+    teamId: z.number().int().positive().nullable().optional(),
     itemGroup: z.enum(ITEM_GROUPS).nullable().optional(),
     itemName: z.string().trim().min(1).max(120),
     itemType: z.string().trim().max(80).nullable().optional(),

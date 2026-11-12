@@ -8,7 +8,7 @@ import { resolveConversion } from "./conversion-rules";
 
 type ListOptions = { teamId?: number; itemGroup?: string; search?: string; page?: number; limit?: number; itemName?: string; unit?: string; isActive?: boolean };
 type ItemInput = Pick<NewInventoryItem, "itemName" | "itemType" | "description" | "specifications" | "unit" | "hsnCode" | "isActive">
-    & { itemGroup?: string | null }
+    & { teamId?: number | null; itemGroup?: string | null }
     & { conversionUnit?: string | null; conversionFactor?: string | number | null };
 
 @Injectable()
@@ -46,22 +46,26 @@ export class InventoryItemsService {
         return item;
     }
 
-    async create(data: ItemInput, teamId: number): Promise<InventoryItem> {
-        await this.validateTeamId(teamId);
-        await this.ensureUnique(data, teamId, undefined);
-        const conversion = this.resolveItemConversion(data.unit, data.conversionUnit, data.conversionFactor, data.specifications || {});
+    async create(data: ItemInput): Promise<InventoryItem> {
+        const { teamId: _ignoredTeamId, ...itemData } = data;
+        void _ignoredTeamId;
+        await this.ensureUnique(itemData, undefined);
+        const conversion = this.resolveItemConversion(itemData.unit, itemData.conversionUnit, itemData.conversionFactor, itemData.specifications || {});
         const [item] = await this.db.insert(inventoryItems).values({
-            ...data, ...conversion, teamId, itemCode: await this.nextItemCode(),
+            ...itemData, ...conversion,
+            // The Drizzle schema still requires teamId; migration 0172 makes the database column nullable.
+            teamId: null as unknown as number,
+            itemCode: await this.nextItemCode(),
         }).returning();
         return item;
     }
 
-    async update(id: number, data: Partial<ItemInput>, requestedTeamId?: number): Promise<InventoryItem> {
+    async update(id: number, data: Partial<ItemInput>): Promise<InventoryItem> {
         const current = await this.findById(id);
-        const teamId = requestedTeamId ?? current.teamId;
-        await this.validateTeamId(teamId);
-        const updatedValues = { ...current, ...data };
-        await this.ensureUnique(updatedValues, teamId, id);
+        const { teamId: _ignoredTeamId, ...itemData } = data;
+        void _ignoredTeamId;
+        const updatedValues = { ...current, ...itemData };
+        await this.ensureUnique(updatedValues, id);
         const conversion = this.resolveItemConversion(
             updatedValues.unit,
             updatedValues.conversionUnit,
@@ -71,7 +75,7 @@ export class InventoryItemsService {
         const values = {
             itemName: updatedValues.itemName, itemType: updatedValues.itemType, description: updatedValues.description,
             specifications: updatedValues.specifications, unit: updatedValues.unit, hsnCode: updatedValues.hsnCode,
-            isActive: updatedValues.isActive, ...conversion, itemGroup: updatedValues.itemGroup, teamId, updatedAt: new Date(),
+            isActive: updatedValues.isActive, ...conversion, itemGroup: updatedValues.itemGroup, updatedAt: new Date(),
         };
         const [item] = await this.db.update(inventoryItems).set(values).where(eq(inventoryItems.id, id)).returning();
         return item;
@@ -110,11 +114,10 @@ export class InventoryItemsService {
         return `ITM-${String(nextValue).padStart(4, "0")}`;
     }
 
-    private async ensureUnique(data: Pick<ItemInput, "itemName" | "itemType" | "specifications"> & { itemGroup?: string | null }, teamId: number, excludeId?: number) {
+    private async ensureUnique(data: Pick<ItemInput, "itemName" | "itemType" | "specifications"> & { itemGroup?: string | null }, excludeId?: number) {
         const candidates = await this.db.select({ id: inventoryItems.id }).from(inventoryItems).where(
             and(
                 isNull(inventoryItems.deletedAt),
-                eq(inventoryItems.teamId, teamId),
                 data.itemGroup ? eq(inventoryItems.itemGroup, data.itemGroup) : isNull(inventoryItems.itemGroup),
                 eq(inventoryItems.itemName, data.itemName),
                 data.itemType ? eq(inventoryItems.itemType, data.itemType) : sql`${inventoryItems.itemType} is null`,

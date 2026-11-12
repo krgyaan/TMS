@@ -31,15 +31,13 @@ export class SettingsInventoryItemsController {
     @CanCreate("master.item-master")
     @HttpCode(HttpStatus.CREATED)
     create(@Body() body: unknown) {
-        const { teamId, ...data } = parseItemBody(itemSchema, body);
-        return this.service.create(data, teamId);
+        return this.service.create(parseItemBody(itemSchema, body));
     }
 
     @Patch(":id")
     @CanUpdate("master.item-master")
     update(@Param("id", ParseIntPipe) id: number, @Body() body: unknown) {
-        const { teamId, ...data } = parseItemBody(updateItemSchema, body);
-        return this.service.update(id, data, teamId);
+        return this.service.update(id, parseItemBody(updateItemSchema, body));
     }
 
     @Delete(":id")
