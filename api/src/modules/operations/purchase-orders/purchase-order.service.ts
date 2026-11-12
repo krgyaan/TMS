@@ -311,6 +311,8 @@ export class PurchaseOrderService {
 
                     sellerName: normalizeVendorName(body.sellerName),
                     sellerOrganizationId: body.sellerOrganizationId || null,
+                    sellerGstId: body.sellerGstId || null,
+                    vendorPersonId: body.vendorPersonId || null,
                     sellerAddress: body.sellerAddress,
                     sellerEmail: body.sellerEmail,
                     sellerGstNo: body.sellerGstNo,
@@ -320,7 +322,11 @@ export class PurchaseOrderService {
                     contactPersonName: body.contactPersonName,
                     contactPersonPhone: body.contactPersonPhone,
                     contactPersonEmail: body.contactPersonEmail,
+                    vendorContactPersonName: body.vendorContactPersonName,
+                    vendorContactPersonPhone: body.vendorContactPersonPhone,
+                    vendorContactPersonEmail: body.vendorContactPersonEmail,
 
+                    shipToPartyId: body.shipToPartyId || null,
                     shipToName: body.shipToName,
                     shippingAddress: body.shippingAddress,
                     shipToGst: body.shipToGst,
@@ -372,25 +378,6 @@ export class PurchaseOrderService {
                 });
             }
         }
-
-        // Client directory holds external parties, so the vendor's person goes in -
-        // not our own contact, which is an internal employee.
-        await this.clientDirectorySyncService.syncToClientDirectory(
-            [
-                {
-                    name: body.vendorContactPersonName,
-                    email: body.vendorContactPersonEmail,
-                    phone: body.vendorContactPersonPhone,
-                    org: normalizeVendorName(body.sellerName),
-                },
-                {
-                    name: normalizeVendorName(body.sellerName),
-                    email: body.sellerEmail,
-                    phone: null,
-                    org: null,
-                },
-            ].filter(c => c.name)
-        );
 
         this.logger.info(`Purchase Order created: ${poNumber}`);
 
@@ -1136,6 +1123,8 @@ export class PurchaseOrderService {
 
                     sellerName: normalizeVendorName(body.sellerName),
                     sellerOrganizationId: body.sellerOrganizationId || null,
+                    sellerGstId: body.sellerGstId || null,
+                    vendorPersonId: body.vendorPersonId || null,
                     sellerAddress: body.sellerAddress,
                     sellerEmail: body.sellerEmail,
                     sellerGstNo: body.sellerGstNo,
@@ -1149,6 +1138,7 @@ export class PurchaseOrderService {
                     vendorContactPersonPhone: body.vendorContactPersonPhone,
                     vendorContactPersonEmail: body.vendorContactPersonEmail,
 
+                    shipToPartyId: body.shipToPartyId || null,
                     shipToName: body.shipToName,
                     shippingAddress: body.shippingAddress,
                     shipToGst: body.shipToGst,
@@ -1218,17 +1208,6 @@ export class PurchaseOrderService {
         this.generatePdfForPO(updatedPO, body.products).catch(err => {
             this.logger.error(`Failed to generate PO PDF after update: ${err.message}`);
         });
-
-        await this.clientDirectorySyncService.syncToClientDirectory(
-            [
-                {
-                    name: body.vendorContactPersonName,
-                    email: body.vendorContactPersonEmail,
-                    phone: body.vendorContactPersonPhone,
-                    org: normalizeVendorName(body.sellerName),
-                },
-            ].filter(c => c.name)
-        );
 
         this.logger.info(`Purchase Order updated: ${updatedPO.poNumber}`);
 

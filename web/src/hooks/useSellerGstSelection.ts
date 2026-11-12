@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { useSellerGsts } from "@/hooks/api/usePurchaseOrders";
 
@@ -76,5 +76,11 @@ export function useSellerGstSelection<T extends SellerGstForm>(form: UseFormRetu
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [orgId, sellerGsts, sellerGstId, sellerGstNo]);
 
-    return { sellerGsts, isLoading };
+    // Edit pages call this after form.reset so the hydrated id is treated as
+    // already applied: the effect must not overwrite the saved GST number.
+    const seedInitialSelection = useCallback((gstId?: string | number | null) => {
+        lastFilledIdRef.current = gstId ? String(gstId) : null;
+    }, []);
+
+    return { sellerGsts, isLoading, seedInitialSelection };
 }

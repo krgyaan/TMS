@@ -104,6 +104,10 @@ export interface PurchaseOrderRow {
     projectId: number;
     projectName?: string;
     poNumber: string;
+    sellerOrganizationId?: number;
+    sellerGstId?: number;
+    vendorPersonId?: number;
+    shipToPartyId?: number;
     sellerName: string;
     sellerEmail?: string;
     sellerAddress?: string;

@@ -22,7 +22,7 @@ import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, ArrowLeft, Building2, Calendar, FileText, Hash, Info, Loader2, Mail, MapPin, Phone, Save, UserCheck, UserPlus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -134,6 +134,12 @@ export default function EditPurchaseOrderPage() {
     const selectedSellerGstId = form.watch("sellerGstId");
     const selectedPartyId = form.watch("partyId");
 
+    // The document's saved seller/ship-to snapshot must win over master data on
+    // Edit. These refs record which selection the master values were applied
+    // for, so a refetch (or the hydration reset) cannot overwrite user edits.
+    const autoFilledSellerRef = useRef<string | null>(null);
+    const autoFilledPartyRef = useRef<string | null>(null);
+
     // Server-searched pickers. Each owns its query (debounced inside), and pins
     // the current id so the row behind it is always in the response no matter
     // what is typed - otherwise the auto-fill effect below loses its row.
@@ -144,8 +150,8 @@ export default function EditPurchaseOrderPage() {
     const selectedUserId = form.watch("selectedUserId");
     const activeTeamMembers = useMemo(() => (teamMembers || []).filter((u: any) => u.isActive), [teamMembers]);
 
-    const { sellerPersons } = useSellerContactPerson(form, { autoSelectFirstOnLoad: false });
-    const { sellerGsts, isLoading: isSellerGstsLoading } = useSellerGstSelection(form);
+    const { sellerPersons, seedInitialSelection: seedVendorPerson } = useSellerContactPerson(form, { autoSelectFirstOnLoad: false });
+    const { sellerGsts, isLoading: isSellerGstsLoading, seedInitialSelection: seedSellerGst } = useSellerGstSelection(form);
 
     const sellerPersonOptions = useMemo(() => sellerPersons.map(p => ({ id: String(p.id), name: p.name || "Unnamed person" })), [sellerPersons]);
     const sellerGstOptions = useMemo(
@@ -160,8 +166,10 @@ export default function EditPurchaseOrderPage() {
 
     useEffect(() => {
         if (!selectedSellerId || selectedSellerId === "__create_new__") return;
+        if (autoFilledSellerRef.current === selectedSellerId) return;
         const party = sellerRows.find(p => String(p.id) === selectedSellerId);
         if (!party) return;
+        autoFilledSellerRef.current = selectedSellerId;
         form.setValue("sellerName", formatVendorName(party.name || ""));
         form.setValue("sellerAddress", party.address || "");
         form.setValue("sellerPanNo", party.pan || "");
@@ -174,8 +182,10 @@ export default function EditPurchaseOrderPage() {
 
     useEffect(() => {
         if (!selectedPartyId || selectedPartyId === "__create_new__") return;
+        if (autoFilledPartyRef.current === selectedPartyId) return;
         const party = shipToRows.find(p => String(p.id) === selectedPartyId);
         if (!party) return;
+        autoFilledPartyRef.current = selectedPartyId;
         form.setValue("shipToName", party.name || "");
         form.setValue("shippingAddress", party.address || "");
         form.setValue("shipToGst", party.gstNo || "");
@@ -193,13 +203,19 @@ export default function EditPurchaseOrderPage() {
 
     useEffect(() => {
         if (!poData) return;
+        // Mark the document's own selection as already applied before resetting,
+        // so the master-data effects below never replace the saved snapshot.
+        autoFilledSellerRef.current = poData.sellerOrganizationId ? String(poData.sellerOrganizationId) : null;
+        autoFilledPartyRef.current = poData.shipToPartyId ? String(poData.shipToPartyId) : null;
+        seedSellerGst(poData.sellerGstId);
+        seedVendorPerson(poData.vendorPersonId);
         form.reset({
             poType: poData.poType || "new",
             piAttachments: poData.piAttachments ? (typeof poData.piAttachments === "string" ? JSON.parse(poData.piAttachments) : poData.piAttachments) : [],
             category: poData.category || "",
             poDate: formatDateForInput(poData.poDate),
             sellerId: poData.sellerOrganizationId ? String(poData.sellerOrganizationId) : "",
-            sellerGstId: "",
+            sellerGstId: poData.sellerGstId ? String(poData.sellerGstId) : "",
             sellerName: poData.sellerName || "",
             sellerEmail: poData.sellerEmail || "",
             sellerAddress: poData.sellerAddress || "",
@@ -210,11 +226,11 @@ export default function EditPurchaseOrderPage() {
             contactPersonName: poData.contactPersonName || "",
             contactPersonPhone: poData.contactPersonPhone || "",
             contactPersonEmail: poData.contactPersonEmail || "",
-            vendorPersonId: "",
+            vendorPersonId: poData.vendorPersonId ? String(poData.vendorPersonId) : "",
             vendorContactPersonName: poData.vendorContactPersonName || "",
             vendorContactPersonPhone: poData.vendorContactPersonPhone || "",
             vendorContactPersonEmail: poData.vendorContactPersonEmail || "",
-            partyId: "",
+            partyId: poData.shipToPartyId ? String(poData.shipToPartyId) : "",
             selectedUserId: "",
             selectedCertRecipients: poData.certRecipients?.map(String) ?? (poData.certRecipient ? [String(poData.certRecipient)] : []),
             shipToName: poData.shipToName || "",
@@ -247,7 +263,7 @@ export default function EditPurchaseOrderPage() {
                 : [],
             remarks: poData.remarks || "",
         });
-    }, [poData, form]);
+    }, [poData, form, seedSellerGst, seedVendorPerson]);
 
     const handleAddNewParty = async (partyData: CreatePartyPayload) => {
         if (!partyData.name.trim()) {
