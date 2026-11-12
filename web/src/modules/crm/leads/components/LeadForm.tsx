@@ -237,7 +237,7 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
         setLocationModal({ open: false });
     }, []);
 
-    const isLocationRequired = mode === "create";
+    const isLocationRequired = mode === "create" && addFirstInteraction;
     const formDisabled = isLocationRequired && locationBlocked;
 
     useEffect(() => {
@@ -342,8 +342,8 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
                                     <div className="flex items-start justify-between gap-4">
                                         <div className="space-y-1">
                                             <p>
-                                                Location access is required to create a lead. Please allow
-                                                location access to continue.
+                                                Location access is required when adding first interaction
+                                                details. Please allow location access to continue.
                                             </p>
                                             <p className="text-xs text-muted-foreground">
                                                 To allow location: click the lock icon in the browser
@@ -380,7 +380,7 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
                                         {liveLocation.longitude?.toFixed(6) ?? "—"}
                                     </p>
                                 </div>
-                                {isLocationRequired && (
+                                {mode === "create" && (
                                     <Button
                                         type="button"
                                         size="sm"
