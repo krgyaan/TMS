@@ -309,6 +309,55 @@ export const DemandDraftSchema = z.object({
     }
 });
 
+const BG_COURIER_REQUIRED_FIELDS = [
+    ['bgCourierOrg', 'Organization Name'],
+    ['bgCourierName', 'Recipient Name'],
+    ['bgCourierPhone', 'Phone'],
+    ['bgCourierAddrLine1', 'Address Line 1'],
+    ['bgCourierAddrLine2', 'Address Line 2'],
+    ['bgCourierCity', 'City'],
+    ['bgCourierState', 'State'],
+    ['bgCourierPincode', 'Pin Code'],
+    ['bgCourierEmpFrom', 'Courier From'],
+    ['bgCourierDelDate', 'Delivery Date'],
+    ['bgCourierUrgency', 'Dispatch Urgency'],
+] as const;
+
+/**
+ * Shared BG Courier Dispatch validation — every BG form (EMD + project BI)
+ * renders the dispatch block, so these fields are mandatory for mode BG.
+ */
+const addBgCourierDispatchIssues = (
+    details: Record<string, any>,
+    ctx: z.RefinementCtx,
+    pathPrefix: (string | number)[] = [],
+) => {
+    for (const [key, label] of BG_COURIER_REQUIRED_FIELDS) {
+        const value = details[key];
+        const missing =
+            value === undefined ||
+            value === null ||
+            (typeof value === 'string' && value.trim() === '') ||
+            (typeof value === 'number' && isNaN(value));
+        if (missing) {
+            ctx.addIssue({
+                code: 'custom',
+                message: `${label} is required`,
+                path: [...pathPrefix, key],
+            });
+        }
+    }
+
+    const pincode = details.bgCourierPincode;
+    if (typeof pincode === 'string' && pincode.trim() !== '' && !/^\d{6}$/.test(pincode.trim())) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Pin Code must be 6 digits',
+            path: [...pathPrefix, 'bgCourierPincode'],
+        });
+    }
+};
+
 export const BankGuaranteeSchema = z.object({
     bgPurpose: z.string().optional(),
     bgAmount: z.coerce.number().optional(),
@@ -406,17 +455,8 @@ export const BankGuaranteeSchema = z.object({
             path: ['bgBank'],
         });
     }
-    const usesCourierDispatch = !!data.bgCourierOrg;
-    if (
-        !usesCourierDispatch &&
-        (!data.bgCourierAddress || (typeof data.bgCourierAddress === 'string' && data.bgCourierAddress.trim() === ''))
-    ) {
-        ctx.addIssue({
-            code: 'custom',
-            message: 'Courier Address is required',
-            path: ['bgCourierAddress'],
-        });
-    }
+    // Courier Dispatch replaces the legacy single "Courier Address" field.
+    addBgCourierDispatchIssues(data as Record<string, any>, ctx);
 });
 
 export const FdrSchema = z.object({
@@ -670,20 +710,6 @@ export const OldEntryPaymentRequestSchema = z.object({
 /**
  * Schema for BI Other Than EMD Request Form (includes tender details, only EMD)
  */
-const BG_COURIER_REQUIRED_FIELDS = [
-    ['bgCourierOrg', 'Organization Name'],
-    ['bgCourierName', 'Recipient Name'],
-    ['bgCourierPhone', 'Phone'],
-    ['bgCourierAddrLine1', 'Address Line 1'],
-    ['bgCourierAddrLine2', 'Address Line 2'],
-    ['bgCourierCity', 'City'],
-    ['bgCourierState', 'State'],
-    ['bgCourierPincode', 'Pin Code'],
-    ['bgCourierEmpFrom', 'Courier From'],
-    ['bgCourierDelDate', 'Delivery Date'],
-    ['bgCourierUrgency', 'Dispatch Urgency'],
-] as const;
-
 export const BiOtherThanTenderRequestSchema = z.object({
     tenderName: z.string().optional(),
     tenderNo: z.string().optional(),
@@ -715,31 +741,6 @@ export const ProjectBgRequestSchema = BiOtherThanTenderRequestSchema.superRefine
                 path: ['EMD', 'details', key],
             });
         }
-    }
-
-    for (const [key, label] of BG_COURIER_REQUIRED_FIELDS) {
-        const value = details[key];
-        const missing =
-            value === undefined ||
-            value === null ||
-            (typeof value === 'string' && value.trim() === '') ||
-            (typeof value === 'number' && isNaN(value));
-        if (missing) {
-            ctx.addIssue({
-                code: 'custom',
-                message: `${label} is required`,
-                path: ['EMD', 'details', key],
-            });
-        }
-    }
-
-    const pincode = details.bgCourierPincode;
-    if (typeof pincode === 'string' && pincode.trim() !== '' && !/^\d{6}$/.test(pincode.trim())) {
-        ctx.addIssue({
-            code: 'custom',
-            message: 'Pin Code must be 6 digits',
-            path: ['EMD', 'details', 'bgCourierPincode'],
-        });
     }
 });
 
