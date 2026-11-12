@@ -66,6 +66,7 @@ export default function LeadFollowupListPage() {
     };
 
     const [activeTab, setActiveTab] = useState<FollowupTabType>(getInitialTab);
+    const isStepTwo = searchParams.get('step') === '2';
 
     const leadIdNum = leadId ? Number(leadId) : null;
     const { data: lead, isLoading: leadLoading } = useLead(leadIdNum);
@@ -79,7 +80,9 @@ export default function LeadFollowupListPage() {
     const handleTabChange = (value: string) => {
         const newTab = value as FollowupTabType;
         setActiveTab(newTab);
-        setSearchParams({ tab: newTab });
+        const next = new URLSearchParams(searchParams);
+        next.set('tab', newTab);
+        setSearchParams(next);
         localStorage.setItem(LAST_TAB_KEY, newTab);
     };
 
@@ -135,6 +138,18 @@ export default function LeadFollowupListPage() {
                         View History
                     </Button>
                 </div>
+
+                {isStepTwo && (
+                    <div className="mt-4 flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
+                            2
+                        </span>
+                        <span className="font-medium">Step 2 of 2:</span>
+                        <span className="text-muted-foreground">
+                            Add the first interaction details below.
+                        </span>
+                    </div>
+                )}
             </CardHeader>
 
             <CardContent className="flex-1">
