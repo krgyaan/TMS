@@ -1,0 +1,12 @@
+api/drizzle/meta/_journal.json
+api/src/db/schemas/accounts/inventory-items.schema.ts
+api/src/modules/accounts/inventory-items/inventory-items.controller.ts
+api/src/modules/accounts/inventory-items/inventory-items.service.ts
+web/src/hooks/api/useInventoryItems.ts
+web/src/lib/nav-config.ts
+web/src/modules/accounts/inventory-items/InventoryItemFormDialog.tsx
+web/src/modules/accounts/inventory-items/InventoryItemListPage.tsx
+web/src/modules/accounts/inventory-items/InventoryItemViewDialog.tsx
+web/src/modules/accounts/inventory-items/item-config.ts
+web/src/services/api/inventory-items.service.ts
+web/src/types/inventory-item.types.ts

@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useInventoryItem, type ItemMasterTeam } from "@/hooks/api/useInventoryItems";
 import { paths } from "@/app/routes/paths";
 import type { InventoryItem } from "@/types/inventory-item.types";
+import { getCategory } from "./item-config";
 
 const formatDate = (value?: string | null) => value ? new Date(value).toLocaleString("en-IN") : "—";
 const formatFactor = (value?: string | null) => {
@@ -42,7 +43,7 @@ export default function InventoryItemDetailPage({ team }: { team: Exclude<ItemMa
 }
 
 function ItemDetails({ item }: { item: InventoryItem }) {
-    const teamName = item.teamId === 1 ? "AC" : item.teamId === 2 ? "DC" : `Team ${item.teamId}`;
+    const specificationLabels = new Map((getCategory(item.itemName)?.fields || []).map(field => [field.key, field.label]));
     const conversion = item.conversionUnit
         ? `1 ${item.unit} = ${formatFactor(item.conversionFactor)} ${item.conversionUnit}`
         : "No conversion";
@@ -52,7 +53,6 @@ function ItemDetails({ item }: { item: InventoryItem }) {
             <section className="space-y-3"><h2 className="font-semibold">Item information</h2><dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <DetailField label="Record ID">{item.id}</DetailField>
                 <DetailField label="Item code">{item.itemCode}</DetailField>
-                <DetailField label="Team">{teamName}</DetailField>
                 <DetailField label="Item group">{item.itemGroup}</DetailField>
                 <DetailField label="Item name">{item.itemName}</DetailField>
                 <DetailField label="Type">{item.itemType}</DetailField>
@@ -60,7 +60,7 @@ function ItemDetails({ item }: { item: InventoryItem }) {
                 <DetailField label="Status"><Badge variant={item.isActive ? "default" : "secondary"}>{item.isActive ? "Active" : "Inactive"}</Badge></DetailField>
             </dl></section>
             <section className="space-y-3"><h2 className="font-semibold">Specifications</h2>{Object.keys(item.specifications || {}).length ? <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {Object.entries(item.specifications || {}).map(([key, value]) => <DetailField key={key} label={key}>{value}</DetailField>)}
+                {Object.entries(item.specifications || {}).map(([key, value]) => <DetailField key={key} label={specificationLabels.get(key) || key}>{value}</DetailField>)}
             </dl> : <p className="text-sm text-muted-foreground">No specifications recorded.</p>}</section>
             <section className="space-y-3"><h2 className="font-semibold">Unit & conversion</h2><dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <DetailField label="Unit">{item.unit}</DetailField>

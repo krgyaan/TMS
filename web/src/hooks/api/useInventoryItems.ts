@@ -9,7 +9,7 @@ export type ItemMasterTeam = ItemMasterApi;
 export const inventoryItemsKey = ["inventory-items"] as const;
 const serviceFor = (team: ItemMasterTeam) => inventoryItemsService[team];
 
-export type InventoryItemFilters = { search?: string; teamId?: number; itemName?: string; unit?: string; isActive?: string; page?: number; limit?: number };
+export type InventoryItemFilters = { search?: string; teamId?: number; itemGroup?: string; itemName?: string; unit?: string; isActive?: string; page?: number; limit?: number };
 export const itemListKey = [...inventoryItemsKey, "list"] as const;
 
 export const useInventoryItems = (team: ItemMasterTeam, filters: InventoryItemFilters = {}) =>

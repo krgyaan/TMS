@@ -6,7 +6,7 @@ export type ItemMasterApi = "accounts" | "operations" | "master";
 class InventoryItemsReadService extends BaseApiService {
     constructor(team: ItemMasterApi) { super(`/${team}/item-master`); }
 
-    getAll(params?: { search?: string; page?: number; limit?: number; teamId?: number; itemName?: string; unit?: string; isActive?: string }): Promise<InventoryItemsResponse> {
+    getAll(params?: { search?: string; page?: number; limit?: number; teamId?: number; itemGroup?: string; itemName?: string; unit?: string; isActive?: string }): Promise<InventoryItemsResponse> {
         return this.get<InventoryItemsResponse>("", { params });
     }
     getById(id: number): Promise<InventoryItem> { return this.get<InventoryItem>(`/${id}`); }

@@ -2,7 +2,7 @@ export interface InventoryItem {
     id: number;
     itemCode: string;
     itemGroup?: string | null;
-    teamId: number;
+    teamId: number | null;
     itemName: string;
     itemType: string | null;
     description: string | null;
@@ -29,5 +29,5 @@ export interface InventoryItemsResponse {
     meta: { total: number; page: number; limit: number; totalPages: number };
 }
 
-export type InventoryItemPayload = Omit<InventoryItem, "id" | "itemCode" | "deletedAt" | "createdAt" | "updatedAt" | "conversion" | "conversionUnit" | "conversionFactor">
-    & { conversionUnit?: string | null; conversionFactor?: string | null };
+export type InventoryItemPayload = Omit<InventoryItem, "id" | "itemCode" | "deletedAt" | "createdAt" | "updatedAt" | "conversion" | "conversionUnit" | "conversionFactor" | "teamId">
+    & { itemGroup?: string | null; conversionUnit?: string | null; conversionFactor?: string | null };

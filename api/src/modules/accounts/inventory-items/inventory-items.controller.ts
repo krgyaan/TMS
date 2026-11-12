@@ -6,9 +6,11 @@ import { CanRead } from "@/modules/auth/decorators/permissions.decorator";
 import { InventoryItemsService } from "./inventory-items.service";
 
 const ITEM_UNITS = ["Kg", "Mtr", "Ft", "Nos.", "RMtr", "Sq. Mtr."] as const;
+const ITEM_GROUPS = ["Raw Materials", "Finished Goods", "Supplies"] as const;
 
 export const itemSchema = z.object({
-    teamId: z.number().int().positive(),
+    teamId: z.number().int().positive().nullable().optional(),
+    itemGroup: z.enum(ITEM_GROUPS).nullable().optional(),
     itemName: z.string().trim().min(1).max(120),
     itemType: z.string().trim().max(80).nullable().optional(),
     description: z.string().trim().max(500).nullable().optional(),
@@ -37,8 +39,8 @@ export class AccountsInventoryItemsController {
 
     @Get()
     @CanRead("accounts.item-master")
-    list(@Query("search") search?: string, @Query("page") page?: string, @Query("limit") limit?: string, @Query("teamId") teamId?: string, @Query("itemName") itemName?: string, @Query("unit") unit?: string, @Query("isActive") isActive?: string) {
-        return this.service.findAll({ teamId: teamId ? Number(teamId) : undefined, search, page: page ? Number(page) : undefined, limit: limit ? Number(limit) : undefined, itemName, unit, isActive: isActive === undefined || isActive === "" ? undefined : isActive === "true" });
+    list(@Query("search") search?: string, @Query("page") page?: string, @Query("limit") limit?: string, @Query("teamId") teamId?: string, @Query("itemGroup") itemGroup?: string, @Query("itemName") itemName?: string, @Query("unit") unit?: string, @Query("isActive") isActive?: string) {
+        return this.service.findAll({ teamId: teamId ? Number(teamId) : undefined, itemGroup, search, page: page ? Number(page) : undefined, limit: limit ? Number(limit) : undefined, itemName, unit, isActive: isActive === undefined || isActive === "" ? undefined : isActive === "true" });
     }
 
     @Get(":id")

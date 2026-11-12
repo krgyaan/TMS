@@ -1,4 +1,6 @@
 export type ItemField = { key: string; label: string; options?: string[] };
+export const ITEM_GROUPS = ["Raw Materials", "Finished Goods", "Supplies"] as const;
+export type ItemGroup = typeof ITEM_GROUPS[number];
 export const UNIT_OPTIONS = ["Kg", "Mtr", "Ft", "Nos.", "RMtr", "Sq. Mtr."] as const;
 export type Unit = typeof UNIT_OPTIONS[number];
 
@@ -29,5 +31,13 @@ export const ITEM_CATEGORIES: ItemCategory[] = [
     { name: "Rubber Pad", fields: [common("Thickness (in mm)", "thickness"), common("Size (in Inches)", "size")] },
 ];
 
+export const ITEM_GROUP_FAMILIES: Record<ItemGroup, string[]> = {
+    "Raw Materials": ["Copper", "PVC Pipe", "UPVC Pipe", "CPVC Pipe", "Sleeve Insulation", "Round Duct with Aluminium Foil", "GI Duct / MS Duct", "GI Sheet / MS Sheet", "Nitrile Insulation Sheet / XLPE Insulation Sheet", "Acoustic Insulation", "Underdeck Insulation", "Aluminium Perforated Sheet", "Tissue Paper", "Rubber Pad"],
+    "Finished Goods": ["AC Stand"],
+    Supplies: ["Canvas"],
+};
+
 export const categoryOptions = ITEM_CATEGORIES.map(category => ({ id: category.name, name: category.name }));
+export const groupOptions = ITEM_GROUPS.map(group => ({ id: group, name: group }));
+export const getFamiliesForGroup = (group?: ItemGroup) => group ? ITEM_GROUP_FAMILIES[group].map(name => ({ id: name, name })) : [];
 export const getCategory = (name?: string) => ITEM_CATEGORIES.find(category => category.name === name);
