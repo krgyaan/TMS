@@ -14,6 +14,8 @@ export const paymentPurposeEnum = pgEnum('payment_purpose', [
     'Security Bond/Deposit', // Project dashboard BG purpose
     'Surety Bond',       // Corresponds to MySQL emds.purpose = 'Surety Bond'
     'Other Payment',     // Corresponds to MySQL emds.purpose = 'Other Payment'
+    'Financial',         // BG purpose (BI dashboard BG form)
+    'Counter Guarantee', // BG purpose (BI dashboard BG form)
     'DD',
     'FDR',
 ]);

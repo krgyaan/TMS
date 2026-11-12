@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Briefcase, Loader2, Mail, Phone, Save, Truck, User } from 'lucide-react';
+import { ArrowLeft, Briefcase, Check, ChevronDown, Loader2, Mail, Phone, Save, Truck, User } from 'lucide-react';
 import { useCreatePaymentRequest } from '@/hooks/api/usePaymentRequests';
 import { useProjectList, useProjectOverview } from '@/hooks/api/useProjectDashboard';
 import { useCreateWoContact, useWoContactsByBasicDetail } from '@/hooks/api/useWoContacts';
@@ -17,6 +17,12 @@ import { toast } from 'sonner';
 import DateInput from '@/components/form/DateInput';
 import FieldWrapper from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Textarea } from '@/components/ui/textarea';
 import { SelectField, Combobox, type SelectOption } from '@/components/form/SelectField';
 import { NumberInput } from '@/components/form/NumberInput';
@@ -31,11 +37,12 @@ type FormValues = ProjectBgRequestFormValues;
 
 const BG_PREFIX = 'EMD.details';
 
-// Same purpose options as the project dashboard BG form.
+// Purpose options for this form.
 const BG_PURPOSE_OPTIONS = [
     { value: 'ADVANCE_PAYMENT', label: 'Advance Payment' },
-    { value: 'SECURITY_BOND_DEPOSIT', label: 'Security Bond/Deposit' },
-    { value: 'PERFORMANCE_BG', label: 'Performance BG' },
+    { value: 'SECURITY_DEPOSIT', label: 'Security Deposit' },
+    { value: 'FINANCIAL', label: 'Financial' },
+    { value: 'COUNTER_GUARANTEE', label: 'Counter Guarantee' },
 ];
 
 // No 48-hour option.
@@ -119,16 +126,75 @@ function TenderProjectSelector({
         return { options, byKey };
     }, [tenderList, projectList]);
 
+    const [open, setOpen] = useState(false);
+    const [query, setQuery] = useState('');
+
+    const selected = options.find(option => option.id === value);
+    const filtered = useMemo(() => {
+        const q = query.trim().toLowerCase();
+        if (!q) return options;
+        return options.filter(option =>
+            option.name.toLowerCase().includes(q) || (option.description ?? '').toLowerCase().includes(q),
+        );
+    }, [options, query]);
+
     return (
-        <Combobox
-            value={value}
-            onChange={(next) => {
-                const context = byKey.get(next);
-                if (context) onSelect(context);
+        <DropdownMenu
+            open={open}
+            onOpenChange={(next) => {
+                setOpen(next);
+                if (!next) setQuery('');
             }}
-            options={options}
-            placeholder="Select Tender / Project"
-        />
+        >
+            <DropdownMenuTrigger asChild>
+                <Button type="button" variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between min-w-0">
+                    <span className="truncate">{selected ? selected.name : 'Select Tender / Project'}</span>
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-96 max-w-[90vw] p-0" align="start">
+                <div className="p-2 border-b">
+                    <Input
+                        autoFocus
+                        placeholder="Search..."
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        className="h-8"
+                    />
+                </div>
+                <div className="max-h-64 overflow-auto py-1">
+                    {filtered.length === 0 && (
+                        <div className="px-2 py-2 text-sm text-muted-foreground">No results</div>
+                    )}
+                    {filtered.map((option) => {
+                        const isSelected = option.id === value;
+                        return (
+                            <DropdownMenuItem
+                                key={option.id}
+                                onClick={() => {
+                                    const context = byKey.get(option.id);
+                                    if (context) onSelect(context);
+                                    setOpen(false);
+                                    setQuery('');
+                                }}
+                                className="flex items-center justify-between gap-2"
+                            >
+                                <div className="flex min-w-0 flex-1 items-center gap-2">
+                                    <Check className={`mr-1 h-4 w-4 shrink-0 ${isSelected ? 'opacity-100' : 'opacity-0'}`} />
+                                    <span className="flex-1 min-w-0 truncate">{option.name}</span>
+                                </div>
+                                {option.description && (
+                                    <span className="shrink-0 max-w-[45%] truncate text-xs text-muted-foreground">
+                                        {option.description}
+                                    </span>
+                                )}
+                            </DropdownMenuItem>
+                        );
+                    })}
+                </div>
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 }
 
@@ -404,6 +470,7 @@ export function BankGuaranteeRequestForm() {
     }, [selection, projectName, poNo, form]);
 
     const bgFormatFiles = useWatch({ control: form.control, name: `${BG_PREFIX}.bgFormatFiles` });
+    const bgPoFiles = useWatch({ control: form.control, name: `${BG_PREFIX}.bgPoFiles` });
 
     const handleSubmit = async (values: FormValues) => {
         if (!selection) {
@@ -466,7 +533,7 @@ export function BankGuaranteeRequestForm() {
                         })}
                         className="space-y-8"
                     >
-                        <div className="space-y-2">
+                        <div className="space-y-2 max-w-sm">
                             <label className="text-sm font-medium">Tender / Project *</label>
                             <TenderProjectSelector
                                 value={selection ? `${selection.kind}:${selection.id}` : ''}
@@ -550,7 +617,7 @@ export function BankGuaranteeRequestForm() {
                                     <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgStampValue`} label="Stamp Paper Value">
                                         {(field) => <NumberInput min={0} {...field} />}
                                     </FieldWrapper>
-                                    <SelectField control={form.control} name={`${BG_PREFIX}.bgBank`} label="Bank *" options={BANKS} placeholder="Select Bank" disabled />
+                                    <SelectField control={form.control} name={`${BG_PREFIX}.bgBank`} label="Bank *" options={BANKS} placeholder="Select Bank" />
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -612,7 +679,7 @@ export function BankGuaranteeRequestForm() {
                                             placeholder="Select Employee"
                                             valueType="string"
                                         />
-                                        <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgCourierDelDate`} label="Delivery Date *">
+                                        <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgCourierDelDate`} label="Expected Delivery Date *">
                                             {(field) => <DateInput value={field.value || null} onChange={field.onChange} />}
                                         </FieldWrapper>
                                         <SelectField
@@ -627,24 +694,20 @@ export function BankGuaranteeRequestForm() {
                                             valueType="string"
                                         />
                                     </div>
-
-                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgCourierDocs`} label="Soft Copy of the documents">
-                                        {(field) => (
-                                            <FileUploader
-                                                context="courier"
-                                                value={field.value ?? []}
-                                                onChange={field.onChange}
-                                            />
-                                        )}
-                                    </FieldWrapper>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <FileUploader
                                         context="bg-format-files"
                                         label="BG Format (Max 5 files)"
                                         value={bgFormatFiles}
                                         onChange={(paths) => form.setValue(`${BG_PREFIX}.bgFormatFiles`, paths)}
+                                    />
+                                    <FileUploader
+                                        context="bg-po-files"
+                                        label="PO/Tender/Request Letter"
+                                        value={bgPoFiles}
+                                        onChange={(paths) => form.setValue(`${BG_PREFIX}.bgPoFiles`, paths)}
                                     />
                                 </div>
                             </div>
