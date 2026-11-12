@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, Plus } from "lucide-react";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,20 +15,42 @@ import { useDeleteInventoryItem, useInventoryItems, useUpdateInventoryItem, type
 import type { InventoryItem } from "@/types/inventory-item.types";
 import { toast } from "sonner";
 import { paths } from "@/app/routes/paths";
-import { itemMasterColumnsForViewport } from "./item-master-display";
+import { formatKeySpecification, itemMasterColumnsForViewport } from "./item-master-display";
+
+const formatFactor = (value: string | number | null | undefined) => {
+    if (value === null || value === undefined || value === "") return "";
+    const number = Number(value);
+    return Number.isFinite(number) ? number.toLocaleString("en-IN", { maximumFractionDigits: 6 }) : String(value);
+};
+
+const conversionDisplay = (item?: InventoryItem) => {
+    if (!item?.conversionUnit || !item.conversionFactor) return "—";
+    const from = item.conversion?.value?.split(" -> ")[0] || item.unit;
+    return `1 ${from} = ${formatFactor(item.conversionFactor)} ${item.conversionUnit}`;
+};
 
 export default function InventoryItemListPage({ team: scope }: { team: ItemMasterScope }) {
     const isSettings = scope === "master";
     const permissionModule = isSettings ? "master.item-master" : `${scope}.item-master`;
     const navigate = useNavigate();
     const { canCreate, canUpdate, canDelete } = useAuth();
-    const [viewportWidth, setViewportWidth] = useState(() => typeof window === "undefined" ? 1920 : window.innerWidth);
-    const visibility = itemMasterColumnsForViewport(viewportWidth);
+    const [gridWidth, setGridWidth] = useState(0);
+    const gridContainerRef = useRef<HTMLDivElement>(null);
+    const visibility = itemMasterColumnsForViewport(gridWidth, isSettings);
     const [searchInput, setSearchInput] = useState("");
     const [search, setSearch] = useState("");
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 });
     const [selectedRows, setSelectedRows] = useState<InventoryItem[]>([]);
-    useEffect(() => { const resize = () => setViewportWidth(window.innerWidth); window.addEventListener("resize", resize); return () => window.removeEventListener("resize", resize); }, []);
+    useEffect(() => {
+        const container = gridContainerRef.current;
+        if (!container) return;
+        const observer = new ResizeObserver(entries => {
+            const width = Math.floor(entries[0]?.contentRect.width || 0);
+            setGridWidth(current => current === width ? current : width);
+        });
+        observer.observe(container);
+        return () => observer.disconnect();
+    }, []);
     useEffect(() => {
         const timer = window.setTimeout(() => setSearch(searchInput.trim()), 300);
         return () => window.clearTimeout(timer);
@@ -51,11 +73,17 @@ export default function InventoryItemListPage({ team: scope }: { team: ItemMaste
     ], [isSettings, canUpdate, permissionModule, canDelete, deleteItem, navigate, scope]);
 
     const columns = useMemo<ColDef<InventoryItem>[]>(() => [
-        { headerName: "Item", flex: 2, minWidth: 200, valueGetter: p => p.data?.itemName || "—", tooltipValueGetter: p => `${p.data?.itemName || "—"} · ${p.data?.itemCode || ""}`, cellRenderer: (p: { data?: InventoryItem }) => <div className="flex h-full min-w-0 flex-col justify-center leading-tight"><span className="truncate font-semibold">{p.data?.itemName || "—"}</span><span className="truncate text-xs text-muted-foreground">{p.data?.itemCode}</span></div> },
-        { field: "itemType", headerName: "Type", width: 110, minWidth: 110, valueGetter: p => p.data?.itemType || "—", tooltipValueGetter: p => p.value },
-        ...(visibility.hsn ? [{ field: "hsnCode", headerName: "HSN", width: 90, minWidth: 90, valueGetter: (p: { data?: InventoryItem }) => p.data?.hsnCode || "—", tooltipValueGetter: (p: { value: string }) => p.value } as ColDef<InventoryItem>] : []),
-        { headerName: "Actions", filter: false, sortable: false, pinned: "right", width: 60, minWidth: 60, cellRenderer: createActionColumnRenderer(actions) },
-    ], [visibility.hsn, actions]);
+        { field: "itemCode", headerName: "Item Code", width: 110, minWidth: 110, maxWidth: 180, tooltipField: "itemCode", cellStyle: { display: "flex", alignItems: "center" } },
+        { field: "itemName", headerName: "Item Name", flex: 2, minWidth: 180, maxWidth: 420, tooltipField: "itemName", cellStyle: { display: "flex", alignItems: "center", fontWeight: 500 } },
+        ...(visibility.itemType ? [{ field: "itemType", headerName: "Type", flex: 1, minWidth: 120, maxWidth: 300, valueGetter: (p: { data?: InventoryItem }) => p.data?.itemType || "—", tooltipValueGetter: (p: { value: string }) => p.value, cellStyle: { display: "flex", alignItems: "center" } } as ColDef<InventoryItem>] : []),
+        ...(visibility.specifications ? [{ headerName: "Key Specification", flex: 2, minWidth: 200, maxWidth: 500, valueGetter: (p: { data?: InventoryItem }) => formatKeySpecification(p.data?.itemName || "", p.data?.specifications || {}), tooltipValueGetter: (p: { value: string }) => p.value, cellRenderer: (p: { value?: string }) => <div className="line-clamp-2 whitespace-normal leading-tight" title={p.value}>{p.value}</div> } as ColDef<InventoryItem>] : []),
+        { field: "unit", headerName: "Unit", width: 80, minWidth: 80, maxWidth: 100, cellStyle: { display: "flex", alignItems: "center" } },
+        ...(visibility.conversion ? [{ headerName: "Conversion", width: 150, minWidth: 150, maxWidth: 190, valueGetter: (p: { data?: InventoryItem }) => conversionDisplay(p.data), tooltipValueGetter: (p: { value: string }) => p.value, cellStyle: { display: "flex", alignItems: "center" } } as ColDef<InventoryItem>] : []),
+        { field: "hsnCode", headerName: "HSN Code", width: 110, minWidth: 110, maxWidth: 150, valueGetter: (p: { data?: InventoryItem }) => p.data?.hsnCode || "—", tooltipValueGetter: (p: { value: string }) => p.value, cellStyle: { display: "flex", alignItems: "center" } },
+        { field: "isActive", headerName: "Status", width: 100, minWidth: 100, maxWidth: 130, valueGetter: (p: { data?: InventoryItem }) => p.data?.isActive ? "Active" : "Inactive", cellStyle: { display: "flex", alignItems: "center" } },
+        ...(visibility.createdAt ? [{ headerName: "Created on", field: "createdAt", width: 130, minWidth: 130, maxWidth: 170, valueGetter: (p: { data?: InventoryItem }) => p.data?.createdAt ? new Date(p.data.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—", cellStyle: { display: "flex", alignItems: "center" } } as ColDef<InventoryItem>] : []),
+        { headerName: "Actions", filter: false, sortable: false, pinned: "right", width: 80, minWidth: 80, maxWidth: 80, cellRenderer: createActionColumnRenderer(actions), cellStyle: { display: "flex", alignItems: "center" } },
+    ], [visibility.itemType, visibility.specifications, visibility.conversion, visibility.createdAt, actions]);
 
     const setSearchValue = (value: string) => {
         setSearchInput(value);
@@ -99,13 +127,12 @@ export default function InventoryItemListPage({ team: scope }: { team: ItemMaste
             </div>}
             {visibility.mobile ? <div className="space-y-3">
                 {(data?.data || []).map(item => <article key={item.id} className="space-y-3 rounded-md border p-3">
-                    <div className="min-w-0"><div className="break-words font-semibold">{item.itemName}</div><div className="text-xs text-muted-foreground">{item.itemCode}</div></div>
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm"><div><span className="text-muted-foreground">Type</span><div>{item.itemType || "—"}</div></div><div><span className="text-muted-foreground">HSN</span><div>{item.hsnCode || "—"}</div></div></div>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm"><div><span className="text-muted-foreground">Item Code</span><div className="break-words">{item.itemCode}</div></div><div><span className="text-muted-foreground">Item Name</span><div className="break-words font-medium">{item.itemName}</div></div><div><span className="text-muted-foreground">HSN Code</span><div>{item.hsnCode || "—"}</div></div><div><span className="text-muted-foreground">Unit</span><div>{item.unit || "—"}</div></div><div><span className="text-muted-foreground">Status</span><div>{item.isActive ? "Active" : "Inactive"}</div></div></div>
                     {isSettings && (canUpdate(permissionModule) || canDelete(permissionModule)) && <input type="checkbox" aria-label={`Select ${item.itemName}`} checked={selectedRows.some(row => row.id === item.id)} onChange={event => setSelectedRows(current => event.target.checked ? [...current.filter(row => row.id !== item.id), item] : current.filter(row => row.id !== item.id))} />}
                     <div className="flex justify-end">{actions.filter(action => action.visible?.(item) ?? true).map(action => <Button key={action.label} className={action.className} size="sm" variant="ghost" onClick={() => void action.onClick(item)}>{action.label}</Button>)}</div>
                 </article>)}
-            </div> : <div className="w-full min-w-0">
-                <DataTable data={data?.data || []} columnDefs={columns} gridOptions={{ rowHeight: 52, headerHeight: 40, defaultColDef: { filter: false, sortable: true, resizable: true, cellStyle: { paddingLeft: "4px", paddingRight: "4px" } }, tooltipShowDelay: 350 }} loading={isFetching} manualPagination rowCount={data?.meta.total || 0} paginationState={pagination} onPaginationChange={updatePagination} onPageSizeChange={pageSize => setPagination({ pageIndex: 0, pageSize })} enableRowSelection={isSettings && (canUpdate(permissionModule) || canDelete(permissionModule))} selectionType="multiple" onSelectionChanged={isSettings ? setSelectedRows : undefined} />
+            </div> : <div ref={gridContainerRef} className="w-full min-w-0 overflow-hidden">
+                <DataTable data={data?.data || []} columnDefs={columns} gridOptions={{ rowHeight: 52, headerHeight: 40, selectionColumnDef: { width: 48, minWidth: 48, maxWidth: 48, pinned: "left" }, defaultColDef: { filter: false, sortable: true, resizable: true, cellStyle: { paddingLeft: "4px", paddingRight: "4px", display: "flex", alignItems: "center" } }, tooltipShowDelay: 350 }} loading={isFetching} manualPagination rowCount={data?.meta.total || 0} paginationState={pagination} onPaginationChange={updatePagination} onPageSizeChange={pageSize => setPagination({ pageIndex: 0, pageSize })} enableRowSelection={isSettings && (canUpdate(permissionModule) || canDelete(permissionModule))} selectionType="multiple" onSelectionChanged={isSettings ? setSelectedRows : undefined} />
             </div>}
             {visibility.mobile && <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm">
                 <span>{data?.meta.total ? `${pagination.pageIndex * pagination.pageSize + 1}–${Math.min((pagination.pageIndex + 1) * pagination.pageSize, data.meta.total)} of ${data.meta.total}` : "0 items"}</span>
