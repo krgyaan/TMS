@@ -273,8 +273,11 @@ const PURPOSE_VALUE_MAP: Record<string, PaymentPurpose> = {
 const PROJECT_BG_PURPOSE_MAP: Record<string, PaymentPurpose> = {
     'ADVANCE_PAYMENT': 'Advance Payment',
     'SECURITY_BOND_DEPOSIT': 'Security Bond/Deposit',
+    'SECURITY_DEPOSIT': 'Security Deposit',
     'PERFORMANCE_BG': 'Performance BG',
     'PERFORMANCE': 'Performance BG',
+    'FINANCIAL': 'Financial',
+    'COUNTER_GUARANTEE': 'Counter Guarantee',
 };
 
 export function extractProjectBgPurpose(details: any, defaultPurpose: PaymentPurpose = 'Other Payment'): PaymentPurpose {

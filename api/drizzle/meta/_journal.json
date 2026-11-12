@@ -687,6 +687,13 @@
       "when": 1797000000003,
       "tag": "0175_add_project_bg_purposes_to_payment_purpose_enum",
       "breakpoints": true
+    },
+    {
+      "idx": 122,
+      "version": "7",
+      "when": 1797000000004,
+      "tag": "0176_add_financial_and_counter_guarantee_to_payment_purpose_enum",
+      "breakpoints": true
     }
   ]
 }
