@@ -441,10 +441,14 @@ export class LeadsService {
     }
 
     async create(data: CreateLeadDto, createdBy: number): Promise<Lead> {
+        const definedData = Object.fromEntries(
+            Object.entries(data).filter(([, value]) => value !== undefined),
+        ) as NewLead;
+
         const [newLead] = await this.db
             .insert(leads)
             .values({
-                ...data as NewLead,
+                ...definedData,
                 bdPerson: createdBy,
                 leadPriority: data.leadPriority || 'Cold',
             })
