@@ -70,7 +70,6 @@ export interface CallFollowupRequest {
     type: 'call';
     body: string;
     veResponsibility?: string | null;
-    contacts: ContactPerson[];
     nextFollowupDate?: string | null;
 }
 
@@ -78,21 +77,21 @@ export interface VisitFollowupRequest {
     type: 'visit';
     body: string;
     veResponsibility?: string | null;
-    contacts: ContactPerson[];
     nextFollowupDate?: string | null;
 }
 
 export interface LetterFollowupRequest {
     type: 'letter';
-    toOrg: string;
-    toName: string;
-    toAddr: string;
-    toPin: string;
-    toMobile: string;
-    empFrom: number;
-    delDate: string;
-    urgency: number;
-    attachments: string[];
+    courierId?: number;
+    toOrg?: string;
+    toName?: string;
+    toAddr?: string;
+    toPin?: string;
+    toMobile?: string;
+    empFrom?: number;
+    delDate?: string;
+    urgency?: number;
+    attachments?: string[];
     nextFollowupDate?: string | null;
 }
 

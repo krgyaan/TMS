@@ -1,10 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { handleQueryError } from "@/lib/react-query";
 import type { PaginatedResult } from "@/types/api.types";
 import { courierService } from "@/services/api/courier.service";
+import { useDebouncedSearch } from "../useDebouncedSearch";
 import type {
     Courier,
     CourierDashboardCounts,
@@ -43,32 +44,11 @@ export const useCourierDashboardCounts = () => {
     });
 };
 
-export const useAllCouriers = () => {
-    return useQuery<Courier[]>({
-        queryKey: courierKeys.lists(),
-        queryFn: () => courierService.getAll(),
-    });
-};
-
 export const useMyCouriers = () => {
     return useQuery<Courier[]>({
         queryKey: courierKeys.myList(),
         queryFn: () => courierService.getMyCouriers(),
     });
-};
-
-export const useCourierOptions = () => {
-    const { data: courier = [] } = useAllCouriers();
-    return useMemo(
-        () =>
-            Array.isArray(courier)
-                ? courier.map((c: Courier) => ({
-                      value: String(c.id),
-                      label: `${c.id} - ${c.toOrg}`,
-                  }))
-                : [],
-        [courier]
-    );
 };
 
 export const useCouriersByStatus = (status: number) => {
@@ -84,6 +64,39 @@ export const useCourier = (id: number) => {
         queryFn: () => courierService.getById(id),
         enabled: !!id,
     });
+};
+
+export const useCourierSelectOptions = (selectedId?: string) => {
+    const [query, setQuery] = useState('');
+    const debouncedQuery = useDebouncedSearch(query, 300);
+    const { data, isLoading } = useCourierDashboard({
+        search: debouncedQuery || undefined,
+        page: 1,
+        limit: 20,
+        sortBy: 'createdAt',
+        sortOrder: 'desc',
+    });
+
+    const parsedSelectedId = selectedId ? Number(selectedId) : 0;
+    const selectedCourierId = Number.isInteger(parsedSelectedId) && parsedSelectedId > 0 ? parsedSelectedId : 0;
+    const { data: selectedCourier } = useCourier(selectedCourierId);
+
+    const options = useMemo(() => {
+        const rows = data?.data ?? [];
+        const all = selectedCourier && !rows.some((row) => row.id === selectedCourier.id)
+            ? [selectedCourier, ...rows]
+            : rows;
+
+        return all.map((c) => ({
+            id: String(c.id),
+            name: `${c.id} - ${c.toOrg} - ${c.toName}`,
+            keywords: [c.toOrg, c.toName, c.toAddr, c.toPin, c.toMobile, c.courierProvider, c.docketNo, c.trackingNumber]
+                .filter(Boolean)
+                .join(' '),
+        }));
+    }, [data, selectedCourier]);
+
+    return { options, onSearch: setQuery, isLoading, selectedCourier };
 };
 
 export const useCourierDetails = (id: number) => {

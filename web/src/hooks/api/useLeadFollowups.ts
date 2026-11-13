@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -169,15 +169,53 @@ export const WhatsappSchema = z.object({
 });
 
 export const LetterSchema = z.object({
-    toOrg: z.string().min(1, { message: "Organization name is required" }),
-    toName: z.string().min(1, { message: "Recipient name is required" }),
-    toAddr: z.string().min(1, { message: "Address is required" }),
-    toPin: z.string().min(1, { message: "Pin code is required" }),
-    toMobile: z.string().min(1, { message: "Mobile number is required" }),
-    empFrom: z.string().min(1, { message: "Please select an employee" }),
-    delDate: z.string().min(1, { message: "Expected delivery date is required" }),
-    urgency: z.string().min(1, { message: "Please select urgency" }),
+    isCourierRequested: z.enum(["yes", "no"]),
+    courierId: z.coerce.number().int().positive().optional(),
+    toOrg: z.string().optional(),
+    toName: z.string().optional(),
+    toAddr: z.string().optional(),
+    toPin: z.string().optional(),
+    toMobile: z.string().optional(),
+    empFrom: z.string().optional(),
+    delDate: z.string().optional(),
+    urgency: z.string().optional(),
     nextFollowupDate: z.string().optional().nullable(),
+}).superRefine((data, ctx) => {
+    if (data.isCourierRequested === "yes") {
+        if (!data.courierId) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Please select a courier",
+                path: ["courierId"],
+            });
+        }
+        return;
+    }
+
+    if (!data.toOrg) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Organization name is required", path: ["toOrg"] });
+    }
+    if (!data.toName) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Recipient name is required", path: ["toName"] });
+    }
+    if (!data.toAddr) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Address is required", path: ["toAddr"] });
+    }
+    if (!data.toPin) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Pin code is required", path: ["toPin"] });
+    }
+    if (!data.toMobile) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Mobile number is required", path: ["toMobile"] });
+    }
+    if (!data.empFrom) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Please select an employee", path: ["empFrom"] });
+    }
+    if (!data.delDate) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Expected delivery date is required", path: ["delDate"] });
+    }
+    if (!data.urgency) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Please select urgency", path: ["urgency"] });
+    }
 });
 
 export type VisitFormValues = z.infer<typeof VisitSchema>;
@@ -277,16 +315,12 @@ export const useVisitForm = (source: FollowupSource) => {
 
     const createFollowup = useCreateFollowup(source);
     const updateFollowup = useUpdateFollowup(source);
-    const sourceRecord = useSourceRecord(source);
     const { data: allFollowups = [] } = useLeadFollowups(source);
 
     const existingFollowup = followupId
         ? allFollowups.find(f => f.id === followupId && f.type === 'visit') ?? null
         : null;
     const isEditMode = !!existingFollowup;
-
-    const [contacts, setContacts] = useState<ContactPerson[]>([]);
-    const [lockedCount, setLockedCount] = useState(0);
 
     const form = useForm<VisitFormValues>({
         resolver: zodResolver(VisitSchema),
@@ -304,27 +338,14 @@ export const useVisitForm = (source: FollowupSource) => {
                 veResponsibility: existingFollowup.veResponsibility || "",
                 nextFollowupDate: formatDateForInput(existingFollowup.nextFollowupDate),
             });
-            setContacts(existingFollowup.contacts || []);
-            setLockedCount(0);
         }
     }, [existingFollowup, isEditMode, form]);
-
-    useEffect(() => {
-        if (isEditMode) return;
-
-        const seeded = seedContactsFromSource(sourceRecord);
-        if (seeded.length > 0) {
-            setContacts(seeded);
-            setLockedCount(seeded.length);
-        }
-    }, [sourceRecord, isEditMode]);
 
     const handleSubmit = async (values: VisitFormValues) => {
         const payload: VisitFollowupRequest = {
             type: 'visit',
             body: values.body,
             veResponsibility: values.veResponsibility || null,
-            contacts,
             nextFollowupDate: values.nextFollowupDate || null,
         };
 
@@ -338,12 +359,6 @@ export const useVisitForm = (source: FollowupSource) => {
             } else {
                 await createFollowup.mutateAsync(payload);
                 form.reset();
-
-                const seeded = seedContactsFromSource(sourceRecord);
-                if (seeded.length > 0) {
-                    setContacts(seeded);
-                    setLockedCount(seeded.length);
-                }
             }
         } catch {
             // handled by hook
@@ -356,9 +371,6 @@ export const useVisitForm = (source: FollowupSource) => {
 
     return {
         form,
-        contacts,
-        setContacts,
-        lockedCount,
         isEditMode,
         saving: createFollowup.isPending || updateFollowup.isPending,
         handleSubmit,
@@ -378,16 +390,12 @@ export const useCallForm = (source: FollowupSource) => {
 
     const createFollowup = useCreateFollowup(source);
     const updateFollowup = useUpdateFollowup(source);
-    const sourceRecord = useSourceRecord(source);
     const { data: allFollowups = [] } = useLeadFollowups(source);
 
     const existingFollowup = followupId
         ? allFollowups.find(f => f.id === followupId && f.type === 'call') ?? null
         : null;
     const isEditMode = !!existingFollowup;
-
-    const [contacts, setContacts] = useState<ContactPerson[]>([]);
-    const [lockedCount, setLockedCount] = useState(0);
 
     const form = useForm<CallFormValues>({
         resolver: zodResolver(CallSchema),
@@ -405,27 +413,14 @@ export const useCallForm = (source: FollowupSource) => {
                 veResponsibility: existingFollowup.veResponsibility || "",
                 nextFollowupDate: formatDateForInput(existingFollowup.nextFollowupDate),
             });
-            setContacts(existingFollowup.contacts || []);
-            setLockedCount(0);
         }
     }, [existingFollowup, isEditMode, form]);
-
-    useEffect(() => {
-        if (isEditMode) return;
-
-        const seeded = seedContactsFromSource(sourceRecord);
-        if (seeded.length > 0) {
-            setContacts(seeded);
-            setLockedCount(seeded.length);
-        }
-    }, [sourceRecord, isEditMode]);
 
     const handleSubmit = async (values: CallFormValues) => {
         const payload: CallFollowupRequest = {
             type: 'call',
             body: values.body,
             veResponsibility: values.veResponsibility || null,
-            contacts,
             nextFollowupDate: values.nextFollowupDate || null,
         };
 
@@ -439,12 +434,6 @@ export const useCallForm = (source: FollowupSource) => {
             } else {
                 await createFollowup.mutateAsync(payload);
                 form.reset();
-
-                const seeded = seedContactsFromSource(sourceRecord);
-                if (seeded.length > 0) {
-                    setContacts(seeded);
-                    setLockedCount(seeded.length);
-                }
             }
         } catch {
             // handled by hook
@@ -457,18 +446,12 @@ export const useCallForm = (source: FollowupSource) => {
 
     return {
         form,
-        contacts,
-        setContacts,
-        lockedCount,
         isEditMode,
         saving: createFollowup.isPending || updateFollowup.isPending,
         handleSubmit,
         handleCancelEdit,
     };
 };
-
-// ─── Mail Form Hook ───────────────────────────────────────────────────────────
-// ── UNCHANGED ────────────────────────────────────────────────────────────────
 
 export const useMailForm = (source: FollowupSource) => {
     const [searchParams] = useSearchParams();
@@ -551,9 +534,6 @@ export const useMailForm = (source: FollowupSource) => {
         handleCancelEdit,
     };
 };
-
-// ─── WhatsApp Form Hook ───────────────────────────────────────────────────────
-// ── UNCHANGED ────────────────────────────────────────────────────────────────
 
 export const useWhatsappForm = (source: FollowupSource) => {
     const [searchParams] = useSearchParams();
@@ -643,6 +623,7 @@ export const useLetterForm = (source: FollowupSource) => {
 
     const createFollowup = useCreateFollowup(source);
     const updateFollowup = useUpdateFollowup(source);
+    const queryClient = useQueryClient();
     const { data: allFollowups = [] } = useLeadFollowups(source);
 
     const existingFollowup = followupId
@@ -653,8 +634,10 @@ export const useLetterForm = (source: FollowupSource) => {
     const [attachmentPaths, setAttachmentPaths] = useState<string[]>([]);
 
     const form = useForm<LetterFormValues>({
-        resolver: zodResolver(LetterSchema),
+        resolver: zodResolver(LetterSchema) as Resolver<LetterFormValues>,
         defaultValues: {
+            isCourierRequested: "no",
+            courierId: undefined,
             toOrg: "", toName: "", toAddr: "", toPin: "",
             toMobile: "", empFrom: "", delDate: "",
             urgency: "", nextFollowupDate: "",
@@ -668,48 +651,54 @@ export const useLetterForm = (source: FollowupSource) => {
             // All letter-specific fields live inside it.
             const courierData = existingFollowup.courier;
 
-            if (courierData) {
-                form.reset({
-                    // These fields come directly from the courier record
-                    toOrg:    courierData.toOrg    || "",
-                    toName:   courierData.toName   || "",
-                    toAddr:   courierData.toAddr   || "",
-                    toPin:    courierData.toPin    || "",
-                    toMobile: courierData.toMobile || "",
-                    // empFrom and urgency are integers in the DB but the
-                    // form schema expects strings (for <select> elements)
-                    empFrom:  courierData.empFrom  ? String(courierData.empFrom)  : "",
-                    urgency:  courierData.urgency  ? String(courierData.urgency)  : "",
-                    // delDate is a timestamp from the DB, format it for
-                    // <input type="date"> which needs "YYYY-MM-DD"
-                    delDate:  formatDateForInput(courierData.delDate),
-                    // nextFollowupDate lives on the main followup record, not courier
-                    nextFollowupDate: formatDateForInput(existingFollowup.nextFollowupDate),
-                });
+            form.reset({
+                isCourierRequested: existingFollowup.courierId ? "yes" : "no",
+                courierId: existingFollowup.courierId ?? undefined,
+                // These fields come directly from the courier record
+                toOrg:    courierData?.toOrg    || "",
+                toName:   courierData?.toName   || "",
+                toAddr:   courierData?.toAddr   || "",
+                toPin:    courierData?.toPin    || "",
+                toMobile: courierData?.toMobile || "",
+                // empFrom and urgency are integers in the DB but the
+                // form schema expects strings (for <select> elements)
+                empFrom:  courierData?.empFrom  ? String(courierData.empFrom)  : "",
+                urgency:  courierData?.urgency  ? String(courierData.urgency)  : "",
+                // delDate is a timestamp from the DB, format it for
+                // <input type="date"> which needs "YYYY-MM-DD"
+                delDate:  formatDateForInput(courierData?.delDate),
+                // nextFollowupDate lives on the main followup record, not courier
+                nextFollowupDate: formatDateForInput(existingFollowup.nextFollowupDate),
+            });
 
-                // Attachments are stored as `courierDocs` in the couriers table.
-                // Your create/update service maps `attachments` → `courierDocs`.
-                setAttachmentPaths(courierData.courierDocs || []);
-            }
+            // Attachments are stored as `courierDocs` in the couriers table.
+            // Your create/update service maps `attachments` → `courierDocs`.
+            setAttachmentPaths(courierData?.courierDocs || []);
         }
     }, [existingFollowup, isEditMode, form]);
     // ── END CHANGED ───────────────────────────────────────────────────
 
     const handleSubmit = async (values: LetterFormValues) => {
-        const payload: LetterFollowupRequest = {
-            type: 'letter',
-            toOrg:    values.toOrg,
-            toName:   values.toName,
-            toAddr:   values.toAddr,
-            toPin:    values.toPin,
-            toMobile: values.toMobile,
-            // Convert strings back to numbers for the API/DTO
-            empFrom:  Number(values.empFrom),
-            delDate:  values.delDate,
-            urgency:  Number(values.urgency),
-            attachments: attachmentPaths,
-            nextFollowupDate: values.nextFollowupDate || null,
-        };
+        const payload: LetterFollowupRequest = values.isCourierRequested === "yes"
+            ? {
+                type: 'letter',
+                courierId: values.courierId,
+                nextFollowupDate: values.nextFollowupDate || null,
+            }
+            : {
+                type: 'letter',
+                toOrg:    values.toOrg ?? "",
+                toName:   values.toName ?? "",
+                toAddr:   values.toAddr ?? "",
+                toPin:    values.toPin ?? "",
+                toMobile: values.toMobile ?? "",
+                // Convert strings back to numbers for the API/DTO
+                empFrom:  Number(values.empFrom),
+                delDate:  values.delDate ?? "",
+                urgency:  Number(values.urgency),
+                attachments: attachmentPaths,
+                nextFollowupDate: values.nextFollowupDate || null,
+            };
 
         try {
             if (isEditMode && followupId) {
@@ -717,9 +706,15 @@ export const useLetterForm = (source: FollowupSource) => {
                     followupId,
                     data: payload,
                 });
+                if (values.isCourierRequested === "no") {
+                    queryClient.invalidateQueries({ queryKey: ['couriers'] });
+                }
                 navigate(sourceViewPath(source));
             } else {
                 await createFollowup.mutateAsync(payload);
+                if (values.isCourierRequested === "no") {
+                    queryClient.invalidateQueries({ queryKey: ['couriers'] });
+                }
                 form.reset();
                 setAttachmentPaths([]);
             }
