@@ -346,6 +346,17 @@ export class PaymentRequestsNotificationService {
         return fallback;
     };
 
+    
+    private resolveBgFdAccountNo = (
+        bankName: string | null | undefined,
+        fallback: string,
+    ): string => {
+        const code = (bankName || '').toUpperCase();
+        if (code.includes('8316')) return '2506245699298316';
+        if (code.includes('5190')) return '2506245699295190';
+        return fallback;
+    };
+
     /**
      * Data for the prefilled BG application format (the AU Bank form).
      * Undefined values fall back to the built-in sample; empty strings stay empty
@@ -1381,7 +1392,7 @@ export class PaymentRequestsNotificationService {
                         beneficiaryAddress: bgDetails?.beneficiaryAddress || '',
                         bgExpiryDate: bgDetails?.bgExpiryDate ? this.formatDateDDMMYYYY(bgDetails.bgExpiryDate) : '',
                         claimExpiryDate: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',
-                        accountNo: bgDetails?.bgBankAcc || '',
+                        accountNo: this.resolveBgFdAccountNo(bgDetails?.bankName, bgDetails?.bgBankAcc || ''),
                         ifsc: bgDetails?.bgBankIfsc || '',
                         uniqueCode: bgDetails?.uniqueCode || '',
                     });
