@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { findCatalogItem, fieldIsVisible, UNIT_OPTIONS } from "./item-catalog";
+// @ts-expect-error Node's test loader needs the explicit TypeScript extension.
+import { findCatalogItem, fieldIsVisible, UNIT_OPTIONS } from "./item-catalog.ts";
 
 export const buildInventoryItemFormSchema = () => z.object({
     category: z.string().min(1, "Category is required"),

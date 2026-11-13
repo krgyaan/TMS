@@ -1,4 +1,5 @@
-import { fieldIsVisible, findCatalogItem } from "./item-catalog";
+// @ts-expect-error Node's test loader needs the explicit TypeScript extension.
+import { fieldIsVisible, findCatalogItem } from "./item-catalog.ts";
 
 const safeTokenPattern = /^[A-Z0-9/.+%-]+$/;
 

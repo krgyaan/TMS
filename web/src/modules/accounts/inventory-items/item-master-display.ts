@@ -1,4 +1,5 @@
-import { findCatalogItem } from "./item-catalog";
+// @ts-expect-error Node's test loader needs the explicit TypeScript extension.
+import { findCatalogItem } from "./item-catalog.ts";
 
 export type KeySpecificationAttribute = { key: string; label: string; value: string };
 
