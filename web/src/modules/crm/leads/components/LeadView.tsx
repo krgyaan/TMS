@@ -49,6 +49,8 @@ export function LeadView({
         return null;
     }
 
+    const isVendor = lead.typeName?.trim().toLowerCase() === "vendor";
+
     const priorityColors: Record<string, string> = {
         Hot: "bg-red-100 text-red-800 border-red-300",
         Warm: "bg-yellow-100 text-yellow-800 border-yellow-300",
@@ -222,10 +224,10 @@ export function LeadView({
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
-                                Industry
+                                {isVendor ? "Item" : "Industry"}
                             </TableCell>
                             <TableCell className="text-sm">
-                                {lead.industryName || "—"}
+                                {isVendor ? (lead.itemName || "—") : (lead.industryName || "—")}
                             </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Lead Type

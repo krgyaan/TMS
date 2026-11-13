@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { useSellerPersons } from "@/hooks/api/usePurchaseOrders";
 import type { SellerPersonOption } from "@/modules/operations/purchase-orders/helpers/purchaseOrder.types";
@@ -86,6 +86,8 @@ export function useSellerContactPerson<
         if (lastFilledIdRef.current !== vendorPersonId) fillFrom(chosen);
         return;
       }
+      // Persons still loading: keep the saved id instead of dropping it.
+      if (persons.length === 0) return;
       // Person no longer exists in vendor master for this org.
       setField("vendorPersonId", "");
       lastFilledIdRef.current = null;
@@ -125,5 +127,11 @@ export function useSellerContactPerson<
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orgId, persons, vendorPersonId]);
 
-  return { sellerOrgId: orgId, sellerPersons: persons };
+  // Edit pages call this after form.reset so the hydrated person is treated as
+  // already applied: the effect must not overwrite the saved contact snapshot.
+  const seedInitialSelection = useCallback((personId?: string | number | null) => {
+    lastFilledIdRef.current = personId ? String(personId) : null;
+  }, []);
+
+  return { sellerOrgId: orgId, sellerPersons: persons, seedInitialSelection };
 }

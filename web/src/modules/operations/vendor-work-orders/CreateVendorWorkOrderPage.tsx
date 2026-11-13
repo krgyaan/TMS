@@ -17,7 +17,9 @@ import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { useHasWCInsurance } from "@/hooks/api/useProjectInsurance";
 import { useCreatePoParty } from "@/hooks/api/usePurchaseOrders";
 import { useSellerSelectOptions, useShipToSelectOptions } from "@/hooks/useSelectOptions";
-import { VendorSellerSection } from "@/modules/operations/components/VendorSellerSection";
+import { useSellerContactPerson } from "@/hooks/useSellerContactPerson";
+import { useSellerGstSelection } from "@/hooks/useSellerGstSelection";
+import { formatVendorName } from "@/lib/vendorName";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNextVWONumber, useCreateVendorWorkOrder } from "@/hooks/api/useVendorWorkOrders";
@@ -27,7 +29,7 @@ import { DEFAULT_VWO_TERMS_ROWS } from "./helpers/vwoForm.constants";
 import { VWOFormPreview } from "./components/VWOFormPreview";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertCircle, ArrowLeft, Building2, Calendar, Eye, FileText, Hash, Mail, MapPin, Phone, ShieldCheck, UserCheck, UserPlus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -117,7 +119,13 @@ export default function CreateVendorWorkOrderPage() {
         defaultValues: defaultFormValues,
     });
     const selectedSellerId = form.watch("sellerId");
+    const selectedSellerGstId = form.watch("sellerGstId");
     const selectedPartyId = form.watch("partyId");
+
+    // Only fill master values when the user changes the selection. A refetch of
+    // the picker rows must not replace details the user has edited.
+    const autoFilledSellerRef = useRef<string | null>(null);
+    const autoFilledPartyRef = useRef<string | null>(null);
 
     // Server-searched pickers. Each owns its query (debounced inside), and pins
     // the current id so the row behind it is always in the response no matter
@@ -129,10 +137,42 @@ export default function CreateVendorWorkOrderPage() {
     const selectedUserId = form.watch("selectedUserId");
     const activeTeamMembers = useMemo(() => (teamMembers || []).filter((u: any) => u.isActive), [teamMembers]);
 
+    const { sellerPersons } = useSellerContactPerson(form);
+    const { sellerGsts, isLoading: isSellerGstsLoading } = useSellerGstSelection(form);
+
+    const sellerPersonOptions = useMemo(() => sellerPersons.map(p => ({ id: String(p.id), name: p.name || "Unnamed person" })), [sellerPersons]);
+    const sellerGstOptions = useMemo(
+        () =>
+            sellerGsts.map(g => ({
+                id: String(g.id),
+                name: g.gstNo || "No GSTIN",
+                description: [g.gstState, g.address].filter(Boolean).join(" · ") || undefined,
+            })),
+        [sellerGsts],
+    );
+
+    useEffect(() => {
+        if (!selectedSellerId || selectedSellerId === "__create_new__") return;
+        if (autoFilledSellerRef.current === selectedSellerId) return;
+        const party = sellerRows.find(p => String(p.id) === selectedSellerId);
+        if (!party) return;
+        autoFilledSellerRef.current = selectedSellerId;
+        form.setValue("sellerName", formatVendorName(party.name || ""));
+        form.setValue("sellerAddress", party.address || "");
+        form.setValue("sellerPanNo", party.pan || "");
+        form.setValue("sellerMsmeNo", party.msme || "");
+        // Contact person is deliberately not written here: the seller effect used
+        // to fill the same fields as "Quick Fill from Team Member", and whichever
+        // ran last won. Vendor-side contact now lives in vendorContactPerson* and
+        // is handled by useSellerContactPerson.
+    }, [selectedSellerId, sellerRows, form]);
+
     useEffect(() => {
         if (!selectedPartyId || selectedPartyId === "__create_new__") return;
+        if (autoFilledPartyRef.current === selectedPartyId) return;
         const party = shipToRows.find(p => String(p.id) === selectedPartyId);
         if (!party) return;
+        autoFilledPartyRef.current = selectedPartyId;
         form.setValue("shipToName", party.name || "");
         form.setValue("shippingAddress", party.address || "");
         form.setValue("shipToGst", party.gstNo || "");
@@ -334,32 +374,161 @@ export default function CreateVendorWorkOrderPage() {
 
                         <div className="flex flex-col md:flex-row gap-6 mt-6">
                             {/* ── Seller Information ── */}
-                            <VendorSellerSection
-                                form={form}
-                                mode="vwo"
-                                sellerOptions={sellerOptions}
-                                sellerRows={sellerRows}
-                                onSellerSearch={onSellerSearch}
-                                isSellerLoading={isSellerLoading}
-                                onAddSeller={() => {
-                                    setPartyCreationType("seller");
-                                    setIsAddPartyOpen(true);
-                                }}
-                                isCreatingSeller={createPartyMutation.isPending}
-                                addSellerDialog={
-                                    <PartyFormDialog
-                                        title="Add New Vendor"
-                                        description="Add a new party to use as a vendor."
-                                        open={isAddPartyOpen}
-                                        onOpenChange={open => {
-                                            setIsAddPartyOpen(open);
-                                            if (open) setPartyCreationType("seller");
+                            <div className="border rounded-lg border-primary border-dashed p-2 my-3 w-full md:w-1/2">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                                        <Building2 className="h-5 w-5" />
+                                        Vendor Information
+                                    </h3>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        type="button"
+                                        onClick={() => {
+                                            setPartyCreationType("seller");
+                                            setIsAddPartyOpen(true);
                                         }}
-                                        onSubmit={handleAddNewParty}
-                                        isLoading={createPartyMutation.isPending}
-                                    />
-                                }
-                            />
+                                    >
+                                        <UserPlus className="mr-2 h-4 w-4" />
+                                        Add New Vendor
+                                    </Button>
+                                </div>
+                                <PartyFormDialog
+                                    title="Add New Vendor"
+                                    description="Add a new party to use as a vendor."
+                                    open={isAddPartyOpen}
+                                    onOpenChange={open => {
+                                        setIsAddPartyOpen(open);
+                                        if (open) setPartyCreationType("seller");
+                                    }}
+                                    onSubmit={handleAddNewParty}
+                                    isLoading={createPartyMutation.isPending}
+                                />
+                                <p className="text-sm text-muted-foreground mb-4">Select or enter vendor details</p>
+                                <AsyncSelectField
+                                    control={form.control}
+                                    name="sellerId"
+                                    label="Select Existing Vendor"
+                                    options={sellerOptions}
+                                    placeholder="Choose a vendor..."
+                                    onSearch={onSellerSearch}
+                                    isLoading={isSellerLoading}
+                                />
+                                <SelectField
+                                    control={form.control}
+                                    name="sellerGstId"
+                                    label="GST Registration"
+                                    options={sellerGstOptions}
+                                    placeholder={
+                                        !selectedSellerId
+                                            ? "Select a vendor first"
+                                            : isSellerGstsLoading
+                                              ? "Loading GSTs..."
+                                              : sellerGsts.length === 0
+                                                ? "No GSTs saved for this vendor"
+                                                : "Select a GST..."
+                                    }
+                                    disabled={!selectedSellerId || sellerGsts.length === 0}
+                                    valueType="string"
+                                />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name="sellerName"
+                                        label={
+                                            <>
+                                                Vendor Name <span className="text-destructive">*</span>
+                                            </>
+                                        }
+                                    >
+                                        {field => (
+                                            <Input
+                                                {...field}
+                                                placeholder="Enter vendor name"
+                                                onBlur={() => {
+                                                    field.onChange(formatVendorName(field.value));
+                                                    field.onBlur();
+                                                }}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name="sellerEmail"
+                                        label={
+                                            <>
+                                                <Mail className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />
+                                                Vendor Email
+                                            </>
+                                        }
+                                    >
+                                        {field => <Input {...field} type="email" placeholder="vendor@example.com" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="sellerGstNo" label="GST Number">
+                                        {field => (
+                                            <Input
+                                                {...field}
+                                                placeholder="e.g. 27ABCDE1234F1Z5"
+                                                className="font-mono"
+                                                maxLength={15}
+                                                onChange={e => field.onChange(e.target.value.toUpperCase())}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name="sellerAddress"
+                                        label={
+                                            <>
+                                                <MapPin className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />
+                                                Vendor Address
+                                            </>
+                                        }
+                                    >
+                                        {field => <Textarea {...field} placeholder="Enter complete address" rows={2} />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="sellerPanNo" label="PAN Number">
+                                        {field => (
+                                            <Input
+                                                {...field}
+                                                placeholder="e.g. ABCDE1234F"
+                                                className="font-mono"
+                                                maxLength={10}
+                                                onChange={e => field.onChange(e.target.value.toUpperCase())}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="sellerMsmeNo" label="MSME Number">
+                                        {field => (
+                                            <Input
+                                                {...field}
+                                                placeholder="e.g. UDYAM-XX-00-0000000"
+                                                className="font-mono"
+                                                onChange={e => field.onChange(e.target.value.toUpperCase())}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name="sellerCinNo"
+                                        label={
+                                            <>
+                                                <Building2 className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />
+                                                CIN Number
+                                            </>
+                                        }
+                                    >
+                                        {field => (
+                                            <Input
+                                                {...field}
+                                                placeholder="e.g. U74999KA2020PTC123456"
+                                                className="font-mono"
+                                                onChange={e => field.onChange(e.target.value.toUpperCase())}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                </div>
+                            </div>
                             {/* ── Ship To Details ── */}
                             <div className="border rounded-lg border-sidebar-primary-foreground border-dashed p-2 my-3 w-full md:w-1/2">
                                 <div className="flex items-center justify-between mb-4">
@@ -453,6 +622,52 @@ export default function CreateVendorWorkOrderPage() {
 
                         {/* ── Contact Persons ── */}
                         <div className="space-y-6 my-6">
+                            <div>
+                                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">Vendor Contact Person</p>
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                    <SelectField
+                                        control={form.control}
+                                        name="vendorPersonId"
+                                        label={
+                                            <>
+                                                <Building2 className="h-3.5 w-3.5 inline mr-1" />
+                                                Vendor Contact Person
+                                            </>
+                                        }
+                                        options={sellerPersonOptions}
+                                        placeholder={sellerPersons.length ? "Select vendor contact person..." : "No persons saved for this vendor"}
+                                        disabled={!selectedSellerGstId && sellerGsts.length > 0}
+                                    />
+                                    <FieldWrapper control={form.control} name="vendorContactPersonName" label="Vendor Contact Name">
+                                        {field => <Input {...field} placeholder="Enter vendor contact name" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name="vendorContactPersonPhone"
+                                        label={
+                                            <>
+                                                <Phone className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />
+                                                Vendor Contact Phone
+                                            </>
+                                        }
+                                    >
+                                        {field => <Input {...field} placeholder="e.g. +91-9876543210" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name="vendorContactPersonEmail"
+                                        label={
+                                            <>
+                                                <Mail className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />
+                                                Vendor Contact Email
+                                            </>
+                                        }
+                                    >
+                                        {field => <Input {...field} type="email" placeholder="contact@example.com" />}
+                                    </FieldWrapper>
+                                </div>
+                            </div>
+
                             <div>
                                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">Our Contact Person (printed on the WO)</p>
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
