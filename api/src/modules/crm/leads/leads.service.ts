@@ -6,6 +6,7 @@ import { leadFollowups } from '@db/schemas/crm/lead-followups.schema';
 import { happyCalling } from '@db/schemas/crm/happy-calling.schema';
 import { leadIndustries } from '@db/schemas/master/lead-industries.schema';
 import { leadTypes } from '@db/schemas/crm/lead-types.schema';
+import { items } from '@db/schemas/master/items.schema';
 import { teams } from '@db/schemas/master/teams.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { and, asc, desc, eq, ilike, isNotNull, or, sql, type SQL } from 'drizzle-orm';
@@ -27,6 +28,7 @@ export type LeadListFilters = {
 
 export type LeadWithNames = Lead & {
     industryName?: string | null;
+    itemName?: string | null;
     typeName?: string | null;
     teamName?: string | null;
     bdPersonName?: string | null;
@@ -187,6 +189,7 @@ export class LeadsService {
                 state: null,
                 type: null,
                 industry: null,
+                itemId: null,
                 team: null,
                 bdPerson: null,
                 allocatedTe: null,
@@ -219,6 +222,7 @@ export class LeadsService {
                 updatedAt: entry.updatedAt,
 
                 industryName: null,
+                itemName: null,
                 typeName: null,
                 teamName: null,
                 bdPersonName: null,
@@ -307,6 +311,7 @@ export class LeadsService {
             .select({
                 leads,
                 industryName: leadIndustries.name,
+                itemName: items.name,
                 typeName: leadTypes.name,
                 teamName: teams.name,
                 bdPersonName: bdUser.name,
@@ -316,6 +321,7 @@ export class LeadsService {
             })
             .from(leads)
             .leftJoin(leadIndustries, eq(leadIndustries.id, sql`NULLIF(${leads.industry}, '')::BIGINT`))
+            .leftJoin(items, eq(items.id, leads.itemId))
             .leftJoin(leadTypes, eq(leadTypes.id, sql`NULLIF(${leads.type}, '')::BIGINT`))
             .leftJoin(teams, eq(teams.id, sql`NULLIF(${leads.team}, '')::BIGINT`))
             .leftJoin(bdUser, eq(bdUser.id, leads.bdPerson))
@@ -333,6 +339,7 @@ export class LeadsService {
                     ...row.leads,
                     source: 'lead' as const,
                     industryName: row.industryName ?? null,
+                    itemName: row.itemName ?? null,
                     typeName: row.typeName ?? null,
                     teamName: row.teamName ?? null,
                     bdPersonName: row.bdPersonName ?? null,
@@ -399,6 +406,7 @@ export class LeadsService {
             .select({
                 leads,
                 industryName: leadIndustries.name,
+                itemName: items.name,
                 typeName: leadTypes.name,
                 teamName: teams.name,
                 bdPersonName: bdUser.name,
@@ -408,6 +416,7 @@ export class LeadsService {
             })
             .from(leads)
             .leftJoin(leadIndustries, eq(leadIndustries.id, sql`NULLIF(${leads.industry}, '')::BIGINT`))
+            .leftJoin(items, eq(items.id, leads.itemId))
             .leftJoin(leadTypes, eq(leadTypes.id, sql`NULLIF(${leads.type}, '')::BIGINT`))
             .leftJoin(teams, eq(teams.id, sql`NULLIF(${leads.team}, '')::BIGINT`))
             .leftJoin(bdUser, eq(bdUser.id, leads.bdPerson))
@@ -422,6 +431,7 @@ export class LeadsService {
         return {
             ...row.leads,
             industryName: row.industryName ?? null,
+            itemName: row.itemName ?? null,
             typeName: row.typeName ?? null,
             teamName: row.teamName ?? null,
             bdPersonName: row.bdPersonName ?? null,

@@ -22,6 +22,7 @@ import { ArrowLeft, Loader2, MapPin, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { paths } from "@/app/routes/paths";
 import { useCreateLead, useUpdateLead } from "@/hooks/api/useLeads";
+import { useItems } from "@/hooks/api/useItems";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import { useAuth } from "@/contexts/AuthContext";
 import axiosInstance from "@/lib/axios";
@@ -81,6 +82,7 @@ const LeadFormSchema = z.object({
     state: z.string().min(1, { message: "State is required" }),
     type: z.string().optional(),
     industry: z.string().optional(),
+    itemId: z.string().optional(),
     allocatedTe: z.string().optional(),
     addFirstInteraction: z.boolean().optional(),
     firstInteractionType: z.enum(["call", "mail", "visit", "letter", "whatsapp"]).optional(),
@@ -154,6 +156,15 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
         queryFn: fetchIndustries,
     });
 
+    const { data: allItems = [] } = useItems();
+
+    const itemOptions = allItems
+        .filter((item) => item.status)
+        .map((item) => ({
+            value: item.id.toString(),
+            label: item.name,
+        }));
+
     const { data: teamMembers = [], isLoading: teamMembersLoading } = useGetTeamMembers(
         effectiveTeamId ?? 0
     );
@@ -174,10 +185,11 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
             phone: lead?.phone || "",
             email: lead?.email || "",
             address: lead?.address || "",
-            country: lead?.country || "",
+            country: mode === "create" ? "India" : (lead?.country || ""),
             state: lead?.state || "",
             type: lead?.type || "",
             industry: lead?.industry || "",
+            itemId: lead?.itemId?.toString() ?? "",
             allocatedTe: mode === "create" ? (user?.id?.toString() ?? "") : (lead?.allocatedTe?.toString() ?? ""),
             addFirstInteraction: false,
             firstInteractionType: "call",
@@ -187,6 +199,29 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
     const country = useWatch({ control: form.control, name: "country" });
     const isIndia = country === "India";
     const addFirstInteraction = form.watch("addFirstInteraction") ?? false;
+
+    const selectedType = useWatch({ control: form.control, name: "type" });
+    const selectedTypeName =
+        typeOptions.find((option) => option.value === selectedType)?.label ??
+        (mode === "edit" ? (lead?.typeName ?? "") : "");
+    const isVendor = selectedTypeName.trim().toLowerCase() === "vendor";
+    const previousIsVendor = useRef<boolean | null>(null);
+
+    useEffect(() => {
+        if (typeOptions.length === 0) return;
+        if (previousIsVendor.current === null) {
+            previousIsVendor.current = isVendor;
+            return;
+        }
+        if (previousIsVendor.current === isVendor) return;
+
+        if (isVendor) {
+            form.setValue("industry", "");
+        } else {
+            form.setValue("itemId", "");
+        }
+        previousIsVendor.current = isVendor;
+    }, [isVendor, typeOptions.length, form]);
 
     const [locationBlocked, setLocationBlocked] = useState(false);
     const [locationModal, setLocationModal] = useState<{ open: boolean; lat?: number; lng?: number }>({ open: false });
@@ -277,7 +312,12 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
                         : {}),
                     ...(values.email?.trim() ? { email: values.email.trim() } : {}),
                     ...(values.type ? { type: values.type } : {}),
-                    ...(values.industry ? { industry: values.industry } : {}),
+                    ...(isVendor && values.itemId
+                        ? { itemId: Number(values.itemId) }
+                        : {}),
+                    ...(!isVendor && values.industry
+                        ? { industry: values.industry }
+                        : {}),
                     ...(values.allocatedTe
                         ? { allocatedTe: Number(values.allocatedTe) }
                         : {}),
@@ -296,7 +336,8 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
                     designation: values.designation?.trim() || null,
                     email: values.email?.trim() || null,
                     type: values.type || null,
-                    industry: values.industry || null,
+                    itemId: isVendor && values.itemId ? Number(values.itemId) : null,
+                    industry: !isVendor && values.industry ? values.industry : null,
                     allocatedTe: values.allocatedTe
                         ? Number(values.allocatedTe)
                         : null,
@@ -541,13 +582,23 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
                                     placeholder="Select Type"
                                 />
 
-                                <SelectField<LeadFormValues, "industry">
-                                    control={form.control}
-                                    name="industry"
-                                    label="Industry"
-                                    options={industryOptions}
-                                    placeholder="Select Industry"
-                                />
+                                {isVendor ? (
+                                    <SelectField<LeadFormValues, "itemId">
+                                        control={form.control}
+                                        name="itemId"
+                                        label="Item"
+                                        options={itemOptions}
+                                        placeholder="Select Item"
+                                    />
+                                ) : (
+                                    <SelectField<LeadFormValues, "industry">
+                                        control={form.control}
+                                        name="industry"
+                                        label="Industry"
+                                        options={industryOptions}
+                                        placeholder="Select Industry"
+                                    />
+                                )}
 
                                 <SelectField<LeadFormValues, "allocatedTe">
                                     control={form.control}

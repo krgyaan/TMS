@@ -18,6 +18,7 @@ export interface Lead {
     state: string | null;
     type: string | null;
     industry: string | null;
+    itemId: number | null;
     team: string | null;
     bdPerson: number | null;
     allocatedTe: number | null;
@@ -48,6 +49,7 @@ export interface Lead {
 
 export interface LeadWithNames extends Lead {
     industryName?: string | null;
+    itemName?: string | null;
     typeName?: string | null;
     teamName?: string | null;
     bdPersonName?: string | null;
@@ -73,6 +75,7 @@ export interface CreateLeadRequest {
     state: string;
     type?: string | null;
     industry?: string | null;
+    itemId?: number | null;
     team?: string | null;
     bdPerson?: number | null;
     allocatedTe?: number | null;
