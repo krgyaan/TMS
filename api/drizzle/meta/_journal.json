@@ -715,6 +715,13 @@
       "when": 1798000000001,
       "tag": "0178_item_master_catalog_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 126,
+      "version": "7",
+      "when": 1798000000002,
+      "tag": "0179_item_master_catalog_update",
+      "breakpoints": true
     }
   ]
 }

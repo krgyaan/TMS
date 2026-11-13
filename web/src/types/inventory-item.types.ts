@@ -4,6 +4,8 @@ export interface InventoryItem {
     itemGroup?: string | null;
     teamId: number | null;
     category: string | null;
+    subcategory: string | null;
+    modelNumber: string | null;
     makeBrand: string | null;
     createdBy: number | null;
     updatedBy: number | null;

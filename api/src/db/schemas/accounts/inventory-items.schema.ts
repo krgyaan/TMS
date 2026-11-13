@@ -8,6 +8,8 @@ export const inventoryItems = pgTable("inventory_items", {
     itemGroup: varchar("item_group", { length: 40 }),
     teamId: bigint("team_id", { mode: "number" }).references(() => teams.id),
     category: varchar("category", { length: 80 }),
+    subcategory: varchar("subcategory", { length: 120 }),
+    modelNumber: varchar("model_number", { length: 120 }),
     makeBrand: varchar("make_brand", { length: 120 }),
     createdBy: bigint("created_by", { mode: "number" }).references(() => users.id, { onDelete: "set null" }),
     updatedBy: bigint("updated_by", { mode: "number" }).references(() => users.id, { onDelete: "set null" }),
@@ -26,6 +28,7 @@ export const inventoryItems = pgTable("inventory_items", {
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, table => ({
     categoryIdx: index("inventory_items_category_idx").on(table.category),
+    subcategoryIdx: index("inventory_items_subcategory_idx").on(table.subcategory),
     createdByIdx: index("inventory_items_created_by_idx").on(table.createdBy),
 }));
 
