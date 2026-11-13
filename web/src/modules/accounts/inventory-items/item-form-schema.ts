@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { findCatalogItem, fieldIsVisible, UNIT_OPTIONS } from "./item-catalog.ts";
+import { findCatalogItem, fieldIsVisible, UNIT_OPTIONS } from "./item-catalog";
 
 export const buildInventoryItemFormSchema = () => z.object({
     category: z.string().min(1, "Category is required"),

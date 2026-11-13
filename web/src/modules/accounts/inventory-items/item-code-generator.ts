@@ -1,4 +1,4 @@
-import { fieldIsVisible, findCatalogItem } from "./item-catalog.ts";
+import { fieldIsVisible, findCatalogItem } from "./item-catalog";
 
 const safeTokenPattern = /^[A-Z0-9/.+%-]+$/;
 

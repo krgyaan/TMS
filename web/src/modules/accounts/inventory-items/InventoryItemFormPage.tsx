@@ -13,8 +13,9 @@ import { useCreateInventoryItem, useInventoryItem, useItemConversionOptions, use
 import { handleQueryError } from "@/lib/react-query";
 import { paths } from "@/app/routes/paths";
 import type { InventoryItemPayload } from "@/types/inventory-item.types";
-import { ITEM_CATALOG, fieldIsVisible, findCatalogItem, UNIT_OPTIONS, type Unit } from "./item-catalog.ts";
-import { generateTemplatedItemCode, getItemCodePreview } from "./item-code-generator.ts";
+import { ITEM_CATALOG, fieldIsVisible, findCatalogItem } from "./item-catalog";
+import { UNIT_OPTIONS, type Unit } from "./item-config";
+import { generateTemplatedItemCode, getItemCodePreview } from "./item-code-generator";
 import { inventoryItemFormSchema, type InventoryItemFormValues } from "./item-form-schema";
 
 const formControlClass = "h-11 w-full rounded-md border border-slate-400 bg-background px-3 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:border-slate-600 md:h-10";
@@ -326,7 +327,7 @@ export default function InventoryItemFormPage() {
                         : selectedConversion?.factorMode === "width" ? "Calculated from width." : selectedConversion?.factorMode === "fixed" ? "Fixed by the unit conversion rule." : "Enter a positive factor with up to 6 decimals."} error={errors.conversionFactor?.message}>
                         <Input type="number" inputMode="decimal" min="0" step={selectedConversion?.factorMode === "manual" ? "0.000001" : "any"} className={formControlClass} aria-invalid={Boolean(errors.conversionFactor)} readOnly={selectedConversion?.factorMode !== "manual"} {...form.register("conversionFactor")} />
                     </FormField>}
-                </div>
+                </div>}
                 {conversionEnabled && conversionUnit && conversionOptionsQuery.isLoading && <p className="text-sm text-muted-foreground">Loading valid conversions…</p>}
                 {conversionEnabled && conversionUnit && conversionOptionsQuery.error && <Alert variant="destructive"><AlertDescription>Unable to load conversion rules. Retry by changing the unit.</AlertDescription></Alert>}
                 {conversionEnabled && conversionUnit && !conversionOptionsQuery.isLoading && !selectedConversion && <Alert variant="destructive"><AlertDescription>This saved conversion pair is invalid. Choose a valid target.</AlertDescription></Alert>}

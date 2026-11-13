@@ -1,4 +1,4 @@
-import { ITEM_CATALOG, UNIT_OPTIONS, findCatalogItem } from "./item-catalog.ts";
+import { ITEM_CATALOG, UNIT_OPTIONS, findCatalogItem } from "./item-catalog";
 
 export { UNIT_OPTIONS };
 export type Unit = typeof UNIT_OPTIONS[number];

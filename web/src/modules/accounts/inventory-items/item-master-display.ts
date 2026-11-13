@@ -1,4 +1,4 @@
-import { findCatalogItem } from "./item-catalog.ts";
+import { findCatalogItem } from "./item-catalog";
 
 export type KeySpecificationAttribute = { key: string; label: string; value: string };
 
