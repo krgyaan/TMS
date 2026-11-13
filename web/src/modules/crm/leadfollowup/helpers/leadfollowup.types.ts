@@ -70,7 +70,6 @@ export interface CallFollowupRequest {
     type: 'call';
     body: string;
     veResponsibility?: string | null;
-    contacts: ContactPerson[];
     nextFollowupDate?: string | null;
 }
 
@@ -78,7 +77,6 @@ export interface VisitFollowupRequest {
     type: 'visit';
     body: string;
     veResponsibility?: string | null;
-    contacts: ContactPerson[];
     nextFollowupDate?: string | null;
 }
 

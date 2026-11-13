@@ -548,33 +548,31 @@ export class LeadFollowupsService {
                 .where(eq(leadFollowups.id, id))
                 .returning();
 
-            // Update contacts for call/visit
+            // Update contacts for call/visit only when contacts are explicitly provided
             if (
                 (data.type === 'call' || data.type === 'visit') &&
-                'contacts' in data
+                'contacts' in data &&
+                (data as CallFollowupDto | VisitFollowupDto).contacts.length > 0
             ) {
                 // Delete old contacts
                 await tx
                     .delete(leadContacts)
                     .where(eq(leadContacts.followupId, id));
 
-                // Insert new contacts
-                if ((data as CallFollowupDto | VisitFollowupDto).contacts.length > 0) {
-                    const contactSource = data.type === 'call' ? 'call_followup' : 'visit_followup';
-                    const contactsPayload: NewLeadContact[] = (data as CallFollowupDto | VisitFollowupDto)
-                        .contacts
-                        .map((contact: ContactDto) => ({
-                            leadId: updatedFollowup.leadId ?? null,
-                            followupId: id,
-                            name: contact.name,
-                            designation: contact.designation ?? null,
-                            phone: contact.phone ?? null,
-                            email: contact.email ?? null,
-                            source: contactSource,
-                        }));
+                const contactSource = data.type === 'call' ? 'call_followup' : 'visit_followup';
+                const contactsPayload: NewLeadContact[] = (data as CallFollowupDto | VisitFollowupDto)
+                    .contacts
+                    .map((contact: ContactDto) => ({
+                        leadId: updatedFollowup.leadId ?? null,
+                        followupId: id,
+                        name: contact.name,
+                        designation: contact.designation ?? null,
+                        phone: contact.phone ?? null,
+                        email: contact.email ?? null,
+                        source: contactSource,
+                    }));
 
-                    await tx.insert(leadContacts).values(contactsPayload);
-                }
+                await tx.insert(leadContacts).values(contactsPayload);
             }
 
             return updatedFollowup;

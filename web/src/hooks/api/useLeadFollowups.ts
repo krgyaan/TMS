@@ -277,16 +277,12 @@ export const useVisitForm = (source: FollowupSource) => {
 
     const createFollowup = useCreateFollowup(source);
     const updateFollowup = useUpdateFollowup(source);
-    const sourceRecord = useSourceRecord(source);
     const { data: allFollowups = [] } = useLeadFollowups(source);
 
     const existingFollowup = followupId
         ? allFollowups.find(f => f.id === followupId && f.type === 'visit') ?? null
         : null;
     const isEditMode = !!existingFollowup;
-
-    const [contacts, setContacts] = useState<ContactPerson[]>([]);
-    const [lockedCount, setLockedCount] = useState(0);
 
     const form = useForm<VisitFormValues>({
         resolver: zodResolver(VisitSchema),
@@ -304,27 +300,14 @@ export const useVisitForm = (source: FollowupSource) => {
                 veResponsibility: existingFollowup.veResponsibility || "",
                 nextFollowupDate: formatDateForInput(existingFollowup.nextFollowupDate),
             });
-            setContacts(existingFollowup.contacts || []);
-            setLockedCount(0);
         }
     }, [existingFollowup, isEditMode, form]);
-
-    useEffect(() => {
-        if (isEditMode) return;
-
-        const seeded = seedContactsFromSource(sourceRecord);
-        if (seeded.length > 0) {
-            setContacts(seeded);
-            setLockedCount(seeded.length);
-        }
-    }, [sourceRecord, isEditMode]);
 
     const handleSubmit = async (values: VisitFormValues) => {
         const payload: VisitFollowupRequest = {
             type: 'visit',
             body: values.body,
             veResponsibility: values.veResponsibility || null,
-            contacts,
             nextFollowupDate: values.nextFollowupDate || null,
         };
 
@@ -338,12 +321,6 @@ export const useVisitForm = (source: FollowupSource) => {
             } else {
                 await createFollowup.mutateAsync(payload);
                 form.reset();
-
-                const seeded = seedContactsFromSource(sourceRecord);
-                if (seeded.length > 0) {
-                    setContacts(seeded);
-                    setLockedCount(seeded.length);
-                }
             }
         } catch {
             // handled by hook
@@ -356,9 +333,6 @@ export const useVisitForm = (source: FollowupSource) => {
 
     return {
         form,
-        contacts,
-        setContacts,
-        lockedCount,
         isEditMode,
         saving: createFollowup.isPending || updateFollowup.isPending,
         handleSubmit,
@@ -378,16 +352,12 @@ export const useCallForm = (source: FollowupSource) => {
 
     const createFollowup = useCreateFollowup(source);
     const updateFollowup = useUpdateFollowup(source);
-    const sourceRecord = useSourceRecord(source);
     const { data: allFollowups = [] } = useLeadFollowups(source);
 
     const existingFollowup = followupId
         ? allFollowups.find(f => f.id === followupId && f.type === 'call') ?? null
         : null;
     const isEditMode = !!existingFollowup;
-
-    const [contacts, setContacts] = useState<ContactPerson[]>([]);
-    const [lockedCount, setLockedCount] = useState(0);
 
     const form = useForm<CallFormValues>({
         resolver: zodResolver(CallSchema),
@@ -405,27 +375,14 @@ export const useCallForm = (source: FollowupSource) => {
                 veResponsibility: existingFollowup.veResponsibility || "",
                 nextFollowupDate: formatDateForInput(existingFollowup.nextFollowupDate),
             });
-            setContacts(existingFollowup.contacts || []);
-            setLockedCount(0);
         }
     }, [existingFollowup, isEditMode, form]);
-
-    useEffect(() => {
-        if (isEditMode) return;
-
-        const seeded = seedContactsFromSource(sourceRecord);
-        if (seeded.length > 0) {
-            setContacts(seeded);
-            setLockedCount(seeded.length);
-        }
-    }, [sourceRecord, isEditMode]);
 
     const handleSubmit = async (values: CallFormValues) => {
         const payload: CallFollowupRequest = {
             type: 'call',
             body: values.body,
             veResponsibility: values.veResponsibility || null,
-            contacts,
             nextFollowupDate: values.nextFollowupDate || null,
         };
 
@@ -439,12 +396,6 @@ export const useCallForm = (source: FollowupSource) => {
             } else {
                 await createFollowup.mutateAsync(payload);
                 form.reset();
-
-                const seeded = seedContactsFromSource(sourceRecord);
-                if (seeded.length > 0) {
-                    setContacts(seeded);
-                    setLockedCount(seeded.length);
-                }
             }
         } catch {
             // handled by hook
@@ -457,18 +408,12 @@ export const useCallForm = (source: FollowupSource) => {
 
     return {
         form,
-        contacts,
-        setContacts,
-        lockedCount,
         isEditMode,
         saving: createFollowup.isPending || updateFollowup.isPending,
         handleSubmit,
         handleCancelEdit,
     };
 };
-
-// ─── Mail Form Hook ───────────────────────────────────────────────────────────
-// ── UNCHANGED ────────────────────────────────────────────────────────────────
 
 export const useMailForm = (source: FollowupSource) => {
     const [searchParams] = useSearchParams();
@@ -551,9 +496,6 @@ export const useMailForm = (source: FollowupSource) => {
         handleCancelEdit,
     };
 };
-
-// ─── WhatsApp Form Hook ───────────────────────────────────────────────────────
-// ── UNCHANGED ────────────────────────────────────────────────────────────────
 
 export const useWhatsappForm = (source: FollowupSource) => {
     const [searchParams] = useSearchParams();

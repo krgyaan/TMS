@@ -8,7 +8,6 @@ import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { MapPin, MessageSquare, ClipboardList, Calendar, User, Loader2, Edit, Save, X, ChevronDown, ChevronUp } from "lucide-react";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
-import { ContactPersonFields } from "./ContactPersonFields";
 import { format } from "date-fns";
 import { 
     useLeadFollowups, 
@@ -40,9 +39,6 @@ export function VisitTab({ source, mode = 'create' }: VisitTabProps) {
 function VisitCreateForm({ source }: { source: FollowupSource }) {
     const {
         form,
-        contacts,
-        setContacts,
-        lockedCount,
         isEditMode,
         saving,
         handleSubmit,
@@ -100,13 +96,6 @@ function VisitCreateForm({ source }: { source: FollowupSource }) {
                         />
                     )}
                 </FieldWrapper>
-
-                <ContactPersonFields
-                    contacts={contacts}
-                    onChange={setContacts}
-                    disabled={saving}
-                    lockedCount={lockedCount}
-                />
 
                 <div className="w-64">
                     <FieldWrapper<VisitFormValues, "nextFollowupDate">
