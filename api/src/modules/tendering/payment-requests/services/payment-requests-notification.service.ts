@@ -1,4 +1,4 @@
-import { couriers, emailLogs, emdResponsibility, tenderInfos, users } from '@/db/schemas';
+import { couriers, emailLogs, emdResponsibility, projects, tenderInfos, users } from '@/db/schemas';
 import { AppLogger } from '@/logger/app-logger.service';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
@@ -7,6 +7,7 @@ import { PdfGeneratorService } from '@/modules/pdf/pdf-generator.service';
 import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { instrumentBgDetails, instrumentChequeDetails, instrumentFdrDetails, instrumentTransferDetails, paymentInstruments, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
+import { woBasicDetails } from '@db/schemas/operations';
 import { BG_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import { getIstDayBounds } from '@/utils/ist-date';
 import { Inject, Injectable } from '@nestjs/common';
@@ -142,6 +143,87 @@ export class PaymentRequestsNotificationService {
         }
 
         return requestDueDate && !Number.isNaN(requestDueDate.getTime()) ? requestDueDate : null;
+    };
+
+    /**
+     * Parses `tender_infos.documents` and returns the main tender document.
+     * Supports the structured shape { schemaVersion, mainTender, atc[], boq, otherDocuments[] }
+     * and the legacy flat-array shape (index 0 = main tender).
+     */
+    private parseTenderMainDoc = (raw: string | null | undefined): string | null => {
+        if (!raw || !raw.trim()) return null;
+
+        const trimmed = raw.trim();
+
+        try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) {
+                const first = parsed.find((p) => typeof p === 'string' && p.trim().length > 0);
+                return typeof first === 'string' ? first.trim() : null;
+            }
+            if (parsed && typeof parsed === 'object') {
+                const main = (parsed as Record<string, any>).mainTender;
+                return typeof main === 'string' && main.trim().length > 0 ? main.trim() : null;
+            }
+        } catch {
+            // Not JSON — treat it as a plain path.
+        }
+
+        return trimmed;
+    };
+
+    /**
+     * Second attachment of the BG creation mail.
+     * Cascade: document uploaded in the BG dashboard form -> project WO draft ->
+     * main tender document. Returns the paths plus the label for the mail line.
+     */
+    private async resolveBgSupportingDocs(
+        paymentReq: { tenderId?: number | null; projectId?: number | null },
+        bgDetails: { bgPo?: string | null } | null | undefined,
+    ): Promise<{ paths: string[]; label: string }> {
+        // 1) Document uploaded from the BG dashboard form.
+        const uploaded = this.toAttachmentPaths(bgDetails?.bgPo);
+        if (uploaded.length > 0) {
+            return { paths: uploaded, label: 'PO copy/request letter from beneficiary' };
+        }
+
+        // 2) Project dashboard: the WO draft document stored on wo_basic_details.
+        if (paymentReq.projectId) {
+            const [project] = await this.db
+                .select({ woBasicDetailId: projects.woBasicDetailId })
+                .from(projects)
+                .where(eq(projects.id, paymentReq.projectId))
+                .limit(1);
+
+            if (project?.woBasicDetailId) {
+                const [woBasic] = await this.db
+                    .select({ woDraft: woBasicDetails.woDraft })
+                    .from(woBasicDetails)
+                    .where(eq(woBasicDetails.id, project.woBasicDetailId))
+                    .limit(1);
+
+                const woDraftPaths = this.toAttachmentPaths(woBasic?.woDraft);
+                if (woDraftPaths.length > 0) {
+                    return { paths: woDraftPaths, label: 'WO draft document (LOA/GEM PO/LOI)' };
+                }
+            }
+        }
+
+        // 3) EMD / tender flow: the main tender document.
+        if (paymentReq.tenderId) {
+            const [tender] = await this.db
+                .select({ documents: tenderInfos.documents })
+                .from(tenderInfos)
+                .where(eq(tenderInfos.id, paymentReq.tenderId))
+                .limit(1);
+
+            const mainDoc = this.parseTenderMainDoc(tender?.documents);
+            if (mainDoc) {
+                return { paths: [mainDoc], label: 'Main tender document' };
+            }
+        }
+
+        return { paths: [], label: '' };
     };
 
     private formatCurrency = (amount: number) => {
@@ -1023,6 +1105,7 @@ export class PaymentRequestsNotificationService {
                         type: paymentRequests.type,
                         dueDate: paymentRequests.dueDate,
                         createdAt: paymentRequests.createdAt,
+                        projectId: paymentRequests.projectId,
                     })
                     .from(paymentRequests)
                     .where(eq(paymentRequests.id, instrument.requestId))
@@ -1106,22 +1189,25 @@ export class PaymentRequestsNotificationService {
                     );
                 }
 
-                try {
-                    // Get PO copy file path
-                    const [bgPo] = await this.db
-                        .select({ bgPo: instrumentBgDetails.bgPo })
-                        .from(instrumentBgDetails)
-                        .where(eq(instrumentBgDetails.instrumentId, instrumentId))
-                        .limit(1);
+                // Attachment 1 — the BG Format uploaded in the create form
+                // (bgSoftCopy holds the first uploaded file).
+                attachmentFiles.push(...this.toAttachmentPaths(bgDetails?.bgSoftCopy));
 
-                    if (bgPo?.bgPo) {
-                        attachmentFiles.push(...this.toAttachmentPaths(bgPo.bgPo));
-                    }
+                // Attachment 2 — the PO doc uploaded in the BG dashboard form,
+                // else the project's WO draft, else the main tender document.
+                let supportingDocLabel = '';
+                try {
+                    const supportingDoc = await this.resolveBgSupportingDocs(paymentReq, bgDetails);
+                    attachmentFiles.push(...supportingDoc.paths);
+                    supportingDocLabel = supportingDoc.label;
                 } catch (error) {
                     this.logger.warn(
-                        `Failed to resolve BG PO attachments for instrument ${instrumentId} — sending create mail without them: ${error instanceof Error ? error.message : String(error)}`
+                        `Failed to resolve BG supporting documents for instrument ${instrumentId} — sending create mail without them: ${error instanceof Error ? error.message : String(error)}`
                     );
                 }
+
+                // Attach each file only once.
+                const uniqueAttachmentFiles = Array.from(new Set(attachmentFiles));
 
                 // Get recipient email - use Imran (Accounts Leader) as specified
                 // Fallback to lookup if configured, otherwise hardcode Imran
@@ -1171,11 +1257,13 @@ export class PaymentRequestsNotificationService {
                             actionLink: `${this.getFrontendUrl()}/bi-dashboard/bank-guarantee/action/${instrumentId}?section=accounts-form-2`,
                             actionLinkText: 'Stage 2: After BG Creation',
                             courierAddress: instrument.courierAddress || '',
+                            hasBgFormat: this.toAttachmentPaths(bgDetails?.bgSoftCopy).length > 0,
+                            supportingDocLabel,
                         },
                         to: toEmails,
                         cc: ccEmails,
                         attachments: {
-                            files: attachmentFiles,
+                            files: uniqueAttachmentFiles,
                         },
                     });
 

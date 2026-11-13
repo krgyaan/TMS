@@ -26,8 +26,12 @@
         <p style="margin: 8px 0; font-size: 14px;"><strong>BG Claim Date:</strong> {{data.claimDate}}</p>
         <p style="margin: 8px 0; font-size: 14px;"><strong>Amount:</strong> Rs. {{data.amount}}</p>
         <p style="margin: 8px 0; font-size: 14px;"><strong>BG Stamp paper value:</strong> Rs. {{data.stampPaperValue}}</p>
+        {{#if data.hasBgFormat}}
         <p style="margin: 8px 0; font-size: 14px;"><strong>BG Format (Tender executive):</strong> attached.</p>
-        <p style="margin: 8px 0; font-size: 14px;"><strong>PO copy/request letter from beneficiary:</strong> attached.</p>
+        {{/if}}
+        {{#if data.supportingDocLabel}}
+        <p style="margin: 8px 0; font-size: 14px;"><strong>{{data.supportingDocLabel}}:</strong> attached.</p>
+        {{/if}}
     </div>
 
     <div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 4px;">
