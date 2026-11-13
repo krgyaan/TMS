@@ -7,13 +7,15 @@ import { PdfGeneratorService } from '@/modules/pdf/pdf-generator.service';
 import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { instrumentBgDetails, instrumentChequeDetails, instrumentFdrDetails, instrumentTransferDetails, paymentInstruments, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
-import { woBasicDetails } from '@db/schemas/operations';
+import { woBasicDetails, woContacts } from '@db/schemas/operations';
+import { tenderClients } from '@db/schemas/tendering/tender-info-sheet.schema';
+import { otherContacts } from '@db/schemas/shared/other-contacts.schema';
 import { BG_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import { getIstDayBounds } from '@/utils/ist-date';
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { differenceInDays } from 'date-fns';
-import { and, eq, gte, isNull, lt, ne, notInArray } from 'drizzle-orm';
+import { and, eq, gte, isNull, lt, ne, notInArray, sql } from 'drizzle-orm';
 
 /** Blank bank/beneficiary values are shown as "Not Provided" in the BG mail. */
 const orNotProvided = (value: string | null | undefined): string =>
@@ -224,6 +226,122 @@ export class PaymentRequestsNotificationService {
         }
 
         return { paths: [], label: '' };
+    };
+
+    /**
+     * Builds the courier address block shown in the BG cover letter.
+     * Prefers the structured JSON saved by the forms, falls back to the
+     * free-text column (EMD flow).
+     */
+    private resolveBgCourierAddress = (
+        instrument: { courierAddressJson?: unknown; courierAddress?: string | null } | null | undefined,
+    ): string => {
+        const json = instrument?.courierAddressJson as Record<string, any> | null | undefined;
+        if (json && typeof json === 'object') {
+            const parts = [
+                json.name,
+                json.phone,
+                [json.line1, json.line2].filter(Boolean).join(', '),
+                [json.city, json.state].filter(Boolean).join(', '),
+                json.pincode ? `- ${json.pincode}` : null,
+            ].filter((part): part is string => typeof part === 'string' && part.trim().length > 0);
+
+            if (parts.length > 0) {
+                return parts.join('\n');
+            }
+        }
+
+        return instrument?.courierAddress?.trim() || 'Not specified';
+    };
+
+    /**
+     * "Tender No./Work Order No." for the cover letter:
+     * tender no. -> project's WO number -> project name.
+     */
+    private resolveBgReferenceNo = async (
+        paymentReq: { tenderNo?: string | null; projectId?: number | null; projectName?: string | null },
+    ): Promise<string> => {
+        const tenderNo = paymentReq.tenderNo?.trim();
+        if (tenderNo && tenderNo.toUpperCase() !== 'NA') {
+            return tenderNo;
+        }
+
+        if (paymentReq.projectId) {
+            try {
+                const [project] = await this.db
+                    .select({ woBasicDetailId: projects.woBasicDetailId })
+                    .from(projects)
+                    .where(eq(projects.id, paymentReq.projectId))
+                    .limit(1);
+
+                if (project?.woBasicDetailId) {
+                    const [woBasic] = await this.db
+                        .select({ woNumber: woBasicDetails.woNumber })
+                        .from(woBasicDetails)
+                        .where(eq(woBasicDetails.id, project.woBasicDetailId))
+                        .limit(1);
+
+                    if (woBasic?.woNumber) {
+                        return woBasic.woNumber;
+                    }
+                }
+            } catch (error) {
+                this.logger.warn(
+                    `Failed to resolve WO number for BG cover letter (project ${paymentReq.projectId}): ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
+        }
+
+        return paymentReq.projectName?.trim() || 'NA';
+    };
+
+    /**
+     * Looks up the client C&P contact (name + designation) by the email saved
+     * in `instrument_bg_details.bg_client_cp`, across the three contact tables.
+     */
+    private resolveBgCoveringLetterCp = async (
+        email: string | null | undefined,
+    ): Promise<{ name: string; designation: string }> => {
+        const fallback = { name: 'C&P', designation: '' };
+        const normalized = email?.trim().toLowerCase();
+        if (!normalized) {
+            return fallback;
+        }
+
+        try {
+            const [wo] = await this.db
+                .select({ name: woContacts.name, designation: woContacts.designation })
+                .from(woContacts)
+                .where(sql`lower(${woContacts.email}) = ${normalized}`)
+                .limit(1);
+            if (wo?.name) {
+                return { name: wo.name, designation: wo.designation || '' };
+            }
+
+            const [tc] = await this.db
+                .select({ name: tenderClients.clientName, designation: tenderClients.clientDesignation })
+                .from(tenderClients)
+                .where(sql`lower(${tenderClients.clientEmail}) = ${normalized}`)
+                .limit(1);
+            if (tc?.name) {
+                return { name: tc.name, designation: tc.designation || '' };
+            }
+
+            const [oc] = await this.db
+                .select({ name: otherContacts.name, designation: otherContacts.designation })
+                .from(otherContacts)
+                .where(sql`lower(${otherContacts.email}) = ${normalized}`)
+                .limit(1);
+            if (oc?.name) {
+                return { name: oc.name, designation: oc.designation || '' };
+            }
+        } catch (error) {
+            this.logger.warn(
+                `Failed to resolve C&P contact for BG cover letter (email ${normalized}): ${error instanceof Error ? error.message : String(error)}`
+            );
+        }
+
+        return fallback;
     };
 
     private formatCurrency = (amount: number) => {
@@ -1106,6 +1224,8 @@ export class PaymentRequestsNotificationService {
                         dueDate: paymentRequests.dueDate,
                         createdAt: paymentRequests.createdAt,
                         projectId: paymentRequests.projectId,
+                        tenderNo: paymentRequests.tenderNo,
+                        projectName: paymentRequests.projectName,
                     })
                     .from(paymentRequests)
                     .where(eq(paymentRequests.id, instrument.requestId))
@@ -1141,7 +1261,7 @@ export class PaymentRequestsNotificationService {
 
                 // Get TL user
                 const [tlUser] = await this.db
-                    .select({ name: users.name })
+                    .select({ name: users.name, mobile: users.mobile, email: users.email })
                     .from(users)
                     .where(
                         and(
@@ -1151,6 +1271,17 @@ export class PaymentRequestsNotificationService {
                     )
                     .limit(1);
 
+                // Accounts Leader shown in the cover letter signature block.
+                const [accountsLeader] = await this.db
+                    .select({ name: users.name, mobile: users.mobile, email: users.email })
+                    .from(users)
+                    .where(eq(users.email, 'imran@volksenergie.in'))
+                    .limit(1);
+
+                // Client C&P contact (name + designation) resolved by the saved C&P email.
+                const cpContact = await this.resolveBgCoveringLetterCp(bgDetails?.bgClientCp);
+                const referenceNo = await this.resolveBgReferenceNo(paymentReq);
+
                 // Build attachments. A PDF/file failure must never block the
                 // create-request mail — send without the missing attachment instead.
                 const attachmentFiles: string[] = [];
@@ -1158,20 +1289,24 @@ export class PaymentRequestsNotificationService {
                 try {
                     // Generate covering letter PDF
                     const coveringLetterData = {
-                        date: new Date().toISOString().split('T')[0],
-                        beneficiaryName: bgDetails?.beneficiaryName || '',
-                        beneficiaryAddress: bgDetails?.beneficiaryAddress || '',
-                        amount: instrument.amount || 0,
+                        date: this.formatDateDDMMYYYY(new Date()),
+                        cpName: cpContact.name,
+                        cpDesignation: cpContact.designation,
+                        courierAddress: this.resolveBgCourierAddress(instrument),
+                        referenceNo,
+                        purpose: bgDetails?.bgPurpose || 'Financial security',
+                        // BG number/date do not exist yet at request creation.
+                        bgNo: '',
+                        bgDate: '',
                         bgExpiryDate: bgDetails?.bgExpiryDate ? this.formatDateDDMMYYYY(bgDetails.bgExpiryDate) : '',
                         claimDate: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',
-                        purpose: bgDetails?.bgPurpose || 'Financial security',
-                        stampPaperValue: bgDetails?.stampCharges || 300,
-                        courierAddress: instrument.courierAddress || '',
-                        bgPurpose: bgDetails?.bgPurpose || '',
-                        actionLink: `${this.getFrontendUrl()}/bi-dashboard/bank-guarantee/action/${instrumentId}`,
-                        actionLinkText: 'Accounts Form (BG) Stage 2: After BG Creation',
-                        recipientName: 'Imran',
+                        amount: instrument.amount ? Number(instrument.amount).toLocaleString('en-IN') : '',
                         teamLeaderName: tlUser?.name || 'Team Leader',
+                        teamLeaderPhone: tlUser?.mobile || '',
+                        teamLeaderEmail: tlUser?.email || '',
+                        accountsLeaderName: accountsLeader?.name || 'Accounts Leader',
+                        accountsLeaderPhone: accountsLeader?.mobile || '',
+                        accountsLeaderEmail: accountsLeader?.email || 'imran@volksenergie.in',
                     };
 
                     const coveringLetterPaths = await this.pdfGenerator.generatePdfs(

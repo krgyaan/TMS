@@ -1,57 +1,273 @@
 <!DOCTYPE html>
 <html>
+
 <head>
+    <meta charset="utf-8">
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .header { text-align: center; margin-bottom: 20px; }
-        .logo { width: 80px; height: auto; margin: 0 auto 10px; }
-        .address { font-size: 12px; margin: 5px 0; }
-        .subject { font-weight: bold; font-size: 14px; text-align: center; margin: 20px 0; }
-        .details { margin: 15px 0; }
-        .details p { margin: 5px 0; }
-        .enclosure { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc; font-size: 12px; }
+        * {
+            font-family: 'Calibri Light', sans-serif;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+
+        /* Body clears the fixed footer (margins for this template are 0mm). */
+        .page {
+            padding: 0 50px 24mm 50px;
+        }
+
+        .footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: #fff;
+        }
+
+        .footer-line {
+            width: 100%;
+            height: 2px;
+            background: #000;
+        }
+
+        .footer-content {
+            padding: 8px 10px;
+        }
+
+        .letter-body {
+            font-size: 12.5px;
+            line-height: 1.42;
+            padding: 0 10px;
+        }
+
+        .letter-body p {
+            margin: 6px 0;
+        }
+
+        .party-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .party-table td {
+            vertical-align: top;
+        }
+
+        .bg-details td {
+            padding: 2px 0;
+            vertical-align: top;
+        }
+
+        .bg-details .label {
+            width: 230px;
+        }
+
+        .rep-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8px 0;
+            font-size: 11.5px;
+        }
+
+        .rep-table th,
+        .rep-table td {
+            border: 1px solid #333;
+            padding: 4px 6px;
+            text-align: left;
+        }
+
+        .rep-table th {
+            background: #f2f2f2;
+        }
+
+        .signature-block {
+            margin-top: 12px;
+        }
+
+        .signature-block p {
+            margin: 0;
+        }
     </style>
 </head>
+
 <body>
-    <div class="header">
-        <img src="data:image/png;base64,{{logoBase64}}" alt="Volks Energie Logo" class="logo">
-        <div class="address">Volks Energie Pvt. Ltd.</div>
-        <div class="address">[[addressLine1]]</div>
-        <div class="address">[[addressLine2]] [[city]], [[state]] - [[pincode]]</div>
-        <div class="address">Phone: [[phone]] | Email: [[email]] | Web: [[web]]</div>
+    <div class="page">
+        <!-- Letterhead (same as yes-authorisation.hbs) -->
+        <div style="border-top: 10px solid #333; border-bottom: 5px solid #f04e23;"></div>
+        <div style="padding: 10px 0; font-family: sans-serif;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="width: 100%;">
+                <tr>
+                    <!-- Left: Logo -->
+                    <td style="width: 50%; padding-left: 20px;">
+                        <img src="data:image/png;base64,{{ img_logo_base64 }}"
+                            alt="Volks Energie Logo" style="height: 60px;">
+                    </td>
+
+                    <!-- Right: Contact Info -->
+                    <td style="width: 50%; text-align: right; font-size: 10px; color: #333; padding-right: 20px;">
+                        <div>
+                            B-1/D8, 2nd floor,<br>
+                            Mohan Cooperative Industrial Estate,<br>
+                            New Delhi 110044
+                        </div>
+                        <div>
+                            <img src="data:image/png;base64,{{ img_phone_base64 }}"
+                                alt="Phone" style="height: 12px; vertical-align: middle;">
+                            +91 9650393636, +91 9654551781<br>
+                            Accounts: +91 8882591733
+                        </div>
+                        <div>
+                            <img src="data:image/png;base64,{{ img_email_base64 }}"
+                                alt="Email" style="height: 12px; vertical-align: middle;">
+                            contact@volksenergie.in
+                        </div>
+                        <div>
+                            <img src="data:image/png;base64,{{ img_web_base64 }}"
+                                alt="Website" style="height: 12px; vertical-align: middle;">
+                            www.volksenergie.in
+                        </div>
+                    </td>
+                </tr>
+            </table>
+            <hr />
+        </div>
+
+        <div class="letter-body">
+            <table class="party-table">
+                <tr>
+                    <td style="text-align: left;">
+                        To,<br>
+                        {{ cpName }},<br>
+                        {{ cpDesignation }},<br>
+                        <span style="white-space: pre-line;">{{ courierAddress }}</span>
+                    </td>
+                    <td style="text-align: right; white-space: nowrap;">
+                        Date: {{ date }}
+                    </td>
+                </tr>
+            </table>
+
+            <p><strong>Tender No./Work Order No.:</strong> {{ referenceNo }}</p>
+
+            <p>
+                <strong>Subject:</strong> Submission and SFMS Confirmation of Bank Guarantee for
+                Tender No./Work Order No. {{ referenceNo }}
+            </p>
+
+            <p>Dear Sir,</p>
+
+            <p>
+                We are pleased to confirm the submission of the Bank Guarantee against
+                Tender No./Work Order No. {{ referenceNo }}, for the purpose of {{ purpose }}.
+            </p>
+
+            <table class="bg-details">
+                <tr>
+                    <td class="label">Bank Guarantee No.:</td>
+                    <td>{{ bgNo }}</td>
+                </tr>
+                <tr>
+                    <td class="label">Bank Guarantee Date:</td>
+                    <td>{{ bgDate }}</td>
+                </tr>
+                <tr>
+                    <td class="label">Bank Guarantee Expiry:</td>
+                    <td>{{ bgExpiryDate }}</td>
+                </tr>
+                <tr>
+                    <td class="label">Bank Guarantee Claim Period:</td>
+                    <td>{{ claimDate }}</td>
+                </tr>
+                <tr>
+                    <td class="label">Bank Guarantee Amount:</td>
+                    <td>Rs. {{ amount }}</td>
+                </tr>
+            </table>
+
+            <p>
+                We would like to inform you that, along with the Bank Guarantee, our bank has sent an
+                SFMS (Structured Financial Messaging System) confirmation to your bank branch as per the
+                IFSC shared by you. The SFMS confirmation is an electronic transmission sent between banks,
+                which is a confirmation of the authenticity of the Bank Guarantee. We request that you take
+                the SFMS confirmation from your bank. In the meantime, we too are arranging the SFMS copy
+                from our bank and will mail the same to you in a few days.
+            </p>
+
+            <p>
+                Once the SFMS confirmation is submitted, no additional bank confirmation is required for the
+                BG confirmation. However, if you still require a separate confirmation letter from the bank,
+                you may contact the following Bank representatives
+            </p>
+
+            <table class="rep-table">
+                <tr>
+                    <th>Name</th>
+                    <th>Designation</th>
+                    <th>Phone No.</th>
+                    <th>Email Id</th>
+                </tr>
+                <tr>
+                    <td>Manish Kumar</td>
+                    <td>Trade Desk Officer</td>
+                    <td>+91-9057042155</td>
+                    <td>manish.kumar142@aubank.in</td>
+                </tr>
+                <tr>
+                    <td>Pratik Rathore</td>
+                    <td>Product Sales Manager Trade Finance</td>
+                    <td>+91-9205172471</td>
+                    <td>pratik.rathore@aubank.in</td>
+                </tr>
+                <tr>
+                    <td>Sourabh Kumar</td>
+                    <td>Trade Forex Head</td>
+                    <td>+91-8130611897</td>
+                    <td>kumar.sourabh@aubank.in</td>
+                </tr>
+                <tr>
+                    <td>BG Confirmation Team</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>bgconfirm_ctu@aubank.in</td>
+                </tr>
+            </table>
+
+            <p>Please contact the undersigned for any further clarification.</p>
+
+            <p>Best Regards,</p>
+
+            <div class="signature-block">
+                <p><strong>{{ teamLeaderName }}</strong></p>
+                <p>Team Leader</p>
+                <p>{{ teamLeaderPhone }}</p>
+                <p>{{ teamLeaderEmail }}</p>
+            </div>
+
+            <div class="signature-block">
+                <p><strong>{{ accountsLeaderName }}</strong></p>
+                <p>Accounts Leader</p>
+                <p>{{ accountsLeaderPhone }}</p>
+                <p>{{ accountsLeaderEmail }}</p>
+            </div>
+        </div>
     </div>
 
-    <p><strong>Date:</strong> {{date}}</p>
-
-    <p><strong>Subject:</strong> Request for issuance of Bank Guarantee in favour of {{beneficiaryName}}</p>
-
-    <p>Dear Sir/Madam,</p>
-
-    <p>We request you to please issue a Bank Guarantee as per the details mentioned below:</p>
-
-    <div class="details">
-        <p><strong>1. BG in favour:</strong> {{beneficiaryName}}</p>
-        <p><strong>2. Beneficiary address:</strong> {{beneficiaryAddress}}</p>
-        <p><strong>3. BG amount:</strong> Rs. {{amount}}</p>
-        <p><strong>4. BG validity:</strong> {{validityDate}}</p>
-        <p><strong>5. Claim period expiry:</strong> {{claimExpiryDate}}</p>
-        <p><strong>6. Purpose / Project:</strong> {{purpose}}</p>
-    </div>
-
-    <p>Kindly courier the BG to our office at the address given below along with the FDR / stamp paper formalities:</p>
-
-    <p><strong>Courier Address:</strong> {{courierAddress}}</p>
-
-    <p>For Volks Energie Pvt. Ltd.,</p>
-
-    <div style="margin-top: 40px;">
-        <p>______________________</p>
-        <p><strong>{{teamLeaderName}}</strong></p>
-        <p>(Team Leader - Authorised Signatory)</p>
-    </div>
-
-    <div class="enclosure">
-        <p>Encl: PO copy / request letter from beneficiary</p>
+    <!-- Footer (same as dd-cancellation.hbs) -->
+    <div class="footer">
+        <div class="footer-content">
+            <table width="100%" style="font-size: 12px; color: #555;">
+                <tr>
+                    <td style="text-align: left;"><b>CIN: </b>U40100DL2011PTC228907</td>
+                    <td style="text-align: center;"><b>PAN: </b>AADCV9386C</td>
+                    <td style="text-align: right;"><b>MSME: </b>UDYAM-DL-0900000465</td>
+                </tr>
+            </table>
+        </div>
+        <div class="footer-line"></div>
     </div>
 </body>
+
 </html>
