@@ -152,11 +152,11 @@ export default function LeadFollowupListPage() {
                 )}
             </CardHeader>
 
-            <CardContent className="flex-1">
+            <CardContent className="">
                 <Tabs
                     value={activeTab}
                     onValueChange={handleTabChange}
-                    className="w-full"
+                    className="w-full m-auto"
                 >
                     <TabsList className="mb-6">
                         {FOLLOWUP_TABS.map(tab => (

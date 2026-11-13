@@ -86,7 +86,7 @@ function LetterCreateForm({ source }: { source: FollowupSource }) {
             )}
 
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 items-start gap-6">
                     <FieldWrapper<LetterFormValues, "toOrg"> control={form.control} name="toOrg" label="Organization Name">
                         {(field) => <Input placeholder="Enter organization name" disabled={saving} {...field} />}
                     </FieldWrapper>
@@ -95,26 +95,25 @@ function LetterCreateForm({ source }: { source: FollowupSource }) {
                         {(field) => <Input placeholder="Enter recipient name" disabled={saving} {...field} />}
                     </FieldWrapper>
 
-                    <div className="col-span-full">
-                        <FieldWrapper<LetterFormValues, "toAddr"> control={form.control} name="toAddr" label="Address">
-                            {(field) => (
-                                <textarea
-                                    className="border-input placeholder:text-muted-foreground dark:bg-input/30 h-20 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                    placeholder="Enter full address"
-                                    disabled={saving}
-                                    {...field}
-                                />
-                            )}
-                        </FieldWrapper>
-                    </div>
+                    <FieldWrapper<LetterFormValues, "toMobile"> control={form.control} name="toMobile" label="Mobile Number">
+                        {(field) => <Input type="tel" placeholder="Enter mobile number" disabled={saving} {...field} />}
+                    </FieldWrapper>
 
                     <FieldWrapper<LetterFormValues, "toPin"> control={form.control} name="toPin" label="Pin Code">
                         {(field) => <Input placeholder="Enter pin code" disabled={saving} {...field} />}
                     </FieldWrapper>
 
-                    <FieldWrapper<LetterFormValues, "toMobile"> control={form.control} name="toMobile" label="Mobile Number">
-                        {(field) => <Input type="tel" placeholder="Enter mobile number" disabled={saving} {...field} />}
+                    <FieldWrapper<LetterFormValues, "toAddr"> control={form.control} name="toAddr" label="Address">
+                        {(field) => (
+                            <textarea
+                                className="border-input placeholder:text-muted-foreground dark:bg-input/30 h-20 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                placeholder="Enter full address"
+                                disabled={saving}
+                                {...field}
+                            />
+                        )}
                     </FieldWrapper>
+
 
                     <SelectField<LetterFormValues, "empFrom">
                         control={form.control}
@@ -155,7 +154,7 @@ function LetterCreateForm({ source }: { source: FollowupSource }) {
                         )}
                     </FieldWrapper>
 
-                    <div className="col-span-full">
+                    <div className="">
                         <FileUploader
                             context="lead-followups"
                             value={attachmentPaths}
