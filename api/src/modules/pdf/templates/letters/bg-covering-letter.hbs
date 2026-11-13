@@ -11,17 +11,17 @@
         body {
             margin: 0;
             padding: 0;
-            color: #333;
+            color: #000;
         }
 
         /* Body clears the fixed footer (margins for this template are 0mm). */
         .page {
-            padding: 0 50px 24mm 50px;
+            padding: 0 40px 24mm 40px;
         }
 
         .footer {
             position: fixed;
-            bottom: 0;
+            bottom: 6mm;
             left: 0;
             width: 100%;
             background: #fff;
@@ -37,6 +37,17 @@
             padding: 8px 10px;
         }
 
+        .wm {
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            width: 150mm;
+            transform: translate(-50%, -50%);
+            z-index: -1;
+            opacity: 0.1;
+            pointer-events: none;
+        }
+
         .letter-body {
             font-size: 12.5px;
             line-height: 1.42;
@@ -45,6 +56,10 @@
 
         .letter-body p {
             margin: 6px 0;
+        }
+
+        .spaced-block {
+            margin-top: 32px;
         }
 
         .party-table {
@@ -56,13 +71,22 @@
             vertical-align: top;
         }
 
+        .bg-details {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8px 0;
+            font-size: 12.5px;
+        }
+
         .bg-details td {
-            padding: 2px 0;
+            border: 1px solid #333;
+            padding: 3px 8px;
             vertical-align: top;
         }
 
         .bg-details .label {
             width: 230px;
+            font-weight: bold;
         }
 
         .rep-table {
@@ -75,7 +99,7 @@
         .rep-table th,
         .rep-table td {
             border: 1px solid #333;
-            padding: 4px 6px;
+            padding: 3px 6px;
             text-align: left;
         }
 
@@ -94,9 +118,11 @@
 </head>
 
 <body>
+    <img class="wm" alt="" src="data:image/png;base64,{{ img_watermark_base64 }}">
+    <!-- Full-bleed letterhead bar -->
+    <div style="border-top: 10px solid #333; border-bottom: 5px solid #f04e23;"></div>
     <div class="page">
         <!-- Letterhead (same as yes-authorisation.hbs) -->
-        <div style="border-top: 10px solid #333; border-bottom: 5px solid #f04e23;"></div>
         <div style="padding: 10px 0; font-family: sans-serif;">
             <table width="100%" cellpadding="0" cellspacing="0" style="width: 100%;">
                 <tr>
@@ -117,6 +143,8 @@
                             <img src="data:image/png;base64,{{ img_phone_base64 }}"
                                 alt="Phone" style="height: 12px; vertical-align: middle;">
                             +91 9650393636, +91 9654551781<br>
+                            <img src="data:image/png;base64,{{ img_phone_base64 }}"
+                                alt="Phone" style="height: 12px; vertical-align: middle;">
                             Accounts: +91 8882591733
                         </div>
                         <div>
@@ -145,19 +173,23 @@
                         <span style="white-space: pre-line;">{{ courierAddress }}</span>
                     </td>
                     <td style="text-align: right; white-space: nowrap;">
-                        Date: {{ date }}
+                        <strong>Date:</strong> {{ date }}
                     </td>
                 </tr>
             </table>
+            
 
-            <p><strong>Tender No./Work Order No.:</strong> {{ referenceNo }}</p>
+            <p class="spaced-block"><strong>Tender No.:</strong> {{ referenceNo }}</p>
 
-            <p>
+            
+
+            <p class="spaced-block">
                 <strong>Subject:</strong> Submission and SFMS Confirmation of Bank Guarantee for
-                Tender No./Work Order No. {{ referenceNo }}
+                Tender No. {{ referenceNo }}
             </p>
+            <br>
 
-            <p>Dear Sir,</p>
+            <p><strong>Dear Sir,</strong></p>
 
             <p>
                 We are pleased to confirm the submission of the Bank Guarantee against
@@ -166,24 +198,24 @@
 
             <table class="bg-details">
                 <tr>
-                    <td class="label">Bank Guarantee No.:</td>
+                    <td class="label">Bank Guarantee No.</td>
                     <td>{{ bgNo }}</td>
                 </tr>
                 <tr>
-                    <td class="label">Bank Guarantee Date:</td>
-                    <td>{{ bgDate }}</td>
+                    <td class="label">Bank Guarantee Date</td>
+                    <td><strong>{{ bgDate }}</strong></td>
                 </tr>
                 <tr>
-                    <td class="label">Bank Guarantee Expiry:</td>
-                    <td>{{ bgExpiryDate }}</td>
+                    <td class="label">Bank Guarantee Expiry</td>
+                    <td><strong>{{ bgExpiryDate }}</strong></td>
                 </tr>
                 <tr>
-                    <td class="label">Bank Guarantee Claim Period:</td>
-                    <td>{{ claimDate }}</td>
+                    <td class="label">Bank Guarantee Claim Period</td>
+                    <td><strong>{{ claimDate }}</strong></td>
                 </tr>
                 <tr>
-                    <td class="label">Bank Guarantee Amount:</td>
-                    <td>Rs. {{ amount }}</td>
+                    <td class="label">Bank Guarantee Amount</td>
+                    <td><strong> {{ amount }}</strong></td>
                 </tr>
             </table>
 

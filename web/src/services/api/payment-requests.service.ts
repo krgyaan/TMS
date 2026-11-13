@@ -102,6 +102,23 @@ class PaymentRequestsService extends BaseApiService {
         const baseUrl = axiosInstance.defaults.baseURL || '';
         return `${baseUrl}/payment-requests/instruments/${instrumentId}/pdf`;
     }
+
+    // BG cover letter preview (no request created). HTML by default, PDF on demand.
+    async previewBgCoverLetterHtml(overrides: Record<string, string> = {}): Promise<string> {
+        const qs = new URLSearchParams(overrides).toString();
+        return this.get<string>(`/bg-cover-letter/preview${qs ? `?${qs}` : ''}`, {
+            responseType: 'text',
+            headers: { Accept: 'text/html' },
+        });
+    }
+
+    async previewBgCoverLetterPdf(overrides: Record<string, string> = {}): Promise<Blob> {
+        const qs = new URLSearchParams({ ...overrides, format: 'pdf' }).toString();
+        return this.get<Blob>(`/bg-cover-letter/preview?${qs}`, {
+            responseType: 'blob',
+            timeout: 120000,
+        });
+    }
 }
 
 export const paymentRequestsService = new PaymentRequestsService();

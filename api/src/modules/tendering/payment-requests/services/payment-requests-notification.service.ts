@@ -344,6 +344,81 @@ export class PaymentRequestsNotificationService {
         return fallback;
     };
 
+    /**
+     * Sample data for the in-UI BG cover letter preview. TL and Accounts Leader
+     * come from the DB; everything else is a fixture that can be overridden via
+     * query params (e.g. ?referenceNo=...&cpName=...).
+     */
+    private buildBgCoverLetterPreviewData = async (
+        overrides: Record<string, string> = {},
+    ): Promise<Record<string, any>> => {
+        const valueOr = (value: string | undefined, fallback: string): string =>
+            typeof value === 'string' && value.trim().length > 0 ? value : fallback;
+
+        const [tlUser] = await this.db
+            .select({ name: users.name, mobile: users.mobile, email: users.email })
+            .from(users)
+            .where(eq(users.roleId, 3))
+            .orderBy(users.id)
+            .limit(1);
+
+        const [accountsLeader] = await this.db
+            .select({ name: users.name, mobile: users.mobile, email: users.email })
+            .from(users)
+            .where(eq(users.email, 'imran@volksenergie.in'))
+            .limit(1);
+
+        return {
+            date: this.formatDateDDMMYYYY(new Date()),
+            cpName: valueOr(overrides.cpName, 'Ravi Kumar'),
+            cpDesignation: valueOr(overrides.cpDesignation, 'Manager (C&P)'),
+            courierAddress: valueOr(
+                overrides.courierAddress,
+                'NTPC Limited\nEngineering Office Complex\nSector 24, Noida, Uttar Pradesh - 201301'
+            ),
+            referenceNo: valueOr(overrides.referenceNo, 'NTPC/NR/2026-27/00123'),
+            purpose: valueOr(overrides.purpose, 'Performance BG'),
+            bgNo: overrides.bgNo ?? '',
+            bgDate: overrides.bgDate ?? '',
+            bgExpiryDate: valueOr(overrides.bgExpiryDate, '31-12-2027'),
+            claimDate: valueOr(overrides.claimDate, '31-03-2028'),
+            amount: valueOr(overrides.amount, '12,50,000'),
+            teamLeaderName: tlUser?.name || 'Team Leader',
+            teamLeaderPhone: this.formatPhoneWithCountryCode(tlUser?.mobile),
+            teamLeaderEmail: tlUser?.email || '',
+            accountsLeaderName: accountsLeader?.name || 'Accounts Leader',
+            accountsLeaderPhone: this.formatPhoneWithCountryCode(accountsLeader?.mobile),
+            accountsLeaderEmail: accountsLeader?.email || 'imran@volksenergie.in',
+        };
+    };
+
+    /** HTML preview of the BG cover letter (no file written). */
+    async previewBgCoverLetterHtml(overrides: Record<string, string> = {}): Promise<string> {
+        const data = await this.buildBgCoverLetterPreviewData(overrides);
+        return this.pdfGenerator.renderPreviewHtml('bgCoveringLetter', data);
+    }
+
+    /** PDF preview of the BG cover letter (rendered in memory, nothing written). */
+    async previewBgCoverLetterPdf(overrides: Record<string, string> = {}): Promise<Buffer> {
+        const data = await this.buildBgCoverLetterPreviewData(overrides);
+        return this.pdfGenerator.renderPreviewPdf('bgCoveringLetter', data);
+    }
+
+    /**
+     * Formats a mobile number as +91-XXXXXXXXXX for the cover letter signature
+     * blocks. Accepts numbers stored with or without the country code.
+     */
+    private formatPhoneWithCountryCode = (value: string | null | undefined): string => {
+        const raw = (value || '').trim();
+        if (!raw) return '';
+
+        const digits = raw.replace(/\D/g, '');
+        if (!digits) return raw;
+
+        const local = digits.length > 10 ? digits.slice(-10) : digits;
+        return `+91-${local}`;
+    };
+
     private formatCurrency = (amount: number) => {
         return `₹${amount.toLocaleString('en-IN')}`;
     };
@@ -1302,10 +1377,10 @@ export class PaymentRequestsNotificationService {
                         claimDate: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',
                         amount: instrument.amount ? Number(instrument.amount).toLocaleString('en-IN') : '',
                         teamLeaderName: tlUser?.name || 'Team Leader',
-                        teamLeaderPhone: tlUser?.mobile || '',
+                        teamLeaderPhone: this.formatPhoneWithCountryCode(tlUser?.mobile),
                         teamLeaderEmail: tlUser?.email || '',
                         accountsLeaderName: accountsLeader?.name || 'Accounts Leader',
-                        accountsLeaderPhone: accountsLeader?.mobile || '',
+                        accountsLeaderPhone: this.formatPhoneWithCountryCode(accountsLeader?.mobile),
                         accountsLeaderEmail: accountsLeader?.email || 'imran@volksenergie.in',
                     };
 

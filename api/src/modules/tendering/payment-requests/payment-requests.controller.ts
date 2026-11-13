@@ -8,6 +8,7 @@ import type { Response } from 'express';
 import { CreateMomRemarkSchema } from './dto/payment-mom.dto';
 import { CreatePaymentRequestSchema, DashboardQuerySchema, UpdatePaymentRequestSchema, UpdateStatusSchema, type DashboardCounts, type DashboardResponse, type DashboardTab } from './dto/payment-requests.dto';
 import { PaymentRequestsCommandService } from './services/payment-requests.command.service';
+import { PaymentRequestsNotificationService } from './services/payment-requests-notification.service';
 import { PaymentRequestsQueryService } from './services/payment-requests.query.service';
 
 @Controller('payment-requests')
@@ -18,6 +19,7 @@ export class PaymentRequestsController {
         private readonly appLogger: AppLogger,
         private readonly queryService: PaymentRequestsQueryService,
         private readonly commandService: PaymentRequestsCommandService,
+        private readonly notificationService: PaymentRequestsNotificationService,
         private readonly timersService: TimersService
     ) {
         this.logger = this.appLogger.withContext(PaymentRequestsController.name);
@@ -180,5 +182,28 @@ export class PaymentRequestsController {
         @Res({ passthrough: true }) res: Response,
     ): Promise<StreamableFile> {
         return this.queryService.serveGeneratedPdf(id);
+    }
+
+    /**
+     * Preview the BG cover letter without creating a request.
+     * Returns HTML by default, or the real PDF with ?format=pdf.
+     * Sample values can be overridden via query params.
+     */
+    @Get('bg-cover-letter/preview')
+    async previewBgCoverLetter(
+        @Query() query: Record<string, string>,
+        @Res({ passthrough: true }) res: Response,
+    ): Promise<string | StreamableFile> {
+        if ((query.format || '').toLowerCase() === 'pdf') {
+            const buffer = await this.notificationService.previewBgCoverLetterPdf(query);
+            res.set({
+                'Content-Type': 'application/pdf',
+                'Content-Disposition': 'inline; filename="bg-cover-letter-preview.pdf"',
+            });
+            return new StreamableFile(buffer);
+        }
+
+        res.set({ 'Content-Type': 'text/html; charset=utf-8' });
+        return this.notificationService.previewBgCoverLetterHtml(query);
     }
 }
