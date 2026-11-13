@@ -15,9 +15,11 @@ import { formatDate } from "@/hooks/useFormatedDate";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { paths } from "@/app/routes/paths";
 import { useProjectMasters } from "@/hooks/api/useProjectMaster";
+import { useAuth } from "@/contexts/AuthContext";
 import type { ProjectMasterListRow } from "./helpers/projectMaster.types";
 
 const ProjectsListPage = () => {
+    const { isAdmin, isSuperUser } = useAuth();
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: "asc" | "desc" }[]>([]);
     const [search, setSearch] = useState("");
@@ -194,13 +196,15 @@ const ProjectsListPage = () => {
                             Manage project master entries
                         </CardDescription>
                     </div>
-                    <Button
-                        onClick={() => navigate(paths.documentDashboard.projectsCreate)}
-                        className="bg-orange-500 hover:bg-orange-600"
-                    >
-                        <Plus className="mr-2 h-4 w-4" />
-                        Create Project
-                    </Button>
+                    {(isAdmin || isSuperUser) && (
+                        <Button
+                            onClick={() => navigate(paths.documentDashboard.projectsCreate)}
+                            className="bg-orange-500 hover:bg-orange-600"
+                        >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Create Project
+                        </Button>
+                    )}
                 </div>
             </CardHeader>
             <CardContent className="px-0">
