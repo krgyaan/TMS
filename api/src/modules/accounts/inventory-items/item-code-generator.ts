@@ -23,8 +23,8 @@ export const generateTemplatedItemCode = (
     specifications: Record<string, string>,
 ): string | undefined => {
     const item = findCatalogItem(category, itemName);
-    if (!item?.codeTemplate) return undefined;
-    const template = item.codeTemplate;
+    const template = item?.codeTemplate;
+    if (!template) return undefined;
 
     let complete = true;
     const segments = template.split("/").flatMap(segment => {
