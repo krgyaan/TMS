@@ -111,6 +111,18 @@ export const PDF_CONFIG = {
                 left: '0mm',
             },
         },
+        bgPrefilledFormat: {
+            directory: 'letters',
+            templates: ['bg-prefilled-format'],
+            storagePath: 'bgprefill',
+            baseDir: 'bi-dashboard/bank-guarantee/bgprefill',
+            margin: {
+                top: '0mm',
+                right: '0mm',
+                bottom: '0mm',
+                left: '0mm',
+            },
+        },
         ddFormat: {
             directory: 'dd',
             templates: ['dd-format'],

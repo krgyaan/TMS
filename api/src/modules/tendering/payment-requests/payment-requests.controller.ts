@@ -185,25 +185,33 @@ export class PaymentRequestsController {
     }
 
     /**
-     * Preview the BG cover letter without creating a request.
-     * Returns HTML by default, or the real PDF with ?format=pdf.
-     * Sample values can be overridden via query params.
+     * Preview the BG cover letter / prefilled application format without
+     * creating a request. `?type=application` selects the AU Bank application
+     * form (default is the cover letter). Returns HTML by default, PDF with
+     * `?format=pdf`. Sample values can be overridden via query params.
      */
     @Get('bg-cover-letter/preview')
     async previewBgCoverLetter(
         @Query() query: Record<string, string>,
         @Res({ passthrough: true }) res: Response,
     ): Promise<string | StreamableFile> {
-        if ((query.format || '').toLowerCase() === 'pdf') {
-            const buffer = await this.notificationService.previewBgCoverLetterPdf(query);
+        const isApplication = (query.type || '').toLowerCase() === 'application';
+        const asPdf = (query.format || '').toLowerCase() === 'pdf';
+
+        if (asPdf) {
+            const buffer = isApplication
+                ? await this.notificationService.previewBgPrefilledPdf(query)
+                : await this.notificationService.previewBgCoverLetterPdf(query);
             res.set({
                 'Content-Type': 'application/pdf',
-                'Content-Disposition': 'inline; filename="bg-cover-letter-preview.pdf"',
+                'Content-Disposition': `inline; filename="${isApplication ? 'bg-application-format' : 'bg-cover-letter'}-preview.pdf"`,
             });
             return new StreamableFile(buffer);
         }
 
         res.set({ 'Content-Type': 'text/html; charset=utf-8' });
-        return this.notificationService.previewBgCoverLetterHtml(query);
+        return isApplication
+            ? this.notificationService.previewBgPrefilledHtml(query)
+            : this.notificationService.previewBgCoverLetterHtml(query);
     }
 }

@@ -32,6 +32,7 @@ export default function BgCoverLetterPreviewPage() {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
 
+    const [docType, setDocType] = useState<'letter' | 'application'>('letter');
     const [html, setHtml] = useState('');
     const [loading, setLoading] = useState(true);
     const [downloading, setDownloading] = useState(false);
@@ -65,7 +66,7 @@ export default function BgCoverLetterPreviewPage() {
             setLoading(true);
             setError('');
             try {
-                const result = await paymentRequestsService.previewBgCoverLetterHtml(overrides);
+                const result = await paymentRequestsService.previewBgCoverLetterHtml(overrides, docType);
                 if (!cancelled) setHtml(result);
             } catch (err: any) {
                 if (!cancelled) {
@@ -81,7 +82,7 @@ export default function BgCoverLetterPreviewPage() {
             cancelled = true;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [queryString, reloadToken]);
+    }, [queryString, reloadToken, docType]);
 
     const applyOverrides = () => {
         const next = new URLSearchParams();
@@ -110,11 +111,11 @@ export default function BgCoverLetterPreviewPage() {
         setDownloading(true);
         setError('');
         try {
-            const blob = await paymentRequestsService.previewBgCoverLetterPdf(overrides);
+            const blob = await paymentRequestsService.previewBgCoverLetterPdf(overrides, docType);
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = 'bg-cover-letter-preview.pdf';
+            link.download = docType === 'application' ? 'bg-application-format-preview.pdf' : 'bg-cover-letter-preview.pdf';
             document.body.appendChild(link);
             link.click();
             link.remove();
@@ -132,9 +133,9 @@ export default function BgCoverLetterPreviewPage() {
                 <CardHeader>
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
-                            <CardTitle>BG Cover Letter Preview</CardTitle>
+                            <CardTitle>BG Letter Preview</CardTitle>
                             <CardDescription className="mt-2">
-                                Renders the exact template that is attached to the BG create mail. No request is created.
+                                Renders the exact templates attached to the BG create mail. No request is created.
                             </CardDescription>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
@@ -162,6 +163,22 @@ export default function BgCoverLetterPreviewPage() {
                     </div>
                 </CardHeader>
                 <CardContent>
+                    <div className="mb-4 inline-flex rounded-lg border border-border p-1">
+                        <Button
+                            size="sm"
+                            variant={docType === 'letter' ? 'default' : 'ghost'}
+                            onClick={() => setDocType('letter')}
+                        >
+                            Cover Letter
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant={docType === 'application' ? 'default' : 'ghost'}
+                            onClick={() => setDocType('application')}
+                        >
+                            BG Application Format
+                        </Button>
+                    </div>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         {OVERRIDE_KEYS.map((key) => (
                             <div key={key} className="flex flex-col gap-1">
@@ -208,10 +225,10 @@ export default function BgCoverLetterPreviewPage() {
                     ) : (
                         <div className="flex justify-center bg-muted/40 p-4">
                             <iframe
-                                title="BG Cover Letter Preview"
+                                title="BG Letter Preview"
                                 srcDoc={html}
                                 className="w-full max-w-[794px] rounded-lg border border-border bg-white shadow-sm"
-                                style={{ height: '1123px' }}
+                                style={{ height: docType === 'application' ? '2246px' : '1123px' }}
                             />
                         </div>
                     )}

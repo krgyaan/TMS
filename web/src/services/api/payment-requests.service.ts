@@ -103,17 +103,29 @@ class PaymentRequestsService extends BaseApiService {
         return `${baseUrl}/payment-requests/instruments/${instrumentId}/pdf`;
     }
 
-    // BG cover letter preview (no request created). HTML by default, PDF on demand.
-    async previewBgCoverLetterHtml(overrides: Record<string, string> = {}): Promise<string> {
-        const qs = new URLSearchParams(overrides).toString();
+    // BG cover letter / application preview (no request created). HTML by default, PDF on demand.
+    async previewBgCoverLetterHtml(
+        overrides: Record<string, string> = {},
+        type: 'letter' | 'application' = 'letter',
+    ): Promise<string> {
+        const params = { ...overrides, ...(type === 'application' ? { type: 'application' } : {}) };
+        const qs = new URLSearchParams(params).toString();
         return this.get<string>(`/bg-cover-letter/preview${qs ? `?${qs}` : ''}`, {
             responseType: 'text',
             headers: { Accept: 'text/html' },
         });
     }
 
-    async previewBgCoverLetterPdf(overrides: Record<string, string> = {}): Promise<Blob> {
-        const qs = new URLSearchParams({ ...overrides, format: 'pdf' }).toString();
+    async previewBgCoverLetterPdf(
+        overrides: Record<string, string> = {},
+        type: 'letter' | 'application' = 'letter',
+    ): Promise<Blob> {
+        const params = {
+            ...overrides,
+            ...(type === 'application' ? { type: 'application' } : {}),
+            format: 'pdf',
+        };
+        const qs = new URLSearchParams(params).toString();
         return this.get<Blob>(`/bg-cover-letter/preview?${qs}`, {
             responseType: 'blob',
             timeout: 120000,

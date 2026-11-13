@@ -405,6 +405,47 @@ export class PaymentRequestsNotificationService {
     }
 
     /**
+     * Data for the prefilled BG application format (the AU Bank form).
+     * Undefined values fall back to the built-in sample; empty strings stay empty
+     * (used by real generation, where missing fields must render blank).
+     */
+    private buildBgPrefilledData = (
+        overrides: Partial<Record<
+            'date' | 'bgAmount' | 'beneficiaryName' | 'beneficiaryAddress' | 'bgExpiryDate' |
+            'claimExpiryDate' | 'accountNo' | 'ifsc' | 'uniqueCode',
+            string
+        >> = {},
+    ): Record<string, any> => {
+        const pick = (value: string | undefined, fallback: string): string =>
+            value === undefined ? fallback : value;
+
+        return {
+            date: pick(overrides.date, this.formatDateDDMMYYYY(new Date())),
+            bgAmount: pick(overrides.bgAmount, '75,636/-'),
+            beneficiaryName: pick(overrides.beneficiaryName, 'NHPC Limited'),
+            beneficiaryAddress: pick(
+                overrides.beneficiaryAddress,
+                'NHPC Office Complex, Sector-33, Faridabad (Haryana) -121003 (India).'
+            ),
+            bgExpiryDate: pick(overrides.bgExpiryDate, '31-01-2028'),
+            claimExpiryDate: pick(overrides.claimExpiryDate, '30-04-2028'),
+            accountNo: pick(overrides.accountNo, '2506245699295190'),
+            ifsc: pick(overrides.ifsc, 'SBIN0003704'),
+            uniqueCode: pick(overrides.uniqueCode, ''),
+        };
+    };
+
+    /** HTML preview of the prefilled BG application format. */
+    async previewBgPrefilledHtml(overrides: Record<string, string> = {}): Promise<string> {
+        return this.pdfGenerator.renderPreviewHtml('bgPrefilledFormat', this.buildBgPrefilledData(overrides));
+    }
+
+    /** PDF preview of the prefilled BG application format. */
+    async previewBgPrefilledPdf(overrides: Record<string, string> = {}): Promise<Buffer> {
+        return this.pdfGenerator.renderPreviewPdf('bgPrefilledFormat', this.buildBgPrefilledData(overrides));
+    }
+
+    /**
      * Formats a mobile number as +91-XXXXXXXXXX for the cover letter signature
      * blocks. Accepts numbers stored with or without the country code.
      */
@@ -1396,6 +1437,37 @@ export class PaymentRequestsNotificationService {
                 } catch (error) {
                     this.logger.warn(
                         `BG covering letter generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
+                    );
+                }
+
+                // Attachment — prefilled BG application format (AU Bank form),
+                // regenerated from the request data. FD No. is intentionally left
+                // blank (filled manually by the bank).
+                try {
+                    const prefilledBgData = this.buildBgPrefilledData({
+                        date: this.formatDateDDMMYYYY(new Date()),
+                        bgAmount: instrument.amount ? `${Number(instrument.amount).toLocaleString('en-IN')}/-` : '',
+                        beneficiaryName: bgDetails?.beneficiaryName || '',
+                        beneficiaryAddress: bgDetails?.beneficiaryAddress || '',
+                        bgExpiryDate: bgDetails?.bgExpiryDate ? this.formatDateDDMMYYYY(bgDetails.bgExpiryDate) : '',
+                        claimExpiryDate: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',
+                        accountNo: bgDetails?.bgBankAcc || '',
+                        ifsc: bgDetails?.bgBankIfsc || '',
+                        uniqueCode: bgDetails?.uniqueCode || '',
+                    });
+
+                    const prefilledBgPaths = await this.pdfGenerator.generatePdfs(
+                        'bgPrefilledFormat',
+                        prefilledBgData,
+                        instrumentId,
+                        'BG'
+                    );
+                    if (prefilledBgPaths && prefilledBgPaths.length > 0) {
+                        attachmentFiles.push(prefilledBgPaths[0]);
+                    }
+                } catch (error) {
+                    this.logger.warn(
+                        `BG prefilled application format generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
                     );
                 }
 
