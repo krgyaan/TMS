@@ -3,6 +3,7 @@ import { PaymentRequestsController } from './payment-requests.controller';
 import { PaymentRequestsQueryService } from './services/payment-requests.query.service';
 import { PaymentRequestsCommandService } from './services/payment-requests.command.service';
 import { PaymentRequestsNotificationService } from './services/payment-requests-notification.service';
+import { BgDocxService } from './services/bg-docx.service';
 import { TendersModule } from '@/modules/tendering/tenders/tenders.module';
 import { TenderStatusHistoryModule } from '@/modules/tendering/tender-status-history/tender-status-history.module';
 import { EmailModule } from '@/modules/email/email.module';
@@ -17,6 +18,7 @@ import { PaymentRequestModule } from '@/modules/operations/payment-requests/paym
         PaymentRequestsQueryService,
         PaymentRequestsCommandService,
         PaymentRequestsNotificationService,
+        BgDocxService,
     ],
     exports: [
         PaymentRequestsQueryService,

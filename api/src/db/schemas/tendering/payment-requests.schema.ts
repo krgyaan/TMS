@@ -247,6 +247,8 @@ export const instrumentBgDetails = pgTable('instrument_bg_details', {
     bgPurpose: varchar('bg_purpose', { length: 255 }), // emd_bgs.bg_purpose
     bgSoftCopy: varchar('bg_soft_copy', { length: 255 }), // emd_bgs.bg_soft_copy
     bgPo: varchar('bg_po', { length: 255 }), // emd_bgs.bg_po
+    uniqueCode: varchar('unique_code', { length: 255 }),
+    uniqueAdviceMessage: text('unique_advice_message'),
 
     // Client Info
     bgClientUser: varchar('bg_client_user', { length: 255 }), // emd_bgs.bg_client_user

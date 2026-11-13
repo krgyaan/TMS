@@ -112,6 +112,8 @@ const bgDetails = z.object({
     bgStampValue: optionalNumber(z.coerce.number().min(0)),
     bgFormatFiles: z.array(z.string()).optional(),
     bgPoFiles: z.array(z.string()).optional(),
+    uniqueCode: optionalString,
+    uniqueAdviceMessage: optionalString,
     bgClientUserEmail: z.string().email().optional().or(z.literal("")),
     bgClientCpEmail: z.string().email().optional().or(z.literal("")),
     bgClientFinanceEmail: z.string().email().optional().or(z.literal("")),
