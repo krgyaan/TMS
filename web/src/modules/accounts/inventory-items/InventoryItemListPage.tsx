@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useDeleteInventoryItem, useInventoryItems, useUpdateInventoryItem, type ItemMasterTeam } from "@/hooks/api/useInventoryItems";
 import type { InventoryItem } from "@/types/inventory-item.types";
 import { formatKeySpecification, itemMasterColumnsForViewport, keySpecificationAttributes } from "./item-master-display";
+import { getItemMainCategory, getItemSubcategory } from "./item-catalog";
 import { toast } from "sonner";
 import { paths } from "@/app/routes/paths";
 
@@ -77,7 +78,7 @@ export default function InventoryItemListPage({ team }: { team: ItemMasterTeam }
     const columns = useMemo<ColDef<InventoryItem>[]>(() => [
         { field: "itemCode", headerName: "Item Code", width: 130, minWidth: 130, maxWidth: 175, tooltipField: "itemCode" },
         { field: "itemName", headerName: "Item Name", flex: 1.4, minWidth: 190, maxWidth: 350, tooltipField: "itemName", cellStyle: { fontWeight: 500 } },
-        ...(visibility.category ? [{ headerName: "Category", field: "category", flex: 1.2, minWidth: 170, maxWidth: 300, valueGetter: (p: { data?: InventoryItem }) => p.data?.category || "Legacy", tooltipValueGetter: (p: { value?: string | null }) => p.value ?? "", wrapText: true, autoHeight: true, cellRenderer: (p: { value?: string }) => <div className="w-full whitespace-normal break-words py-1 leading-5">{p.value}</div> } as ColDef<InventoryItem>] : []),
+        ...(visibility.category ? [{ headerName: "Category", field: "category", flex: 1.2, minWidth: 170, maxWidth: 300, valueGetter: (p: { data?: InventoryItem }) => p.data ? `${getItemMainCategory(p.data.itemName, p.data.category)}\n${p.data.subcategory || getItemSubcategory(p.data.itemName) || ""}` : "", tooltipValueGetter: (p: { value?: string | null }) => p.value ?? "", wrapText: true, autoHeight: true, cellRenderer: (p: { value?: string }) => { const [main, sub] = (p.value || "").split("\n"); return <div className="w-full whitespace-normal break-words py-1 leading-5">{main}<div className="text-xs text-muted-foreground">{sub}</div></div>; } } as ColDef<InventoryItem>] : []),
         { headerName: "Key Specification", flex: 2.4, minWidth: 280, maxWidth: 500, valueGetter: (p: { data?: InventoryItem }) => formatKeySpecification(p.data?.category, p.data?.itemName || "", p.data?.specifications || {}, p.data?.itemType), tooltipValueGetter: (p: { value?: string | null }) => p.value ?? "", wrapText: true, autoHeight: true, cellRenderer: (p: { data?: InventoryItem }) => p.data ? <KeySpecificationChips item={p.data} /> : <span>—</span> },
         ...(visibility.unit ? [{ field: "unit", headerName: "Unit", width: 80, minWidth: 80, maxWidth: 90 } as ColDef<InventoryItem>] : []),
         { field: "hsnCode", headerName: "HSN Code", width: 110, minWidth: 110, maxWidth: 130, valueGetter: (p: { data?: InventoryItem }) => p.data?.hsnCode || "—", tooltipValueGetter: (p: { value?: string | null }) => p.value ?? "" },
@@ -131,7 +132,7 @@ export default function InventoryItemListPage({ team }: { team: ItemMasterTeam }
                         <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
                             <div><span className="text-muted-foreground">Item Code</span><div className="break-words">{item.itemCode}</div></div>
                             <div><span className="text-muted-foreground">Item Name</span><div className="break-words font-medium">{item.itemName}</div></div>
-                            <div><span className="text-muted-foreground">Category</span><div>{item.category || "Legacy"}</div></div>
+                            <div><span className="text-muted-foreground">Category</span><div>{getItemMainCategory(item.itemName, item.category)}</div><div className="text-xs text-muted-foreground">{item.subcategory || getItemSubcategory(item.itemName)}</div></div>
                             <div className="col-span-2"><span className="text-muted-foreground">Key Specification</span><KeySpecificationChips item={item} compact /></div>
                             <div><span className="text-muted-foreground">HSN Code</span><div>{item.hsnCode || "—"}</div></div>
                             <div><span className="text-muted-foreground">Created By</span><div>{item.createdByName || "—"}</div></div>

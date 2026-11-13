@@ -13,6 +13,8 @@ export const itemSchema = z.object({
     teamId: z.number().int().positive().nullable().optional(),
     itemGroup: z.enum(ITEM_GROUPS).nullable().optional(),
     category: z.string().trim().min(1).max(80),
+    subcategory: z.string().trim().max(120).nullable().optional(),
+    modelNumber: z.string().trim().max(120).nullable().optional(),
     itemName: z.string().trim().min(1).max(120),
     itemType: z.string().trim().max(80).nullable().optional(),
     makeBrand: z.string().trim().max(120).nullable().optional(),

@@ -31,6 +31,8 @@ export const validateCatalogItemValues = (
         if (isBlank(value)) continue;
 
         const trimmed = value.trim();
+        if (itemName === "Torque Wrench" && itemField.key === "torqueRange" && (trimmed.length > 12 || !/^\d+(?:-\d+)?$/.test(trimmed))) return "Torque Range must be a number or number-number, up to 12 characters";
+        if (itemName === "Battery Stand" && itemField.key === "colourCode" && trimmed && (trimmed.length > 12 || !/^[A-Za-z0-9 -]+$/.test(trimmed))) return "Colour Code must be at most 12 letters, numbers, spaces or hyphens";
         if (itemField.kind === "select" && !itemField.options?.some(option => option.value === trimmed)) {
             return `${itemField.label} has an invalid option`;
         }

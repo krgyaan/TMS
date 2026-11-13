@@ -1,5 +1,5 @@
 // @ts-expect-error Node's test loader needs the explicit TypeScript extension.
-import { findCatalogItem } from "./item-catalog.ts";
+import { resolveCatalogItemByName } from "./item-catalog.ts";
 
 export type KeySpecificationAttribute = { key: string; label: string; value: string };
 
@@ -9,7 +9,7 @@ export function keySpecificationAttributes(
     specifications: Record<string, string> = {},
     itemType?: string | null,
 ): KeySpecificationAttribute[] {
-    const item = findCatalogItem(category || "Legacy", itemName);
+    const item = resolveCatalogItemByName(itemName);
     const configured = item?.fields || [];
     const result: KeySpecificationAttribute[] = configured.flatMap(field => {
         const rawValue = specifications[field.key]?.trim();

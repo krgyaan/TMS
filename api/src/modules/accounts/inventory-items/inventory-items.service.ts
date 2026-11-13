@@ -6,7 +6,7 @@ import { inventoryItems, type InventoryItem } from "@db/schemas/accounts/invento
 import { teams } from "@db/schemas/master/teams.schema";
 import { users } from "@db/schemas/auth/users.schema";
 import { resolveConversion } from "./conversion-rules";
-import { findCatalogItem } from "./item-catalog";
+import { findCatalogItem, findCatalogSubcategory, getItemMainCategory } from "./item-catalog";
 import { generateTemplatedItemCode } from "./item-code-generator";
 import { validateCatalogItemValues } from "./item-catalog-validation";
 
@@ -15,6 +15,8 @@ type ItemInput = {
     teamId?: number | null;
     itemGroup?: string | null;
     category: string;
+    subcategory?: string | null;
+    modelNumber?: string | null;
     itemName: string;
     itemType?: string | null;
     makeBrand?: string | null;
@@ -49,6 +51,8 @@ export class InventoryItemsService {
                 ilike(inventoryItems.itemCode, `%${search}%`),
                 ilike(inventoryItems.itemName, `%${search}%`),
                 ilike(inventoryItems.category, `%${search}%`),
+                ilike(inventoryItems.subcategory, `%${search}%`),
+                ilike(inventoryItems.modelNumber, `%${search}%`),
                 ilike(inventoryItems.itemType, `%${search}%`),
                 ilike(inventoryItems.hsnCode, `%${search}%`),
                 ilike(inventoryItems.makeBrand, `%${search}%`),
@@ -86,6 +90,9 @@ export class InventoryItemsService {
         const { teamId: _ignoredTeamId, ...itemData } = data;
         void _ignoredTeamId;
         const catalogItem = findCatalogItem(itemData.category, itemData.itemName);
+        if (catalogItem?.pending) throw new BadRequestException("UPS is pending finalization and cannot be created");
+        const expectedSubcategory = findCatalogSubcategory(itemData.category, itemData.itemName);
+        if (expectedSubcategory && itemData.subcategory !== expectedSubcategory) throw new BadRequestException("Item subcategory does not match its catalog category");
         const validationError = validateCatalogItemValues(itemData.category, itemData.itemName, itemData.itemType, itemData.specifications);
         if (validationError) throw new BadRequestException(validationError);
 
@@ -109,6 +116,8 @@ export class InventoryItemsService {
                 itemGroup: itemData.itemGroup ?? null,
                 teamId: null,
                 category: itemData.category,
+                subcategory: itemData.subcategory ?? expectedSubcategory ?? null,
+                modelNumber: itemData.modelNumber?.trim() || null,
                 makeBrand: itemData.makeBrand?.trim() || null,
                 itemType: itemData.itemType?.trim() || null,
                 description: itemData.description?.trim() || null,
@@ -130,9 +139,9 @@ export class InventoryItemsService {
         const { teamId: _ignoredTeamId, ...itemData } = data;
         void _ignoredTeamId;
         const updatedValues = { ...current, ...itemData };
-        const category = updatedValues.category || "Legacy";
+        const category = itemData.category || getItemMainCategory(current.itemName, current.category);
         const specifications = { ...(current.specifications || {}), ...(itemData.specifications || {}) };
-        const currentCategory = current.category || "Legacy";
+        const currentCategory = getItemMainCategory(current.itemName, current.category);
         const currentCatalogItem = findCatalogItem(currentCategory, current.itemName);
         const currentGeneratedCode = currentCatalogItem?.codeTemplate
             ? generateTemplatedItemCode(currentCategory, current.itemName, current.specifications || {})
@@ -157,6 +166,10 @@ export class InventoryItemsService {
             );
             if (validationError) throw new BadRequestException(validationError);
         }
+        const targetCatalogItem = findCatalogItem(category, updatedValues.itemName);
+        if (targetCatalogItem?.pending) throw new BadRequestException("UPS is pending finalization and cannot be created");
+        const expectedSubcategory = findCatalogSubcategory(category, updatedValues.itemName);
+        if (updatedValues.subcategory && expectedSubcategory && updatedValues.subcategory !== expectedSubcategory) throw new BadRequestException("Item subcategory does not match its catalog category");
 
         const uniquenessData = { ...updatedValues, category, specifications };
         await this.ensureUnique(uniquenessData, current.itemCode, id, this.db, codeIsCatalogGenerated);
@@ -170,6 +183,8 @@ export class InventoryItemsService {
             itemName: updatedValues.itemName,
             itemType: updatedValues.itemType,
             category: updatedValues.category ?? null,
+            subcategory: expectedSubcategory ?? updatedValues.subcategory ?? null,
+            modelNumber: updatedValues.modelNumber?.trim() || null,
             makeBrand: updatedValues.makeBrand?.trim() || null,
             description: updatedValues.description,
             specifications,
@@ -251,13 +266,13 @@ export class InventoryItemsService {
     }
 
     private async ensureUnique(
-        data: Pick<ItemInput, "itemName" | "unit" | "makeBrand">,
+        data: Pick<ItemInput, "itemName" | "unit" | "makeBrand" | "modelNumber" | "specifications">,
         itemCode: string,
         excludeId?: number,
         db: ItemCodeQueryDb = this.db,
         forceBusinessKey = false,
     ) {
-        let candidates: { id: number; itemCode: string }[];
+        let candidates: { id: number; itemCode: string; modelNumber: string | null; specifications: Record<string, string>; makeBrand: string | null }[];
         const usesBusinessKey = forceBusinessKey || itemCode.startsWith("ITM-") || /^[A-Z]+-\d{3}$/.test(itemCode);
         if (usesBusinessKey) {
             const normalizedName = data.itemName.trim().toLowerCase();
@@ -269,15 +284,19 @@ export class InventoryItemsService {
                 eq(inventoryItems.unit, data.unit),
             ];
             if (excludeId !== undefined) filters.push(ne(inventoryItems.id, excludeId));
-            candidates = await db.select({ id: inventoryItems.id, itemCode: inventoryItems.itemCode })
+            candidates = await db.select({ id: inventoryItems.id, itemCode: inventoryItems.itemCode, modelNumber: inventoryItems.modelNumber, specifications: inventoryItems.specifications, makeBrand: inventoryItems.makeBrand })
                 .from(inventoryItems).where(and(...filters));
         } else {
             const filters: SQL[] = [eq(inventoryItems.itemCode, itemCode)];
             if (excludeId !== undefined) filters.push(ne(inventoryItems.id, excludeId));
-            candidates = await db.select({ id: inventoryItems.id, itemCode: inventoryItems.itemCode })
+            candidates = await db.select({ id: inventoryItems.id, itemCode: inventoryItems.itemCode, modelNumber: inventoryItems.modelNumber, specifications: inventoryItems.specifications, makeBrand: inventoryItems.makeBrand })
                 .from(inventoryItems).where(and(...filters)).limit(1);
         }
-        const duplicate = candidates[0];
+        const normalize = (value: unknown): string => String(value ?? "").trim().toLowerCase();
+        const normalizedSpecifications = (value: Record<string, string> | null | undefined) => Object.entries(value || {}).sort(([a], [b]) => a.localeCompare(b)).map(([key, entry]) => `${normalize(key)}=${normalize(entry)}`).join("&");
+        const duplicate = candidates.find(candidate => usesBusinessKey
+            ? normalize(candidate.makeBrand) === normalize(data.makeBrand) && normalize(candidate.modelNumber) === normalize(data.modelNumber) && normalizedSpecifications(candidate.specifications) === normalizedSpecifications(data.specifications)
+            : true);
         if (duplicate) {
             if (usesBusinessKey) {
                 throw new ConflictException(`An item with the same name, make/brand and unit already exists (code ${duplicate.itemCode})`);

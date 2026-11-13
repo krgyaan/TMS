@@ -13,7 +13,7 @@ export const normalizeCapacityToken = (raw: string): string | undefined => {
 const optionToken = (category: string, itemName: string, fieldKey: string, raw: string): string | undefined => {
     const item = findCatalogItem(category, itemName);
     const configured = item?.fields.find(candidate => candidate.key === fieldKey)?.options?.find(option => option.value === raw)?.codeToken;
-    const token = configured || raw.toUpperCase();
+    const token = configured || (fieldKey === "colourCode" ? raw.trim().replace(/[^a-z0-9-]/gi, "").slice(0, 12).toUpperCase() : raw.trim().replace(/\s+/g, "-").toUpperCase());
     return safeTokenPattern.test(token) ? token : undefined;
 };
 
@@ -42,7 +42,9 @@ export const generateTemplatedItemCode = (
                 complete = false;
                 return "";
             }
-            const token = key === "capacity" ? normalizeCapacityToken(raw) : optionToken(category, itemName, key, raw);
+            const token = ["capacity", "wattage", "length", "voltageRange", "currentRange", "current", "steps", "tiers"].includes(key)
+                ? normalizeCapacityToken(raw)
+                : optionToken(category, itemName, key, raw);
             if (!token) {
                 complete = false;
                 return "";

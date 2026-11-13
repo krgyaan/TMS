@@ -22,7 +22,7 @@ export const useItemConversionOptions = (unit: string, width?: string, enabled =
     useQuery({
         queryKey: [...inventoryItemsKey, "conversion-options", unit, width],
         queryFn: () => inventoryItemsService.master.getConversionOptions(unit, width),
-        enabled: enabled && Boolean(unit) && unit !== "Nos.",
+        enabled: enabled && Boolean(unit) && !["Nos.", "Litre", "Pair", "Set"].includes(unit),
     });
 
 const useItemMutation = (action: (data: InventoryItemPayload) => Promise<InventoryItem>, message: string, includeCode = false) => {
