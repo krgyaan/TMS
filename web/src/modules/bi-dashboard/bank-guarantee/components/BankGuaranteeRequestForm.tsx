@@ -9,6 +9,7 @@ import { useCreatePaymentRequest } from '@/hooks/api/usePaymentRequests';
 import { useProjectList, useProjectOverview } from '@/hooks/api/useProjectDashboard';
 import { useCreateWoContact, useWoContactsByBasicDetail } from '@/hooks/api/useWoContacts';
 import { useAddTenderClient, useTenderContacts } from '@/hooks/api/useInfoSheets';
+import { useAddOtherContact, useOtherContacts } from '@/hooks/api/useOtherContacts';
 import { useTenders } from '@/hooks/api/useTenders';
 import { useUsers } from '@/hooks/api/useUsers';
 import { bankGuaranteesKey } from '@/hooks/api/useBankGuarantees';
@@ -48,7 +49,10 @@ const BG_PURPOSE_OPTIONS = [
 // No 48-hour option.
 const BG_NEEDED_IN_OPTIONS_FILTERED = BG_NEEDED_IN_OPTIONS.filter(option => option.value !== '48');
 
-const BG_BANK = 'AU_8316';
+const BG_BANK = 'AU_5190';
+
+// Tag written to other_contacts when no tender/project is selected.
+const CONTACT_PURPOSE = 'BG';
 
 const ADD_CONTACT_OPTION = '__add_contact__';
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -85,9 +89,11 @@ const formatDateForLabel = (value: string | null | undefined): string => {
 function TenderProjectSelector({
     value,
     onSelect,
+    onClear,
 }: {
     value: string;
     onSelect: (context: BgContext) => void;
+    onClear: () => void;
 }) {
     const { data: tenderList } = useTenders(undefined, undefined, { page: 1, limit: 200 });
     const { data: projectList } = useProjectList({ page: 1, limit: 200 });
@@ -173,8 +179,13 @@ function TenderProjectSelector({
                             <DropdownMenuItem
                                 key={option.id}
                                 onClick={() => {
-                                    const context = byKey.get(option.id);
-                                    if (context) onSelect(context);
+                                    if (isSelected) {
+                                        // Clicking the current choice clears it (selection is optional).
+                                        onClear();
+                                    } else {
+                                        const context = byKey.get(option.id);
+                                        if (context) onSelect(context);
+                                    }
                                     setOpen(false);
                                     setQuery('');
                                 }}
@@ -219,9 +230,11 @@ export function BankGuaranteeRequestForm() {
     const { data: woContacts } = useWoContactsByBasicDetail(woBasicDetailId);
     const { data: employees = [] } = useUsers();
     const { data: tenderContacts } = useTenderContacts(tenderId);
+    const { data: otherContactList } = useOtherContacts(CONTACT_PURPOSE);
 
     const createWoContact = useCreateWoContact();
     const addTenderClient = useAddTenderClient();
+    const addOtherContact = useAddOtherContact();
 
     const [addingFor, setAddingFor] = useState<EmailFieldKey | null>(null);
     const [contactDraft, setContactDraft] = useState<ContactDraft>(EMPTY_CONTACT_DRAFT);
@@ -246,6 +259,7 @@ export function BankGuaranteeRequestForm() {
         const rawContacts = [
             ...(woContacts ?? []).map(contact => ({ name: contact.name, email: contact.email })),
             ...(tenderContacts?.contacts ?? []).map(contact => ({ name: contact.name, email: contact.email })),
+            ...(otherContactList ?? []).map(contact => ({ name: contact.name, email: contact.email })),
         ];
         const seen = new Set<string>();
         const options = rawContacts
@@ -266,16 +280,12 @@ export function BankGuaranteeRequestForm() {
 
         options.push({ id: ADD_CONTACT_OPTION, name: '+ Add contact person' });
         return options;
-    }, [woContacts, tenderContacts]);
+    }, [woContacts, tenderContacts, otherContactList]);
 
     const emailPlaceholder = emailOptions.length > 1 ? 'Select Email' : '+ Add contact person';
 
     const handleEmailChange = (key: EmailFieldKey) => (value: string) => {
         if (value === ADD_CONTACT_OPTION) {
-            if (!woBasicDetailId && !tenderId) {
-                toast.error('Select a tender or project first');
-                return;
-            }
             setAddingFor(key);
             setContactDraft(EMPTY_CONTACT_DRAFT);
             setContactError(null);
@@ -310,8 +320,8 @@ export function BankGuaranteeRequestForm() {
         }
 
         try {
-            if (woBasicDetailId) {
-                // Project flow: saved into wo_contacts (same table as the WO basic details form).
+            if (selection?.kind === 'project' && woBasicDetailId) {
+                // Project selected: saved into wo_contacts (same table as the WO basic details form).
                 await createWoContact.mutateAsync({
                     woBasicDetailId,
                     name,
@@ -319,8 +329,8 @@ export function BankGuaranteeRequestForm() {
                     email,
                     phone: contactDraft.phone.trim() || undefined,
                 });
-            } else {
-                // Tender flow: saved into tender_clients.
+            } else if (selection?.kind === 'tender' && tenderId) {
+                // Tender selected: saved into tender_clients.
                 await addTenderClient.mutateAsync({
                     tenderId,
                     data: {
@@ -329,6 +339,15 @@ export function BankGuaranteeRequestForm() {
                         clientEmail: email,
                         clientMobile: contactDraft.phone.trim() || undefined,
                     },
+                });
+            } else {
+                // Nothing selected: saved into the generic other_contacts table.
+                await addOtherContact.mutateAsync({
+                    name,
+                    designation: contactDraft.designation.trim() || undefined,
+                    email,
+                    phone: contactDraft.phone.trim() || undefined,
+                    purpose: CONTACT_PURPOSE,
                 });
             }
             form.setValue(emailFieldNames[addingFor], email, { shouldValidate: true, shouldDirty: true });
@@ -339,7 +358,7 @@ export function BankGuaranteeRequestForm() {
         }
     };
 
-    const isSavingContact = createWoContact.isPending || addTenderClient.isPending;
+    const isSavingContact = createWoContact.isPending || addTenderClient.isPending || addOtherContact.isPending;
 
     const renderEmailField = (key: EmailFieldKey, label: string) => (
         <FieldWrapper control={form.control} name={emailFieldNames[key]} label={label}>
@@ -473,18 +492,15 @@ export function BankGuaranteeRequestForm() {
     const bgPoFiles = useWatch({ control: form.control, name: `${BG_PREFIX}.bgPoFiles` });
 
     const handleSubmit = async (values: FormValues) => {
-        if (!selection) {
-            toast.error('Select a tender or project');
-            return;
-        }
+        const selectedTender = selection?.kind === 'tender' ? selection : null;
+        const selectedProject = selection?.kind === 'project' ? selection : null;
 
-        const selectedTender = selection.kind === 'tender' ? selection : null;
         const payload: any = {
             type: 'Other Than Tender',
             tenderNo: selectedTender ? selectedTender.tenderNo : (poNo || values.tenderNo || ''),
             tenderName: selectedTender ? selectedTender.tenderName : (projectName || values.tenderName || ''),
             dueDate: values.tenderDueDate || (selectedTender ? toDateOnly(selectedTender.dueDate) : ''),
-            ...(selectedTender ? {} : { projectId: selection.id }),
+            ...(selectedProject ? { projectId: selectedProject.id } : {}),
             // Keep the exact project-style BG purpose (Advance Payment /
             // Security Bond/Deposit / Performance BG) on the request.
             preserveBgPurpose: true,
@@ -534,16 +550,23 @@ export function BankGuaranteeRequestForm() {
                         className="space-y-8"
                     >
                         <div className="space-y-2 max-w-sm">
-                            <label className="text-sm font-medium">Tender / Project *</label>
+                            <label className="text-sm font-medium">Tender / Project</label>
                             <TenderProjectSelector
                                 value={selection ? `${selection.kind}:${selection.id}` : ''}
                                 onSelect={(context) => {
                                     setSelection(context);
                                     cancelContactDraft();
                                 }}
+                                onClear={() => {
+                                    setSelection(null);
+                                    form.setValue('tenderName', '');
+                                    form.setValue('tenderNo', '');
+                                    form.setValue('tenderDueDate', '');
+                                    cancelContactDraft();
+                                }}
                             />
                             <p className="text-xs text-muted-foreground">
-                                Select the tender or project this bank guarantee is for.
+                                Optional — pick a tender or project, or leave blank to raise the request without one.
                             </p>
                         </div>
 
@@ -621,10 +644,10 @@ export function BankGuaranteeRequestForm() {
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgBankAccountName`} label="Customer Account Name *">
+                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgBankAccountName`} label="Customer Account Name">
                                         {(field) => <Input {...field} placeholder="e.g., Individual or Company Name" />}
                                     </FieldWrapper>
-                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgBankAccountNo`} label="Customer Account Number *">
+                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgBankAccountNo`} label="Customer Account Number">
                                         {(field) => <Input {...field} placeholder="e.g., 1234567890" />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgBankIfsc`} label="Customer IFSC Code *">
@@ -636,6 +659,15 @@ export function BankGuaranteeRequestForm() {
                                     {renderEmailField('user', 'User Dept. Email')}
                                     {renderEmailField('cp', 'C&P Dept. Email')}
                                     {renderEmailField('finance', 'Finance Dept. Email')}
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.uniqueCode`} label="Unique Code">
+                                        {(field) => <Input {...field} placeholder="e.g., BG-XXXXXX" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.uniqueAdviceMessage`} label="Unique Advice Message">
+                                        {(field) => <Textarea rows={3} {...field} placeholder="Advice message from the bank" />}
+                                    </FieldWrapper>
                                 </div>
 
                                 <div className="space-y-3">
