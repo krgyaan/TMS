@@ -136,7 +136,73 @@ export class OperationNotificationService {
     'office_expenses', 'printing_stationary', 'office_maintenance',
     'portal_renewal_charges', 'professional_charges', 'od_ac_interest',
     'asset_purchase', 'po', 'vwo', 'others', 'gem_charges',
+    'registration_charges', 'pop_charges', 'bank_charges', 'diwali_gift_expenses',
+    'inventory_purchase', 'dd', 'bt', 'pop', 'bg', 'sb', 'fdr',
+    'sd_vendor', 'sd_landlord', 'emd'
   ]);
+
+  private readonly CATEGORY_LABELS: Record<string, string> = {
+    upload_invoice: 'Upload Invoice',
+    new_pi: 'New PI',
+    po: 'PO',
+    vwo: 'Work Order (V)',
+    others: 'Imprest',
+    imprest: 'Imprest',
+    fixed: 'Fixed',
+    loan_return: 'Loan Repayment/Return',
+    own_bank: 'Own Bank',
+    capital_asset_purchase: 'Capital/Asset Purchase',
+    communication: 'Communication',
+    courier: 'Courier',
+    electricity: 'Electricity',
+    rent: 'Rent',
+    emi: 'EMI',
+    salary: 'Salary',
+    software: 'Software',
+    office_expenses: 'Office Expenses',
+    od_ac_interest: 'OD A/C Interest',
+    printing_stationary: 'Printing & Stationary',
+    office_maintenance: 'Office Maintenance',
+    related_party: 'Related Party',
+    nbfc_oc_acc: 'NBFC OC Account',
+    nbfc_od_acc: 'NBFC OD Account',
+    loan_principal_return: 'Loan Principal Return',
+    AU_5242: 'AU Current Account (AU_5242)',
+    AU_5180: 'AU Inflow Account (AU_5180)',
+    AU_5190: 'AU Expenses Account (AU_5190)',
+    AU_8316: 'AU Outflow Account (AU_8316)',
+    AU_9589: 'AU EMD Account (AU_9589)',
+    AU_9284: 'AU Cash Reserve Account (AU_9284)',
+    amex_cc: 'Amex Company Credit Card',
+    investment: 'Investment',
+    asset_purchase: 'Asset Purchase',
+    portal_renewal_charges: 'Portal Renewal Charges',
+    professional_charges: 'Professional Charges',
+    insurance: 'Insurance',
+    YES_BANK_2011: 'Yes Bank Inflow Account (2011)',
+    YES_BANK_0771: 'Yes Bank (0771)',
+    inventory_purchase: 'Inventory Purchase',
+    gem_charges: 'GeM Charges',
+    registration_charges: 'Registration Charges',
+    pop_charges: 'POP Charges',
+    bank_charges: 'Bank Charges',
+    cc_ac_interest: 'CC A/C Interest',
+    esi: 'ESI',
+    pf: 'PF',
+    gst: 'GST',
+    tds: 'TDS',
+    income_tax: 'Income Tax',
+    diwali_gift_expenses: 'Diwali/Gift Expenses',
+    dd: 'Demand Draft',
+    bt: 'Bank Transfer',
+    pop: 'Pay On Portal',
+    bg: 'Bank Guarantee',
+    sb: 'Surity Bond',
+    fdr: 'Fixed Deposit Receipt',
+    sd_vendor: 'Security Deposit - Vendor',
+    sd_landlord: 'Security Deposit - Landlord',
+    emd: 'EMD',
+  };
 
   private readonly USER_RESTRICTED_CATEGORIES: Record<string, number[]> = {
     salary: [7, 21, 26],
@@ -196,9 +262,23 @@ export class OperationNotificationService {
     }
   }
 
+  private labelForCategory(category: string): string {
+    const label = this.CATEGORY_LABELS[category];
+    if (label) {
+      return label;
+    }
+    if (!category) {
+      return 'N/A';
+    }
+    return category
+      .split('_')
+      .map(word => (word === word.toUpperCase() && word.length > 1 ? word : word.charAt(0).toUpperCase() + word.slice(1)))
+      .join(' ');
+  }
+
   private async buildText(
     header: string,
-    data: { amount: string | number; partyName: string | null; portalLink: string | null; requestNo?: string; utrNumber?: string | null; rejectionReason?: string | null },
+    data: { amount: string | number; partyName: string | null; portalLink: string | null; category: string; requestNo?: string; utrNumber?: string | null; rejectionReason?: string | null },
     userName: string,
     isPaymentDone: boolean = false,
     isRejection: boolean = false,
@@ -218,6 +298,7 @@ export class OperationNotificationService {
     lines.push(`Request: ${data.requestNo || 'N/A'}`);
     lines.push(`Amount: ₹${data.amount}`);
     lines.push(`Party: ${data.partyName || data.portalLink || 'N/A'}`);
+    lines.push(`Category: ${this.labelForCategory(data.category)}`);
 
     if (isPaymentDone && data.utrNumber) {
       lines.push(`UTR: ${data.utrNumber}`);
@@ -258,6 +339,7 @@ export class OperationNotificationService {
         amount: data.amount,
         partyName: data.partyName,
         portalLink: data.portalLink,
+        category: data.category,
         requestNo: data.requestNo,
       }, userName);
 
@@ -292,6 +374,7 @@ export class OperationNotificationService {
         amount: data.amount,
         partyName: data.partyName,
         portalLink: data.portalLink,
+        category: data.category,
         utrNumber: data.utrNumber,
       }, userName, true);
 
@@ -326,6 +409,7 @@ export class OperationNotificationService {
         amount: data.amount,
         partyName: data.partyName,
         portalLink: data.portalLink,
+        category: data.category,
         rejectionReason: data.rejectionReason,
       }, userName, false, true);
 
@@ -360,6 +444,7 @@ export class OperationNotificationService {
         amount: data.amount,
         partyName: data.partyName,
         portalLink: data.portalLink,
+        category: data.category,
       }, userName);
 
       await this.sendToTargets(text, target);
