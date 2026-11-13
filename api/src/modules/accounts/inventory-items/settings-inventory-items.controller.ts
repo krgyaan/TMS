@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPip
 import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
 import { PermissionGuard } from "@/modules/auth/guards/permission.guard";
 import { CanCreate, CanDelete, CanRead, CanUpdate } from "@/modules/auth/decorators/permissions.decorator";
+import { CurrentUser } from "@/modules/auth/decorators/current-user.decorator";
 import { InventoryItemsService } from "./inventory-items.service";
 import { itemSchema, parseItemBody, updateItemSchema } from "./inventory-items.controller";
 import { getConversionOptions } from "./conversion-rules";
@@ -30,14 +31,14 @@ export class SettingsInventoryItemsController {
     @Post()
     @CanCreate("master.item-master")
     @HttpCode(HttpStatus.CREATED)
-    create(@Body() body: unknown) {
-        return this.service.create(parseItemBody(itemSchema, body));
+    create(@Body() body: unknown, @CurrentUser("id") authenticatedUserId: number) {
+        return this.service.create(parseItemBody(itemSchema, body), authenticatedUserId);
     }
 
     @Patch(":id")
     @CanUpdate("master.item-master")
-    update(@Param("id", ParseIntPipe) id: number, @Body() body: unknown) {
-        return this.service.update(id, parseItemBody(updateItemSchema, body));
+    update(@Param("id", ParseIntPipe) id: number, @Body() body: unknown, @CurrentUser("id") authenticatedUserId: number) {
+        return this.service.update(id, parseItemBody(updateItemSchema, body), authenticatedUserId);
     }
 
     @Delete(":id")

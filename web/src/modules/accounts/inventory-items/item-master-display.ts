@@ -1,43 +1,41 @@
-import { getCategory } from "./item-config";
+import { findCatalogItem } from "./item-catalog.ts";
 
-export function formatKeySpecification(itemName: string, specifications: Record<string, string> = {}): string {
-    const labels = new Map((getCategory(itemName)?.fields || []).map(field => [field.key, field.label]));
-    return Object.entries(specifications).flatMap(([key, raw]) => {
+export type KeySpecificationAttribute = { key: string; label: string; value: string };
+
+export function keySpecificationAttributes(
+    category: string | null | undefined,
+    itemName: string,
+    specifications: Record<string, string> = {},
+    itemType?: string | null,
+): KeySpecificationAttribute[] {
+    const item = findCatalogItem(category || "Legacy", itemName);
+    const configured = item?.fields || [];
+    const result: KeySpecificationAttribute[] = configured.flatMap(field => {
+        const rawValue = specifications[field.key]?.trim();
+        const value = rawValue && field.suffix && !rawValue.toLowerCase().endsWith(field.suffix.toLowerCase()) ? `${rawValue} ${field.suffix}` : rawValue;
+        return value ? [{ key: field.key, label: field.listColumn === "type" ? "Type" : field.label.replace(/\s*\([^)]*\)$/, "").trim(), value }] : [];
+    });
+    const knownKeys = new Set(configured.map(field => field.key));
+    if (itemType?.trim() && !configured.some(field => field.listColumn === "type" && specifications[field.key]?.trim())) {
+        result.unshift({ key: "itemType", label: "Type", value: itemType.trim() });
+    }
+    for (const [key, raw] of Object.entries(specifications)) {
         const value = raw?.trim();
-        if (!value) return [];
-        const label = labels.get(key);
-        if (!label) return [value];
-        const displayLabel = label.replace(/\s*\([^)]*\)$/, "").trim();
-        const unit = label.match(/\((?:in\s+)?([^)]*)\)$/i)?.[1];
-        if (key === "strength") return [value];
-        if (/gauge/i.test(unit || "")) return [`Gauge ${value}`];
-        const suffix = unit && !/^in\s+(gauge|mil)$/i.test(unit) && !value.toLowerCase().includes(unit.toLowerCase()) ? ` ${unit}` : "";
-        return [`${displayLabel} ${value}${suffix}`];
-    }).join(" · ") || "—";
+        if (value && !knownKeys.has(key)) result.push({ key, label: key, value });
+    }
+    return result;
 }
 
-export function itemMasterColumnsForViewport(width: number, isSettings = false) {
-    const visible = new Set(["itemCode", "itemName", "hsnCode", "unit", "status", "actions"]);
-    const minimumWidth = isSettings ? 708 : 660;
-    let usedWidth = minimumWidth;
-    const priorities = [
-        { key: "itemType", width: 120 },
-        { key: "specifications", width: 200 },
-        { key: "conversion", width: 150 },
-    ];
-    for (const column of priorities) {
-        if (usedWidth + column.width <= width) {
-            visible.add(column.key);
-            usedWidth += column.width;
-        } else break;
-    }
-    if (width >= 1536 && usedWidth + 130 <= width) visible.add("createdAt");
+export function formatKeySpecification(category: string | null | undefined, itemName: string, specifications: Record<string, string> = {}, itemType?: string | null): string {
+    return keySpecificationAttributes(category, itemName, specifications, itemType)
+        .map(attribute => `${attribute.label}: ${attribute.value}`).join("\n") || "—";
+}
+
+export function itemMasterColumnsForViewport(width: number) {
     return {
         mobile: width < 768,
-        itemType: visible.has("itemType"),
-        specifications: visible.has("specifications"),
-        conversion: visible.has("conversion"),
-        createdAt: visible.has("createdAt"),
-        hsn: true,
+        createdBy: width >= 1280,
+        category: width >= 1120,
+        unit: width >= 960,
     };
 }

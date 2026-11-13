@@ -4,25 +4,28 @@ import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
 import { PermissionGuard } from "@/modules/auth/guards/permission.guard";
 import { CanRead } from "@/modules/auth/decorators/permissions.decorator";
 import { InventoryItemsService } from "./inventory-items.service";
+import { UNIT_OPTIONS } from "./item-catalog";
 
-const ITEM_UNITS = ["Kg", "Mtr", "Ft", "Nos.", "RMtr", "Sq. Mtr."] as const;
 const ITEM_GROUPS = ["Raw Materials", "Finished Goods", "Supplies"] as const;
+const HSN_CODE = z.string().regex(/^\d{4,8}$/, "HSN code must contain 4 to 8 digits");
 
 export const itemSchema = z.object({
     teamId: z.number().int().positive().nullable().optional(),
     itemGroup: z.enum(ITEM_GROUPS).nullable().optional(),
+    category: z.string().trim().min(1).max(80),
     itemName: z.string().trim().min(1).max(120),
     itemType: z.string().trim().max(80).nullable().optional(),
+    makeBrand: z.string().trim().max(120).nullable().optional(),
     description: z.string().trim().max(500).nullable().optional(),
     specifications: z.record(z.string(), z.string().trim().max(200)).default({}),
-    unit: z.enum(ITEM_UNITS),
-    conversionUnit: z.enum(ITEM_UNITS).nullable().optional(),
+    unit: z.enum(UNIT_OPTIONS),
+    conversionUnit: z.enum(UNIT_OPTIONS).nullable().optional(),
     conversionFactor: z.union([z.number(), z.string()]).nullable().optional(),
-    hsnCode: z.string().trim().max(30).nullable().optional(),
+    hsnCode: HSN_CODE,
     isActive: z.boolean().default(true),
 });
 
-export const updateItemSchema = itemSchema.partial();
+export const updateItemSchema = itemSchema.partial().extend({ hsnCode: HSN_CODE.optional() });
 
 export const parseItemBody = <T extends z.ZodType>(schema: T, body: unknown): z.infer<T> => {
     const result = schema.safeParse(body);
