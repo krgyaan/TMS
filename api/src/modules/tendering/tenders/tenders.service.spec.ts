@@ -32,8 +32,11 @@ describe('TenderInfosService document invalidation (Prompt 2A b)', () => {
         mockTenderStatusHistoryService = {};
         mockEmailService = {
             sendMail: jest.fn(),
+            sendTenderEmail: jest.fn().mockResolvedValue({ success: true }),
         };
-        mockRecipientResolver = {};
+        mockRecipientResolver = {
+            getUserById: jest.fn().mockResolvedValue({ id: 10, name: 'Tender Executive' }),
+        };
         mockTimersService = {
             startTimer: jest.fn(),
         };
@@ -237,5 +240,77 @@ describe('TenderInfosService document invalidation (Prompt 2A b)', () => {
         const tenderInfosUpdate = updateCalls.find((c) => c.table === tenderInfos);
         expect(tenderInfosUpdate).toBeDefined();
         expect(tenderInfosUpdate?.setArgs.documents).toBe('new_addendum_doc.pdf');
+    });
+
+    it('includes structured tender documents in the creation email', async () => {
+        const documents = JSON.stringify({
+            schemaVersion: 1,
+            mainTender: 'tender-documents/nit.pdf',
+            atc: ['tender-documents/atc.pdf'],
+            boq: null,
+            otherDocuments: ['tender-documents/other.pdf'],
+        });
+
+        const tender: any = {
+            id: 500,
+            team: 1,
+            teamMember: 10,
+            tenderName: 'Test Tender',
+            tenderNo: 'TND-500',
+            documents,
+            dueDate: new Date(),
+        };
+
+        jest.spyOn(service, 'findById').mockResolvedValue(tender);
+        jest.spyOn(service as any, 'getCoordinatorName').mockResolvedValue('Coordinator');
+        jest.spyOn(service as any, 'getCoordinatorUserId').mockResolvedValue(8);
+        mockConfigService.get.mockImplementation((key: string) =>
+            key === 'app.apiUrl' ? 'https://api.example.com/api/v1' : 'https://app.example.com',
+        );
+
+        await (service as any).sendTenderCreatedEmail(500, { documents }, 42);
+
+        expect(mockEmailService.sendTenderEmail).toHaveBeenCalledTimes(1);
+        expect(mockEmailService.sendTenderEmail.mock.calls[0][0].data.documentUrls).toEqual([
+            'https://api.example.com/api/v1/files/serve/tender-documents/nit.pdf',
+            'https://api.example.com/api/v1/files/serve/tender-documents/atc.pdf',
+            'https://api.example.com/api/v1/files/serve/tender-documents/other.pdf',
+        ]);
+    });
+
+    it('includes structured tender documents and sends an email for document-only updates', async () => {
+        const documents = JSON.stringify({
+            schemaVersion: 1,
+            mainTender: 'tender-documents/nit-v2.pdf',
+            atc: [],
+            boq: 'tender-documents/boq.xlsx',
+            otherDocuments: [],
+        });
+
+        const oldTender: any = {
+            id: 501,
+            team: 1,
+            teamMember: 10,
+            tenderName: 'Test Tender',
+            tenderNo: 'TND-501',
+            documents: null,
+            dueDate: new Date(),
+        };
+        const newTender: any = { ...oldTender, documents };
+
+        jest.spyOn(service as any, 'getCoordinatorName').mockResolvedValue('Coordinator');
+        jest.spyOn(service as any, 'getCoordinatorUserId').mockResolvedValue(8);
+        mockConfigService.get.mockImplementation((key: string) =>
+            key === 'app.apiUrl' ? 'https://api.example.com/api/v1' : 'https://app.example.com',
+        );
+
+        await (service as any).sendTenderUpdateEmail(oldTender, newTender, { documents }, 42);
+
+        expect(mockEmailService.sendTenderEmail).toHaveBeenCalledTimes(1);
+        expect(mockEmailService.sendTenderEmail.mock.calls[0][0].data.documentUrls).toEqual([
+            'https://api.example.com/api/v1/files/serve/tender-documents/nit-v2.pdf',
+            'https://api.example.com/api/v1/files/serve/tender-documents/boq.xlsx',
+        ]);
+        expect(mockEmailService.sendTenderEmail.mock.calls[0][0].data.changedFields).toContain('Tender Documents');
     });
 });

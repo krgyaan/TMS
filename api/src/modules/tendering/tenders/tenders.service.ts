@@ -23,6 +23,7 @@ import { leadEnquiries } from '@db/schemas/crm/lead-enquiries.schema';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { FileUploadService } from '@/modules/file-upload/file-upload.service';
+import { buildFileServeUrl, resolveTenderDocumentPaths } from '@/utils/tender-documents.util';
 import * as fs from 'fs';
 import * as path from 'path';
 import { and, asc, desc, eq, ilike, inArray, isNull, notInArray, or, sql, SQL } from 'drizzle-orm';
@@ -787,15 +788,6 @@ export class TenderInfosService {
             // Send WhatsApp notification to the (re)allocated team's group
             this.notifyTenderAllocatedWhatsapp(updatedTender ?? rows[0], data.teamMember);
 
-            // Send email notification for tender update (allocation change)
-            try {
-                if (updatedTender) {
-                    await this.sendTenderUpdateEmail(currentTender, updatedTender, data, updatedBy);
-                }
-            } catch (error) {
-                this.logger.error(`Failed to send tender update email for tender ${id}: ${error instanceof Error ? error.message : String(error)}`);
-            }
-
             try {
                 this.logger.log(`Assigning team member — starting timer for tender ${id}`);
                 await this.timersService.startTimer({
@@ -1030,21 +1022,9 @@ export class TenderInfosService {
 
         const apiUrl = this.configService.get<string>('app.apiUrl') || '';
 
-        // Build document URLs instead of file attachments
-        let documentUrls: string[] = [];
-        if (data.documents) {
-            try {
-                const docPaths = Array.isArray(data.documents)
-                  ? data.documents
-                  : JSON.parse(data.documents);
-
-                if (Array.isArray(docPaths)) {
-                    documentUrls = docPaths.map(path => `${apiUrl}/files/serve/${path}`);
-                }
-            } catch (e) {
-                this.logger.error(`Failed to parse tender documents: ${e}`);
-            }
-        }
+        const documentUrls = resolveTenderDocumentPaths(tender.documents ?? data.documents).map((filePath) =>
+            buildFileServeUrl(apiUrl, filePath)
+        );
 
         const emailData = {
             tenderName: tender.tenderName,
@@ -1155,6 +1135,9 @@ export class TenderInfosService {
         if (changedData.emd !== undefined && changedData.emd !== oldTender.emd) {
             changedFields.push('EMD');
         }
+        if (changedData.documents !== undefined && changedData.documents !== oldTender.documents) {
+            changedFields.push('Tender Documents');
+        }
 
         // Only send email if there are significant changes
         if (changedFields.length === 0 && !isTeamMemberChange && !isTeamChange && !isTenderNoChange) {
@@ -1177,23 +1160,9 @@ export class TenderInfosService {
 
         const apiUrl = this.configService.get<string>('app.apiUrl') || '';
 
-        // Build document URLs instead of file attachments
-        let documentUrls: string[] = [];
-        const documentsString = changedData.documents !== undefined ? changedData.documents : newTender.documents;
-
-        if (documentsString) {
-            try {
-                const docPaths = Array.isArray(documentsString)
-                  ? documentsString
-                  : JSON.parse(documentsString);
-
-                if (Array.isArray(docPaths)) {
-                    documentUrls = docPaths.map(path => `${apiUrl}/files/serve/${path}`);
-                }
-            } catch (e) {
-                this.logger.error(`Failed to parse tender documents for update: ${e}`);
-            }
-        }
+        const documentUrls = resolveTenderDocumentPaths(newTender.documents).map((filePath) =>
+            buildFileServeUrl(apiUrl, filePath)
+        );
 
         await this.sendEmail(
             'tender.updated',
