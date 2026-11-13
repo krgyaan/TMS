@@ -10,9 +10,14 @@ import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { Loader2, FileText, Edit, Save, X, ChevronDown, ChevronUp, Mail, User, MapPin, Phone, Briefcase, Eye, Calendar, Package, Building2 } from "lucide-react";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
+import { AsyncSelectField } from "@/components/form/AsyncSelectField";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { FileUploader } from "@/components/file-upload";
 import { fileUploadService } from "@/services/api/file-upload.service";
 import { useUsers } from "@/hooks/api/useUsers";
+import { useCourierSelectOptions } from "@/hooks/api/useCourier";
+import { COURIER_STATUS_BADGE, COURIER_STATUS_LABELS } from "@/modules/shared/courier/helpers/courier.constants";
 import { format } from "date-fns";
 import {
     useLeadFollowups,
@@ -46,8 +51,6 @@ export function LetterTab({ source, mode = 'create' }: LetterTabProps) {
     return <LetterCreateForm source={source} />;
 }
 
-// ─── Create / Edit Form ───────────────────────────────────────────────────────
-
 function LetterCreateForm({ source }: { source: FollowupSource }) {
     const {
         form,
@@ -60,6 +63,21 @@ function LetterCreateForm({ source }: { source: FollowupSource }) {
     } = useLetterForm(source);
 
     const { data: allUsers = [] } = useUsers();
+    const isCourierRequested = form.watch("isCourierRequested");
+    const selectedCourierId = form.watch("courierId");
+    const {
+        options: courierOptions,
+        onSearch: onCourierSearch,
+        isLoading: isCourierLoading,
+        selectedCourier,
+    } = useCourierSelectOptions(selectedCourierId ? String(selectedCourierId) : undefined);
+    const selectedCourierSender = allUsers.find(u => u.id === selectedCourier?.empFrom)?.name
+        ?? selectedCourier?.empFromUser?.name
+        ?? null;
+    const selectedCourierUrgency = selectedCourier?.urgency != null
+        ? URGENCY_OPTIONS.find(o => o.value === String(selectedCourier.urgency))?.label ?? String(selectedCourier.urgency)
+        : null;
+    const selectedCourierDocs = selectedCourier?.courierDocs?.filter(Boolean) ?? [];
     const employeeOptions = allUsers.map(u => ({
         value: u.id.toString(),
         label: u.team?.name ? `${u.name} (${u.team.name})` : (u.name ?? ""),
@@ -86,62 +104,194 @@ function LetterCreateForm({ source }: { source: FollowupSource }) {
             )}
 
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-4 items-start gap-6">
-                    <FieldWrapper<LetterFormValues, "toOrg"> control={form.control} name="toOrg" label="Organization Name">
-                        {(field) => <Input placeholder="Enter organization name" disabled={saving} {...field} />}
-                    </FieldWrapper>
+                <div className="space-y-4">
+                    <h4 className="font-semibold text-base text-primary border-b pb-2">
+                        Courier Information
+                    </h4>
 
-                    <FieldWrapper<LetterFormValues, "toName"> control={form.control} name="toName" label="Name">
-                        {(field) => <Input placeholder="Enter recipient name" disabled={saving} {...field} />}
-                    </FieldWrapper>
-
-                    <FieldWrapper<LetterFormValues, "toMobile"> control={form.control} name="toMobile" label="Mobile Number">
-                        {(field) => <Input type="tel" placeholder="Enter mobile number" disabled={saving} {...field} />}
-                    </FieldWrapper>
-
-                    <FieldWrapper<LetterFormValues, "toPin"> control={form.control} name="toPin" label="Pin Code">
-                        {(field) => <Input placeholder="Enter pin code" disabled={saving} {...field} />}
-                    </FieldWrapper>
-
-                    <FieldWrapper<LetterFormValues, "toAddr"> control={form.control} name="toAddr" label="Address">
+                    <FieldWrapper<LetterFormValues, "isCourierRequested">
+                        control={form.control}
+                        name="isCourierRequested"
+                        label="Courier Status"
+                    >
                         {(field) => (
-                            <textarea
-                                className="border-input placeholder:text-muted-foreground dark:bg-input/30 h-20 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                placeholder="Enter full address"
+                            <RadioGroup
+                                value={field.value}
+                                onValueChange={field.onChange}
+                                className="flex gap-6"
                                 disabled={saving}
-                                {...field}
-                            />
+                            >
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="yes" id="letter_courier_yes" />
+                                    <Label htmlFor="letter_courier_yes">Use Existing Courier</Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="no" id="letter_courier_no" />
+                                    <Label htmlFor="letter_courier_no">Create New Courier Request</Label>
+                                </div>
+                            </RadioGroup>
                         )}
                     </FieldWrapper>
 
+                    {isCourierRequested === "yes" ? (
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-4 items-start gap-6">
+                                <AsyncSelectField<LetterFormValues, "courierId">
+                                    control={form.control}
+                                    name="courierId"
+                                    label="Select Courier"
+                                    options={courierOptions}
+                                    placeholder="Select an existing courier"
+                                    valueType="number"
+                                    onSearch={onCourierSearch}
+                                    isLoading={isCourierLoading}
+                                    disabled={saving}
+                                />
+                            </div>
 
-                    <SelectField<LetterFormValues, "empFrom">
-                        control={form.control}
-                        name="empFrom"
-                        label="Courier From"
-                        options={employeeOptions}
-                        placeholder="Select Employee"
-                    />
+                            {selectedCourier && (
+                                <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Package className="h-4 w-4 text-muted-foreground" />
+                                            <span className="text-sm font-semibold">
+                                                Courier #{selectedCourier.id}
+                                            </span>
+                                        </div>
+                                        <Badge variant={COURIER_STATUS_BADGE[selectedCourier.status]}>
+                                            {COURIER_STATUS_LABELS[selectedCourier.status] ?? `Status ${selectedCourier.status}`}
+                                        </Badge>
+                                    </div>
 
-                    <FieldWrapper<LetterFormValues, "delDate"> control={form.control} name="delDate" label="Expected Delivery Date">
-                        {(field) => (
-                            <input
-                                type="date"
-                                className="border-input dark:bg-input/30 h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                disabled={saving}
-                                {...field}
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-3 text-sm">
+                                        <div>
+                                            <span className="text-muted-foreground">Organization: </span>
+                                            <span className="font-medium">{selectedCourier.toOrg || "—"}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted-foreground">Recipient: </span>
+                                            <span className="font-medium">{selectedCourier.toName || "—"}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted-foreground">Mobile: </span>
+                                            <span className="font-medium">{selectedCourier.toMobile || "—"}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted-foreground">Pin Code: </span>
+                                            <span className="font-medium">{selectedCourier.toPin || "—"}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted-foreground">Courier From: </span>
+                                            <span className="font-medium">{selectedCourierSender || "—"}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted-foreground">Expected Delivery: </span>
+                                            <span className="font-medium">
+                                                {selectedCourier.delDate ? format(new Date(selectedCourier.delDate), "PP") : "—"}
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted-foreground">Urgency: </span>
+                                            <span className="font-medium">{selectedCourierUrgency || "—"}</span>
+                                        </div>
+                                        <div className="md:col-span-3">
+                                            <span className="text-muted-foreground">Address: </span>
+                                            <span className="font-medium">{selectedCourier.toAddr || "—"}</span>
+                                        </div>
+                                        {selectedCourierDocs.length > 0 && (
+                                            <div className="md:col-span-3">
+                                                <span className="text-muted-foreground">Documents: </span>
+                                                <div className="mt-1 flex flex-wrap gap-2">
+                                                    {selectedCourierDocs.map((doc, idx) => (
+                                                        <a
+                                                            key={idx}
+                                                            href={docUrl(doc)}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-muted text-blue-600 hover:text-blue-800 hover:underline"
+                                                        >
+                                                            <Eye className="h-3 w-3" />
+                                                            {doc.split('/').pop()}
+                                                        </a>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-4 items-start gap-6">
+                            <FieldWrapper<LetterFormValues, "toOrg"> control={form.control} name="toOrg" label="Organization Name">
+                                {(field) => <Input placeholder="Enter organization name" disabled={saving} {...field} />}
+                            </FieldWrapper>
+
+                            <FieldWrapper<LetterFormValues, "toName"> control={form.control} name="toName" label="Name">
+                                {(field) => <Input placeholder="Enter recipient name" disabled={saving} {...field} />}
+                            </FieldWrapper>
+
+                            <FieldWrapper<LetterFormValues, "toMobile"> control={form.control} name="toMobile" label="Mobile Number">
+                                {(field) => <Input type="tel" placeholder="Enter mobile number" disabled={saving} {...field} />}
+                            </FieldWrapper>
+
+                            <FieldWrapper<LetterFormValues, "toPin"> control={form.control} name="toPin" label="Pin Code">
+                                {(field) => <Input placeholder="Enter pin code" disabled={saving} {...field} />}
+                            </FieldWrapper>
+
+                            <FieldWrapper<LetterFormValues, "toAddr"> control={form.control} name="toAddr" label="Address">
+                                {(field) => (
+                                    <textarea
+                                        className="border-input placeholder:text-muted-foreground dark:bg-input/30 h-20 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                        placeholder="Enter full address"
+                                        disabled={saving}
+                                        {...field}
+                                    />
+                                )}
+                            </FieldWrapper>
+
+
+                            <SelectField<LetterFormValues, "empFrom">
+                                control={form.control}
+                                name="empFrom"
+                                label="Courier From"
+                                options={employeeOptions}
+                                placeholder="Select Employee"
                             />
-                        )}
-                    </FieldWrapper>
 
-                    <SelectField<LetterFormValues, "urgency">
-                        control={form.control}
-                        name="urgency"
-                        label="Dispatch Urgency"
-                        options={URGENCY_OPTIONS}
-                        placeholder="Select Urgency"
-                    />
+                            <FieldWrapper<LetterFormValues, "delDate"> control={form.control} name="delDate" label="Expected Delivery Date">
+                                {(field) => (
+                                    <input
+                                        type="date"
+                                        className="border-input dark:bg-input/30 h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                        disabled={saving}
+                                        {...field}
+                                    />
+                                )}
+                            </FieldWrapper>
 
+                            <SelectField<LetterFormValues, "urgency">
+                                control={form.control}
+                                name="urgency"
+                                label="Dispatch Urgency"
+                                options={URGENCY_OPTIONS}
+                                placeholder="Select Urgency"
+                            />
+
+                            <div className="">
+                                <FileUploader
+                                    context="lead-followups"
+                                    value={attachmentPaths}
+                                    onChange={setAttachmentPaths}
+                                    label="Soft Copy of Documents"
+                                    disabled={saving}
+                                />
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <div className="w-64">
                     <FieldWrapper<LetterFormValues, "nextFollowupDate"> control={form.control} name="nextFollowupDate" label="Next Follow-up Date">
                         {(field) => (
                             <input
@@ -153,16 +303,6 @@ function LetterCreateForm({ source }: { source: FollowupSource }) {
                             />
                         )}
                     </FieldWrapper>
-
-                    <div className="">
-                        <FileUploader
-                            context="lead-followups"
-                            value={attachmentPaths}
-                            onChange={setAttachmentPaths}
-                            label="Soft Copy of Documents"
-                            disabled={saving}
-                        />
-                    </div>
                 </div>
 
                 <div className="flex justify-end pt-2">

@@ -82,15 +82,16 @@ export interface VisitFollowupRequest {
 
 export interface LetterFollowupRequest {
     type: 'letter';
-    toOrg: string;
-    toName: string;
-    toAddr: string;
-    toPin: string;
-    toMobile: string;
-    empFrom: number;
-    delDate: string;
-    urgency: number;
-    attachments: string[];
+    courierId?: number;
+    toOrg?: string;
+    toName?: string;
+    toAddr?: string;
+    toPin?: string;
+    toMobile?: string;
+    empFrom?: number;
+    delDate?: string;
+    urgency?: number;
+    attachments?: string[];
     nextFollowupDate?: string | null;
 }
 

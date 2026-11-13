@@ -2,6 +2,7 @@ import { paths } from '@/app/routes/paths';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { MultiSelectField } from '@/components/form/MultiSelectField';
 import { SelectField } from '@/components/form/SelectField';
+import { AsyncSelectField } from '@/components/form/AsyncSelectField';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,7 +20,7 @@ import { useNavigate } from 'react-router-dom';
 // Import from helpers
 import { Label } from '@/components/ui/label';
 import { useUsers } from '@/hooks/api/useUsers';
-import { useCreateCourier, useCourierOptions } from '@/hooks/api/useCourier';
+import { useCreateCourier, useCourierSelectOptions } from '@/hooks/api/useCourier';
 import { FileUploader } from '@/components/file-upload';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -85,7 +86,12 @@ export function PhysicalDocsForm({ tenderId, mode, existingData }: PhysicalDocsF
     });
 
     const isSubmitting = createMutation.isPending || updateMutation.isPending || createCourierMutation.isPending;
-    const courierOptions = useCourierOptions();
+    const selectedCourierId = form.watch('courierNo');
+    const {
+        options: courierOptions,
+        onSearch: onCourierSearch,
+        isLoading: isCourierLoading,
+    } = useCourierSelectOptions(selectedCourierId ? String(selectedCourierId) : undefined);
     const watchIsCourierRequested = form.watch('isCourierRequested');
 
     const handleAddPerson = () => {
@@ -190,12 +196,15 @@ export function PhysicalDocsForm({ tenderId, mode, existingData }: PhysicalDocsF
 
                             {watchIsCourierRequested === 'yes' ? (
                                 <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
-                                    <SelectField
+                                    <AsyncSelectField
                                         control={form.control}
                                         name="courierNo"
                                         label="Select Courier"
                                         options={courierOptions}
                                         placeholder="Select an existing courier"
+                                        valueType="number"
+                                        onSearch={onCourierSearch}
+                                        isLoading={isCourierLoading}
                                     />
                                     <MultiSelectField
                                         control={form.control}
