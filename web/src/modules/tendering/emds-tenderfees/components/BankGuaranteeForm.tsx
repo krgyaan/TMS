@@ -312,7 +312,7 @@ export function BankGuaranteeForm({ amount, prefix = 'emd.details', readOnly = f
                 <FieldWrapper control={control} name={`${prefix}.bgBankAccountNo`} label="Bank Account Number">
                     {(field) => <Input {...field} placeholder="e.g., 1234567890" />}
                 </FieldWrapper>
-                <FieldWrapper control={control} name={`${prefix}.bgBankIfsc`} label="Bank IFSC Code">
+                <FieldWrapper control={control} name={`${prefix}.bgBankIfsc`} label="Bank IFSC Code *">
                     {(field) => <Input {...field} placeholder="e.g., SBIN0001234" />}
                 </FieldWrapper>
             </div>

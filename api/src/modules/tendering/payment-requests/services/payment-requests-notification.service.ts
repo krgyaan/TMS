@@ -14,6 +14,10 @@ import { ConfigService } from '@nestjs/config';
 import { differenceInDays } from 'date-fns';
 import { and, eq, gte, isNull, lt, ne, notInArray } from 'drizzle-orm';
 
+/** Blank bank/beneficiary values are shown as "Not Provided" in the BG mail. */
+const orNotProvided = (value: string | null | undefined): string =>
+    value && value.trim().length > 0 ? value.trim() : 'Not Provided';
+
 @Injectable()
 export class PaymentRequestsNotificationService {
     private readonly logger;
@@ -90,7 +94,7 @@ export class PaymentRequestsNotificationService {
         return result?.userId ?? null;
     }
 
-    private formatDateDDMMYYYY = (dateStr: string | null | undefined): string => {
+    private formatDateDDMMYYYY = (dateStr: string | Date | null | undefined): string => {
         if (!dateStr) return '';
         try {
             const d = new Date(dateStr);
@@ -99,22 +103,52 @@ export class PaymentRequestsNotificationService {
             const year = d.getFullYear();
             return `${day}-${month}-${year}`;
         } catch {
-            return dateStr;
+            return String(dateStr);
         }
+    };
+
+    
+    private resolveBgDueDate(
+        paymentReq: { type?: string | null; dueDate?: Date | string | null; createdAt?: Date | string | null },
+        bgDetails: { bgNeeds?: string | null } | null | undefined,
+        instrument: { courierAddressJson?: unknown } | null | undefined,
+    ): Date | null {
+        const requestDueDate = paymentReq.dueDate ? new Date(paymentReq.dueDate) : null;
+
+        // The EMD form goes through the TMS path; the two dashboard forms send
+        // type 'Other Than Tender'.
+        if ((paymentReq.type || '') !== 'Other Than Tender') {
+            return requestDueDate && !Number.isNaN(requestDueDate.getTime()) ? requestDueDate : null;
+        }
+
+        const hours = Number(bgDetails?.bgNeeds) || 0;
+        const createdAt = paymentReq.createdAt ? new Date(paymentReq.createdAt) : null;
+
+        const fromNeededIn =
+            hours > 0 && createdAt && !Number.isNaN(createdAt.getTime())
+                ? new Date(createdAt.getTime() + hours * 60 * 60 * 1000 + 2 * 24 * 60 * 60 * 1000)
+                : null;
+
+        const courierAddress = (instrument?.courierAddressJson ?? null) as Record<string, any> | null;
+        const rawCourierDate = courierAddress?.delDate;
+        const courierDelivery = rawCourierDate ? new Date(rawCourierDate) : null;
+
+        const candidates = [fromNeededIn, courierDelivery].filter(
+            (d): d is Date => !!d && !Number.isNaN(d.getTime()),
+        );
+
+        if (candidates.length > 0) {
+            return candidates.reduce((latest, current) => (current > latest ? current : latest));
+        }
+
+        return requestDueDate && !Number.isNaN(requestDueDate.getTime()) ? requestDueDate : null;
     };
 
     private formatCurrency = (amount: number) => {
         return `₹${amount.toLocaleString('en-IN')}`;
     };
 
-    /**
-     * Normalize a DB file-path value into a list of plain attachment paths.
-     * Multi-file upload fields are persisted either as a JSON array string
-     * (e.g. '["bi-dashboard/.../a.pdf","bi-dashboard/.../b.pdf"]') or as a
-     * single plain path, depending on how the frontend submitted them. Passing
-     * the raw JSON string to EmailService would make attachment resolution
-     * throw ("Unknown file context: [\"bi-dashboard"), killing the whole email.
-     */
+    
     private toAttachmentPaths = (value: string | null | undefined): string[] => {
         if (!value || typeof value !== 'string' || value.trim().length === 0) {
             return [];
@@ -986,6 +1020,9 @@ export class PaymentRequestsNotificationService {
                         requestedBy: paymentRequests.requestedBy,
                         tenderId: paymentRequests.tenderId,
                         purpose: paymentRequests.purpose,
+                        type: paymentRequests.type,
+                        dueDate: paymentRequests.dueDate,
+                        createdAt: paymentRequests.createdAt,
                     })
                     .from(paymentRequests)
                     .where(eq(paymentRequests.id, instrument.requestId))
@@ -995,6 +1032,11 @@ export class PaymentRequestsNotificationService {
                     this.logger.warn(`RequestedBy not found for BG instrument ${instrumentId}`);
                     return;
                 }
+
+                const bgDueDate = this.resolveBgDueDate(paymentReq, bgDetails, instrument);
+                const dueDateTime = bgDueDate
+                    ? `${this.formatDateDDMMYYYY(bgDueDate)} 18:00`
+                    : 'the due date';
 
                 // Get tender team ID
                 let tenderTeamId = 1;
@@ -1119,9 +1161,15 @@ export class PaymentRequestsNotificationService {
                             claimDate: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',
                             amount: instrument.amount ? Number(instrument.amount).toLocaleString('en-IN') : '',
                             stampPaperValue: bgDetails?.stampCharges || 300,
-                            timeLimit: instrument.courierDeadline || 24,
-                            actionLink: `${this.getFrontendUrl()}/bi-dashboard/bank-guarantee/action/${instrumentId}`,
-                            actionLinkText: 'Accounts Form (BG) Stage 2: After BG Creation',
+                            timeLimit: Number(bgDetails?.bgNeeds) || instrument.courierDeadline || 24,
+                            dueDateTime,
+                            beneName: orNotProvided(bgDetails?.bgBankAccName),
+                            beneAcc: orNotProvided(bgDetails?.bgBankAcc),
+                            beneIfsc: orNotProvided(bgDetails?.bgBankIfsc),
+                            uniqueCode: orNotProvided(bgDetails?.uniqueCode),
+                            stage1Link: `${this.getFrontendUrl()}/bi-dashboard/bank-guarantee/action/${instrumentId}?section=accounts-form-1`,
+                            actionLink: `${this.getFrontendUrl()}/bi-dashboard/bank-guarantee/action/${instrumentId}?section=accounts-form-2`,
+                            actionLinkText: 'Stage 2: After BG Creation',
                             courierAddress: instrument.courierAddress || '',
                         },
                         to: toEmails,

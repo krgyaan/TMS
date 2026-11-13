@@ -431,6 +431,13 @@ export const BankGuaranteeSchema = z.object({
             path: ['bgAddress'],
         });
     }
+    if (!data.bgBankIfsc || (typeof data.bgBankIfsc === 'string' && data.bgBankIfsc.trim() === '')) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Bank IFSC Code is required',
+            path: ['bgBankIfsc'],
+        });
+    }
     if (!data.bgExpiryDate || (typeof data.bgExpiryDate === 'string' && data.bgExpiryDate.trim() === '')) {
         ctx.addIssue({
             code: 'custom',

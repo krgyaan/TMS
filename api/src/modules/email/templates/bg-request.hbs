@@ -4,7 +4,7 @@
     </h2>
 
     <p style="font-size: 14px; line-height: 1.6; color: #555;">
-        Dear {{data.recipientName}} (Accounts Team),
+        Dear {{data.recipientName}} (Accounts team),
     </p>
 
     <p style="font-size: 14px; line-height: 1.6; color: #555;">
@@ -15,6 +15,10 @@
         The purpose of the Bank Guarantee is {{data.bgPurpose}}.
     </p>
 
+    <p style="font-size: 14px; line-height: 1.6; color: #555;">
+        Please prepare the BG using the details below:
+    </p>
+
     <div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 4px;">
         <p style="margin: 8px 0; font-size: 14px;"><strong>BG in favour of:</strong> {{data.beneficiaryName}}</p>
         <p style="margin: 8px 0; font-size: 14px;"><strong>BG address:</strong> {{data.beneficiaryAddress}}</p>
@@ -22,6 +26,16 @@
         <p style="margin: 8px 0; font-size: 14px;"><strong>BG Claim Date:</strong> {{data.claimDate}}</p>
         <p style="margin: 8px 0; font-size: 14px;"><strong>Amount:</strong> Rs. {{data.amount}}</p>
         <p style="margin: 8px 0; font-size: 14px;"><strong>BG Stamp paper value:</strong> Rs. {{data.stampPaperValue}}</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>BG Format (Tender executive):</strong> attached.</p>
+        <p style="margin: 8px 0; font-size: 14px;"><strong>PO copy/request letter from beneficiary:</strong> attached.</p>
+    </div>
+
+    <div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 4px;">
+        <p style="margin: 8px 0; font-size: 14px;"><strong>Beneficiary Account details:</strong></p>
+        <p style="margin: 8px 0; font-size: 14px;">Beneficiary Name: {{data.beneName}}</p>
+        <p style="margin: 8px 0; font-size: 14px;">Account No.: {{data.beneAcc}}</p>
+        <p style="margin: 8px 0; font-size: 14px;">IFSC code: {{data.beneIfsc}}</p>
+        <p style="margin: 8px 0; font-size: 14px;">Unique Code: {{data.uniqueCode}}</p>
     </div>
 
     <p style="font-size: 14px; line-height: 1.6; color: #555; margin: 20px 0;">
@@ -30,18 +44,21 @@
 
     <div style="margin: 20px 0; padding: 15px; background: #e8f4fd; border-radius: 4px; border-left: 4px solid #2c3e50;">
         <p style="margin: 8px 0; font-size: 14px;">
-            Please courier the BG to the address below keeping sufficient margin for the courier delivery time to ensure the BG reaches before the due date and time (in case of tender). Share the SOFT COPY of the BG and the Docket slip along with SFMS confirmation with us on time using the link below or your dashboard:
+            Please review the BG format, if accepted, send a request to the bank using the
+            <a href="{{data.stage1Link}}" style="color: #0066cc; text-decoration: underline;">Stage 1: Request to Bank</a>.
+            If Corrections are required, reject the request and mention the corrections needed.
         </p>
-        <p style="margin: 10px 0; font-size: 13px;">
-            <a href="{{data.actionLink}}" style="color: #0066cc; text-decoration: underline;">
-                {{data.actionLinkText}}
-            </a>
+        <p style="margin: 8px 0; font-size: 14px;">
+            Please courier the BG to the address below keeping sufficient margin for the courier delivery time to ensure the BG reaches before the
+            <strong>{{data.dueDateTime}}</strong> and share the SOFT COPY of the BG and the Docket slip along with SFMS confirmation with us on time using the form
+            <a href="{{data.actionLink}}" style="color: #0066cc; text-decoration: underline;">{{data.actionLinkText}}</a>
+            or your dashboard:
         </p>
         <p style="margin: 8px 0; font-size: 14px;"><strong>Courier Address:</strong> {{data.courierAddress}}</p>
     </div>
 
     <p style="font-size: 12px; color: #666; margin: 20px 0;">
-        Please attach the cover letter with the bank guarantee and courier the BG. (Attached below) (Pending)
+        Please attach the cover letter with the bank guarantee when you courier the BG. (Attached below)
     </p>
 
     <p style="font-size: 12px; color: #666; font-style: italic; margin: 20px 0;">
@@ -50,6 +67,7 @@
 
     <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #888;">
         <p>Regards,</p>
-        <p>Tender Executive, Approved by Team Leader</p>
+        <p>Tender executive,</p>
+        <p>Approved by Team Leader</p>
     </div>
 </div>
