@@ -27,6 +27,7 @@ type ItemInput = {
     isActive: boolean;
 };
 type ItemMasterResponse = InventoryItem & { createdByName: string };
+type ItemCodeQueryDb = Pick<DbInstance, "select" | "execute">;
 
 @Injectable()
 export class InventoryItemsService {
@@ -94,9 +95,13 @@ export class InventoryItemsService {
         if (catalogItem?.codeTemplate && !generatedCode) {
             throw new BadRequestException("Select all code-forming options to generate the item code");
         }
+        const conversion = this.resolveItemConversion(itemData.unit, itemData.conversionUnit, itemData.conversionFactor, itemData.specifications || {});
+        if (catalogItem?.codePrefix) {
+            const insertedId = await this.createPrefixedItem(itemData, catalogItem.codePrefix, conversion, authenticatedUserId);
+            return this.findById(insertedId);
+        }
         const itemCode = generatedCode || await this.nextItemCode();
         await this.ensureUnique(itemData, itemCode);
-        const conversion = this.resolveItemConversion(itemData.unit, itemData.conversionUnit, itemData.conversionFactor, itemData.specifications || {});
         let inserted: { id: number } | undefined;
         try {
             [inserted] = await this.db.insert(inventoryItems).values({
@@ -199,9 +204,61 @@ export class InventoryItemsService {
         }
     }
 
-    private async ensureUnique(data: Pick<ItemInput, "itemName" | "unit" | "makeBrand">, itemCode: string, excludeId?: number) {
+    private async createPrefixedItem(
+        itemData: ItemInput,
+        prefix: string,
+        conversion: ReturnType<typeof resolveConversion>,
+        authenticatedUserId: number,
+    ): Promise<number> {
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                return await this.db.transaction(async tx => {
+                    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`inventory-item-code:${prefix}`})::bigint)`);
+                    const itemCode = await this.nextPrefixedItemCode(tx, prefix);
+                    await this.ensureUnique(itemData, itemCode, undefined, tx);
+                    const [inserted] = await tx.insert(inventoryItems).values({
+                        ...itemData,
+                        itemGroup: itemData.itemGroup ?? null,
+                        teamId: null,
+                        category: itemData.category,
+                        makeBrand: itemData.makeBrand?.trim() || null,
+                        itemType: itemData.itemType?.trim() || null,
+                        description: itemData.description?.trim() || null,
+                        ...conversion,
+                        createdBy: authenticatedUserId,
+                        updatedBy: authenticatedUserId,
+                        itemCode,
+                    }).returning({ id: inventoryItems.id });
+                    if (!inserted) throw new Error("Unable to create inventory item");
+                    return inserted.id;
+                });
+            } catch (error) {
+                if (!this.isUniqueViolation(error)) throw error;
+            }
+        }
+        throw new ConflictException(`Unable to allocate a unique ${prefix} item code after retries`);
+    }
+
+    private async nextPrefixedItemCode(db: Pick<DbInstance, "execute">, prefix: string): Promise<string> {
+        const { rows } = await db.execute<{ current: number }>(sql`
+            SELECT COALESCE(MAX(substring(item_code FROM ${prefix.length + 2})::integer), 0)::integer AS current
+              FROM inventory_items
+             WHERE item_code ~ ${`^${prefix}-[0-9]{3}$`}
+        `);
+        const nextValue = Number(rows[0]?.current || 0) + 1;
+        if (nextValue > 999) throw new ConflictException(`The ${prefix} item code sequence is exhausted`);
+        return `${prefix}-${String(nextValue).padStart(3, "0")}`;
+    }
+
+    private async ensureUnique(
+        data: Pick<ItemInput, "itemName" | "unit" | "makeBrand">,
+        itemCode: string,
+        excludeId?: number,
+        db: ItemCodeQueryDb = this.db,
+    ) {
         let candidates: { id: number; itemCode: string }[];
-        if (itemCode.startsWith("ITM-")) {
+        const usesBusinessKey = itemCode.startsWith("ITM-") || /^[A-Z]+-\d{3}$/.test(itemCode);
+        if (usesBusinessKey) {
             const normalizedName = data.itemName.trim().toLowerCase();
             const normalizedBrand = (data.makeBrand || "").trim().toLowerCase();
             const filters: SQL[] = [
@@ -211,17 +268,17 @@ export class InventoryItemsService {
                 eq(inventoryItems.unit, data.unit),
             ];
             if (excludeId !== undefined) filters.push(ne(inventoryItems.id, excludeId));
-            candidates = await this.db.select({ id: inventoryItems.id, itemCode: inventoryItems.itemCode })
+            candidates = await db.select({ id: inventoryItems.id, itemCode: inventoryItems.itemCode })
                 .from(inventoryItems).where(and(...filters));
         } else {
             const filters: SQL[] = [eq(inventoryItems.itemCode, itemCode)];
             if (excludeId !== undefined) filters.push(ne(inventoryItems.id, excludeId));
-            candidates = await this.db.select({ id: inventoryItems.id, itemCode: inventoryItems.itemCode })
+            candidates = await db.select({ id: inventoryItems.id, itemCode: inventoryItems.itemCode })
                 .from(inventoryItems).where(and(...filters)).limit(1);
         }
         const duplicate = candidates[0];
         if (duplicate) {
-            if (itemCode.startsWith("ITM-")) {
+            if (usesBusinessKey) {
                 throw new ConflictException(`An item with the same name, make/brand and unit already exists (code ${duplicate.itemCode})`);
             }
             throw new ConflictException(`Item code ${duplicate.itemCode} already exists`);

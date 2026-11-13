@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useInventoryItem, type ItemMasterTeam } from "@/hooks/api/useInventoryItems";
 import { paths } from "@/app/routes/paths";
 import type { InventoryItem } from "@/types/inventory-item.types";
-import { getCategory } from "./item-config";
+import { findCatalogItem } from "./item-catalog.ts";
 
 const formatDate = (value?: string | null) => value ? new Date(value).toLocaleString("en-IN") : "—";
 const formatFactor = (value?: string | null) => {
@@ -43,7 +43,8 @@ export default function InventoryItemDetailPage({ team }: { team: Exclude<ItemMa
 }
 
 function ItemDetails({ item }: { item: InventoryItem }) {
-    const specificationLabels = new Map((getCategory(item.itemName)?.fields || []).map(field => [field.key, field.label]));
+    const category = item.category || "Legacy";
+    const specificationLabels = new Map((findCatalogItem(category, item.itemName)?.fields || []).map(field => [field.key, field.label]));
     const conversion = item.conversionUnit
         ? `1 ${item.unit} = ${formatFactor(item.conversionFactor)} ${item.conversionUnit}`
         : "No conversion";
@@ -53,9 +54,11 @@ function ItemDetails({ item }: { item: InventoryItem }) {
             <section className="space-y-3"><h2 className="font-semibold">Item information</h2><dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <DetailField label="Record ID">{item.id}</DetailField>
                 <DetailField label="Item code">{item.itemCode}</DetailField>
+                <DetailField label="Category">{category}</DetailField>
                 <DetailField label="Item group">{item.itemGroup}</DetailField>
                 <DetailField label="Item name">{item.itemName}</DetailField>
                 <DetailField label="Type">{item.itemType}</DetailField>
+                <DetailField label="Make/Brand">{item.makeBrand}</DetailField>
                 <DetailField label="HSN code">{item.hsnCode}</DetailField>
                 <DetailField label="Status"><Badge variant={item.isActive ? "default" : "secondary"}>{item.isActive ? "Active" : "Inactive"}</Badge></DetailField>
             </dl></section>
@@ -74,6 +77,8 @@ function ItemDetails({ item }: { item: InventoryItem }) {
                 <DetailField label="Created">{formatDate(item.createdAt)}</DetailField>
                 <DetailField label="Updated">{formatDate(item.updatedAt)}</DetailField>
                 <DetailField label="Deleted">{formatDate(item.deletedAt)}</DetailField>
+                <DetailField label="Created by">{item.createdByName}</DetailField>
+                <DetailField label="Updated by">{item.updatedByName}</DetailField>
             </dl></section>
         </CardContent>
     </Card>;

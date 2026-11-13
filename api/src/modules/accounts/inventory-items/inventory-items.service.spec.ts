@@ -80,7 +80,7 @@ describe("Item Master catalog codes and validation", () => {
     });
 
     it("uses no catalog template for every non-sheet item", () => {
-        expect(generateTemplatedItemCode("Battery Accessories", "ICC", { diameter: "M10" })).toBeUndefined();
+        expect(generateTemplatedItemCode("Battery Accessories", "ICC", { diameter: "M10", material: "Insulated", coating: "Nickel-Coated" })).toBe("ICC/M10/INS/NI");
         expect(generateTemplatedItemCode("Legacy", "Copper", { diameter: "12" })).toBeUndefined();
     });
 
@@ -147,7 +147,7 @@ describe("Item Master create, update, and audit behavior", () => {
         await service.create(itemSchema.parse(payload({
             category: "Battery Maintenance and Safety Equipment", itemName: "Eye Wash Bottle", specifications: {},
         })), 7);
-        expect(inserted()).toMatchObject({ itemCode: "ITM-0007", category: "Battery Maintenance and Safety Equipment" });
+        expect(inserted()).toMatchObject({ itemCode: "EWB-001", category: "Battery Maintenance and Safety Equipment" });
     });
 
     it("uses the existing sequence code for a Legacy item", async () => {

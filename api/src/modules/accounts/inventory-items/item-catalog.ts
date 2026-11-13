@@ -17,6 +17,7 @@ export type CatalogItem = {
     name: string;
     fields: CatalogField[];
     codeTemplate?: string;
+    codePrefix?: string;
     defaultUnit?: string;
     legacyTypes?: string[];
 };
@@ -25,7 +26,16 @@ export type CatalogCategory = { name: string; items: CatalogItem[] };
 const options = (...values: string[]): CatalogOption[] => values.map(value => ({ value }));
 const field = (key: string, label: string, kind: CatalogField["kind"], extra: Partial<CatalogField> = {}): CatalogField => ({ key, label, kind, ...extra });
 const legacy = (name: string, fields: CatalogField[], legacyTypes?: string[]): CatalogItem => ({ name, fields, legacyTypes });
-const noAttributes = (...names: string[]): CatalogItem[] => names.map(name => ({ name, fields: [] }));
+const sequencePrefixes: Record<string, string> = {
+    Thermometer: "THM", "Thermometer Stand": "THMS", "Temperature Gun": "TGUN", Hydrometer: "HYD",
+    "Hydrometer Stand": "HYDS", "Earth Fault Locator": "EFL", "Impedance Tester": "IMPT",
+    "Eye Wash Bottle": "EWB", "Eye Wash Station": "EWS", "Boric Acid": "BORIC", "Petroleum Jelly": "PJELLY",
+    "Safety Goggles": "GOG", "Safety Gloves": "GLV", "Safety Apron": "APR", "Rubber Boots": "RBT",
+    "Stand Insulator": "SINS", "Strout Bristles": "STB", "PP Sheet": "PPS", Glands: "GLD",
+    "Torque Wrench": "TW", "SPV (Solar Photovoltaic)": "SPV", "PCU (Power Conditioning Unit)": "PCU",
+    Structure: "STR", "ACDB (AC Distribution Box)": "ACDB", "DCDB (DC Distribution Box)": "DCDB",
+};
+const noAttributes = (...names: string[]): CatalogItem[] => names.map(name => ({ name, fields: [], codePrefix: sequencePrefixes[name] }));
 
 export const ITEM_CATALOG: CatalogCategory[] = [
     {
@@ -50,23 +60,23 @@ export const ITEM_CATALOG: CatalogCategory[] = [
     {
         name: "Battery Accessories",
         items: [
-            { name: "ICC", fields: [field("diameter", "Diameter", "select", { required: true, options: options("M10", "M20") }), field("material", "Material", "select", { required: true, options: [{ value: "Insulated", codeToken: "INS" }, { value: "Non-Insulated", codeToken: "NINS" }] }), field("coating", "Coating", "select", { required: true, options: [{ value: "Nickel-Coated", codeToken: "NI" }, { value: "Tin-Coated", codeToken: "TIN" }] })] },
-            { name: "IPP", fields: [field("numberOfHoles", "Number of Holes", "select", { required: true, options: options("1", "2", "3", "4", "5", "6") }), field("diameter", "Diameter", "select", { required: true, options: options("M10", "M20") }), field("material", "Material", "select", { required: true, options: [{ value: "Insulated", codeToken: "INS" }, { value: "Non-Insulated", codeToken: "NINS" }] }), field("coating", "Coating", "select", { required: true, options: [{ value: "Nickel-Coated", codeToken: "NI" }, { value: "Tin-Coated", codeToken: "TIN" }] })] },
-            { name: "Vent Plug", fields: [field("diameter", "Diameter", "select", { required: true, options: options("M10", "M20") }), field("type", "Type", "select", { required: true, listColumn: "type", options: [{ value: "Flip-Flop", codeToken: "FF" }, { value: "Vented", codeToken: "VENT" }] })] },
-            { name: "Electrolyte", fields: [field("typeMaterial", "Type/Material", "select", { required: true, listColumn: "type", options: [{ value: "H2SO4 (Sulphuric Acid)", codeToken: "H2SO4" }, { value: "KOH (Potassium Hydroxide)", codeToken: "KOH" }, { value: "DM Water", codeToken: "DMW" }] })] },
-            { name: "Shrouds", fields: [field("type", "Type", "select", { required: true, listColumn: "type", options: options("Linear", "Horizontal") }), field("numberOfPoles", "Number of Poles", "number", { required: true, min: 1, max: 6, integer: true })] },
-            { name: "Cell Lifter", fields: [field("type", "Type", "select", { required: true, listColumn: "type", options: options("Normal", "Insulated") })] },
-            { name: "Battery Stand", fields: [field("material", "Material", "select", { required: true, options: options("MS", "FR") }), field("configuration", "Configuration", "select", { required: true, options: options("Step", "Tier") }), field("colourCode", "Colour Code", "text")] },
-            { name: "Battery Terminal Box", fields: [field("numberOfPoles", "Number of Poles", "number", { required: true, min: 1, max: 6, integer: true }), field("lugSize", "Lug Size", "select", { required: true, options: options("M10", "M20") })] },
-            { name: "Glands", fields: [field("specifications", "Specifications", "text")] },
+            { name: "ICC", codeTemplate: "ICC/{diameter}/{material}/{coating}", fields: [field("diameter", "Diameter", "select", { required: true, options: options("M10", "M20") }), field("material", "Material", "select", { required: true, options: [{ value: "Insulated", codeToken: "INS" }, { value: "Non-Insulated", codeToken: "NINS" }] }), field("coating", "Coating", "select", { required: true, options: [{ value: "Nickel-Coated", codeToken: "NI" }, { value: "Tin-Coated", codeToken: "TIN" }] })] },
+            { name: "IPP", codeTemplate: "IPP/{numberOfHoles}H/{diameter}/{material}/{coating}", fields: [field("numberOfHoles", "Number of Holes", "select", { required: true, options: options("1", "2", "3", "4", "5", "6") }), field("diameter", "Diameter", "select", { required: true, options: options("M10", "M20") }), field("material", "Material", "select", { required: true, options: [{ value: "Insulated", codeToken: "INS" }, { value: "Non-Insulated", codeToken: "NINS" }] }), field("coating", "Coating", "select", { required: true, options: [{ value: "Nickel-Coated", codeToken: "NI" }, { value: "Tin-Coated", codeToken: "TIN" }] })] },
+            { name: "Vent Plug", codeTemplate: "VENT/{diameter}/{type}", fields: [field("diameter", "Diameter", "select", { required: true, options: options("M10", "M20") }), field("type", "Type", "select", { required: true, listColumn: "type", options: [{ value: "Flip-Flop", codeToken: "FF" }, { value: "Vented", codeToken: "VENT" }] })] },
+            { name: "Electrolyte", codeTemplate: "ELY/{typeMaterial}", fields: [field("typeMaterial", "Type/Material", "select", { required: true, listColumn: "type", options: [{ value: "H2SO4 (Sulphuric Acid)", codeToken: "H2SO4" }, { value: "KOH (Potassium Hydroxide)", codeToken: "KOH" }, { value: "DM Water", codeToken: "DMW" }] })] },
+            { name: "Shrouds", codeTemplate: "SHR/{type}/{numberOfPoles}P", fields: [field("type", "Type", "select", { required: true, listColumn: "type", options: [{ value: "Linear" }, { value: "Horizontal", codeToken: "HOR" }] }), field("numberOfPoles", "Number of Poles", "number", { required: true, min: 1, max: 6, integer: true })] },
+            { name: "Cell Lifter", codeTemplate: "CL/{type}", fields: [field("type", "Type", "select", { required: true, listColumn: "type", options: [{ value: "Normal", codeToken: "NORM" }, { value: "Insulated", codeToken: "INS" }] })] },
+            { name: "Battery Stand", codeTemplate: "BST/{material}/{configuration}", fields: [field("material", "Material", "select", { required: true, options: options("MS", "FR") }), field("configuration", "Configuration", "select", { required: true, options: options("Step", "Tier") }), field("colourCode", "Colour Code", "text")] },
+            { name: "Battery Terminal Box", codeTemplate: "TB/{numberOfPoles}P/{lugSize}", fields: [field("numberOfPoles", "Number of Poles", "number", { required: true, min: 1, max: 6, integer: true }), field("lugSize", "Lug Size", "select", { required: true, options: options("M10", "M20") })] },
+            { name: "Glands", codePrefix: "GLD", fields: [field("specifications", "Specifications", "text")] },
         ],
     },
     {
         name: "Testing and Measuring Instruments",
         items: [
-            { name: "Multimeter", fields: [field("measurementType", "Measurement Type", "select", { required: true, listColumn: "type", options: [{ value: "AC" }, { value: "DC" }, { value: "AC-DC", codeToken: "ACDC" }] }), field("voltageRange", "Voltage Range", "number", { required: true, min: 1, max: 2000, suffix: "V" }), field("currentRange", "Current Range", "number", { required: true, min: 1, max: 2000, suffix: "A" })] },
-            { name: "Clamp Meter", fields: [field("measurementType", "Measurement Type", "select", { required: true, listColumn: "type", options: [{ value: "AC" }, { value: "DC" }, { value: "AC-DC", codeToken: "ACDC" }] }), field("voltageRange", "Voltage Range", "number", { required: true, min: 1, max: 2000, suffix: "V" }), field("currentRange", "Current Range", "number", { required: true, min: 1, max: 2000, suffix: "A" })] },
-            { name: "Torque Wrench", fields: [field("torqueRange", "Torque Range (Nm)", "text", { required: true, suffix: "Nm" })] },
+            { name: "Multimeter", codeTemplate: "MM/{measurementType}/{voltageRange}V/{currentRange}A", fields: [field("measurementType", "Measurement Type", "select", { required: true, listColumn: "type", options: [{ value: "AC" }, { value: "DC" }, { value: "AC-DC", codeToken: "ACDC" }] }), field("voltageRange", "Voltage Range", "number", { required: true, min: 1, max: 2000, suffix: "V" }), field("currentRange", "Current Range", "number", { required: true, min: 1, max: 2000, suffix: "A" })] },
+            { name: "Clamp Meter", codeTemplate: "CM/{measurementType}/{voltageRange}V/{currentRange}A", fields: [field("measurementType", "Measurement Type", "select", { required: true, listColumn: "type", options: [{ value: "AC" }, { value: "DC" }, { value: "AC-DC", codeToken: "ACDC" }] }), field("voltageRange", "Voltage Range", "number", { required: true, min: 1, max: 2000, suffix: "V" }), field("currentRange", "Current Range", "number", { required: true, min: 1, max: 2000, suffix: "A" })] },
+            { name: "Torque Wrench", codePrefix: "TW", fields: [field("torqueRange", "Torque Range (Nm)", "text", { required: true, suffix: "Nm" })] },
             ...noAttributes("Thermometer", "Thermometer Stand", "Temperature Gun", "Hydrometer", "Hydrometer Stand", "Earth Fault Locator", "Impedance Tester"),
         ],
     },
@@ -77,15 +87,15 @@ export const ITEM_CATALOG: CatalogCategory[] = [
     {
         name: "Hardware and Fasteners",
         items: [
-            { name: "PP Sheet", fields: [], defaultUnit: "Sq. Mtr." },
-            { name: "Washer", fields: [field("type", "Type", "select", { required: true, listColumn: "type", options: options("Plain", "Spring", "Belleville") }), field("material", "Material", "select", { required: true, options: options("SS", "GI") }), field("diameter", "Diameter", "select", { required: true, options: options("M10", "M20") })] },
-            { name: "Bolt", fields: [field("material", "Material", "select", { required: true, options: options("SS", "GI") }), field("diameter", "Diameter", "select", { required: true, options: options("M10", "M20") }), field("length", "Length", "number", { required: true, min: 0, minExclusive: true, suffix: "mm" })] },
-            { name: "Nut", fields: [field("material", "Material", "select", { required: true, options: options("SS", "GI") }), field("diameter", "Diameter", "select", { required: true, options: options("M10", "M20") })] },
+            { name: "PP Sheet", fields: [], codePrefix: "PPS", defaultUnit: "Sq. Mtr." },
+            { name: "Washer", codeTemplate: "WSR/{type}/{material}/{diameter}", fields: [field("type", "Type", "select", { required: true, listColumn: "type", options: options("Plain", "Spring", "Belleville") }), field("material", "Material", "select", { required: true, options: options("SS", "GI") }), field("diameter", "Diameter", "select", { required: true, options: options("M10", "M20") })] },
+            { name: "Bolt", codeTemplate: "BLT/{material}/{diameter}/{length}MM", fields: [field("material", "Material", "select", { required: true, options: options("SS", "GI") }), field("diameter", "Diameter", "select", { required: true, options: options("M10", "M20") }), field("length", "Length", "number", { required: true, min: 0, minExclusive: true, suffix: "mm" })] },
+            { name: "Nut", codeTemplate: "NUT/{material}/{diameter}", fields: [field("material", "Material", "select", { required: true, options: options("SS", "GI") }), field("diameter", "Diameter", "select", { required: true, options: options("M10", "M20") })] },
         ],
     },
     {
         name: "Battery Chargers",
-        items: [{ name: "Battery Charger", fields: [
+        items: [{ name: "Battery Charger", codeTemplate: "BC/{chargerType}/{technology}/{regulationType}/{voltage}V/{current}A/{pulse}P/{moduleType}", fields: [
             field("chargerType", "Charger Type", "select", { required: true, listColumn: "type", options: options("FCBC", "FC", "BC", "GC") }),
             field("technology", "Technology", "select", { required: true, options: options("SCR", "IGBT", "SMPS") }),
             field("regulationType", "Regulation Type", "select", { required: true, options: options("CC", "CV") }),
@@ -97,7 +107,7 @@ export const ITEM_CATALOG: CatalogCategory[] = [
     },
     {
         name: "UPS",
-        items: [{ name: "UPS", fields: [
+        items: [{ name: "UPS", codeTemplate: "UPS/{topology}/{outputPowerFactor}/{phaseConfiguration}/{efficiency}/{redundancy}/{monitoring}/{zeroTransferTime}", fields: [
             field("topology", "Topology/Type", "select", { required: true, listColumn: "type", options: [
                 { value: "Offline", codeToken: "OFF", helper: "Switches to battery operation during power failure." },
                 { value: "Line-Interactive", codeToken: "LI", helper: "AVR + Battery Backup." },
@@ -107,10 +117,10 @@ export const ITEM_CATALOG: CatalogCategory[] = [
             ] }),
             field("zeroTransferTime", "Zero Transfer Time", "select", { showWhen: { field: "topology", value: "Online (Double Conversion)" }, options: options("Yes", "No") }),
             field("outputPowerFactor", "Output Power Factor", "select", { required: true, options: options("0.8", "0.9", "1.0") }),
-            field("phaseConfiguration", "Phase Configuration", "select", { required: true, options: options("1/1", "3/1", "3/3") }),
+            field("phaseConfiguration", "Phase Configuration", "select", { required: true, options: [{ value: "1/1", codeToken: "1X1" }, { value: "3/1", codeToken: "3X1" }, { value: "3/3", codeToken: "3X3" }] }),
             field("redundancy", "Redundancy", "select", { options: options("None", "N+1") }),
-            field("efficiency", "Efficiency", "select", { required: true, options: options("90%", "95%", "Eco Mode") }),
-            field("monitoring", "Monitoring", "select", { options: options("None", "SNMP Card") }),
+            field("efficiency", "Efficiency", "select", { required: true, options: [{ value: "90%", codeToken: "90PCT" }, { value: "95%", codeToken: "95PCT" }, { value: "Eco Mode", codeToken: "ECO" }] }),
+            field("monitoring", "Monitoring", "select", { options: [{ value: "None" }, { value: "SNMP Card", codeToken: "SNMP" }] }),
         ] }],
     },
     {
