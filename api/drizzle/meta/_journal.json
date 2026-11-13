@@ -701,6 +701,13 @@
       "when": 1797000000005,
       "tag": "0177_create_other_contacts",
       "breakpoints": true
+    },
+    {
+      "idx": 124,
+      "version": "7",
+      "when": 1797000000006,
+      "tag": "0178_add_unique_code_and_advice_to_instrument_bg_details",
+      "breakpoints": true
     }
   ]
 }

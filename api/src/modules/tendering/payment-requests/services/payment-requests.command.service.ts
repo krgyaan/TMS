@@ -716,6 +716,8 @@ export class PaymentRequestsCommandService {
                     stampCharges: details.bgStampValue || null,
                     bgSoftCopy: details.bgFormatFiles?.[0] || null,
                     bgPo: details.bgPoFiles?.[0] || null,
+                    uniqueCode: details.uniqueCode || null,
+                    uniqueAdviceMessage: details.uniqueAdviceMessage || null,
                 }).execute();
                 break;
 
@@ -1035,6 +1037,8 @@ export class PaymentRequestsCommandService {
                     stampCharges: details.bgStampValue || null,
                     bgSoftCopy: details.bgFormatFiles?.[0] || null,
                     bgPo: details.bgPoFiles?.[0] || null,
+                    uniqueCode: details.uniqueCode || null,
+                    uniqueAdviceMessage: details.uniqueAdviceMessage || null,
                 }).where(eq(instrumentBgDetails.instrumentId, instrumentId));
                 break;
 

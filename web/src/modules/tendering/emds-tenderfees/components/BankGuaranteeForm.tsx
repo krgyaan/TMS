@@ -322,6 +322,15 @@ export function BankGuaranteeForm({ amount, prefix = 'emd.details', readOnly = f
                 {renderEmailField('finance', 'Finance Dept. Email')}
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FieldWrapper control={control} name={`${prefix}.uniqueCode`} label="Unique Code">
+                    {(field) => <Input {...field} placeholder="e.g., BG-XXXXXX" />}
+                </FieldWrapper>
+                <FieldWrapper control={control} name={`${prefix}.uniqueAdviceMessage`} label="Unique Advice Message">
+                    {(field) => <Textarea rows={3} {...field} placeholder="Advice message from the bank" />}
+                </FieldWrapper>
+            </div>
+
             <div className="space-y-3">
                 <div className="flex items-center gap-2 pt-2 border-t">
                     <Truck className="h-4 w-4 text-primary" />
