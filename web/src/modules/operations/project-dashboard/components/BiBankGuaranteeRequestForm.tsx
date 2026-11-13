@@ -401,10 +401,10 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgBankAccountName`} label="Customer Account Name *">
+                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgBankAccountName`} label="Customer Account Name">
                                         {(field) => <Input {...field} placeholder="e.g., Individual or Company Name" />}
                                     </FieldWrapper>
-                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgBankAccountNo`} label="Customer Account Number *">
+                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgBankAccountNo`} label="Customer Account Number">
                                         {(field) => <Input {...field} placeholder="e.g., 1234567890" />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgBankIfsc`} label="Customer IFSC Code *">
@@ -416,6 +416,15 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
                                     {renderEmailField('user', 'User Dept. Email')}
                                     {renderEmailField('cp', 'C&P Dept. Email')}
                                     {renderEmailField('finance', 'Finance Dept. Email')}
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.uniqueCode`} label="Unique Code">
+                                        {(field) => <Input {...field} placeholder="e.g., BG-XXXXXX" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name={`${BG_PREFIX}.uniqueAdviceMessage`} label="Unique Advice Message">
+                                        {(field) => <Textarea rows={3} {...field} placeholder="Advice message from the bank" />}
+                                    </FieldWrapper>
                                 </div>
 
                                 <div className="space-y-3">

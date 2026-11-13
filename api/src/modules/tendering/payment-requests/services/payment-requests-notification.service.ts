@@ -1,18 +1,26 @@
-import { couriers, emailLogs, emdResponsibility, tenderInfos, users } from '@/db/schemas';
+import { couriers, emailLogs, emdResponsibility, projects, tenderInfos, users } from '@/db/schemas';
 import { AppLogger } from '@/logger/app-logger.service';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { PdfGeneratorService } from '@/modules/pdf/pdf-generator.service';
+import { BgDocxService } from './bg-docx.service';
 import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { instrumentBgDetails, instrumentChequeDetails, instrumentFdrDetails, instrumentTransferDetails, paymentInstruments, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
+import { woBasicDetails, woContacts } from '@db/schemas/operations';
+import { tenderClients } from '@db/schemas/tendering/tender-info-sheet.schema';
+import { otherContacts } from '@db/schemas/shared/other-contacts.schema';
 import { BG_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import { getIstDayBounds } from '@/utils/ist-date';
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { differenceInDays } from 'date-fns';
-import { and, eq, gte, isNull, lt, ne, notInArray } from 'drizzle-orm';
+import { and, eq, gte, isNull, lt, ne, notInArray, sql } from 'drizzle-orm';
+
+/** Blank bank/beneficiary values are shown as "Not Provided" in the BG mail. */
+const orNotProvided = (value: string | null | undefined): string =>
+    value && value.trim().length > 0 ? value.trim() : 'Not Provided';
 
 @Injectable()
 export class PaymentRequestsNotificationService {
@@ -24,6 +32,7 @@ export class PaymentRequestsNotificationService {
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
         private readonly pdfGenerator: PdfGeneratorService,
+        private readonly bgDocxService: BgDocxService,
         private readonly configService: ConfigService,
     ) {
         this.logger = this.appLogger.withContext(PaymentRequestsNotificationService.name);
@@ -90,7 +99,7 @@ export class PaymentRequestsNotificationService {
         return result?.userId ?? null;
     }
 
-    private formatDateDDMMYYYY = (dateStr: string | null | undefined): string => {
+    private formatDateDDMMYYYY = (dateStr: string | Date | null | undefined): string => {
         if (!dateStr) return '';
         try {
             const d = new Date(dateStr);
@@ -99,22 +108,306 @@ export class PaymentRequestsNotificationService {
             const year = d.getFullYear();
             return `${day}-${month}-${year}`;
         } catch {
-            return dateStr;
+            return String(dateStr);
         }
+    };
+
+    
+    private resolveBgDueDate(
+        paymentReq: { type?: string | null; dueDate?: Date | string | null; createdAt?: Date | string | null },
+        bgDetails: { bgNeeds?: string | null } | null | undefined,
+        instrument: { courierAddressJson?: unknown } | null | undefined,
+    ): Date | null {
+        const requestDueDate = paymentReq.dueDate ? new Date(paymentReq.dueDate) : null;
+
+        // The EMD form goes through the TMS path; the two dashboard forms send
+        // type 'Other Than Tender'.
+        if ((paymentReq.type || '') !== 'Other Than Tender') {
+            return requestDueDate && !Number.isNaN(requestDueDate.getTime()) ? requestDueDate : null;
+        }
+
+        const hours = Number(bgDetails?.bgNeeds) || 0;
+        const createdAt = paymentReq.createdAt ? new Date(paymentReq.createdAt) : null;
+
+        const fromNeededIn =
+            hours > 0 && createdAt && !Number.isNaN(createdAt.getTime())
+                ? new Date(createdAt.getTime() + hours * 60 * 60 * 1000 + 2 * 24 * 60 * 60 * 1000)
+                : null;
+
+        const courierAddress = (instrument?.courierAddressJson ?? null) as Record<string, any> | null;
+        const rawCourierDate = courierAddress?.delDate;
+        const courierDelivery = rawCourierDate ? new Date(rawCourierDate) : null;
+
+        const candidates = [fromNeededIn, courierDelivery].filter(
+            (d): d is Date => !!d && !Number.isNaN(d.getTime()),
+        );
+
+        if (candidates.length > 0) {
+            return candidates.reduce((latest, current) => (current > latest ? current : latest));
+        }
+
+        return requestDueDate && !Number.isNaN(requestDueDate.getTime()) ? requestDueDate : null;
+    };
+
+    /**
+     * Parses `tender_infos.documents` and returns the main tender document.
+     * Supports the structured shape { schemaVersion, mainTender, atc[], boq, otherDocuments[] }
+     * and the legacy flat-array shape (index 0 = main tender).
+     */
+    private parseTenderMainDoc = (raw: string | null | undefined): string | null => {
+        if (!raw || !raw.trim()) return null;
+
+        const trimmed = raw.trim();
+
+        try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) {
+                const first = parsed.find((p) => typeof p === 'string' && p.trim().length > 0);
+                return typeof first === 'string' ? first.trim() : null;
+            }
+            if (parsed && typeof parsed === 'object') {
+                const main = (parsed as Record<string, any>).mainTender;
+                return typeof main === 'string' && main.trim().length > 0 ? main.trim() : null;
+            }
+        } catch {
+            // Not JSON — treat it as a plain path.
+        }
+
+        return trimmed;
+    };
+
+    /**
+     * Second attachment of the BG creation mail.
+     * Cascade: document uploaded in the BG dashboard form -> project WO draft ->
+     * main tender document. Returns the paths plus the label for the mail line.
+     */
+    private async resolveBgSupportingDocs(
+        paymentReq: { tenderId?: number | null; projectId?: number | null },
+        bgDetails: { bgPo?: string | null } | null | undefined,
+    ): Promise<{ paths: string[]; label: string }> {
+        // 1) Document uploaded from the BG dashboard form.
+        const uploaded = this.toAttachmentPaths(bgDetails?.bgPo);
+        if (uploaded.length > 0) {
+            return { paths: uploaded, label: 'PO copy/request letter from beneficiary' };
+        }
+
+        // 2) Project dashboard: the WO draft document stored on wo_basic_details.
+        if (paymentReq.projectId) {
+            const [project] = await this.db
+                .select({ woBasicDetailId: projects.woBasicDetailId })
+                .from(projects)
+                .where(eq(projects.id, paymentReq.projectId))
+                .limit(1);
+
+            if (project?.woBasicDetailId) {
+                const [woBasic] = await this.db
+                    .select({ woDraft: woBasicDetails.woDraft })
+                    .from(woBasicDetails)
+                    .where(eq(woBasicDetails.id, project.woBasicDetailId))
+                    .limit(1);
+
+                const woDraftPaths = this.toAttachmentPaths(woBasic?.woDraft);
+                if (woDraftPaths.length > 0) {
+                    return { paths: woDraftPaths, label: 'WO draft document (LOA/GEM PO/LOI)' };
+                }
+            }
+        }
+
+        // 3) EMD / tender flow: the main tender document.
+        if (paymentReq.tenderId) {
+            const [tender] = await this.db
+                .select({ documents: tenderInfos.documents })
+                .from(tenderInfos)
+                .where(eq(tenderInfos.id, paymentReq.tenderId))
+                .limit(1);
+
+            const mainDoc = this.parseTenderMainDoc(tender?.documents);
+            if (mainDoc) {
+                return { paths: [mainDoc], label: 'Main tender document' };
+            }
+        }
+
+        return { paths: [], label: '' };
+    };
+
+    /**
+     * Builds the courier address block shown in the BG cover letter.
+     * Prefers the structured JSON saved by the forms, falls back to the
+     * free-text column (EMD flow).
+     */
+    private resolveBgCourierAddress = (
+        instrument: { courierAddressJson?: unknown; courierAddress?: string | null } | null | undefined,
+    ): string => {
+        const json = instrument?.courierAddressJson as Record<string, any> | null | undefined;
+        if (json && typeof json === 'object') {
+            const parts = [
+                json.name,
+                json.phone,
+                [json.line1, json.line2].filter(Boolean).join(', '),
+                [json.city, json.state].filter(Boolean).join(', '),
+                json.pincode ? `- ${json.pincode}` : null,
+            ].filter((part): part is string => typeof part === 'string' && part.trim().length > 0);
+
+            if (parts.length > 0) {
+                return parts.join('\n');
+            }
+        }
+
+        return instrument?.courierAddress?.trim() || 'Not specified';
+    };
+
+    /**
+     * "Tender No./Work Order No." for the cover letter:
+     * tender no. -> project's WO number -> project name.
+     */
+    private resolveBgReferenceNo = async (
+        paymentReq: { tenderNo?: string | null; projectId?: number | null; projectName?: string | null },
+    ): Promise<string> => {
+        const tenderNo = paymentReq.tenderNo?.trim();
+        if (tenderNo && tenderNo.toUpperCase() !== 'NA') {
+            return tenderNo;
+        }
+
+        if (paymentReq.projectId) {
+            try {
+                const [project] = await this.db
+                    .select({ woBasicDetailId: projects.woBasicDetailId })
+                    .from(projects)
+                    .where(eq(projects.id, paymentReq.projectId))
+                    .limit(1);
+
+                if (project?.woBasicDetailId) {
+                    const [woBasic] = await this.db
+                        .select({ woNumber: woBasicDetails.woNumber })
+                        .from(woBasicDetails)
+                        .where(eq(woBasicDetails.id, project.woBasicDetailId))
+                        .limit(1);
+
+                    if (woBasic?.woNumber) {
+                        return woBasic.woNumber;
+                    }
+                }
+            } catch (error) {
+                this.logger.warn(
+                    `Failed to resolve WO number for BG cover letter (project ${paymentReq.projectId}): ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
+        }
+
+        return paymentReq.projectName?.trim() || 'NA';
+    };
+
+    /**
+     * Looks up the client C&P contact (name + designation) by the email saved
+     * in `instrument_bg_details.bg_client_cp`, across the three contact tables.
+     */
+    private resolveBgCoveringLetterCp = async (
+        email: string | null | undefined,
+    ): Promise<{ name: string; designation: string }> => {
+        const fallback = { name: 'C&P', designation: '' };
+        const normalized = email?.trim().toLowerCase();
+        if (!normalized) {
+            return fallback;
+        }
+
+        try {
+            const [wo] = await this.db
+                .select({ name: woContacts.name, designation: woContacts.designation })
+                .from(woContacts)
+                .where(sql`lower(${woContacts.email}) = ${normalized}`)
+                .limit(1);
+            if (wo?.name) {
+                return { name: wo.name, designation: wo.designation || '' };
+            }
+
+            const [tc] = await this.db
+                .select({ name: tenderClients.clientName, designation: tenderClients.clientDesignation })
+                .from(tenderClients)
+                .where(sql`lower(${tenderClients.clientEmail}) = ${normalized}`)
+                .limit(1);
+            if (tc?.name) {
+                return { name: tc.name, designation: tc.designation || '' };
+            }
+
+            const [oc] = await this.db
+                .select({ name: otherContacts.name, designation: otherContacts.designation })
+                .from(otherContacts)
+                .where(sql`lower(${otherContacts.email}) = ${normalized}`)
+                .limit(1);
+            if (oc?.name) {
+                return { name: oc.name, designation: oc.designation || '' };
+            }
+        } catch (error) {
+            this.logger.warn(
+                `Failed to resolve C&P contact for BG cover letter (email ${normalized}): ${error instanceof Error ? error.message : String(error)}`
+            );
+        }
+
+        return fallback;
+    };
+
+    
+    private resolveBgFdAccountNo = (
+        bankName: string | null | undefined,
+        fallback: string,
+    ): string => {
+        const code = (bankName || '').toUpperCase();
+        if (code.includes('8316')) return '2506245699298316';
+        if (code.includes('5190')) return '2506245699295190';
+        return fallback;
+    };
+
+    /**
+     * Data for the prefilled BG application format (the AU Bank form).
+     * Undefined values fall back to the built-in sample; empty strings stay empty
+     * (used by real generation, where missing fields must render blank).
+     */
+    private buildBgPrefilledData = (
+        overrides: Partial<Record<
+            'date' | 'bgAmount' | 'beneficiaryName' | 'beneficiaryAddress' | 'bgExpiryDate' |
+            'claimExpiryDate' | 'accountNo' | 'ifsc' | 'uniqueCode',
+            string
+        >> = {},
+    ): Record<string, any> => {
+        const pick = (value: string | undefined, fallback: string): string =>
+            value === undefined ? fallback : value;
+
+        return {
+            date: pick(overrides.date, this.formatDateDDMMYYYY(new Date())),
+            bgAmount: pick(overrides.bgAmount, '75,636/-'),
+            beneficiaryName: pick(overrides.beneficiaryName, 'NHPC Limited'),
+            beneficiaryAddress: pick(
+                overrides.beneficiaryAddress,
+                'NHPC Office Complex, Sector-33, Faridabad (Haryana) -121003 (India).'
+            ),
+            bgExpiryDate: pick(overrides.bgExpiryDate, '31-01-2028'),
+            claimExpiryDate: pick(overrides.claimExpiryDate, '30-04-2028'),
+            accountNo: pick(overrides.accountNo, '2506245699295190'),
+            ifsc: pick(overrides.ifsc, 'SBIN0003704'),
+            uniqueCode: pick(overrides.uniqueCode, ''),
+        };
+    };
+
+    /**
+     * Formats a mobile number as +91-XXXXXXXXXX for the cover letter signature
+     * blocks. Accepts numbers stored with or without the country code.
+     */
+    private formatPhoneWithCountryCode = (value: string | null | undefined): string => {
+        const raw = (value || '').trim();
+        if (!raw) return '';
+
+        const digits = raw.replace(/\D/g, '');
+        if (!digits) return raw;
+
+        const local = digits.length > 10 ? digits.slice(-10) : digits;
+        return `+91-${local}`;
     };
 
     private formatCurrency = (amount: number) => {
         return `₹${amount.toLocaleString('en-IN')}`;
     };
 
-    /**
-     * Normalize a DB file-path value into a list of plain attachment paths.
-     * Multi-file upload fields are persisted either as a JSON array string
-     * (e.g. '["bi-dashboard/.../a.pdf","bi-dashboard/.../b.pdf"]') or as a
-     * single plain path, depending on how the frontend submitted them. Passing
-     * the raw JSON string to EmailService would make attachment resolution
-     * throw ("Unknown file context: [\"bi-dashboard"), killing the whole email.
-     */
+    
     private toAttachmentPaths = (value: string | null | undefined): string[] => {
         if (!value || typeof value !== 'string' || value.trim().length === 0) {
             return [];
@@ -986,6 +1279,12 @@ export class PaymentRequestsNotificationService {
                         requestedBy: paymentRequests.requestedBy,
                         tenderId: paymentRequests.tenderId,
                         purpose: paymentRequests.purpose,
+                        type: paymentRequests.type,
+                        dueDate: paymentRequests.dueDate,
+                        createdAt: paymentRequests.createdAt,
+                        projectId: paymentRequests.projectId,
+                        tenderNo: paymentRequests.tenderNo,
+                        projectName: paymentRequests.projectName,
                     })
                     .from(paymentRequests)
                     .where(eq(paymentRequests.id, instrument.requestId))
@@ -995,6 +1294,11 @@ export class PaymentRequestsNotificationService {
                     this.logger.warn(`RequestedBy not found for BG instrument ${instrumentId}`);
                     return;
                 }
+
+                const bgDueDate = this.resolveBgDueDate(paymentReq, bgDetails, instrument);
+                const dueDateTime = bgDueDate
+                    ? `${this.formatDateDDMMYYYY(bgDueDate)} 18:00`
+                    : 'the due date';
 
                 // Get tender team ID
                 let tenderTeamId = 1;
@@ -1016,7 +1320,7 @@ export class PaymentRequestsNotificationService {
 
                 // Get TL user
                 const [tlUser] = await this.db
-                    .select({ name: users.name })
+                    .select({ name: users.name, mobile: users.mobile, email: users.email })
                     .from(users)
                     .where(
                         and(
@@ -1026,37 +1330,50 @@ export class PaymentRequestsNotificationService {
                     )
                     .limit(1);
 
+                // Accounts Leader shown in the cover letter signature block.
+                const [accountsLeader] = await this.db
+                    .select({ name: users.name, mobile: users.mobile, email: users.email })
+                    .from(users)
+                    .where(eq(users.email, 'imran@volksenergie.in'))
+                    .limit(1);
+
+                // Client C&P contact (name + designation) resolved by the saved C&P email.
+                const cpContact = await this.resolveBgCoveringLetterCp(bgDetails?.bgClientCp);
+                const referenceNo = await this.resolveBgReferenceNo(paymentReq);
+
                 // Build attachments. A PDF/file failure must never block the
                 // create-request mail — send without the missing attachment instead.
                 const attachmentFiles: string[] = [];
 
                 try {
-                    // Generate covering letter PDF
+                    // Generate covering letter DOCX
                     const coveringLetterData = {
-                        date: new Date().toISOString().split('T')[0],
-                        beneficiaryName: bgDetails?.beneficiaryName || '',
-                        beneficiaryAddress: bgDetails?.beneficiaryAddress || '',
-                        amount: instrument.amount || 0,
+                        date: this.formatDateDDMMYYYY(new Date()),
+                        cpName: cpContact.name,
+                        cpDesignation: cpContact.designation,
+                        courierAddress: this.resolveBgCourierAddress(instrument),
+                        referenceNo,
+                        purpose: bgDetails?.bgPurpose || 'Financial security',
+                        // BG number/date do not exist yet at request creation.
+                        bgNo: '',
+                        bgDate: '',
                         bgExpiryDate: bgDetails?.bgExpiryDate ? this.formatDateDDMMYYYY(bgDetails.bgExpiryDate) : '',
                         claimDate: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',
-                        purpose: bgDetails?.bgPurpose || 'Financial security',
-                        stampPaperValue: bgDetails?.stampCharges || 300,
-                        courierAddress: instrument.courierAddress || '',
-                        bgPurpose: bgDetails?.bgPurpose || '',
-                        actionLink: `${this.getFrontendUrl()}/bi-dashboard/bank-guarantee/action/${instrumentId}`,
-                        actionLinkText: 'Accounts Form (BG) Stage 2: After BG Creation',
-                        recipientName: 'Imran',
+                        amount: instrument.amount ? Number(instrument.amount).toLocaleString('en-IN') : '',
                         teamLeaderName: tlUser?.name || 'Team Leader',
+                        teamLeaderPhone: this.formatPhoneWithCountryCode(tlUser?.mobile),
+                        teamLeaderEmail: tlUser?.email || '',
+                        accountsLeaderName: accountsLeader?.name || 'Accounts Leader',
+                        accountsLeaderPhone: this.formatPhoneWithCountryCode(accountsLeader?.mobile),
+                        accountsLeaderEmail: accountsLeader?.email || 'imran@volksenergie.in',
                     };
 
-                    const coveringLetterPaths = await this.pdfGenerator.generatePdfs(
-                        'bgCoveringLetter',
+                    const coveringLetterPath = await this.bgDocxService.buildCoveringLetter(
                         coveringLetterData,
-                        instrumentId,
-                        'BG'
+                        instrumentId
                     );
-                    if (coveringLetterPaths && coveringLetterPaths.length > 0) {
-                        attachmentFiles.push(coveringLetterPaths[0]);
+                    if (coveringLetterPath) {
+                        attachmentFiles.push(coveringLetterPath);
                     }
                 } catch (error) {
                     this.logger.warn(
@@ -1064,22 +1381,54 @@ export class PaymentRequestsNotificationService {
                     );
                 }
 
+                // Attachment — prefilled BG application format (AU Bank form),
+                // regenerated from the request data. FD No. is intentionally left
+                // blank (filled manually by the bank).
                 try {
-                    // Get PO copy file path
-                    const [bgPo] = await this.db
-                        .select({ bgPo: instrumentBgDetails.bgPo })
-                        .from(instrumentBgDetails)
-                        .where(eq(instrumentBgDetails.instrumentId, instrumentId))
-                        .limit(1);
+                    const prefilledBgData = this.buildBgPrefilledData({
+                        date: this.formatDateDDMMYYYY(new Date()),
+                        bgAmount: instrument.amount ? `${Number(instrument.amount).toLocaleString('en-IN')}/-` : '',
+                        beneficiaryName: bgDetails?.beneficiaryName || '',
+                        beneficiaryAddress: bgDetails?.beneficiaryAddress || '',
+                        bgExpiryDate: bgDetails?.bgExpiryDate ? this.formatDateDDMMYYYY(bgDetails.bgExpiryDate) : '',
+                        claimExpiryDate: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',
+                        accountNo: this.resolveBgFdAccountNo(bgDetails?.bankName, bgDetails?.bgBankAcc || ''),
+                        ifsc: bgDetails?.bgBankIfsc || '',
+                        uniqueCode: bgDetails?.uniqueCode || '',
+                    });
 
-                    if (bgPo?.bgPo) {
-                        attachmentFiles.push(...this.toAttachmentPaths(bgPo.bgPo));
+                    const prefilledBgPath = await this.bgDocxService.buildPrefilledApplication(
+                        prefilledBgData as any,
+                        instrumentId
+                    );
+                    if (prefilledBgPath) {
+                        attachmentFiles.push(prefilledBgPath);
                     }
                 } catch (error) {
                     this.logger.warn(
-                        `Failed to resolve BG PO attachments for instrument ${instrumentId} — sending create mail without them: ${error instanceof Error ? error.message : String(error)}`
+                        `BG prefilled application format generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
                     );
                 }
+
+                // Attachment 1 — the BG Format uploaded in the create form
+                // (bgSoftCopy holds the first uploaded file).
+                attachmentFiles.push(...this.toAttachmentPaths(bgDetails?.bgSoftCopy));
+
+                // Attachment 2 — the PO doc uploaded in the BG dashboard form,
+                // else the project's WO draft, else the main tender document.
+                let supportingDocLabel = '';
+                try {
+                    const supportingDoc = await this.resolveBgSupportingDocs(paymentReq, bgDetails);
+                    attachmentFiles.push(...supportingDoc.paths);
+                    supportingDocLabel = supportingDoc.label;
+                } catch (error) {
+                    this.logger.warn(
+                        `Failed to resolve BG supporting documents for instrument ${instrumentId} — sending create mail without them: ${error instanceof Error ? error.message : String(error)}`
+                    );
+                }
+
+                // Attach each file only once.
+                const uniqueAttachmentFiles = Array.from(new Set(attachmentFiles));
 
                 // Get recipient email - use Imran (Accounts Leader) as specified
                 // Fallback to lookup if configured, otherwise hardcode Imran
@@ -1119,15 +1468,23 @@ export class PaymentRequestsNotificationService {
                             claimDate: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',
                             amount: instrument.amount ? Number(instrument.amount).toLocaleString('en-IN') : '',
                             stampPaperValue: bgDetails?.stampCharges || 300,
-                            timeLimit: instrument.courierDeadline || 24,
-                            actionLink: `${this.getFrontendUrl()}/bi-dashboard/bank-guarantee/action/${instrumentId}`,
-                            actionLinkText: 'Accounts Form (BG) Stage 2: After BG Creation',
+                            timeLimit: Number(bgDetails?.bgNeeds) || instrument.courierDeadline || 24,
+                            dueDateTime,
+                            beneName: orNotProvided(bgDetails?.bgBankAccName),
+                            beneAcc: orNotProvided(bgDetails?.bgBankAcc),
+                            beneIfsc: orNotProvided(bgDetails?.bgBankIfsc),
+                            uniqueCode: orNotProvided(bgDetails?.uniqueCode),
+                            stage1Link: `${this.getFrontendUrl()}/bi-dashboard/bank-guarantee/action/${instrumentId}?section=accounts-form-1`,
+                            actionLink: `${this.getFrontendUrl()}/bi-dashboard/bank-guarantee/action/${instrumentId}?section=accounts-form-2`,
+                            actionLinkText: 'Stage 2: After BG Creation',
                             courierAddress: instrument.courierAddress || '',
+                            hasBgFormat: this.toAttachmentPaths(bgDetails?.bgSoftCopy).length > 0,
+                            supportingDocLabel,
                         },
                         to: toEmails,
                         cc: ccEmails,
                         attachments: {
-                            files: attachmentFiles,
+                            files: uniqueAttachmentFiles,
                         },
                     });
 

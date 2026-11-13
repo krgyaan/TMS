@@ -80,6 +80,8 @@ export const PaymentDetailsSchema = z.object({
     bgStampValue: z.coerce.number().optional(),
     bgFormatFiles: z.array(z.string()).optional(),
     bgPoFiles: z.array(z.string()).optional(),
+    uniqueCode: z.string().optional(),
+    uniqueAdviceMessage: z.string().optional(),
     bgClientUserEmail: z.email().optional().or(z.literal('')),
     bgClientCpEmail: z.email().optional().or(z.literal('')),
     bgClientFinanceEmail: z.email().optional().or(z.literal('')),
@@ -369,6 +371,8 @@ export const BankGuaranteeSchema = z.object({
     bgStampValue: z.coerce.number().optional(),
     bgFormatFiles: z.array(z.string()).optional(),
     bgPoFiles: z.array(z.string()).optional(),
+    uniqueCode: z.string().optional(),
+    uniqueAdviceMessage: z.string().optional(),
     bgClientUserEmail: z.email().optional().or(z.literal('')),
     bgClientCpEmail: z.email().optional().or(z.literal('')),
     bgClientFinanceEmail: z.email().optional().or(z.literal('')),
@@ -425,6 +429,13 @@ export const BankGuaranteeSchema = z.object({
             code: 'custom',
             message: 'BG Address is required',
             path: ['bgAddress'],
+        });
+    }
+    if (!data.bgBankIfsc || (typeof data.bgBankIfsc === 'string' && data.bgBankIfsc.trim() === '')) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Bank IFSC Code is required',
+            path: ['bgBankIfsc'],
         });
     }
     if (!data.bgExpiryDate || (typeof data.bgExpiryDate === 'string' && data.bgExpiryDate.trim() === '')) {
@@ -727,8 +738,6 @@ export const ProjectBgRequestSchema = BiOtherThanTenderRequestSchema.superRefine
     const details: Record<string, any> = data.EMD?.details ?? {};
 
     const BG_BANK_REQUIRED_FIELDS = [
-        ['bgBankAccountName', 'Customer Account Name'],
-        ['bgBankAccountNo', 'Customer Account Number'],
         ['bgBankIfsc', 'Customer IFSC Code'],
     ] as const;
 

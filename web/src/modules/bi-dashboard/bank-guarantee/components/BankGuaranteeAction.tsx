@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useFieldArray, useForm, useWatch, type Resolver } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useEffect, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
@@ -132,16 +132,24 @@ interface BankGuaranteeActionFormProps {
 
 export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormProps) {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const updateMutation = useUpdateBankGuaranteeAction();
     const createCourierMutation = useCreateCourier();
     const { data: employees = [] } = useUsers();
     const { data: formData } = useBGActionFormData(instrumentId);
     const { data: followupData } = useBGFollowupData(instrumentId);
 
+    // Deep links from the BG emails: ?section=accounts-form-1 / accounts-form-2
+    const requestedSection = searchParams.get('section');
+    const defaultSection =
+        requestedSection && ACTION_OPTIONS.some((option) => option.value === requestedSection)
+            ? requestedSection
+            : '';
+
     const form = useForm<BankGuaranteeActionFormValues>({
         resolver: zodResolver(BankGuaranteeActionFormSchema) as Resolver<BankGuaranteeActionFormValues>,
         defaultValues: {
-            action: '',
+            action: defaultSection,
             contacts: [],
             bank_mail_ids: [{ email: '' }],
             bank_mail_ids_cc: [{ email: '' }],

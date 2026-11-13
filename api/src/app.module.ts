@@ -76,6 +76,7 @@ import { WebsitesModule } from "@/modules/master/websites/websites.module";
 import { WoBasicDetailsModule } from "@/modules/operations/wo-basic-details/wo-basic-details.module";
 import { SchedulerModule } from "@/modules/scheduler/scheduler.module";
 import { ClientDirectoryModule } from "@/modules/shared/client-directory/client-directory.module";
+import { OtherContactsModule } from "@/modules/shared/other-contacts/other-contacts.module";
 import { PublicNotificationsModule } from "@/modules/public-notifications/public-notifications.module";
 import { FinanceDocumentsModule } from "@/modules/shared/finance-documents/finance-documents.module";
 import { PqrModule } from "@/modules/shared/pqr/pqr.module";
@@ -287,6 +288,7 @@ import { QueueMonitoringModule } from "./modules/queue-monitoring/queue-monitori
         EmployeeOnboardingModule,
         ProfileModule,
         ClientDirectoryModule,
+        OtherContactsModule,
         TrainingModule,
         CircularsModule,
         AmcModule,
