@@ -4,6 +4,7 @@ import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { PdfGeneratorService } from '@/modules/pdf/pdf-generator.service';
+import { BgDocxService } from './bg-docx.service';
 import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { instrumentBgDetails, instrumentChequeDetails, instrumentFdrDetails, instrumentTransferDetails, paymentInstruments, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
@@ -31,6 +32,7 @@ export class PaymentRequestsNotificationService {
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
         private readonly pdfGenerator: PdfGeneratorService,
+        private readonly bgDocxService: BgDocxService,
         private readonly configService: ConfigService,
     ) {
         this.logger = this.appLogger.withContext(PaymentRequestsNotificationService.name);
@@ -1333,7 +1335,7 @@ export class PaymentRequestsNotificationService {
                 const attachmentFiles: string[] = [];
 
                 try {
-                    // Generate covering letter PDF
+                    // Generate covering letter DOCX
                     const coveringLetterData = {
                         date: this.formatDateDDMMYYYY(new Date()),
                         cpName: cpContact.name,
@@ -1355,14 +1357,12 @@ export class PaymentRequestsNotificationService {
                         accountsLeaderEmail: accountsLeader?.email || 'imran@volksenergie.in',
                     };
 
-                    const coveringLetterPaths = await this.pdfGenerator.generatePdfs(
-                        'bgCoveringLetter',
+                    const coveringLetterPath = await this.bgDocxService.buildCoveringLetter(
                         coveringLetterData,
-                        instrumentId,
-                        'BG'
+                        instrumentId
                     );
-                    if (coveringLetterPaths && coveringLetterPaths.length > 0) {
-                        attachmentFiles.push(coveringLetterPaths[0]);
+                    if (coveringLetterPath) {
+                        attachmentFiles.push(coveringLetterPath);
                     }
                 } catch (error) {
                     this.logger.warn(
@@ -1386,14 +1386,12 @@ export class PaymentRequestsNotificationService {
                         uniqueCode: bgDetails?.uniqueCode || '',
                     });
 
-                    const prefilledBgPaths = await this.pdfGenerator.generatePdfs(
-                        'bgPrefilledFormat',
-                        prefilledBgData,
-                        instrumentId,
-                        'BG'
+                    const prefilledBgPath = await this.bgDocxService.buildPrefilledApplication(
+                        prefilledBgData as any,
+                        instrumentId
                     );
-                    if (prefilledBgPaths && prefilledBgPaths.length > 0) {
-                        attachmentFiles.push(prefilledBgPaths[0]);
+                    if (prefilledBgPath) {
+                        attachmentFiles.push(prefilledBgPath);
                     }
                 } catch (error) {
                     this.logger.warn(
