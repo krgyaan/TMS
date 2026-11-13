@@ -23,6 +23,7 @@ import { CashFlowService } from "@/modules/operations/cash-flows/cash-flow.servi
 import { insurancePayloadSchema, insurancePolicySchema, type InsurancePayload } from "@/modules/insurance/zod/insurance-policy.schema";
 import { OperationNotificationService } from "@/modules/operations/operation-notification.service";
 import { computeTdsDeducted } from "./helpers/tds-calculator";
+import { syncLinkedInstruments } from "./helpers/payment-instrument-sync.helper";
 
 export { computeTdsDeducted };
 
@@ -438,6 +439,8 @@ export class PaymentRequestService {
                     .where(eq(paymentRequests.id, id))
                     .returning()
             )[0];
+
+            await syncLinkedInstruments(tx, id, body, updated.updatedAt);
 
             if (hasAmount) {
                 // Fixed expenses are created with amount 0 when variable; the amount
