@@ -56,6 +56,8 @@ const headings = [
     {label: 'own_bank', value: 'Own Bank'},
     {label: 'capital_asset_purchase', value: 'Capital/Asset Purchase'},
     {label: 'taxes', value: 'Taxes'},
+    {label: 'emd', value: 'EMD'},
+    {label: 'security', value: 'Security Deposit'},
 ];
 
 const fixedCategory = [
