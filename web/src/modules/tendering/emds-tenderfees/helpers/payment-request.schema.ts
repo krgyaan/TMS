@@ -731,8 +731,6 @@ export const ProjectBgRequestSchema = BiOtherThanTenderRequestSchema.superRefine
     const details: Record<string, any> = data.EMD?.details ?? {};
 
     const BG_BANK_REQUIRED_FIELDS = [
-        ['bgBankAccountName', 'Customer Account Name'],
-        ['bgBankAccountNo', 'Customer Account Number'],
         ['bgBankIfsc', 'Customer IFSC Code'],
     ] as const;
 
