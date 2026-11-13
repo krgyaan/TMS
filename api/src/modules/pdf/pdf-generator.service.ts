@@ -154,28 +154,6 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
     }
 
     /**
-     * Render a template to HTML (with letterhead images injected) without
-     * writing anything to disk. Used by in-UI preview endpoints.
-     */
-    async renderPreviewHtml(templateType: string, data: Record<string, any>): Promise<string> {
-        const typeConfig = PDF_CONFIG.templateTypes[templateType as keyof typeof PDF_CONFIG.templateTypes];
-        if (!typeConfig) {
-            throw new Error(`Unknown template type: ${templateType}`);
-        }
-
-        const dataWithImages = await this.injectPdfImages(data);
-        return this.renderTemplate(typeConfig.directory, typeConfig.templates[0], dataWithImages);
-    }
-
-    /**
-     * Render a template straight to a PDF Buffer without writing it to disk.
-     */
-    async renderPreviewPdf(templateType: string, data: Record<string, any>): Promise<Buffer> {
-        const html = await this.renderPreviewHtml(templateType, data);
-        return this.htmlToPdf(html, templateType);
-    }
-
-    /**
      * Generate a single PDF from a template
      */
     private async generateSinglePdf(

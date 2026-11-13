@@ -345,66 +345,6 @@ export class PaymentRequestsNotificationService {
     };
 
     /**
-     * Sample data for the in-UI BG cover letter preview. TL and Accounts Leader
-     * come from the DB; everything else is a fixture that can be overridden via
-     * query params (e.g. ?referenceNo=...&cpName=...).
-     */
-    private buildBgCoverLetterPreviewData = async (
-        overrides: Record<string, string> = {},
-    ): Promise<Record<string, any>> => {
-        const valueOr = (value: string | undefined, fallback: string): string =>
-            typeof value === 'string' && value.trim().length > 0 ? value : fallback;
-
-        const [tlUser] = await this.db
-            .select({ name: users.name, mobile: users.mobile, email: users.email })
-            .from(users)
-            .where(eq(users.roleId, 3))
-            .orderBy(users.id)
-            .limit(1);
-
-        const [accountsLeader] = await this.db
-            .select({ name: users.name, mobile: users.mobile, email: users.email })
-            .from(users)
-            .where(eq(users.email, 'imran@volksenergie.in'))
-            .limit(1);
-
-        return {
-            date: this.formatDateDDMMYYYY(new Date()),
-            cpName: valueOr(overrides.cpName, 'Ravi Kumar'),
-            cpDesignation: valueOr(overrides.cpDesignation, 'Manager (C&P)'),
-            courierAddress: valueOr(
-                overrides.courierAddress,
-                'NTPC Limited\nEngineering Office Complex\nSector 24, Noida, Uttar Pradesh - 201301'
-            ),
-            referenceNo: valueOr(overrides.referenceNo, 'NTPC/NR/2026-27/00123'),
-            purpose: valueOr(overrides.purpose, 'Performance BG'),
-            bgNo: overrides.bgNo ?? '',
-            bgDate: overrides.bgDate ?? '',
-            bgExpiryDate: valueOr(overrides.bgExpiryDate, '31-12-2027'),
-            claimDate: valueOr(overrides.claimDate, '31-03-2028'),
-            amount: valueOr(overrides.amount, '12,50,000'),
-            teamLeaderName: tlUser?.name || 'Team Leader',
-            teamLeaderPhone: this.formatPhoneWithCountryCode(tlUser?.mobile),
-            teamLeaderEmail: tlUser?.email || '',
-            accountsLeaderName: accountsLeader?.name || 'Accounts Leader',
-            accountsLeaderPhone: this.formatPhoneWithCountryCode(accountsLeader?.mobile),
-            accountsLeaderEmail: accountsLeader?.email || 'imran@volksenergie.in',
-        };
-    };
-
-    /** HTML preview of the BG cover letter (no file written). */
-    async previewBgCoverLetterHtml(overrides: Record<string, string> = {}): Promise<string> {
-        const data = await this.buildBgCoverLetterPreviewData(overrides);
-        return this.pdfGenerator.renderPreviewHtml('bgCoveringLetter', data);
-    }
-
-    /** PDF preview of the BG cover letter (rendered in memory, nothing written). */
-    async previewBgCoverLetterPdf(overrides: Record<string, string> = {}): Promise<Buffer> {
-        const data = await this.buildBgCoverLetterPreviewData(overrides);
-        return this.pdfGenerator.renderPreviewPdf('bgCoveringLetter', data);
-    }
-
-    /**
      * Data for the prefilled BG application format (the AU Bank form).
      * Undefined values fall back to the built-in sample; empty strings stay empty
      * (used by real generation, where missing fields must render blank).
@@ -434,16 +374,6 @@ export class PaymentRequestsNotificationService {
             uniqueCode: pick(overrides.uniqueCode, ''),
         };
     };
-
-    /** HTML preview of the prefilled BG application format. */
-    async previewBgPrefilledHtml(overrides: Record<string, string> = {}): Promise<string> {
-        return this.pdfGenerator.renderPreviewHtml('bgPrefilledFormat', this.buildBgPrefilledData(overrides));
-    }
-
-    /** PDF preview of the prefilled BG application format. */
-    async previewBgPrefilledPdf(overrides: Record<string, string> = {}): Promise<Buffer> {
-        return this.pdfGenerator.renderPreviewPdf('bgPrefilledFormat', this.buildBgPrefilledData(overrides));
-    }
 
     /**
      * Formats a mobile number as +91-XXXXXXXXXX for the cover letter signature

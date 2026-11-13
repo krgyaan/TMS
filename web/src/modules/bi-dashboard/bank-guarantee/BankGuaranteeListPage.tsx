@@ -428,10 +428,6 @@ const BankGuaranteeListPage = () => {
                                     exporting={exporting}
                                     handleExport={handleExport}
                                 />
-                                <Button variant="outline" onClick={() => navigate(paths.bi.bankGuaranteeCoverLetterPreview())}>
-                                    <FileText className="w-4 h-4" />
-                                    Cover Letter Preview
-                                </Button>
                                 <Button variant="outline" onClick={() => navigate(paths.bi.bankGuaranteeCreate())}>
                                     <Plus className="w-4 h-4" />
                                     Add BG
