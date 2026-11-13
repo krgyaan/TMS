@@ -919,7 +919,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             'bgPo', 'bgClientUser', 'bgClientCp', 'bgClientFin',
             'bgBankAcc', 'bgBankIfsc', 'bgBankAccName', 'courierNo',
             'extensionLetter', 'newBgClaim', 'approveBg',
-            'fdrAmt', 'fdrPer', 'fdrNo', 'fdrValidity', 'fdrRoi',
+            'fdrAmt', 'fdrPer', 'fdrNo', 'fdrDate', 'fdrValidity', 'fdrRoi',
             'bankMailIds', 'bankMailIdsCc',
             'bgChargeDeducted', 'newStampChargeDeducted', 'cancelRemark',
             'bgFdrCancelDate', 'bgFdrCancelAmount', 'bgFdrCancelRefNo',
@@ -1150,6 +1150,22 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             if (mailIds !== null) bgDetailsUpdate.bankMailIds = mailIds;
             const mailIdsCc = this.parseStringArray(body.bank_mail_ids_cc);
             if (mailIdsCc !== null) bgDetailsUpdate.bankMailIdsCc = mailIdsCc;
+
+            // FDR details are captured up-front in Form 1 as well. They share the
+            // same columns as Accounts Form 3, so a later Form 3 submission
+            // refines/overwrites these values.
+            if (body.fdr_no) bgDetailsUpdate.fdrNo = body.fdr_no;
+            if (body.fdr_date) bgDetailsUpdate.fdrDate = body.fdr_date;
+            if (body.fdr_validity) bgDetailsUpdate.fdrValidity = body.fdr_validity;
+            if (body.fdr_roi) bgDetailsUpdate.fdrRoi = body.fdr_roi;
+
+            const fdrCopyFile = this.getFileForField('fdr_copy', files, body, fileIndexTracker);
+            const fdrCopyPath = this.getFilePathFromBody('fdr_copy', body);
+            if (fdrCopyFile) {
+                bgDetailsUpdate.fdrCopy = this.bgFileStoredPath('bg-fdr-copy', fdrCopyFile.filename);
+            } else if (fdrCopyPath) {
+                bgDetailsUpdate.fdrCopy = fdrCopyPath;
+            }
 
             // Handle bg_format_imran file (single file)
             const bgFormatImranFile = this.getFileForField('bg_format_imran', files, body, fileIndexTracker);
@@ -1501,6 +1517,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 fdrPer: instrumentBgDetails.fdrPer,
                 fdrCopy: instrumentBgDetails.fdrCopy,
                 fdrNo: instrumentBgDetails.fdrNo,
+                fdrDate: instrumentBgDetails.fdrDate,
                 fdrValidity: instrumentBgDetails.fdrValidity,
                 fdrRoi: instrumentBgDetails.fdrRoi,
                 bgChargeDeducted: instrumentBgDetails.bgChargeDeducted,
@@ -1635,6 +1652,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 fdrNo: instrumentBgDetails.fdrNo,
                 fdrAmt: instrumentBgDetails.fdrAmt,
                 fdrValidity: instrumentBgDetails.fdrValidity,
+                fdrDate: instrumentBgDetails.fdrDate,
                 fdrRoi: instrumentBgDetails.fdrRoi,
                 cancelRemark: instrumentBgDetails.cancelRemark,
                 stampCoveringLetter: instrumentBgDetails.stampCoveringLetter,
@@ -1834,6 +1852,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             newStampChargeDeducted: result.newStampChargeDeducted ? Number(result.newStampChargeDeducted) : null,
             fdrNo: result.fdrNo,
             fdrAmt: result.fdrAmt ? Number(result.fdrAmt) : null,
+            fdrDate: result.fdrDate ? new Date(result.fdrDate) : null,
             fdrValidity: result.fdrValidity ? new Date(result.fdrValidity) : null,
             fdrRoi: result.fdrRoi ? Number(result.fdrRoi) : null,
             cancelRemark: result.cancelRemark,

@@ -157,7 +157,7 @@ export function BankGuaranteeView({
     );
 
     // Check if sections have data
-    const hasFdrDetails = data.fdrNo || data.fdrAmt || parseFilePaths(data.fdrCopy).length > 0 || data.bgFdrCancelDate;
+    const hasFdrDetails = data.fdrNo || data.fdrDate || data.fdrAmt || parseFilePaths(data.fdrCopy).length > 0 || data.bgFdrCancelDate;
     const hasBankInfo = data.bankName || data.bgBankAcc || data.bgBankIfsc;
     const hasExtensionDetails = data.extendedAmount || data.extendedValidityDate;
     const hasCourierInfo =
@@ -394,38 +394,42 @@ export function BankGuaranteeView({
                                     <DataRow
                                         label1="FDR No"
                                         value1={data.fdrNo || '—'}
-                                        label2="FDR Amount"
-                                        value2={
+                                        label2="FDR Date"
+                                        value2={data.fdrDate ? formatDate(data.fdrDate) : '—'}
+                                    />
+                                    <DataRow
+                                        label1="FDR Amount"
+                                        value1={
                                             <span className="font-semibold">
                                                 {data.fdrAmt ? formatINR(Number(data.fdrAmt)) : '—'}
                                             </span>
                                         }
+                                        label2="FDR Validity"
+                                        value2={data.fdrValidity ? formatDate(data.fdrValidity) : '—'}
                                     />
                                     <DataRow
-                                        label1="FDR Validity"
-                                        value1={data.fdrValidity ? formatDate(data.fdrValidity) : '—'}
-                                        label2="FDR ROI"
-                                        value2={data.fdrRoi ? `${Number(data.fdrRoi)}%` : '—'}
+                                        label1="FDR ROI"
+                                        value1={data.fdrRoi ? `${Number(data.fdrRoi)}%` : '—'}
+                                        label2="FDR Copy"
+                                        value2={<FileLink file={data.fdrCopy} />}
                                     />
                                     <DataRow
-                                        label1="FDR Copy"
-                                        value1={<FileLink file={data.fdrCopy} />}
-                                        label2="FDR Cancellation Date"
-                                        value2={
+                                        label1="FDR Cancellation Date"
+                                        value1={
                                             data.bgFdrCancelDate
                                                 ? formatDate(data.bgFdrCancelDate)
                                                 : '—'
                                         }
-                                    />
-                                    <DataRow
-                                        label1="Cancelled FDR Amount"
-                                        value1={
+                                        label2="Cancelled FDR Amount"
+                                        value2={
                                             data.bgFdrCancelAmount
                                                 ? formatINR(Number(data.bgFdrCancelAmount))
                                                 : '—'
                                         }
-                                        label2="Bank Reference No"
-                                        value2={data.bgFdrCancelRefNo || '—'}
+                                    />
+                                    <DataRow
+                                        label1="Bank Reference No"
+                                        value1={data.bgFdrCancelRefNo || '—'}
                                     />
                                 </>
                             )}

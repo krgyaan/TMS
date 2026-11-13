@@ -41,6 +41,7 @@ const STEP_NAMES = {
     fdrPer: 'fdr_per',
     fdrAmt: 'fdr_amt',
     fdrNo: 'fdr_no',
+    fdrDate: 'fdr_date',
     fdrRoi: 'fdr_roi',
     fdrValidity: 'fdr_validity',
     fdrCopy: 'fdr_copy',
@@ -216,6 +217,11 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
             }
             form.setValue('prefilled_signed_bg', prefilledFiles);
             form.setValue('bg_format_imran', safeParseArray(formData.bgFormatTe));
+            form.setValue('fdr_no', formData.fdrNo ?? undefined);
+            form.setValue('fdr_date', toDateString(formData.fdrDate));
+            form.setValue('fdr_validity', toDateString(formData.fdrValidity));
+            form.setValue('fdr_roi', formData.fdrRoi ?? undefined);
+            form.setValue('fdr_copy', safeParseArray(formData.fdrCopy));
             bankMailIds.replace(toMailRows(formData.bankMailIds));
             bankMailIdsCc.replace(toMailRows(formData.bankMailIdsCc));
         } else if (action === 'accounts-form-2') {

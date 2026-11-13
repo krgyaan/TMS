@@ -722,6 +722,13 @@
       "when": 1798000000000,
       "tag": "0177_add_party_ids_to_po_and_vwo",
       "breakpoints": true
+    },
+    {
+      "idx": 125,
+      "version": "7",
+      "when": 1799000000000,
+      "tag": "0179_add_fdr_date_to_instrument_bg_details",
+      "breakpoints": true
     }
   ]
 }

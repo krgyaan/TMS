@@ -286,6 +286,7 @@ export const instrumentBgDetails = pgTable('instrument_bg_details', {
     fdrPer: decimal('fdr_per', { precision: 15, scale: 2 }), // emd_bgs.fdr_per
     fdrCopy: varchar('fdr_copy', { length: 255 }), // emd_bgs.fdr_copy
     fdrNo: varchar('fdr_no', { length: 255 }), // emd_bgs.fdr_no
+    fdrDate: date('fdr_date'), // FDR creation date captured in Accounts Form (BG) 1
     fdrValidity: date('fdr_validity'), // emd_bgs.fdr_validity
     fdrRoi: decimal('fdr_roi', { precision: 15, scale: 2 }), // emd_bgs.fdr_roi
 

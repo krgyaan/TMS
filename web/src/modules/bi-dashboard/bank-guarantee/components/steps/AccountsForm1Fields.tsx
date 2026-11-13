@@ -8,6 +8,9 @@ import { CompactFileUploader, FileUploader } from '@/components/file-upload';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Plus, Trash2 } from 'lucide-react';
+import { NumberInput } from '@/components/form/NumberInput';
+import DateInput from '@/components/form/DateInput';
+import { toFileArray } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
 
 const FDR_PERCENTAGE_OPTIONS = [
     { value: '10', label: '10%' },
@@ -35,6 +38,11 @@ export interface AccountsForm1Names<T extends FieldValues> {
     bankMailIdsCc: FieldPath<T>;
     bgApprovedFdrPer?: FieldPath<T>;
     bgFormatImran?: FieldPath<T>;
+    fdrNo?: FieldPath<T>;
+    fdrDate?: FieldPath<T>;
+    fdrValidity?: FieldPath<T>;
+    fdrRoi?: FieldPath<T>;
+    fdrCopy?: FieldPath<T>;
 }
 
 interface BankMailIdsFieldsProps<T extends FieldValues> {
@@ -146,16 +154,58 @@ export function AccountsForm1Fields<T extends FieldValues>({
             </FieldWrapper>
 
             {bgReq === 'Accepted' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-start pt-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 gap-y-4 items-start pt-3">
                     {names.bgApprovedFdrPer && (
                         <SelectField
-                            label="FDR %"
+                            label="FDR %age *"
                             control={control}
                             name={names.bgApprovedFdrPer}
                             options={FDR_PERCENTAGE_OPTIONS}
                             placeholder="Select percentage"
                             valueType={fdrValueType}
                         />
+                    )}
+                    {names.fdrNo && (
+                        <FieldWrapper control={control} name={names.fdrNo} label="FDR No. *">
+                            {(field) => (
+                                <Input
+                                    {...field}
+                                    value={(field.value as string | undefined) ?? ''}
+                                    placeholder="Enter FDR number"
+                                />
+                            )}
+                        </FieldWrapper>
+                    )}
+                    {names.fdrDate && (
+                        <FieldWrapper control={control} name={names.fdrDate} label="FDR Date *">
+                            {(field) => (
+                                <DateInput
+                                    value={(field.value as string | undefined) ?? undefined}
+                                    onChange={field.onChange}
+                                />
+                            )}
+                        </FieldWrapper>
+                    )}
+                    {names.fdrValidity && (
+                        <FieldWrapper control={control} name={names.fdrValidity} label="FDR Validity *">
+                            {(field) => (
+                                <DateInput
+                                    value={(field.value as string | undefined) ?? undefined}
+                                    onChange={field.onChange}
+                                />
+                            )}
+                        </FieldWrapper>
+                    )}
+                    {names.fdrRoi && (
+                        <FieldWrapper control={control} name={names.fdrRoi} label="FDR ROI % *">
+                            {(field) => (
+                                <NumberInput
+                                    {...field}
+                                    value={field.value as number | null | undefined}
+                                    placeholder="Enter ROI"
+                                />
+                            )}
+                        </FieldWrapper>
                     )}
                     <SelectField
                         label="Approved BG Format"
@@ -167,13 +217,13 @@ export function AccountsForm1Fields<T extends FieldValues>({
                 </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-start pt-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 gap-y-4 items-start pt-3">
                 {bgReq === 'Rejected' && (
                     <FieldWrapper
                         control={control}
                         name={names.reasonReq}
                         label="Reason for Rejection *"
-                        className="md:col-span-2"
+                        className="md:col-span-3"
                     >
                         {(field) => (
                             <Textarea
@@ -181,6 +231,18 @@ export function AccountsForm1Fields<T extends FieldValues>({
                                 value={(field.value as string | undefined) ?? ''}
                                 placeholder="Enter reason for rejection"
                                 className="min-h-[80px]"
+                            />
+                        )}
+                    </FieldWrapper>
+                )}
+                {bgReq === 'Accepted' && names.fdrCopy && (
+                    <FieldWrapper control={control} name={names.fdrCopy} label="FDR copy *">
+                        {(field) => (
+                            <FileUploader
+                                context="bg-fdr-copy"
+                                value={toFileArray(field.value)}
+                                onChange={field.onChange}
+                                disabled={disabled}
                             />
                         )}
                     </FieldWrapper>
