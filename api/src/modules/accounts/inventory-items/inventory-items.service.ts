@@ -159,7 +159,7 @@ export class InventoryItemsService {
         }
 
         const uniquenessData = { ...updatedValues, category, specifications };
-        if (!codeIsCatalogGenerated) await this.ensureUnique(uniquenessData, current.itemCode, id);
+        await this.ensureUnique(uniquenessData, current.itemCode, id, this.db, codeIsCatalogGenerated);
         const conversion = this.resolveItemConversion(
             updatedValues.unit,
             updatedValues.conversionUnit,
@@ -255,9 +255,10 @@ export class InventoryItemsService {
         itemCode: string,
         excludeId?: number,
         db: ItemCodeQueryDb = this.db,
+        forceBusinessKey = false,
     ) {
         let candidates: { id: number; itemCode: string }[];
-        const usesBusinessKey = itemCode.startsWith("ITM-") || /^[A-Z]+-\d{3}$/.test(itemCode);
+        const usesBusinessKey = forceBusinessKey || itemCode.startsWith("ITM-") || /^[A-Z]+-\d{3}$/.test(itemCode);
         if (usesBusinessKey) {
             const normalizedName = data.itemName.trim().toLowerCase();
             const normalizedBrand = (data.makeBrand || "").trim().toLowerCase();

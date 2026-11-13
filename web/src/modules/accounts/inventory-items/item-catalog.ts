@@ -68,7 +68,7 @@ export const ITEM_CATALOG: CatalogCategory[] = [
             { name: "Cell Lifter", codeTemplate: "CL/{type}", fields: [field("type", "Type", "select", { required: true, listColumn: "type", options: [{ value: "Normal", codeToken: "NORM" }, { value: "Insulated", codeToken: "INS" }] })] },
             { name: "Battery Stand", codeTemplate: "BST/{material}/{configuration}", fields: [field("material", "Material", "select", { required: true, options: options("MS", "FR") }), field("configuration", "Configuration", "select", { required: true, options: options("Step", "Tier") }), field("colourCode", "Colour Code", "text")] },
             { name: "Battery Terminal Box", codeTemplate: "TB/{numberOfPoles}P/{lugSize}", fields: [field("numberOfPoles", "Number of Poles", "number", { required: true, min: 1, max: 6, integer: true }), field("lugSize", "Lug Size", "select", { required: true, options: options("M10", "M20") })] },
-            { name: "Glands", codePrefix: "GLD", fields: [field("specifications", "Specifications", "text")] },
+            { name: "Glands", codePrefix: "GLD", fields: [field("glandSpec", "Specifications", "text")] },
         ],
     },
     {
