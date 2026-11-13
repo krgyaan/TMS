@@ -265,3 +265,100 @@ describe("OperationNotificationService.notifyWoBasicDetailsRevised", () => {
         expect(sendText).not.toHaveBeenCalled();
     });
 });
+
+describe("OperationNotificationService payment request notifications", () => {
+    let service: OperationNotificationService;
+    let sendText: jest.Mock;
+    let dryRun: boolean;
+
+    const paymentRequestData = {
+        requestNo: "MR/2026/0001",
+        amount: 5000,
+        partyName: "Acme Traders",
+        portalLink: null,
+        requestedBy: 1,
+        category: "dd",
+    };
+
+    beforeEach(async () => {
+        sendText = jest.fn().mockResolvedValue({ messageId: "m1" });
+        dryRun = false;
+
+        const db = {
+            select: jest.fn().mockReturnValue({
+                from: jest.fn().mockReturnValue({
+                    where: jest.fn().mockReturnValue({
+                        limit: jest.fn().mockResolvedValue([{ name: "Rahul Sharma" }]),
+                    }),
+                }),
+            }),
+        };
+
+        const module: TestingModule = await Test.createTestingModule({
+            providers: [
+                OperationNotificationService,
+                { provide: OpenwaService, useValue: { sendText } },
+                { provide: DRIZZLE, useValue: db },
+                { provide: WhatsappJidResolver, useValue: { toJid: jest.fn() } },
+                { provide: PublicLinkService, useValue: { buildUrl: jest.fn() } },
+                {
+                    provide: openwaConfig.KEY,
+                    useFactory: () => ({
+                        get OPENWA_DRY_RUN() {
+                            return dryRun;
+                        },
+                    }),
+                },
+            ],
+        }).compile();
+
+        service = module.get(OperationNotificationService);
+    });
+
+    it("sends newly routed categories to the PAYMENTS group", async () => {
+        await service.notifyNewPaymentRequest(paymentRequestData);
+
+        expect(sendText).toHaveBeenCalledTimes(1);
+        const [group, text] = sendText.mock.calls[0];
+        expect(group).toBe(GROUPS.PAYMENTS);
+        expect(text).toContain("Category: Demand Draft");
+    });
+
+    it.each([
+        ["registration_charges", "Registration Charges"],
+        ["pop_charges", "POP Charges"],
+        ["bank_charges", "Bank Charges"],
+        ["diwali_gift_expenses", "Diwali/Gift Expenses"],
+        ["inventory_purchase", "Inventory Purchase"],
+        ["bt", "Bank Transfer"],
+        ["pop", "Pay On Portal"],
+        ["bg", "Bank Guarantee"],
+        ["sb", "Surity Bond"],
+        ["fdr", "Fixed Deposit Receipt"],
+        ["sd_vendor", "Security Deposit - Vendor"],
+        ["sd_landlord", "Security Deposit - Landlord"],
+    ])("routes %s to PAYMENTS with label %s", async (category, label) => {
+        await service.notifyNewPaymentRequest({ ...paymentRequestData, category });
+
+        const [group, text] = sendText.mock.calls[0];
+        expect(group).toBe(GROUPS.PAYMENTS);
+        expect(text).toContain(`Category: ${label}`);
+    });
+
+    it("includes the category label on maker done, payment done and rejection messages", async () => {
+        await service.notifyMakerDone({ ...paymentRequestData, category: "po" });
+        await service.notifyPaymentDone({ ...paymentRequestData, category: "po", utrNumber: "UTR123" });
+        await service.notifyRejection({ ...paymentRequestData, category: "po", rejectionReason: "Invalid invoice" });
+
+        const texts = sendText.mock.calls.map(([, text]) => text as string);
+        expect(texts).toHaveLength(3);
+        texts.forEach(text => expect(text).toContain("Category: PO"));
+    });
+
+    it("falls back to a prettified label for unknown categories", async () => {
+        await service.notifyNewPaymentRequest({ ...paymentRequestData, category: "some_new_category" });
+
+        const [, text] = sendText.mock.calls[0];
+        expect(text).toContain("Category: Some New Category");
+    });
+});
