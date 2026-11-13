@@ -6,7 +6,7 @@ import { inventoryItems, type InventoryItem } from "@db/schemas/accounts/invento
 import { teams } from "@db/schemas/master/teams.schema";
 import { users } from "@db/schemas/auth/users.schema";
 import { resolveConversion } from "./conversion-rules";
-import { findCatalogItem, findCatalogSubcategory, getItemMainCategory } from "./item-catalog";
+import { findCatalogItem, getItemMainCategory } from "./item-catalog";
 import { generateTemplatedItemCode } from "./item-code-generator";
 import { validateCatalogItemValues } from "./item-catalog-validation";
 
@@ -91,8 +91,6 @@ export class InventoryItemsService {
         void _ignoredTeamId;
         const catalogItem = findCatalogItem(itemData.category, itemData.itemName);
         if (catalogItem?.pending) throw new BadRequestException("UPS is pending finalization and cannot be created");
-        const expectedSubcategory = findCatalogSubcategory(itemData.category, itemData.itemName);
-        if (expectedSubcategory && itemData.subcategory !== expectedSubcategory) throw new BadRequestException("Item subcategory does not match its catalog category");
         const validationError = validateCatalogItemValues(itemData.category, itemData.itemName, itemData.itemType, itemData.specifications);
         if (validationError) throw new BadRequestException(validationError);
 
@@ -116,7 +114,7 @@ export class InventoryItemsService {
                 itemGroup: itemData.itemGroup ?? null,
                 teamId: null,
                 category: itemData.category,
-                subcategory: itemData.subcategory ?? expectedSubcategory ?? null,
+                subcategory: null,
                 modelNumber: itemData.modelNumber?.trim() || null,
                 makeBrand: itemData.makeBrand?.trim() || null,
                 itemType: itemData.itemType?.trim() || null,
@@ -143,10 +141,7 @@ export class InventoryItemsService {
         const specifications = { ...(current.specifications || {}), ...(itemData.specifications || {}) };
         const currentCategory = getItemMainCategory(current.itemName, current.category);
         const currentCatalogItem = findCatalogItem(currentCategory, current.itemName);
-        const currentGeneratedCode = currentCatalogItem?.codeTemplate
-            ? generateTemplatedItemCode(currentCategory, current.itemName, current.specifications || {})
-            : undefined;
-        const codeIsCatalogGenerated = Boolean(currentGeneratedCode && currentGeneratedCode === current.itemCode);
+        const codeIsCatalogGenerated = Boolean(currentCatalogItem?.codeTemplate && current.itemCode);
 
         if (codeIsCatalogGenerated && currentCatalogItem?.codeTemplate) {
             const codeKeys = [...currentCatalogItem.codeTemplate.matchAll(/\{([A-Za-z0-9_]+)\}/g)].map(match => match[1]);
@@ -168,8 +163,6 @@ export class InventoryItemsService {
         }
         const targetCatalogItem = findCatalogItem(category, updatedValues.itemName);
         if (targetCatalogItem?.pending) throw new BadRequestException("UPS is pending finalization and cannot be created");
-        const expectedSubcategory = findCatalogSubcategory(category, updatedValues.itemName);
-        if (updatedValues.subcategory && expectedSubcategory && updatedValues.subcategory !== expectedSubcategory) throw new BadRequestException("Item subcategory does not match its catalog category");
 
         const uniquenessData = { ...updatedValues, category, specifications };
         await this.ensureUnique(uniquenessData, current.itemCode, id, this.db, codeIsCatalogGenerated);
@@ -183,7 +176,7 @@ export class InventoryItemsService {
             itemName: updatedValues.itemName,
             itemType: updatedValues.itemType,
             category: updatedValues.category ?? null,
-            subcategory: expectedSubcategory ?? updatedValues.subcategory ?? null,
+            subcategory: updatedValues.subcategory ?? null,
             modelNumber: updatedValues.modelNumber?.trim() || null,
             makeBrand: updatedValues.makeBrand?.trim() || null,
             description: updatedValues.description,

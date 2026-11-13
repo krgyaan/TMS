@@ -9,6 +9,7 @@ export function keySpecificationAttributes(
     specifications: Record<string, string> = {},
     itemType?: string | null,
 ): KeySpecificationAttribute[] {
+    void category;
     const item = resolveCatalogItemByName(itemName);
     const configured = item?.fields || [];
     const result: KeySpecificationAttribute[] = configured.flatMap(field => {

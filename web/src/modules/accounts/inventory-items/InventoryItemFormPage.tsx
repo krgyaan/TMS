@@ -13,7 +13,7 @@ import { useCreateInventoryItem, useInventoryItem, useItemConversionOptions, use
 import { handleQueryError } from "@/lib/react-query";
 import { paths } from "@/app/routes/paths";
 import type { InventoryItemPayload } from "@/types/inventory-item.types";
-import { ITEM_CATALOG, fieldIsVisible, findCatalogItem, getItemMainCategory, getItemSubcategory } from "./item-catalog";
+import { ITEM_CATALOG, fieldIsVisible, findCatalogItem, getItemMainCategory } from "./item-catalog";
 import { UNIT_OPTIONS, type Unit } from "./item-config";
 import { generateTemplatedItemCode, getItemCodePreview } from "./item-code-generator";
 import { inventoryItemFormSchema, type InventoryItemFormValues } from "./item-form-schema";
@@ -44,7 +44,6 @@ export default function InventoryItemFormPage() {
     const [unitChangedNotice, setUnitChangedNotice] = useState(false);
     const unit = useWatch({ control: form.control, name: "unit" });
     const categoryName = useWatch({ control: form.control, name: "category" });
-    const subcategoryName = useWatch({ control: form.control, name: "subcategory" });
     const itemName = useWatch({ control: form.control, name: "itemName" });
     const specifications = useWatch({ control: form.control, name: "specifications" }) || {};
     const conversionEnabled = useWatch({ control: form.control, name: "conversionEnabled" });
@@ -67,7 +66,7 @@ export default function InventoryItemFormPage() {
         if (isEdit) {
             if (!item || initializedForm.current === `edit-${itemId}`) return;
             form.reset({
-                category: getItemMainCategory(item.itemName, item.category), subcategory: item.subcategory || getItemSubcategory(item.itemName) || "", itemName: item.itemName, itemType: item.itemType || "",
+                category: getItemMainCategory(item.itemName, item.category), subcategory: "", itemName: item.itemName, itemType: item.itemType || "",
                 specifications: item.specifications || {}, makeBrand: item.makeBrand || "", modelNumber: item.modelNumber || "", description: item.description || "",
                 unit: item.unit as Unit, conversionEnabled: Boolean(item.conversionUnit), conversionUnit: item.conversionUnit || "",
                 conversionFactor: item.conversionFactor || "", hsnCode: item.hsnCode || "", isActive: item.isActive,
@@ -237,7 +236,6 @@ export default function InventoryItemFormPage() {
                 <div className="grid gap-4 md:grid-cols-2">
                     <FormField label="Category" required helper={isCatalogCodeEdit ? "These options form the item code and cannot be changed. Create a new item instead." : "Select the item category."} error={errors.category?.message}>
                         {isCatalogCodeEdit ? <div className={`${formControlClass} flex items-center`} aria-readonly="true">{categoryName}</div> : <select className={formControlClass} aria-invalid={Boolean(errors.category)} {...form.register("category", { onChange: event => {
-                            form.setValue("subcategory", "", { shouldDirty: true });
                             form.setValue("itemName", "", { shouldDirty: true, shouldValidate: true });
                             form.setValue("itemType", "", { shouldDirty: true });
                             form.setValue("specifications", {}, { shouldDirty: true });
@@ -246,11 +244,6 @@ export default function InventoryItemFormPage() {
                             {ITEM_CATALOG.map(option => <option key={option.name} value={option.name}>{option.name}</option>)}
                         </select>}
                     </FormField>
-                    {category?.items.some(candidate => candidate.subcategory) && <FormField label="Subcategory" required helper="Select the component group." error={errors.subcategory?.message}>
-                        <select className={formControlClass} {...form.register("subcategory", { onChange: () => { form.setValue("itemName", "", { shouldDirty: true, shouldValidate: true }); form.setValue("specifications", {}, { shouldDirty: true }); } })}>
-                            <option value="">Select subcategory</option>{[...new Set(category.items.map(candidate => candidate.subcategory).filter((value): value is string => Boolean(value)))].map(value => <option key={value} value={value}>{value}</option>)}
-                        </select>
-                    </FormField>}
                     <FormField label="Item Name" required helper={isCatalogCodeEdit ? "These options form the item code and cannot be changed. Create a new item instead." : "Select an item in this category."} error={errors.itemName?.message}>
                         {isCatalogCodeEdit ? <div className={`${formControlClass} flex items-center`} aria-readonly="true">{itemName}</div> : <select className={formControlClass} aria-invalid={Boolean(errors.itemName)} disabled={!category} {...form.register("itemName", { onChange: event => {
                             form.setValue("itemType", "", { shouldDirty: true });
@@ -259,7 +252,7 @@ export default function InventoryItemFormPage() {
                             if (selected?.defaultUnit) form.setValue("unit", selected.defaultUnit as Unit, { shouldDirty: true });
                         } })}>
                             <option value="">Select item name</option>
-                            {category && <optgroup label={category.name}>{category.items.filter(option => !option.subcategory || option.subcategory === subcategoryName).map(option => <option key={option.name} value={option.name} disabled={option.pending}>{option.pending ? `${option.name} (pending finalization)` : option.name}</option>)}</optgroup>}
+                            {category && <optgroup label={category.name}>{category.items.map(option => <option key={option.name} value={option.name} disabled={option.pending}>{option.pending ? `${option.name} (pending finalization)` : option.name}</option>)}</optgroup>}
                         </select>}
                     </FormField>
                     {catalogItem?.legacyTypes && <FormField label="Type" helper="Select the legacy item type." error={errors.itemType?.message}>

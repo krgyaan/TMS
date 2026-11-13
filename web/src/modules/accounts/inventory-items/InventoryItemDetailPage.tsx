@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useInventoryItem, type ItemMasterTeam } from "@/hooks/api/useInventoryItems";
 import { paths } from "@/app/routes/paths";
 import type { InventoryItem } from "@/types/inventory-item.types";
-import { findCatalogItem, getItemMainCategory, getItemSubcategory } from "./item-catalog";
+import { findCatalogItem, getItemMainCategory } from "./item-catalog";
 
 const formatDate = (value?: string | null) => value ? new Date(value).toLocaleString("en-IN") : "—";
 const formatFactor = (value?: string | null) => {
@@ -56,7 +56,6 @@ function ItemDetails({ item }: { item: InventoryItem }) {
                 <DetailField label="Record ID">{item.id}</DetailField>
                 <DetailField label="Item code">{item.itemCode}</DetailField>
                 <DetailField label="Category">{category}</DetailField>
-                <DetailField label="Subcategory">{item.subcategory || getItemSubcategory(item.itemName)}</DetailField>
                 <DetailField label="Item group">{item.itemGroup}</DetailField>
                 <DetailField label="Item name">{item.itemName}</DetailField>
                 <DetailField label="Type">{item.itemType}</DetailField>
