@@ -3,7 +3,7 @@
 -- columns stay the source for display/print; these ids only make the picker
 -- selection restorable when the document is edited.
 --
--- Apply with: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f drizzle/0163_add_party_ids_to_po_and_vwo.sql
+-- Apply with: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f drizzle/0177_add_party_ids_to_po_and_vwo.sql
 
 ALTER TABLE "purchase_orders"
     ADD COLUMN IF NOT EXISTS "seller_gst_id" bigint REFERENCES "vendor_gsts"("id") ON DELETE SET NULL,
