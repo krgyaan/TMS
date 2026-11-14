@@ -1192,6 +1192,10 @@ export class VendorMasterService {
             const filled: Record<string, string> = {};
             const keeperPatch: Partial<NewVendorOrganization> = {};
             const blank = (value: string | null | undefined) => !value?.trim();
+            if (blank(keep.category) && drop.category?.trim()) {
+                keeperPatch.category = drop.category;
+                filled.category = drop.category;
+            }
             if (blank(keep.pan) && drop.pan?.trim()) {
                 keeperPatch.pan = drop.pan;
                 filled.pan = drop.pan;
@@ -1200,9 +1204,29 @@ export class VendorMasterService {
                 keeperPatch.msme = drop.msme;
                 filled.msme = drop.msme;
             }
+            if (blank(keep.msmeSize) && drop.msmeSize?.trim()) {
+                keeperPatch.msmeSize = drop.msmeSize;
+                filled.msmeSize = drop.msmeSize;
+            }
             if (blank(keep.msmeType) && drop.msmeType?.trim()) {
                 keeperPatch.msmeType = drop.msmeType;
                 filled.msmeType = drop.msmeType;
+            }
+            if (blank(keep.majorActivity) && drop.majorActivity?.trim()) {
+                keeperPatch.majorActivity = drop.majorActivity;
+                filled.majorActivity = drop.majorActivity;
+            }
+            if (blank(keep.registrationType) && drop.registrationType?.trim()) {
+                keeperPatch.registrationType = drop.registrationType;
+                filled.registrationType = drop.registrationType;
+            }
+            if (keep.creditPeriodDays == null && drop.creditPeriodDays != null) {
+                keeperPatch.creditPeriodDays = drop.creditPeriodDays;
+                filled.creditPeriodDays = String(drop.creditPeriodDays);
+            }
+            if (keep.creditAmount == null && drop.creditAmount != null) {
+                keeperPatch.creditAmount = drop.creditAmount;
+                filled.creditAmount = String(drop.creditAmount);
             }
             if (blank(keep.address) && drop.address?.trim()) {
                 keeperPatch.address = drop.address;

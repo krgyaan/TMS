@@ -8,8 +8,14 @@ import { VendorMasterService } from "@/modules/master/vendor-master/vendor-maste
 
 const VendorOrganizationFields = z.object({
     name: z.string().min(1).max(255),
+    category: z.string().max(50).optional().nullable(),
     msme: z.string().max(50).optional().nullable(),
+    msmeSize: z.enum(["Micro", "Small", "Medium"]).optional().nullable(),
     msmeType: z.enum(["M", "S"]).optional().nullable(),
+    majorActivity: z.string().max(50).optional().nullable(),
+    registrationType: z.enum(["REGULAR", "UNREGISTERED"]).optional().nullable(),
+    creditPeriodDays: z.number().int().nonnegative().optional().nullable(),
+    creditAmount: z.number().nonnegative().optional().nullable(),
     pan: z.string().max(100).optional().nullable(),
     address: z.string().optional(),
     status: z.boolean().optional().default(true),
