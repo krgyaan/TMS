@@ -72,9 +72,9 @@ describe("InventoryItemsService.validateTeamId", () => {
 
 describe("Item Master catalog codes and validation", () => {
     it.each([
-        ["Batteries", "Ni-Cd Battery", { type: "KP", discharge: "L", capacity: "100.00" }, "NICD/KP/L/100"],
-        ["Batteries", "VRLA Battery", { type: "TGel", voltage: "12V", capacity: "40.500" }, "VRLA/TGEL/12V/40.5"],
-        ["Batteries", "Flooded Lead-Acid Battery", { type: "OPzS", capacity: "00120.0" }, "FLA/OPZS/120"],
+        ["Batteries", "Ni-Cd Battery", { type: "KP", discharge: "L", capacity: "100.00" }, "NICD/KP/L/100AH"],
+        ["Batteries", "VRLA Battery", { type: "TGel", voltage: "12V", capacity: "40.500" }, "VRLA/TGEL/12V/40.5AH"],
+        ["Batteries", "Flooded Lead-Acid Battery", { type: "OPzS", capacity: "00120.0" }, "FLA/OPZS/120AH"],
     ])("generates the sheet code template for %s / %s", (category, name, specifications, expected) => {
         expect(generateTemplatedItemCode(category as string, name as string, specifications as Record<string, string>)).toBe(expected);
     });
@@ -175,7 +175,7 @@ describe("Item Master create, update, and audit behavior", () => {
         const parsed = itemSchema.parse(payload({ createdBy: 999, updatedBy: 888 }));
         const result = await service.create(parsed, 42);
         expect(inserted()).toMatchObject({
-            itemCode: "NICD/KP/L/100", teamId: null, createdBy: 42, updatedBy: 42,
+            itemCode: "NICD/KP/L/100AH", teamId: null, createdBy: 42, updatedBy: 42,
             category: "Batteries", hsnCode: "0009997",
         });
         expect(inserted()).not.toHaveProperty("createdBy", 999);
@@ -200,6 +200,26 @@ describe("Item Master create, update, and audit behavior", () => {
         expect(inserted()).toMatchObject({ itemCode: "CU/Elbow/H/1/12", itemType: "Elbow", conversionUnit: null });
     });
 
+    it("preserves an existing ITM code when editing an AC item without changing its code attributes", async () => {
+        const existing = row({
+            itemCode: "ITM-0012", category: "AC Accessories", itemName: "Copper", itemType: "Pipe",
+            specifications: { diameter: "6.4", thickness: "21", strength: "Hard" }, unit: "Kg", hsnCode: "0009997",
+        });
+        const { service, updated } = serviceForCrud({ existing });
+        await service.update(1, { description: "Reviewed legacy item" }, 42);
+        expect(updated()).toMatchObject({ itemCode: "ITM-0012" });
+    });
+
+    it("preserves an existing DC code when editing a battery without changing its code attributes", async () => {
+        const existing = row({
+            itemCode: "NICD/RGP/M/400", category: "Batteries", itemName: "Ni-Cd Battery", itemType: "RGP",
+            specifications: { type: "RGP", discharge: "M", capacity: "400" }, unit: "Nos.",
+        });
+        const { service, updated } = serviceForCrud({ existing });
+        await service.update(1, { description: "Reviewed legacy battery" }, 42);
+        expect(updated()).toMatchObject({ itemCode: "NICD/RGP/M/400" });
+    });
+
     it("allows blank HSN only for definitions marked not applicable", async () => {
         const { service, inserted } = serviceForCrud();
         const body = itemSchema.parse(payload({ category: "Battery Accessories", itemName: "Eye Wash Bottle", specifications: {}, hsnCode: "" }));
@@ -222,10 +242,10 @@ describe("Item Master create, update, and audit behavior", () => {
     });
 
     it("reports an existing templated code in duplicate conflicts", async () => {
-        const duplicate = row({ itemCode: "NICD/KP/L/100", itemName: "Ni-Cd Battery", category: "Batteries", unit: "Nos.", specifications: { type: "KP", discharge: "L", capacity: "100" } });
+        const duplicate = row({ itemCode: "NICD/KP/L/100AH", itemName: "Ni-Cd Battery", category: "Batteries", unit: "Nos.", specifications: { type: "KP", discharge: "L", capacity: "100" } });
         const { service } = serviceForCrud({ candidates: [duplicate] });
         await expect(service.create(itemSchema.parse(payload()), 7))
-            .rejects.toThrow("code NICD/KP/L/100");
+            .rejects.toThrow("code NICD/KP/L/100AH");
     });
 
     it("reports the existing code for an untemplated name, brand and unit duplicate", async () => {
@@ -271,6 +291,6 @@ describe("Item Master create, update, and audit behavior", () => {
         });
         const { service, updated } = serviceForCrud({ existing });
         await service.update(1, { specifications: { type: "RGS", discharge: "L", capacity: "100" } }, 42);
-        expect(updated()).toMatchObject({ itemCode: "NICD/RGS/L/100" });
+        expect(updated()).toMatchObject({ itemCode: "NICD/RGS/L/100AH" });
     });
 });

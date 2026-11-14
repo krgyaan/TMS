@@ -194,6 +194,7 @@ export class InventoryItemsService {
         if (hsnCode && !/^\d{4,8}$/.test(hsnCode)) throw new BadRequestException("HSN code must contain 4 to 8 digits");
 
         const uniquenessData = { ...updatedValues, category, specifications };
+        if (nextItemCode !== current.itemCode) await this.assertItemCodeAvailable(nextItemCode, id);
         await this.ensureUnique(uniquenessData, nextItemCode, id, this.db, true);
         const conversion = this.resolveItemConversion(
             updatedValues.unit,
@@ -219,7 +220,13 @@ export class InventoryItemsService {
             updatedAt: new Date(),
             itemCode: nextItemCode,
         };
-        const [updated] = await this.db.update(inventoryItems).set(values).where(eq(inventoryItems.id, id)).returning({ id: inventoryItems.id });
+        let updated: { id: number } | undefined;
+        try {
+            [updated] = await this.db.update(inventoryItems).set(values).where(eq(inventoryItems.id, id)).returning({ id: inventoryItems.id });
+        } catch (error) {
+            if (this.isUniqueViolation(error)) throw new ConflictException(`Item code ${nextItemCode} already exists`);
+            throw error;
+        }
         if (!updated) throw new NotFoundException(`Inventory item with ID ${id} not found`);
         return this.findById(updated.id);
     }
@@ -280,6 +287,14 @@ export class InventoryItemsService {
             }
             throw new ConflictException(`Item code ${duplicate.itemCode} already exists`);
         }
+    }
+
+    private async assertItemCodeAvailable(itemCode: string, excludeId: number) {
+        const [existing] = await this.db.select({ id: inventoryItems.id })
+            .from(inventoryItems)
+            .where(and(eq(inventoryItems.itemCode, itemCode), ne(inventoryItems.id, excludeId)))
+            .limit(1);
+        if (existing) throw new ConflictException(`Item code ${itemCode} already exists`);
     }
 
     private isUniqueViolation(error: unknown): boolean {

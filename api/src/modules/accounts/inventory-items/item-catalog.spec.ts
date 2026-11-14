@@ -32,9 +32,9 @@ describe("AC item catalog", () => {
     });
 
     it("keeps representative DC templates unchanged", () => {
-        expect(generateTemplatedItemCode("Batteries", "Ni-Cd Battery", { type: "KP", discharge: "L", capacity: "100" })).toBe("NICD/KP/L/100");
-        expect(generateTemplatedItemCode("Batteries", "VRLA Battery", { type: "TGel", voltage: "12V", capacity: "200" })).toBe("VRLA/TGEL/12V/200");
-        expect(generateTemplatedItemCode("Batteries", "Flooded Lead-Acid (FLA) Battery", { type: "OPzS", capacity: "500" })).toBe("FLA/OPZS/500");
+        expect(generateTemplatedItemCode("Batteries", "Ni-Cd Battery", { type: "KP", discharge: "L", capacity: "100" })).toBe("NICD/KP/L/100AH");
+        expect(generateTemplatedItemCode("Batteries", "VRLA Battery", { type: "TGel", voltage: "12V", capacity: "200" })).toBe("VRLA/TGEL/12V/200AH");
+        expect(generateTemplatedItemCode("Batteries", "Flooded Lead-Acid (FLA) Battery", { type: "OPzS", capacity: "500" })).toBe("FLA/OPZS/500AH");
     });
 
     it.each(acExamples)("generates the specified %s code", (name, specifications, expected) => {
