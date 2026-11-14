@@ -346,17 +346,6 @@ export class PaymentRequestsNotificationService {
         return fallback;
     };
 
-    
-    private resolveBgFdAccountNo = (
-        bankName: string | null | undefined,
-        fallback: string,
-    ): string => {
-        const code = (bankName || '').toUpperCase();
-        if (code.includes('8316')) return '2506245699298316';
-        if (code.includes('5190')) return '2506245699295190';
-        return fallback;
-    };
-
     /**
      * Data for the prefilled BG application format (the AU Bank form).
      * Undefined values fall back to the built-in sample; empty strings stay empty
@@ -382,7 +371,7 @@ export class PaymentRequestsNotificationService {
             ),
             bgExpiryDate: pick(overrides.bgExpiryDate, '31-01-2028'),
             claimExpiryDate: pick(overrides.claimExpiryDate, '30-04-2028'),
-            accountNo: pick(overrides.accountNo, '2506245699295190'),
+            accountNo: pick(overrides.accountNo, '2502245699295242'),
             ifsc: pick(overrides.ifsc, 'SBIN0003704'),
             uniqueCode: pick(overrides.uniqueCode, ''),
         };
@@ -1392,7 +1381,7 @@ export class PaymentRequestsNotificationService {
                         beneficiaryAddress: bgDetails?.beneficiaryAddress || '',
                         bgExpiryDate: bgDetails?.bgExpiryDate ? this.formatDateDDMMYYYY(bgDetails.bgExpiryDate) : '',
                         claimExpiryDate: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',
-                        accountNo: this.resolveBgFdAccountNo(bgDetails?.bankName, bgDetails?.bgBankAcc || ''),
+                        accountNo: '2502245699295242',
                         ifsc: bgDetails?.bgBankIfsc || '',
                         uniqueCode: bgDetails?.uniqueCode || '',
                     });
