@@ -181,9 +181,14 @@ export interface Company {}
 export interface VendorOrganization {
     id: number;
     name: string;
-    alias?: string | null;
+    category?: string | null;
     msme?: string | null;
+    msmeSize?: "Micro" | "Small" | "Medium" | null;
     msmeType?: "M" | "S" | null;
+    majorActivity?: string | null;
+    registrationType?: "REGULAR" | "UNREGISTERED" | null;
+    creditPeriodDays?: number | null;
+    creditAmount?: number | null;
     pan?: string | null;
     address?: string;
     status: boolean;
@@ -235,8 +240,14 @@ export interface Vendor {
     organization?: {
         id: number;
         name: string;
-        alias?: string | null;
+        category?: string | null;
         msme?: string | null;
+        msmeSize?: "Micro" | "Small" | "Medium" | null;
+        msmeType?: "M" | "S" | null;
+        majorActivity?: string | null;
+        registrationType?: "REGULAR" | "UNREGISTERED" | null;
+        creditPeriodDays?: number | null;
+        creditAmount?: number | null;
         pan?: string | null;
         address?: string;
     } | null;
@@ -356,9 +367,14 @@ export interface UpdateVendorFileDto {
 export interface CreateVendorOrganizationWithRelationsDto {
     organization: {
         name: string;
-        alias?: string | null;
+        category?: string | null;
         msme?: string | null;
+        msmeSize?: "Micro" | "Small" | "Medium" | null;
         msmeType?: "M" | "S" | null;
+        majorActivity?: string | null;
+        registrationType?: "REGULAR" | "UNREGISTERED" | null;
+        creditPeriodDays?: number | null;
+        creditAmount?: number | null;
         pan?: string | null;
         address?: string;
         status?: boolean;
@@ -378,9 +394,14 @@ export interface CreateVendorOrganizationWithRelationsDto {
 export interface UpdateVendorOrganizationWithRelationsDto {
     organization?: {
         name?: string;
-        alias?: string | null;
+        category?: string | null;
         msme?: string | null;
+        msmeSize?: "Micro" | "Small" | "Medium" | null;
         msmeType?: "M" | "S" | null;
+        majorActivity?: string | null;
+        registrationType?: "REGULAR" | "UNREGISTERED" | null;
+        creditPeriodDays?: number | null;
+        creditAmount?: number | null;
         pan?: string | null;
         address?: string;
         status?: boolean;
@@ -490,9 +511,14 @@ export interface UpdateVendorDto extends Partial<CreateVendorDto> {}
 
 export interface CreateVendorOrganizationDto {
     name: string;
-    alias?: string | null;
+    category?: string | null;
     msme?: string | null;
+    msmeSize?: "Micro" | "Small" | "Medium" | null;
     msmeType?: "M" | "S" | null;
+    majorActivity?: string | null;
+    registrationType?: "REGULAR" | "UNREGISTERED" | null;
+    creditPeriodDays?: number | null;
+    creditAmount?: number | null;
     pan?: string | null;
     address?: string;
     status?: boolean;

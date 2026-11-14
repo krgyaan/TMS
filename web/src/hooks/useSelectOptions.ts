@@ -192,8 +192,8 @@ export function useSellerSelectOptions(selectedId?: string) {
                 const displayName = formatVendorName(p.name);
                 return {
                     id: String(p.id),
-                    name: p.alias ? `${displayName} (${p.alias})` : displayName,
-                    keywords: [p.name, p.alias, p.gstNo, p.pan, p.msme, p.address]
+                    name: displayName,
+                    keywords: [p.name, p.gstNo, p.pan, p.msme, p.address]
                         .filter(Boolean)
                         .join(' '),
                 };
