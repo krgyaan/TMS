@@ -199,7 +199,7 @@ export default function CreatePurchaseOrderPage() {
         try {
             const dto: CreatePartyDTO = {
                 name: partyData.name.trim(),
-                alias: partyData.alias || undefined,
+                alias: partyCreationType === "ship_to" ? partyData.alias || undefined : undefined,
                 email: partyData.email || undefined,
                 address: partyData.address || undefined,
                 gstNo: partyData.gstNo || undefined,
@@ -420,6 +420,7 @@ export default function CreatePurchaseOrderPage() {
                                 <PartyFormDialog
                                     title="Add New Seller"
                                     description="Add a new party to use as a seller."
+                                    showAlias={false}
                                     open={isAddPartyOpen}
                                     onOpenChange={open => {
                                         setIsAddPartyOpen(open);
@@ -580,6 +581,7 @@ export default function CreatePurchaseOrderPage() {
                                 <PartyFormDialog
                                     title="Add New Ship To"
                                     description="Add a new party to use as a shipping destination."
+                                    showAlias
                                     open={isShipToPartyOpen}
                                     onOpenChange={open => {
                                         setIsShipToPartyOpen(open);

@@ -69,7 +69,6 @@ export interface CreatePartyDTO {
 export interface SellerOption {
     id: number;
     name: string;
-    alias?: string | null;
     gstNo?: string | null;
     msme?: string | null;
     pan?: string | null;
