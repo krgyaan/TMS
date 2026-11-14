@@ -10,6 +10,7 @@ import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import type { WoBasicDetail, WorkflowStage } from '../helpers/basiDetail.types';
 import type { WoContact } from '../../types/wo.types';
+import { GEM_GST_RATE, GEM_TDS_RATE } from '../helpers/gemCharges';
 import { paths } from '@/app/routes/paths';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -407,6 +408,71 @@ export function BasicDetailView({
                             </TableCell>
                             <TableCell colSpan={2} />
                         </TableRow>
+
+                        {Number(data.gemChargesAmount || 0) > 0 && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        <div className="flex items-center gap-2">
+                                            <Calculator className="h-4 w-4" />
+                                            GeM Charges Payment Request
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        GeM Charges (Pre-GST)
+                                    </TableCell>
+                                    <TableCell className="text-sm font-semibold">
+                                        {formatINR(Number(data.gemChargesAmount || 0))}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        GST @ {GEM_GST_RATE}%
+                                    </TableCell>
+                                    <TableCell className="text-sm font-semibold">
+                                        {formatINR(Number(data.gemChargesGstAmount || 0))}
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Total Payable
+                                    </TableCell>
+                                    <TableCell className="text-sm font-semibold">
+                                        {formatINR(Number(data.gemChargesTotalPayable || 0))}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        TDS @ {GEM_TDS_RATE}% (pre-GST)
+                                    </TableCell>
+                                    <TableCell className="text-sm font-semibold text-destructive">
+                                        -{formatINR(Number(data.gemChargesTdsAmount || 0))}
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="font-bold hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium">Net Payable</TableCell>
+                                    <TableCell className="text-sm font-semibold text-emerald-600">
+                                        {formatINR(Number(data.gemChargesNetPayable || 0))}
+                                    </TableCell>
+                                    <TableCell colSpan={2} />
+                                </TableRow>
+                                {data.gemChargesPortalLink && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Portal Link
+                                        </TableCell>
+                                        <TableCell colSpan={3} className="text-sm">
+                                            <a
+                                                href={data.gemChargesPortalLink}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-blue-600 underline break-all"
+                                            >
+                                                {data.gemChargesPortalLink}
+                                            </a>
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </>
+                        )}
 
                         {/* Operations Executive Assignments */}
                         {hasOeAssignments && (

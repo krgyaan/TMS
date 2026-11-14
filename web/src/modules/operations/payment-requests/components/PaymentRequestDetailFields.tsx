@@ -56,6 +56,34 @@ export const PaymentRequestDetailFields: React.FC<PaymentRequestDetailFieldsProp
                 </div>
             );
         })()}
+        {detail.paymentAgainst === "gem_charges" && Number(detail.gemChargesPreGstAmount ?? 0) > 0 && (
+            <div className="col-span-2 space-y-2">
+                <Label className="text-muted-foreground text-xs">GeM Charges Breakdown</Label>
+                <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-sm">
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">Pre-GST:</span>
+                        <span>{formatINR(detail.gemChargesPreGstAmount || 0)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">GST @ 18%:</span>
+                        <span>{formatINR(detail.gemChargesGstAmount || 0)}</span>
+                    </div>
+                    <div className="flex justify-between font-medium">
+                        <span>Total Payable:</span>
+                        <span>{formatINR(detail.gemChargesTotalPayable || 0)}</span>
+                    </div>
+                    <div className="flex justify-between text-destructive">
+                        <span>TDS @ 2% (pre-GST):</span>
+                        <span>-{formatINR(detail.gemChargesTdsAmount || 0)}</span>
+                    </div>
+                    <div className="border-t my-1.5" />
+                    <div className="flex justify-between font-semibold">
+                        <span>Net Payable:</span>
+                        <span className="text-green-500">{formatINR(detail.gemChargesNetPayable || 0)}</span>
+                    </div>
+                </div>
+            </div>
+        )}
         <div>
             <Label className="text-muted-foreground text-xs">Account Number</Label>
             <p className="font-mono">{detail.accountNumber}</p>
