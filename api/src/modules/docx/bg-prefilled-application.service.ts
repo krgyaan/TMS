@@ -35,12 +35,13 @@ const BASE_DIR = 'bi-dashboard/bank-guarantee/bgprefill';
 @Injectable()
 export class BgPrefilledApplicationService extends BgDocxBase {
     async buildPrefilledApplication(data: BgPrefilledApplicationData, instrumentId: number): Promise<string> {
+        const watermark = await this.fadedWatermark();
         const doc = new Document({
             styles: { default: { document: { run: { font: 'Calibri Light', size: 20 } } } },
             sections: [
                 {
                     properties: this.sectionProperties(),
-                    headers: { default: new Header({ children: this.headerChildren() }) },
+                    headers: { default: new Header({ children: this.headerChildren(watermark) }) },
                     footers: { default: new Footer({ children: this.footerChildren() }) },
                     children: this.prefilledApplicationBody(data),
                 },

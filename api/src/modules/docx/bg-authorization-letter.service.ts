@@ -35,12 +35,13 @@ const COMPANY_NAME = 'Volks Energie Private Limited';
 @Injectable()
 export class BgAuthorizationLetterService extends BgDocxBase {
     async buildAuthorizationLetter(data: BgAuthorizationLetterData, instrumentId: number): Promise<string> {
+        const watermark = await this.fadedWatermark();
         const doc = new Document({
             styles: { default: { document: { run: { font: 'Calibri Light', size: 21 } } } },
             sections: [
                 {
                     properties: this.sectionProperties(),
-                    headers: { default: new Header({ children: this.headerChildren() }) },
+                    headers: { default: new Header({ children: this.headerChildren(watermark) }) },
                     footers: { default: new Footer({ children: this.footerChildren() }) },
                     children: this.authorizationLetterBody(data),
                 },

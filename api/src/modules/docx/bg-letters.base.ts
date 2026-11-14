@@ -5,6 +5,7 @@ import {
     Document,
     Footer,
     Header,
+    HeightRule,
     ImageRun,
     Packer,
     Paragraph,
@@ -16,6 +17,7 @@ import {
     WidthType,
 } from 'docx';
 import { ImageWatermark } from 'docx/watermarks';
+import sharp from 'sharp';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import * as fs from 'fs/promises';
@@ -23,6 +25,9 @@ import * as path from 'path';
 
 export const BLACK = '000000';
 export const GREY = '555555';
+
+/** Opacity applied to the letterhead watermark (matches the PDF letters' 0.1). */
+const WATERMARK_OPACITY = 0.1;
 
 /**
  * Shared DOCX building blocks for the BG letters: A4 section setup, the
@@ -34,6 +39,7 @@ export abstract class BgDocxBase {
     protected readonly logger = new Logger(this.constructor.name);
     private readonly assetsBasePath: string;
     private readonly imageCache = new Map<string, Buffer>();
+    private watermarkCache: Buffer | null = null;
 
     constructor() {
         const isProd = process.env.NODE_ENV === 'production';
@@ -49,9 +55,9 @@ export abstract class BgDocxBase {
                 size: { width: 11906, height: 16838 }, // A4 in twips
                 margin: {
                     top: 2286, // 1.59" — clears the letterhead
-                    right: 1225, // ~2.2 cm
+                    right: 500, // ~0.88 cm, matches the PDF letters
                     bottom: 1700,
-                    left: 1225,
+                    left: 500,
                     header: 360,
                     footer: 600,
                 },
@@ -59,18 +65,31 @@ export abstract class BgDocxBase {
         };
     }
 
-    protected headerChildren(): Array<Paragraph | Table> {
+    protected headerChildren(watermarkData?: Buffer): Array<Paragraph | Table> {
         const logo = this.image('logo.png', { height: 56 });
+
+        // The dark bar + orange rule are drawn as solid shaded rows with exact
+        // heights: paragraph borders leave the default line-height gap between
+        // the top and bottom rule, which showed up as two separated lines.
+        const barRow = (height: number, fill: string) =>
+            new TableRow({
+                height: { value: height, rule: HeightRule.EXACT },
+                children: [
+                    new TableCell({
+                        borders: this.noBorders(),
+                        shading: { fill },
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                        children: [new Paragraph({ children: [new TextRun({ text: '', size: 2 })] })],
+                    }),
+                ],
+            });
 
         return [
             // Full-width dark bar + orange rule (same as the PDF letterhead).
-            new Paragraph({
-                spacing: { after: 0 },
-                border: {
-                    top: { style: BorderStyle.SINGLE, size: 60, color: '333333', space: 0 },
-                    bottom: { style: BorderStyle.SINGLE, size: 30, color: 'F04E23', space: 0 },
-                },
-                children: [new TextRun({ text: '', size: 2 })],
+            new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                borders: this.noBorders(),
+                rows: [barRow(60, '333333'), barRow(30, 'F04E23')],
             }),
             new Table({
                 width: { size: 100, type: WidthType.PERCENTAGE },
@@ -108,9 +127,11 @@ export abstract class BgDocxBase {
                 children: [
                     new ImageWatermark({
                         type: 'png',
-                        data: this.imageData('watermark.png'),
+                        data: watermarkData ?? this.imageData('watermark.png'),
                         transformation: this.watermarkSize(),
-                        washout: true,
+                        // The PNG itself is pre-faded to WATERMARK_OPACITY;
+                        // Word's washout would lighten it a second time.
+                        washout: false,
                     }),
                 ],
             }),
@@ -266,6 +287,33 @@ export abstract class BgDocxBase {
         const buffer = readFileSync(path.join(this.assetsBasePath, fileName));
         this.imageCache.set(fileName, buffer);
         return buffer;
+    }
+
+    /**
+     * Watermark image pre-faded to WATERMARK_OPACITY so it matches the PDF
+     * letters (`opacity: 0.1`). `ImageWatermark` only exposes Word's binary
+     * washout, so the alpha channel is scaled here instead. Cached per instance.
+     */
+    protected async fadedWatermark(): Promise<Buffer> {
+        if (this.watermarkCache) return this.watermarkCache;
+
+        const source = this.imageData('watermark.png');
+        const { data, info } = await sharp(source)
+            .ensureAlpha()
+            .raw()
+            .toBuffer({ resolveWithObject: true });
+
+        for (let i = 3; i < data.length; i += 4) {
+            data[i] = Math.round(data[i] * WATERMARK_OPACITY);
+        }
+
+        this.watermarkCache = await sharp(data, {
+            raw: { width: info.width, height: info.height, channels: 4 },
+        })
+            .png()
+            .toBuffer();
+
+        return this.watermarkCache;
     }
 
     private image(fileName: string, options: { height: number }): ImageRun | null {

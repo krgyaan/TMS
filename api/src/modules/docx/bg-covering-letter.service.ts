@@ -42,12 +42,13 @@ const BASE_DIR = 'bi-dashboard/bank-guarantee/bgcovletter';
 @Injectable()
 export class BgCoveringLetterService extends BgDocxBase {
     async buildCoveringLetter(data: BgCoveringLetterData, instrumentId: number): Promise<string> {
+        const watermark = await this.fadedWatermark();
         const doc = new Document({
             styles: { default: { document: { run: { font: 'Calibri Light', size: 21 } } } },
             sections: [
                 {
                     properties: this.sectionProperties(),
-                    headers: { default: new Header({ children: this.headerChildren() }) },
+                    headers: { default: new Header({ children: this.headerChildren(watermark) }) },
                     footers: { default: new Footer({ children: this.footerChildren() }) },
                     children: this.coveringLetterBody(data),
                 },
