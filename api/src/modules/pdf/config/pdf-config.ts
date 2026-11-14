@@ -64,6 +64,18 @@ export const PDF_CONFIG = {
                 left: '0mm',
             },
         },
+        bgEnvelopeSlip: {
+            directory: 'bg',
+            templates: ['envelope-slip'],
+            storagePath: 'bgenvslip',
+            baseDir: 'bi-dashboard/bank-guarantee/bgenvslip',
+            margin: {
+                top: '0mm',
+                right: '0mm',
+                bottom: '0mm',
+                left: '0mm',
+            },
+        },
         ddCancellation: {
             directory: 'dd',
             templates: ['dd-cancellation'],
@@ -272,7 +284,7 @@ export function getOutputPath(
     const storagePath = getStoragePath(templateType);
 
     let fileName: string;
-    if (templateType === 'bg' && instrumentId) {
+    if ((templateType === 'bg' || templateType === 'bgEnvelopeSlip') && instrumentId) {
         fileName = `bg_${instrumentId}_${templateName}_${s}.pdf`;
     } else {
         const prefix = storagePath;
@@ -295,7 +307,7 @@ export function getRelativePath(
     const storagePath = getStoragePath(templateType);
 
     let fileName: string;
-    if (templateType === 'bg' && instrumentId) {
+    if ((templateType === 'bg' || templateType === 'bgEnvelopeSlip') && instrumentId) {
         fileName = `bg_${instrumentId}_${templateName}_${s}.pdf`;
     } else {
         const prefix = storagePath;

@@ -1451,6 +1451,63 @@ export class PaymentRequestsNotificationService {
                     );
                 }
 
+                // Attachment — envelope slip (PDF) printed and pasted on the
+                // dispatch envelope. No letterhead / footer / watermark.
+                try {
+                    const courierJson = (instrument?.courierAddressJson ?? null) as Record<string, any> | null;
+                    const addressLines: string[] = courierJson
+                        ? [
+                            courierJson.line1,
+                            courierJson.line2,
+                            [courierJson.city, courierJson.state].filter(Boolean).join(', '),
+                            courierJson.pincode ? `- ${courierJson.pincode}` : null,
+                        ].filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
+                        : (instrument?.courierAddress || '')
+                            .split(/\r?\n/)
+                            .map((line) => line.trim())
+                            .filter((line) => line.length > 0);
+
+                    // "BG Submission Against <TenderNo / WO No>" — plain
+                    // "BG Submission" when the request has no tender/project.
+                    const hasReference = paymentReq.tenderId > 0 || Boolean(paymentReq.projectId);
+                    const referenceNo = hasReference ? await this.resolveBgReferenceNo(paymentReq) : '';
+                    const submissionRef = referenceNo && referenceNo.trim().toUpperCase() !== 'NA'
+                        ? referenceNo.trim()
+                        : '';
+
+                    const [envelopeSlipPath] = await this.pdfGenerator.generatePdfs(
+                        'bgEnvelopeSlip',
+                        {
+                            data: {
+                                to_name: courierJson?.name || '',
+                                to_address_lines: addressLines,
+                                contact_number: courierJson?.phone || '',
+                                submission_ref: submissionRef,
+                            },
+                        },
+                        instrumentId,
+                        'BG'
+                    );
+
+                    if (envelopeSlipPath) {
+                        attachmentFiles.push(envelopeSlipPath);
+                        try {
+                            await this.db
+                                .update(instrumentBgDetails)
+                                .set({ envelopeSlip: envelopeSlipPath })
+                                .where(eq(instrumentBgDetails.instrumentId, instrumentId));
+                        } catch (persistError) {
+                            this.logger.warn(
+                                `Failed to persist BG envelope slip path for instrument ${instrumentId}: ${persistError instanceof Error ? persistError.message : String(persistError)}`
+                            );
+                        }
+                    }
+                } catch (error) {
+                    this.logger.warn(
+                        `BG envelope slip generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
+                    );
+                }
+
                 // Attachment 1 — the BG Format uploaded in the create form
                 // (bgSoftCopy holds the first uploaded file).
                 attachmentFiles.push(...this.toAttachmentPaths(bgDetails?.bgSoftCopy));

@@ -274,6 +274,8 @@ export function BankGuaranteeView({
                             <DataRow
                                 label1="Authorization Letter (Generated)"
                                 value1={<FileLink file={data.authorizationLetterDocx} />}
+                                label2="Envelope Slip (Generated)"
+                                value2={<FileLink file={data.envelopeSlip} />}
                             />
 
                             {/* Section 3: Tender/Project Information */}
