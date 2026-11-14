@@ -58,7 +58,7 @@ export default function InventoryItemFormPage() {
     const storedSpecifications = item ? { ...(item.specifications || {}), ...(item.itemType && !item.specifications?.type ? { type: item.itemType } : {}) } : {};
     const templateKeys = [...(catalogItem?.codeTemplate || "").matchAll(/\{([A-Za-z0-9_]+)\}/g)].map(match => match[1]);
     const codeFieldsUnchanged = Boolean(isEdit && item && categoryName === storedCategory && itemName === item.itemName && templateKeys.every(key => (specifications[key] || "") === (storedSpecifications[key] || "")));
-    const itemCodePreview = codePreviewQuery.data?.message || (codeFieldsUnchanged && item ? item.itemCode : catalogItem?.codeTemplate ? "Select all options to generate the code" : itemName ? "ITM sequence assigned on save" : "Select all options to generate the code");
+    const itemCodePreview = codeFieldsUnchanged && item ? item.itemCode : codePreviewQuery.data?.message || (catalogItem?.codeTemplate ? "Select all options to generate the code" : itemName ? "ITM sequence assigned on save" : "Select all options to generate the code");
     const typeField = catalogItem?.fields.find(field => field.listColumn === "type");
     const conversionOptionsQuery = useItemConversionOptions(unit, width, conversionEnabled, categoryName, itemName, typeField ? specifications[typeField.key] : undefined);
     const conversionOptions = conversionOptionsQuery.data || [];
@@ -66,7 +66,7 @@ export default function InventoryItemFormPage() {
     const saving = createItem.isPending || updateItem.isPending;
     const allowedConversionPairs = getAllowedConversionPairs(categoryName, itemName, specifications);
     const conversionApplicable = allowedConversionPairs === undefined
-        ? !["Nos.", "Litre", "Pair", "Set"].includes(unit)
+        ? !["Nos.", "Can", "Pair", "Pairs", "Set"].includes(unit)
         : allowedConversionPairs.some(pair => pair.from === unit);
 
     useEffect(() => {

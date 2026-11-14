@@ -72,6 +72,16 @@ describe("InventoryItemsService.validateTeamId", () => {
 });
 
 describe("Item Master catalog codes and validation", () => {
+    it("serves the same authoritative code preview used when saving", () => {
+        const { service } = serviceForCrud();
+        expect(service.previewItemCode({
+            category: "HVAC", itemName: "Split AC",
+            specifications: { type: "Fixed Speed", operation: "Cooling", tonnage: "1.5", btu: "18000", starRating: "5" },
+        })).toEqual({ itemCode: "SAC/F/C/1.5T/18000/5", message: "SAC/F/C/1.5T/18000/5" });
+        expect(() => service.previewItemCode({ category: "Glands", itemName: "Gland", specifications: {} }))
+            .toThrow("Gland is pending finalization and cannot be created");
+    });
+
     it.each([
         ["Batteries", "Ni-Cd Battery", { type: "KP", discharge: "L", capacity: "100.00" }, "NICD/KPL/100"],
         ["Batteries", "VRLA Battery", { type: "TGel", voltage: "12V", capacity: "40.500" }, "VRLA/TGEL/12V/40.5"],
@@ -102,8 +112,8 @@ describe("Item Master catalog codes and validation", () => {
         ["Battery Accessories", "Battery Stand", { material: "MS", steps: "4", tiers: "2", colourCode: "RED-1" }, "BStand/MS/S4/T2/RED-1"],
         ["Battery Accessories", "Battery Terminal Box", { numberOfPoles: "6", mRating: "M20" }, "BTerminal/P6/M20"],
         ["Battery Accessories", "PP Sheet", { thickness: "2", dimensions: "1000 x 2000 mm" }, "PPSheet/2/1000-X-2000-MM"],
-        ["Testing & Measuring Instruments", "Multimeter", { measurementType: "AC-DC", voltageRange: "600", currentRange: "10" }, "Multimeter/AC-DC/600/10"],
-        ["Testing & Measuring Instruments", "Clamp Meter", { measurementType: "DC", voltageRange: "1000", currentRange: "400" }, "ClampMeter/DC/1000/400"],
+        ["Testing & Measuring Instruments", "Multimeter", { measurementType: "AC-DC", voltageRange: "600", currentRange: "10" }, "MultiM/AC-DC/600/10"],
+        ["Testing & Measuring Instruments", "Clamp Meter", { measurementType: "DC", voltageRange: "1000", currentRange: "400" }, "ClampM/DC/1000/400"],
         ["Testing & Measuring Instruments", "Torque Wrench", { torqueRange: "20-100" }, "TorqueWrench/20-100"],
         ["Testing & Measuring Instruments", "Thermometer", {}, "Thermometer"],
         ["Testing & Measuring Instruments", "Thermometer Stand", {}, "ThermometerStand"],

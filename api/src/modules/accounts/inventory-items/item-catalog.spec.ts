@@ -10,16 +10,16 @@ const acExamples: [string, Record<string, string>, string][] = [
     ["UPVC Pipe", { type: "Tee", diameter: "25", thickness: "50", strength: "Soft" }, "UPVC/Tee/S/50/25"],
     ["CPVC Pipe", { type: "Pipe", diameter: "32", thickness: "11", strength: "Hard" }, "CPVC/Pipe/H/11/32"],
     ["MS", { type: "Reducer", diameter: "40", thickness: "12", strength: "Soft" }, "MS/Reducer/S/12/40"],
-    ["Sleeve Insulation", { diameter: "20", thickness: "10", class: "1" }, "SI/1/20/10"],
+    ["Sleeve Insulation", { diameter: "20", thickness: "10", class: "1" }, "Sleeve Ins./1/20/10"],
     ["Round Duct with Aluminium Foil", { construction: "Rigid", insulationStatus: "Insulated", insulationThickness: "25", diameter: "300" }, "RoundDuct/R/I/25"],
     ["GI Duct / MS Duct", { material: "GI", shape: "Rectangular", fabrication: "Factory", thickness: "24", coating: "120" }, "Duct/GI/Re/F/24G/120"],
-    ["GI Sheet / MS Sheet", { material: "MS", width: "900 mm", coating: "120", thickness: "24" }, "Sheet/MS/900/120/24"],
+    ["GI Sheet / MS Sheet", { material: "MS", width: "900 mm", coating: "120", thickness: "24" }, "Sheet/MS/900/120/24G"],
     ["Canvas", { type: "Roll" }, "Canvas/R"],
-    ["Nitrile Insulation Sheet / XLPE Insulation Sheet", { material: "Nitrile", coating: "Aluminium Foil", class: "1", thickness: "10" }, "InsulationSheet/N/AF/1/10"],
-    ["Acoustic Insulation", { type: "Glasswool", thickness: "25" }, "AcousticInsulation/G/25"],
-    ["Underdeck Insulation", { type: "Glasswool (Roll)", thickness: "50" }, "UnderdeckInsulation/G-Roll/50"],
-    ["Aluminium Perforated Sheet", { thickness: "24" }, "AlPerforatedSheet/24"],
-    ["Tissue Paper", { thickness: "10" }, "TissuePaper/10"],
+    ["Nitrile Insulation Sheet / XLPE Insulation Sheet", { material: "Nitrile", coating: "Aluminium Foil", class: "1", thickness: "10" }, "Ins.Sheet/N/AF/1/10"],
+    ["Acoustic Insulation", { type: "Glasswool", thickness: "25" }, "AccousticIns./G/25"],
+    ["Underdeck Insulation", { type: "Glasswool (Roll)", thickness: "50" }, "UnderdeckIns./Gr/50"],
+    ["Aluminium Perforated Sheet", { thickness: "24" }, "AlP/24"],
+    ["Tissue Paper", { thickness: "10" }, "Tissue/10"],
     ["AC Stand", { type: "Powder Coated", mounting: "Wall", size: "18" }, "ACStand/PC/W/18"],
     ["Rubber Pad", { thickness: "3", size: "4" }, "RubberPad/3/4"],
 ];
@@ -49,7 +49,7 @@ describe("AC item catalog", () => {
     });
 
     it("enforces Pipe versus fittings units and conversion availability", () => {
-        expect(getAllowedUnits(category, "PVC Pipe", { type: "Pipe" })).toEqual(["Mtr", "Ft"]);
+    expect(getAllowedUnits(category, "PVC Pipe", { type: "Pipe" })).toEqual(["Mtr", "Ft", "Length (3M)", "Length (6M)"]);
         expect(getAllowedUnits(category, "PVC Pipe", { type: "Elbow" })).toContain("Nos.");
         expect(getAllowedConversionPairs(category, "Copper", { type: "Elbow" })).toEqual([]);
         expect(getAllowedConversionPairs(category, "Copper", { type: "Pipe" })).toContainEqual({ from: "Kg", to: "Ft" });

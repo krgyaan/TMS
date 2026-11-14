@@ -35,6 +35,7 @@ export class SettingsInventoryItemsController {
 
     @Post("code-preview")
     @CanRead("master.item-master")
+    @HttpCode(HttpStatus.OK)
     previewCode(@Body() body: unknown) {
         const parsed = itemCodePreviewSchema.safeParse(body);
         if (!parsed.success) throw new BadRequestException(parsed.error.issues.map(issue => `${issue.path.join(".") || "item"}: ${issue.message}`).join("; "));
