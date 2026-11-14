@@ -1363,6 +1363,16 @@ export class PaymentRequestsNotificationService {
                     );
                     if (coveringLetterPath) {
                         attachmentFiles.push(coveringLetterPath);
+                        try {
+                            await this.db
+                                .update(instrumentBgDetails)
+                                .set({ coverLetterDocx: coveringLetterPath })
+                                .where(eq(instrumentBgDetails.instrumentId, instrumentId));
+                        } catch (persistError) {
+                            this.logger.warn(
+                                `Failed to persist BG cover letter path for instrument ${instrumentId}: ${persistError instanceof Error ? persistError.message : String(persistError)}`
+                            );
+                        }
                     }
                 } catch (error) {
                     this.logger.warn(
@@ -1392,6 +1402,16 @@ export class PaymentRequestsNotificationService {
                     );
                     if (prefilledBgPath) {
                         attachmentFiles.push(prefilledBgPath);
+                        try {
+                            await this.db
+                                .update(instrumentBgDetails)
+                                .set({ prefilledAppDocx: prefilledBgPath })
+                                .where(eq(instrumentBgDetails.instrumentId, instrumentId));
+                        } catch (persistError) {
+                            this.logger.warn(
+                                `Failed to persist BG prefilled application path for instrument ${instrumentId}: ${persistError instanceof Error ? persistError.message : String(persistError)}`
+                            );
+                        }
                     }
                 } catch (error) {
                     this.logger.warn(

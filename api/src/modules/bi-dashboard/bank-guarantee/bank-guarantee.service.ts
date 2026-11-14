@@ -1494,6 +1494,8 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 extensionLetterPath: instrumentBgDetails.extensionLetterPath,
                 cancellationLetterPath: instrumentBgDetails.cancellationLetterPath,
                 prefilledSignedBg: instrumentBgDetails.prefilledSignedBg,
+                coverLetterDocx: instrumentBgDetails.coverLetterDocx,
+                prefilledAppDocx: instrumentBgDetails.prefilledAppDocx,
                 bgNeeds: instrumentBgDetails.bgNeeds,
                 bgPurpose: instrumentBgDetails.bgPurpose,
                 bgSoftCopy: instrumentBgDetails.bgSoftCopy,

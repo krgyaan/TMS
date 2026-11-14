@@ -241,6 +241,9 @@ export const instrumentBgDetails = pgTable('instrument_bg_details', {
     extensionLetterPath: varchar('extension_letter_path', { length: 500 }), // emd_bgs.request_extension_pdf
     cancellationLetterPath: varchar('cancellation_letter_path', { length: 500 }), // emd_bgs.request_cancellation_pdf
     prefilledSignedBg: text('prefilled_signed_bg'), // emd_bgs.prefilled_signed_bg
+    // DOCX letters generated automatically when the BG create-request mail is sent
+    coverLetterDocx: varchar('cover_letter_docx', { length: 500 }), // bi-dashboard/bank-guarantee/bgcovletter/...
+    prefilledAppDocx: varchar('prefilled_app_docx', { length: 500 }), // bi-dashboard/bank-guarantee/bgprefill/...
 
     // BG Basic Info
     bgNeeds: varchar('bg_needs', { length: 255 }), // emd_bgs.bg_needs

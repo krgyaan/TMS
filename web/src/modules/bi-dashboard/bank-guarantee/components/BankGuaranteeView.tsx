@@ -259,6 +259,12 @@ export function BankGuaranteeView({
                                 label2="PO / Request Letter / Tender Name"
                                 value2={<FileLink file={data.bgPo} />}
                             />
+                            <DataRow
+                                label1="Cover Letter (Generated)"
+                                value1={<FileLink file={data.coverLetterDocx} />}
+                                label2="Prefilled BG Application (Generated)"
+                                value2={<FileLink file={data.prefilledAppDocx} />}
+                            />
 
                             {/* Section 3: Tender/Project Information */}
                             <SectionHeader title="Tender/Project Information" />
