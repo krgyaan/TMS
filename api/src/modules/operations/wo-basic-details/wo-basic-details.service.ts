@@ -14,6 +14,7 @@ import { BadRequestException, ConflictException, Inject, Injectable, NotFoundExc
 import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { AssignOeDto, BulkAssignOeDto, CreateWoBasicDetailDto, RemoveOeAssignmentDto, ReviseOrderDto, UpdateWoBasicDetailDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
+import { computeGemChargesBreakdown, gemBreakdownToDbColumns } from './helpers/gem-charges.helper';
 const oeFirstUser = alias(users, 'oeFirstUser');
 const oeSiteVisitUser = alias(users, 'oeSiteVisitUser');
 const oeDocsPrepUser = alias(users, 'oeDocsPrepUser');
@@ -57,6 +58,15 @@ export class WoBasicDetailsService {
             budgetAdmin: data.budgetAdmin ?? null,
             budgetBuybackSale: data.budgetBuybackSale ?? null,
             budgetGemCharges: data.budgetGemCharges ?? null,
+            ...(Number(data.gemChargesAmount) > 0
+                ? gemBreakdownToDbColumns(data.gemChargesAmount)
+                : {
+                      gemChargesPreGstAmount: null,
+                      gemChargesGstAmount: null,
+                      gemChargesTotalPayable: null,
+                      gemChargesTdsAmount: null,
+                      gemChargesNetPayable: null,
+                  }),
             woDraft: data.woDraft ?? null,
             teChecklistConfirmed: data.teChecklistConfirmed ?? false,
             tmsDocuments: data.tmsDocuments ?? null,
@@ -89,6 +99,17 @@ export class WoBasicDetailsService {
         if (data.budgetAdmin !== undefined) out.budgetAdmin = data.budgetAdmin;
         if (data.budgetBuybackSale !== undefined) out.budgetBuybackSale = data.budgetBuybackSale;
         if (data.budgetGemCharges !== undefined) out.budgetGemCharges = data.budgetGemCharges;
+        if (data.gemChargesAmount !== undefined) {
+            if (Number(data.gemChargesAmount) > 0) {
+                Object.assign(out, gemBreakdownToDbColumns(data.gemChargesAmount));
+            } else {
+                out.gemChargesPreGstAmount = null;
+                out.gemChargesGstAmount = null;
+                out.gemChargesTotalPayable = null;
+                out.gemChargesTdsAmount = null;
+                out.gemChargesNetPayable = null;
+            }
+        }
         if (data.woDraft !== undefined) out.woDraft = data.woDraft;
         if (data.teChecklistConfirmed !== undefined) out.teChecklistConfirmed = data.teChecklistConfirmed;
         if (data.tmsDocuments !== undefined) out.tmsDocuments = data.tmsDocuments;
@@ -123,6 +144,11 @@ export class WoBasicDetailsService {
             budgetAdmin: row.budgetAdmin,
             budgetBuybackSale: row.budgetBuybackSale,
             budgetGemCharges: row.budgetGemCharges,
+            gemChargesPreGstAmount: row.gemChargesPreGstAmount,
+            gemChargesGstAmount: row.gemChargesGstAmount,
+            gemChargesTotalPayable: row.gemChargesTotalPayable,
+            gemChargesTdsAmount: row.gemChargesTdsAmount,
+            gemChargesNetPayable: row.gemChargesNetPayable,
             woDraft: row.woDraft,
             tmsDocuments: row.tmsDocuments,
             oeFirst: row.oeFirst,
@@ -353,15 +379,19 @@ export class WoBasicDetailsService {
         }
 
         const response = this.mapRowToResponse(row);
-        const gemCharges = await this.getGemCharges(id);
+        const gemCharges = await this.getGemCharges(id, row);
         return { ...response, ...gemCharges };
     }
 
     /**
      * Loads the auto-created GeM charges project payment request for a WO Basic Detail
      * so it can be preloaded into the edit form and reconciled on update.
+     *
+     * The breakdown is persisted on the WO Basic Detail. Legacy rows (created before
+     * the breakdown columns existed) fall back to treating the stored payment request
+     * amount as the pre-GST amount, which matches the old semantics.
      */
-    private async getGemCharges(woBasicDetailId: number) {
+    private async getGemCharges(woBasicDetailId: number, row?: WoBasicDetailRow) {
         const [project] = await this.db
             .select({ id: projects.id })
             .from(projects)
@@ -369,14 +399,32 @@ export class WoBasicDetailsService {
             .limit(1);
 
         if (!project) {
-            return { gemChargesAmount: null, gemChargesPortalLink: null, gemChargesInvoice: null };
+            return {
+                gemChargesAmount: null,
+                gemChargesGstAmount: null,
+                gemChargesTotalPayable: null,
+                gemChargesTdsAmount: null,
+                gemChargesNetPayable: null,
+                gemChargesPortalLink: null,
+                gemChargesInvoice: null,
+            };
         }
 
         const requests = await this.paymentRequestService.getByProject(project.id);
         const gemRequest: any = requests.find((r: any) => r.paymentAgainst === 'gem_charges') ?? null;
 
+        const storedPreGst = row?.gemChargesPreGstAmount != null ? Number(row.gemChargesPreGstAmount) : null;
+        const legacyPreGst = gemRequest?.amount != null ? Number(gemRequest.amount) : null;
+        const preGst = storedPreGst != null ? storedPreGst : legacyPreGst;
+
+        const breakdown = preGst != null && preGst > 0 ? computeGemChargesBreakdown(preGst) : null;
+
         return {
-            gemChargesAmount: gemRequest?.amount != null ? Number(gemRequest.amount) : null,
+            gemChargesAmount: breakdown?.preGst ?? null,
+            gemChargesGstAmount: breakdown?.gstAmount ?? null,
+            gemChargesTotalPayable: breakdown?.totalPayable ?? null,
+            gemChargesTdsAmount: breakdown?.tdsAmount ?? null,
+            gemChargesNetPayable: breakdown?.netPayable ?? null,
             gemChargesPortalLink: gemRequest?.portalLink ?? null,
             gemChargesInvoice: gemRequest?.billFiles ? JSON.stringify(gemRequest.billFiles) : null,
         };
@@ -770,7 +818,8 @@ export class WoBasicDetailsService {
         currentUserId?: number
     ): Promise<void> {
         try {
-            const amount = Number(data.gemChargesAmount) || 0;
+            const breakdown = computeGemChargesBreakdown(data.gemChargesAmount);
+            const amount = breakdown.netPayable;
             if (!(amount > 0)) {
                 this.logger.log(`Skipping project payment request for WO Basic Detail ${woBasicDetailId}: GeM charges amount is 0`);
                 return;
@@ -787,7 +836,7 @@ export class WoBasicDetailsService {
                 portalLink: data.gemChargesPortalLink || null,
                 uploadedInvoiceFile: gemInvoiceFiles[0] ?? null,
                 billFiles: gemInvoiceFiles,
-                remark: `Auto-created from Basic Detail: ${woBasicDetailId}, for ${data.projectName}`,
+                remark: `Auto-created from Basic Detail: ${woBasicDetailId}, for ${data.projectName}. Pre-GST ${breakdown.preGst}, GST ${breakdown.gstAmount}, Total ${breakdown.totalPayable}, TDS ${breakdown.tdsAmount}, Net payable ${breakdown.netPayable}`,
                 requestedBy: currentUserId,
             };
 
@@ -894,7 +943,8 @@ export class WoBasicDetailsService {
             const requests = await this.paymentRequestService.getByProject(project.id);
             const existing: any = requests.find((r: any) => r.paymentAgainst === 'gem_charges') ?? null;
 
-            const amount = Number(data.gemChargesAmount) || 0;
+            const breakdown = computeGemChargesBreakdown(data.gemChargesAmount);
+            const amount = breakdown.netPayable;
 
             if (amount > 0) {
                 if (!existing) {
@@ -915,7 +965,7 @@ export class WoBasicDetailsService {
                     portalLink: data.gemChargesPortalLink || null,
                     uploadedInvoiceFile: gemInvoiceFiles[0] ?? null,
                     billFiles: gemInvoiceFiles,
-                    remark: `Auto-created from Basic Detail: ${woBasicDetailId}, for ${data.projectName ?? project.projectName ?? ''}`,
+                    remark: `Auto-created from Basic Detail: ${woBasicDetailId}, for ${data.projectName ?? project.projectName ?? ''}. Pre-GST ${breakdown.preGst}, GST ${breakdown.gstAmount}, Total ${breakdown.totalPayable}, TDS ${breakdown.tdsAmount}, Net payable ${breakdown.netPayable}`,
                 });
                 this.logger.log(`Updated project payment request ${existing.id} for WO Basic Detail ${woBasicDetailId}`);
                 return;

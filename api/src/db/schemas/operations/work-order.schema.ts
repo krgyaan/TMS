@@ -39,6 +39,13 @@ export const woBasicDetails = pgTable("wo_basic_details", {
     budgetBuybackSale: numeric("budget_buyback_sale", { precision: 20, scale: 2 }),
     budgetGemCharges: numeric("budget_gem_charges", { precision: 20, scale: 2 }),
 
+    // GeM charges payment request breakdown (auto-created maker request uses net payable)
+    gemChargesPreGstAmount: numeric("gem_charges_pre_gst_amount", { precision: 20, scale: 2 }),
+    gemChargesGstAmount: numeric("gem_charges_gst_amount", { precision: 20, scale: 2 }),
+    gemChargesTotalPayable: numeric("gem_charges_total_payable", { precision: 20, scale: 2 }),
+    gemChargesTdsAmount: numeric("gem_charges_tds_amount", { precision: 20, scale: 2 }),
+    gemChargesNetPayable: numeric("gem_charges_net_payable", { precision: 20, scale: 2 }),
+
     // Document upload
     woDraft: varchar("wo_draft", { length: 255 }),
     tmsDocuments: jsonb("tms_documents"),

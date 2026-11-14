@@ -14,6 +14,7 @@ import { purchaseOrderProducts } from "@/db/schemas/operations/purchase-order-pr
 import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.schema";
 import { vendorWorkOrderItems } from "@/db/schemas/operations/vendor-work-order-items.schema";
 import { orderExtraCharges } from "@/db/schemas/operations/order-extra-charges.schema";
+import { woBasicDetails } from "@/db/schemas/operations/work-order.schema";
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, desc, eq, gt, like, ne, sql, type SQL } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
@@ -769,10 +770,16 @@ export class PaymentRequestService {
                 vwoTotalPaymentDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE vendor_work_order_id = ${vendorWorkOrders.id} AND status = 'payment_done'), 0)`,
                 fixedExpenseId: fixedExpenses.id,
                 fixedExpenseAmountType: fixedExpenses.amountType,
+                gemChargesPreGstAmount: woBasicDetails.gemChargesPreGstAmount,
+                gemChargesGstAmount: woBasicDetails.gemChargesGstAmount,
+                gemChargesTotalPayable: woBasicDetails.gemChargesTotalPayable,
+                gemChargesTdsAmount: woBasicDetails.gemChargesTdsAmount,
+                gemChargesNetPayable: woBasicDetails.gemChargesNetPayable,
             })
             .from(paymentRequests)
             .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
             .leftJoin(projects, eq(paymentRequests.projectId, projects.id))
+            .leftJoin(woBasicDetails, eq(projects.woBasicDetailId, woBasicDetails.id))
             .leftJoin(purchaseOrders, eq(paymentRequests.purchaseOrderId, purchaseOrders.id))
             .leftJoin(vendorWorkOrders, eq(paymentRequests.vendorWorkOrderId, vendorWorkOrders.id))
             .leftJoin(purchaseInvoices, eq(paymentRequests.purchaseInvoiceId, purchaseInvoices.id))
