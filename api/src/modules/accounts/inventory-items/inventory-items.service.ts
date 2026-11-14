@@ -28,6 +28,7 @@ type ItemInput = {
     isActive: boolean;
 };
 type ItemMasterResponse = InventoryItem & { createdByName: string };
+type ItemCodePreviewInput = { category: string; itemName: string; specifications: Record<string, string> };
 type ItemCodeQueryDb = Pick<DbInstance, "select" | "execute">;
 
 @Injectable()
@@ -74,8 +75,8 @@ export class InventoryItemsService {
         return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
     }
 
-    async findById(id: number): Promise<ItemMasterResponse> {
-        const [item] = await this.db.select({ ...getTableColumns(inventoryItems), createdByName: sql<string>`coalesce(${users.name}, '—')` })
+    async findById(id: number, db: Pick<DbInstance, "select"> = this.db): Promise<ItemMasterResponse> {
+        const [item] = await db.select({ ...getTableColumns(inventoryItems), createdByName: sql<string>`coalesce(${users.name}, '—')` })
             .from(inventoryItems)
             .leftJoin(users, eq(inventoryItems.createdBy, users.id))
             .where(and(eq(inventoryItems.id, id), isNull(inventoryItems.deletedAt)))
@@ -84,11 +85,20 @@ export class InventoryItemsService {
         return item;
     }
 
+    previewItemCode({ category, itemName, specifications }: ItemCodePreviewInput) {
+        const catalogItem = findCatalogItem(category, itemName);
+        if (!catalogItem) throw new BadRequestException(`Item "${itemName}" is not configured in category "${category}"`);
+        if (catalogItem.pending) throw new BadRequestException(`${catalogItem.name} is pending finalization and cannot be created`);
+        if (!catalogItem.codeTemplate) return { itemCode: null, message: "ITM sequence assigned on save" };
+        const itemCode = generateTemplatedItemCode(category, itemName, specifications);
+        return { itemCode: itemCode ?? null, message: itemCode || "Select all options to generate the code" };
+    }
+
     async create(data: ItemInput, authenticatedUserId: number): Promise<ItemMasterResponse> {
         const { teamId: _ignoredTeamId, ...itemData } = data;
         void _ignoredTeamId;
         const catalogItem = findCatalogItem(itemData.category, itemData.itemName);
-        if (catalogItem?.pending) throw new BadRequestException("UPS is pending finalization and cannot be created");
+        if (catalogItem?.pending) throw new BadRequestException(`${catalogItem.name} is pending finalization and cannot be created`);
         if (!getAllowedUnits(itemData.category, itemData.itemName, itemData.specifications).some(unit => unit === itemData.unit)) throw new BadRequestException(`Unit ${itemData.unit} is not valid for ${itemData.itemName}`);
         const hsnCode = itemData.hsnCode?.trim() || null;
         if (!catalogItem?.hsnNotApplicable && !hsnCode) throw new BadRequestException("HSN code is required");
@@ -135,7 +145,12 @@ export class InventoryItemsService {
     }
 
     async update(id: number, data: Partial<ItemInput>, authenticatedUserId: number): Promise<ItemMasterResponse> {
-        const current = await this.findById(id);
+        return this.db.transaction(tx => this.updateInTransaction(tx, id, data, authenticatedUserId));
+    }
+
+    private async updateInTransaction(tx: Pick<DbInstance, "select" | "update" | "execute">, id: number, data: Partial<ItemInput>, authenticatedUserId: number): Promise<ItemMasterResponse> {
+        await tx.execute(sql`SELECT id FROM inventory_items WHERE id = ${id} AND deleted_at IS NULL FOR UPDATE`);
+        const current = await this.findById(id, tx);
         const { teamId: _ignoredTeamId, ...itemData } = data;
         void _ignoredTeamId;
         const updatedValues = { ...current, ...itemData };
@@ -194,8 +209,8 @@ export class InventoryItemsService {
         if (hsnCode && !/^\d{4,8}$/.test(hsnCode)) throw new BadRequestException("HSN code must contain 4 to 8 digits");
 
         const uniquenessData = { ...updatedValues, category, specifications };
-        if (nextItemCode !== current.itemCode) await this.assertItemCodeAvailable(nextItemCode, id);
-        await this.ensureUnique(uniquenessData, nextItemCode, id, this.db, true);
+        if (nextItemCode !== current.itemCode) await this.assertItemCodeAvailable(nextItemCode, id, tx);
+        await this.ensureUnique(uniquenessData, nextItemCode, id, tx, true);
         const conversion = this.resolveItemConversion(
             updatedValues.unit,
             updatedValues.conversionUnit,
@@ -222,13 +237,13 @@ export class InventoryItemsService {
         };
         let updated: { id: number } | undefined;
         try {
-            [updated] = await this.db.update(inventoryItems).set(values).where(eq(inventoryItems.id, id)).returning({ id: inventoryItems.id });
+            [updated] = await tx.update(inventoryItems).set(values).where(eq(inventoryItems.id, id)).returning({ id: inventoryItems.id });
         } catch (error) {
             if (this.isUniqueViolation(error)) throw new ConflictException(`Item code ${nextItemCode} already exists`);
             throw error;
         }
         if (!updated) throw new NotFoundException(`Inventory item with ID ${id} not found`);
-        return this.findById(updated.id);
+        return this.findById(updated.id, tx);
     }
 
     async softDelete(id: number): Promise<void> {
@@ -289,8 +304,8 @@ export class InventoryItemsService {
         }
     }
 
-    private async assertItemCodeAvailable(itemCode: string, excludeId: number) {
-        const [existing] = await this.db.select({ id: inventoryItems.id })
+    private async assertItemCodeAvailable(itemCode: string, excludeId: number, db: Pick<DbInstance, "select"> = this.db) {
+        const [existing] = await db.select({ id: inventoryItems.id })
             .from(inventoryItems)
             .where(and(eq(inventoryItems.itemCode, itemCode), ne(inventoryItems.id, excludeId)))
             .limit(1);

@@ -22,7 +22,15 @@ export const useItemConversionOptions = (unit: string, width?: string, enabled =
     useQuery({
         queryKey: [...inventoryItemsKey, "conversion-options", unit, width, category, itemName, type],
         queryFn: () => inventoryItemsService.master.getConversionOptions(unit, width, category, itemName, type),
-        enabled: enabled && Boolean(unit) && !["Nos.", "Litre", "Pair", "Set"].includes(unit),
+        enabled: enabled && Boolean(unit),
+    });
+
+export const useItemCodePreview = (category: string, itemName: string, specifications: Record<string, string>, enabled = true) =>
+    useQuery({
+        queryKey: [...inventoryItemsKey, "code-preview", category, itemName, specifications],
+        queryFn: () => inventoryItemsService.master.previewCode(category, itemName, specifications),
+        enabled: enabled && Boolean(category && itemName),
+        staleTime: 30_000,
     });
 
 const useItemMutation = (action: (data: InventoryItemPayload) => Promise<InventoryItem>, message: string, includeCode = false) => {

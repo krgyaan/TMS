@@ -47,6 +47,7 @@ const serviceForCrud = (options: { existing?: ReturnType<typeof row>; candidates
         } }),
         execute: async () => ({ rows: [{ nextval: "7" }] }),
     };
+    Object.assign(db, { transaction: (callback: (tx: unknown) => unknown) => callback(db) });
     return { service: new InventoryItemsService(db as never), inserted: () => inserted, updated: () => updated };
 };
 
@@ -71,16 +72,26 @@ describe("InventoryItemsService.validateTeamId", () => {
 });
 
 describe("Item Master catalog codes and validation", () => {
+    it("serves the same authoritative code preview used when saving", () => {
+        const { service } = serviceForCrud();
+        expect(service.previewItemCode({
+            category: "HVAC", itemName: "Split AC",
+            specifications: { type: "Fixed Speed", operation: "Cooling", tonnage: "1.5", btu: "18000", starRating: "5" },
+        })).toEqual({ itemCode: "SAC/F/C/1.5T/18000/5", message: "SAC/F/C/1.5T/18000/5" });
+        expect(() => service.previewItemCode({ category: "Glands", itemName: "Gland", specifications: {} }))
+            .toThrow("Gland is pending finalization and cannot be created");
+    });
+
     it.each([
-        ["Batteries", "Ni-Cd Battery", { type: "KP", discharge: "L", capacity: "100.00" }, "NICD/KP/L/100AH"],
-        ["Batteries", "VRLA Battery", { type: "TGel", voltage: "12V", capacity: "40.500" }, "VRLA/TGEL/12V/40.5AH"],
-        ["Batteries", "Flooded Lead-Acid Battery", { type: "OPzS", capacity: "00120.0" }, "FLA/OPZS/120AH"],
+        ["Batteries", "Ni-Cd Battery", { type: "KP", discharge: "L", capacity: "100.00" }, "NICD/KPL/100"],
+        ["Batteries", "VRLA Battery", { type: "TGel", voltage: "12V", capacity: "40.500" }, "VRLA/TGEL/12V/40.5"],
+        ["Batteries", "Flooded Lead-Acid Battery", { type: "OPzS", capacity: "00120.0" }, "FLA/OPZS/120"],
     ])("generates the sheet code template for %s / %s", (category, name, specifications, expected) => {
         expect(generateTemplatedItemCode(category as string, name as string, specifications as Record<string, string>)).toBe(expected);
     });
 
     it("uses no catalog template for every non-sheet item", () => {
-        expect(generateTemplatedItemCode("Battery Accessories", "ICC", { mRating: "M10", insulation: "Insulated", coating: "Nickel-Coated" })).toBe("ICC/M10/INSULATED/NICKEL-COATED");
+        expect(generateTemplatedItemCode("Battery Accessories", "ICC", { mRating: "M10", insulation: "Insulated", coating: "Nickel-Coated" })).toBe("ICC/I/M10/NC");
         expect(generateTemplatedItemCode("Legacy", "Copper", { diameter: "12" })).toBeUndefined();
     });
 
@@ -94,15 +105,15 @@ describe("Item Master catalog codes and validation", () => {
     });
 
     it.each([
-        ["Battery Accessories", "IPP", { numberOfPoles: "3", mRating: "M10", insulation: "Insulated", coating: "Tin-Coated" }, "IPP/3/M10/INSULATED/TIN-COATED"],
-        ["Battery Accessories", "Vent Plug", { mRating: "M20", type: "Vented" }, "Vent/M20/VENTED"],
-        ["Battery Accessories", "Electrolyte", { type: "DM Water" }, "Electrolyte/DM-WATER"],
+        ["Battery Accessories", "IPP", { numberOfPoles: "3", mRating: "M10", insulation: "Insulated", coating: "Tin-Coated" }, "IPP/P3/M10/I/TC"],
+        ["Battery Accessories", "Vent Plug", { mRating: "M20", type: "Vented" }, "Vent/V/M20"],
+        ["Battery Accessories", "Electrolyte", { type: "DM Water" }, "Electrolyte/DM"],
         ["Battery Accessories", "Cell Lifter", { type: "Non-Insulated" }, "CellLifter/NI"],
-        ["Battery Accessories", "Battery Stand", { material: "MS", steps: "4", tiers: "2", colourCode: "RED-1" }, "BStand/MS/4/2/RED-1"],
-        ["Battery Accessories", "Battery Terminal Box", { numberOfPoles: "6", mRating: "M20" }, "BTerminal/6/M20"],
+        ["Battery Accessories", "Battery Stand", { material: "MS", steps: "4", tiers: "2", colourCode: "RED-1" }, "BStand/MS/S4/T2/RED-1"],
+        ["Battery Accessories", "Battery Terminal Box", { numberOfPoles: "6", mRating: "M20" }, "BTerminal/P6/M20"],
         ["Battery Accessories", "PP Sheet", { thickness: "2", dimensions: "1000 x 2000 mm" }, "PPSheet/2/1000-X-2000-MM"],
-        ["Testing & Measuring Instruments", "Multimeter", { measurementType: "AC-DC", voltageRange: "600", currentRange: "10" }, "Multimeter/AC-DC/600/10"],
-        ["Testing & Measuring Instruments", "Clamp Meter", { measurementType: "DC", voltageRange: "1000", currentRange: "400" }, "ClampMeter/DC/1000/400"],
+        ["Testing & Measuring Instruments", "Multimeter", { measurementType: "AC-DC", voltageRange: "600", currentRange: "10" }, "MultiM/AC-DC/600/10"],
+        ["Testing & Measuring Instruments", "Clamp Meter", { measurementType: "DC", voltageRange: "1000", currentRange: "400" }, "ClampM/DC/1000/400"],
         ["Testing & Measuring Instruments", "Torque Wrench", { torqueRange: "20-100" }, "TorqueWrench/20-100"],
         ["Testing & Measuring Instruments", "Thermometer", {}, "Thermometer"],
         ["Testing & Measuring Instruments", "Thermometer Stand", {}, "ThermometerStand"],
@@ -139,7 +150,10 @@ describe("Item Master catalog codes and validation", () => {
         })).toMatch(/Zero Transfer Time is not available/);
         expect(validateCatalogItemValues("Testing & Measuring Instruments", "Multimeter", null, {
             measurementType: "AC", voltageRange: "0", currentRange: "1",
-        })).toBe("Voltage Range (V) must be greater than 0");
+        })).toBe("Voltage Range (V) must be at least 1");
+        expect(validateCatalogItemValues("Testing & Measuring Instruments", "Multimeter", null, {
+            measurementType: "AC", voltageRange: "2001", currentRange: "1",
+        })).toBe("Voltage Range (V) must be at most 2000");
         expect(validateCatalogItemValues("Batteries", "Ni-Cd Battery", null, {
             type: "KP", discharge: "L", capacity: "0",
         })).toBe("Capacity must be greater than 0");
@@ -175,7 +189,7 @@ describe("Item Master create, update, and audit behavior", () => {
         const parsed = itemSchema.parse(payload({ createdBy: 999, updatedBy: 888 }));
         const result = await service.create(parsed, 42);
         expect(inserted()).toMatchObject({
-            itemCode: "NICD/KP/L/100AH", teamId: null, createdBy: 42, updatedBy: 42,
+            itemCode: "NICD/KPL/100", teamId: null, createdBy: 42, updatedBy: 42,
             category: "Batteries", hsnCode: "0009997",
         });
         expect(inserted()).not.toHaveProperty("createdBy", 999);
@@ -233,19 +247,19 @@ describe("Item Master create, update, and audit behavior", () => {
         await expect(service.create(body, 7)).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it("uses the existing sequence code for an item without a code template", async () => {
+    it("rejects items whose technical configuration is pending", async () => {
         const { service, inserted } = serviceForCrud();
-        await service.create(itemSchema.parse(payload({
+        await expect(service.create(itemSchema.parse(payload({
             category: "Glands", itemName: "Gland", specifications: {},
-        })), 7);
-        expect(inserted()).toMatchObject({ itemCode: "ITM-0007" });
+        })), 7)).rejects.toThrow("Gland is pending finalization and cannot be created");
+        expect(inserted()).toBeUndefined();
     });
 
     it("reports an existing templated code in duplicate conflicts", async () => {
-        const duplicate = row({ itemCode: "NICD/KP/L/100AH", itemName: "Ni-Cd Battery", category: "Batteries", unit: "Nos.", specifications: { type: "KP", discharge: "L", capacity: "100" } });
+        const duplicate = row({ itemCode: "NICD/KPL/100", itemName: "Ni-Cd Battery", category: "Batteries", unit: "Nos.", specifications: { type: "KP", discharge: "L", capacity: "100" } });
         const { service } = serviceForCrud({ candidates: [duplicate] });
         await expect(service.create(itemSchema.parse(payload()), 7))
-            .rejects.toThrow("code NICD/KP/L/100AH");
+            .rejects.toThrow("code NICD/KPL/100");
     });
 
     it("reports the existing code for an untemplated name, brand and unit duplicate", async () => {
@@ -291,6 +305,6 @@ describe("Item Master create, update, and audit behavior", () => {
         });
         const { service, updated } = serviceForCrud({ existing });
         await service.update(1, { specifications: { type: "RGS", discharge: "L", capacity: "100" } }, 42);
-        expect(updated()).toMatchObject({ itemCode: "NICD/RGS/L/100AH" });
+        expect(updated()).toMatchObject({ itemCode: "NICD/RGSL/100" });
     });
 });
