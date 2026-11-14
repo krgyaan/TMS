@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useDeleteInventoryItem, useInventoryItems, useUpdateInventoryItem, type ItemMasterTeam } from "@/hooks/api/useInventoryItems";
 import type { InventoryItem } from "@/types/inventory-item.types";
 import { formatKeySpecification, itemMasterColumnsForViewport, keySpecificationAttributes } from "./item-master-display";
+import { getItemMainCategory } from "./item-catalog";
 import { toast } from "sonner";
 import { paths } from "@/app/routes/paths";
 
@@ -76,13 +77,13 @@ export default function InventoryItemListPage({ team }: { team: ItemMasterTeam }
 
     const columns = useMemo<ColDef<InventoryItem>[]>(() => [
         { field: "itemCode", headerName: "Item Code", width: 130, minWidth: 130, maxWidth: 175, tooltipField: "itemCode" },
-        { field: "itemName", headerName: "Item Name", flex: 1.4, minWidth: 190, maxWidth: 350, tooltipField: "itemName", cellStyle: { fontWeight: 500 } },
+        { field: "itemName", headerName: "Item Name", flex: 1.4, minWidth: 190, maxWidth: 350, tooltipField: "itemName", cellStyle: { fontWeight: 500 } as ColDef<InventoryItem>["cellStyle"] },
         ...(visibility.category ? [{ headerName: "Category", field: "category", flex: 1.2, minWidth: 170, maxWidth: 300, valueGetter: (p: { data?: InventoryItem }) => p.data ? p.data.category || "Legacy" : "", tooltipValueGetter: (p: { value?: string | null }) => p.value ?? "", wrapText: true, autoHeight: true, cellRenderer: (p: { value?: string }) => <div className="w-full whitespace-normal break-words py-1 leading-5">{p.value}</div> } as ColDef<InventoryItem>] : []),
         { headerName: "Key Specification", flex: 2.4, minWidth: 280, maxWidth: 500, valueGetter: (p: { data?: InventoryItem }) => formatKeySpecification(p.data?.category, p.data?.itemName || "", p.data?.specifications || {}, p.data?.itemType), tooltipValueGetter: (p: { value?: string | null }) => p.value ?? "", wrapText: true, autoHeight: true, cellRenderer: (p: { data?: InventoryItem }) => p.data ? <KeySpecificationChips item={p.data} /> : <span>—</span> },
         ...(visibility.unit ? [{ field: "unit", headerName: "Unit", width: 80, minWidth: 80, maxWidth: 90 } as ColDef<InventoryItem>] : []),
         { field: "hsnCode", headerName: "HSN Code", width: 110, minWidth: 110, maxWidth: 130, valueGetter: (p: { data?: InventoryItem }) => p.data?.hsnCode || "—", tooltipValueGetter: (p: { value?: string | null }) => p.value ?? "" },
         ...(visibility.createdBy ? [{ headerName: "Created By", field: "createdByName", width: 150, minWidth: 150, maxWidth: 180, valueGetter: (p: { data?: InventoryItem }) => p.data?.createdByName || "—", tooltipValueGetter: (p: { value?: string | null }) => p.value ?? "" } as ColDef<InventoryItem>] : []),
-        { headerName: "Actions", filter: false, sortable: false, width: 80, minWidth: 80, maxWidth: 80, headerComponent: () => <div className="w-full text-center">Actions</div>, cellRenderer: createActionColumnRenderer(actions), cellStyle: { display: "flex", alignItems: "center", justifyContent: "center" } },
+        { headerName: "Actions", filter: false, sortable: false, width: 80, minWidth: 80, maxWidth: 80, headerComponent: () => <div className="w-full text-center">Actions</div>, cellRenderer: createActionColumnRenderer(actions), cellStyle: { display: "flex", alignItems: "center", justifyContent: "center" } as ColDef<InventoryItem>["cellStyle"] },
     ], [visibility.category, visibility.unit, visibility.createdBy, actions]);
 
     const setSearchValue = (value: string) => {
