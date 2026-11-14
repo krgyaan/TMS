@@ -17,7 +17,7 @@ export const vendorOrganizations = pgTable(
         majorActivity: varchar("major_activity", { length: 50 }),
         registrationType: varchar("registration_type", { length: 20 }),
         creditPeriodDays: integer("credit_period_days"),
-        creditAmount: numeric("credit_amount", { precision: 14, scale: 2 }),
+        creditAmount: numeric("credit_amount", { precision: 14, scale: 2, mode: "number" }),
         pan: varchar("pan", { length: 100 }),
         // Also holds the sheet's "Unregistered Address" for UNREGISTERED vendors.
         address: text("address"),
