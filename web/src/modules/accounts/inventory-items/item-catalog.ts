@@ -128,7 +128,28 @@ export const AC_ITEM_CATALOG: CatalogCategory[] = [{ name: "AC Accessories", ite
     { name: "AC Stand", codeTemplate: "ACStand/{type}/{mounting}/{size}", unitOptions: ["Nos.", "Kg"], defaultUnit: "Nos.", fields: [field("type", "Type", "select", { required: true, options: [{ value: "Powder Coated", codeToken: "PC" }, { value: "MS", codeToken: "MS" }] }), field("mounting", "Mounting", "select", { required: true, options: [{ value: "Wall", codeToken: "W" }, { value: "Floor", codeToken: "F" }] }), select("size", "Size", ["18", "24", "26"])], conversionPairs: [] },
     { name: "Rubber Pad", codeTemplate: "RubberPad/{thickness}/{size}", unitOptions: ["Nos."], fields: [field("thickness", "Thickness (mm)", "number", { required: true, min: 0, minExclusive: true }), field("size", "Size (inches)", "number", { required: true, min: 0, minExclusive: true })], conversionPairs: [] },
     noCode("Stand Insulator", { pending: true, fields: [field("specification", "Specification", "text")] }),
-]}];
+]}, {
+    name: "HVAC", items: [
+        ...[
+            { name: "Split AC", code: "SAC" },
+            { name: "Window AC", code: "WAC" },
+            { name: "Tower AC", code: "TAC" },
+            { name: "Cassette AC", code: "CAC" },
+        ].map(({ name, code }): CatalogItem => ({
+            name,
+            codeTemplate: `${code}/{type}/{operation}/{tonnage}T/{btu}/{starRating}`,
+            defaultUnit: "Nos.",
+            unitOptions: ["Nos."],
+            fields: [
+                field("type", "Type", "select", { required: true, options: [{ value: "Fixed Speed", codeToken: "F" }, { value: "Inverter", codeToken: "I" }] }),
+                field("operation", "Operation Type", "select", { required: true, options: [{ value: "Cooling", codeToken: "C" }, { value: "Hot & Cold", codeToken: "HC" }] }),
+                field("tonnage", "Tonnage (T)", "number", { required: true, min: 0, minExclusive: true }),
+                field("btu", "BTU", "number", { required: true, min: 0, minExclusive: true }),
+                field("starRating", "Star Rating", "number", { required: true, min: 0, minExclusive: true, integer: true }),
+            ],
+        })),
+    ],
+}];
 
 export const ITEM_CATALOG: CatalogCategory[] = [...DC_ITEM_CATALOG, ...AC_ITEM_CATALOG];
 
