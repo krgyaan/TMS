@@ -762,6 +762,13 @@
       "when": 1798300000000,
       "tag": "0180_vendor_organizations_sheet_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 127,
+      "version": "7",
+      "when": 1798000000003,
+      "tag": "0180_remove_inventory_item_subcategory",
+      "breakpoints": true
     }
   ]
 }

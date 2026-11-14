@@ -6,7 +6,7 @@ import { inventoryItems, type InventoryItem } from "@db/schemas/accounts/invento
 import { teams } from "@db/schemas/master/teams.schema";
 import { users } from "@db/schemas/auth/users.schema";
 import { resolveConversion } from "./conversion-rules";
-import { findCatalogItem, getItemMainCategory } from "./item-catalog";
+import { fieldIsVisible, findCatalogItem, getAllowedConversionPairs, getAllowedUnits, getItemMainCategory } from "./item-catalog";
 import { generateTemplatedItemCode } from "./item-code-generator";
 import { validateCatalogItemValues } from "./item-catalog-validation";
 
@@ -15,7 +15,6 @@ type ItemInput = {
     teamId?: number | null;
     itemGroup?: string | null;
     category: string;
-    subcategory?: string | null;
     modelNumber?: string | null;
     itemName: string;
     itemType?: string | null;
@@ -25,7 +24,7 @@ type ItemInput = {
     unit: string;
     conversionUnit?: string | null;
     conversionFactor?: string | number | null;
-    hsnCode: string;
+    hsnCode?: string | null;
     isActive: boolean;
 };
 type ItemMasterResponse = InventoryItem & { createdByName: string };
@@ -51,7 +50,6 @@ export class InventoryItemsService {
                 ilike(inventoryItems.itemCode, `%${search}%`),
                 ilike(inventoryItems.itemName, `%${search}%`),
                 ilike(inventoryItems.category, `%${search}%`),
-                ilike(inventoryItems.subcategory, `%${search}%`),
                 ilike(inventoryItems.modelNumber, `%${search}%`),
                 ilike(inventoryItems.itemType, `%${search}%`),
                 ilike(inventoryItems.hsnCode, `%${search}%`),
@@ -91,33 +89,37 @@ export class InventoryItemsService {
         void _ignoredTeamId;
         const catalogItem = findCatalogItem(itemData.category, itemData.itemName);
         if (catalogItem?.pending) throw new BadRequestException("UPS is pending finalization and cannot be created");
+        if (!getAllowedUnits(itemData.category, itemData.itemName, itemData.specifications).some(unit => unit === itemData.unit)) throw new BadRequestException(`Unit ${itemData.unit} is not valid for ${itemData.itemName}`);
+        const hsnCode = itemData.hsnCode?.trim() || null;
+        if (!catalogItem?.hsnNotApplicable && !hsnCode) throw new BadRequestException("HSN code is required");
+        if (hsnCode && !/^\d{4,8}$/.test(hsnCode)) throw new BadRequestException("HSN code must contain 4 to 8 digits");
         const validationError = validateCatalogItemValues(itemData.category, itemData.itemName, itemData.itemType, itemData.specifications);
         if (validationError) throw new BadRequestException(validationError);
+        const cleanSpecifications = this.applicableSpecifications(itemData.category, itemData.itemName, itemData.specifications);
+        const typeField = catalogItem?.fields.find(field => field.listColumn === "type");
+        const resolvedItemType = typeField ? cleanSpecifications[typeField.key] || null : itemData.itemType?.trim() || null;
 
         const generatedCode = catalogItem?.codeTemplate
-            ? generateTemplatedItemCode(itemData.category, itemData.itemName, itemData.specifications)
+            ? generateTemplatedItemCode(itemData.category, itemData.itemName, cleanSpecifications)
             : undefined;
         if (catalogItem?.codeTemplate && !generatedCode) {
             throw new BadRequestException("Select all code-forming options to generate the item code");
         }
-        const conversion = this.resolveItemConversion(itemData.unit, itemData.conversionUnit, itemData.conversionFactor, itemData.specifications || {});
-        if (catalogItem?.codePrefix) {
-            const insertedId = await this.createPrefixedItem(itemData, catalogItem.codePrefix, conversion, authenticatedUserId);
-            return this.findById(insertedId);
-        }
+        const conversion = this.resolveItemConversion(itemData.unit, itemData.conversionUnit, itemData.conversionFactor, cleanSpecifications, getAllowedConversionPairs(itemData.category, itemData.itemName, cleanSpecifications));
         const itemCode = generatedCode || await this.nextItemCode();
-        await this.ensureUnique(itemData, itemCode);
+        await this.ensureUnique(itemData, itemCode, undefined, this.db, true);
         let inserted: { id: number } | undefined;
         try {
             [inserted] = await this.db.insert(inventoryItems).values({
                 ...itemData,
+                specifications: cleanSpecifications,
                 itemGroup: itemData.itemGroup ?? null,
                 teamId: null,
                 category: itemData.category,
-                subcategory: null,
                 modelNumber: itemData.modelNumber?.trim() || null,
                 makeBrand: itemData.makeBrand?.trim() || null,
-                itemType: itemData.itemType?.trim() || null,
+                itemType: resolvedItemType,
+                hsnCode,
                 description: itemData.description?.trim() || null,
                 ...conversion,
                 createdBy: authenticatedUserId,
@@ -138,56 +140,84 @@ export class InventoryItemsService {
         void _ignoredTeamId;
         const updatedValues = { ...current, ...itemData };
         const category = itemData.category || getItemMainCategory(current.itemName, current.category);
-        const specifications = { ...(current.specifications || {}), ...(itemData.specifications || {}) };
+        let mergedSpecifications = { ...(current.specifications || {}), ...(itemData.specifications || {}) };
         const currentCategory = getItemMainCategory(current.itemName, current.category);
         const currentCatalogItem = findCatalogItem(currentCategory, current.itemName);
-        const codeIsCatalogGenerated = Boolean(currentCatalogItem?.codeTemplate && current.itemCode);
+        const currentTypeFieldForMerge = currentCatalogItem?.fields.find(field => field.listColumn === "type");
+        if (currentTypeFieldForMerge && current.itemType && !mergedSpecifications[currentTypeFieldForMerge.key]) {
+            mergedSpecifications = { ...mergedSpecifications, [currentTypeFieldForMerge.key]: current.itemType };
+        }
+        const targetCatalogItem = findCatalogItem(category, updatedValues.itemName);
+        const specifications = this.applicableSpecifications(category, updatedValues.itemName, mergedSpecifications);
+        const targetTypeField = targetCatalogItem?.fields.find(field => field.listColumn === "type");
+        const resolvedItemType = targetTypeField ? specifications[targetTypeField.key] || null : updatedValues.itemType;
+        if (targetCatalogItem && itemData.specifications) {
+            const invalidHiddenField = targetCatalogItem.fields.find(field => itemData.specifications?.[field.key]?.trim() && !fieldIsVisible(mergedSpecifications, field));
+            if (invalidHiddenField) throw new BadRequestException(`${invalidHiddenField.label} is not available for the selected options`);
+        }
+        const currentTypeField = currentCatalogItem?.fields.find(field => field.listColumn === "type");
+        const currentSpecificationsForCode = { ...(current.specifications || {}), ...(currentTypeField && current.itemType && !current.specifications?.[currentTypeField.key] ? { [currentTypeField.key]: current.itemType } : {}) };
+        const codeIsCatalogGenerated = Boolean(currentCatalogItem?.codeTemplate && current.itemCode === generateTemplatedItemCode(currentCategory, current.itemName, currentSpecificationsForCode));
+        let nextItemCode = current.itemCode;
 
-        if (codeIsCatalogGenerated && currentCatalogItem?.codeTemplate) {
-            const codeKeys = [...currentCatalogItem.codeTemplate.matchAll(/\{([A-Za-z0-9_]+)\}/g)].map(match => match[1]);
-            const changedCodeField = itemData.category !== undefined && itemData.category !== current.category
-                || itemData.itemName !== undefined && itemData.itemName !== current.itemName
-                || codeKeys.some(key => itemData.specifications?.[key] !== undefined && itemData.specifications[key] !== current.specifications?.[key]);
-            if (changedCodeField) throw new BadRequestException("Code-forming fields cannot be changed after an item code is assigned");
+        const codeKeys = new Set([
+            ...[currentCatalogItem?.codeTemplate, targetCatalogItem?.codeTemplate].filter((template): template is string => Boolean(template))
+                .flatMap(template => [...template.matchAll(/\{([A-Za-z0-9_]+)\}/g)].map(match => match[1])),
+        ]);
+        const changedCodeField = itemData.category !== undefined && itemData.category !== current.category
+            || itemData.itemName !== undefined && itemData.itemName !== current.itemName
+            || [...codeKeys].some(key => specifications[key] !== currentSpecificationsForCode[key]);
+        if (changedCodeField && targetCatalogItem?.codeTemplate) {
+            nextItemCode = generateTemplatedItemCode(category, updatedValues.itemName, specifications) || "";
+            if (!nextItemCode) throw new BadRequestException("Select valid values for all code-forming fields");
+        } else if (changedCodeField && codeIsCatalogGenerated) {
+            nextItemCode = await this.nextItemCode();
         }
 
         if (itemData.category !== undefined || itemData.itemName !== undefined || itemData.specifications !== undefined) {
             const validationError = validateCatalogItemValues(
                 category,
                 updatedValues.itemName,
-                updatedValues.itemType,
+                resolvedItemType,
                 specifications,
                 Object.keys(current.specifications || {}),
+                !codeIsCatalogGenerated && !changedCodeField,
             );
             if (validationError) throw new BadRequestException(validationError);
         }
-        const targetCatalogItem = findCatalogItem(category, updatedValues.itemName);
-        if (targetCatalogItem?.pending) throw new BadRequestException("UPS is pending finalization and cannot be created");
+        if (((itemData.unit !== undefined && itemData.unit !== current.unit) || changedCodeField)
+            && !getAllowedUnits(category, updatedValues.itemName, specifications).some(unit => unit === updatedValues.unit)) {
+            throw new BadRequestException(`Unit ${itemData.unit} is not valid for ${updatedValues.itemName}`);
+        }
+        const hsnCode = itemData.hsnCode === undefined ? current.hsnCode : itemData.hsnCode?.trim() || null;
+        if (itemData.hsnCode !== undefined && !targetCatalogItem?.hsnNotApplicable && !hsnCode) throw new BadRequestException("HSN code is required");
+        if (hsnCode && !/^\d{4,8}$/.test(hsnCode)) throw new BadRequestException("HSN code must contain 4 to 8 digits");
 
         const uniquenessData = { ...updatedValues, category, specifications };
-        await this.ensureUnique(uniquenessData, current.itemCode, id, this.db, codeIsCatalogGenerated);
+        await this.ensureUnique(uniquenessData, nextItemCode, id, this.db, true);
         const conversion = this.resolveItemConversion(
             updatedValues.unit,
             updatedValues.conversionUnit,
             updatedValues.conversionFactor,
             specifications,
+            getAllowedConversionPairs(category, updatedValues.itemName, specifications),
         );
         const values = {
             itemName: updatedValues.itemName,
-            itemType: updatedValues.itemType,
+            itemType: resolvedItemType,
             category: updatedValues.category ?? null,
-            subcategory: updatedValues.subcategory ?? null,
             modelNumber: updatedValues.modelNumber?.trim() || null,
             makeBrand: updatedValues.makeBrand?.trim() || null,
             description: updatedValues.description,
             specifications,
             unit: updatedValues.unit,
-            hsnCode: updatedValues.hsnCode,
+            hsnCode,
             isActive: updatedValues.isActive,
             ...conversion,
             itemGroup: updatedValues.itemGroup ?? null,
             updatedBy: authenticatedUserId,
             updatedAt: new Date(),
+            itemCode: nextItemCode,
         };
         const [updated] = await this.db.update(inventoryItems).set(values).where(eq(inventoryItems.id, id)).returning({ id: inventoryItems.id });
         if (!updated) throw new NotFoundException(`Inventory item with ID ${id} not found`);
@@ -210,52 +240,6 @@ export class InventoryItemsService {
             this.logger.error(`Failed to validate Item Master team ${teamId}`, error instanceof Error ? error.stack : undefined);
             throw error;
         }
-    }
-
-    private async createPrefixedItem(
-        itemData: ItemInput,
-        prefix: string,
-        conversion: ReturnType<typeof resolveConversion>,
-        authenticatedUserId: number,
-    ): Promise<number> {
-        for (let attempt = 0; attempt < 3; attempt++) {
-            try {
-                return await this.db.transaction(async tx => {
-                    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`inventory-item-code:${prefix}`})::bigint)`);
-                    const itemCode = await this.nextPrefixedItemCode(tx, prefix);
-                    await this.ensureUnique(itemData, itemCode, undefined, tx);
-                    const [inserted] = await tx.insert(inventoryItems).values({
-                        ...itemData,
-                        itemGroup: itemData.itemGroup ?? null,
-                        teamId: null,
-                        category: itemData.category,
-                        makeBrand: itemData.makeBrand?.trim() || null,
-                        itemType: itemData.itemType?.trim() || null,
-                        description: itemData.description?.trim() || null,
-                        ...conversion,
-                        createdBy: authenticatedUserId,
-                        updatedBy: authenticatedUserId,
-                        itemCode,
-                    }).returning({ id: inventoryItems.id });
-                    if (!inserted) throw new Error("Unable to create inventory item");
-                    return inserted.id;
-                });
-            } catch (error) {
-                if (!this.isUniqueViolation(error)) throw error;
-            }
-        }
-        throw new ConflictException(`Unable to allocate a unique ${prefix} item code after retries`);
-    }
-
-    private async nextPrefixedItemCode(db: Pick<DbInstance, "execute">, prefix: string): Promise<string> {
-        const { rows } = await db.execute<{ current: number }>(sql`
-            SELECT COALESCE(MAX(substring(item_code FROM ${prefix.length + 2})::integer), 0)::integer AS current
-              FROM inventory_items
-             WHERE item_code ~ ${`^${prefix}-[0-9]{3}$`}
-        `);
-        const nextValue = Number(rows[0]?.current || 0) + 1;
-        if (nextValue > 999) throw new ConflictException(`The ${prefix} item code sequence is exhausted`);
-        return `${prefix}-${String(nextValue).padStart(3, "0")}`;
     }
 
     private async ensureUnique(
@@ -303,12 +287,21 @@ export class InventoryItemsService {
         return candidate?.code === "23505" || candidate?.cause?.code === "23505";
     }
 
-    private resolveItemConversion(unit: string, conversionUnit: string | null | undefined, factor: unknown, specifications: Record<string, string>) {
+    private resolveItemConversion(unit: string, conversionUnit: string | null | undefined, factor: unknown, specifications: Record<string, string>, allowedPairs?: { from: string; to: string }[]) {
         try {
-            return resolveConversion(unit, conversionUnit, factor, specifications);
+            return resolveConversion(unit, conversionUnit, factor, specifications, allowedPairs);
         } catch (error) {
             throw new BadRequestException(error instanceof Error ? error.message : "Invalid item conversion");
         }
+    }
+
+    private applicableSpecifications(category: string, itemName: string, specifications: Record<string, string>) {
+        const catalogItem = findCatalogItem(category, itemName);
+        if (!catalogItem) return specifications;
+        return Object.fromEntries(Object.entries(specifications).filter(([key]) => {
+            const field = catalogItem.fields.find(candidate => candidate.key === key);
+            return !field || fieldIsVisible(specifications, field);
+        }));
     }
 
     private async nextItemCode() {

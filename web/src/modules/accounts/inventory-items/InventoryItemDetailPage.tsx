@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useInventoryItem, type ItemMasterTeam } from "@/hooks/api/useInventoryItems";
 import { paths } from "@/app/routes/paths";
 import type { InventoryItem } from "@/types/inventory-item.types";
-import { findCatalogItem, getItemMainCategory } from "./item-catalog";
+import { findCatalogItem } from "./item-catalog";
 
 const formatDate = (value?: string | null) => value ? new Date(value).toLocaleString("en-IN") : "—";
 const formatFactor = (value?: string | null) => {
@@ -43,7 +43,7 @@ export default function InventoryItemDetailPage({ team }: { team: Exclude<ItemMa
 }
 
 function ItemDetails({ item }: { item: InventoryItem }) {
-    const category = getItemMainCategory(item.itemName, item.category);
+    const category = item.category || "Legacy";
     const catalogItem = findCatalogItem(category, item.itemName);
     const specificationLabels = new Map((catalogItem?.fields || []).map(field => [field.key, field.label]));
     const conversion = item.conversionUnit

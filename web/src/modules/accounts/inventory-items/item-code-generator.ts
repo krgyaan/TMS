@@ -1,8 +1,7 @@
 // @ts-expect-error Node's test loader needs the explicit TypeScript extension.
 import { fieldIsVisible, findCatalogItem } from "./item-catalog.ts";
 
-const safeTokenPattern = /^[A-Z0-9/.+%-]+$/;
-
+const safeTokenPattern = /^[A-Za-z0-9.+%-]+$/;
 export const normalizeCapacityToken = (raw: string): string | undefined => {
     const match = raw.trim().match(/^(\d+)(?:\.(\d+))?$/);
     if (!match) return undefined;
@@ -11,56 +10,47 @@ export const normalizeCapacityToken = (raw: string): string | undefined => {
     return fraction ? `${integer}.${fraction}` : integer;
 };
 
-const optionToken = (category: string, itemName: string, fieldKey: string, raw: string): string | undefined => {
-    const item = findCatalogItem(category, itemName);
-    const configured = item?.fields.find(candidate => candidate.key === fieldKey)?.options?.find(option => option.value === raw)?.codeToken;
-    const token = configured || raw.toUpperCase();
+const tokenFor = (category: string, itemName: string, key: string, raw: string): string | undefined => {
+    const configured = findCatalogItem(category, itemName)?.fields.find(candidate => candidate.key === key)?.options?.find(option => option.value === raw)?.codeToken;
+    const token = configured || (key === "colourCode" ? raw.trim().replace(/[^a-z0-9-]/gi, "").toUpperCase() : raw.trim().replace(/\s+/g, "-").toUpperCase());
     return safeTokenPattern.test(token) ? token : undefined;
 };
 
-export const generateTemplatedItemCode = (
-    category: string,
-    itemName: string,
-    specifications: Record<string, string>,
-): string | undefined => {
+export const generateTemplatedItemCode = (category: string, itemName: string, specifications: Record<string, string>): string | undefined => {
     const item = findCatalogItem(category, itemName);
     if (!item?.codeTemplate) return undefined;
-    const template = item.codeTemplate;
-
     let complete = true;
-    const segments = template.split("/").flatMap(segment => {
+    const segments = item.codeTemplate.split("/").flatMap(segment => {
         const keys = [...segment.matchAll(/\{([A-Za-z0-9_]+)\}/g)].map(match => match[1]);
-        const fields = keys.map(key => item.fields.find(candidate => candidate.key === key));
-        if (fields.some(field => field && !fieldIsVisible(specifications, field))) return [];
-        if (keys.some(key => !specifications[key]?.trim())) {
-            if (fields.every(field => field && !field.required)) return [];
+        if (keys.length && keys.every(key => {
+            const configured = item.fields.find(candidate => candidate.key === key);
+            return configured && !fieldIsVisible(specifications, configured);
+        })) return [];
+        const missing = keys.filter(key => !specifications[key]?.trim());
+        if (missing.length) {
+            const optional = missing.every(key => {
+                const configured = item.fields.find(candidate => candidate.key === key);
+                return configured && !configured.required;
+            });
+            if (optional) return [];
             complete = false;
-            return [""];
+            return [];
         }
-        const rendered = segment.replace(/\{([A-Za-z0-9_]+)\}/g, (_match, key: string) => {
-            const raw = specifications[key]?.trim();
-            if (!raw) {
-                complete = false;
-                return "";
-            }
-            const token = key === "capacity" ? normalizeCapacityToken(raw) : optionToken(category, itemName, key, raw);
-            if (!token) {
-                complete = false;
-                return "";
-            }
+        return [segment.replace(/\{([A-Za-z0-9_]+)\}/g, (_match, key: string) => {
+            const raw = specifications[key].trim();
+            const configured = item.fields.find(candidate => candidate.key === key);
+            const token = configured?.kind === "number" ? normalizeCapacityToken(raw) : tokenFor(category, itemName, key, raw);
+            if (!token) { complete = false; return ""; }
             return token;
-        });
-        return [rendered];
+        })];
     });
     const code = segments.join("/");
-
-    return complete && code.length <= 80 ? code : undefined;
+    return complete && code.length > 0 && code.length <= 80 ? code : undefined;
 };
 
 export const getItemCodePreview = (category: string, itemName: string, specifications: Record<string, string>): string => {
     const item = findCatalogItem(category, itemName);
     if (!item) return "Select all options to generate the code";
-    if (item.codePrefix) return `${item.codePrefix}-### (number assigned on save)`;
     if (!item.codeTemplate) return "ITM sequence assigned on save";
     return generateTemplatedItemCode(category, itemName, specifications) || "Select all options to generate the code";
 };

@@ -1,4 +1,4 @@
-export const UNIT_OPTIONS = ["Kg", "Mtr", "Ft", "Nos.", "RMtr", "Sq. Mtr."] as const;
+export const UNIT_OPTIONS = ["Kg", "Mtr", "Ft", "Nos.", "RMtr", "Sq. Mtr.", "Litre", "Container", "Pair", "Set"] as const;
 export type Unit = typeof UNIT_OPTIONS[number];
 
 type ConversionRule = {
@@ -16,6 +16,8 @@ export const CONVERSION_RULES: ConversionRule[] = [
     { from: "Ft", to: "Mtr", factor: 0.3048 },
     { from: "RMtr", to: "Sq. Mtr.", factor: null },
     { from: "Sq. Mtr.", to: "RMtr", factor: null },
+    { from: "Litre", to: "Container", factor: null },
+    { from: "Container", to: "Litre", factor: null },
 ];
 
 export const getConversionRule = (from: string, to: string) =>
@@ -42,9 +44,11 @@ const parseWidthMillimetres = (specifications: Record<string, string>) => {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 };
 
-export const getConversionOptions = (from: string, specifications: Record<string, string>): ConversionOption[] => {
+export const getConversionOptions = (from: string, specifications: Record<string, string>, allowedPairs?: { from: string; to: string }[]): ConversionOption[] => {
     const width = (from === "RMtr" || from === "Sq. Mtr.") ? parseWidthMillimetres(specifications) : undefined;
-    return CONVERSION_RULES.filter(rule => rule.from === from).map(rule => {
+    const rules = CONVERSION_RULES.filter(rule => rule.from === from && (!allowedPairs || allowedPairs.some(pair => pair.from === rule.from && pair.to === rule.to)));
+    const configuredRules = allowedPairs?.filter(pair => pair.from === from && !rules.some(rule => rule.to === pair.to)).map(pair => ({ from: pair.from as Unit, to: pair.to as Unit, factor: null })) || [];
+    return [...rules, ...configuredRules].map(rule => {
         if (rule.factor !== null) return { to: rule.to, factor: rule.factor, factorMode: "fixed" };
         if (width !== undefined) {
             return {
@@ -71,6 +75,7 @@ export const resolveConversion = (
     to: string | null | undefined,
     factor: unknown,
     specifications: Record<string, string>,
+    allowedPairs?: { from: string; to: string }[],
 ): ConversionResolution => {
     if (!to) {
         if (factor !== undefined && factor !== null && factor !== "") {
@@ -80,7 +85,7 @@ export const resolveConversion = (
     }
 
     if (from === to) throw new Error("Unit and conversion unit must differ");
-    const option = getConversionOptions(from, specifications).find(candidate => candidate.to === to);
+    const option = getConversionOptions(from, specifications, allowedPairs).find(candidate => candidate.to === to);
     if (!option) throw new Error("This unit conversion is not allowed");
 
     let resolvedFactor = option.factor;

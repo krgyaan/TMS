@@ -6,6 +6,7 @@ import { CurrentUser } from "@/modules/auth/decorators/current-user.decorator";
 import { InventoryItemsService } from "./inventory-items.service";
 import { itemSchema, parseItemBody, updateItemSchema } from "./inventory-items.controller";
 import { getConversionOptions } from "./conversion-rules";
+import { getAllowedConversionPairs } from "./item-catalog";
 
 @Controller("master/item-master")
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -20,8 +21,9 @@ export class SettingsInventoryItemsController {
 
     @Get("conversion-options")
     @CanRead("master.item-master")
-    conversionOptions(@Query("unit") unit?: string, @Query("width") width?: string) {
-        return getConversionOptions(unit || "", width ? { width } : {});
+    conversionOptions(@Query("unit") unit?: string, @Query("width") width?: string, @Query("category") category?: string, @Query("itemName") itemName?: string, @Query("type") type?: string) {
+        const specifications = { ...(width ? { width } : {}), ...(type ? { type } : {}) };
+        return getConversionOptions(unit || "", specifications, category && itemName ? getAllowedConversionPairs(category, itemName, specifications) : undefined);
     }
 
     @Get(":id")
