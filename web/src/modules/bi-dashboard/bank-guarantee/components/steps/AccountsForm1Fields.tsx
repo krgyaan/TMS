@@ -248,7 +248,7 @@ export function AccountsForm1Fields<T extends FieldValues>({
                     </FieldWrapper>
                 )}
                 {bgReq === 'Accepted' && (
-                    <FieldWrapper control={control} name={names.prefilledSignedBg} label="Prefilled Bank Formats">
+                    <FieldWrapper control={control} name={names.prefilledSignedBg} label="Prefilled Signed Bank Formats">
                         {(field) =>
                             prefilledMode === 'single' ? (
                                 <CompactFileUploader

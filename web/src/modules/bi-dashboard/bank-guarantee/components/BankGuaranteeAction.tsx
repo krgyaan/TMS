@@ -236,13 +236,7 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
             form.setValue('bg_signed_covering_letter', safeParseArray(formData.bgSignedCoveringLetter));
             form.setValue('bg2_remark', formData.bg2Remark ?? undefined);
         } else if (action === 'accounts-form-3') {
-            form.setValue('fdr_per', toFdrEnum(formData.fdrPer));
-            form.setValue('fdr_amt', formData.fdrAmt ?? undefined);
-            form.setValue('fdr_copy', safeParseArray(formData.fdrCopy));
             form.setValue('sfms_conf', safeParseArray(formData.sfmsConf));
-            form.setValue('fdr_no', formData.fdrNo ?? undefined);
-            form.setValue('fdr_validity', toDateString(formData.fdrValidity));
-            form.setValue('fdr_roi', formData.fdrRoi ?? undefined);
             form.setValue('bg_charge_deducted', formData.bgChargeDeducted ?? undefined);
             form.setValue('sfms_charge_deducted', formData.sfmsChargesDeducted ?? undefined);
             form.setValue('stamp_charge_deducted', formData.stampChargesDeducted ?? undefined);
@@ -397,12 +391,11 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
                     )}
 
                     {action === 'accounts-form-3' && (
-                        <SectionCard title="Accounts Form (BG) 3 - Capture FDR Details">
+                        <SectionCard title="Accounts Form (BG) 3 - Charges & SFMS Confirmation">
                             <AccountsForm3Fields
                                 control={form.control}
                                 names={STEP_NAMES}
                                 disabled={isStepLocked('accounts-form-3')}
-                                fdrValueType="string"
                             />
                         </SectionCard>
                     )}

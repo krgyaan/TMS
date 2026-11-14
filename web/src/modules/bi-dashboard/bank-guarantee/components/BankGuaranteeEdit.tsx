@@ -76,7 +76,7 @@ const STEP_NAMES = {
 const EDIT_SECTIONS: SelectOption[] = [
     { id: 'accounts-form-1', name: 'Accounts Form (BG) 1 - Request to Bank' },
     { id: 'accounts-form-2', name: 'Accounts Form (BG) 2 - After BG Creation' },
-    { id: 'accounts-form-3', name: 'Accounts Form (BG) 3 - Capture FDR Details' },
+    { id: 'accounts-form-3', name: 'Accounts Form (BG) 3 - Charges & SFMS Confirmation' },
     { id: 'initiate-followup', name: 'Initiate Followup' },
     { id: 'request-extension', name: 'Request Extension' },
     { id: 'returned-courier', name: 'Returned via Courier' },
@@ -482,12 +482,11 @@ export function BankGuaranteeEdit({ instrumentId, initialData }: BankGuaranteeEd
                             )}
 
                             {activeSection === 'accounts-form-3' && (
-                                <SectionBlock title="Accounts Form (BG) 3 - Capture FDR Details">
+                                <SectionBlock title="Accounts Form (BG) 3 - Charges & SFMS Confirmation">
                                     <AccountsForm3Fields
                                         control={form.control}
                                         names={STEP_NAMES}
                                         disabled={isStepLocked('accounts-form-3')}
-                                        fdrValueType="string"
                                     />
                                 </SectionBlock>
                             )}

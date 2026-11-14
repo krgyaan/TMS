@@ -33,6 +33,13 @@ const hasFile = (value: unknown): boolean => {
     return true;
 };
 
+// Charges are required on Stage 3 but 0 is a valid amount, so an empty input
+// has to stay `undefined` instead of being coerced to 0 by z.coerce.number().
+const optionalCharge = z.preprocess(
+    (value) => (value === '' || value === null || value === undefined ? undefined : Number(value)),
+    z.number().optional(),
+);
+
 // Bank Guarantee Action Form Schema
 export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     // Accounts Form (BG) 1 - Request to Bank
@@ -55,7 +62,7 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     bg_signed_covering_letter: z.any().optional(), // File - signed covering letter
     bg2_remark: z.string().optional(),
 
-    // Accounts Form (BG) 3 - Capture FDR Details
+    // Accounts Form (BG) 3 - Charges & SFMS Confirmation
     sfms_conf: z.any().optional(), // File
     fdr_per: z.enum(['10', '15', '100']).optional(),
     fdr_amt: z.coerce.number().optional(),
@@ -64,10 +71,10 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     fdr_date: z.string().optional(),
     fdr_validity: z.string().optional(),
     fdr_roi: z.coerce.number().optional(),
-    bg_charge_deducted: z.coerce.number().optional(),
-    sfms_charge_deducted: z.coerce.number().optional(),
-    stamp_charge_deducted: z.coerce.number().optional(),
-    other_charge_deducted: z.coerce.number().optional(),
+    bg_charge_deducted: optionalCharge,
+    sfms_charge_deducted: optionalCharge,
+    stamp_charge_deducted: optionalCharge,
+    other_charge_deducted: optionalCharge,
 
     // Initiate Followup
     organisation_name: z.string().optional(),
@@ -313,15 +320,27 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     }
 ).refine(
     (data) => {
-        // Accounts Form (BG) 3: core FDR details are required
-        if (data.action === 'accounts-form-3') {
-            return !!data.fdr_per && !!data.fdr_amt && !!data.fdr_no && !!data.fdr_validity;
-        }
-        return true;
+        // Accounts Form (BG) 3: the SFMS confirmation copy is required once the
+        // bank has processed the BG.
+        if (data.action !== 'accounts-form-3') return true;
+        return hasFile(data.sfms_conf);
     },
     {
-        message: 'FDR percentage, amount, number, and validity are required',
-        path: ['fdr_per'],
+        message: 'SFMS confirmation copy is required',
+        path: ['sfms_conf'],
+    }
+).refine(
+    (data) => {
+        // Accounts Form (BG) 3: all charges must be entered. A value of 0 is
+        // valid, so check for a number rather than truthiness.
+        if (data.action !== 'accounts-form-3') return true;
+        return typeof data.bg_charge_deducted === 'number'
+            && typeof data.sfms_charge_deducted === 'number'
+            && typeof data.stamp_charge_deducted === 'number';
+    },
+    {
+        message: 'BG charges, SFMS charges and stamp paper charges are required',
+        path: ['bg_charge_deducted'],
     }
 ).refine(
     (data) => {
