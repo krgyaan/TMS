@@ -39,20 +39,21 @@ export class BankGuaranteeService {
     private statusMap() {
         return {
             [BG_STATUSES.PENDING]: 'Pending',
-            [BG_STATUSES.ACCOUNTS_FORM_ACCEPTED]: 'Accepted',
+            [BG_STATUSES.ACCOUNTS_FORM_ACCEPTED]: 'Format Accepted',
             [BG_STATUSES.ACCOUNTS_FORM_REJECTED]: 'Rejected',
             [BG_STATUSES.BG_CREATED]: 'Created',
-            [BG_STATUSES.FDR_DETAILS_CAPTURED]: 'FDR Details Captured',
+            // Accounts Form 3 now captures the SFMS confirmation + charges.
+            [BG_STATUSES.FDR_DETAILS_CAPTURED]: 'SFMS Submitted',
             [BG_STATUSES.FOLLOWUP_INITIATED]: 'Followup Initiated',
-            [BG_STATUSES.EXTENSION_REQUESTED]: 'Extension Requested',
-            [BG_STATUSES.RETURN_VIA_COURIER]: 'Courier Returned',
+            [BG_STATUSES.EXTENSION_REQUESTED]: 'Extension Request',
+            [BG_STATUSES.RETURN_VIA_COURIER]: 'Returned via courier',
             [BG_STATUSES.CANCELLATION_REQUESTED]: 'Cancellation Request',
-            [BG_STATUSES.BG_CANCELLATION_CONFIRMED]: 'Cancelled at Branch',
-            [BG_STATUSES.FDR_CANCELLED_CONFIRMED]: 'FDR Cancellation Confirmed',
+            [BG_STATUSES.BG_CANCELLATION_CONFIRMED]: 'BG Cancelled',
+            [BG_STATUSES.FDR_CANCELLED_CONFIRMED]: 'FDR released',
             // Legacy rows written with pre-migration status strings.
-            RETURNED_VIA_COURIER: 'Courier Returned',
-            BG_CANCELLED: 'Cancelled at Branch',
-            FDR_CANCELLED: 'FDR Cancellation Confirmed',
+            RETURNED_VIA_COURIER: 'Returned via courier',
+            BG_CANCELLED: 'BG Cancelled',
+            FDR_CANCELLED: 'FDR released',
         };
     }
 
@@ -145,7 +146,7 @@ export class BankGuaranteeService {
                 sql`${statuses.name} ILIKE ${searchStr}`,
                 sql`${paymentInstruments.status} ILIKE ${searchStr}`,
                 // Search by BG status display label (table shows "Pending", "Accepted", etc.)
-                sql`(CASE ${paymentInstruments.status} WHEN 'PENDING' THEN 'Pending' WHEN 'ACCOUNTS_FORM_ACCEPTED' THEN 'Accepted' WHEN 'ACCOUNTS_FORM_REJECTED' THEN 'Rejected' WHEN 'BG_CREATED' THEN 'Created' WHEN 'FDR_DETAILS_CAPTURED' THEN 'FDR Details Captured' WHEN 'FOLLOWUP_INITIATED' THEN 'Followup Initiated' WHEN 'EXTENSION_REQUESTED' THEN 'Extension Requested' WHEN 'RETURN_VIA_COURIER' THEN 'Courier Returned' WHEN 'CANCELLATION_REQUESTED' THEN 'Cancellation Request' WHEN 'BG_CANCELLATION_CONFIRMED' THEN 'Cancelled at Branch' WHEN 'FDR_CANCELLED_CONFIRMED' THEN 'FDR Cancellation Confirmed' ELSE ${paymentInstruments.status}::text END)::text ILIKE ${searchStr}`,
+                sql`(CASE ${paymentInstruments.status} WHEN 'PENDING' THEN 'Pending' WHEN 'ACCOUNTS_FORM_ACCEPTED' THEN 'Format Accepted' WHEN 'ACCOUNTS_FORM_REJECTED' THEN 'Rejected' WHEN 'BG_CREATED' THEN 'Created' WHEN 'FDR_DETAILS_CAPTURED' THEN 'SFMS Submitted' WHEN 'FOLLOWUP_INITIATED' THEN 'Followup Initiated' WHEN 'EXTENSION_REQUESTED' THEN 'Extension Request' WHEN 'RETURN_VIA_COURIER' THEN 'Returned via courier' WHEN 'CANCELLATION_REQUESTED' THEN 'Cancellation Request' WHEN 'BG_CANCELLATION_CONFIRMED' THEN 'BG Cancelled' WHEN 'FDR_CANCELLED_CONFIRMED' THEN 'FDR released' ELSE ${paymentInstruments.status}::text END)::text ILIKE ${searchStr}`,
             ];
             conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
         }
@@ -186,6 +187,11 @@ export class BankGuaranteeService {
             .select({
                 id: paymentInstruments.id,
                 requestId: paymentRequests.id,
+                action: paymentInstruments.action,
+                createdAt: paymentInstruments.createdAt,
+                tenderId: paymentRequests.tenderId,
+                projectId: paymentRequests.projectId,
+                bgNeeds: instrumentBgDetails.bgNeeds,
                 bgDate: instrumentBgDetails.bgDate,
                 bgNo: instrumentBgDetails.bgNo,
                 beneficiaryName: instrumentBgDetails.beneficiaryName,
@@ -244,6 +250,24 @@ export class BankGuaranteeService {
 
         const total = Number(countResult?.count || 0);
 
+        // Follow-ups that have been stopped: used to show "Followup Stopped"
+        // instead of "Followup Initiated" on the dashboard.
+        const stoppedFollowupIds = new Set<number>();
+        const instrumentIds = rows.map((row) => row.id);
+        if (instrumentIds.length > 0) {
+            const stoppedRows = await this.db
+                .select({ emdId: followUps.emdId })
+                .from(followUps)
+                .where(and(
+                    inArray(followUps.emdId, instrumentIds),
+                    isNull(followUps.deletedAt),
+                    sql`(${followUps.stopReason} is not null or ${followUps.stopRemarks} is not null)`,
+                ));
+            for (const stopped of stoppedRows) {
+                if (stopped.emdId != null) stoppedFollowupIds.add(Number(stopped.emdId));
+            }
+        }
+
         // Map rows and apply calculations using helper functions
         const data: BankGuaranteeDashboardRow[] = rows.map((row) => {
             const bgDate = row.bgDate ? new Date(row.bgDate) : null;
@@ -254,6 +278,34 @@ export class BankGuaranteeService {
                 ?? (row.bgExpiryDateBg ? new Date(row.bgExpiryDateBg) : null);
             const amount = row.amount ? Number(row.amount) : null;
 
+            // Show the real project/tender name whenever one exists; only fall
+            // back to "Accounts/Admin" when no name was captured at all.
+            const projectLabel = this.resolveProjectLabel(row.projectName, row.tenderName);
+
+            const bgStatusLabel = row.bgStatus === BG_STATUSES.FOLLOWUP_INITIATED
+                && stoppedFollowupIds.has(row.id)
+                ? 'Followup Stopped'
+                : this.statusMap()[row.bgStatus] ?? null;
+
+            // Stage 1 gets a fixed 12h window; Stage 2 uses the "BG Needed In"
+            // hours captured on the BG. Both count from the request creation.
+            const timerHours = row.action === 0
+                ? 12
+                : row.action === 1 && row.bgNeeds
+                    ? Number(row.bgNeeds)
+                    : null;
+            const timer: BankGuaranteeDashboardRow['timer'] = timerHours && Number.isFinite(timerHours) && row.createdAt
+                ? (() => {
+                    const deadline = new Date(new Date(row.createdAt).getTime() + timerHours * 60 * 60 * 1000);
+                    const remainingSeconds = Math.floor((deadline.getTime() - Date.now()) / 1000);
+                    return {
+                        remainingSeconds,
+                        status: remainingSeconds < 0 ? 'OVERDUE' : 'RUNNING',
+                        deadline,
+                    };
+                })()
+                : null;
+
             return {
                 id: row.id,
                 requestId: row.requestId,
@@ -261,6 +313,7 @@ export class BankGuaranteeService {
                 bgNo: row.bgNo,
                 beneficiaryName: row.beneficiaryName,
                 tenderName: row.tenderName || row.projectName,
+                projectLabel,
                 tenderNo: row.tenderNo || row.projectNo,
                 amount,
                 bgExpiryDate,
@@ -277,14 +330,15 @@ export class BankGuaranteeService {
                     amount,
                     bgDate,
                     effectiveClaimDate,
-                    row.stampCharges ? Number(row.stampCharges) : null,
-                    row.sfmsCharges ? Number(row.sfmsCharges) : null
+                    row.stampChargesDeducted ? Number(row.stampChargesDeducted) : null,
+                    row.stampCharges ? Number(row.stampCharges) : null
                 ),
                 fdrNo: row.fdrNo,
                 fdrValue: row.fdrValue ? Number(row.fdrValue) : null,
                 tenderStatus: row.tenderStatusFromTender,
                 bidValidity: row.tenderDueDate || row.requestDueDate,
-                bgStatus: this.statusMap()[row.bgStatus],
+                bgStatus: bgStatusLabel,
+                timer,
                 expiryStatus: this.calculateExpiryStatus(
                     row.bgExpiryDateBg ? new Date(row.bgExpiryDateBg) : null,
                     claimExpiryDate,
@@ -309,6 +363,8 @@ export class BankGuaranteeService {
                 bgDate: instrumentBgDetails.bgDate,
                 bgNo: instrumentBgDetails.bgNo,
                 beneficiaryName: instrumentBgDetails.beneficiaryName,
+                tenderId: paymentRequests.tenderId,
+                projectId: paymentRequests.projectId,
                 tenderDueDate: tenderInfos.dueDate,
                 requestDueDate: paymentRequests.dueDate,
                 projectName: paymentRequests.projectName,
@@ -358,6 +414,8 @@ export class BankGuaranteeService {
                 ?? (row.bgExpiryDateBg ? new Date(row.bgExpiryDateBg) : null);
             const amount = row.amount ? Number(row.amount) : null;
 
+            const projectLabel = this.resolveProjectLabel(row.projectName, null);
+
             return {
                 id: row.id,
                 requestId: row.requestId,
@@ -365,6 +423,7 @@ export class BankGuaranteeService {
                 bgNo: row.bgNo,
                 beneficiaryName: row.beneficiaryName,
                 projectName: row.projectName,
+                projectLabel,
                 projectNo: row.projectNo,
                 amount,
                 bgExpiryDate,
@@ -381,8 +440,8 @@ export class BankGuaranteeService {
                     amount,
                     bgDate,
                     effectiveClaimDate,
-                    row.stampCharges ? Number(row.stampCharges) : null,
-                    row.sfmsCharges ? Number(row.sfmsCharges) : null
+                    row.stampChargesDeducted ? Number(row.stampChargesDeducted) : null,
+                    row.stampCharges ? Number(row.stampCharges) : null
                 ),
                 fdrNo: row.fdrNo,
                 fdrValue: row.fdrValue ? Number(row.fdrValue) : null,
@@ -591,33 +650,58 @@ export class BankGuaranteeService {
      * Interest: bgValue * (0.01/365) * monthsDifference * 1.18 (GST)
      * Note: Laravel uses diffInMonths which returns integer months, then multiplies by daily rate
      */
+    /**
+     * Resolve the display label for the "Project Name" column.
+     *
+     * The request's `project_name` is authoritative whenever it holds a real
+     * value; the joined tender name is the fallback. "Accounts/Admin" is only
+     * used when no name was captured at all (tender/project id presence is not
+     * a reliable signal — most Accounts/Admin rows still carry a real name).
+     */
+    private resolveProjectLabel(
+        projectName: string | null | undefined,
+        tenderName: string | null | undefined,
+    ): string {
+        const isRealName = (value: string | null | undefined) => {
+            const trimmed = value?.trim();
+            return trimmed && trimmed.toUpperCase() !== 'NA' ? trimmed : null;
+        };
+
+        return isRealName(projectName) ?? isRealName(tenderName) ?? 'Accounts/Admin';
+    }
+
+    /**
+     * Calculate the charges the bank should charge for a BG:
+     *   BG value × (0.65% / 365) × days(BG creation → claim expiry) × 1.18 (GST)
+     *   + Stamp Paper charges deducted (Accounts Form 3)
+     *   + BG stamp paper value captured on the create form (default 300)
+     *   + fixed SFMS charge (590)
+     */
     private calculateBgChargesCalculated(
         bgValue: number | null,
         bgDate: Date | null,
         claimExpiryDate: Date | null,
-        stampCharges: number | null,
-        sfmsCharges: number | null
+        stampChargesDeducted: number | null,
+        bgStampPaperValue: number | null
     ): number | null {
         if (!bgValue || !bgDate || !claimExpiryDate) {
             return null;
         }
 
-        const bgStampPaperValue = stampCharges ?? 300;
-        const sfmsChargesValue = sfmsCharges ?? 590;
+        const stampPaperCharges = stampChargesDeducted ?? 0;
+        const stampPaperValue = bgStampPaperValue ?? 300;
+        const sfmsFixedCharges = 590;
 
-        // Calculate months difference (integer months, matching Laravel's diffInMonths)
-        const monthsDifference = this.calculateMonthsDifference(bgDate, claimExpiryDate);
+        const dayMs = 1000 * 60 * 60 * 24;
+        const days = Math.max(
+            0,
+            Math.round((new Date(claimExpiryDate).getTime() - new Date(bgDate).getTime()) / dayMs),
+        );
 
-        // Daily interest rate: 0.01 / 365
-        const dailyInterestRate = 0.01 / 365;
+        // Interest at 0.65% per annum, plus 18% GST.
+        const interestWithGST = bgValue * (0.0065 / 365) * days * 1.18;
 
-        // Interest component (matching Laravel: bgValue * dailyRate * months)
-        const interestComponent = bgValue * dailyInterestRate * monthsDifference;
-
-        // Add GST (1.18)
-        const interestWithGST = interestComponent * 1.18;
-
-        return bgStampPaperValue + sfmsChargesValue + interestWithGST;
+        return stampPaperCharges + stampPaperValue + sfmsFixedCharges + interestWithGST;
     }
 
     /**
@@ -679,28 +763,6 @@ export class BankGuaranteeService {
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
         return diffDays;
-    }
-
-    /**
-     * Calculate months difference between two dates
-     * Returns integer months (matching Laravel's diffInMonths behavior)
-     */
-    private calculateMonthsDifference(startDate: Date, endDate: Date): number {
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-
-        const yearsDiff = end.getFullYear() - start.getFullYear();
-        const monthsDiff = end.getMonth() - start.getMonth();
-
-        // Calculate total months (integer, matching Laravel's diffInMonths)
-        let totalMonths = yearsDiff * 12 + monthsDiff;
-
-        // Adjust if end day is before start day (same logic as Carbon's diffInMonths)
-        if (end.getDate() < start.getDate()) {
-            totalMonths--;
-        }
-
-        return totalMonths;
     }
 
     /**

@@ -31,6 +31,8 @@ export interface BankGuaranteeDashboardRow {
     bgNo: string | null;
     beneficiaryName: string | null;
     tenderName: string | null;
+    /** Tender/project name, or "Accounts/Admin" when neither is linked. */
+    projectLabel: string | null;
     tenderNo: string | null;
     bidValidity: Date | null;
     amount: number | null;
@@ -47,6 +49,12 @@ export interface BankGuaranteeDashboardRow {
     expiry: Date | null;
     expiryStatus: string | null;
     bgStatus: string | null;
+    /** Stage timer: Stage 1 = 12h, Stage 2 = BG Needed In hours. */
+    timer: {
+        remainingSeconds: number;
+        status: 'RUNNING' | 'OVERDUE';
+        deadline: Date;
+    } | null;
 }
 
 export interface BankGuaranteeDashboardCounts {
