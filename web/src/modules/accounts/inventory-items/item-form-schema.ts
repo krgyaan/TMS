@@ -4,6 +4,7 @@ import { findCatalogItem, fieldIsVisible, getAllowedUnits, UNIT_OPTIONS } from "
 
 export const buildInventoryItemFormSchema = () => z.object({
     category: z.string().min(1, "Category is required"),
+    legacyCodeEdit: z.boolean().default(false),
     modelNumber: z.string().max(120).optional(),
     itemName: z.string().min(1, "Item name is required"),
     itemType: z.string().max(80).optional(),
@@ -24,7 +25,7 @@ export const buildInventoryItemFormSchema = () => z.object({
     } else {
         if (item.pending) context.addIssue({ code: "custom", path: ["itemName"], message: `${item.name} is pending finalization and cannot be created.` });
         const knownFields = new Set(item.fields.map(field => field.key));
-        if (values.category !== "Legacy") {
+        if (values.category !== "Legacy" && !values.legacyCodeEdit) {
             for (const key of Object.keys(values.specifications)) {
                 if (!knownFields.has(key)) context.addIssue({ code: "custom", path: ["specifications", key], message: `Unknown specification key: ${key}` });
             }
@@ -37,7 +38,7 @@ export const buildInventoryItemFormSchema = () => z.object({
                 continue;
             }
             if (!value) {
-                if (field.required) context.addIssue({ code: "custom", path: ["specifications", field.key], message: `${field.label} is required.` });
+                if (field.required && !values.legacyCodeEdit) context.addIssue({ code: "custom", path: ["specifications", field.key], message: `${field.label} is required.` });
                 continue;
             }
             if (field.options && !field.options.some(option => option.value === value)) {
@@ -57,7 +58,7 @@ export const buildInventoryItemFormSchema = () => z.object({
         if (!item.hsnNotApplicable && !/^\d{4,8}$/.test(values.hsnCode.trim())) {
             context.addIssue({ code: "custom", path: ["hsnCode"], message: "HSN code must contain 4 to 8 digits." });
         }
-        if (!getAllowedUnits(values.category, values.itemName).includes(values.unit) && values.unit !== values.storedUnit) {
+        if (!getAllowedUnits(values.category, values.itemName, values.specifications).includes(values.unit) && values.unit !== values.storedUnit) {
             context.addIssue({ code: "custom", path: ["unit"], message: `Choose a valid unit for ${values.itemName}.` });
         }
         if (values.itemName === "Torque Wrench" && !/^\d+(?:-\d+)?$/.test(values.specifications.torqueRange?.trim() || "")) {

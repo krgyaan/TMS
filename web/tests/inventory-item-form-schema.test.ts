@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ITEM_CATALOG, UNIT_OPTIONS, fieldIsVisible, findCatalogItem } from "../src/modules/accounts/inventory-items/item-catalog.ts";
+import { ITEM_CATALOG, UNIT_OPTIONS, fieldIsVisible, findCatalogItem, getAllowedUnits } from "../src/modules/accounts/inventory-items/item-catalog.ts";
 import { buildInventoryItemFormSchema } from "../src/modules/accounts/inventory-items/item-form-schema.ts";
 import { generateTemplatedItemCode, getItemCodePreview } from "../src/modules/accounts/inventory-items/item-code-generator.ts";
 import { formatKeySpecification, itemMasterColumnsForViewport } from "../src/modules/accounts/inventory-items/item-master-display.ts";
@@ -33,6 +33,51 @@ test("catalog code generator matches the API sheet formats and sequence fallback
     assert.equal(getItemCodePreview("Battery Accessories", "Eye Wash Bottle", {}), "EyeWashBottle");
     assert.equal(generateTemplatedItemCode("Battery Accessories", "ICC", { mRating: "M10", insulation: "Insulated", coating: "Nickel-Coated" }), "ICC/M10/INSULATED/NICKEL-COATED");
     assert.equal(getItemCodePreview("Batteries", "Ni-Cd Battery", {}), "Select all options to generate the code");
+});
+
+test("all 18 AC configurations generate their specified code formats", () => {
+    const cases: [string, Record<string, string>, string][] = [
+        ["Copper", { type: "Pipe", diameter: "12", thickness: "0.5", strength: "Hard" }, "CU/Pipe/H/0.5/12"],
+        ["Copper", { type: "Elbow", diameter: "12", thickness: "1", strength: "Soft" }, "CU/Elbow/S/1/12"],
+        ["PVC Pipe", { type: "Pipe", diameter: "20", thickness: "40", strength: "Hard" }, "PVC/Pipe/H/40/20"],
+        ["UPVC Pipe", { type: "Tee", diameter: "25", thickness: "50", strength: "Soft" }, "UPVC/Tee/S/50/25"],
+        ["CPVC Pipe", { type: "Pipe", diameter: "32", thickness: "11", strength: "Hard" }, "CPVC/Pipe/H/11/32"],
+        ["MS", { type: "Reducer", diameter: "40", thickness: "12", strength: "Soft" }, "MS/Reducer/S/12/40"],
+        ["Sleeve Insulation", { diameter: "20", thickness: "10", class: "1" }, "SI/1/20/10"],
+        ["Round Duct with Aluminium Foil", { construction: "Rigid", insulationStatus: "Insulated", insulationThickness: "25", diameter: "300" }, "RoundDuct/R/I/25/300"],
+        ["GI Duct / MS Duct", { material: "GI", shape: "Rectangular", fabrication: "Factory", thickness: "24" }, "Duct/GI/Re/F/24"],
+        ["GI Sheet / MS Sheet", { material: "MS", width: "900 mm", coating: "120", thickness: "24" }, "Sheet/MS/900/120/24"],
+        ["Canvas", { type: "Roll" }, "Canvas/R"],
+        ["Nitrile Insulation Sheet / XLPE Insulation Sheet", { material: "Nitrile", coating: "Aluminium Foil", class: "1", thickness: "10" }, "InsulationSheet/N/AF/1/10"],
+        ["Acoustic Insulation", { type: "Glasswool", thickness: "25" }, "AcousticInsulation/G/25"],
+        ["Underdeck Insulation", { type: "Glasswool (Roll)", thickness: "50" }, "UnderdeckInsulation/G-Roll/50"],
+        ["Aluminium Perforated Sheet", { thickness: "24" }, "AlPerforatedSheet/24"],
+        ["Tissue Paper", { thickness: "10" }, "TissuePaper/10"],
+        ["AC Stand", { type: "Powder Coated", mounting: "Wall", size: "18" }, "ACStand/PC/W/18"],
+        ["Rubber Pad", { thickness: "3", size: "4" }, "RubberPad/3/4"],
+    ];
+    for (const [itemName, specifications, expected] of cases) {
+        assert.equal(generateTemplatedItemCode("AC Accessories", itemName, specifications), expected, itemName);
+    }
+    assert.notEqual(
+        generateTemplatedItemCode("AC Accessories", "Underdeck Insulation", { type: "Glasswool (Roll)", thickness: "50" }),
+        generateTemplatedItemCode("AC Accessories", "Underdeck Insulation", { type: "Glasswool (Bag)", thickness: "50" }),
+    );
+});
+
+test("AC conditional fields, N/A exclusion, numeric values and Pipe unit restrictions", () => {
+    const duct = findCatalogItem("AC Accessories", "Round Duct with Aluminium Foil");
+    const insulationThickness = duct?.fields.find(field => field.key === "insulationThickness");
+    assert.ok(insulationThickness);
+    const nonInsulated = { construction: "Rigid", insulationStatus: "Non-Insulated", diameter: "300" };
+    assert.equal(fieldIsVisible(nonInsulated, insulationThickness), false);
+    assert.equal(generateTemplatedItemCode("AC Accessories", "Round Duct with Aluminium Foil", nonInsulated), "RoundDuct/R/NI/300");
+    assert.equal(generateTemplatedItemCode("AC Accessories", "Round Duct with Aluminium Foil", { ...nonInsulated, insulationThickness: "N/A" }), "RoundDuct/R/NI/300");
+    assert.deepEqual(getAllowedUnits("AC Accessories", "PVC Pipe", { type: "Pipe" }), ["Mtr", "Ft"]);
+    assert.equal(buildInventoryItemFormSchema().safeParse(base({
+        category: "AC Accessories", itemName: "Rubber Pad", unit: "Nos.", storedUnit: "",
+        specifications: { thickness: "three", size: "4" },
+    })).success, false);
 });
 
 test("form validation follows catalog required, optional, conditional and range rules", () => {

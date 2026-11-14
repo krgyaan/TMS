@@ -8,6 +8,11 @@ export type CatalogField = {
 export type CatalogItem = {
     name: string; pending?: boolean; hsnNotApplicable?: boolean; fields: CatalogField[];
     codeTemplate?: string; defaultUnit?: string; legacyTypes?: string[];
+    unitOptions?: readonly string[];
+    unitOptionsByField?: Record<string, Record<string, readonly string[]>>;
+    defaultUnitByField?: Record<string, Record<string, string>>;
+    conversionPairs?: { from: string; to: string }[];
+    conversionPairsByField?: Record<string, Record<string, { from: string; to: string }[]>>;
 };
 export type CatalogCategory = { name: string; items: CatalogItem[] };
 
@@ -18,7 +23,7 @@ const noCode = (name: string, extra: Partial<CatalogItem> = {}): CatalogItem => 
 const aliases: Record<string, string> = { "Solar Photovoltaic": "SPV (Solar Photovoltaic)", "Power Conditioning Unit": "PCU (Power Conditioning Unit)", ACDB: "ACDB (AC Distribution Box)", DCDB: "DCDB (DC Distribution Box)", "Flooded Lead-Acid Battery": "Flooded Lead-Acid (FLA) Battery", "Strout Bristles": "Shroud Bristles" };
 const resolvedItemName = (name: string) => aliases[name] || name;
 
-export const ITEM_CATALOG: CatalogCategory[] = [
+export const DC_ITEM_CATALOG: CatalogCategory[] = [
     { name: "Batteries", items: [
         { name: "Ni-Cd Battery", codeTemplate: "NICD/{type}/{discharge}/{capacity}", fields: [select("type", "Type", ["KP", "RGS", "RGP"], { listColumn: "type" }), select("discharge", "Discharge", ["L", "M", "H"]), field("capacity", "Capacity", "number", { required: true, min: 0, minExclusive: true, suffix: "Ah" })] },
         { name: "VRLA Battery", codeTemplate: "VRLA/{type}/{voltage}/{capacity}", fields: [field("type", "Type", "select", { required: true, listColumn: "type", options: [{ value: "AGM" }, { value: "SMF" }, { value: "TGel", codeToken: "TGEL" }] }), select("voltage", "Voltage", ["2V", "12V"]), field("capacity", "Capacity", "number", { required: true, min: 0, minExclusive: true, suffix: "Ah" })] },
@@ -70,25 +75,62 @@ export const ITEM_CATALOG: CatalogCategory[] = [
     { name: "Lugs", items: [{ name: "Lug", codeTemplate: "Lug/{type}/{insulation}/{material}/{cableSize}/{studHole}", fields: [field("type", "Type", "select", { required: true, options: options("Ring", "Pin", "Reducer", "Palm", "Hex Snap", "Fork") }), field("insulation", "Insulation", "select", { required: true, options: [{ value: "Insulated", codeToken: "I" }, { value: "Non-Insulated", codeToken: "NI" }] }), field("material", "Material", "select", { required: true, options: [{ value: "Copper", codeToken: "Cu" }, { value: "Aluminium", codeToken: "Al" }, { value: "Bimetallic", codeToken: "BM" }] }), field("cableSize", "Cable Size (mm)", "number", { required: true, min: 0, minExclusive: true }), field("studHole", "Stud Hole (mm)", "number", { required: true, min: 0, minExclusive: true, hideWhen: ["Pin", "Reducer", "Hex Snap"].map(value => ({ field: "type", value })) })] }] },
     { name: "Glands", items: [noCode("Gland")] },
     { name: "Ferrules", items: [{ name: "Ferrule", codeTemplate: "Ferrule/{type}", fields: [field("type", "Type", "select", { required: true, listColumn: "type", options: [{ value: "Alphabet", codeToken: "A" }, { value: "Numeric", codeToken: "N" }] })] }] },
-    { name: "AC Accessories", items: [
-        { name: "Copper", legacyTypes: ["Pipe", "Elbow", "Socket", "Reducer", "U-Bend", "Tee"], fields: [field("diameter", "Diameter (in mm)", "text"), field("thickness", "Thickness (in Gauge)", "text"), field("strength", "Strength", "select", { options: options("Hard", "Soft") })] },
-        { name: "PVC Pipe", legacyTypes: ["Pipe", "Elbow", "Socket", "Reducer", "U-Bend", "Tee"], fields: [field("diameter", "Diameter (in mm)", "text"), field("thickness", "Thickness (kg/psi)", "text"), field("strength", "Strength", "select", { options: options("Hard", "Soft") })] },
-        { name: "UPVC Pipe", legacyTypes: ["Pipe", "Elbow", "Socket", "Reducer", "U-Bend", "Tee"], fields: [field("diameter", "Diameter (in mm)", "text"), field("thickness", "Thickness (kg/psi)", "text"), field("strength", "Strength", "select", { options: options("Hard", "Soft") })] },
-        { name: "CPVC Pipe", legacyTypes: ["Pipe", "Elbow", "Socket", "Reducer", "U-Bend", "Tee"], fields: [field("diameter", "Diameter (in mm)", "text"), field("thickness", "Thickness (SDR)", "text"), field("strength", "Strength", "select", { options: options("Hard", "Soft") })] },
-        { name: "Sleeve Insulation", fields: [field("diameter", "Diameter (in mm)", "text"), field("thickness", "Thickness (in mm)", "text"), field("class", "Class", "select", { options: options("0", "1") })] },
-        { name: "Round Duct with Aluminium Foil", fields: [field("diameter", "Diameter (in mm)", "text"), field("construction", "Construction", "select", { options: options("Rigid", "Soft") }), field("finish", "Finish", "select", { options: options("Plain", "With Insulation") }), field("insulationThickness", "Insulation Thickness", "select", { options: options("25 mm", "50 mm") })] },
-        { name: "GI Duct / MS Duct", fields: [field("shape", "Shape", "select", { options: options("Round", "Oval", "Rectangular") }), field("fabrication", "Fabrication", "select", { options: options("Hand", "Factory") }), field("thickness", "Thickness of Sheet (in Gauge)", "text")] },
-        { name: "GI Sheet / MS Sheet", fields: [field("width", "Width", "select", { options: options("900 mm", "1000 mm", "1200 mm") }), field("coating", "Coating (in GSM)", "text"), field("thickness", "Thickness (in Gauge)", "text")] },
-        { name: "Canvas", fields: [field("type", "Type", "select", { options: options("Cloth", "Readymade", "Roll") })] },
-        { name: "Nitrile Insulation Sheet / XLPE Insulation Sheet", fields: [field("thickness", "Thickness (in mm)", "text"), field("coating", "Coating", "select", { options: options("Plain", "Aluminium Foil") }), field("class", "Class", "select", { options: options("0", "1") })] },
-        { name: "Acoustic Insulation", fields: [field("type", "Type", "select", { options: options("Open Cell (Accousound)", "Glasswool", "Rigid Board") }), field("thickness", "Thickness", "select", { options: options("10 mm", "12 mm", "15 mm", "19 mm", "25 mm") })] },
-        { name: "Underdeck Insulation", fields: [field("type", "Type", "select", { options: options("Nitrile", "PUF", "Glasswool (Roll)", "Glasswool (Bag)", "Rigid Board", "Sheet") }), field("thickness", "Thickness (in mm)", "text")] },
-        { name: "Aluminium Perforated Sheet", fields: [field("thickness", "Thickness (in Gauge)", "text")] }, { name: "Tissue Paper", fields: [field("thickness", "Thickness (in Mil)", "text")] },
-        { name: "AC Stand", fields: [field("type", "Type", "select", { options: options("Powder Coated", "MS") }), field("mounting", "Mounting", "select", { options: options("Wall", "Floor") }), field("size", "Size", "select", { options: options("18", "24", "26") })] },
-        { name: "Rubber Pad", fields: [field("thickness", "Thickness (in mm)", "text"), field("size", "Size (in Inches)", "text")] },
-        { name: "Stand Insulator", fields: [field("specification", "Specification", "text")] },
-    ] },
 ];
+
+const fittingTypes: CatalogOption[] = [
+    { value: "Pipe", codeToken: "Pipe" }, { value: "Elbow", codeToken: "Elbow" }, { value: "Socket", codeToken: "Socket" },
+    { value: "Reducer", codeToken: "Reducer" }, { value: "U-Bend", codeToken: "U-Bend" }, { value: "Tee", codeToken: "Tee" },
+];
+const strengthOptions: CatalogOption[] = [{ value: "Hard", codeToken: "H" }, { value: "Soft", codeToken: "S" }];
+const acPipe = (name: string, prefix: string, thicknessLabel: string, unitOptionsByType: Record<string, readonly string[]>, defaultUnitByType: Record<string, string>, conversionPairsByType: Record<string, { from: string; to: string }[]>): CatalogItem => ({
+    name, codeTemplate: `${prefix}/{type}/{strength}/{thickness}/{diameter}`,
+    fields: [
+        field("type", "Type", "select", { required: true, listColumn: "type", options: fittingTypes }),
+        field("diameter", "Diameter (mm)", "number", { required: true, min: 0, minExclusive: true }),
+        field("thickness", thicknessLabel, "number", { required: true, min: 0, minExclusive: true }),
+        field("strength", "Strength", "select", { required: true, options: strengthOptions }),
+    ],
+    unitOptionsByField: { type: unitOptionsByType }, defaultUnitByField: { type: defaultUnitByType },
+    conversionPairsByField: { type: conversionPairsByType },
+});
+
+export const AC_ITEM_CATALOG: CatalogCategory[] = [{ name: "AC Accessories", items: [
+    acPipe("Copper", "CU", "Thickness (Gauge)",
+        { Pipe: ["Kg", "Mtr", "Ft"], Elbow: ["Nos."], Socket: ["Nos."], Reducer: ["Nos."], "U-Bend": ["Nos."], Tee: ["Nos."] },
+        { Pipe: "Kg", Elbow: "Nos.", Socket: "Nos.", Reducer: "Nos.", "U-Bend": "Nos.", Tee: "Nos." },
+        { Pipe: [{ from: "Kg", to: "Mtr" }, { from: "Kg", to: "Ft" }], Elbow: [], Socket: [], Reducer: [], "U-Bend": [], Tee: [] }),
+    acPipe("PVC Pipe", "PVC", "Thickness (kg/psi)",
+        { Pipe: ["Mtr", "Ft"], Elbow: ["Nos.", "Mtr", "Ft"], Socket: ["Nos.", "Mtr", "Ft"], Reducer: ["Nos.", "Mtr", "Ft"], "U-Bend": ["Nos.", "Mtr", "Ft"], Tee: ["Nos.", "Mtr", "Ft"] },
+        { Pipe: "Mtr", Elbow: "Nos.", Socket: "Nos.", Reducer: "Nos.", "U-Bend": "Nos.", Tee: "Nos." },
+        Object.fromEntries(["Pipe", "Elbow", "Socket", "Reducer", "U-Bend", "Tee"].map(type => [type, [{ from: "Mtr", to: "Ft" }]]))),
+    acPipe("UPVC Pipe", "UPVC", "Thickness (kg/psi)",
+        { Pipe: ["Mtr", "Ft"], Elbow: ["Mtr", "Ft", "Nos."], Socket: ["Mtr", "Ft", "Nos."], Reducer: ["Mtr", "Ft", "Nos."], "U-Bend": ["Mtr", "Ft", "Nos."], Tee: ["Mtr", "Ft", "Nos."] },
+        { Pipe: "Mtr", Elbow: "Nos.", Socket: "Nos.", Reducer: "Nos.", "U-Bend": "Nos.", Tee: "Nos." },
+        Object.fromEntries(["Pipe", "Elbow", "Socket", "Reducer", "U-Bend", "Tee"].map(type => [type, [{ from: "Mtr", to: "Ft" }]]))),
+    acPipe("CPVC Pipe", "CPVC", "Thickness (SDR)",
+        { Pipe: ["Mtr", "Ft"], Elbow: ["Mtr", "Ft", "Nos."], Socket: ["Mtr", "Ft", "Nos."], Reducer: ["Mtr", "Ft", "Nos."], "U-Bend": ["Mtr", "Ft", "Nos."], Tee: ["Mtr", "Ft", "Nos."] },
+        { Pipe: "Mtr", Elbow: "Nos.", Socket: "Nos.", Reducer: "Nos.", "U-Bend": "Nos.", Tee: "Nos." },
+        Object.fromEntries(["Pipe", "Elbow", "Socket", "Reducer", "U-Bend", "Tee"].map(type => [type, [{ from: "Mtr", to: "Ft" }]]))),
+    acPipe("MS", "MS", "Thickness (SDR)",
+        { Pipe: ["Mtr", "Ft"], Elbow: ["Mtr", "Ft", "Nos."], Socket: ["Mtr", "Ft", "Nos."], Reducer: ["Mtr", "Ft", "Nos."], "U-Bend": ["Mtr", "Ft", "Nos."], Tee: ["Mtr", "Ft", "Nos."] },
+        { Pipe: "Mtr", Elbow: "Nos.", Socket: "Nos.", Reducer: "Nos.", "U-Bend": "Nos.", Tee: "Nos." },
+        Object.fromEntries(["Pipe", "Elbow", "Socket", "Reducer", "U-Bend", "Tee"].map(type => [type, [{ from: "Mtr", to: "Ft" }]]))),
+    { name: "Sleeve Insulation", codeTemplate: "SI/{class}/{diameter}/{thickness}", unitOptions: ["Mtr", "Ft", "Nos."] , fields: [field("diameter", "Diameter (mm)", "number", { required: true, min: 0, minExclusive: true }), field("thickness", "Thickness (mm)", "number", { required: true, min: 0, minExclusive: true }), select("class", "Class", ["0", "1"])] , conversionPairs: [] },
+    { name: "Round Duct with Aluminium Foil", codeTemplate: "RoundDuct/{construction}/{insulationStatus}/{insulationThickness}/{diameter}", unitOptions: ["Mtr", "Ft", "Sq. Mtr."], conversionPairs: [], fields: [field("diameter", "Diameter (mm)", "number", { required: true, min: 0, minExclusive: true }), field("construction", "Type", "select", { required: true, options: [{ value: "Rigid", codeToken: "R" }, { value: "Soft", codeToken: "S" }] }), field("insulationStatus", "Insulation Status", "select", { required: true, options: [{ value: "Insulated", codeToken: "I" }, { value: "Non-Insulated", codeToken: "NI" }] }), field("insulationThickness", "Insulation Thickness (mm)", "select", { required: true, options: options("25", "50"), showWhen: { field: "insulationStatus", value: "Insulated" } })] },
+    { name: "GI Duct / MS Duct", codeTemplate: "Duct/{material}/{shape}/{fabrication}/{thickness}", fields: [field("material", "Material", "select", { required: true, options: options("GI", "MS") }), field("shape", "Shape", "select", { required: true, options: [{ value: "Round", codeToken: "R" }, { value: "Oval", codeToken: "O" }, { value: "Rectangular", codeToken: "Re" }] }), field("fabrication", "Fabrication", "select", { required: true, options: [{ value: "Hand", codeToken: "H" }, { value: "Factory", codeToken: "F" }] }), field("thickness", "Thickness of Sheet (Gauge)", "number", { required: true, min: 0, minExclusive: true })] , conversionPairs: [] },
+    { name: "GI Sheet / MS Sheet", codeTemplate: "Sheet/{material}/{width}/{coating}/{thickness}", fields: [select("material", "Material", ["GI", "MS"]), field("width", "Width (mm)", "select", { required: true, options: [{ value: "900 mm", codeToken: "900" }, { value: "1000 mm", codeToken: "1000" }, { value: "1200 mm", codeToken: "1200" }] }), field("coating", "Coating (GSM)", "number", { required: true, min: 0, minExclusive: true }), field("thickness", "Thickness (Gauge)", "number", { required: true, min: 0, minExclusive: true })] , conversionPairs: [] },
+    { name: "Canvas", codeTemplate: "Canvas/{type}", unitOptions: ["RMtr", "Sq. Mtr."], defaultUnit: "RMtr", conversionPairs: [{ from: "RMtr", to: "Sq. Mtr." }], fields: [field("type", "Type", "select", { required: true, listColumn: "type", options: [{ value: "Cloth", codeToken: "C" }, { value: "Readymade", codeToken: "RM" }, { value: "Roll", codeToken: "R" }] })] },
+    { name: "Nitrile Insulation Sheet / XLPE Insulation Sheet", codeTemplate: "InsulationSheet/{material}/{coating}/{class}/{thickness}", unitOptions: ["Sq. Mtr."], fields: [field("material", "Material", "select", { required: true, options: [{ value: "Nitrile", codeToken: "N" }, { value: "XLPE", codeToken: "X" }] }), field("thickness", "Thickness (mm)", "number", { required: true, min: 0, minExclusive: true }), field("coating", "Coating", "select", { required: true, options: [{ value: "Plain", codeToken: "P" }, { value: "Aluminium Foil", codeToken: "AF" }] }), select("class", "Class", ["0", "1"])] , conversionPairs: [] },
+    { name: "Acoustic Insulation", codeTemplate: "AcousticInsulation/{type}/{thickness}", unitOptions: ["Sq. Mtr."], fields: [field("type", "Type", "select", { required: true, listColumn: "type", options: [{ value: "Open Cell (Accousound)", codeToken: "O" }, { value: "Glasswool", codeToken: "G" }, { value: "Rigid Board", codeToken: "R" }] }), field("thickness", "Thickness (mm)", "select", { required: true, options: options("10", "12", "15", "19", "25") })] , conversionPairs: [] },
+    { name: "Underdeck Insulation", codeTemplate: "UnderdeckInsulation/{type}/{thickness}", unitOptions: ["Sq. Mtr."], fields: [field("type", "Type", "select", { required: true, listColumn: "type", options: [{ value: "Nitrile", codeToken: "N" }, { value: "PUF", codeToken: "P" }, { value: "Glasswool (Roll)", codeToken: "G-Roll" }, { value: "Glasswool (Bag)", codeToken: "G-Bag" }, { value: "Rigid Board", codeToken: "RB" }, { value: "Sheet", codeToken: "Sh" }] }), field("thickness", "Thickness (mm)", "number", { required: true, min: 0, minExclusive: true })] , conversionPairs: [] },
+    { name: "Aluminium Perforated Sheet", codeTemplate: "AlPerforatedSheet/{thickness}", unitOptions: ["Sq. Mtr."], fields: [field("thickness", "Thickness (Gauge)", "number", { required: true, min: 0, minExclusive: true })], conversionPairs: [] },
+    { name: "Tissue Paper", codeTemplate: "TissuePaper/{thickness}", unitOptions: ["Sq. Mtr."], fields: [field("thickness", "Thickness (Mil)", "number", { required: true, min: 0, minExclusive: true })], conversionPairs: [] },
+    { name: "AC Stand", codeTemplate: "ACStand/{type}/{mounting}/{size}", unitOptions: ["Nos.", "Kg"], defaultUnit: "Nos.", fields: [field("type", "Type", "select", { required: true, options: [{ value: "Powder Coated", codeToken: "PC" }, { value: "MS", codeToken: "MS" }] }), field("mounting", "Mounting", "select", { required: true, options: [{ value: "Wall", codeToken: "W" }, { value: "Floor", codeToken: "F" }] }), select("size", "Size", ["18", "24", "26"])], conversionPairs: [] },
+    { name: "Rubber Pad", codeTemplate: "RubberPad/{thickness}/{size}", unitOptions: ["Nos."], fields: [field("thickness", "Thickness (mm)", "number", { required: true, min: 0, minExclusive: true }), field("size", "Size (inches)", "number", { required: true, min: 0, minExclusive: true })], conversionPairs: [] },
+    noCode("Stand Insulator", { pending: true, fields: [field("specification", "Specification", "text")] }),
+]}];
+
+export const ITEM_CATALOG: CatalogCategory[] = [...DC_ITEM_CATALOG, ...AC_ITEM_CATALOG];
 
 export const UNIT_OPTIONS = ["Kg", "Mtr", "Ft", "Nos.", "RMtr", "Sq. Mtr.", "Litre", "Container", "Pair", "Set"] as const;
 export const DEFAULT_UNIT = "Nos.";
@@ -102,8 +144,32 @@ const fixedUnits: Record<string, string[]> = {
     Washer: ["Nos."], Bolt: ["Nos."], Nut: ["Nos."], "Battery Charger": ["Nos."],
     "SPV (Solar Photovoltaic)": ["Nos."], "MC4 Connector (in Pairs)": ["Pair"], "Earthing Insulator": ["Nos."], Ferrule: ["Nos."],
 };
-export const getAllowedUnits = (_categoryName: string, itemName: string) => fixedUnits[resolvedItemName(itemName)] || UNIT_OPTIONS;
-export const getDefaultUnit = (categoryName: string, itemName: string) => findCatalogItem(categoryName, itemName)?.defaultUnit || getAllowedUnits(categoryName, itemName)[0] || DEFAULT_UNIT;
+export const getAllowedUnits = (categoryName: string, itemName: string, specifications: Record<string, string> = {}) => {
+    const item = findCatalogItem(categoryName, itemName);
+    if (item?.unitOptionsByField) {
+        const [fieldKey, optionsByValue] = Object.entries(item.unitOptionsByField)[0] || [];
+        return optionsByValue?.[specifications[fieldKey] || ""] || UNIT_OPTIONS;
+    }
+    return item?.unitOptions || fixedUnits[resolvedItemName(itemName)] || UNIT_OPTIONS;
+};
+export const getDefaultUnit = (categoryName: string, itemName: string, specifications: Record<string, string> = {}) => {
+    const item = findCatalogItem(categoryName, itemName);
+    if (item?.defaultUnitByField) {
+        const [fieldKey, defaultsByValue] = Object.entries(item.defaultUnitByField)[0] || [];
+        const configured = defaultsByValue?.[specifications[fieldKey] || ""];
+        if (configured) return configured;
+    }
+    return item?.defaultUnit || getAllowedUnits(categoryName, itemName, specifications)[0] || DEFAULT_UNIT;
+};
+export const getAllowedConversionPairs = (categoryName: string, itemName: string, specifications: Record<string, string> = {}) => {
+    const item = findCatalogItem(categoryName, itemName);
+    if (!item) return undefined;
+    if (item.conversionPairsByField) {
+        const [fieldKey, pairsByValue] = Object.entries(item.conversionPairsByField)[0] || [];
+        return pairsByValue?.[specifications[fieldKey] || ""] || [];
+    }
+    return item.conversionPairs;
+};
 export const resolveCatalogItemByName = (name: string) => ITEM_CATALOG.flatMap(category => category.items).find(item => item.name === resolvedItemName(name));
 export const getItemMainCategory = (itemName: string, fallback?: string | null) => ITEM_CATALOG.find(category => category.items.some(item => item.name === resolvedItemName(itemName)))?.name || fallback || "AC Accessories";
 export const categoryForItem = (itemName: string) => ITEM_CATALOG.find(category => category.items.some(item => item.name === resolvedItemName(itemName)));

@@ -190,6 +190,16 @@ describe("Item Master create, update, and audit behavior", () => {
         expect(inserted()).toMatchObject({ itemCode: "EyeWashBottle", category: "Battery Accessories" });
     });
 
+    it("creates an AC copper fitting with the configured code and no conversion", async () => {
+        const { service, inserted } = serviceForCrud();
+        await service.create(itemSchema.parse(payload({
+            category: "AC Accessories", itemName: "Copper", itemType: "Elbow",
+            specifications: { type: "Elbow", diameter: "12", thickness: "1", strength: "Hard" },
+            unit: "Nos.", hsnCode: "123456",
+        })), 7);
+        expect(inserted()).toMatchObject({ itemCode: "CU/Elbow/H/1/12", itemType: "Elbow", conversionUnit: null });
+    });
+
     it("allows blank HSN only for definitions marked not applicable", async () => {
         const { service, inserted } = serviceForCrud();
         const body = itemSchema.parse(payload({ category: "Battery Accessories", itemName: "Eye Wash Bottle", specifications: {}, hsnCode: "" }));
@@ -203,12 +213,12 @@ describe("Item Master create, update, and audit behavior", () => {
         await expect(service.create(body, 7)).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it("uses the existing sequence code for a Legacy item", async () => {
+    it("uses the existing sequence code for an item without a code template", async () => {
         const { service, inserted } = serviceForCrud();
         await service.create(itemSchema.parse(payload({
-            category: "AC Accessories", itemName: "Copper", itemType: "Pipe", specifications: { diameter: "12" },
+            category: "Glands", itemName: "Gland", specifications: {},
         })), 7);
-        expect(inserted()).toMatchObject({ itemCode: "ITM-0007", itemType: "Pipe" });
+        expect(inserted()).toMatchObject({ itemCode: "ITM-0007" });
     });
 
     it("reports an existing templated code in duplicate conflicts", async () => {
@@ -257,7 +267,7 @@ describe("Item Master create, update, and audit behavior", () => {
     it("regenerates catalog item codes when code-forming fields change", async () => {
         const existing = row({
             itemCode: "NICD/KP/L/100", category: "Batteries", itemName: "Ni-Cd Battery",
-            itemType: null, specifications: { type: "KP", discharge: "L", capacity: "100" },
+            itemType: null, unit: "Nos.", specifications: { type: "KP", discharge: "L", capacity: "100" },
         });
         const { service, updated } = serviceForCrud({ existing });
         await service.update(1, { specifications: { type: "RGS", discharge: "L", capacity: "100" } }, 42);
