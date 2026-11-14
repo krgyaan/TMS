@@ -244,6 +244,8 @@ export const instrumentBgDetails = pgTable('instrument_bg_details', {
     // DOCX letters generated automatically when the BG create-request mail is sent
     coverLetterDocx: varchar('cover_letter_docx', { length: 500 }), // bi-dashboard/bank-guarantee/bgcovletter/...
     prefilledAppDocx: varchar('prefilled_app_docx', { length: 500 }), // bi-dashboard/bank-guarantee/bgprefill/...
+    bgUpload: varchar('bg_upload', { length: 500 }), // Accounts Form (BG) 2 - issued BG document
+    bgSignedCoveringLetter: varchar('bg_signed_covering_letter', { length: 500 }), // Accounts Form (BG) 2 - signed covering letter
 
     // BG Basic Info
     bgNeeds: varchar('bg_needs', { length: 255 }), // emd_bgs.bg_needs

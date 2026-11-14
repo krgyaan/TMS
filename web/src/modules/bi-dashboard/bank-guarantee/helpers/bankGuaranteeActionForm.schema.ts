@@ -51,21 +51,9 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     bg_date: z.string().optional(),
     bg_validity: z.string().optional(),
     bg_claim_period: z.string().optional(),
+    bg_upload: z.any().optional(), // File - issued BG document
+    bg_signed_covering_letter: z.any().optional(), // File - signed covering letter
     bg2_remark: z.string().optional(),
-
-    // Courier Dispatch (BG) 2 - creates a couriers row, id stored in req_no
-    courierOrg: z.string().optional(),
-    courierName: z.string().optional(),
-    courierPhone: z.string().optional(),
-    courierAddrLine1: z.string().optional(),
-    courierAddrLine2: z.string().optional(),
-    courierCity: z.string().optional(),
-    courierState: z.string().optional(),
-    courierPincode: z.string().optional(),
-    empFrom: z.coerce.number().optional(),
-    delDate: z.string().optional(),
-    urgency: z.coerce.number().optional(),
-    courier_docs: z.array(z.string()).optional(),
 
     // Accounts Form (BG) 3 - Capture FDR Details
     sfms_conf: z.any().optional(), // File
@@ -293,23 +281,18 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     }
 ).superRefine(
     (data, ctx) => {
-        // Accounts Form (BG) 2: core BG + courier details are required
+        // Accounts Form (BG) 2: BG details plus the issued BG document and the
+        // signed covering letter are required. Courier dispatch is captured in
+        // the BG create form, so it is no longer validated here.
         if (data.action !== 'accounts-form-2') return;
         if (!data.bg_no) ctx.addIssue({ code: 'custom', message: 'BG number is required', path: ['bg_no'] });
         if (!data.bg_date) ctx.addIssue({ code: 'custom', message: 'BG creation date is required', path: ['bg_date'] });
         if (!data.bg_validity) ctx.addIssue({ code: 'custom', message: 'BG validity is required', path: ['bg_validity'] });
-        if (!data.courierOrg) ctx.addIssue({ code: 'custom', message: 'Courier organization is required', path: ['courierOrg'] });
-        if (!data.courierName) ctx.addIssue({ code: 'custom', message: 'Courier recipient name is required', path: ['courierName'] });
-        if (!data.courierPhone) ctx.addIssue({ code: 'custom', message: 'Courier phone is required', path: ['courierPhone'] });
-        if (!data.courierAddrLine1) ctx.addIssue({ code: 'custom', message: 'Courier address is required', path: ['courierAddrLine1'] });
-        if (!data.courierPincode) {
-            ctx.addIssue({ code: 'custom', message: 'Courier pin code is required', path: ['courierPincode'] });
-        } else if (!/^\d{6}$/.test(data.courierPincode)) {
-            ctx.addIssue({ code: 'custom', message: 'Courier pin code must be 6 digits', path: ['courierPincode'] });
+        if (!data.bg_claim_period) ctx.addIssue({ code: 'custom', message: 'BG claim period expiry is required', path: ['bg_claim_period'] });
+        if (!hasFile(data.bg_upload)) ctx.addIssue({ code: 'custom', message: 'BG document is required', path: ['bg_upload'] });
+        if (!hasFile(data.bg_signed_covering_letter)) {
+            ctx.addIssue({ code: 'custom', message: 'Signed covering letter is required', path: ['bg_signed_covering_letter'] });
         }
-        if (!data.empFrom) ctx.addIssue({ code: 'custom', message: 'Courier sender is required', path: ['empFrom'] });
-        if (!data.delDate) ctx.addIssue({ code: 'custom', message: 'Delivery date is required', path: ['delDate'] });
-        if (!data.urgency) ctx.addIssue({ code: 'custom', message: 'Dispatch urgency is required', path: ['urgency'] });
     }
 ).refine(
     (data) => {

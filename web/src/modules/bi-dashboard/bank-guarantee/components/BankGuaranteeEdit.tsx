@@ -475,6 +475,7 @@ export function BankGuaranteeEdit({ instrumentId, initialData }: BankGuaranteeEd
                                     <AccountsForm2Fields
                                         control={form.control}
                                         names={STEP_NAMES}
+                                        showCourier
                                         employees={employees}
                                     />
                                 </SectionBlock>

@@ -1061,16 +1061,6 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             }
         } else if (body.action === 'accounts-form-2') {
             nextStatus = 'BG_CREATED';
-            if (body.req_no) updateData.reqNo = String(body.req_no);
-            if (body.courier_address_json) {
-                try {
-                    updateData.courierAddressJson = typeof body.courier_address_json === 'string'
-                        ? JSON.parse(body.courier_address_json)
-                        : body.courier_address_json;
-                } catch {
-                    updateData.courierAddressJson = null;
-                }
-            }
         } else if (body.action === 'accounts-form-3') {
             nextStatus = 'FDR_DETAILS_CAPTURED';
         } else if (body.action === 'initiate-followup') {
@@ -1201,6 +1191,24 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             if (body.bg_validity) bgDetailsUpdate.validityDate = body.bg_validity;
             if (body.bg_claim_period) bgDetailsUpdate.claimExpiryDate = body.bg_claim_period;
             if (body.bg2_remark) bgDetailsUpdate.bg2Remark = body.bg2_remark;
+
+            // The issued BG document uploaded with the form.
+            const bgUploadFile = this.getFileForField('bg_upload', files, body, fileIndexTracker);
+            const bgUploadPath = this.getFilePathFromBody('bg_upload', body);
+            if (bgUploadFile) {
+                bgDetailsUpdate.bgUpload = this.bgFileStoredPath('bg-upload', bgUploadFile.filename);
+            } else if (bgUploadPath) {
+                bgDetailsUpdate.bgUpload = bgUploadPath;
+            }
+
+            // The signed covering letter received back from the bank/client.
+            const signedCoveringFile = this.getFileForField('bg_signed_covering_letter', files, body, fileIndexTracker);
+            const signedCoveringPath = this.getFilePathFromBody('bg_signed_covering_letter', body);
+            if (signedCoveringFile) {
+                bgDetailsUpdate.bgSignedCoveringLetter = this.bgFileStoredPath('bg-signed-covering-letter', signedCoveringFile.filename);
+            } else if (signedCoveringPath) {
+                bgDetailsUpdate.bgSignedCoveringLetter = signedCoveringPath;
+            }
         } else if (body.action === 'accounts-form-3') {
             if (body.fdr_no) bgDetailsUpdate.fdrNo = body.fdr_no;
             if (body.fdr_amt) bgDetailsUpdate.fdrAmt = body.fdr_amt;
@@ -1496,6 +1504,8 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 prefilledSignedBg: instrumentBgDetails.prefilledSignedBg,
                 coverLetterDocx: instrumentBgDetails.coverLetterDocx,
                 prefilledAppDocx: instrumentBgDetails.prefilledAppDocx,
+                bgUpload: instrumentBgDetails.bgUpload,
+                bgSignedCoveringLetter: instrumentBgDetails.bgSignedCoveringLetter,
                 bgNeeds: instrumentBgDetails.bgNeeds,
                 bgPurpose: instrumentBgDetails.bgPurpose,
                 bgSoftCopy: instrumentBgDetails.bgSoftCopy,
@@ -1635,6 +1645,8 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 bgFormatTl: instrumentBgDetails.bgFormatTl,
                 // Accounts Form 2 (after BG creation)
                 bg2Remark: instrumentBgDetails.bg2Remark,
+                bgUpload: instrumentBgDetails.bgUpload,
+                bgSignedCoveringLetter: instrumentBgDetails.bgSignedCoveringLetter,
                 // Accounts Form 3 (capture FDR details)
                 fdrPer: instrumentBgDetails.fdrPer,
                 fdrCopy: instrumentBgDetails.fdrCopy,
@@ -1828,6 +1840,8 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             bgFormatTl: result.bgFormatTl,
             // Accounts Form 2 (after BG creation)
             bg2Remark: result.bg2Remark,
+            bgUpload: result.bgUpload,
+            bgSignedCoveringLetter: result.bgSignedCoveringLetter,
             // Accounts Form 3 (capture FDR details). fdrPer is returned as a
             // string because the form field is z.enum(['10','15','100']) and the
             // SelectField emits strings for it.

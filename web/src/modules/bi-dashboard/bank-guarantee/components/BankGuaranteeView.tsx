@@ -227,6 +227,12 @@ export function BankGuaranteeView({
                                 label2="Accounts Form 2 Remarks"
                                 value2={data.bg2Remark || '—'}
                             />
+                            <DataRow
+                                label1="Upload BG"
+                                value1={<FileLink file={data.bgUpload} />}
+                                label2="Signed Covering Letter"
+                                value2={<FileLink file={data.bgSignedCoveringLetter} />}
+                            />
 
                             {/* Section 2: Request Information */}
                             <SectionHeader title="Request Information" />

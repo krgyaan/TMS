@@ -9,8 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BankGuaranteeActionFormSchema, type BankGuaranteeActionFormValues } from '../helpers/bankGuaranteeActionForm.schema';
 import { useUpdateBankGuaranteeAction, useBGActionFormData, useBGFollowupData } from '@/hooks/api/useBankGuarantees';
 import type { Checkpoint } from '@/components/tendering/SubmissionChecklist';
-import { useCreateCourier } from '@/hooks/api/useCourier';
-import { useUsers } from '@/hooks/api/useUsers';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -37,6 +35,8 @@ const STEP_NAMES = {
     bgDate: 'bg_date',
     bgValidity: 'bg_validity',
     bgClaimPeriod: 'bg_claim_period',
+    bgUpload: 'bg_upload',
+    bgSignedCoveringLetter: 'bg_signed_covering_letter',
     bg2Remark: 'bg2_remark',
     fdrPer: 'fdr_per',
     fdrAmt: 'fdr_amt',
@@ -135,8 +135,6 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const updateMutation = useUpdateBankGuaranteeAction();
-    const createCourierMutation = useCreateCourier();
-    const { data: employees = [] } = useUsers();
     const { data: formData } = useBGActionFormData(instrumentId);
     const { data: followupData } = useBGFollowupData(instrumentId);
 
@@ -225,34 +223,18 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
             bankMailIds.replace(toMailRows(formData.bankMailIds));
             bankMailIdsCc.replace(toMailRows(formData.bankMailIdsCc));
         } else if (action === 'accounts-form-2') {
+            // BG No. is a required field on this form, so it is only present once
+            // Stage 2 has actually been saved. Some older instruments already
+            // carry dates in instrument_bg_details (written by the legacy create
+            // path), which must not pre-fill a Stage 2 that was never filled in.
+            const stage2Saved = Boolean(formData.bgNo);
             form.setValue('bg_no', formData.bgNo ?? undefined);
-            form.setValue('bg_date', toDateString(formData.bgDate));
-            form.setValue('bg_validity', toDateString(formData.validityDate));
-            form.setValue('bg_claim_period', toDateString(formData.claimExpiryDate));
+            form.setValue('bg_date', stage2Saved ? toDateString(formData.bgDate) : undefined);
+            form.setValue('bg_validity', stage2Saved ? toDateString(formData.validityDate) : undefined);
+            form.setValue('bg_claim_period', stage2Saved ? toDateString(formData.claimExpiryDate) : undefined);
+            form.setValue('bg_upload', safeParseArray(formData.bgUpload));
+            form.setValue('bg_signed_covering_letter', safeParseArray(formData.bgSignedCoveringLetter));
             form.setValue('bg2_remark', formData.bg2Remark ?? undefined);
-            const courier = formData.courierDetails;
-            const courierAddr = formData.courierAddressJson;
-            if (courier || courierAddr) {
-                form.setValue('courierOrg', courierAddr?.org ?? courier?.toOrg ?? undefined);
-                form.setValue('courierName', courierAddr?.name ?? courier?.toName ?? undefined);
-                form.setValue('courierPhone', courierAddr?.phone ?? courier?.toMobile ?? undefined);
-                form.setValue('courierAddrLine1', courierAddr?.line1 ?? undefined);
-                form.setValue('courierAddrLine2', courierAddr?.line2 ?? undefined);
-                form.setValue('courierCity', courierAddr?.city ?? undefined);
-                form.setValue('courierState', courierAddr?.state ?? undefined);
-                form.setValue('courierPincode', courierAddr?.pincode ?? courier?.toPin ?? undefined);
-                form.setValue('empFrom', courierAddr?.empFrom ?? (courier?.empFrom ? Number(courier.empFrom) : undefined));
-                form.setValue('delDate', toDateString(courierAddr?.delDate ?? courier?.delDate));
-                form.setValue('urgency', courierAddr?.urgency ?? (courier?.urgency ? Number(courier.urgency) : undefined));
-                const jsonDocs = courierAddr?.docs;
-                const courierDocs = courier?.courierDocs;
-                form.setValue('courier_docs',
-                    Array.isArray(jsonDocs)
-                        ? jsonDocs
-                        : Array.isArray(courierDocs)
-                            ? courierDocs
-                            : safeParseArray(courierDocs));
-            }
         } else if (action === 'accounts-form-3') {
             form.setValue('fdr_per', toFdrEnum(formData.fdrPer));
             form.setValue('fdr_amt', formData.fdrAmt ?? undefined);
@@ -291,7 +273,7 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [action, formData]);
 
-    const isSubmitting = form.formState.isSubmitting || updateMutation.isPending || createCourierMutation.isPending;
+    const isSubmitting = form.formState.isSubmitting || updateMutation.isPending;
 
     const handleSubmit = async (values: BankGuaranteeActionFormValues) => {
         if (isReadOnly) return;
@@ -333,41 +315,6 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
                 })),
             );
             payload.attachments = values.attachments ?? [];
-
-            if (values.action === 'accounts-form-2' && values.courierOrg) {
-                if (!formData?.courierDetails?.id) {
-                    const toAddr = [values.courierAddrLine1, values.courierAddrLine2, values.courierCity, values.courierState]
-                        .filter(Boolean).join(', ');
-                    const createdCourier = await createCourierMutation.mutateAsync({
-                        data: {
-                            toOrg: values.courierOrg,
-                            toName: values.courierName || '',
-                            toAddr: toAddr || '',
-                            toPin: values.courierPincode || '',
-                            toMobile: values.courierPhone || '',
-                            empFrom: values.empFrom || 0,
-                            delDate: values.delDate || '',
-                            urgency: values.urgency || 1,
-                        },
-                        filenames: values.courier_docs,
-                    });
-                    payload.req_no = String(createdCourier.id);
-                }
-                payload.courier_address_json = JSON.stringify({
-                    org: values.courierOrg || null,
-                    name: values.courierName || null,
-                    phone: values.courierPhone || null,
-                    line1: values.courierAddrLine1 || null,
-                    line2: values.courierAddrLine2 || null,
-                    city: values.courierCity || null,
-                    state: values.courierState || null,
-                    pincode: values.courierPincode || null,
-                    empFrom: values.empFrom ?? null,
-                    delDate: values.delDate || null,
-                    urgency: values.urgency ?? null,
-                    docs: values.courier_docs ?? [],
-                });
-            }
 
             await updateMutation.mutateAsync({ id: instrumentId, payload });
             toast.success('Action submitted successfully');
@@ -445,7 +392,6 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
                             <AccountsForm2Fields
                                 control={form.control}
                                 names={STEP_NAMES}
-                                employees={employees}
                             />
                         </SectionCard>
                     )}
