@@ -36,6 +36,7 @@ export interface BankGuaranteeDashboardCounts {
     'live-bg-limit': number;
     'live-sbi': number;
     'live-yes': number;
+    'live-au': number;
     cancelled: number;
     rejected: number;
     total: number;

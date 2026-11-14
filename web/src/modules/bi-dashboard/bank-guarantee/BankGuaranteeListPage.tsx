@@ -29,43 +29,49 @@ const TABS_CONFIG: Array<{ key: BankGuaranteeDashboardTab; name: string; icon: R
     {
         key: 'new-requests',
         name: 'New Requests',
-        icon: <FileText className="h-4 w-4" />,
+        icon: <FileText className="h-3.5 w-3.5" />,
         description: 'New bank guarantee requests',
     },
     {
         key: 'live-pnb',
         name: 'Live PNB',
-        icon: <Shield className="h-4 w-4" />,
+        icon: <Shield className="h-3.5 w-3.5" />,
         description: 'Live bank guarantees from PNB',
     },
     {
         key: 'live-bg-limit',
         name: 'Live BG Limit',
-        icon: <Shield className="h-4 w-4" />,
+        icon: <Shield className="h-3.5 w-3.5" />,
         description: 'Live bank guarantees within limit',
     },
     {
         key: 'live-sbi',
         name: 'Live SBI',
-        icon: <Shield className="h-4 w-4" />,
+        icon: <Shield className="h-3.5 w-3.5" />,
         description: 'Live bank guarantees from SBI',
     },
     {
         key: 'live-yes',
         name: 'Live YES',
-        icon: <Shield className="h-4 w-4" />,
+        icon: <Shield className="h-3.5 w-3.5" />,
         description: 'Live bank guarantees from YES Bank',
+    },
+    {
+        key: 'live-au',
+        name: 'Live AU',
+        icon: <Shield className="h-3.5 w-3.5" />,
+        description: 'Live bank guarantees from AU Bank',
     },
     {
         key: 'cancelled',
         name: 'Cancelled',
-        icon: <XCircle className="h-4 w-4" />,
+        icon: <XCircle className="h-3.5 w-3.5" />,
         description: 'Cancelled bank guarantees',
     },
     {
         key: 'rejected',
         name: 'Rejected',
-        icon: <XCircle className="h-4 w-4" />,
+        icon: <XCircle className="h-3.5 w-3.5" />,
         description: 'Rejected bank guarantees',
     }
 ];
@@ -135,7 +141,7 @@ const BankGuaranteeListPage = () => {
         getExportDataFn: (params) => bankGuaranteesService.getExportData(params),
         tabsConfig: TABS_CONFIG,
         pendingTabKey: 'new-requests',
-        tabsWithForm: ['live-pnb', 'live-bg-limit', 'live-sbi', 'live-yes', 'cancelled', 'rejected'],
+        tabsWithForm: ['live-pnb', 'live-bg-limit', 'live-sbi', 'live-yes', 'live-au', 'cancelled', 'rejected'],
         filenamePrefix: 'bank-guarantees',
         flattenFormData,
         mapPendingRow: (r: any) => ({
@@ -487,17 +493,17 @@ const BankGuaranteeListPage = () => {
                         value={activeTab}
                         onValueChange={(value) => setActiveTab(value as BankGuaranteeDashboardTab)}
                     >
-                        <TabsList className="m-auto mb-4">
+                        <TabsList className="m-auto mb-4 h-auto flex-wrap gap-0.5 p-1">
                             {tabsWithData.map((tab) => (
                                 <TabsTrigger
                                     key={tab.key}
                                     value={tab.key}
-                                    className="data-[state=active]:shadow-md flex items-center gap-2"
+                                    className="data-[state=active]:shadow-md flex items-center gap-1 px-2.5 py-1 text-xs"
                                 >
                                     {tab.icon}
-                                    <span className="font-semibold text-sm">{tab.name}</span>
+                                    <span className="font-semibold text-xs">{tab.name}</span>
                                     {tab.count > 0 && (
-                                        <Badge variant="secondary" className="text-xs ml-1">
+                                        <Badge variant="secondary" className="ml-0.5 px-1.5 py-0 text-[10px] leading-4">
                                             {tab.count}
                                         </Badge>
                                     )}

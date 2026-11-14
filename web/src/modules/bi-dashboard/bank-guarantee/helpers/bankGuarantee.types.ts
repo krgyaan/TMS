@@ -1,4 +1,4 @@
-export type BankGuaranteeDashboardTab = 'new-requests' | 'live-pnb' | 'live-bg-limit' | 'live-sbi' | 'live-yes' | 'cancelled' | 'rejected';
+export type BankGuaranteeDashboardTab = 'new-requests' | 'live-pnb' | 'live-bg-limit' | 'live-sbi' | 'live-yes' | 'live-au' | 'cancelled' | 'rejected';
 export type BankGuaranteeExportTab = BankGuaranteeDashboardTab | 'all';
 
 export const toFileArray = (value: unknown): string[] => {
@@ -63,6 +63,7 @@ export interface BankGuaranteeDashboardCounts {
     'live-bg-limit': number;
     'live-sbi': number;
     'live-yes': number;
+    'live-au': number;
     cancelled: number;
     rejected: number;
     total: number;

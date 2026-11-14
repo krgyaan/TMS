@@ -21,7 +21,7 @@ import {
 } from '@db/schemas/tendering/payment-requests.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, like, ne, sql } from 'drizzle-orm';
 
 @Injectable()
 export class BankGuaranteeService {
@@ -89,6 +89,13 @@ export class BankGuaranteeService {
             conditions.push(
                 inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
                 inArray(instrumentBgDetails.bankName, ['YESBANK_2011', 'YESBANK_0771'])
+            );
+        } else if (tab === 'live-au') {
+            // AU Small Finance Bank — bank names are stored as AU_<branch code>
+            // (AU_8316, AU_5190, AU_5180, AU_5242, …).
+            conditions.push(
+                inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
+                like(instrumentBgDetails.bankName, 'AU_%')
             );
         } else if (tab === 'cancelled') {
             conditions.push(
@@ -189,6 +196,11 @@ export class BankGuaranteeService {
                 requestId: paymentRequests.id,
                 action: paymentInstruments.action,
                 createdAt: paymentInstruments.createdAt,
+                // Elapsed time is computed in SQL: `created_at` is a
+                // `timestamp without time zone` written in IST, so parsing it
+                // in Node (UTC) would shift it by 5h30m. Postgres compares it
+                // against `now()` in the session timezone, which is correct.
+                elapsedSeconds: sql<number>`extract(epoch from (now() - ${paymentInstruments.createdAt}))`,
                 tenderId: paymentRequests.tenderId,
                 projectId: paymentRequests.projectId,
                 bgNeeds: instrumentBgDetails.bgNeeds,
@@ -287,21 +299,24 @@ export class BankGuaranteeService {
                 ? 'Followup Stopped'
                 : this.statusMap()[row.bgStatus] ?? null;
 
-            // Stage 1 gets a fixed 12h window; Stage 2 uses the "BG Needed In"
-            // hours captured on the BG. Both count from the request creation.
+            // Stage 1 gets a fixed 12h window; once Stage 1 is accepted (action
+            // 1) Stage 2 counts down the "BG Needed In" hours. Both are measured
+            // from the request creation time.
+            const bgNeedsHours = Number.parseInt(String(row.bgNeeds ?? '').replace(/[^0-9]/g, ''), 10);
             const timerHours = row.action === 0
                 ? 12
-                : row.action === 1 && row.bgNeeds
-                    ? Number(row.bgNeeds)
+                : row.action === 1 && Number.isFinite(bgNeedsHours) && bgNeedsHours > 0
+                    ? bgNeedsHours
                     : null;
-            const timer: BankGuaranteeDashboardRow['timer'] = timerHours && Number.isFinite(timerHours) && row.createdAt
+            const elapsedSeconds = Number(row.elapsedSeconds ?? 0);
+            const timer: BankGuaranteeDashboardRow['timer'] = timerHours && Number.isFinite(elapsedSeconds)
                 ? (() => {
-                    const deadline = new Date(new Date(row.createdAt).getTime() + timerHours * 60 * 60 * 1000);
-                    const remainingSeconds = Math.floor((deadline.getTime() - Date.now()) / 1000);
+                    const remainingSeconds = Math.floor(timerHours * 60 * 60 - elapsedSeconds);
                     return {
                         remainingSeconds,
                         status: remainingSeconds < 0 ? 'OVERDUE' : 'RUNNING',
-                        deadline,
+                        // Absolute instant, so the client can tick against it.
+                        deadline: new Date(Date.now() + remainingSeconds * 1000),
                     };
                 })()
                 : null;
@@ -496,6 +511,11 @@ export class BankGuaranteeService {
             inArray(instrumentBgDetails.bankName, ['YESBANK_2011', 'YESBANK_0771']),
         );
 
+        const liveAuFilter = and(
+            inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
+            like(instrumentBgDetails.bankName, 'AU_%'),
+        );
+
         const cancelledFilter = inArray(paymentInstruments.action, [8, 9]);
 
         const rejectedFilter = and(
@@ -509,6 +529,7 @@ export class BankGuaranteeService {
             liveBgLimit: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${liveBgLimitFilter})`,
             liveSbi: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${liveSbiFilter})`,
             liveYes: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${liveYesFilter})`,
+            liveAu: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${liveAuFilter})`,
             cancelled: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${cancelledFilter})`,
             rejected: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${rejectedFilter})`,
         })
@@ -525,6 +546,7 @@ export class BankGuaranteeService {
         const liveBgLimit = Number(counts?.liveBgLimit ?? 0);
         const liveSbi = Number(counts?.liveSbi ?? 0);
         const liveYes = Number(counts?.liveYes ?? 0);
+        const liveAu = Number(counts?.liveAu ?? 0);
         const cancelled = Number(counts?.cancelled ?? 0);
         const rejected = Number(counts?.rejected ?? 0);
 
@@ -534,9 +556,10 @@ export class BankGuaranteeService {
             'live-bg-limit': liveBgLimit,
             'live-sbi': liveSbi,
             'live-yes': liveYes,
+            'live-au': liveAu,
             cancelled,
             rejected,
-            total: newRequests + livePnb + liveBgLimit + liveSbi + liveYes + cancelled + rejected,
+            total: newRequests + livePnb + liveBgLimit + liveSbi + liveYes + liveAu + cancelled + rejected,
         };
     }
 
