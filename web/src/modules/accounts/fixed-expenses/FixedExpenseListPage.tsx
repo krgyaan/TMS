@@ -16,7 +16,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { usePersistentTableState } from '@/hooks/usePersistentTableState';
 import { useArchiveFixedExpense, useFixedExpenses, useFixedExpenseTabCounts } from '@/hooks/api/useFixedExpense';
 import { useAuth } from '@/contexts/AuthContext';
-import { currencyCol, dateCol } from '@/components/data-grid';
+import { currencyCol, dateCol } from '@/components/data-grid'; 
 import { formatINR } from '@/hooks/useINRFormatter';
 import type { FixedExpenseListParams, FixedExpenseListRow } from './helpers/fixedExpense.types';
 import {

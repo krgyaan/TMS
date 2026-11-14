@@ -1,4 +1,4 @@
-export const UNIT_OPTIONS = ["Kg", "Mtr", "Ft", "Nos.", "RMtr", "Sq. Mtr."] as const;
+export const UNIT_OPTIONS = ["Kg", "Mtr", "Ft", "Nos.", "RMtr", "Sq. Mtr.", "Litre", "Container", "Pair", "Set"] as const;
 export type Unit = typeof UNIT_OPTIONS[number];
 
 type ConversionRule = {
@@ -16,6 +16,8 @@ export const CONVERSION_RULES: ConversionRule[] = [
     { from: "Ft", to: "Mtr", factor: 0.3048 },
     { from: "RMtr", to: "Sq. Mtr.", factor: null },
     { from: "Sq. Mtr.", to: "RMtr", factor: null },
+    { from: "Litre", to: "Container", factor: null },
+    { from: "Container", to: "Litre", factor: null },
 ];
 
 export const getConversionRule = (from: string, to: string) =>
