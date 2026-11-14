@@ -39,8 +39,14 @@ const EditVendorPage = () => {
         defaultValues: {
             organization: {
                 name: "",
-                alias: "",
+                category: "",
                 msme: "",
+                msmeSize: undefined,
+                msmeType: undefined,
+                majorActivity: "",
+                registrationType: undefined,
+                creditPeriodDays: undefined,
+                creditAmount: undefined,
                 pan: "",
                 address: "",
                 status: true,

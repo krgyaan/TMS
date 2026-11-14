@@ -35,7 +35,7 @@ const OrgSummaryCard = ({ title, org }: { title: string; org: VendorMergeOrgSumm
         <CardContent className="space-y-2 text-sm">
             <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                 <div>
-                    <span className="text-muted-foreground">Alias:</span> {org.alias || "-"}
+                    <span className="text-muted-foreground">Category:</span> {org.category || "-"}
                 </div>
                 <div>
                     <span className="text-muted-foreground">MSME:</span> {org.msme || "-"}

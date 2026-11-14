@@ -50,9 +50,14 @@ export const fileApiToForm = (file: VendorFile): FileFormValues => ({
 export const vendorOrgToFormValues = (organization: VendorOrganizationWithRelations): VendorFormValues => ({
     organization: {
         name: organization.name,
-        alias: organization.alias ?? "",
+        category: organization.category ?? "",
         msme: organization.msme ?? "",
+        msmeSize: organization.msmeSize ?? undefined,
         msmeType: organization.msmeType ?? undefined,
+        majorActivity: organization.majorActivity ?? "",
+        registrationType: organization.registrationType ?? undefined,
+        creditPeriodDays: organization.creditPeriodDays ?? undefined,
+        creditAmount: organization.creditAmount ?? undefined,
         pan: organization.pan ?? "",
         address: organization.address ?? "",
         status: organization.status,
