@@ -1261,7 +1261,6 @@ export class VendorWorkOrderService {
             .select({
                 id: vendorOrganizations.id,
                 name: vendorOrganizations.name,
-                alias: vendorOrganizations.alias,
                 gstNo: vendorGsts.gstNo,
                 msme: vendorOrganizations.msme,
                 pan: vendorOrganizations.pan,
@@ -1345,7 +1344,6 @@ export class VendorWorkOrderService {
                         .insert(vendorOrganizations)
                         .values({
                             name,
-                            alias: body.alias || null,
                             msme: body.msme || null,
                             pan: body.pan || null,
                             address: body.address || null,
@@ -1445,7 +1443,6 @@ export class VendorWorkOrderService {
                     .update(vendorOrganizations)
                     .set({
                         name: name ?? undefined,
-                        alias: body.alias ?? undefined,
                         msme: body.msme ?? undefined,
                         pan: body.pan ?? undefined,
                         address: body.address ?? undefined,
@@ -1581,7 +1578,6 @@ export class VendorWorkOrderService {
                 ...(hasGst ? {} : { address: body.sellerAddress || null }),
                 updatedAt: new Date(),
             };
-            if (body.sellerAlias !== undefined) patch.alias = body.sellerAlias || null;
 
             const formattedName = normalizeVendorName(body.sellerName);
             try {
