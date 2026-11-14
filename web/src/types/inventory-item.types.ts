@@ -31,6 +31,11 @@ export interface ItemConversionOption {
     factorMode: "fixed" | "width" | "manual";
 }
 
+export interface ItemCodePreview {
+    itemCode: string | null;
+    message: string;
+}
+
 export interface InventoryItemsResponse {
     data: InventoryItem[];
     meta: { total: number; page: number; limit: number; totalPages: number };

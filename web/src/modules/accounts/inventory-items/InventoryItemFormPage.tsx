@@ -9,13 +9,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useCreateInventoryItem, useInventoryItem, useItemConversionOptions, useUpdateInventoryItem } from "@/hooks/api/useInventoryItems";
+import { useCreateInventoryItem, useInventoryItem, useItemCodePreview, useItemConversionOptions, useUpdateInventoryItem } from "@/hooks/api/useInventoryItems";
 import { handleQueryError } from "@/lib/react-query";
 import { paths } from "@/app/routes/paths";
 import type { InventoryItemPayload } from "@/types/inventory-item.types";
 import { ITEM_CATALOG, fieldIsVisible, findCatalogItem, getAllowedConversionPairs, getAllowedUnits, getDefaultUnit, getItemMainCategory } from "./item-catalog";
 import { type Unit } from "./item-config";
-import { generateTemplatedItemCode, getItemCodePreview } from "./item-code-generator";
 import { inventoryItemFormSchema, type InventoryItemFormValues } from "./item-form-schema";
 
 const formControlClass = "h-11 w-full rounded-md border border-slate-400 bg-background px-3 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:border-slate-600 md:h-10";
@@ -41,6 +40,7 @@ export default function InventoryItemFormPage() {
     const formUrl = useRef(window.location.href);
     const lastWidth = useRef("");
     const initializedForm = useRef("");
+    const legacyCodeCheckFor = useRef("");
     const [unitChangedNotice, setUnitChangedNotice] = useState(false);
     const unit = useWatch({ control: form.control, name: "unit" });
     const categoryName = useWatch({ control: form.control, name: "category" });
@@ -53,7 +53,12 @@ export default function InventoryItemFormPage() {
     const isDirty = form.formState.isDirty;
     const category = ITEM_CATALOG.find(candidate => candidate.name === categoryName);
     const catalogItem = findCatalogItem(categoryName, itemName);
-    const itemCodePreview = generateTemplatedItemCode(categoryName, itemName, specifications) || (isEdit && item ? item.itemCode : getItemCodePreview(categoryName, itemName, specifications));
+    const codePreviewQuery = useItemCodePreview(categoryName, itemName, specifications, Boolean(findCatalogItem(categoryName, itemName)));
+    const storedCategory = item ? getItemMainCategory(item.itemName, item.category) : "";
+    const storedSpecifications = item ? { ...(item.specifications || {}), ...(item.itemType && !item.specifications?.type ? { type: item.itemType } : {}) } : {};
+    const templateKeys = [...(catalogItem?.codeTemplate || "").matchAll(/\{([A-Za-z0-9_]+)\}/g)].map(match => match[1]);
+    const codeFieldsUnchanged = Boolean(isEdit && item && categoryName === storedCategory && itemName === item.itemName && templateKeys.every(key => (specifications[key] || "") === (storedSpecifications[key] || "")));
+    const itemCodePreview = codePreviewQuery.data?.message || (codeFieldsUnchanged && item ? item.itemCode : catalogItem?.codeTemplate ? "Select all options to generate the code" : itemName ? "ITM sequence assigned on save" : "Select all options to generate the code");
     const typeField = catalogItem?.fields.find(field => field.listColumn === "type");
     const conversionOptionsQuery = useItemConversionOptions(unit, width, conversionEnabled, categoryName, itemName, typeField ? specifications[typeField.key] : undefined);
     const conversionOptions = conversionOptionsQuery.data || [];
@@ -68,10 +73,8 @@ export default function InventoryItemFormPage() {
         if (isEdit) {
             if (!item || initializedForm.current === `edit-${itemId}`) return;
             const editCategory = getItemMainCategory(item.itemName, item.category);
-            const editSpecifications = { ...(item.specifications || {}), ...(item.itemType && !item.specifications?.type ? { type: item.itemType } : {}) };
-            const isLegacyCode = Boolean(findCatalogItem(editCategory, item.itemName)?.codeTemplate && generateTemplatedItemCode(editCategory, item.itemName, editSpecifications) !== item.itemCode);
             form.reset({
-                category: editCategory, legacyCodeEdit: isLegacyCode, itemName: item.itemName, itemType: item.itemType || "",
+                category: editCategory, legacyCodeEdit: false, itemName: item.itemName, itemType: item.itemType || "",
                 specifications: editSpecifications, makeBrand: item.makeBrand || "", modelNumber: item.modelNumber || "", description: item.description || "",
                 unit: item.unit as Unit, storedUnit: item.unit, conversionEnabled: Boolean(item.conversionUnit), conversionUnit: item.conversionUnit || "",
                 conversionFactor: item.conversionFactor || "", hsnCode: item.hsnCode || "", isActive: item.isActive,
@@ -91,6 +94,13 @@ export default function InventoryItemFormPage() {
             setUnitChangedNotice(false);
         }
     }, [isEdit, itemId, item, form]);
+
+    useEffect(() => {
+        if (!isEdit || !item || !codeFieldsUnchanged || !codePreviewQuery.isSuccess || legacyCodeCheckFor.current === String(item.id)) return;
+        const storedCatalogItem = findCatalogItem(storedCategory, item.itemName);
+        form.setValue("legacyCodeEdit", Boolean(storedCatalogItem?.codeTemplate && codePreviewQuery.data.itemCode !== item.itemCode), { shouldDirty: false });
+        legacyCodeCheckFor.current = String(item.id);
+    }, [isEdit, item, codeFieldsUnchanged, codePreviewQuery.isSuccess, codePreviewQuery.data, storedCategory, form]);
 
     useEffect(() => {
         if (!catalogItem) return;
@@ -273,6 +283,7 @@ export default function InventoryItemFormPage() {
                             if (selected) form.setValue("unit", getDefaultUnit(categoryName, selected.name) as Unit, { shouldDirty: true });
                         } })}>
                             <option value="">Select item name</option>
+                            {isEdit && item && itemName === item.itemName && category?.name === categoryName && !category.items.some(option => option.name === item.itemName) && <option value={item.itemName}>{item.itemName} (legacy name)</option>}
                             {category && <optgroup label={category.name}>{category.items.map(option => <option key={option.name} value={option.name} disabled={option.pending}>{option.pending ? `${option.name} (pending finalization)` : option.name}</option>)}</optgroup>}
                         </select>
                     </FormField>

@@ -25,6 +25,14 @@ export const useItemConversionOptions = (unit: string, width?: string, enabled =
         enabled: enabled && Boolean(unit) && !["Nos.", "Litre", "Pair", "Set"].includes(unit),
     });
 
+export const useItemCodePreview = (category: string, itemName: string, specifications: Record<string, string>, enabled = true) =>
+    useQuery({
+        queryKey: [...inventoryItemsKey, "code-preview", category, itemName, specifications],
+        queryFn: () => inventoryItemsService.master.previewCode(category, itemName, specifications),
+        enabled: enabled && Boolean(category && itemName),
+        staleTime: 30_000,
+    });
+
 const useItemMutation = (action: (data: InventoryItemPayload) => Promise<InventoryItem>, message: string, includeCode = false) => {
     const client = useQueryClient();
     return useMutation({
