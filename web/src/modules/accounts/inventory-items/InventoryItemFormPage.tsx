@@ -171,7 +171,7 @@ export default function InventoryItemFormPage() {
             lastWidth.current = width;
             setUnitChangedNotice(true);
             form.clearErrors(["conversionUnit", "conversionFactor"]);
-        }
+        } 
     };
 
     const handleConversionChange = (nextUnit: string) => {
@@ -200,9 +200,9 @@ export default function InventoryItemFormPage() {
             }));
             const payload: InventoryItemPayload = {
                 category: values.category, modelNumber: values.modelNumber?.trim() || null, itemName: values.itemName,
-                itemType: typeField ? values.specifications[typeField.key] || null : values.itemType?.trim() || null,
-                makeBrand: values.makeBrand?.trim() || null,
-                specifications: visibleSpecifications, description: values.description?.trim() || null,
+                itemType: typeField ? values.specifications[typeField.key] || null : values.itemType.trim() || null,
+                makeBrand: values.makeBrand.trim() || null,
+                specifications: visibleSpecifications, description: values.description.trim() || null,
                 unit: values.unit, conversionUnit: values.conversionEnabled ? values.conversionUnit || null : null,
                 conversionFactor: values.conversionEnabled && values.conversionUnit ? values.conversionFactor : null,
                 hsnCode: values.hsnCode.trim(), isActive: values.isActive, 
