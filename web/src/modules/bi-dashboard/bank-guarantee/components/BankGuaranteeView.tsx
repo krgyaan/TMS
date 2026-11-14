@@ -271,6 +271,10 @@ export function BankGuaranteeView({
                                 label2="Prefilled BG Application (Generated)"
                                 value2={<FileLink file={data.prefilledAppDocx} />}
                             />
+                            <DataRow
+                                label1="Authorization Letter (Generated)"
+                                value1={<FileLink file={data.authorizationLetterDocx} />}
+                            />
 
                             {/* Section 3: Tender/Project Information */}
                             <SectionHeader title="Tender/Project Information" />

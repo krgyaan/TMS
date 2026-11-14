@@ -743,6 +743,13 @@
       "when": 1801000000000,
       "tag": "0181_add_stage2_uploads_to_instrument_bg_details",
       "breakpoints": true
+    },
+    {
+      "idx": 128,
+      "version": "7",
+      "when": 1802000000000,
+      "tag": "0182_add_authorization_letter_docx_to_instrument_bg_details",
+      "breakpoints": true
     }
   ]
 }

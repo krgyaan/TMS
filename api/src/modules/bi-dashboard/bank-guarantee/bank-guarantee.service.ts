@@ -1566,6 +1566,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 prefilledSignedBg: instrumentBgDetails.prefilledSignedBg,
                 coverLetterDocx: instrumentBgDetails.coverLetterDocx,
                 prefilledAppDocx: instrumentBgDetails.prefilledAppDocx,
+                authorizationLetterDocx: instrumentBgDetails.authorizationLetterDocx,
                 bgUpload: instrumentBgDetails.bgUpload,
                 bgSignedCoveringLetter: instrumentBgDetails.bgSignedCoveringLetter,
                 bgNeeds: instrumentBgDetails.bgNeeds,

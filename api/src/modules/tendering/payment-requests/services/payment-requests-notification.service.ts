@@ -4,7 +4,7 @@ import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { PdfGeneratorService } from '@/modules/pdf/pdf-generator.service';
-import { BgDocxService } from './bg-docx.service';
+import { DocxService } from '@/modules/docx/docx.service';
 import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { instrumentBgDetails, instrumentChequeDetails, instrumentFdrDetails, instrumentTransferDetails, paymentInstruments, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
@@ -32,7 +32,7 @@ export class PaymentRequestsNotificationService {
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
         private readonly pdfGenerator: PdfGeneratorService,
-        private readonly bgDocxService: BgDocxService,
+        private readonly docxService: DocxService,
         private readonly configService: ConfigService,
     ) {
         this.logger = this.appLogger.withContext(PaymentRequestsNotificationService.name);
@@ -1357,7 +1357,7 @@ export class PaymentRequestsNotificationService {
                         accountsLeaderEmail: accountsLeader?.email || 'imran@volksenergie.in',
                     };
 
-                    const coveringLetterPath = await this.bgDocxService.buildCoveringLetter(
+                    const coveringLetterPath = await this.docxService.buildCoveringLetter(
                         coveringLetterData,
                         instrumentId
                     );
@@ -1396,7 +1396,7 @@ export class PaymentRequestsNotificationService {
                         uniqueCode: bgDetails?.uniqueCode || '',
                     });
 
-                    const prefilledBgPath = await this.bgDocxService.buildPrefilledApplication(
+                    const prefilledBgPath = await this.docxService.buildPrefilledApplication(
                         prefilledBgData as any,
                         instrumentId
                     );
@@ -1416,6 +1416,38 @@ export class PaymentRequestsNotificationService {
                 } catch (error) {
                     this.logger.warn(
                         `BG prefilled application format generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
+                    );
+                }
+
+                // Attachment — authorization letter letting the named persons
+                // collect the BG from the AU Bank branch.
+                try {
+                    const authorizationLetterPath = await this.docxService.buildAuthorizationLetter(
+                        {
+                            date: this.formatDateDDMMYYYY(new Date()),
+                            partyName: bgDetails?.beneficiaryName || '',
+                            bgAmount: instrument.amount
+                                ? `${Number(instrument.amount).toLocaleString('en-IN')}/-`
+                                : '',
+                        },
+                        instrumentId
+                    );
+                    if (authorizationLetterPath) {
+                        attachmentFiles.push(authorizationLetterPath);
+                        try {
+                            await this.db
+                                .update(instrumentBgDetails)
+                                .set({ authorizationLetterDocx: authorizationLetterPath })
+                                .where(eq(instrumentBgDetails.instrumentId, instrumentId));
+                        } catch (persistError) {
+                            this.logger.warn(
+                                `Failed to persist BG authorization letter path for instrument ${instrumentId}: ${persistError instanceof Error ? persistError.message : String(persistError)}`
+                            );
+                        }
+                    }
+                } catch (error) {
+                    this.logger.warn(
+                        `BG authorization letter generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
                     );
                 }
 
