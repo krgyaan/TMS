@@ -1016,7 +1016,6 @@ export class PurchaseOrderService {
                         .insert(vendorOrganizations)
                         .values({
                             name,
-                            alias: body.alias || null,
                             msme: body.msme || null,
                             pan: body.pan || null,
                             address: body.address || null,
@@ -1237,7 +1236,6 @@ export class PurchaseOrderService {
                 ...(hasGst ? {} : { address: body.sellerAddress || null }),
                 updatedAt: new Date(),
             };
-            if (body.sellerAlias !== undefined) patch.alias = body.sellerAlias || null;
 
             const formattedName = normalizeVendorName(body.sellerName);
             try {
@@ -1790,7 +1788,6 @@ export class PurchaseOrderService {
             .select({
                 id: vendorOrganizations.id,
                 name: vendorOrganizations.name,
-                alias: vendorOrganizations.alias,
                 gstNo: vendorGsts.gstNo,
                 msme: vendorOrganizations.msme,
                 pan: vendorOrganizations.pan,
@@ -1851,7 +1848,6 @@ export class PurchaseOrderService {
         const matches = pattern
             ? sql`(
                 ${vendorOrganizations.name} ILIKE ${pattern} OR
-                ${vendorOrganizations.alias} ILIKE ${pattern} OR
                 ${vendorOrganizations.pan} ILIKE ${pattern} OR
                 ${vendorOrganizations.msme} ILIKE ${pattern} OR
                 ${vendorOrganizations.address} ILIKE ${pattern} OR
@@ -1872,7 +1868,6 @@ export class PurchaseOrderService {
             .select({
                 id: vendorOrganizations.id,
                 name: vendorOrganizations.name,
-                alias: vendorOrganizations.alias,
                 // vendor_gsts is 1:N (one org holds 43 rows), so a join fans 482
                 // orgs out to 1251 rows and duplicate ids reach the picker. A
                 // correlated subquery keeps exactly one row per org instead.
@@ -2005,7 +2000,6 @@ export class PurchaseOrderService {
                     .update(vendorOrganizations)
                     .set({
                         name: name ?? undefined,
-                        alias: body.alias ?? undefined,
                         msme: body.msme ?? undefined,
                         pan: body.pan ?? undefined,
                         address: body.address ?? undefined,

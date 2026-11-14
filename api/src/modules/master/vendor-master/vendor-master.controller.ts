@@ -8,7 +8,6 @@ import { VendorMasterService } from "@/modules/master/vendor-master/vendor-maste
 
 const VendorOrganizationFields = z.object({
     name: z.string().min(1).max(255),
-    alias: z.string().max(255).optional().nullable(),
     msme: z.string().max(50).optional().nullable(),
     msmeType: z.enum(["M", "S"]).optional().nullable(),
     pan: z.string().max(100).optional().nullable(),

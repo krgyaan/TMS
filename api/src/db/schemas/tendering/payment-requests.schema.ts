@@ -80,6 +80,7 @@ export const paymentRequests = pgTable('payment_requests', {
 export const paymentInstruments = pgTable('payment_instruments', {
     id: serial('id').primaryKey(),
     requestId: integer('request_id').notNull(), // Links to payment_requests.id
+    makerRequestId: bigint('maker_request_id', { mode: 'number' }), // Links to operations project_payment_requests.id (auto-created maker request)
 
     instrumentType: instrumentTypeEnum('instrument_type').notNull(),
     purpose: varchar('purpose', { length: 255 }),
@@ -147,6 +148,7 @@ export const paymentInstruments = pgTable('payment_instruments', {
         { typeIdx: index('instruments_type_idx').on(table.instrumentType) },
         { statusIdx: index('instruments_status_idx').on(table.status) },
         { utrIdx: index('instruments_utr_idx').on(table.utr) },
+        { makerRequestIdx: index('instruments_maker_request_id_idx').on(table.makerRequestId) },
         { legacyDdIdx: index('instruments_legacy_dd_id_idx').on(table.legacyDdId) },
         { legacyFdrIdx: index('instruments_legacy_fdr_id_idx').on(table.legacyFdrId) },
         { legacyBgIdx: index('instruments_legacy_bg_id_idx').on(table.legacyBgId) },

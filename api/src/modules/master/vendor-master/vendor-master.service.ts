@@ -285,15 +285,18 @@ export class VendorMasterService {
             const q = `%${search}%`;
             conditions.push(sql`(
                 ${vendorOrganizations.name} ILIKE ${q} OR
-                ${vendorOrganizations.alias} ILIKE ${q} OR
+                ${vendorOrganizations.category} ILIKE ${q} OR
                 ${vendorOrganizations.pan} ILIKE ${q} OR
                 ${vendorOrganizations.msme} ILIKE ${q} OR
                 ${vendorOrganizations.address} ILIKE ${q} OR
+                ${vendorOrganizations.msmeSize} ILIKE ${q} OR
+                ${vendorOrganizations.majorActivity} ILIKE ${q} OR
                 case ${vendorOrganizations.msmeType}
                     when 'M' then 'Manufacturer'
                     when 'S' then 'Service'
                     else ${vendorOrganizations.msmeType}
                 end ILIKE ${q} OR
+                ${vendorOrganizations.registrationType} ILIKE ${q} OR
                 exists (
                     select 1 from ${vendorGsts}
                     where ${vendorGsts.orgId} = ${vendorOrganizations.id}
@@ -324,8 +327,23 @@ export class VendorMasterService {
         const sortFn = filters?.sortOrder === "desc" ? desc : asc;
         let orderByClause: SQL<unknown>;
         switch (filters?.sortBy) {
-            case "alias":
-                orderByClause = sortFn(vendorOrganizations.alias);
+            case "category":
+                orderByClause = sortFn(vendorOrganizations.category);
+                break;
+            case "registrationType":
+                orderByClause = sortFn(vendorOrganizations.registrationType);
+                break;
+            case "majorActivity":
+                orderByClause = sortFn(vendorOrganizations.majorActivity);
+                break;
+            case "msmeSize":
+                orderByClause = sortFn(vendorOrganizations.msmeSize);
+                break;
+            case "creditPeriodDays":
+                orderByClause = sortFn(vendorOrganizations.creditPeriodDays);
+                break;
+            case "creditAmount":
+                orderByClause = sortFn(vendorOrganizations.creditAmount);
                 break;
             case "pan":
                 orderByClause = sortFn(vendorOrganizations.pan);
@@ -696,8 +714,14 @@ export class VendorMasterService {
             organization: {
                 id: vendorOrganizations.id,
                 name: vendorOrganizations.name,
-                alias: vendorOrganizations.alias,
+                category: vendorOrganizations.category,
                 msme: vendorOrganizations.msme,
+                msmeSize: vendorOrganizations.msmeSize,
+                msmeType: vendorOrganizations.msmeType,
+                majorActivity: vendorOrganizations.majorActivity,
+                registrationType: vendorOrganizations.registrationType,
+                creditPeriodDays: vendorOrganizations.creditPeriodDays,
+                creditAmount: vendorOrganizations.creditAmount,
                 pan: vendorOrganizations.pan,
                 address: vendorOrganizations.address,
             },
@@ -1168,10 +1192,6 @@ export class VendorMasterService {
             const filled: Record<string, string> = {};
             const keeperPatch: Partial<NewVendorOrganization> = {};
             const blank = (value: string | null | undefined) => !value?.trim();
-            if (blank(keep.alias) && drop.alias?.trim()) {
-                keeperPatch.alias = drop.alias;
-                filled.alias = drop.alias;
-            }
             if (blank(keep.pan) && drop.pan?.trim()) {
                 keeperPatch.pan = drop.pan;
                 filled.pan = drop.pan;
@@ -1198,10 +1218,10 @@ export class VendorMasterService {
             // Archive the dropped row for manual rollback (runbook §3a).
             await tx.execute(sql`
                 INSERT INTO vendor_organizations_dups_archive
-                    (id, kept_id, name, alias, address, pan, msme, msme_type, status,
+                    (id, kept_id, name, address, pan, msme, msme_type, status,
                      created_at, updated_at, reason, moved_refs, filled)
                 VALUES
-                    (${drop.id}, ${keep.id}, ${drop.name}, ${drop.alias}, ${drop.address}, ${drop.pan},
+                    (${drop.id}, ${keep.id}, ${drop.name}, ${drop.address}, ${drop.pan},
                      ${drop.msme}, ${drop.msmeType}, ${drop.status}, ${drop.createdAt}, ${drop.updatedAt},
                      ${"app merge (VendorMergePage)"},
                      CAST(${JSON.stringify(movedRefs)} AS jsonb), CAST(${JSON.stringify(filled)} AS jsonb))

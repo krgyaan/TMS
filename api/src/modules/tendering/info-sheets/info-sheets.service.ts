@@ -23,6 +23,7 @@ import { BadRequestException, ConflictException, Inject, Injectable, InternalSer
 import { ConfigService } from '@nestjs/config';
 import { eq, inArray, or } from 'drizzle-orm';
 import { countExtractionFieldKeys, extractionFieldsUpsertValue } from './extraction-fields-merge';
+import { buildFileServeUrl, resolveTenderDocumentPaths } from '@/utils/tender-documents.util';
 
 export type TechnicalDocument = {
     id: number;
@@ -1400,17 +1401,7 @@ export class TenderInfoSheetsService {
 
         // ── Tender documents 
 
-        let tenderDocsList: string[] = [];
-        if (tender.documents) {
-            try {
-                const parsed = JSON.parse(tender.documents);
-                tenderDocsList = Array.isArray(parsed)
-                    ? parsed.filter(Boolean).map(String)
-                    : [];
-            } catch {
-                tenderDocsList = [];
-            }
-        }
+        const tenderDocsList = resolveTenderDocumentPaths(tender.documents);
 
         // ── Resolve rejection reason 
 
@@ -1598,7 +1589,7 @@ export class TenderInfoSheetsService {
             ),
             tender_docs: tenderDocsList,
             tender_docs_urls: tenderDocsList.map(
-                (file) => `${this.configService.get<string>('app.apiUrl') || ''}/files/serve/${file}`
+                (file) => buildFileServeUrl(this.configService.get<string>('app.apiUrl') || '', file)
             ),
 
             // ── Rejection Proofs ─

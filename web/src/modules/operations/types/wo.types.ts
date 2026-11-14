@@ -109,6 +109,10 @@ export interface WoBasicDetail {
   budgetGemCharges: string | null;
   requestGemCharges?: boolean;
   gemChargesAmount?: number | null;
+  gemChargesGstAmount?: number | null;
+  gemChargesTotalPayable?: number | null;
+  gemChargesTdsAmount?: number | null;
+  gemChargesNetPayable?: number | null;
   gemChargesPortalLink?: string | null;
   gemChargesInvoice?: string | null;
   woDraft: string | null;

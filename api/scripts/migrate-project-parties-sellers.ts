@@ -12,7 +12,7 @@
  *   1. resolves every seller to a vendor org (see match tiers below)
  *   2. creates a vendor_organizations + contact + GST row for sellers whose
  *      override says action = "create"
- *   3. backfills EMPTY vendor-master fields (pan/address/alias/msme/gst/contact)
+ *   3. backfills EMPTY vendor-master fields (pan/address/msme/gst/contact)
  *      from the seller row - never overwrites existing vendor data
  *   4. backfills purchase_orders.seller_organization_id and
  *      vendor_work_orders.seller_organization_id by name -> PAN -> GST
@@ -84,7 +84,6 @@ interface OrgRow {
     n: string;
     pan: string | null;
     address: string | null;
-    alias: string | null;
     msme: string | null;
     msmeType: string | null;
 }
@@ -283,7 +282,6 @@ async function main(): Promise<void> {
                     name: schema.vendorOrganizations.name,
                     pan: schema.vendorOrganizations.pan,
                     address: schema.vendorOrganizations.address,
-                    alias: schema.vendorOrganizations.alias,
                     msme: schema.vendorOrganizations.msme,
                     msmeType: schema.vendorOrganizations.msmeType,
                 })
@@ -454,7 +452,6 @@ async function main(): Promise<void> {
                         .insert(schema.vendorOrganizations)
                         .values({
                             name: r.seller.name,
-                            alias: trimOrNull(r.seller.alias),
                             pan: trimOrNull(r.seller.pan),
                             address: trimOrNull(r.seller.address),
                             msme: isJunkMsme(trimOrNull(r.seller.msme)) ? null : trimOrNull(r.seller.msme),
@@ -502,9 +499,6 @@ async function main(): Promise<void> {
                     }
                     if (!org.address && trimOrNull(r.seller.address)) {
                         patch.address = trimOrNull(r.seller.address);
-                    }
-                    if (!org.alias && trimOrNull(r.seller.alias)) {
-                        patch.alias = trimOrNull(r.seller.alias);
                     }
                     if (!org.msme && !isJunkMsme(trimOrNull(r.seller.msme))) {
                         patch.msme = trimOrNull(r.seller.msme);

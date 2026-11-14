@@ -149,10 +149,10 @@ export function useTenderStepStatuses(tenderId: number | null, options: UseTende
             id: "basic-details",
             label: "Basic Details",
             shortLabel: "Basic Details",
-            stepNumber: 10,
-            hasData: !!basicDetails,
+            stepNumber: 11,
+            hasData: Array.isArray(basicDetails) && basicDetails.length > 0,
             isLoading: l12,
-            status: deriveStatus(!!basicDetails, l12),
+            status: deriveStatus(Array.isArray(basicDetails) && basicDetails.length > 0, l12),
         },
     ];
 

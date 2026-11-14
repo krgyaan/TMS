@@ -3,6 +3,7 @@ import { and, desc, eq, gt, like, sql } from "drizzle-orm";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { paymentRequests } from "@/db/schemas/operations/payment-requests.schema";
+import { syncLinkedInstruments } from "@/modules/operations/payment-requests/helpers/payment-instrument-sync.helper";
 import { fixedExpenses } from "@/db/schemas/accounts/fixed-expense.schema";
 import { fixedExpensesHistory, MR_STATUS_TO_HISTORY_STATUS } from "@/db/schemas/accounts/fixed-expense-history.schema";
 import { users } from "@/db/schemas/";
@@ -142,8 +143,8 @@ export class MakerRequestService {
             throw new BadRequestException(`Cannot transition from "${existing.status}" to "${body.status}"`);
         }
 
-        const updated = (
-            await this.db
+        const updated = await this.db.transaction(async tx => {
+            const [row] = await tx
                 .update(paymentRequests)
                 .set({
                     status: body.status,
@@ -153,8 +154,12 @@ export class MakerRequestService {
                     ...(hasAmount ? { amount: (parsedAmount as number).toFixed(2) } : {}),
                 })
                 .where(and(eq(paymentRequests.id, id), sql`${paymentRequests.projectId} IS NULL`))
-                .returning()
-        )[0];
+                .returning();
+
+            await syncLinkedInstruments(tx, id, body, row.updatedAt);
+
+            return row;
+        });
 
         this.logger.info(`Maker Request #${id} status updated to "${body.status}"`);
 

@@ -88,7 +88,6 @@ WITH d AS (SELECT * FROM vendor_organizations WHERE id = :drop),
            'project_parties_sellers_archive.vendor_organization_id',(SELECT coalesce(json_agg(id),'[]') FROM project_parties_sellers_archive WHERE vendor_organization_id = d.id)
          ) AS moved_refs,
          jsonb_strip_nulls(jsonb_build_object(
-           'alias',     CASE WHEN k.alias     IS NULL OR btrim(k.alias)     = '' THEN d.alias     END,
            'pan',       CASE WHEN k.pan       IS NULL OR btrim(k.pan)       = '' THEN d.pan       END,
            'msme',      CASE WHEN k.msme      IS NULL OR btrim(k.msme)      = '' THEN d.msme      END,
            'msme_type', CASE WHEN k.msme_type IS NULL OR btrim(k.msme_type) = '' THEN d.msme_type END,
@@ -97,9 +96,9 @@ WITH d AS (SELECT * FROM vendor_organizations WHERE id = :drop),
        FROM d, k
      )
 INSERT INTO vendor_organizations_dups_archive
-  (id, kept_id, name, alias, address, pan, msme, msme_type, status,
+  (id, kept_id, name, address, pan, msme, msme_type, status,
    created_at, updated_at, reason, moved_refs, filled)
-SELECT d.id, k.id, d.name, d.alias, d.address, d.pan, d.msme, d.msme_type,
+SELECT d.id, k.id, d.name, d.address, d.pan, d.msme, d.msme_type,
        d.status, d.created_at, d.updated_at, 'manual merge (see runbook §3)',
        p.moved_refs, p.filled
 FROM d, k, plan p
@@ -109,8 +108,7 @@ ON CONFLICT (id) DO UPDATE
 
 -- 3b. fill the keeper's EMPTY identifying fields from the drop
 UPDATE vendor_organizations k
-SET alias     = CASE WHEN k.alias     IS NULL OR btrim(k.alias)     = '' THEN d.alias     ELSE k.alias END,
-    pan       = CASE WHEN k.pan       IS NULL OR btrim(k.pan)       = '' THEN d.pan       ELSE k.pan END,
+SET pan       = CASE WHEN k.pan       IS NULL OR btrim(k.pan)       = '' THEN d.pan       ELSE k.pan END,
     msme      = CASE WHEN k.msme      IS NULL OR btrim(k.msme)      = '' THEN d.msme      ELSE k.msme END,
     msme_type = CASE WHEN k.msme_type IS NULL OR btrim(k.msme_type) = '' THEN d.msme_type ELSE k.msme_type END,
     address   = CASE WHEN k.address   IS NULL OR btrim(k.address)   = '' THEN d.address   ELSE k.address END

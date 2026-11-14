@@ -138,7 +138,7 @@ export class OperationNotificationService {
     'asset_purchase', 'po', 'vwo', 'others', 'gem_charges',
     'registration_charges', 'pop_charges', 'bank_charges', 'diwali_gift_expenses',
     'inventory_purchase', 'dd', 'bt', 'pop', 'bg', 'sb', 'fdr',
-    'sd_vendor', 'sd_landlord', 'emd'
+    'sd_vendor', 'sd_landlord', 'emd', 'EMD', 'Tender Fee', 'Processing Fee',
   ]);
 
   private readonly CATEGORY_LABELS: Record<string, string> = {
@@ -202,6 +202,9 @@ export class OperationNotificationService {
     sd_vendor: 'Security Deposit - Vendor',
     sd_landlord: 'Security Deposit - Landlord',
     emd: 'EMD',
+    EMD: 'EMD',
+    'Tender Fee': 'Tender Fee',
+    'Processing Fee': 'Processing Fee',
   };
 
   private readonly USER_RESTRICTED_CATEGORIES: Record<string, number[]> = {
