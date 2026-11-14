@@ -27,9 +27,9 @@ test("web catalog content matches the API catalog", () => {
 });
 
 test("catalog code generator matches the API sheet formats and sequence fallback", () => {
-    assert.equal(generateTemplatedItemCode("Batteries", "Ni-Cd Battery", { type: "KP", discharge: "L", capacity: "100" }), "NICD/KP/L/100");
-    assert.equal(generateTemplatedItemCode("Batteries", "VRLA Battery", { type: "AGM", voltage: "12V", capacity: "100" }), "VRLA/AGM/12V/100");
-    assert.equal(generateTemplatedItemCode("Batteries", "Flooded Lead-Acid Battery", { type: "OPzS", capacity: "500.00" }), "FLA/OPZS/500");
+    assert.equal(generateTemplatedItemCode("Batteries", "Ni-Cd Battery", { type: "KP", discharge: "L", capacity: "100" }), "NICD/KP/L/100AH");
+    assert.equal(generateTemplatedItemCode("Batteries", "VRLA Battery", { type: "AGM", voltage: "12V", capacity: "100" }), "VRLA/AGM/12V/100AH");
+    assert.equal(generateTemplatedItemCode("Batteries", "Flooded Lead-Acid Battery", { type: "OPzS", capacity: "500.00" }), "FLA/OPZS/500AH");
     assert.equal(getItemCodePreview("Battery Accessories", "Eye Wash Bottle", {}), "EyeWashBottle");
     assert.equal(generateTemplatedItemCode("Battery Accessories", "ICC", { mRating: "M10", insulation: "Insulated", coating: "Nickel-Coated" }), "ICC/M10/INSULATED/NICKEL-COATED");
     assert.equal(getItemCodePreview("Batteries", "Ni-Cd Battery", {}), "Select all options to generate the code");
