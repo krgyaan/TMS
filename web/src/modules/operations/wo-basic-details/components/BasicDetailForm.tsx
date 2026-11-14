@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { useCreateWoBasicDetail, useUpdateWoBasicDetail, useWoBasicDetailPrefill } from "@/hooks/api/useWoBasicDetails";
 import { useCreateBulkWoContacts, useDeleteAllContactsByBasicDetail, useWoContactsByBasicDetail } from "@/hooks/api/useWoContacts";
 import { useItemOptions, useLocationOptions, useOrganizationOptions, useTeamOptions } from "@/hooks/useSelectOptions";
+import { formatINR } from "@/hooks/useINRFormatter";
 import type { CreateWoBasicDetailDto } from "@/modules/operations/types/wo.types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Calculator, Check, Plus, Save, Trash2, TrendingUp } from "lucide-react";
@@ -23,6 +24,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { YES_NO_OPTIONS } from "../../wo-details/helpers/constants";
 import { buildDefaultValues, mapFormToCreatePayload, mapFormToUpdatePayload, mapResponseToForm } from "../helpers/basiDetail.mapper";
+import { computeGemChargesBreakdown, GEM_GST_RATE, GEM_TDS_RATE } from "../helpers/gemCharges";
 import { WoBasicDetailFormSchema } from "../helpers/basiDetail.schema";
 import type { WoBasicDetail, WoBasicDetailFormValues } from "../helpers/basiDetail.types";
 import { ProjectNameWarningAlert } from "./ProjectNameWarningAlert";
@@ -83,6 +85,11 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
         }
     }, [projectNameSuffix, form, mode]);
     const watchPaymentConsent = form.watch("requestGemCharges");
+    const watchGemChargesAmount = form.watch("gemChargesAmount");
+    const gemChargesBreakdown = useMemo(
+        () => computeGemChargesBreakdown(watchGemChargesAmount),
+        [watchGemChargesAmount],
+    );
 
     const tenderId = watchTenderId ? Number(watchTenderId) : null;
     const { data: prefillData } = useWoBasicDetailPrefill(isNonTender ? null : tenderId);
@@ -692,22 +699,45 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                 />
                                 {/* Gem Charges Payment Request Section */}
                                 <ConditionalSection show={watchPaymentConsent === "true"} className="col-span-3">
-                                    <div className="grid gap-4 grid-cols-1 md:grid-cols-3 lg:grid-cols-4 items-start">
-                                        <FieldWrapper control={form.control} name="gemChargesAmount" label="Gem Charges Amount (pre GST)">
-                                            {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
-                                        </FieldWrapper>
-                                        <FieldWrapper control={form.control} name="gemChargesPortalLink" label="Portal Link">
-                                            {field => <Input {...field} placeholder="Enter portal payment link..." value={field.value || ""} />}
-                                        </FieldWrapper>
-                                        <FieldWrapper control={form.control} name="gemChargesInvoice" label="Invoice">
-                                            {field => (
-                                                <FileUploader
-                                                    context="wo-draft"
-                                                    value={field.value ?? []}
-                                                    onChange={paths => field.onChange(paths)}
-                                                />
-                                            )}
-                                        </FieldWrapper>
+                                    <div className="space-y-3">
+                                        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 items-start">
+                                            <FieldWrapper control={form.control} name="gemChargesAmount" label="GeM Charges Amount (Pre-GST)">
+                                                {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
+                                            </FieldWrapper>
+                                            <FieldWrapper control={form.control} name="gemChargesPortalLink" label="Portal Link">
+                                                {field => <Input {...field} placeholder="Enter portal payment link..." value={field.value || ""} />}
+                                            </FieldWrapper>
+                                            <FieldWrapper control={form.control} name="gemChargesInvoice" label="Invoice">
+                                                {field => (
+                                                    <FileUploader
+                                                        context="wo-draft"
+                                                        value={field.value ?? []}
+                                                        onChange={paths => field.onChange(paths)}
+                                                    />
+                                                )}
+                                            </FieldWrapper>
+                                        </div>
+                                        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 p-4 bg-muted/30 rounded-lg border">
+                                            <div className="space-y-1">
+                                                <p className="text-sm text-muted-foreground">GST @ {GEM_GST_RATE}%</p>
+                                                <p className="font-semibold">{formatINR(gemChargesBreakdown.gstAmount)}</p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <p className="text-sm text-muted-foreground">Total Payable</p>
+                                                <p className="font-semibold">{formatINR(gemChargesBreakdown.totalPayable)}</p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <p className="text-sm text-muted-foreground">TDS @ {GEM_TDS_RATE}% (pre-GST)</p>
+                                                <p className="font-semibold text-destructive">-{formatINR(gemChargesBreakdown.tdsAmount)}</p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <p className="text-sm text-muted-foreground">Net Payable</p>
+                                                <p className="font-bold text-emerald-600">{formatINR(gemChargesBreakdown.netPayable)}</p>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            The maker request will be auto-created for the Net Payable amount ({formatINR(gemChargesBreakdown.netPayable)}).
+                                        </p>
                                     </div>
                                 </ConditionalSection>
                             </div>

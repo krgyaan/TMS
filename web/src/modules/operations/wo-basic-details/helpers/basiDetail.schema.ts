@@ -43,7 +43,7 @@ export const WoBasicDetailFormSchema = z.object({
 .superRefine((data, ctx) => {
   // GEM Charges conditional validation
   if (data.requestGemCharges === "true") {
-    if (data.gemChargesAmount === undefined) {
+    if (!data.gemChargesAmount || data.gemChargesAmount <= 0) {
       ctx.addIssue({
         code: "custom",
         path: ["gemChargesAmount"],

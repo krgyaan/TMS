@@ -860,6 +860,7 @@ export class PaymentRequestsCommandService {
                 requestedBy: userId || 0,
             };
             const makerRequest = await this.paymentRequestService.create(makerRequestBody, userId || 0);
+            await this.linkMakerRequestToInstrument(tx, instrument.id, makerRequest?.id);
             this.logger.log(`Auto-created project payment request: ${makerRequest.requestNo} for payment request ${paymentRequest.id}`);
             return makerRequest;
         }
@@ -879,11 +880,22 @@ export class PaymentRequestsCommandService {
                 requestedBy: userId || 0,
             };
             const makerRequest = await this.paymentRequestService.create(makerRequestBody, userId || 0);
+            await this.linkMakerRequestToInstrument(tx, instrument.id, makerRequest?.id);
             this.logger.log(`Auto-created project payment request: ${makerRequest.requestNo} for payment request ${paymentRequest.id}`);
             return makerRequest;
         }
 
         return null;
+    }
+
+    private async linkMakerRequestToInstrument(tx: any, instrumentId: number, makerRequestId?: number): Promise<void> {
+        if (!makerRequestId) {
+            return;
+        }
+        await tx
+            .update(paymentInstruments)
+            .set({ makerRequestId, updatedAt: new Date() })
+            .where(eq(paymentInstruments.id, instrumentId));
     }
 
     private async generateProjectPaymentRequestNo(): Promise<string> {
