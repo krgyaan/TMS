@@ -91,6 +91,30 @@ export const biDashboardConfigs: Record<string, FileConfig> = {
         allowedMimeTypes: [...DOCS],
         allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
     }),
+    "bgcovletter": bgFile({
+        maxFiles: 5,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".doc", ".docx"],
+    }),
+    "bgprefill": bgFile({
+        maxFiles: 5,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".doc", ".docx"],
+    }),
+    "bgauthletter": bgFile({
+        maxFiles: 5,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".doc", ".docx"],
+    }),
+    "bgenvslip": bgFile({
+        maxFiles: 5,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf"],
+    }),
     // FDR file contexts
     "fdr-format-imran": {
         maxFiles: 2,

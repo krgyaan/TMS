@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <style>
         * {
-            font-family: 'Calibri', sans-serif;
+            font-family: 'Calibri', 'Carlito', sans-serif;
         }
 
         body {
@@ -16,85 +16,68 @@
         }
 
         .page {
-            padding: 72pt 69.5pt 72pt 72pt;
+            padding: 54pt 72pt;
+            box-sizing: border-box;
+        }
+
+        .heading {
+            margin: 0;
+            font-size: 16pt;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        .heading .ref {
+            font-weight: 700;
+        }
+
+        .to {
+            margin: 54pt 0 0 0;
         }
 
         .line {
             margin: 0;
-            line-height: 1.08;
+            line-height: 1.15;
             font-size: 12pt;
         }
 
-        .to-label {
-            margin: 0 0 2pt 0;
-            font-size: 12pt;
-        }
-
-        .to-name {
-            font-size: 12pt;
-        }
-
-        .subject {
-            font-size: 13pt;
+        .name {
             font-weight: 700;
         }
 
-        .subject-line {
-            white-space: nowrap;
-        }
-
         .from {
-            margin: 48pt 30pt 0 190pt;
-            text-align: center;
+            margin: 46pt 0 0 430pt;
         }
 
-        .from-name {
-            font-size: 12pt;
-        }
-
-        .from-address {
-            margin: 4pt 0 0 0;
-            text-align: left;
-            line-height: 1.08;
-            font-size: 12pt;
+        .from .line {
+            line-height: 1.25;
         }
     </style>
 </head>
 
 <body>
     <div class="page">
-        <p class="to-label">To,</p>
+        <p class="heading">
+            {{#if submission_ref}}BG Submission Against {{submission_label}} <span class="ref">{{submission_ref}}</span>{{else}}BG Submission{{/if}}
+        </p>
 
-        <table style="width: 100%; border-collapse: collapse;">
-            <tr>
-                <td style="width: 40%; padding: 0; vertical-align: top;">
-                    <p class="line to-name">{{to_name}}</p>
-                </td>
-                <td style="width: 60%; padding: 0; vertical-align: top;">
-                    <p class="line subject-line">
-                        {{#if submission_ref}}
-                        BG Submission Against <span class="subject">{{submission_ref}}</span>
-                        {{else}}
-                        BG Submission
-                        {{/if}}
-                    </p>
-                </td>
-            </tr>
-        </table>
-
-        {{#each to_address_lines}}
-        <p class="line">{{this}}</p>
-        {{/each}}
-        {{#if contact_number}}
-        <p class="line">Contact Number: {{contact_number}}</p>
-        {{/if}}
+        <div class="to">
+            <p class="line">To,</p>
+            <p class="line name">{{to_name}}</p>
+            {{#each to_address_lines}}
+            <p class="line">{{this}}</p>
+            {{/each}}
+            {{#if contact_number}}
+            <p class="line">Contact Number: {{contact_number}}</p>
+            {{/if}}
+        </div>
 
         <div class="from">
-            <p class="line">FROM:</p>
-            <p class="line from-name">Piyush Goyal &nbsp;( Director &amp; CEO)</p>
-            <p class="line">Volks Energie Pvt Ltd,</p>
-            <p class="line from-address">2<sup>nd</sup> Floor B1/D8 Mohan Cooperative Industrial Estate, New Delhi-110044.
-                Near Mohan Estate Metro Station<br>Mob: 96503 93636</p>
+            <p class="line">From:</p>
+            <p class="line name">Piyush Goyal</p>
+            <p class="line">Director &amp; CEO, Volks Energie Pvt Ltd,</p>
+            <p class="line">2<sup>nd</sup> Floor B1/D8, Mohan Cooperative Industrial Estate, New Delhi-110044</p>
+            <p class="line">Mob: +91 9650393636</p>
         </div>
     </div>
 </body>

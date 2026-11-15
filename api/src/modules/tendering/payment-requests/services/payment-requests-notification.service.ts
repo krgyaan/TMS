@@ -22,6 +22,40 @@ import { and, eq, gte, isNull, lt, ne, notInArray, sql } from 'drizzle-orm';
 const orNotProvided = (value: string | null | undefined): string =>
     value && value.trim().length > 0 ? value.trim() : 'Not Provided';
 
+const BG_PURPOSE_LABELS: Record<string, string> = {
+    ADVANCE_PAYMENT: 'Advance Payment',
+    SECURITY_DEPOSIT: 'Security Deposit',
+    SECURITY: 'Security Deposit',
+    SECURITY_BOND_DEPOSIT: 'Security Bond/Deposit',
+    COUNTER_GUARANTEE: 'Counter Guarantee',
+    FINANCIAL: 'Financial',
+    PERFORMANCE: 'Performance BG',
+    PERFORMANCE_BG: 'Performance BG',
+    BID_BOND: 'Bid Bond',
+    PAYABLE: 'Other Payment',
+    OTHER_PAYMENT: 'Other Payment',
+    OTHER_SECURITY: 'Other Security',
+};
+
+const formatBgPurpose = (value: string | null | undefined, fallback: string): string => {
+    const raw = value?.trim();
+    if (!raw) {
+        return fallback;
+    }
+
+    const mapped = BG_PURPOSE_LABELS[raw.toUpperCase()];
+    if (mapped) {
+        return mapped;
+    }
+
+    return raw
+        .toLowerCase()
+        .split(/[_\s]+/)
+        .filter((word) => word.length > 0)
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+};
+
 @Injectable()
 export class PaymentRequestsNotificationService {
     private readonly logger;
@@ -244,8 +278,8 @@ export class PaymentRequestsNotificationService {
                 json.name,
                 json.phone,
                 [json.line1, json.line2].filter(Boolean).join(', '),
-                [json.city, json.state].filter(Boolean).join(', '),
-                json.pincode ? `- ${json.pincode}` : null,
+                json.city,
+                [json.state, json.pincode].filter(Boolean).join(' - '),
             ].filter((part): part is string => typeof part === 'string' && part.trim().length > 0);
 
             if (parts.length > 0) {
@@ -257,15 +291,15 @@ export class PaymentRequestsNotificationService {
     };
 
     /**
-     * "Tender No./Work Order No." for the cover letter:
-     * tender no. -> project's WO number -> project name.
+     * Reference for the BG cover letter and envelope slip:
+     * tender no. -> project's WO number -> none.
      */
-    private resolveBgReferenceNo = async (
-        paymentReq: { tenderNo?: string | null; projectId?: number | null; projectName?: string | null },
-    ): Promise<string> => {
+    private resolveBgReference = async (
+        paymentReq: { tenderNo?: string | null; projectId?: number | null },
+    ): Promise<{ label: string; value: string } | null> => {
         const tenderNo = paymentReq.tenderNo?.trim();
         if (tenderNo && tenderNo.toUpperCase() !== 'NA') {
-            return tenderNo;
+            return { label: 'Tender No.', value: tenderNo };
         }
 
         if (paymentReq.projectId) {
@@ -283,8 +317,9 @@ export class PaymentRequestsNotificationService {
                         .where(eq(woBasicDetails.id, project.woBasicDetailId))
                         .limit(1);
 
-                    if (woBasic?.woNumber) {
-                        return woBasic.woNumber;
+                    const woNumber = woBasic?.woNumber?.trim();
+                    if (woNumber && woNumber.toUpperCase() !== 'NA') {
+                        return { label: 'Work Order No.', value: woNumber };
                     }
                 }
             } catch (error) {
@@ -294,7 +329,7 @@ export class PaymentRequestsNotificationService {
             }
         }
 
-        return paymentReq.projectName?.trim() || 'NA';
+        return null;
     };
 
     /**
@@ -397,6 +432,22 @@ export class PaymentRequestsNotificationService {
     };
 
     
+    private buildPublicFileUrl = (filePath: string): string => {
+        const apiUrl = (this.configService.get<string>('app.apiUrl') || '').replace(/\/+$/, '');
+        const normalized = filePath.replace(/\\/g, '/').replace(/^\/+/, '');
+        if (!apiUrl || !normalized) {
+            return '';
+        }
+
+        const encoded = normalized
+            .split('/')
+            .filter((segment) => segment.length > 0)
+            .map((segment) => encodeURIComponent(segment))
+            .join('/');
+
+        return `${apiUrl}/files/serve/${encoded}`;
+    };
+
     private toAttachmentPaths = (value: string | null | undefined): string[] => {
         if (!value || typeof value !== 'string' || value.trim().length === 0) {
             return [];
@@ -1212,8 +1263,8 @@ export class PaymentRequestsNotificationService {
                     courierAddr.name,
                     courierAddr.phone,
                     [courierAddr.line1, courierAddr.line2].filter(Boolean).join(', '),
-                    [courierAddr.city, courierAddr.state].filter(Boolean).join(', '),
-                    courierAddr.pincode ? `- ${courierAddr.pincode}` : null,
+                    courierAddr.city,
+                    [courierAddr.state, courierAddr.pincode].filter(Boolean).join(' - '),
                 ].filter(Boolean).join('\n')
                 : (instrument.courierAddress ?? 'Not specified');
 
@@ -1326,24 +1377,28 @@ export class PaymentRequestsNotificationService {
                     .where(eq(users.email, 'imran@volksenergie.in'))
                     .limit(1);
 
-                // Client C&P contact (name + designation) resolved by the saved C&P email.
                 const cpContact = await this.resolveBgCoveringLetterCp(bgDetails?.bgClientCp);
-                const referenceNo = await this.resolveBgReferenceNo(paymentReq);
+                const bgReference = await this.resolveBgReference(paymentReq);
+                const bgPurposeText = formatBgPurpose(bgDetails?.bgPurpose, 'Financial security');
 
-                // Build attachments. A PDF/file failure must never block the
-                // create-request mail — send without the missing attachment instead.
-                const attachmentFiles: string[] = [];
+                const attachmentLinks: Array<{ label: string; url: string }> = [];
+                const addAttachmentLink = (label: string, filePath: string) => {
+                    const url = this.buildPublicFileUrl(filePath);
+                    if (!url || attachmentLinks.some((link) => link.url === url)) {
+                        return;
+                    }
+                    attachmentLinks.push({ label, url });
+                };
 
                 try {
-                    // Generate covering letter DOCX
                     const coveringLetterData = {
                         date: this.formatDateDDMMYYYY(new Date()),
                         cpName: cpContact.name,
                         cpDesignation: cpContact.designation,
                         courierAddress: this.resolveBgCourierAddress(instrument),
-                        referenceNo,
-                        purpose: bgDetails?.bgPurpose || 'Financial security',
-                        // BG number/date do not exist yet at request creation.
+                        referenceNo: bgReference?.value || '',
+                        referenceLabel: bgReference?.label || '',
+                        purpose: bgPurposeText,
                         bgNo: '',
                         bgDate: '',
                         bgExpiryDate: bgDetails?.bgExpiryDate ? this.formatDateDDMMYYYY(bgDetails.bgExpiryDate) : '',
@@ -1357,12 +1412,21 @@ export class PaymentRequestsNotificationService {
                         accountsLeaderEmail: accountsLeader?.email || 'imran@volksenergie.in',
                     };
 
-                    const coveringLetterPath = await this.docxService.buildCoveringLetter(
-                        coveringLetterData,
-                        instrumentId
+                    await this.docxService.buildCoveringLetter(coveringLetterData, instrumentId).catch((error) => {
+                        this.logger.warn(
+                            `BG covering letter DOCX generation failed for instrument ${instrumentId}: ${error instanceof Error ? error.message : String(error)}`
+                        );
+                    });
+
+                    const [coveringLetterPath] = await this.pdfGenerator.generatePdfs(
+                        'bgCoveringLetter',
+                        { ...coveringLetterData },
+                        instrumentId,
+                        'BG'
                     );
+
                     if (coveringLetterPath) {
-                        attachmentFiles.push(coveringLetterPath);
+                        addAttachmentLink('Covering Letter', coveringLetterPath);
                         try {
                             await this.db
                                 .update(instrumentBgDetails)
@@ -1380,9 +1444,6 @@ export class PaymentRequestsNotificationService {
                     );
                 }
 
-                // Attachment — prefilled BG application format (AU Bank form),
-                // regenerated from the request data. FD No. is intentionally left
-                // blank (filled manually by the bank).
                 try {
                     const prefilledBgData = this.buildBgPrefilledData({
                         date: this.formatDateDDMMYYYY(new Date()),
@@ -1396,12 +1457,21 @@ export class PaymentRequestsNotificationService {
                         uniqueCode: bgDetails?.uniqueCode || '',
                     });
 
-                    const prefilledBgPath = await this.docxService.buildPrefilledApplication(
-                        prefilledBgData as any,
-                        instrumentId
+                    await this.docxService.buildPrefilledApplication(prefilledBgData as any, instrumentId).catch((error) => {
+                        this.logger.warn(
+                            `BG prefilled application DOCX generation failed for instrument ${instrumentId}: ${error instanceof Error ? error.message : String(error)}`
+                        );
+                    });
+
+                    const [prefilledBgPath] = await this.pdfGenerator.generatePdfs(
+                        'bgPrefilledFormat',
+                        { ...prefilledBgData },
+                        instrumentId,
+                        'BG'
                     );
+
                     if (prefilledBgPath) {
-                        attachmentFiles.push(prefilledBgPath);
+                        addAttachmentLink('Pre-filled Application Format', prefilledBgPath);
                         try {
                             await this.db
                                 .update(instrumentBgDetails)
@@ -1419,21 +1489,30 @@ export class PaymentRequestsNotificationService {
                     );
                 }
 
-                // Attachment — authorization letter letting the named persons
-                // collect the BG from the AU Bank branch.
                 try {
-                    const authorizationLetterPath = await this.docxService.buildAuthorizationLetter(
-                        {
-                            date: this.formatDateDDMMYYYY(new Date()),
-                            partyName: bgDetails?.beneficiaryName || '',
-                            bgAmount: instrument.amount
-                                ? `${Number(instrument.amount).toLocaleString('en-IN')}/-`
-                                : '',
-                        },
-                        instrumentId
+                    const authorizationLetterData = {
+                        date: this.formatDateDDMMYYYY(new Date()),
+                        partyName: bgDetails?.beneficiaryName || '',
+                        bgAmount: instrument.amount
+                            ? `${Number(instrument.amount).toLocaleString('en-IN')}/-`
+                            : '',
+                    };
+
+                    await this.docxService.buildAuthorizationLetter(authorizationLetterData, instrumentId).catch((error) => {
+                        this.logger.warn(
+                            `BG authorization letter DOCX generation failed for instrument ${instrumentId}: ${error instanceof Error ? error.message : String(error)}`
+                        );
+                    });
+
+                    const [authorizationLetterPath] = await this.pdfGenerator.generatePdfs(
+                        'bgAuthorizationLetter',
+                        { ...authorizationLetterData },
+                        instrumentId,
+                        'BG'
                     );
+
                     if (authorizationLetterPath) {
-                        attachmentFiles.push(authorizationLetterPath);
+                        addAttachmentLink('Authorization Letter', authorizationLetterPath);
                         try {
                             await this.db
                                 .update(instrumentBgDetails)
@@ -1459,21 +1538,13 @@ export class PaymentRequestsNotificationService {
                         ? [
                             courierJson.line1,
                             courierJson.line2,
-                            [courierJson.city, courierJson.state].filter(Boolean).join(', '),
-                            courierJson.pincode ? `- ${courierJson.pincode}` : null,
+                            courierJson.city,
+                            [courierJson.state, courierJson.pincode].filter(Boolean).join(' - '),
                         ].filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
                         : (instrument?.courierAddress || '')
                             .split(/\r?\n/)
                             .map((line) => line.trim())
                             .filter((line) => line.length > 0);
-
-                    // "BG Submission Against <TenderNo / WO No>" — plain
-                    // "BG Submission" when the request has no tender/project.
-                    const hasReference = paymentReq.tenderId > 0 || Boolean(paymentReq.projectId);
-                    const referenceNo = hasReference ? await this.resolveBgReferenceNo(paymentReq) : '';
-                    const submissionRef = referenceNo && referenceNo.trim().toUpperCase() !== 'NA'
-                        ? referenceNo.trim()
-                        : '';
 
                     const [envelopeSlipPath] = await this.pdfGenerator.generatePdfs(
                         'bgEnvelopeSlip',
@@ -1482,7 +1553,8 @@ export class PaymentRequestsNotificationService {
                                 to_name: courierJson?.name || '',
                                 to_address_lines: addressLines,
                                 contact_number: courierJson?.phone || '',
-                                submission_ref: submissionRef,
+                                submission_label: bgReference?.label || '',
+                                submission_ref: bgReference?.value || '',
                             },
                         },
                         instrumentId,
@@ -1490,7 +1562,7 @@ export class PaymentRequestsNotificationService {
                     );
 
                     if (envelopeSlipPath) {
-                        attachmentFiles.push(envelopeSlipPath);
+                        addAttachmentLink('Envelope Slip', envelopeSlipPath);
                         try {
                             await this.db
                                 .update(instrumentBgDetails)
@@ -1510,14 +1582,14 @@ export class PaymentRequestsNotificationService {
 
                 // Attachment 1 — the BG Format uploaded in the create form
                 // (bgSoftCopy holds the first uploaded file).
-                attachmentFiles.push(...this.toAttachmentPaths(bgDetails?.bgSoftCopy));
+                this.toAttachmentPaths(bgDetails?.bgSoftCopy).forEach((path) => addAttachmentLink('BG Format', path));
 
                 // Attachment 2 — the PO doc uploaded in the BG dashboard form,
                 // else the project's WO draft, else the main tender document.
                 let supportingDocLabel = '';
                 try {
                     const supportingDoc = await this.resolveBgSupportingDocs(paymentReq, bgDetails);
-                    attachmentFiles.push(...supportingDoc.paths);
+                    supportingDoc.paths.forEach((path) => addAttachmentLink(supportingDoc.label || 'Supporting document', path));
                     supportingDocLabel = supportingDoc.label;
                 } catch (error) {
                     this.logger.warn(
@@ -1525,18 +1597,13 @@ export class PaymentRequestsNotificationService {
                     );
                 }
 
-                // Attach each file only once.
-                const uniqueAttachmentFiles = Array.from(new Set(attachmentFiles));
-
-                // Get recipient email - use Imran (Accounts Leader) as specified
-                // Fallback to lookup if configured, otherwise hardcode Imran
                 const toEmails: RecipientSource[] = [{ type: 'emails', emails: ['imran@volksenergie.in'] }];
 
                 // From: TE (requestedBy)
                 const fromUserId = paymentReq.requestedBy;
 
                 // Subject
-                const subject = `New Bank Guarantee - ${bgDetails?.bgPurpose || 'Financial security'}`;
+                const subject = `New Bank Guarantee - ${bgPurposeText}`;
 
                 // CC: Coordinator, CEO, Accounts, TL
                 const ccEmails: RecipientSource[] = [
@@ -1548,7 +1615,7 @@ export class PaymentRequestsNotificationService {
 
                 try {
                     this.logger.log(
-                        `BG create mail for instrument ${instrumentId}: to=imran@volksenergie.in, teamId=${tenderTeamId}, attachments=${attachmentFiles.length}`
+                        `BG create mail for instrument ${instrumentId}: to=${toEmails.map((r) => (r as { emails?: string[] }).emails?.join(',')).join(',')}, teamId=${tenderTeamId}, links=${attachmentLinks.length}`
                     );
                     const result = await this.emailService.sendPaymentEmail({
                         requestId: instrument.requestId,
@@ -1559,7 +1626,7 @@ export class PaymentRequestsNotificationService {
                         template: 'bg-request',
                         data: {
                             recipientName: 'Imran',
-                            bgPurpose: bgDetails?.bgPurpose || 'Financial security',
+                            bgPurpose: bgPurposeText,
                             beneficiaryName: bgDetails?.beneficiaryName || '',
                             beneficiaryAddress: bgDetails?.beneficiaryAddress || '',
                             bgExpiryDate: bgDetails?.bgExpiryDate ? this.formatDateDDMMYYYY(bgDetails.bgExpiryDate) : '',
@@ -1578,12 +1645,10 @@ export class PaymentRequestsNotificationService {
                             courierAddress: instrument.courierAddress || '',
                             hasBgFormat: this.toAttachmentPaths(bgDetails?.bgSoftCopy).length > 0,
                             supportingDocLabel,
+                            attachmentLinks,
                         },
                         to: toEmails,
                         cc: ccEmails,
-                        attachments: {
-                            files: uniqueAttachmentFiles,
-                        },
                     });
 
                     if (result.success) {
@@ -2416,12 +2481,12 @@ export class PaymentRequestsNotificationService {
                 tenderId: paymentReq.tenderId || undefined,
                 eventType: 'BG_REJECTED',
                 fromUserId: (await this.db.select({ id: users.id }).from(users).where(eq(users.email, 'imran@volksenergie.in')) as any)[0]?.id ?? 33,
-                subject: `Bank Guarantee rejected - ${bgDetails?.bgPurpose || 'Financial security'}`,
+                subject: `Bank Guarantee rejected - ${formatBgPurpose(bgDetails?.bgPurpose, 'Financial security')}`,
                 template: 'bg-rejected',
                 data: {
                     teName: teUser.name || 'Tender Executive',
                     reason: instrument.rejectionReason || '',
-                    purpose: bgDetails?.bgPurpose || 'Financial security',
+                    purpose: formatBgPurpose(bgDetails?.bgPurpose, 'Financial security'),
                 },
                 to: [{ type: 'emails', emails: [teUser.email] }],
                 cc: ccEmails,
@@ -2521,11 +2586,11 @@ export class PaymentRequestsNotificationService {
                 tenderId: paymentReq.tenderId || undefined,
                 eventType: 'BG_CREATED_COURIERED',
                 fromUserId: sender?.id ?? 33,
-                subject: `New BG created and Couriered - ${bgDetails?.bgPurpose || 'Financial security'}`,
+                subject: `New BG created and Couriered - ${formatBgPurpose(bgDetails?.bgPurpose, 'Financial security')}`,
                 template: 'bg-created-couriered',
                 data: {
                     teName: teUser.name || 'Tender Executive',
-                    purpose: bgDetails?.bgPurpose || 'Financial security',
+                    purpose: formatBgPurpose(bgDetails?.bgPurpose, 'Financial security'),
                     courierNo: bgDetails?.courierNo || '',
                     reasons: bgDetails?.bg2Remark || '',
                 },
@@ -2639,7 +2704,9 @@ export class PaymentRequestsNotificationService {
             }
 
             // Compose email content fields
-            const bgPurpose = bgDetails.bgPurpose || `Performance Bank Guarantee for ${request.projectName || ''}`;
+            const bgPurpose = bgDetails.bgPurpose
+                ? formatBgPurpose(bgDetails.bgPurpose, '')
+                : `Performance Bank Guarantee for ${request.projectName || ''}`;
             const beneficiaryName = bgDetails.beneficiaryName || '';
             const beneficiaryAddress = bgDetails.beneficiaryAddress || '';
             const timeLimit = instrument.courierDeadline || 24;
@@ -3115,7 +3182,7 @@ export class PaymentRequestsNotificationService {
 
             const fromUserId = imranUser ? imranUser.id : 33;
 
-            const purpose = bgDetails.bgPurpose || request.purpose || 'Financial security';
+            const purpose = formatBgPurpose(bgDetails.bgPurpose || request.purpose, 'Financial security');
 
             const tenderDate = ''; // no confirmed schema field for WO/Tender Date
 
@@ -3259,7 +3326,7 @@ export class PaymentRequestsNotificationService {
                 tenderId: paymentReq.tenderId || undefined,
                 eventType: 'BG_FOLLOWUP_RELEASE',
                 fromUserId: (await this.db.select({ id: users.id }).from(users).where(eq(users.email, 'imran@volksenergie.in')) as any)[0]?.id ?? 33,
-                subject: `Bank Guarantee No. - ${bgDetails?.bgNo || ''} - ${statusLabel} - ${tender?.tenderNo || ''} against ${bgDetails?.bgPurpose || paymentReq.purpose || ''}`,
+                subject: `Bank Guarantee No. - ${bgDetails?.bgNo || ''} - ${statusLabel} - ${tender?.tenderNo || ''} against ${formatBgPurpose(bgDetails?.bgPurpose || paymentReq.purpose, '')}`,
                 template: 'bg-followup-release',
                 data,
                 to: [{ type: 'emails', emails: clientEmails }],

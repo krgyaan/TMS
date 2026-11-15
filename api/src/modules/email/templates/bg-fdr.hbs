@@ -1,32 +1,30 @@
-<div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+<div style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.6; color: #222; max-width: 640px;">
+    <p>Dear Sir,</p>
 
-  <p>Dear sir,</p>
+    <p>The following Bank Guarantee has been issued in favour of your organisation.</p>
 
-  <p>The following Bank Guarantee has been issued for your organization.</p>
+    <p>
+        <strong>WO No./Tender No.:</strong> {{data.tenderNo}}<br>
+        <strong>WO/Tender Date:</strong> {{data.tenderDate}}<br>
+        <strong>BG No.:</strong> {{data.bgNo}}<br>
+        <strong>BG Expiry Date:</strong> {{data.bgExpiryDate}}<br>
+        <strong>BG Claim Date:</strong> {{data.bgClaimDate}}<br>
+        <strong>BG in favor of:</strong> {{data.beneficiaryName}}<br>
+        <strong>Amount:</strong> Rs. {{data.amount}}<br>
+        <strong>BG Stamp Paper Value:</strong> Rs. {{data.stampPaperValue}}
+    </p>
 
-  <div style="background-color: #f5f5f5; padding: 15px; border-radius: 6px; margin: 15px 0;">
-    <p><strong>WO No./Tender No.:</strong> {{data.tenderNo}}</p>
-    <p><strong>WO/Tender Date:</strong> {{data.tenderDate}}</p>
-    <p><strong>BG No.:</strong> {{data.bgNo}}</p>
-    <p><strong>BG Expiry Date:</strong> {{data.bgExpiryDate}}</p>
-    <p><strong>BG Claim Date:</strong> {{data.bgClaimDate}}</p>
-    <p><strong>BG in favor of:</strong> {{data.beneficiaryName}}</p>
-    <p><strong>Amount:</strong> Rs. {{data.amount}}</p>
-    <p><strong>BG Stamp Paper Value:</strong> Rs. {{data.stampPaperValue}}</p>
-  </div>
+    <p>
+        The soft copy of the BG and the SFMS confirmation are attached with this mail.
+    </p>
 
-  <p>Soft copy of the BG: attached below</p>
-  <p>SFMS Confirmation: attached below</p>
+    <p>
+        Please track the BG and confirm receipt of the BG and the SFMS confirmation by replying to this mail.
+    </p>
 
-  <p>Please track the BG and confirm receipt of the BG and the SFMS confirmation via a reply to this email.</p>
-
-  <br/>
-  <p>Regards,</p>
-  <p>
-    <strong>Imran Khan</strong><br/>
-    +91-8882591733<br/>
-    Accounts Team,<br/>
-    Volks Energie Pvt. Ltd.
-  </p>
-
+    <p>
+        Regards,<br>
+        {{data.senderName}}<br>
+        Tendering, Volks Energie Pvt. Ltd.
+    </p>
 </div>
