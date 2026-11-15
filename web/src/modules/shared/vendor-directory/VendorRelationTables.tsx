@@ -66,7 +66,7 @@ export const VendorRelationTables = ({
     fileRowActions,
 }: VendorRelationTablesProps) => {
     const gstCols = 4 + (gstRowActions ? 1 : 0);
-    const accountCols = 4 + (accountRowActions ? 1 : 0);
+    const accountCols = 6 + (accountRowActions ? 1 : 0);
     const personCols = 4 + (personRowActions ? 1 : 0);
 
     return (
@@ -116,6 +116,8 @@ export const VendorRelationTables = ({
                             <TableHead>Account Name</TableHead>
                             <TableHead>Account Number</TableHead>
                             <TableHead>IFSC</TableHead>
+                            <TableHead>Branch</TableHead>
+                            <TableHead>SWIFT</TableHead>
                             <TableHead>Status</TableHead>
                             {accountRowActions && <TableHead className="w-[100px] text-right">Actions</TableHead>}
                         </TableRow>
@@ -129,6 +131,8 @@ export const VendorRelationTables = ({
                                     <TableCell>{account.bankAccountName || "-"}</TableCell>
                                     <TableCell className="break-all">{account.accountNum || "-"}</TableCell>
                                     <TableCell className="break-all">{account.ifscCode || "-"}</TableCell>
+                                    <TableCell>{account.branch || "-"}</TableCell>
+                                    <TableCell>{account.swiftCode || "-"}</TableCell>
                                     <TableCell><StatusBadge status={account.status} /></TableCell>
                                     {accountRowActions && (
                                         <TableCell className="text-right">{accountRowActions(account)}</TableCell>

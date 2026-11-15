@@ -184,7 +184,7 @@ export interface VendorOrganization {
     category?: string | null;
     msme?: string | null;
     msmeSize?: "Micro" | "Small" | "Medium" | null;
-    msmeType?: "M" | "S" | null;
+    msmeType?: "M" | "S" | "T" | null;
     majorActivity?: string | null;
     registrationType?: "REGULAR" | "UNREGISTERED" | null;
     creditPeriodDays?: number | null;
@@ -222,6 +222,8 @@ export interface VendorAcc {
     bankAccountName: string;
     accountNum: string;
     ifscCode: string;
+    branch?: string | null;
+    swiftCode?: string | null;
     status: boolean;
     createdAt: string;
     updatedAt: string;
@@ -243,7 +245,7 @@ export interface Vendor {
         category?: string | null;
         msme?: string | null;
         msmeSize?: "Micro" | "Small" | "Medium" | null;
-        msmeType?: "M" | "S" | null;
+        msmeType?: "M" | "S" | "T" | null;
         majorActivity?: string | null;
         registrationType?: "REGULAR" | "UNREGISTERED" | null;
         creditPeriodDays?: number | null;
@@ -342,6 +344,8 @@ export interface CreateVendorAccountDto {
     bankAccountName: string;
     accountNum: string;
     ifscCode: string;
+    branch?: string | null;
+    swiftCode?: string | null;
     status?: boolean;
 }
 
@@ -349,6 +353,8 @@ export interface UpdateVendorAccountDto {
     bankAccountName?: string;
     accountNum?: string;
     ifscCode?: string;
+    branch?: string | null;
+    swiftCode?: string | null;
     status?: boolean;
 }
 
@@ -370,7 +376,7 @@ export interface CreateVendorOrganizationWithRelationsDto {
         category?: string | null;
         msme?: string | null;
         msmeSize?: "Micro" | "Small" | "Medium" | null;
-        msmeType?: "M" | "S" | null;
+        msmeType?: "M" | "S" | "T" | null;
         majorActivity?: string | null;
         registrationType?: "REGULAR" | "UNREGISTERED" | null;
         creditPeriodDays?: number | null;
@@ -397,7 +403,7 @@ export interface UpdateVendorOrganizationWithRelationsDto {
         category?: string | null;
         msme?: string | null;
         msmeSize?: "Micro" | "Small" | "Medium" | null;
-        msmeType?: "M" | "S" | null;
+        msmeType?: "M" | "S" | "T" | null;
         majorActivity?: string | null;
         registrationType?: "REGULAR" | "UNREGISTERED" | null;
         creditPeriodDays?: number | null;
@@ -514,7 +520,7 @@ export interface CreateVendorOrganizationDto {
     category?: string | null;
     msme?: string | null;
     msmeSize?: "Micro" | "Small" | "Medium" | null;
-    msmeType?: "M" | "S" | null;
+    msmeType?: "M" | "S" | "T" | null;
     majorActivity?: string | null;
     registrationType?: "REGULAR" | "UNREGISTERED" | null;
     creditPeriodDays?: number | null;

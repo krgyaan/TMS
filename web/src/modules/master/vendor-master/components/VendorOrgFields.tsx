@@ -10,6 +10,7 @@ import { formatVendorName } from "@/lib/vendorName";
 const MSME_TYPE_OPTIONS = [
     { value: "M", label: "Manufacturer" },
     { value: "S", label: "Service" },
+    { value: "T", label: "Trading" },
 ] as const;
 
 const CATEGORY_OPTIONS = [

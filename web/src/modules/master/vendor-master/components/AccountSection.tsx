@@ -81,6 +81,8 @@ export const AccountSection = ({ orgId }: VendorSectionProps) => {
                                 <div className="text-sm text-muted-foreground">{account.accountNum}</div>
 
                                 <div className="text-sm text-muted-foreground">IFSC: {account.ifscCode}</div>
+                                {account.branch && <div className="text-sm text-muted-foreground">Branch: {account.branch}</div>}
+                                {account.swiftCode && <div className="text-sm text-muted-foreground">SWIFT: {account.swiftCode}</div>}
                             </div>
 
                             <div className="flex gap-2">

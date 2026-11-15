@@ -30,6 +30,8 @@ export const accountApiToForm = (account: VendorAcc): AccountFormValues => ({
     bankAccountName: account.bankAccountName,
     accountNum: account.accountNum,
     ifscCode: account.ifscCode,
+    branch: account.branch ?? "",
+    swiftCode: account.swiftCode ?? "",
     status: account.status ?? true,
 });
 
@@ -90,6 +92,8 @@ export const toCreateAccountDto = (account: AccountFormValues, orgId: number): C
     bankAccountName: account.bankAccountName,
     accountNum: account.accountNum,
     ifscCode: account.ifscCode,
+    branch: account.branch || null,
+    swiftCode: account.swiftCode || null,
     status: account.status,
 });
 
@@ -97,6 +101,8 @@ export const toUpdateAccountDto = (account: AccountFormValues): UpdateVendorAcco
     bankAccountName: account.bankAccountName,
     accountNum: account.accountNum,
     ifscCode: account.ifscCode,
+    branch: account.branch || null,
+    swiftCode: account.swiftCode || null,
     status: account.status,
 });
 

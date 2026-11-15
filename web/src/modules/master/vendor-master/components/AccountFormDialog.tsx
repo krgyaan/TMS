@@ -15,6 +15,8 @@ const emptyAccount: AccountFormValues = {
     bankAccountName: "",
     accountNum: "",
     ifscCode: "",
+    branch: "",
+    swiftCode: "",
     status: true,
 };
 
@@ -83,6 +85,14 @@ export const AccountFormDialog = ({ orgId, open, onOpenChange, initial, siblings
 
                         <FieldWrapper control={form.control} name="ifscCode" label="IFSC Code">
                             {field => <Input placeholder="e.g. HDFC0001234" {...field} value={field.value ?? ""} />}
+                        </FieldWrapper>
+
+                        <FieldWrapper control={form.control} name="branch" label="Branch">
+                            {field => <Input placeholder="e.g. Noida Sector 62" {...field} value={field.value ?? ""} />}
+                        </FieldWrapper>
+
+                        <FieldWrapper control={form.control} name="swiftCode" label="SWIFT Code">
+                            {field => <Input placeholder="e.g. HDFCINBBXXX" {...field} value={field.value ?? ""} />}
                         </FieldWrapper>
 
                         <FormField

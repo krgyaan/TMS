@@ -5,7 +5,7 @@ const OrgFields = z.object({
     category: z.string().max(50).optional(),
     msme: z.string().max(50).optional(),
     msmeSize: z.enum(["Micro", "Small", "Medium"]).optional(),
-    msmeType: z.enum(["M", "S"]).optional(),
+    msmeType: z.enum(["M", "S", "T"]).optional(),
     majorActivity: z.string().max(50).optional(),
     registrationType: z.enum(["REGULAR", "UNREGISTERED"]).optional(),
     creditPeriodDays: z.number().int().nonnegative().optional(),
@@ -41,6 +41,8 @@ export const AccountFormSchema = z.object({
     bankAccountName: z.string().min(1, "Account name is required"),
     accountNum: z.string().min(1, "Account number is required"),
     ifscCode: z.string().min(1, "IFSC code is required"),
+    branch: z.string().max(255).optional(),
+    swiftCode: z.string().max(50).optional(),
     status: z.boolean(),
 });
 
