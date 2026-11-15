@@ -294,6 +294,7 @@ export class VendorMasterService {
                 case ${vendorOrganizations.msmeType}
                     when 'M' then 'Manufacturer'
                     when 'S' then 'Service'
+                    when 'T' then 'Trading'
                     else ${vendorOrganizations.msmeType}
                 end ILIKE ${q} OR
                 ${vendorOrganizations.registrationType} ILIKE ${q} OR

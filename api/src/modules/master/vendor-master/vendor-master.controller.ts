@@ -11,7 +11,7 @@ const VendorOrganizationFields = z.object({
     category: z.string().max(50).optional().nullable(),
     msme: z.string().max(50).optional().nullable(),
     msmeSize: z.enum(["Micro", "Small", "Medium"]).optional().nullable(),
-    msmeType: z.enum(["M", "S"]).optional().nullable(),
+    msmeType: z.enum(["M", "S", "T"]).optional().nullable(),
     majorActivity: z.string().max(50).optional().nullable(),
     registrationType: z.enum(["REGULAR", "UNREGISTERED"]).optional().nullable(),
     creditPeriodDays: z.number().int().nonnegative().optional().nullable(),
@@ -23,7 +23,7 @@ const VendorOrganizationFields = z.object({
 
 // An MSME number is only meaningful once its type (M/S) is known, so reject the
 // number alone. Existing rows are unaffected: this applies to incoming payloads only.
-const requireMsmeType = (val: { msme?: string | null | undefined; msmeType?: "M" | "S" | null | undefined }, ctx: z.RefinementCtx) => {
+const requireMsmeType = (val: { msme?: string | null | undefined; msmeType?: "M" | "S" | "T" | null | undefined }, ctx: z.RefinementCtx) => {
     if (val.msme?.trim() && !val.msmeType) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
@@ -62,6 +62,8 @@ const CreateVendorAccountSchema = z.object({
     bankAccountName: z.string().min(1).max(255),
     accountNum: z.string().min(1).max(255),
     ifscCode: z.string().min(1).max(255),
+    branch: z.string().max(255).optional().nullable(),
+    swiftCode: z.string().max(50).optional().nullable(),
     status: z.boolean().optional().default(true),
 });
 
