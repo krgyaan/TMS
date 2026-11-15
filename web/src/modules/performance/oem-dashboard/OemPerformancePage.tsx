@@ -89,7 +89,7 @@ export default function OemPerformancePage() {
         };
     }, [selectedOemId, fromDate, toDate]);
 
-    const { data: oems = [] } = useVendorOrganizations();
+    const { data: oems = [] } = useVendorOrganizations(true);
     const { data: oemData, isLoading: dataLoading } = useOemPerformance(params);
 
     const tabCounts = useMemo(() => ({

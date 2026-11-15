@@ -69,7 +69,7 @@ const InfoSheetMissingAlert = ({ tenderId, onBack }: { tenderId: number, onBack:
 
 export function TenderApprovalForm({ tenderId, relationships, isLoading: isParentLoading }: TenderApprovalFormProps) {
     const navigate = useNavigate();
-    const { data: vendorOrganizations, isLoading: isVendorOrgsLoading } = useVendorOrganizations();
+    const { data: vendorOrganizations, isLoading: isVendorOrgsLoading } = useVendorOrganizations(true);
     const { data: statuses, isLoading: isStatusesLoading } = useTenderRejectionStatuses();
     const createApproval = useCreateTenderApproval();
     const updateApproval = useUpdateTenderApproval();

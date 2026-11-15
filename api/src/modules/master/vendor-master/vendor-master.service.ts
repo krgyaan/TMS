@@ -162,9 +162,15 @@ export class VendorMasterService {
     /**
      * Get all vendor organizations (flat list)
      */
-    async findAllOrganizations(): Promise<VendorOrganization[]> {
-        const res = await this.db.select().from(vendorOrganizations).orderBy(asc(vendorOrganizations.name));
-        return res;
+    async findAllOrganizations(options?: { activeOnly?: boolean }): Promise<VendorOrganization[]> {
+        if (options?.activeOnly) {
+            return this.db
+                .select()
+                .from(vendorOrganizations)
+                .where(eq(vendorOrganizations.status, true))
+                .orderBy(asc(vendorOrganizations.name));
+        }
+        return this.db.select().from(vendorOrganizations).orderBy(asc(vendorOrganizations.name));
     }
 
     /**
@@ -220,8 +226,8 @@ export class VendorMasterService {
      * Get ALL organizations with their related data
      * (for the expandable list view)
      */
-    async findAllOrganizationsWithRelations() {
-        const orgs = await this.findAllOrganizations();
+    async findAllOrganizationsWithRelations(options?: { activeOnly?: boolean }) {
+        const orgs = await this.findAllOrganizations(options);
 
         // Fetch related data for all organizations
         const orgsWithRelations = await Promise.all(

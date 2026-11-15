@@ -15,23 +15,25 @@ import { toast } from "sonner";
 export const vendorOrganizationsKey = {
     all: ["vendorOrganizations"] as const,
     lists: () => [...vendorOrganizationsKey.all, "list"] as const,
+    list: (activeOnly: boolean) => [...vendorOrganizationsKey.lists(), { activeOnly }] as const,
     paginated: () => [...vendorOrganizationsKey.all, "paginated"] as const,
     withRelations: () => [...vendorOrganizationsKey.all, "withRelations"] as const,
+    withRelationsList: (activeOnly: boolean) => [...vendorOrganizationsKey.withRelations(), { activeOnly }] as const,
     details: () => [...vendorOrganizationsKey.all, "detail"] as const,
     detail: (id: number) => [...vendorOrganizationsKey.details(), id] as const,
 };
 
-export const useVendorOrganizations = () => {
+export const useVendorOrganizations = (activeOnly = false) => {
     return useQuery({
-        queryKey: vendorOrganizationsKey.lists(),
-        queryFn: () => vendorApi.getAllOrganizations(),
+        queryKey: vendorOrganizationsKey.list(activeOnly),
+        queryFn: () => vendorApi.getAllOrganizations(activeOnly),
     });
 };
 
-export const useVendorOrganizationsWithRelations = () => {
+export const useVendorOrganizationsWithRelations = (activeOnly = false) => {
     return useQuery({
-        queryKey: vendorOrganizationsKey.withRelations(),
-        queryFn: () => vendorApi.getAllOrganizationsWithRelations(),
+        queryKey: vendorOrganizationsKey.withRelationsList(activeOnly),
+        queryFn: () => vendorApi.getAllOrganizationsWithRelations(activeOnly),
     });
 };
 

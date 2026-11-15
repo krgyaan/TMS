@@ -50,7 +50,7 @@ export default function CostingApprovalForm({
     const approveAllMutation = useApproveAllCosting();
     const rejectMutation = useRejectCosting();
     const updateDetailMutation = useUpdateApprovedCosting();
-    const { data: vendors } = useVendorOrganizations();
+    const { data: vendors } = useVendorOrganizations(true);
 
     const vendorOptions = vendors?.map((v: VendorOrganization) => ({
         value: v.id.toString(),
@@ -68,7 +68,6 @@ export default function CostingApprovalForm({
     }, [queryClient, costingSheet.id]);
 
     const isRelevantProcessed = (detailId: number) => processedIds.has(detailId);
-    const allRelevantProcessed = relevantDetails.every(d => isRelevantProcessed(d.id));
     const hasAnyPending = relevantDetails.some(d => !isRelevantProcessed(d.id));
 
     const buildDefaultValues = (detail: CostingSheetWithDetails['details'][number]) => {

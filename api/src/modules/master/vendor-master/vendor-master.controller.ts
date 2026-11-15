@@ -100,13 +100,17 @@ export class VendorMasterController {
     constructor(private readonly vendorMasterService: VendorMasterService) {}
 
     @Get("vendor-organizations")
-    async listOrganizations() {
-        return this.vendorMasterService.findAllOrganizations();
+    async listOrganizations(@Query("activeOnly") activeOnly?: string) {
+        return this.vendorMasterService.findAllOrganizations({
+            activeOnly: activeOnly === "true" || activeOnly === "1",
+        });
     }
 
     @Get("vendor-organizations/with-relations")
-    async listOrganizationsWithRelations() {
-        return this.vendorMasterService.findAllOrganizationsWithRelations();
+    async listOrganizationsWithRelations(@Query("activeOnly") activeOnly?: string) {
+        return this.vendorMasterService.findAllOrganizationsWithRelations({
+            activeOnly: activeOnly === "true" || activeOnly === "1",
+        });
     }
 
     // Declared before vendor-organizations/:id so "paginated" is not parsed as an id.

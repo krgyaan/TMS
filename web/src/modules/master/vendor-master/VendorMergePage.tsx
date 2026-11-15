@@ -74,7 +74,7 @@ type VendorSelectProps = {
 };
 
 const VendorSelect = ({ value, onChange, excludeId, placeholder }: VendorSelectProps) => {
-    const { data: orgs, isLoading } = useVendorOrganizations();
+    const { data: orgs, isLoading } = useVendorOrganizations(true);
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState("");
 
