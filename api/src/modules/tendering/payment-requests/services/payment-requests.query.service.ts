@@ -988,6 +988,7 @@ export class PaymentRequestsQueryService {
             .select({
                 id: paymentRequests.id,
                 tenderId: paymentRequests.tenderId,
+                projectId: paymentRequests.projectId,
                 type: paymentRequests.type,
                 tenderNo: paymentRequests.tenderNo,
                 projectName: paymentRequests.projectName,
@@ -1407,6 +1408,7 @@ export class PaymentRequestsQueryService {
         return {
             id: request.id,
             tenderId: request.tenderId,
+            projectId: request.projectId,
             type: request.type,
             tenderNo: request.tenderNo?.toString() || '',
             projectName: request.projectName,
@@ -1564,6 +1566,7 @@ export class PaymentRequestsQueryService {
         const response: any = {
             id: request.id,
             tenderId: request.tenderId,
+            projectId: request.projectId,
             tenderNo: request.tenderNo,
             tenderName: request.projectName,
             tenderDueDate: request.dueDate,

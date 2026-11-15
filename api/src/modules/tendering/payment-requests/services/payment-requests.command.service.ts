@@ -412,7 +412,7 @@ export class PaymentRequestsCommandService {
         await this.db.transaction(async (tx) => {
             // Update request level fields if provided
             const purpose = existing.purpose;
-            const requestData = (payload[purpose] || payload[purpose.toLowerCase()]);
+            const requestData = (payload[purpose] || payload[purpose.toLowerCase()] || payload.EMD);
             
             if (requestData?.details) {
                 const amount = requestData.details.amountRequired || 
