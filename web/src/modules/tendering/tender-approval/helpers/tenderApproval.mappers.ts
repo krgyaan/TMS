@@ -5,7 +5,6 @@ export const getInitialValues = (approval?: TenderApproval | null): TenderApprov
         return {
             tlDecision: '0',
             rfqRequired: undefined,
-            quotationFiles: [],
             rfqTo: [],
             processingFeeMode: undefined,
             tenderFeeMode: undefined,
@@ -31,7 +30,6 @@ export const getInitialValues = (approval?: TenderApproval | null): TenderApprov
     return {
         tlDecision: String(approval.tlStatus ?? approval.tlDecision ?? '0') as '0' | '1' | '2' | '3',
         rfqRequired: approval.rfqRequired as 'yes' | 'no' | undefined,
-        quotationFiles: approval.quotationFiles ?? [],
         rfqTo: approval.rfqTo?.map(id => String(id)) ?? [],
         processingFeeMode: toOptionalString(approval.processingFeeMode),
         tenderFeeMode: toOptionalString(approval.tenderFeeMode),
@@ -40,7 +38,9 @@ export const getInitialValues = (approval?: TenderApproval | null): TenderApprov
         approveFinanceDocSelection: approval.approveFinanceDocSelection as '1' | '2' | undefined,
         alternativeTechnicalDocs: approval.alternativeTechnicalDocs ?? [],
         alternativeFinancialDocs: approval.alternativeFinancialDocs ?? [],
-        tenderStatus: approval.tenderStatus ? String(approval.tenderStatus) : undefined,
+        // Only prefill the rejection status when editing an existing rejection.
+        // Otherwise the form may silently resubmit the current status.
+        tenderStatus: Number(approval.tlStatus) === 2 && approval.tenderStatus ? String(approval.tenderStatus) : undefined,
         oemNotAllowed: approval.oemNotAllowed?.map((item) => String(item)) ?? [],
         tlApprovalRemarks: toOptionalString(approval.tlApprovalRemarks),
         tlRejectionRemarks: toOptionalString(approval.tlRejectionRemarks),
@@ -61,9 +61,6 @@ export const mapFormToPayload = (values: TenderApprovalFormValues): SaveTenderAp
         };
         if (values.rfqRequired) {
             payload.rfqRequired = values.rfqRequired;
-        }
-        if (values.quotationFiles && values.quotationFiles.length > 0) {
-            payload.quotationFiles = values.quotationFiles;
         }
         if (values.rfqTo && values.rfqTo.length > 0) {
             payload.rfqTo = values.rfqTo.map(id => Number(id));

@@ -17,7 +17,6 @@ export const TenderApprovalFormSchema = z.object({
 
     // RFQ Required (when approved)
     rfqRequired: z.enum(['yes', 'no']).optional(),
-    // quotationFiles: z.array(z.string()).max(5).optional(),
 
     // Bidding Details (when approved)
     rfqTo: z.array(z.string()).optional(),
@@ -65,6 +64,15 @@ export const TenderApprovalFormSchema = z.object({
 }, {
     message: "Please select at least one field to mark as incomplete",
     path: ["incompleteFields"],
+}).refine((data) => {
+    // If rejecting, a rejection status must be selected
+    if (data.tlDecision === '2') {
+        return Boolean(data.tenderStatus);
+    }
+    return true;
+}, {
+    message: "Please select a tender status",
+    path: ["tenderStatus"],
 }).refine((data) => {
     // If PQR rejected, must select alternative documents
     if (data.tlDecision === '1' && data.approvePqrSelection === '2') {

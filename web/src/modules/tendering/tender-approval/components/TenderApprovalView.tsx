@@ -9,7 +9,6 @@ import type { TenderWithRelations } from '@/modules/tendering/tenders/helpers/te
 import { usePqrOptions, useFinanceDocumentOptions } from '@/hooks/useSelectOptions';
 import { paths } from '@/app/routes/paths';
 import { useAuth } from '@/contexts/AuthContext';
-import { fileUploadService } from '@/services/api/file-upload.service';
 
 // Helper function to map document IDs to names
 const mapDocumentIdsToNames = (ids: string[] | null | undefined, documentList: Array<{ value: string; label: string }>): string[] => {
@@ -229,26 +228,6 @@ export function TenderApprovalView({
                                                 ) : (
                                                     '—'
                                                 )}
-                                            </TableCell>
-                                        </>
-                                    )}
-                                </TableRow>
-                                <TableRow>
-                                    {approval?.quotationFiles && approval?.quotationFiles?.length > 0 && (
-                                        <>
-                                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                                Quotation Files
-                                            </TableCell>
-                                            <TableCell className="text-sm" colSpan={3}>
-                                                {approval?.quotationFiles.map((doc, i) => {
-                                                    return (
-                                                        <Badge key={i} variant="outline" className="text-xs hover:bg-primary/10">
-                                                            <a href={fileUploadService.getFileUrl(doc)} target="_blank" rel="noopener noreferrer">
-                                                                View File
-                                                            </a>
-                                                        </Badge>
-                                                    );
-                                                })}
                                             </TableCell>
                                         </>
                                     )}
