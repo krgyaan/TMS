@@ -137,14 +137,21 @@ const VendorsPage = () => {
 
     const columns = useMemo<ColDef<VendorRow>[]>(
         () => [
-            { field: "name", headerName: "Organization", sortable: true, filter: true, minWidth: 200 },
+            {
+                field: "name",
+                headerName: "Organization",
+                sortable: true,
+                filter: true,
+                minWidth: 200,
+                cellClassRules: {
+                    "text-destructive": params => params.data?.status === false,
+                },
+            },
             { field: "category", headerName: "Category", sortable: true, filter: true, minWidth: 160 },
             { field: "registrationType", headerName: "Registration", sortable: true, filter: true, minWidth: 120 },
             { field: "pan", headerName: "PAN", sortable: true, filter: true, minWidth: 120 },
             { field: "msme", headerName: "MSME", sortable: true, filter: true, minWidth: 130 },
             { field: "msmeSize", headerName: "MSME Size", sortable: true, filter: true, minWidth: 110 },
-            { field: "majorActivity", headerName: "Major Activity", sortable: true, filter: true, minWidth: 140 },
-            { field: "creditPeriodDays", headerName: "Credit Days", sortable: true, filter: true, minWidth: 110 },
             { field: "gstCount", headerName: "GSTs", sortable: true, filter: true, minWidth: 80, width: 80 },
             { field: "accountCount", headerName: "Accounts", sortable: true, filter: true, minWidth: 100, width: 100 },
             { field: "personCount", headerName: "Persons", sortable: true, filter: true, minWidth: 90, width: 90 },
