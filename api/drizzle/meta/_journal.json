@@ -691,64 +691,92 @@
     {
       "idx": 122,
       "version": "7",
+      "when": 1795200000000,
+      "tag": "0164_add_item_id_to_leads",
+      "breakpoints": true
+    },
+    {
+      "idx": 123,
+      "version": "7",
       "when": 1797000000004,
       "tag": "0176_add_financial_and_counter_guarantee_to_payment_purpose_enum",
       "breakpoints": true
     },
     {
-      "idx": 123,
+      "idx": 124,
       "version": "7",
       "when": 1797000000005,
       "tag": "0177_create_other_contacts",
       "breakpoints": true
     },
     {
-      "idx": 124,
+      "idx": 125,
       "version": "7",
       "when": 1797000000006,
       "tag": "0178_add_unique_code_and_advice_to_instrument_bg_details",
       "breakpoints": true
     },
     {
-      "idx": 123,
-      "version": "7",
-      "when": 1795200000000,
-      "tag": "0164_add_item_id_to_leads",
-      "breakpoints": true
-    },
-    {
-      "idx": 124,
+      "idx": 126,
       "version": "7",
       "when": 1798000000000,
       "tag": "0177_add_party_ids_to_po_and_vwo",
       "breakpoints": true
     },
     {
-      "idx": 125,
+      "idx": 127,
+      "version": "7",
+      "when": 1798000000001,
+      "tag": "0178_item_master_catalog_audit",
+      "breakpoints": true
+    },
+    {
+      "idx": 128,
+      "version": "7",
+      "when": 1798000000002,
+      "tag": "0179_item_master_catalog_update",
+      "breakpoints": true
+    },
+    {
+      "idx": 129,
+      "version": "7",
+      "when": 1798000000003,
+      "tag": "0180_remove_inventory_item_subcategory",
+      "breakpoints": true
+    },
+    {
+      "idx": 130,
       "version": "7",
       "when": 1798100000000,
       "tag": "0178_add_maker_request_id_to_payment_instruments",
       "breakpoints": true
     },
     {
-      "idx": 126,
+      "idx": 131,
       "version": "7",
       "when": 1798200000000,
       "tag": "0179_add_gem_charges_breakdown_to_wo_basic_details",
       "breakpoints": true
     },
     {
-      "idx": 127,
+      "idx": 132,
       "version": "7",
       "when": 1798300000000,
       "tag": "0180_vendor_organizations_sheet_fields",
       "breakpoints": true
     },
     {
-      "idx": 128,
+      "idx": 133,
       "version": "7",
       "when": 1798400000000,
       "tag": "0181_vendor_accs_branch_swift",
+      "breakpoints": true
+    },
+    {
+      "idx": 134,
+      "version": "7",
+      "when": 1798400000003,
+      "tag": "0181_reconcile_inventory_item_master_schema",
       "breakpoints": true
     }
   ]
