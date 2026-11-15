@@ -1,7 +1,23 @@
-# Manual vendor organization merge runbook
+# Vendor organization duplicate merge runbook
 
-Replaces the retired `scripts/merge-vendor-orgs.ts` tool. Everything here is
-manual SQL against `vendor_organizations`.
+For name variants, use the automated audit + merge-plan runner first:
+
+```bash
+pnpm audit:vendor-duplicates
+
+# review migration-logs/vendor-name-variants-*.csv,
+# vendor-name-review-*.csv, vendor-different-name-matches-*.csv
+
+pnpm merge:vendor-duplicates --plan migration-logs/vendor-name-merge-plan-<runId>.json
+pnpm merge:vendor-duplicates --plan migration-logs/vendor-name-merge-plan-<runId>.json --apply
+```
+
+The audit merges only name variants and keeps the lowest id in each cluster.
+Same-PAN / shared-GSTIN groups with different names are logged, not merged.
+The merge runner uses `VendorMasterService.mergeVendors`, so it re-points the
+same references as the UI merge page and deactivates (never deletes) the drop.
+
+For everything else, the manual SQL runbook below still applies.
 
 **Rules**
 
