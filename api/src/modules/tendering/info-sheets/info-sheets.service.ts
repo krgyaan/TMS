@@ -1082,12 +1082,14 @@ export class TenderInfoSheetsService {
                     })
                     .where(eq(tenderInformation.tenderId, tenderId));
 
-                // Update gstValues only when recommending and approved
-                if (!isRejection && isApproved && payload.tenderValue) {
+                // Sync financial values to the tender when the info sheet is edited after approval/rejection
+                if (!isRejection && isApproved) {
                     await tx
                         .update(tenderInfos)
                         .set({
-                            gstValues: payload.tenderValue.toString(),
+                            gstValues: payload.tenderValue != null ? payload.tenderValue.toString() : '0',
+                            tenderFees: payload.tenderFeeAmount != null ? payload.tenderFeeAmount.toString() : '0',
+                            emd: payload.emdAmount != null ? payload.emdAmount.toString() : '0',
                             updatedAt: new Date(),
                         })
                         .where(eq(tenderInfos.id, tenderId));

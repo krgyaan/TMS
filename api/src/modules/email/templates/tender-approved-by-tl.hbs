@@ -41,15 +41,6 @@
         </ul>
         <p>Finance Doc Selection is {{#if data.finApproved}}approved{{else}}rejected, please use the revised Finance Docs{{/if}}.</p>
 
-        {{#if data.quotation_file_urls}}
-        <p><b>Quotation Files (instead of RFQ):</b></p>
-        <ul>
-            {{#each data.quotation_file_urls}}
-                <li><a href="{{this}}" target="_blank" style="color: #0066cc; text-decoration: underline;">Open File</a></li>
-            {{/each}}
-        </ul>
-        {{/if}}
-
         <p><b>Remarks:</b><br/>
         {{data.tl_approval_remark}}</p>
     {{/if}}
