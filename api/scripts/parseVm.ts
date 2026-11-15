@@ -250,7 +250,9 @@ function normalizeMajorActivity(v: unknown): { value: string | null; invalid?: s
     const s = clean(v);
     if (!s) return { value: null };
     const lower = s.toLowerCase();
-    if (lower.includes("manufact")) return { value: "Manufacturing" };
+    // Covers "Mnaufacturing", "Manufactuirng" and normal spellings.
+    const compact = lower.replace(/[^a-z]/g, "");
+    if (compact.includes("manufact") || compact.includes("mnaufact")) return { value: "Manufacturing" };
     if (lower.includes("trading")) return { value: lower.includes("service") ? "Services (Trading)" : "Trading" };
     if (lower.includes("service")) return { value: "Services" };
     return { value: s, invalid: s };
@@ -534,30 +536,48 @@ export function parseVmSheet(filePath: string, options?: { sheetName?: string })
         ];
 
         if (embeddedPans.length > 1) {
-            anomalies.push({
-                vendorName: vendor.name,
-                message: `GSTINs contain multiple PANs (${embeddedPans.join(", ")}) - PAN left as "${vendor.pan ?? "null"}"`,
-            });
-            continue;
-        }
-
-        if (embeddedPans.length !== 1) continue;
-        const embeddedPan = embeddedPans[0];
-        if (!vendor.pan) {
-            vendor.pan = embeddedPan;
-            corrections.push({ vendorName: vendor.name, message: `PAN filled from GSTIN: "${embeddedPan}"` });
-        } else if (vendor.pan !== embeddedPan) {
-            if (PAN_REVIEW_ONLY.has(normalizeKey(vendor.name))) {
+            const columnPan = vendor.pan;
+            if (columnPan && embeddedPans.includes(columnPan)) {
+                const outliers = vendor.gsts.filter(
+                    g => g.gstNo && isGstinShape(g.gstNo) && g.gstNo.slice(2, 12) !== columnPan
+                );
+                if (outliers.length > 0) {
+                    vendor.gsts = vendor.gsts.filter(g => !outliers.includes(g));
+                    anomalies.push({
+                        vendorName: vendor.name,
+                        message: `Dropped GSTIN(s) whose embedded PAN does not match column PAN "${columnPan}": ${outliers
+                            .map(g => `"${g.gstNo}" (${g.gstState})`)
+                            .join(", ")}`,
+                    });
+                }
+            } else {
                 anomalies.push({
                     vendorName: vendor.name,
-                    message: `PAN column "${vendor.pan}" does not match GSTIN PAN "${embeddedPan}" - review manually`,
+                    message: `GSTINs contain multiple PANs (${embeddedPans.join(", ")}) - PAN left as "${vendor.pan ?? "null"}"; review manually`,
                 });
-            } else {
-                corrections.push({
+            }
+        } else if (embeddedPans.length === 1) {
+            const embeddedPan = embeddedPans[0];
+            if (!vendor.pan) {
+                // Never invent a PAN from a possibly misfiled GSTIN. Leave it blank
+                // and let the anomaly report drive manual review.
+                anomalies.push({
                     vendorName: vendor.name,
-                    message: `PAN corrected from "${vendor.pan}" to "${embeddedPan}" (GSTIN-embedded PAN)`,
+                    message: `PAN column is blank; GSTIN PAN "${embeddedPan}" was not filled - review manually`,
                 });
-                vendor.pan = embeddedPan;
+            } else if (vendor.pan !== embeddedPan) {
+                if (PAN_REVIEW_ONLY.has(normalizeKey(vendor.name))) {
+                    anomalies.push({
+                        vendorName: vendor.name,
+                        message: `PAN column "${vendor.pan}" does not match GSTIN PAN "${embeddedPan}" - review manually`,
+                    });
+                } else {
+                    corrections.push({
+                        vendorName: vendor.name,
+                        message: `PAN corrected from "${vendor.pan}" to "${embeddedPan}" (GSTIN-embedded PAN)`,
+                    });
+                    vendor.pan = embeddedPan;
+                }
             }
         }
 
