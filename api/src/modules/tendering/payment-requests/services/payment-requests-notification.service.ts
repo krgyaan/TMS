@@ -292,16 +292,21 @@ export class PaymentRequestsNotificationService {
         return instrument?.courierAddress?.trim() || 'Not specified';
     };
 
-    /**
-     * Reference for the BG cover letter and envelope slip:
-     * tender no. -> project's WO number -> none.
-     */
     private resolveBgReference = async (
-        paymentReq: { tenderNo?: string | null; projectId?: number | null },
-    ): Promise<{ label: string; value: string } | null> => {
+        paymentReq: { tenderNo?: string | null; projectId?: number | null; tenderId?: number | null },
+    ): Promise<{ label: string; value: string; date: string | Date | null } | null> => {
         const tenderNo = paymentReq.tenderNo?.trim();
         if (tenderNo && tenderNo.toUpperCase() !== 'NA') {
-            return { label: 'Tender No.', value: tenderNo };
+            let tenderDate: string | Date | null = null;
+            if (paymentReq.tenderId) {
+                const [tender] = await this.db
+                    .select({ dueDate: tenderInfos.dueDate })
+                    .from(tenderInfos)
+                    .where(eq(tenderInfos.id, paymentReq.tenderId))
+                    .limit(1);
+                tenderDate = tender?.dueDate ?? null;
+            }
+            return { label: 'Tender No.', value: tenderNo, date: tenderDate };
         }
 
         if (paymentReq.projectId) {
@@ -314,14 +319,14 @@ export class PaymentRequestsNotificationService {
 
                 if (project?.woBasicDetailId) {
                     const [woBasic] = await this.db
-                        .select({ woNumber: woBasicDetails.woNumber })
+                        .select({ woNumber: woBasicDetails.woNumber, woDate: woBasicDetails.woDate })
                         .from(woBasicDetails)
                         .where(eq(woBasicDetails.id, project.woBasicDetailId))
                         .limit(1);
 
                     const woNumber = woBasic?.woNumber?.trim();
                     if (woNumber && woNumber.toUpperCase() !== 'NA') {
-                        return { label: 'Work Order No.', value: woNumber };
+                        return { label: 'Work Order No.', value: woNumber, date: woBasic?.woDate ?? null };
                     }
                 }
             } catch (error) {
@@ -509,6 +514,25 @@ export class PaymentRequestsNotificationService {
         });
 
         return staged;
+    };
+
+    private normalizeMailIds = (value: unknown): string[] => {
+        const list = Array.isArray(value)
+            ? value
+            : typeof value === 'string' && value.trim().length > 0
+                ? (() => {
+                    try {
+                        const parsed = JSON.parse(value);
+                        return Array.isArray(parsed) ? parsed : [parsed];
+                    } catch {
+                        return [value];
+                    }
+                })()
+                : [];
+        return list
+            .filter((email): email is string => typeof email === 'string')
+            .map((email) => email.trim())
+            .filter((email) => email.length > 0);
     };
 
     async sendDdMailAfterChequeAction(
@@ -2688,26 +2712,7 @@ export class PaymentRequestsNotificationService {
                 return;
             }
 
-            const normalizeMailIds = (value: unknown): string[] => {
-                const list = Array.isArray(value)
-                    ? value
-                    : typeof value === 'string' && value.trim().length > 0
-                        ? (() => {
-                            try {
-                                const parsed = JSON.parse(value);
-                                return Array.isArray(parsed) ? parsed : [parsed];
-                            } catch {
-                                return [value];
-                            }
-                        })()
-                        : [];
-                return list
-                    .filter((email): email is string => typeof email === 'string')
-                    .map((email) => email.trim())
-                    .filter((email) => email.length > 0);
-            };
-
-            const bankMailIds = normalizeMailIds(bgDetails.bankMailIds);
+            const bankMailIds = this.normalizeMailIds(bgDetails.bankMailIds);
 
             if (bankMailIds.length === 0) {
                 this.logger.warn(
@@ -2726,7 +2731,7 @@ export class PaymentRequestsNotificationService {
                 { type: 'emails', emails: ['accounts@volksenergie.in'] },
             ];
 
-            const bankMailIdsCc = normalizeMailIds(bgDetails.bankMailIdsCc);
+            const bankMailIdsCc = this.normalizeMailIds(bgDetails.bankMailIdsCc);
 
             if (bankMailIdsCc.length > 0) {
                 ccSources.push({ type: 'emails', emails: bankMailIdsCc });
@@ -3231,16 +3236,23 @@ export class PaymentRequestsNotificationService {
                 return;
             }
 
-            const clientEmail = bgDetails.bgClientUser;
+            const clientEmails = [
+                ...this.normalizeMailIds(bgDetails.bgClientUser),
+                ...this.normalizeMailIds(bgDetails.bgClientCp),
+                ...this.normalizeMailIds(bgDetails.bgClientFin),
+            ].filter(
+                (email, index, list) =>
+                    list.findIndex((item) => item.toLowerCase() === email.toLowerCase()) === index,
+            );
 
-            if (!clientEmail) {
+            if (clientEmails.length === 0) {
                 this.logger.warn(
-                    `BG submitted email skipped: no client/department mail id (bgClientUser) saved for instrument ${instrumentId}`,
+                    `BG submitted email skipped: no client/department mail ids saved for instrument ${instrumentId}`,
                 );
                 return;
             }
 
-            const toEmails: RecipientSource[] = [{ type: 'emails', emails: [clientEmail] }];
+            const toEmails: RecipientSource[] = [{ type: 'emails', emails: clientEmails }];
 
             const tenderTeamId = await this.getTenderTeamId(request.tenderId || 0, request.requestedBy);
 
@@ -3261,9 +3273,56 @@ export class PaymentRequestsNotificationService {
                 ccSources.push({ type: 'emails', emails: [teUser.email] });
             }
 
-            const attachmentFiles: string[] = [];
-            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.bgSoftCopy));
-            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.sfmsConf));
+            const reference = await this.resolveBgReference(request);
+            const referenceDate = this.formatDateDDMMYYYY(reference?.date ?? null);
+
+            let courierProvider = '';
+            let courierDocketNo = instrument.docketNo?.trim() || '';
+            let courierDocketSlip = instrument.docketSlip?.trim() || '';
+
+            const courierId = instrument.reqNo ? Number(instrument.reqNo) : NaN;
+            if (!isNaN(courierId)) {
+                const [courier] = await this.db
+                    .select({
+                        courierProvider: couriers.courierProvider,
+                        docketNo: couriers.docketNo,
+                        docketSlip: couriers.docketSlip,
+                    })
+                    .from(couriers)
+                    .where(eq(couriers.id, courierId))
+                    .limit(1);
+
+                if (courier) {
+                    courierProvider = courier.courierProvider?.trim() || '';
+                    courierDocketNo = courier.docketNo?.trim() || courierDocketNo;
+                    courierDocketSlip = courier.docketSlip?.trim() || courierDocketSlip;
+                }
+            }
+
+            const attachmentItems: Array<{ path: string; name: string }> = [
+                ...this.toAttachmentPaths(bgDetails.bgSignedCoveringLetter).map((path) => ({
+                    path,
+                    name: 'Covering Letter',
+                })),
+                ...this.toAttachmentPaths(bgDetails.bgUpload).map((path) => ({
+                    path,
+                    name: 'Soft Copy of the BG',
+                })),
+                ...this.toAttachmentPaths(courierDocketSlip).map((path) => ({
+                    path,
+                    name: 'Courier Docket Slip',
+                })),
+                ...this.toAttachmentPaths(bgDetails.sfmsConf).map((path) => ({
+                    path,
+                    name: 'SFMS Confirmation',
+                })),
+            ];
+
+            const stagedAttachments = this.stageBgMailAttachments(instrumentId, attachmentItems);
+            const attachmentNames = stagedAttachments.map((attachment) => attachment.name);
+            const attachedGroups = new Set(
+                attachmentNames.map((name) => name.replace(/ \(\d+\)$/, '')),
+            );
 
             const [imranUser] = await this.db
                 .select({ id: users.id })
@@ -3274,36 +3333,46 @@ export class PaymentRequestsNotificationService {
             const fromUserId = imranUser ? imranUser.id : 33;
 
             const purpose = formatBgPurpose(bgDetails.bgPurpose || request.purpose, 'Financial security');
-
-            const tenderDate = ''; // no confirmed schema field for WO/Tender Date
+            const referenceValue = reference?.value || '';
+            const amount = Number(instrument.amount) || 0;
+            const stampPaperValue = Number(bgDetails.stampCharges) || 0;
 
             const mailResult = await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
                 tenderId: request.tenderId || undefined,
                 eventType: 'BG_SUBMITTED',
                 template: 'bg-fdr',
-                subject: `Bank Guarantee submitted - ${request.tenderNo || 'N/A'} against ${purpose}`,
+                subject: `Bank Guarantee submitted${referenceValue ? ` - ${referenceValue}` : ''} as ${purpose}`,
                 fromUserId,
                 to: toEmails,
                 cc: ccSources,
                 data: {
-                    tenderNo: request.tenderNo || 'N/A',
-                    tenderDate,
+                    referenceValue,
+                    referenceDate,
                     bgNo: bgDetails.bgNo || '',
                     bgExpiryDate: this.formatDateDDMMYYYY(bgDetails.bgExpiryDate),
                     bgClaimDate: this.formatDateDDMMYYYY(bgDetails.bgClaim),
                     beneficiaryName: instrument.favouring || bgDetails.beneficiaryName || '',
-                    amount: (Number(instrument.amount) || 0).toLocaleString('en-IN'),
-                    stampPaperValue: (Number(bgDetails.stampCharges) || 0).toLocaleString('en-IN'),
+                    amount: amount ? amount.toLocaleString('en-IN') : '',
+                    stampPaperValue: stampPaperValue ? stampPaperValue.toLocaleString('en-IN') : '',
+                    courierProvider,
+                    courierDocketNo,
+                    hasCoveringLetter: attachedGroups.has('Covering Letter'),
+                    hasSoftCopy: attachedGroups.has('Soft Copy of the BG'),
+                    hasDocketSlip: attachedGroups.has('Courier Docket Slip'),
+                    hasSfmsConf: attachedGroups.has('SFMS Confirmation'),
+                    attachmentNames,
                 },
-                attachments: { files: attachmentFiles },
+                attachments: {
+                    files: stagedAttachments.map((attachment) => attachment.path),
+                },
             });
 
             if (mailResult.success) {
-                this.logger.log(`BG submitted email sent for instrument ${instrumentId} to ${clientEmail} (logId: ${mailResult.emailLogId})`);
+                this.logger.log(`BG submitted email sent for instrument ${instrumentId} to ${clientEmails.join(', ')} (logId: ${mailResult.emailLogId})`);
             } else {
                 this.logger.warn(
-                    `BG submitted email failed for instrument ${instrumentId} to ${clientEmail}: ${mailResult.error}`,
+                    `BG submitted email failed for instrument ${instrumentId} to ${clientEmails.join(', ')}: ${mailResult.error}`,
                 );
             }
         } catch (error) {

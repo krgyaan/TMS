@@ -1,30 +1,42 @@
 <div style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.6; color: #222; max-width: 640px;">
-    <p>Dear Sir,</p>
+    <p>Dear sir,</p>
 
-    <p>The following Bank Guarantee has been issued in favour of your organisation.</p>
+    <p>The following Bank guarantee has been issued for your organization.</p>
 
     <p>
-        <strong>WO No./Tender No.:</strong> {{data.tenderNo}}<br>
-        <strong>WO/Tender Date:</strong> {{data.tenderDate}}<br>
-        <strong>BG No.:</strong> {{data.bgNo}}<br>
-        <strong>BG Expiry Date:</strong> {{data.bgExpiryDate}}<br>
-        <strong>BG Claim Date:</strong> {{data.bgClaimDate}}<br>
-        <strong>BG in favor of:</strong> {{data.beneficiaryName}}<br>
-        <strong>Amount:</strong> Rs. {{data.amount}}<br>
-        <strong>BG Stamp Paper Value:</strong> Rs. {{data.stampPaperValue}}
+        {{#if data.referenceValue}}WO No./Tender No.: {{data.referenceValue}}<br>{{/if}}
+        {{#if data.referenceDate}}WO/Tender Date: {{data.referenceDate}}<br>{{/if}}
+        {{#if data.bgNo}}BG No.: {{data.bgNo}}<br>{{/if}}
+        {{#if data.bgExpiryDate}}BG Expiry Date: {{data.bgExpiryDate}}<br>{{/if}}
+        {{#if data.bgClaimDate}}BG Claim Date: {{data.bgClaimDate}}<br>{{/if}}
+        {{#if data.beneficiaryName}}BG in favor of: {{data.beneficiaryName}}<br>{{/if}}
+        {{#if data.amount}}Amount: Rs. {{data.amount}}<br>{{/if}}
+        {{#if data.stampPaperValue}}BG Stamp paper value: Rs. {{data.stampPaperValue}}{{/if}}
     </p>
 
     <p>
-        The soft copy of the BG and the SFMS confirmation are attached with this mail.
+        {{#if data.hasCoveringLetter}}Covering Letter: attached<br>{{/if}}
+        {{#if data.hasSoftCopy}}Soft copy of the BG: attached<br>{{/if}}
+        {{#if data.courierProvider}}Courier Provider: {{data.courierProvider}}<br>{{/if}}
+        {{#if data.courierDocketNo}}Courier Docket no.: {{data.courierDocketNo}}<br>{{/if}}
+        {{#if data.hasDocketSlip}}Courier Docket Slip: attached<br>{{/if}}
+        {{#if data.hasSfmsConf}}SFMS Confirmation: attached{{/if}}
     </p>
 
-    <p>
-        Please track the BG and confirm receipt of the BG and the SFMS confirmation by replying to this mail.
-    </p>
+    <p>Please track the BG and confirm receipt of the BG and the SFMS confirmation via a reply to this email.</p>
 
     <p>
         Regards,<br>
-        {{data.senderName}}<br>
-        Tendering, Volks Energie Pvt. Ltd.
+        Imran Khan,<br>
+        +91-88825-91733<br>
+        Accounts team,<br>
+        Volks Energie Pvt. Ltd.
     </p>
+
+    {{#if data.attachmentNames.length}}
+    <p>
+        Attachment:<br>
+        {{#each data.attachmentNames}}{{this}}{{#unless @last}}<br>{{/unless}}{{/each}}
+    </p>
+    {{/if}}
 </div>
