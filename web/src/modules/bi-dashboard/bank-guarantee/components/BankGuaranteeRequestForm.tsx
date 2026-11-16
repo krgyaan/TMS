@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Briefcase, Check, ChevronDown, Loader2, Mail, Phone, Save, Truck, User } from 'lucide-react';
-import { useCreatePaymentRequest } from '@/hooks/api/usePaymentRequests';
+import { useCreatePaymentRequest, useUpdatePaymentRequest } from '@/hooks/api/usePaymentRequests';
 import { useProjectList, useProjectOverview } from '@/hooks/api/useProjectDashboard';
 import { useCreateWoContact, useWoContactsByBasicDetail } from '@/hooks/api/useWoContacts';
 import { useAddTenderClient, useTenderContacts } from '@/hooks/api/useInfoSheets';
@@ -209,12 +209,37 @@ function TenderProjectSelector({
     );
 }
 
-export function BankGuaranteeRequestForm() {
+export function BankGuaranteeRequestForm({
+    mode = 'create',
+    requestId,
+    initialData,
+}: {
+    mode?: 'create' | 'edit';
+    requestId?: number;
+    initialData?: Record<string, any> | null;
+}) {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const createRequest = useCreatePaymentRequest();
+    const updateRequest = useUpdatePaymentRequest();
+    const isEditMode = mode === 'edit';
 
-    const [selection, setSelection] = useState<BgContext | null>(null);
+    const [selection, setSelection] = useState<BgContext | null>(() => {
+        if (!initialData) return null;
+        if (initialData.projectId) {
+            return { kind: 'project', id: Number(initialData.projectId) };
+        }
+        if (Number(initialData.tenderId) > 0) {
+            return {
+                kind: 'tender',
+                id: Number(initialData.tenderId),
+                tenderName: initialData.tenderName ?? '',
+                tenderNo: initialData.tenderNo ?? '',
+                dueDate: initialData.tenderDueDate ? String(initialData.tenderDueDate) : '',
+            };
+        }
+        return null;
+    });
     const selectedProjectId = selection?.kind === 'project' ? selection.id : 0;
 
     const { data: overview } = useProjectOverview(selectedProjectId);
@@ -243,10 +268,26 @@ export function BankGuaranteeRequestForm() {
     const form = useForm<FormValues>({
         resolver: zodResolver(ProjectBgRequestSchema) as Resolver<FormValues>,
         defaultValues: {
-            tenderName: '',
-            tenderNo: '',
-            EMD: { mode: 'BG', details: { bgBank: BG_BANK } },
-        },
+            tenderName: initialData?.tenderName ?? '',
+            tenderNo: initialData?.tenderNo ?? '',
+            tenderDueDate: toDateOnly(initialData?.tenderDueDate),
+            EMD: {
+                mode: 'BG',
+                details: initialData
+                    ? {
+                        ...initialData,
+                        bgBank: initialData.bgBank || BG_BANK,
+                        bgExpiryDate: toDateOnly(initialData.bgExpiryDate),
+                        bgClaimPeriod: toDateOnly(initialData.bgClaimPeriod),
+                        bgCourierDelDate: toDateOnly(initialData.bgCourierDelDate),
+                        bgCourierEmpFrom:
+                            initialData.bgCourierEmpFrom != null ? String(initialData.bgCourierEmpFrom) : undefined,
+                        bgCourierUrgency:
+                            initialData.bgCourierUrgency != null ? String(initialData.bgCourierUrgency) : undefined,
+                    }
+                    : { bgBank: BG_BANK },
+            },
+        } as FormValues,
     });
 
     const emailFieldNames = {
@@ -278,9 +319,11 @@ export function BankGuaranteeRequestForm() {
             }))
             .sort((a, b) => a.name.localeCompare(b.name));
 
-        options.push({ id: ADD_CONTACT_OPTION, name: '+ Add contact person' });
+        if (!isEditMode) {
+            options.push({ id: ADD_CONTACT_OPTION, name: '+ Add contact person' });
+        }
         return options;
-    }, [woContacts, tenderContacts, otherContactList]);
+    }, [woContacts, tenderContacts, otherContactList, isEditMode]);
 
     const emailPlaceholder = emailOptions.length > 1 ? 'Select Email' : '+ Add contact person';
 
@@ -474,6 +517,7 @@ export function BankGuaranteeRequestForm() {
 
     // Prefill the name/number/due-date fields from the selected tender or project.
     useEffect(() => {
+        if (isEditMode) return;
         if (!selection) return;
         if (selection.kind === 'tender') {
             form.setValue('tenderName', selection.tenderName);
@@ -511,6 +555,22 @@ export function BankGuaranteeRequestForm() {
         };
 
         try {
+            if (isEditMode && requestId) {
+                await updateRequest.mutateAsync({
+                    id: requestId,
+                    data: {
+                        EMD: {
+                            mode: 'BG',
+                            details: values.EMD?.details || {},
+                        },
+                    },
+                });
+                queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.all });
+                toast.success('Bank Guarantee request updated successfully');
+                navigate(-1);
+                return;
+            }
+
             await createRequest.mutateAsync({
                 tenderId: selectedTender ? selectedTender.id : 0,
                 data: payload,
@@ -523,13 +583,17 @@ export function BankGuaranteeRequestForm() {
         }
     };
 
+    const isPending = isEditMode ? updateRequest.isPending : createRequest.isPending;
+
     return (
         <Card>
             <CardHeader>
-                <CardTitle className="text-2xl">Request Bank Guarantee</CardTitle>
+                <CardTitle className="text-2xl">{isEditMode ? 'Edit Bank Guarantee' : 'Request Bank Guarantee'}</CardTitle>
                 <CardDescription>
                     <p className="text-muted-foreground">
-                        Raise a Bank Guarantee request against a tender or a project. It follows the same approval flow as an EMD Bank Guarantee.
+                        {isEditMode
+                            ? 'Update the details of this Bank Guarantee request.'
+                            : 'Raise a Bank Guarantee request against a tender or a project. It follows the same approval flow as an EMD Bank Guarantee.'}
                     </p>
                 </CardDescription>
                 <CardAction>
@@ -549,26 +613,34 @@ export function BankGuaranteeRequestForm() {
                         })}
                         className="space-y-8"
                     >
-                        <div className="space-y-2 max-w-sm">
-                            <label className="text-sm font-medium">Tender / Project</label>
-                            <TenderProjectSelector
-                                value={selection ? `${selection.kind}:${selection.id}` : ''}
-                                onSelect={(context) => {
-                                    setSelection(context);
-                                    cancelContactDraft();
-                                }}
-                                onClear={() => {
-                                    setSelection(null);
-                                    form.setValue('tenderName', '');
-                                    form.setValue('tenderNo', '');
-                                    form.setValue('tenderDueDate', '');
-                                    cancelContactDraft();
-                                }}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                Optional — pick a tender or project, or leave blank to raise the request without one.
+                        {!isEditMode && (
+                            <div className="space-y-2 max-w-sm">
+                                <label className="text-sm font-medium">Tender / Project</label>
+                                <TenderProjectSelector
+                                    value={selection ? `${selection.kind}:${selection.id}` : ''}
+                                    onSelect={(context) => {
+                                        setSelection(context);
+                                        cancelContactDraft();
+                                    }}
+                                    onClear={() => {
+                                        setSelection(null);
+                                        form.setValue('tenderName', '');
+                                        form.setValue('tenderNo', '');
+                                        form.setValue('tenderDueDate', '');
+                                        cancelContactDraft();
+                                    }}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    Optional — pick a tender or project, or leave blank to raise the request without one.
+                                </p>
+                            </div>
+                        )}
+
+                        {isEditMode && !selection && (
+                            <p className="text-sm text-muted-foreground">
+                                This request is not linked to a tender or a project.
                             </p>
-                        </div>
+                        )}
 
                         {selection && (
                             <div className={`grid grid-cols-1 md:grid-cols-2 ${selection.kind === 'tender' ? 'lg:grid-cols-3' : ''} gap-4 items-start mb-4`}>
@@ -751,22 +823,22 @@ export function BankGuaranteeRequestForm() {
                                 variant="outline"
                                 size="lg"
                                 onClick={() => navigate(-1)}
-                                disabled={createRequest.isPending}
+                                disabled={isPending}
                             >
                                 Cancel
                             </Button>
                             <Button
                                 type="submit"
                                 size="lg"
-                                disabled={createRequest.isPending}
+                                disabled={isPending}
                                 className="min-w-48"
                             >
-                                {createRequest.isPending ? (
-                                    'Submitting...'
+                                {isPending ? (
+                                    isEditMode ? 'Saving...' : 'Submitting...'
                                 ) : (
                                     <>
                                         <Save className="mr-2 h-5 w-5" />
-                                        Submit Request
+                                        {isEditMode ? 'Update Request' : 'Submit Request'}
                                     </>
                                 )}
                             </Button>

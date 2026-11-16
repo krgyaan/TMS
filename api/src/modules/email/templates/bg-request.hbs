@@ -1,77 +1,64 @@
-<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-    <h2 style="color: #333; text-align: center; margin-bottom: 20px;">
-        New Bank Guarantee
-    </h2>
+<div style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.6; color: #222; max-width: 640px;">
+    <p>Dear {{data.recipientName}},</p>
 
-    <p style="font-size: 14px; line-height: 1.6; color: #555;">
-        Dear {{data.recipientName}} (Accounts team),
+    <p>
+        Please find the pre-filled forms for the Bank Guarantee below. The purpose of this BG is
+        {{data.bgPurpose}}.
     </p>
 
-    <p style="font-size: 14px; line-height: 1.6; color: #555;">
-        Please use the pre-filled forms attached below to prepare the following Bank Guarantee.
+    <p>
+        <strong>BG in favour of:</strong> {{data.beneficiaryName}}<br>
+        <strong>BG address:</strong> {{data.beneficiaryAddress}}<br>
+        <strong>BG Expiry Date:</strong> {{data.bgExpiryDate}}<br>
+        <strong>BG Claim Date:</strong> {{data.claimDate}}<br>
+        <strong>Amount:</strong> Rs. {{data.amount}}<br>
+        <strong>BG Stamp paper value:</strong> Rs. {{data.stampPaperValue}}
     </p>
 
-    <p style="font-size: 14px; line-height: 1.6; color: #555; margin: 20px 0;">
-        The purpose of the Bank Guarantee is {{data.bgPurpose}}.
+    <p><strong>Beneficiary account details</strong></p>
+    <p>
+        <strong>Beneficiary Name:</strong> {{data.beneName}}<br>
+        <strong>Account No.:</strong> {{data.beneAcc}}<br>
+        <strong>IFSC code:</strong> {{data.beneIfsc}}<br>
+        <strong>Unique Code:</strong> {{data.uniqueCode}}
     </p>
 
-    <p style="font-size: 14px; line-height: 1.6; color: #555;">
-        Please prepare the BG using the details below:
+    <p>This BG is required within {{data.timeLimit}} hours.</p>
+
+    <p>
+        Please go through the BG format once. If it is fine, send the request to the bank here:
+        <a href="{{data.stage1Link}}">Stage 1: Request to Bank</a>. If any correction is needed, reject the request and
+        mention what needs to be changed.
     </p>
 
-    <div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 4px;">
-        <p style="margin: 8px 0; font-size: 14px;"><strong>BG in favour of:</strong> {{data.beneficiaryName}}</p>
-        <p style="margin: 8px 0; font-size: 14px;"><strong>BG address:</strong> {{data.beneficiaryAddress}}</p>
-        <p style="margin: 8px 0; font-size: 14px;"><strong>BG Expiry Date:</strong> {{data.bgExpiryDate}}</p>
-        <p style="margin: 8px 0; font-size: 14px;"><strong>BG Claim Date:</strong> {{data.claimDate}}</p>
-        <p style="margin: 8px 0; font-size: 14px;"><strong>Amount:</strong> Rs. {{data.amount}}</p>
-        <p style="margin: 8px 0; font-size: 14px;"><strong>BG Stamp paper value:</strong> Rs. {{data.stampPaperValue}}</p>
-        {{#if data.hasBgFormat}}
-        <p style="margin: 8px 0; font-size: 14px;"><strong>BG Format (Tender executive):</strong> attached.</p>
-        {{/if}}
-        {{#if data.supportingDocLabel}}
-        <p style="margin: 8px 0; font-size: 14px;"><strong>{{data.supportingDocLabel}}:</strong> attached.</p>
-        {{/if}}
-    </div>
-
-    <div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 4px;">
-        <p style="margin: 8px 0; font-size: 14px;"><strong>Beneficiary Account details:</strong></p>
-        <p style="margin: 8px 0; font-size: 14px;">Beneficiary Name: {{data.beneName}}</p>
-        <p style="margin: 8px 0; font-size: 14px;">Account No.: {{data.beneAcc}}</p>
-        <p style="margin: 8px 0; font-size: 14px;">IFSC code: {{data.beneIfsc}}</p>
-        <p style="margin: 8px 0; font-size: 14px;">Unique Code: {{data.uniqueCode}}</p>
-    </div>
-
-    <p style="font-size: 14px; line-height: 1.6; color: #555; margin: 20px 0;">
-        This BG is required within {{data.timeLimit}} Hrs.
+    <p>
+        Once the BG is ready, please courier it to the address below. Keep enough margin for courier transit so that it
+        reaches before <strong>{{data.dueDateTime}}</strong>, and share the soft copy of the BG, the docket slip and the
+        SFMS confirmation with us here: <a href="{{data.actionLink}}">{{data.actionLinkText}}</a>, or from your
+        dashboard.
     </p>
 
-    <div style="margin: 20px 0; padding: 15px; background: #e8f4fd; border-radius: 4px; border-left: 4px solid #2c3e50;">
-        <p style="margin: 8px 0; font-size: 14px;">
-            Please review the BG format, if accepted, send a request to the bank using the
-            <a href="{{data.stage1Link}}" style="color: #0066cc; text-decoration: underline;">Stage 1: Request to Bank</a>.
-            If Corrections are required, reject the request and mention the corrections needed.
-        </p>
-        <p style="margin: 8px 0; font-size: 14px;">
-            Please courier the BG to the address below keeping sufficient margin for the courier delivery time to ensure the BG reaches before the
-            <strong>{{data.dueDateTime}}</strong> and share the SOFT COPY of the BG and the Docket slip along with SFMS confirmation with us on time using the form
-            <a href="{{data.actionLink}}" style="color: #0066cc; text-decoration: underline;">{{data.actionLinkText}}</a>
-            or your dashboard:
-        </p>
-        <p style="margin: 8px 0; font-size: 14px;"><strong>Courier Address:</strong> {{data.courierAddress}}</p>
-    </div>
-
-    <p style="font-size: 12px; color: #666; margin: 20px 0;">
-        Please attach the cover letter with the bank guarantee when you courier the BG. (Attached below)
+    <p>
+        <strong>Courier Address:</strong><br>
+        {{data.courierAddress}}
     </p>
 
-    <p style="font-size: 12px; color: #666; font-style: italic; margin: 20px 0;">
-        "Ensuring timely operations is the only source of growth."
+    <p>Please attach the covering letter with the BG when you courier it.</p>
+
+    <p style="font-style: italic;">"Ensuring timely operations is the only source of growth."</p>
+
+    <p>
+        Regards,<br>
+        {{data.senderName}},<br>
+        Approved By Team Leader
     </p>
 
-    <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #888;">
-        <p>Regards,</p>
-        <p>Tender executive,</p>
-        <p>Approved by Team Leader</p>
-    </div>
+    {{#if data.attachmentLinks.length}}
+    <p><strong>Documents</strong></p>
+    <ul>
+        {{#each data.attachmentLinks}}
+        <li><a href="{{this.url}}">{{this.label}}</a></li>
+        {{/each}}
+    </ul>
+    {{/if}}
 </div>

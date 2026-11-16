@@ -179,21 +179,21 @@
             </table>
             
 
-            <p class="spaced-block"><strong>Tender No.:</strong> {{ referenceNo }}</p>
-
-            
+            {{#if referenceNo}}
+            <p class="spaced-block"><strong>{{ referenceLabel }}:</strong> {{ referenceNo }}</p>
+            {{/if}}
 
             <p class="spaced-block">
-                <strong>Subject:</strong> Submission and SFMS Confirmation of Bank Guarantee for
-                Tender No. {{ referenceNo }}
+                <strong>Subject:</strong> Submission and SFMS Confirmation of Bank Guarantee{{#if referenceNo}} for
+                {{ referenceLabel }} {{ referenceNo }}{{/if}}
             </p>
             <br>
 
             <p><strong>Dear Sir,</strong></p>
 
             <p>
-                We are pleased to confirm the submission of the Bank Guarantee against
-                Tender No./Work Order No. {{ referenceNo }}, for the purpose of {{ purpose }}.
+                We are pleased to confirm the submission of the Bank Guarantee{{#if referenceNo}} against
+                {{ referenceLabel }} <strong>{{ referenceNo }}</strong>{{/if}}, for the purpose of {{ purpose }}.
             </p>
 
             <table class="bg-details">
@@ -215,7 +215,7 @@
                 </tr>
                 <tr>
                     <td class="label">Bank Guarantee Amount</td>
-                    <td><strong> {{ amount }}</strong></td>
+                    <td><strong>Rs. {{ amount }}</strong></td>
                 </tr>
             </table>
 
