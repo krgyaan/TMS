@@ -362,3 +362,150 @@ describe("OperationNotificationService payment request notifications", () => {
         expect(text).toContain("Category: Some New Category");
     });
 });
+
+describe("OperationNotificationService PO approval notifications", () => {
+    let service: OperationNotificationService;
+    let sendText: jest.Mock;
+    let buildUrl: jest.Mock;
+    let toJid: jest.Mock;
+    let dryRun: boolean;
+
+    beforeEach(async () => {
+        sendText = jest.fn().mockResolvedValue({ messageId: "msg-po-123" });
+        buildUrl = jest.fn().mockResolvedValue("https://tms.example.com/n/po42");
+        toJid = jest.fn().mockResolvedValue("919999900001@c.us");
+        dryRun = false;
+
+        const module: TestingModule = await Test.createTestingModule({
+            providers: [
+                OperationNotificationService,
+                { provide: OpenwaService, useValue: { sendText } },
+                { provide: DRIZZLE, useValue: {} },
+                { provide: WhatsappJidResolver, useValue: { toJid } },
+                { provide: PublicLinkService, useValue: { buildUrl } },
+                {
+                    provide: openwaConfig.KEY,
+                    useFactory: () => ({
+                        get OPENWA_DRY_RUN() {
+                            return dryRun;
+                        },
+                    }),
+                },
+            ],
+        }).compile();
+
+        service = module.get(OperationNotificationService);
+    });
+
+    it("dispatches Stage 1 (TL) 1:1 DM and Team Group broadcast with preview URL", async () => {
+        const res = await service.sendPoApprovalStageMessages({
+            purchaseOrderId: 42,
+            poNumber: "PO0042",
+            stageOrder: 1,
+            stageRole: "tl",
+            approverName: "Rajesh TL",
+            approverJid: "919876543210@c.us",
+            tenderNo: "TND-2026-01",
+            tenderName: "Solar Inverter Supply",
+            organizationName: "DMRC",
+            projectName: "Metro Line 3",
+            sellerName: "SolarMax Pvt Ltd",
+            itemsSummary: "Inverter 50kW (2 Nos)",
+            grandTotal: 250000,
+            createdByName: "Yuvraj Sharma",
+            teamId: 1,
+        });
+
+        expect(res).toEqual({
+            dmMessageId: "msg-po-123",
+            dmChatId: "919876543210@c.us",
+        });
+        expect(buildUrl).toHaveBeenCalledWith({
+            type: "po",
+            id: 42,
+            event: "PO Approval",
+        });
+        expect(sendText).toHaveBeenCalledTimes(2);
+
+        const [dmTarget, dmBody] = sendText.mock.calls[0];
+        expect(dmTarget).toBe("919876543210@c.us");
+        expect(dmBody).toContain("*PO Approval Required — Stage 1: Team Leader Approval*");
+        expect(dmBody).toContain("PO No: PO0042");
+        expect(dmBody).toContain("Tender: TND-2026-01 - Solar Inverter Supply");
+        expect(dmBody).toContain("Organization: DMRC");
+        expect(dmBody).toContain("Preview in TMS: https://tms.example.com/n/po42");
+        expect(dmBody).toContain("Reply *APPROVE* (or *1*) to approve");
+
+        const [groupTarget, groupBody] = sendText.mock.calls[1];
+        expect(groupTarget).toBe(GROUPS.ACTENDERSEARCH);
+        expect(groupBody).toContain("Assigned to: Rajesh TL (Team Leader)");
+    });
+
+    it("dispatches Stage 2 (Accounts) 1:1 DM with 1-11 TDS menu and ACCOUNTS_TEAM broadcast", async () => {
+        await service.sendPoApprovalStageMessages({
+            purchaseOrderId: 42,
+            poNumber: "PO0042",
+            stageOrder: 2,
+            stageRole: "accounts",
+            approverName: "Neha Accounts",
+            approverJid: "919811112222@c.us",
+            tenderNo: "TND-2026-01",
+            tenderName: "Solar Inverter Supply",
+            organizationName: "DMRC",
+            projectName: "Metro Line 3",
+            sellerName: "SolarMax Pvt Ltd",
+            itemsSummary: "Inverter 50kW (2 Nos)",
+            grandTotal: 250000,
+            createdByName: "Yuvraj Sharma",
+            teamId: 1,
+        });
+
+        expect(sendText).toHaveBeenCalledTimes(2);
+        const [dmTarget, dmBody] = sendText.mock.calls[0];
+        expect(dmTarget).toBe("919811112222@c.us");
+        expect(dmBody).toContain("*PO Approval Required — Stage 2: Accounts Approval*");
+        expect(dmBody).toContain("1. No TDS (0%)");
+        expect(dmBody).toContain("11. 194Q @0.1% - Purchase of Goods");
+        expect(dmBody).toContain("Reply *APPROVE <1-11>*");
+
+        const [groupTarget, groupBody] = sendText.mock.calls[1];
+        expect(groupTarget).toBe(GROUPS.ACCOUNTS_TEAM);
+        expect(groupBody).toContain("Assigned to: Neha Accounts (Accounts Manager)");
+    });
+
+    it("broadcasts final approval confirmation to PAYMENTS, ACCOUNTS_TEAM, Team Group, approver, and creator", async () => {
+        await service.sendPoApprovalStageResult({
+            purchaseOrderId: 42,
+            poNumber: "PO0042",
+            stageOrder: 2,
+            stageRole: "accounts",
+            decision: "approved",
+            actorName: "Neha Accounts",
+            sellerName: "SolarMax Pvt Ltd",
+            grandTotal: 250000,
+            tdsSection: "194C",
+            tdsPercentage: "2",
+            amountAfterTds: "245762.71",
+            teamId: 1,
+            creatorUserId: 99,
+            replyToChatId: "919811112222@c.us",
+            isFinalApproval: true,
+        });
+
+        const calledTargets = sendText.mock.calls.map(([target]) => target);
+        expect(calledTargets).toEqual(
+            expect.arrayContaining([
+                GROUPS.PAYMENTS,
+                GROUPS.ACCOUNTS_TEAM,
+                GROUPS.ACTENDERSEARCH,
+                "919811112222@c.us",
+                "919999900001@c.us",
+            ]),
+        );
+        const [, msg] = sendText.mock.calls[0];
+        expect(msg).toContain("*PO Approved (Accounts)*");
+        expect(msg).toContain("TDS: 194C @2%");
+        expect(msg).toContain("Status: Final PO Approval Complete");
+    });
+});
+
