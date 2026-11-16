@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Inject, Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Inject, Injectable, InternalServerErrorException, NotFoundException, Optional } from "@nestjs/common";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, like, ne, or, sql, type SQL } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, rename } from "node:fs/promises";
@@ -27,6 +27,7 @@ import { Logger } from "winston";
 import { OperationNotificationService } from "@/modules/operations/operation-notification.service";
 import { round2, CLOSURE_TOLERANCE } from "@/utils/money.util";
 import { getGstStateNameFromGstin } from "@/utils/gst-state.util";
+import { PoApprovalService } from "./po-approval.service";
 
 @Injectable()
 export class PurchaseOrderService {
@@ -40,7 +41,8 @@ export class PurchaseOrderService {
         private readonly clientDirectorySyncService: ClientDirectorySyncService,
         private readonly insuranceService: InsurancePolicyService,
         private readonly notifications: OperationNotificationService,
-        private readonly cashFlowService: CashFlowService
+        private readonly cashFlowService: CashFlowService,
+        @Optional() private readonly poApprovalService?: PoApprovalService
     ) {}
 
     async getPurchaseOrders(projectId: number) {
@@ -400,6 +402,26 @@ export class PurchaseOrderService {
                 createdBy: userId,
             })
             .catch(err => this.logger.warn(`WhatsApp notification failed: ${err}`));
+
+        const itemsSummary = (body.products || [])
+            .slice(0, 3)
+            .map((p: any) => p.description)
+            .filter(Boolean)
+            .join(", ");
+
+        this.poApprovalService
+            ?.startWorkflowForPo({
+                purchaseOrderId: po.id,
+                poNumber,
+                tenderId: body.tenderId,
+                projectName: body.projectName,
+                sellerName: normalizeVendorName(body.sellerName),
+                grandTotal: grandTotal.toFixed(2),
+                teamId: woBasic?.team ?? null,
+                createdBy: userId,
+                itemsSummary: itemsSummary || null,
+            })
+            .catch(err => this.logger.warn(`PO Stage 1 WhatsApp approval workflow failed: ${err}`));
 
         this.generatePdfForPO(po, body.products).catch(err => {
             this.logger.error(`Failed to generate PO PDF: ${err.message}`);

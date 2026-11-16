@@ -54,6 +54,8 @@ export const purchaseOrders = pgTable(
         amountAfterTds: numeric("amount_after_tds", { precision: 14, scale: 2 }),
         poApproved: boolean("po_approved"),
         poApprovalRemark: text("po_approval_remark"),
+        tlStatus: boolean("tl_status"),
+        tlRemark: text("tl_remark"),
         closedAt: timestamp("closed_at", { withTimezone: true }),
         closedBy: bigint("closed_by", { mode: "number" }),
         closureNote: text("closure_note"),

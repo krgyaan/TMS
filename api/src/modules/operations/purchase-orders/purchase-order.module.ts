@@ -7,11 +7,12 @@ import { CashFlowModule } from "@/modules/operations/cash-flows/cash-flow.module
 import { Module } from "@nestjs/common";
 import { PurchaseOrderController } from "./purchase-order.controller";
 import { PurchaseOrderService } from "./purchase-order.service";
+import { PoApprovalService } from "./po-approval.service";
 
 @Module({
     imports: [DatabaseModule, ClientDirectoryModule, PdfGeneratorModule, InsurancePolicyModule, OpenwaModule, CashFlowModule],
-    providers: [PurchaseOrderService],
+    providers: [PurchaseOrderService, PoApprovalService],
     controllers: [PurchaseOrderController],
-    exports: [PurchaseOrderService],
+    exports: [PurchaseOrderService, PoApprovalService],
 })
 export class PurchaseOrderModule {}
