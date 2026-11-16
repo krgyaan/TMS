@@ -6,28 +6,22 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 
 import { Public } from '@/modules/auth/decorators/public.decorator';
+import {
+  PoApprovalService,
+  type IncomingWhatsappWebhookData,
+} from '@/modules/operations/purchase-orders/po-approval.service';
 
 interface OpenwaWebhookPayload {
   event: string;
   sessionId: string;
-  data: {
-    messageId: string;
-    chatId: string;
-    sender: string;
-    body?: string;
-    type: string;
-    timestamp: number;
-    fromMe: boolean;
-    hasMedia: boolean;
-    mentions?: string[];
-    [key: string]: unknown;
-  };
+  data: IncomingWhatsappWebhookData;
 }
 
 @Public()
@@ -35,7 +29,10 @@ interface OpenwaWebhookPayload {
 export class WebhookController {
   private readonly logger = new Logger(WebhookController.name);
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    @Optional() private readonly poApprovalService?: PoApprovalService,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.OK)
@@ -104,18 +101,16 @@ export class WebhookController {
   }
 
   private async handleIncomingMessage(data: OpenwaWebhookPayload['data']): Promise<void> {
-    // TODO: Implement your inbound message handling logic here
-    // Examples:
-    // - Parse commands (e.g., "!status TENDER-123")
-    // - Auto-reply for specific keywords
-    // - Forward to internal ticketing system
-    // - Store in database for audit
-
     this.logger.log(`Incoming message from ${data.sender} in ${data.chatId}: ${data.body?.slice(0, 100)}`);
 
-    // Example: echo back for testing
-    // if (data.body?.startsWith('!echo ')) {
-    //   await this.openwa.sendText(data.chatId, `Echo: ${data.body.slice(6)}`);
-    // }
+    if (this.poApprovalService) {
+      try {
+        await this.poApprovalService.handleIncomingWhatsappMessage(data);
+      } catch (err) {
+        this.logger.error(
+          `Failed to process incoming WhatsApp PO approval message ${data.messageId}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
   }
 }
