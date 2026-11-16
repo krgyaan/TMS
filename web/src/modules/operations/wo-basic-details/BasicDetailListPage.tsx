@@ -278,7 +278,6 @@ const BasicDetailListPage = () => {
                         </Tooltip>
                     );
                 },
-                hide: activeTab === 'basic_details', // Hide this column in the "Basic Details" tab
             },
             {
                 headerName: '',

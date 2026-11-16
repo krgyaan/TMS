@@ -1,9 +1,9 @@
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
-import type { WoDetailWithRelations } from '@/modules/operations/types/wo.types';
+import type { WoDetailsHistoryEntry, WoDetailWithRelations } from '@/modules/operations/types/wo.types';
 import {
     AlertCircle,
     Building2,
@@ -15,13 +15,126 @@ import {
     MapPin,
     Package,
     Pen,
+    SkipForward,
     TrendingUp,
     Truck,
     XCircle
 } from 'lucide-react';
 
 
-export function WoDetailView({ data }: { data: WoDetailWithRelations }) {
+interface PageState {
+    status: 'completed' | 'skipped' | 'draft' | 'pending';
+    actorName?: string | null;
+    at?: string | null;
+}
+
+function getPageState(
+    data: WoDetailWithRelations,
+    history: WoDetailsHistoryEntry[],
+    pageNum: number
+): PageState {
+    const completedPages = data.completedPages ?? [];
+    const skippedPages = data.skippedPages ?? [];
+    const isCompleted = completedPages.includes(pageNum);
+    const isSkipped = skippedPages.includes(pageNum);
+
+    const pageEvents = history.filter((entry) => entry.pageNo === pageNum);
+    const expectedAction = isCompleted
+        ? 'page_submitted'
+        : isSkipped
+            ? 'page_skipped'
+            : null;
+    const latestEvent =
+        (expectedAction
+            ? pageEvents.find((entry) => entry.action === expectedAction)
+            : undefined) ?? pageEvents[0];
+
+    if (isCompleted) {
+        return {
+            status: 'completed',
+            actorName: latestEvent?.actorName,
+            at: latestEvent?.createdAt,
+        };
+    }
+    if (isSkipped) {
+        return {
+            status: 'skipped',
+            actorName: latestEvent?.actorName,
+            at: latestEvent?.createdAt,
+        };
+    }
+    if (latestEvent) {
+        return {
+            status: 'draft',
+            actorName: latestEvent.actorName,
+            at: latestEvent.createdAt,
+        };
+    }
+    return { status: 'pending' };
+}
+
+function PageStatusBadge({
+    data,
+    history,
+    pageNum,
+}: {
+    data: WoDetailWithRelations;
+    history: WoDetailsHistoryEntry[];
+    pageNum: number;
+}) {
+    const state = getPageState(data, history, pageNum);
+    const actor = state.actorName ? ` by ${state.actorName}` : '';
+
+    if (state.status === 'completed') {
+        return (
+            <Badge
+                variant="outline"
+                className="gap-1 border-emerald-300 bg-emerald-50 text-emerald-700"
+                title={state.at ? formatDateTime(state.at) : undefined}
+            >
+                <CheckCircle2 className="h-3 w-3" />
+                Completed{actor}
+            </Badge>
+        );
+    }
+
+    if (state.status === 'skipped') {
+        return (
+            <Badge
+                variant="outline"
+                className="gap-1 border-amber-300 bg-amber-50 text-amber-700"
+                title={state.at ? formatDateTime(state.at) : undefined}
+            >
+                <SkipForward className="h-3 w-3" />
+                Skipped{actor}
+            </Badge>
+        );
+    }
+
+    if (state.status === 'draft') {
+        return (
+            <Badge
+                variant="outline"
+                className="gap-1 border-blue-300 bg-blue-50 text-blue-700"
+                title={state.at ? formatDateTime(state.at) : undefined}
+            >
+                <Pen className="h-3 w-3" />
+                Draft{actor}
+            </Badge>
+        );
+    }
+
+    return <Badge variant="secondary">Pending</Badge>;
+}
+
+
+export function WoDetailView({
+    data,
+    history = [],
+}: {
+    data: WoDetailWithRelations;
+    history?: WoDetailsHistoryEntry[];
+}) {
     if (!data) return null;
 
     const { woBasicDetail, billingBoq = [], buybackBoq = [], billingAddresses = [], shippingAddresses = [], acceptance } = data;
@@ -67,6 +180,9 @@ export function WoDetailView({ data }: { data: WoDetailWithRelations }) {
                         <FileText className="h-5 w-5 text-orange-500" />
                         Project Handover Checklist (Page 1)
                     </CardTitle>
+                    <CardAction>
+                        <PageStatusBadge data={data} history={history} pageNum={1} />
+                    </CardAction>
                     {data.checklistCompletedAt && (
                         <CardDescription>Completed on {formatDateTime(data.checklistCompletedAt)}</CardDescription>
                     )}
@@ -137,6 +253,9 @@ export function WoDetailView({ data }: { data: WoDetailWithRelations }) {
                         <FileText className="h-5 w-5 text-blue-500" />
                         Compliance Obligations (Page 2)
                     </CardTitle>
+                    <CardAction>
+                        <PageStatusBadge data={data} history={history} pageNum={2} />
+                    </CardAction>
                 </CardHeader>
                 <CardContent className="pt-4">
                     <Table>
@@ -191,6 +310,9 @@ export function WoDetailView({ data }: { data: WoDetailWithRelations }) {
                         <TrendingUp className="h-5 w-5 text-purple-500" />
                         SWOT Analysis (Page 3)
                     </CardTitle>
+                    <CardAction>
+                        <PageStatusBadge data={data} history={history} pageNum={3} />
+                    </CardAction>
                 </CardHeader>
                 <CardContent className="pt-4">
                     <Table>
@@ -247,6 +369,9 @@ export function WoDetailView({ data }: { data: WoDetailWithRelations }) {
                         <Package className="h-5 w-5 text-orange-500" />
                         Billing BOQ (Page 4)
                     </CardTitle>
+                    <CardAction>
+                        <PageStatusBadge data={data} history={history} pageNum={4} />
+                    </CardAction>
                 </CardHeader>
                 <CardContent className="pt-4">
                     <Table>
@@ -401,6 +526,9 @@ export function WoDetailView({ data }: { data: WoDetailWithRelations }) {
                         <Truck className="h-5 w-5 text-orange-500" />
                         Project Execution & Site Visit (Page 5)
                     </CardTitle>
+                    <CardAction>
+                        <PageStatusBadge data={data} history={history} pageNum={5} />
+                    </CardAction>
                 </CardHeader>
                 <CardContent className="pt-4">
                     <Table>
@@ -458,6 +586,9 @@ export function WoDetailView({ data }: { data: WoDetailWithRelations }) {
                         <Link2 className="h-5 w-5 text-orange-500" />
                         Tendering Costing (Page 6)
                     </CardTitle>
+                    <CardAction>
+                        <PageStatusBadge data={data} history={history} pageNum={6} />
+                    </CardAction>
                 </CardHeader>
                 <CardContent className="pt-4">
                     <Table>
@@ -514,6 +645,9 @@ export function WoDetailView({ data }: { data: WoDetailWithRelations }) {
                         <FileEdit className="h-5 w-5 text-primary" />
                         OE Step: Submission Info (Page 7)
                     </CardTitle>
+                    <CardAction>
+                        <PageStatusBadge data={data} history={history} pageNum={7} />
+                    </CardAction>
                 </CardHeader>
                 <CardContent className="pt-4 space-y-4">
                     <Table>

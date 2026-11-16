@@ -1,6 +1,6 @@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useWoDetailWithRelations } from "@/hooks/api/useWoDetails";
+import { useWoDetailWithRelations, useWoDetailsHistory } from "@/hooks/api/useWoDetails";
 import { AlertCircle } from "lucide-react";
 import { WoDetailView } from "./WoDetailView";
 
@@ -10,6 +10,7 @@ interface WoDetailsSectionProps {
 
 export function WoDetailsSection({ woDetailId }: WoDetailsSectionProps) {
     const { data, isLoading, error } = useWoDetailWithRelations(woDetailId);
+    const { data: history = [] } = useWoDetailsHistory(woDetailId);
 
     if (error) {
         return (
@@ -34,5 +35,5 @@ export function WoDetailsSection({ woDetailId }: WoDetailsSectionProps) {
         return <p className="text-sm text-muted-foreground italic">No WO details found.</p>;
     }
 
-    return <WoDetailView data={data} />;
+    return <WoDetailView data={data} history={history} />;
 }

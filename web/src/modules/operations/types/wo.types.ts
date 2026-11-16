@@ -147,6 +147,33 @@ export interface WoBasicDetailWithRelations extends WoBasicDetail {
   woDetail: WoDetail | null;
 }
 
+export type WoDetailsHistoryAction =
+  | 'created'
+  | 'draft_saved'
+  | 'page_saved'
+  | 'page_submitted'
+  | 'page_skipped'
+  | 'all_pages_submitted'
+  | 'submitted_for_review'
+  | 'completion_reverted';
+
+export interface WoDetailsHistoryEntry {
+  id: number;
+  woDetailId: number;
+  pageNo: number | null;
+  action: WoDetailsHistoryAction | string;
+  statusAfter: string | null;
+  remarks: string | null;
+  metadata: {
+    currentPage?: number | null;
+    completedPages?: number[];
+    skippedPages?: number[];
+  } | null;
+  actorId: number | null;
+  actorName: string | null;
+  createdAt: string;
+}
+
 export interface CreateWoBasicDetailDto {
   tenderId?: number;
   enquiryId?: number;

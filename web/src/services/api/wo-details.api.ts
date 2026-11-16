@@ -1,6 +1,6 @@
 import type {
   AcceptanceStatus, CreateWoDetailDto, PaginatedResult, RequestAmendmentDto, SlaComplianceReport, UpdateWoDetailDto,
-  WoAcceptanceDecisionDto, WoDetail, WoDetailsDashboardSummary, WoDetailsFilters, WoDetailWithRelations, WoTimeline
+  WoAcceptanceDecisionDto, WoDetail, WoDetailsDashboardSummary, WoDetailsFilters, WoDetailsHistoryEntry, WoDetailWithRelations, WoTimeline
 } from '@/modules/operations/types/wo.types';
 import type {
   Contact, Page1FormValues, Page2FormValues, Page3FormValues, Page4FormValues, Page5FormValues,
@@ -149,6 +149,10 @@ class WoDetailsService extends BaseApiService {
   // STEP STATUSES FOR SHOW PAGE
   async getStepStatuses(woDetailId: number): Promise<Record<string, boolean>> {
     return this.get<Record<string, boolean>>(`/${woDetailId}/step-statuses`);
+  }
+
+  async getHistory(woDetailId: number): Promise<WoDetailsHistoryEntry[]> {
+    return this.get<WoDetailsHistoryEntry[]>(`/${woDetailId}/history`);
   }
 
   // IMPORT & INTEGRATION METHODS
