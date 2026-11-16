@@ -132,6 +132,8 @@ export interface PurchaseOrderRow {
     amountAfterTds?: number | string;
     poApproved?: boolean;
     poApprovalRemark?: string;
+    tlStatus?: boolean | null;
+    tlRemark?: string | null;
     totalPaymentRequested?: number;
     totalMakerDone?: number;
     totalPaymentDone?: number;

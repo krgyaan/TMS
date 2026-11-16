@@ -23,6 +23,15 @@ export interface PublicPaymentRequestDto {
     updatedAt: Date;
 }
 
+export interface PublicOrderItemDto {
+    description: string | null;
+    qty: string | number | null;
+    unit: string | null;
+    rate: string | null;
+    gstRate: string | null;
+    totalAmount: string | null;
+}
+
 export interface PublicOrderDto {
     id: number;
     referenceNo: string | null;
@@ -35,6 +44,12 @@ export interface PublicOrderDto {
     amountAfterTds: string | null;
     approvalStatus: ApprovalStatus;
     approvalRemark: string | null;
+    tlStatus?: boolean | null;
+    tlRemark?: string | null;
+    tenderNo?: string | null;
+    tenderName?: string | null;
+    organizationName?: string | null;
+    items?: PublicOrderItemDto[];
     raisedByName: string | null;
     orderDate: string | null;
     createdAt: Date;
@@ -122,6 +137,11 @@ const resolvePurchaseOrder: EntityResolver = async (db, id) => {
             amountAfterTds: purchaseOrders.amountAfterTds,
             approvalFlag: purchaseOrders.poApproved,
             approvalRemark: purchaseOrders.poApprovalRemark,
+            tlStatus: purchaseOrders.tlStatus,
+            tlRemark: purchaseOrders.tlRemark,
+            tenderNo: tenderInfos.tenderNo,
+            tenderName: tenderInfos.tenderName,
+            organizationName: sql<string | null>`coalesce(nullif(${organizations.name}, ''), ${organizations.acronym})`,
             raisedByName: users.name,
             orderDate: purchaseOrders.poDate,
             createdAt: purchaseOrders.createdAt,
@@ -129,13 +149,25 @@ const resolvePurchaseOrder: EntityResolver = async (db, id) => {
         })
         .from(purchaseOrders)
         .leftJoin(users, eq(users.id, purchaseOrders.poRaisedBy))
+        .leftJoin(tenderInfos, eq(tenderInfos.id, purchaseOrders.tenderId))
+        .leftJoin(organizations, eq(organizations.id, tenderInfos.organization))
         .where(eq(purchaseOrders.id, id))
         .limit(1);
 
     if (!row) return null;
 
-    const [{ total } = { total: null }] = await db
-        .select({ total: sql<string | null>`coalesce(sum(${purchaseOrderProducts.totalAmount}), '0')` })
+    const [{ total, items } = { total: null, items: [] }] = await db
+        .select({
+            total: sql<string | null>`coalesce(sum(${purchaseOrderProducts.totalAmount}), '0')`,
+            items: sql<PublicOrderItemDto[]>`coalesce(json_agg(json_build_object(
+                'description', ${purchaseOrderProducts.description},
+                'qty', ${purchaseOrderProducts.qty},
+                'unit', ${purchaseOrderProducts.unit},
+                'rate', ${purchaseOrderProducts.rate},
+                'gstRate', ${purchaseOrderProducts.gstRate},
+                'totalAmount', ${purchaseOrderProducts.totalAmount}
+            ) ORDER BY ${purchaseOrderProducts.id}), '[]'::json)`,
+        })
         .from(purchaseOrderProducts)
         .where(eq(purchaseOrderProducts.purchaseOrderId, id));
 
@@ -143,6 +175,7 @@ const resolvePurchaseOrder: EntityResolver = async (db, id) => {
     return {
         ...rest,
         grandTotal: total ?? null,
+        items: Array.isArray(items) ? items : [],
         approvalStatus: toApprovalStatus(approvalFlag),
     };
 };

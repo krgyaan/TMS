@@ -166,6 +166,14 @@ class PurchaseOrderApiService extends BaseApiService {
     async close(id: number, closureNote: string): Promise<void> {
         return this.post(`/${id}/close`, { closureNote });
     }
+
+    async getApprovalWorkflow(id: number): Promise<any> {
+        return this.get(`/${id}/approval-workflow`);
+    }
+
+    async resendApprovalPrompt(id: number): Promise<any> {
+        return this.post(`/${id}/approval-workflow/resend`, {});
+    }
 }
 
 export const purchaseOrderApi = new PurchaseOrderApiService();

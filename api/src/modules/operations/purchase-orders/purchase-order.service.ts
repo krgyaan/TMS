@@ -83,6 +83,8 @@ export class PurchaseOrderService {
                 totalPiCount: sql<number>`COALESCE((SELECT COUNT(*) FROM project_purchase_invoices WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                 poApproved: purchaseOrders.poApproved,
                 poApprovalRemark: purchaseOrders.poApprovalRemark,
+                tlStatus: purchaseOrders.tlStatus,
+                tlRemark: purchaseOrders.tlRemark,
                 closedAt: purchaseOrders.closedAt,
             })
             .from(purchaseOrders)
@@ -197,6 +199,8 @@ export class PurchaseOrderService {
                 amountAfterTds: purchaseOrders.amountAfterTds,
                 poApproved: purchaseOrders.poApproved,
                 poApprovalRemark: purchaseOrders.poApprovalRemark,
+                tlStatus: purchaseOrders.tlStatus,
+                tlRemark: purchaseOrders.tlRemark,
                 closedAt: purchaseOrders.closedAt,
                 totalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0) + COALESCE((SELECT SUM(taxable_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                 totalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0) + COALESCE((SELECT SUM(gst_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
@@ -741,6 +745,10 @@ export class PurchaseOrderService {
                     .catch(err => this.logger.warn(`Cash flow creation failed for PO approval #${po.id}: ${err}`));
             }
 
+            await this.poApprovalService
+                ?.cancelWorkflowOnInAppDecision(id, userId, "approved")
+                .catch(err => this.logger.warn(`Failed to cancel PO WA workflow on in-app approve #${id}: ${err}`));
+
             return updated;
         } else {
             const [updated] = await this.db
@@ -777,6 +785,10 @@ export class PurchaseOrderService {
                     rejectedBy: userId ?? 0,
                 })
                 .catch(err => this.logger.warn(`WhatsApp PO rejection notification failed: ${err}`));
+
+            await this.poApprovalService
+                ?.cancelWorkflowOnInAppDecision(id, userId, "rejected")
+                .catch(err => this.logger.warn(`Failed to cancel PO WA workflow on in-app reject #${id}: ${err}`));
 
             this.logger.info(`TDS rejected for PO #${id}: ${remark || "no remark"}`);
             return updated;
@@ -905,6 +917,8 @@ export class PurchaseOrderService {
             .where(eq(purchaseInvoices.purchaseOrderId, id))
             .orderBy(desc(purchaseInvoices.createdAt));
 
+        const approvalWorkflow = (await this.poApprovalService?.getWorkflowForPo(id)) ?? null;
+
         return {
             ...po,
             products: enrichedProducts,
@@ -915,7 +929,20 @@ export class PurchaseOrderService {
             raisedByName,
             paymentRequests: paymentRequestsData,
             purchaseInvoices: purchaseInvoicesData,
+            approvalWorkflow,
         };
+    }
+
+    async getApprovalWorkflow(id: number) {
+        if (!this.poApprovalService) return null;
+        return this.poApprovalService.getWorkflowForPo(id);
+    }
+
+    async resendApprovalPrompt(id: number, userId?: number) {
+        if (!this.poApprovalService) {
+            throw new BadRequestException("PO WhatsApp approval service is not available");
+        }
+        return this.poApprovalService.resendActiveStagePrompt(id, userId);
     }
 
     async getPurchaseOrderPdf(id: number, version?: string): Promise<{ path: string; filename: string }> {
@@ -1133,6 +1160,7 @@ export class PurchaseOrderService {
         // }
 
         const wasRejected = existingPO.poApproved === false;
+        const isUnapproved = existingPO.poApproved !== true;
         const [woBasic] = await this.db.select({ team: woBasicDetails.team }).from(woBasicDetails).where(eq(woBasicDetails.tenderId, existingPO.tenderId)).limit(1);
         this.logger.info(`Updating Purchase Order: ${body.poNumber} for project: ${body.projectName}, tenderId: ${body.tenderId}, team: ${woBasic?.team}`);
 
@@ -1184,6 +1212,10 @@ export class PurchaseOrderService {
 
                     team: woBasic?.team ?? existingPO.team,
 
+                    ...(isUnapproved && {
+                        tlStatus: null,
+                        tlRemark: null,
+                    }),
                     ...(wasRejected && {
                         poApproved: null,
                         tdsPercentage: null,
@@ -1239,6 +1271,37 @@ export class PurchaseOrderService {
                 updatedBy: userId ?? 0,
             })
             .catch(err => this.logger.warn(`WhatsApp notification failed: ${err}`));
+
+        if (isUnapproved) {
+            const grandTotal = (body.products || []).reduce((sum: number, p: any) => {
+                const qty = Number(p.qty);
+                const rate = Number(p.rate);
+                const gstRate = Number(p.gstRate);
+                const taxable = qty * rate;
+                const gst = (taxable * gstRate) / 100;
+                return sum + taxable + gst;
+            }, 0);
+
+            const itemsSummary = (body.products || [])
+                .slice(0, 3)
+                .map((p: any) => p.description)
+                .filter(Boolean)
+                .join(", ");
+
+            this.poApprovalService
+                ?.startWorkflowForPo({
+                    purchaseOrderId: id,
+                    poNumber: updatedPO.poNumber ?? `#${id}`,
+                    tenderId: updatedPO.tenderId,
+                    projectName: updatedPO.projectName,
+                    sellerName: normalizeVendorName(body.sellerName),
+                    grandTotal: grandTotal.toFixed(2),
+                    teamId: updatedPO.team ?? null,
+                    createdBy: userId ?? updatedPO.poRaisedBy ?? 0,
+                    itemsSummary: itemsSummary || null,
+                })
+                .catch(err => this.logger.warn(`PO WhatsApp approval workflow restart failed after update #${id}: ${err}`));
+        }
 
         return updatedPO;
     }

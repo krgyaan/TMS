@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import type { ConfigType } from "@nestjs/config";
 import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { DRIZZLE } from "@/db/database.module";
@@ -1685,5 +1685,170 @@ export class PoApprovalService {
         } catch (err) {
             this.logger.warn(`Failed to send WhatsApp reply to ${chatId}: ${err}`);
         }
+    }
+
+    /**
+     * Cancel any in_progress WhatsApp workflow when a PO is approved/rejected directly in the TMS web app.
+     */
+    async cancelWorkflowOnInAppDecision(
+        purchaseOrderId: number,
+        actorUserId?: number,
+        decision: "approved" | "rejected" = "approved"
+    ): Promise<void> {
+        const activeWorkflows = await this.db
+            .select({ id: poApprovalWorkflows.id })
+            .from(poApprovalWorkflows)
+            .where(and(eq(poApprovalWorkflows.purchaseOrderId, purchaseOrderId), eq(poApprovalWorkflows.status, "in_progress")));
+
+        if (activeWorkflows.length === 0) return;
+
+        const now = new Date();
+        const wfIds = activeWorkflows.map(w => w.id);
+
+        await this.db
+            .update(poApprovalWorkflows)
+            .set({
+                status: "completed_in_app",
+                currentStage: null,
+                finalizedAt: now,
+                updatedAt: now,
+            })
+            .where(inArray(poApprovalWorkflows.id, wfIds));
+
+        await this.db
+            .update(poApprovalSteps)
+            .set({ status: "superseded", updatedAt: now })
+            .where(and(inArray(poApprovalSteps.workflowId, wfIds), inArray(poApprovalSteps.status, ["active", "pending", "blocked"])));
+
+        await this.db.insert(poApprovalAuditLogs).values(
+            wfIds.map(workflowId => ({
+                purchaseOrderId,
+                workflowId,
+                eventType: "in_app_override" as const,
+                actorUserId: actorUserId ?? null,
+                metadata: { decision },
+            }))
+        );
+    }
+
+    /**
+     * Return the latest workflow, its steps, and recent audit logs for a Purchase Order.
+     */
+    async getWorkflowForPo(purchaseOrderId: number) {
+        const [workflow] = await this.db
+            .select()
+            .from(poApprovalWorkflows)
+            .where(eq(poApprovalWorkflows.purchaseOrderId, purchaseOrderId))
+            .orderBy(desc(poApprovalWorkflows.version))
+            .limit(1);
+
+        if (!workflow) {
+            return null;
+        }
+
+        const [steps, auditLogs] = await Promise.all([
+            this.db
+                .select()
+                .from(poApprovalSteps)
+                .where(eq(poApprovalSteps.workflowId, workflow.id))
+                .orderBy(asc(poApprovalSteps.stageOrder)),
+            this.db
+                .select()
+                .from(poApprovalAuditLogs)
+                .where(eq(poApprovalAuditLogs.workflowId, workflow.id))
+                .orderBy(desc(poApprovalAuditLogs.createdAt))
+                .limit(30),
+        ]);
+
+        return {
+            ...workflow,
+            steps,
+            auditLogs,
+        };
+    }
+
+    /**
+     * Resend the active (or blocked) stage WhatsApp approval prompt for a pending PO.
+     * Re-resolves the approver in case mobile number or TL/Accounts assignment was updated.
+     */
+    async resendActiveStagePrompt(purchaseOrderId: number, actorUserId?: number) {
+        const context = await this.loadPoNotificationContext(purchaseOrderId);
+        if (!context) {
+            throw new NotFoundException("Purchase Order not found");
+        }
+
+        const [workflow] = await this.db
+            .select()
+            .from(poApprovalWorkflows)
+            .where(eq(poApprovalWorkflows.purchaseOrderId, purchaseOrderId))
+            .orderBy(desc(poApprovalWorkflows.version))
+            .limit(1);
+
+        // If no workflow exists yet or the previous workflow is not in_progress, start a fresh workflow
+        if (!workflow || workflow.status !== "in_progress") {
+            return this.startWorkflowForPo({
+                purchaseOrderId,
+                poNumber: context.poNumber,
+                tenderId: context.tenderId,
+                projectName: context.projectName,
+                sellerName: context.sellerName,
+                grandTotal: context.grandTotal,
+                teamId: context.teamId,
+                createdBy: context.createdBy || actorUserId || 0,
+                itemsSummary: context.itemsSummary,
+            });
+        }
+
+        const targetStage = workflow.currentStage ?? 1;
+        const [step] = await this.db
+            .select()
+            .from(poApprovalSteps)
+            .where(and(eq(poApprovalSteps.workflowId, workflow.id), eq(poApprovalSteps.stageOrder, targetStage)))
+            .limit(1);
+
+        if (!step) {
+            throw new BadRequestException(`Stage ${targetStage} step not found for PO #${purchaseOrderId}`);
+        }
+
+        const resolved =
+            step.stageRole === "tl"
+                ? await this.resolveStage1Tl(context.createdBy, context.teamId)
+                : await this.resolveStage2Accounts();
+
+        if (!resolved || !resolved.jid) {
+            throw new BadRequestException(
+                !resolved
+                    ? `No ${step.stageRole === "tl" ? "Team Leader" : "Accounts Manager"} found for this Purchase Order.`
+                    : `${resolved.name} does not have a mobile number configured in TMS.`
+            );
+        }
+
+        const [updatedStep] = await this.db
+            .update(poApprovalSteps)
+            .set({
+                approverUserId: resolved.userId,
+                approverNameSnapshot: resolved.name,
+                approverMobileSnapshot: resolved.mobile,
+                approverJid: resolved.jid,
+                status: "active",
+                skipReason: null,
+                updatedAt: new Date(),
+            })
+            .where(eq(poApprovalSteps.id, step.id))
+            .returning();
+
+        await this.dispatchStageNotification(workflow.id, updatedStep, context);
+
+        await this.db.insert(poApprovalAuditLogs).values({
+            purchaseOrderId,
+            workflowId: workflow.id,
+            stepId: updatedStep.id,
+            eventType: "link_resent",
+            actorUserId: actorUserId ?? null,
+            senderJid: resolved.jid,
+            metadata: { stageOrder: updatedStep.stageOrder, stageRole: updatedStep.stageRole },
+        });
+
+        return this.getWorkflowForPo(purchaseOrderId);
     }
 }

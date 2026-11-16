@@ -156,6 +156,12 @@ function NotificationCard({ data }: { data: PublicNotificationResponse }) {
             <Card className="p-5 space-y-3">
                 <DetailRow label={referenceLabel} value={entity.referenceNo} />
                 {isTender && <DetailRow label="Tender Name" value={tender.tenderName} />}
+                {!isPr && !isTender && (order.tenderNo || order.tenderName) && (
+                    <DetailRow label="Tender" value={[order.tenderNo, order.tenderName].filter(Boolean).join(" - ")} />
+                )}
+                {!isPr && !isTender && order.organizationName && (
+                    <DetailRow label="Organization" value={order.organizationName} />
+                )}
                 <DetailRow
                     label={isTender ? "Tender Value" : "Amount"}
                     value={formatAmount(isTender ? tender.grandTotal : isPr ? pr.amount : order.grandTotal)}
@@ -171,6 +177,13 @@ function NotificationCard({ data }: { data: PublicNotificationResponse }) {
                 {!isPr && !isTender && order.orderDate && (
                     <DetailRow label={type === "po" ? "PO Date" : "WO Date"} value={order.orderDate} />
                 )}
+                {!isPr && !isTender && type === "po" && order.tlStatus !== undefined && (
+                    <DetailRow
+                        label="TL Approval"
+                        value={order.tlStatus === true ? "Approved" : order.tlStatus === false ? "Rejected" : "Pending"}
+                    />
+                )}
+                {!isPr && !isTender && order.tlRemark && <DetailRow label="TL Remark" value={order.tlRemark} />}
                 {isTender && <DetailRow label="Due Date" value={formatDate(tender.dueDate)} />}
                 {isPr && pr.utrNumber && <DetailRow label="UTR" value={pr.utrNumber} />}
                 {isPr && pr.rejectionReason && <DetailRow label="Rejection Reason" value={pr.rejectionReason} />}
@@ -178,6 +191,30 @@ function NotificationCard({ data }: { data: PublicNotificationResponse }) {
                 {!isPr && !isTender && order.approvalRemark && <DetailRow label="Approval Remark" value={order.approvalRemark} />}
                 {!isPr && !isTender && type === "vwo" && <DetailRow label="Scope of Work" value={vwo.scopeOfWork} />}
             </Card>
+
+            {/* ── Line Items (for PO) ────────────────────────────────── */}
+            {!isPr && !isTender && Array.isArray(order.items) && order.items.length > 0 && (
+                <Card className="p-5 space-y-3">
+                    <h2 className="text-sm font-semibold text-foreground">Line Items ({order.items.length})</h2>
+                    <div className="divide-y divide-border">
+                        {order.items.map((item, idx) => (
+                            <div key={idx} className="py-2.5 first:pt-0 last:pb-0 space-y-1 text-xs sm:text-sm">
+                                <div className="flex items-start justify-between gap-3">
+                                    <span className="font-medium text-foreground">{item.description || `Item #${idx + 1}`}</span>
+                                    <span className="font-semibold shrink-0">{formatAmount(item.totalAmount)}</span>
+                                </div>
+                                <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5">
+                                    <span>
+                                        Qty: {item.qty ?? "—"} {item.unit || ""}
+                                    </span>
+                                    <span>Rate: {formatAmount(item.rate)}</span>
+                                    <span>GST: {item.gstRate ?? "0"}%</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </Card>
+            )}
 
             {/* ── Timestamps ─────────────────────────────────────────── */}
             <Card className="p-5 space-y-3">

@@ -175,6 +175,17 @@ export class PurchaseOrderController {
         return this.service.deactivateParty(id, source);
     }
 
+    @Get(":id/approval-workflow")
+    getApprovalWorkflow(@Param("id", ParseIntPipe) id: number) {
+        return this.service.getApprovalWorkflow(id);
+    }
+
+    @Post(":id/approval-workflow/resend")
+    @HttpCode(HttpStatus.OK)
+    resendApprovalPrompt(@Param("id", ParseIntPipe) id: number, @CurrentUser() user: ValidatedUser) {
+        return this.service.resendApprovalPrompt(id, user?.id);
+    }
+
     @Get(":id")
     getPurchaseOrder(@Param("id", ParseIntPipe) id: number) {
         return this.service.getPurchaseOrder(id);

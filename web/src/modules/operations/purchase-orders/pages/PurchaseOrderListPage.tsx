@@ -15,9 +15,11 @@ import { getShortId } from "@/lib/id-utils";
 import type { PurchaseOrderRow } from "@/modules/operations/purchase-orders/helpers/purchaseOrder.types";
 import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
-import { CheckCircle, Eye, FileUp, History, Lock, Search } from "lucide-react";
+import { CheckCircle, Eye, FileUp, History, Lock, Search, Send } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import { purchaseOrderApi } from "@/services/api/purchase-order.api";
 import { SetTdsDialog } from "../components/SetTdsDialog";
 
 interface PurchaseOrderListPageProps {
@@ -76,6 +78,19 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
                 label: "PDF Versions",
                 icon: <History className="h-4 w-4" />,
                 onClick: (row) => navigate(paths.operations.poPdfVersions(row.id, row.projectId)),
+            },
+            {
+                label: "Resend WA Approval",
+                icon: <Send className="h-4 w-4" />,
+                visible: (row) => row.poApproved == null,
+                onClick: async (row) => {
+                    try {
+                        await purchaseOrderApi.resendApprovalPrompt(row.id);
+                        toast.success(`WhatsApp approval prompt resent for ${row.poNumber}`);
+                    } catch (err: any) {
+                        toast.error(err?.response?.data?.message || "Failed to resend WhatsApp approval prompt");
+                    }
+                },
             },
         ];
 
@@ -302,11 +317,13 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
             headerName: "Status",
             sortable: true,
             filter: true,
-            width: 110,
+            width: 140,
             cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => {
                 const d = p.data;
                 const isApproved = d?.poApproved === true;
                 const isRejected = d?.poApproved === false;
+                const tlApproved = d?.tlStatus === true;
+                const tlRejected = d?.tlStatus === false;
                 const tdsPct = d?.tdsPercentage ? Number(d.tdsPercentage) : null;
 
                 let label: string;
@@ -316,10 +333,13 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
                     label = "Approved";
                     variant = "default";
                 } else if (isRejected) {
-                    label = "Rejected";
+                    label = tlRejected ? "Rejected (TL)" : "Rejected";
                     variant = "destructive";
+                } else if (tlApproved) {
+                    label = "Pending Accounts";
+                    variant = "secondary";
                 } else {
-                    label = "Pending";
+                    label = "Pending TL";
                     variant = "outline";
                 }
 
@@ -333,6 +353,17 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
                             </TooltipTrigger>
                             <TooltipContent side="top" align="start" className="max-w-xs dark:bg-accent">
                                 <div className="space-y-1 text-xs">
+                                    <p>
+                                        <strong>Stage 1 (TL):</strong>{" "}
+                                        {tlApproved ? "Approved" : tlRejected ? "Rejected" : "Pending"}
+                                    </p>
+                                    {d?.tlRemark && (
+                                        <p><strong>TL Remark:</strong> {d.tlRemark}</p>
+                                    )}
+                                    <p>
+                                        <strong>Stage 2 (Accounts):</strong>{" "}
+                                        {isApproved ? "Approved" : isRejected && !tlRejected ? "Rejected" : "Pending"}
+                                    </p>
                                     {tdsPct !== null && isApproved && (
                                         <>
                                             <p><strong>TDS:</strong> {tdsPct}% (-{formatINR(d?.tdsAmount || 0)})</p>
@@ -342,8 +373,10 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
                                     {d?.poApprovalRemark && (
                                         <p><strong>Remark:</strong> {d.poApprovalRemark}</p>
                                     )}
-                                    {!d?.poApprovalRemark && !tdsPct && (
-                                        <p className="text-muted-foreground">Awaiting approval</p>
+                                    {!d?.poApprovalRemark && !tdsPct && !isApproved && !isRejected && (
+                                        <p className="text-muted-foreground">
+                                            {tlApproved ? "Awaiting Accounts approval" : "Awaiting Team Leader approval"}
+                                        </p>
                                     )}
                                 </div>
                             </TooltipContent>
