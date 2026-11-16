@@ -23,12 +23,13 @@ import type { ActionItem } from "@/components/ui/ActionMenu";
 
 import { CourierStatusDialog } from "./components/CourierStatusDialog";
 import { createCourierColumns } from "./components/courierColumns";
-import { COURIER_STATUS, COURIER_TABS } from "./helpers/courier.constants";
+import { COURIER_STATUS, COURIER_TABS, isCourierPrivileged } from "./helpers/courier.constants";
 import type { CourierDashboardRow, CourierTab } from "./helpers/courier.types";
 
 const CourierListPage = () => {
     const navigate = useNavigate();
-    const { canDelete } = useAuth();
+    const { user, role, teamId } = useAuth();
+    const isPrivileged = isCourierPrivileged(role, teamId);
     const deleteMutation = useDeleteCourier();
 
     const {
@@ -79,6 +80,7 @@ const CourierListPage = () => {
             label: "Status",
             icon: <FileEdit className="h-4 w-4" />,
             className: "text-blue-600",
+            visible: () => isPrivileged,
             onClick: row => {
                 setSelectedCourier(row);
                 setStatusDialogOpen(true);
@@ -87,7 +89,7 @@ const CourierListPage = () => {
         {
             label: "Dispatch",
             icon: <Truck className="h-4 w-4" />,
-            visible: row => row.status === COURIER_STATUS.PENDING,
+            visible: row => isPrivileged && row.status === COURIER_STATUS.PENDING,
             onClick: row => navigate(paths.shared.courierDispatch(row.id)),
         },
         {
@@ -98,13 +100,14 @@ const CourierListPage = () => {
         {
             label: "Edit",
             icon: <Pencil className="h-4 w-4" />,
+            visible: row => isPrivileged || row.userId === user?.id,
             onClick: row => navigate(paths.shared.courierEdit(row.id)),
         },
         {
             label: "Delete",
             icon: <Trash className="h-4 w-4" />,
             className: "text-red-600",
-            visible: () => canDelete("shared.couriers"),
+            visible: () => isPrivileged,
             onClick: handleDelete,
         },
     ];

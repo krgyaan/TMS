@@ -7,6 +7,19 @@ export const COURIER_STATUS = {
     REJECTED: 5,
 } as const;
 
+export const COURIER_PRIVILEGED_TEAM_ID = 8;
+
+export const COURIER_PRIVILEGED_ROLES = ["Admin", "Super User"] as const;
+
+export function isCourierPrivileged(
+    role: string | null | undefined,
+    teamId: number | null | undefined
+): boolean {
+    if (teamId === COURIER_PRIVILEGED_TEAM_ID) return true;
+    if (!role) return false;
+    return (COURIER_PRIVILEGED_ROLES as readonly string[]).includes(role);
+}
+
 export const COURIER_STATUS_LABELS: Record<number, string> = {
     [COURIER_STATUS.PENDING]: "Pending",
     [COURIER_STATUS.IN_TRANSIT]: "In Transit",

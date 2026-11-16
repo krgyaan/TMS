@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
 
 import { paths } from "@/app/routes/paths";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
@@ -30,6 +31,7 @@ import {
     mapCourierFormToUpdate,
     mapCourierToForm,
 } from "@/modules/shared/courier/helpers/courier.mappers";
+import { isCourierPrivileged } from "@/modules/shared/courier/helpers/courier.constants";
 import type { Courier } from "@/modules/shared/courier/helpers/courier.types";
 
 interface CourierFormProps {
@@ -40,6 +42,9 @@ interface CourierFormProps {
 
 export function CourierForm({ mode, courierId, existingData }: CourierFormProps) {
     const navigate = useNavigate();
+    const { role, teamId } = useAuth();
+    const isPrivileged = isCourierPrivileged(role, teamId);
+    const canUploadDocs = mode === "create" || isPrivileged;
     const { data: employees = [], isLoading: employeesLoading } = useUsers();
 
     const createMutation = useCreateCourier();
@@ -91,7 +96,7 @@ export function CourierForm({ mode, courierId, existingData }: CourierFormProps)
                 data: mapCourierFormToUpdate(values),
             });
 
-            if (files.length > 0) {
+            if (files.length > 0 && canUploadDocs) {
                 await uploadDocsMutation.mutateAsync({ id: courierId, files });
             }
 
@@ -187,15 +192,17 @@ export function CourierForm({ mode, courierId, existingData }: CourierFormProps)
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <p className="text-sm font-medium">Soft Copy of the documents</p>
-                            <FileUploader
-                                context="courier"
-                                value={files}
-                                onChange={setFiles}
-                                disabled={isSubmitting}
-                            />
-                        </div>
+                        {canUploadDocs && (
+                            <div className="space-y-2">
+                                <p className="text-sm font-medium">Soft Copy of the documents</p>
+                                <FileUploader
+                                    context="courier"
+                                    value={files}
+                                    onChange={setFiles}
+                                    disabled={isSubmitting}
+                                />
+                            </div>
+                        )}
 
                         <div className="flex justify-end gap-3 border-t pt-6">
                             <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>
