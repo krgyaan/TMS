@@ -487,6 +487,10 @@ def identify_annexures(
             "[LLM_ANNEXURES][Role 4] Token usage: %d in / %d out (Est. cost: $%.5f USD)",
             in_tok, out_tok, cost,
         )
+        logger.info(
+            "[LLM_SUMMARY] role=role4 model=%s calls=1 input_tokens=%d output_tokens=%d cache_creation_tokens=%d cache_read_tokens=%d cost_usd=%.6f status=ok",
+            resolved_model, in_tok, out_tok, cache_create, cache_read, cost,
+        )
 
     truncated = getattr(response, "stop_reason", None) == "max_tokens"
     if truncated:

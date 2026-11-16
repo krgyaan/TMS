@@ -355,6 +355,10 @@ def analyze_bidding_requirements(
             "[LLM_BIDDING_REQUIREMENTS][Role 3] Token usage: %d in / %d out (Est. cost: $%.5f USD)",
             in_tok, out_tok, cost,
         )
+        logger.info(
+            "[LLM_SUMMARY] role=role3 model=%s calls=1 input_tokens=%d output_tokens=%d cache_creation_tokens=%d cache_read_tokens=%d cost_usd=%.6f status=ok",
+            usage["model"], in_tok, out_tok, cache_create, cache_read, cost,
+        )
 
     requirements: List[Dict[str, Any]] = []
     raw_annexures: Any = []
