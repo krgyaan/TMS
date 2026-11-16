@@ -778,6 +778,34 @@
       "when": 1798400000003,
       "tag": "0181_reconcile_inventory_item_master_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 135,
+      "version": "7",
+      "when": 1799000000000,
+      "tag": "0179_add_fdr_date_to_instrument_bg_details",
+      "breakpoints": true
+    },
+    {
+      "idx": 136,
+      "version": "7",
+      "when": 1800000000000,
+      "tag": "0180_add_generated_bg_docx_paths_to_instrument_bg_details",
+      "breakpoints": true
+    },
+    {
+      "idx": 137,
+      "version": "7",
+      "when": 1801000000000,
+      "tag": "0181_add_stage2_uploads_to_instrument_bg_details",
+      "breakpoints": true
+    },
+    {
+      "idx": 138,
+      "version": "7",
+      "when": 1802000000000,
+      "tag": "0182_add_authorization_letter_docx_to_instrument_bg_details",
+      "breakpoints": true
     }
   ]
 }
