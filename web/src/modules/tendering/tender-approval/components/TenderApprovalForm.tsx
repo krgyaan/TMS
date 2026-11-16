@@ -683,6 +683,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                         label="Tender Status"
                                         options={tenderStatusOptions}
                                         placeholder="Select tender status"
+                                        valueType="string"
                                     />
                                     {isNotAllowedByOem && (
                                         <MultiSelectField
