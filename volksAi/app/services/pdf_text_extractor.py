@@ -179,6 +179,88 @@ def select_smart_pages(doc: Any, max_pages: int) -> List[int]:
     return selected
 
 
+_PDF_MEMORY_CACHE: Dict[str, Any] = {}
+_CHECKBOX_TRIGGER_CHARS = frozenset({"\uf050", "þ", "✔", "☑", "\uf04f", "¨", "☐"})
+
+
+def compute_pdf_cache_key(
+    pdf_path: str | Path,
+    max_pages: Optional[int] = None,
+    smart_sampling: bool = False,
+    zoom: Optional[float] = None,
+) -> str:
+    """Compute a deterministic cache key from the SHA-256 of the PDF bytes and extraction options."""
+    import hashlib
+    resolved_zoom = zoom if zoom is not None else float(os.getenv("PDF_OCR_ZOOM", "2.08"))
+    h = hashlib.sha256()
+    with open(pdf_path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    meta = f"|max_pages={max_pages}|smart_sampling={bool(smart_sampling)}|zoom={resolved_zoom:.2f}"
+    h.update(meta.encode("utf-8"))
+    return h.hexdigest()
+
+
+def _get_cached_pdf_extraction(cache_key: str) -> Optional[List[Dict[str, Any]]]:
+    import copy
+    import pickle
+    import time
+
+    if os.getenv("VOLKSAI_PDF_CACHE_ENABLED", "true").lower() == "false":
+        return None
+    ttl_sec = float(os.getenv("VOLKSAI_PDF_CACHE_TTL_SEC", "3600"))
+    now = time.time()
+
+    mem_entry = _PDF_MEMORY_CACHE.get(cache_key)
+    if mem_entry is not None:
+        ts, data = mem_entry
+        if now - ts <= ttl_sec:
+            return copy.deepcopy(data)
+        _PDF_MEMORY_CACHE.pop(cache_key, None)
+
+    cache_dir = Path(os.getenv("VOLKSAI_PDF_CACHE_DIR", "/tmp/volksai_pdf_cache"))
+    cache_file = cache_dir / f"{cache_key}.pkl"
+    if cache_file.exists():
+        try:
+            if now - cache_file.stat().st_mtime <= ttl_sec:
+                data = pickle.loads(cache_file.read_bytes())
+                _PDF_MEMORY_CACHE[cache_key] = (now, data)
+                return copy.deepcopy(data)
+            else:
+                cache_file.unlink(missing_ok=True)
+        except Exception:
+            pass
+    return None
+
+
+def _store_cached_pdf_extraction(cache_key: str, results: List[Dict[str, Any]]) -> None:
+    import copy
+    import pickle
+    import time
+
+    if os.getenv("VOLKSAI_PDF_CACHE_ENABLED", "true").lower() == "false":
+        return
+    max_entries = int(os.getenv("VOLKSAI_PDF_CACHE_MAX_ENTRIES", "64"))
+    now = time.time()
+
+    if len(_PDF_MEMORY_CACHE) >= max_entries:
+        oldest_key = min(_PDF_MEMORY_CACHE, key=lambda k: _PDF_MEMORY_CACHE[k][0])
+        _PDF_MEMORY_CACHE.pop(oldest_key, None)
+    _PDF_MEMORY_CACHE[cache_key] = (now, copy.deepcopy(results))
+
+    try:
+        cache_dir = Path(os.getenv("VOLKSAI_PDF_CACHE_DIR", "/tmp/volksai_pdf_cache"))
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        files = sorted(cache_dir.glob("*.pkl"), key=lambda p: p.stat().st_mtime)
+        while len(files) >= max_entries:
+            oldest = files.pop(0)
+            oldest.unlink(missing_ok=True)
+        cache_file = cache_dir / f"{cache_key}.pkl"
+        cache_file.write_bytes(pickle.dumps(results))
+    except Exception:
+        pass
+
+
 def extract_pdf_text_hybrid(
     pdf_path: str,
     pages_dir: Path,
@@ -195,6 +277,16 @@ def extract_pdf_text_hybrid(
 
     pdf_name = Path(pdf_path).name
     with stage_timer(f"pdf_open_and_text_extract:{pdf_name}"):
+        cache_key = None
+        try:
+            cache_key = compute_pdf_cache_key(pdf_path, max_pages=max_pages, smart_sampling=smart_sampling)
+            cached = _get_cached_pdf_extraction(cache_key)
+            if cached is not None:
+                logger.info(f"[PDF_CACHE] Cache hit for '{pdf_name}' (key={cache_key[:12]})")
+                return cached
+        except Exception:
+            cache_key = None
+
         doc = fitz.open(pdf_path)
         ocr_engine = None
         ocr_count = 0
@@ -229,7 +321,10 @@ def extract_pdf_text_hybrid(
             if is_digital:
                 native_words = page.get_text("words")
                 blocks = build_text_blocks_from_words(native_words)
-                cb_states = extract_checkbox_states(page)
+                if any(ch in native_text for ch in _CHECKBOX_TRIGGER_CHARS) or "applicable" in native_text.lower():
+                    cb_states = extract_checkbox_states(page)
+                else:
+                    cb_states = []
                 results.append({
                     "page": page_num + 1,
                     "text": native_text,
@@ -339,6 +434,8 @@ def extract_pdf_text_hybrid(
                 })
 
         doc.close()
+        if cache_key is not None:
+            _store_cached_pdf_extraction(cache_key, results)
     return results
 
 

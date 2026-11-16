@@ -871,6 +871,19 @@ def _format_field_object(
     }
 
 
+_EXTRACT_SEMAPHORE: Optional[asyncio.Semaphore] = None
+_EXTRACT_SEMAPHORE_LIMIT: Optional[int] = None
+
+
+def _get_extract_semaphore() -> asyncio.Semaphore:
+    global _EXTRACT_SEMAPHORE, _EXTRACT_SEMAPHORE_LIMIT
+    limit = max(1, int(os.getenv("VOLKSAI_MAX_CONCURRENT_EXTRACTIONS", "2")))
+    if _EXTRACT_SEMAPHORE is None or _EXTRACT_SEMAPHORE_LIMIT != limit:
+        _EXTRACT_SEMAPHORE = asyncio.Semaphore(limit)
+        _EXTRACT_SEMAPHORE_LIMIT = limit
+    return _EXTRACT_SEMAPHORE
+
+
 @router.post("/extract")
 async def extract_tender(
     pdf_file: UploadFile = File(...),
@@ -919,6 +932,21 @@ async def extract_tender(
         f"(job_id: {job_id}, user_id: {user_id}, atc_files: {len(atc_files or [])}, "
         f"boq_file: {bool(boq_file and boq_file.filename)})"
     )
+
+    sem = _get_extract_semaphore()
+    queue_wait_sec = float(os.getenv("VOLKSAI_QUEUE_WAIT_SEC", "5.0"))
+    retry_after_sec = os.getenv("VOLKSAI_RETRY_AFTER_SEC", "15")
+    try:
+        await asyncio.wait_for(sem.acquire(), timeout=queue_wait_sec)
+    except asyncio.TimeoutError:
+        logger.warning(
+            f"[EXTRACT_API] Concurrency limit reached while queueing '{filename}' (job_id: {job_id}, wait={queue_wait_sec}s)"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Extraction service is at capacity. Please retry shortly.",
+            headers={"Retry-After": retry_after_sec},
+        )
 
     # Use TemporaryDirectory as context manager so all generated files
     # (temp PDF, page PNGs in pages/{job_id}, and downloaded child PDFs)
@@ -1034,6 +1062,9 @@ async def extract_tender(
                     }
                     if infosheet_data.get("per_schedule_emd"):
                         response["per_schedule_emd"] = infosheet_data.get("per_schedule_emd")
+                    if infosheet_data.get("_partial"):
+                        response["partial"] = True
+                        response["skipped_stages"] = infosheet_data.get("_skipped_stages", [])
 
                 logger.info(
                     f"[EXTRACT_API] Extraction complete for '{filename}' "
@@ -1058,3 +1089,5 @@ async def extract_tender(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Extraction pipeline failed for '{filename}': {str(exc)}"
         )
+    finally:
+        sem.release()
