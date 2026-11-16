@@ -3,7 +3,7 @@ uvicorn[standard]
 python-multipart
 pymupdf
 pytesseract
-pillow==13.0.0
+pillow==12.3.0
 anthropic
 requests
 httpx
