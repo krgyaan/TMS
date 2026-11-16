@@ -69,12 +69,65 @@ async def lifespan(app: FastAPI):
     verify_anthropic_api_key()
     yield
 
+import uuid
+from fastapi import HTTPException, Request
+from fastapi.responses import JSONResponse
+from app.core.logging import request_id_ctx_var
+
 app = FastAPI(
     title="VolksAI PDF Auto-Extraction Service",
     description="Internal microservice for automated tender PDF extraction and field mapping",
     version="1.0.0",
     lifespan=lifespan,
 )
+
+
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    incoming_req_id = (request.headers.get("X-Request-ID") or "").strip()
+    req_id = incoming_req_id or f"req_{uuid.uuid4().hex[:12]}"
+    token = request_id_ctx_var.set(req_id)
+    try:
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = req_id
+        return response
+    finally:
+        request_id_ctx_var.reset(token)
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_with_request_id(request: Request, exc: HTTPException):
+    req_id = (
+        request_id_ctx_var.get()
+        or (request.headers.get("X-Request-ID") or "").strip()
+        or f"req_{uuid.uuid4().hex[:12]}"
+    )
+    headers = dict(exc.headers or {})
+    headers["X-Request-ID"] = req_id
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail, "request_id": req_id},
+        headers=headers,
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_with_request_id(request: Request, exc: Exception):
+    req_id = (
+        request_id_ctx_var.get()
+        or (request.headers.get("X-Request-ID") or "").strip()
+        or f"req_{uuid.uuid4().hex[:12]}"
+    )
+    logger.exception(
+        "[UNHANDLED_ERROR] Unhandled exception in request",
+        extra={"custom_fields": {"request_id": req_id, "path": str(request.url.path)}},
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error", "request_id": req_id},
+        headers={"X-Request-ID": req_id},
+    )
+
 
 # CORS configured to allow only requests from localhost (service is internal-only,
 # invoked solely by the TMS NestJS backend)
@@ -102,3 +155,4 @@ app.include_router(classify.router)
 app.include_router(bidding_requirements.router)
 
 app.include_router(annexures.router)
+

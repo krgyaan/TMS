@@ -25,6 +25,11 @@ stage_timings_ctx_var: ContextVar[Optional[Dict[str, float]]] = ContextVar(
     "stage_timings", default=None
 )
 
+# Optional per-request stage entry callback for async job progress tracking
+stage_callback_ctx_var: ContextVar[Optional[Callable[[str], None]]] = ContextVar(
+    "stage_callback", default=None
+)
+
 
 def init_stage_timings() -> Dict[str, float]:
     """Initialize a fresh per-request stage timings dictionary in contextvars."""
@@ -51,6 +56,12 @@ def stage_timer(
         [TIMING] stage=<name> elapsed_ms=<n> request_id=<id>
     """
     req_id = request_id or request_id_ctx_var.get() or "none"
+    cb = stage_callback_ctx_var.get()
+    if cb is not None:
+        try:
+            cb(stage)
+        except Exception:
+            pass
     t0 = time.perf_counter()
     state: Dict[str, Any] = {"stage": stage, "request_id": req_id, "elapsed_ms": 0.0}
     try:
