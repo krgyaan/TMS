@@ -1,6 +1,6 @@
 import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Put, Query, Req } from "@nestjs/common";
 
-import { CurrentUser } from "@/decorators/current-user.decorator";
+import { CurrentUser, type CurrentUserType } from "@/decorators/current-user.decorator";
 import { CourierService } from "@/modules/courier/courier.service";
 import {
     CourierDashboardQuerySchema,
@@ -13,7 +13,6 @@ import {
 } from "@/modules/courier/dto";
 
 import { ZodValidationPipe } from "nestjs-zod";
-import { CanDelete } from "../auth/decorators";
 
 // $statusMap = [
 //     'dispatched' => ['1'],
@@ -27,12 +26,12 @@ export class CourierController {
     constructor(private readonly service: CourierService) {}
 
     @Post()
-    create(@Body(new ZodValidationPipe(CreateCourierSchema)) dto: CreateCourierDto, @CurrentUser() user: any) {
+    create(@Body(new ZodValidationPipe(CreateCourierSchema)) dto: CreateCourierDto, @CurrentUser() user: CurrentUserType) {
         return this.service.create(dto, user.sub);
     }
 
     @Post(":id/dispatch")
-    createDispatch(@Param("id", ParseIntPipe) id: number, @Req() req: Request, @CurrentUser("id") userId: number) {
+    createDispatch(@Param("id", ParseIntPipe) id: number, @Req() req: Request, @CurrentUser() user: CurrentUserType) {
         const parsed = CreateDispatchSchema.safeParse(req.body);
 
         if (!parsed.success) {
@@ -41,19 +40,19 @@ export class CourierController {
 
         console.log("createDispatch parsed body:", parsed.data);
 
-        return this.service.createDispatch(id, parsed.data, userId);
+        return this.service.createDispatch(id, parsed.data, user);
     }
 
     // Update dispatch info
     @Patch(":id/dispatch")
-    updateDispatch(@Param("id", ParseIntPipe) id: number, @Req() req: Request, @CurrentUser("id") userId: number) {
+    updateDispatch(@Param("id", ParseIntPipe) id: number, @Req() req: Request, @CurrentUser() user: CurrentUserType) {
         const parsed = CreateDispatchSchema.safeParse(req.body);
 
         if (!parsed.success) {
             throw new BadRequestException(parsed.error.flatten());
         }
 
-        return this.service.updateDispatch(id, parsed.data, userId);
+        return this.service.updateDispatch(id, parsed.data, user);
     }
 
     // Get all couriers for logged-in user
@@ -104,37 +103,36 @@ export class CourierController {
         @Param("id", ParseIntPipe) id: number,
         @Body(new ZodValidationPipe(UpdateCourierSchema))
         body: UpdateCourierInput,
-        @CurrentUser("id") userId: number
+        @CurrentUser() user: CurrentUserType
     ) {
-        return this.service.update(id, body, userId);
+        return this.service.update(id, body, user);
     }
 
     // Update status
     @Patch(":id/status")
-    updateStatus(@Param("id", ParseIntPipe) id: number, @Req() req: Request) {
+    updateStatus(@Param("id", ParseIntPipe) id: number, @Req() req: Request, @CurrentUser() user: CurrentUserType) {
         const parsed = UpdateCourierStatusSchema.safeParse(req.body);
 
         if (!parsed.success) {
             throw new BadRequestException(parsed.error.flatten());
         }
 
-        return this.service.updateStatus(id, parsed.data);
+        return this.service.updateStatus(id, parsed.data, user);
     }
 
     @Delete(":id")
-    @CanDelete("shared.couriers")
-    delete(@Param("id", ParseIntPipe) id: number, @CurrentUser("id") userId: number) {
-        return this.service.delete(id, userId);
+    delete(@Param("id", ParseIntPipe) id: number, @CurrentUser() user: CurrentUserType) {
+        return this.service.delete(id, user);
     }
 
     @Post(":id/upload")
-    uploadDocs(@Param("id", ParseIntPipe) id: number, @Body() body: { filenames: string[] }, @CurrentUser("id") userId: number) {
+    uploadDocs(@Param("id", ParseIntPipe) id: number, @Body() body: { filenames: string[] }, @CurrentUser() user: CurrentUserType) {
         const filenames = Array.isArray(body?.filenames) ? body.filenames : [];
-        return this.service.uploadDocs(id, filenames, userId);
+        return this.service.uploadDocs(id, filenames, user);
     }
 
     @Post(":id/upload-pod")
-    uploadDeliveryPod(@Param("id", ParseIntPipe) id: number, @Body() body: { filename: string }, @CurrentUser("id") userId: number) {
-        return this.service.uploadDeliveryPod(id, body?.filename, userId);
+    uploadDeliveryPod(@Param("id", ParseIntPipe) id: number, @Body() body: { filename: string }, @CurrentUser() user: CurrentUserType) {
+        return this.service.uploadDeliveryPod(id, body?.filename, user);
     }
 }

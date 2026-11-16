@@ -22,6 +22,14 @@ import { format } from "date-fns";
 import { CourierMailTemplates } from "./courier.mail";
 import { MailAudienceService } from "@/core/mail/mail-audience.service";
 import { wrapPaginatedResponse } from "@/utils/responseWrapper";
+import { RoleName } from "@/common/constants/roles.constant";
+import { HR_TEAM_ID } from "@/common/constants/teams.constant";
+
+type CourierActor = {
+    id: number;
+    role: string | null;
+    teamId: number | null;
+};
 
 // Status constants
 export const COURIER_STATUS = {
@@ -59,6 +67,22 @@ export class CourierService {
     private getMailboxUserId(): number {
         const parsed = parseInt(process.env.COURIER_MAILBOX_USER_ID ?? "75", 10);
         return Number.isFinite(parsed) && parsed > 0 ? parsed : 75;
+    }
+
+    private isPrivilegedCourierUser(actor: CourierActor): boolean {
+        return actor.teamId === HR_TEAM_ID || actor.role === RoleName.ADMIN || actor.role === RoleName.SUPER_USER;
+    }
+
+    private assertPrivilegedCourierUser(actor: CourierActor, action: string): void {
+        if (!this.isPrivilegedCourierUser(actor)) {
+            this.logger.warn("Unauthorized courier action attempt", {
+                action,
+                userId: actor.id,
+                teamId: actor.teamId,
+                role: actor.role,
+            });
+            throw new ForbiddenException(`Not authorized to ${action} this courier`);
+        }
     }
 
     private formatMailDate(date: Date | string | null | undefined): string {
@@ -613,10 +637,10 @@ export class CourierService {
         }
     }
 
-    async update(id: number, data: UpdateCourierInput, userId: number) {
+    async update(id: number, data: UpdateCourierInput, actor: CourierActor) {
         this.logger.info("Updating courier", {
             courierId: id,
-            userId,
+            userId: actor.id,
         });
 
         try {
@@ -627,10 +651,10 @@ export class CourierService {
                 throw new NotFoundException("Courier not found");
             }
 
-            if (existing.userId !== userId) {
+            if (existing.userId !== actor.id && !this.isPrivilegedCourierUser(actor)) {
                 this.logger.warn("Unauthorized courier update attempt", {
                     courierId: id,
-                    userId,
+                    userId: actor.id,
                 });
                 throw new ForbiddenException("Not authorized to update this courier");
             }
@@ -663,10 +687,12 @@ export class CourierService {
     }
 
     // Update status (delivery info)
-    async updateStatus(id: number, statusData: UpdateCourierStatusInput) {
+    async updateStatus(id: number, statusData: UpdateCourierStatusInput, actor: CourierActor) {
         this.logger.info("Updating courier status", { courierId: id, status: statusData.status, hasFile: !!statusData.podDoc });
 
         try {
+            this.assertPrivilegedCourierUser(actor, "update status of");
+
             const courierCheck = await this.findOne(id);
             if (!courierCheck) throw new NotFoundException("Courier not found");
 
@@ -757,14 +783,16 @@ export class CourierService {
     /**
      * Dispatch with optional docket slip file (POST endpoint)
      */
-    async createDispatch(id: number, dispatchData: CreateDispatchInput, userId: number) {
+    async createDispatch(id: number, dispatchData: CreateDispatchInput, actor: CourierActor) {
         this.logger.info("Creating courier dispatch", {
             courierId: id,
-            userId,
+            userId: actor.id,
             hasFile: !!dispatchData.docketSlip,
         });
 
         try {
+            this.assertPrivilegedCourierUser(actor, "dispatch");
+
             const courierCheck = await this.findOne(id);
             if (!courierCheck) throw new NotFoundException("Courier not found");
 
@@ -853,11 +881,13 @@ export class CourierService {
     async updateDispatch(
         id: number,
         dispatchData: CreateDispatchInput, // zod inferred type
-        userId: number
+        actor: CourierActor
     ) {
-        this.logger.info("Updating dispatch info", { courierId: id, userId });
+        this.logger.info("Updating dispatch info", { courierId: id, userId: actor.id });
 
         try {
+            this.assertPrivilegedCourierUser(actor, "update dispatch of");
+
             const existing = await this.findOne(id);
             if (!existing) throw new NotFoundException("Courier not found");
 
@@ -885,14 +915,16 @@ export class CourierService {
         }
     }
 
-    async delete(id: number, userId: number) {
-        this.logger.warn("Deleting courier", { courierId: id, userId });
+    async delete(id: number, actor: CourierActor) {
+        this.logger.warn("Deleting courier", { courierId: id, userId: actor.id });
 
         try {
+            this.assertPrivilegedCourierUser(actor, "delete");
+
             const existing = await this.findOne(id);
             if (!existing) throw new NotFoundException("Courier not found");
 
-            this.logger.debug("Courier found for deletion", { courierId: id, currentUser: userId });
+            this.logger.debug("Courier found for deletion", { courierId: id, currentUser: actor.id });
 
             await this.db.delete(couriers).where(eq(couriers.id, id));
 
@@ -908,13 +940,16 @@ export class CourierService {
         }
     }
 
-    async uploadDocs(id: number, filenames: string[], userId: number) {
+    async uploadDocs(id: number, filenames: string[], actor: CourierActor) {
         this.logger.info("Uploading courier docs", {
             courierId: id,
+            userId: actor.id,
             filesCount: filenames.length,
         });
 
         try {
+            this.assertPrivilegedCourierUser(actor, "upload documents to");
+
             const existing = await this.findOne(id);
             if (!existing) throw new NotFoundException("Courier not found");
 
@@ -937,13 +972,16 @@ export class CourierService {
     }
 
     // Upload delivery POD
-    async uploadDeliveryPod(id: number, filename: string, userId: number) {
+    async uploadDeliveryPod(id: number, filename: string, actor: CourierActor) {
         this.logger.info("Uploading delivery POD", {
             courierId: id,
+            userId: actor.id,
             file: filename,
         });
 
         try {
+            this.assertPrivilegedCourierUser(actor, "upload delivery POD to");
+
             const existing = await this.findOne(id);
             if (!existing) throw new NotFoundException("Courier not found");
 
