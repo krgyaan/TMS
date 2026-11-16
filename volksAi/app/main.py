@@ -82,17 +82,40 @@ app = FastAPI(
 )
 
 
-@app.middleware("http")
-async def request_id_middleware(request: Request, call_next):
-    incoming_req_id = (request.headers.get("X-Request-ID") or "").strip()
-    req_id = incoming_req_id or f"req_{uuid.uuid4().hex[:12]}"
-    token = request_id_ctx_var.set(req_id)
-    try:
-        response = await call_next(request)
-        response.headers["X-Request-ID"] = req_id
-        return response
-    finally:
-        request_id_ctx_var.reset(token)
+class _RequestIdASGIMiddleware:
+    """Pure ASGI middleware propagating X-Request-ID without BaseHTTPMiddleware task-group overhead."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+
+        incoming_req_id = ""
+        for k, v in scope.get("headers") or []:
+            if k.lower() == b"x-request-id":
+                incoming_req_id = v.decode("latin-1", errors="ignore").strip()
+                break
+        req_id = incoming_req_id or f"req_{uuid.uuid4().hex[:12]}"
+        token = request_id_ctx_var.set(req_id)
+
+        async def _send_with_request_id(message):
+            if message.get("type") == "http.response.start":
+                raw_headers = list(message.get("headers") or [])
+                if not any(k.lower() == b"x-request-id" for k, _ in raw_headers):
+                    raw_headers.append((b"x-request-id", req_id.encode("latin-1")))
+                message = {**message, "headers": raw_headers}
+            await send(message)
+
+        try:
+            await self.app(scope, receive, _send_with_request_id)
+        finally:
+            request_id_ctx_var.reset(token)
+
+
+app.add_middleware(_RequestIdASGIMiddleware)
 
 
 @app.exception_handler(HTTPException)

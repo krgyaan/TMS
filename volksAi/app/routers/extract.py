@@ -875,14 +875,24 @@ def _format_field_object(
 
 _EXTRACT_SEMAPHORE: Optional[asyncio.Semaphore] = None
 _EXTRACT_SEMAPHORE_LIMIT: Optional[int] = None
+_EXTRACT_SEMAPHORE_LOOP: Optional[int] = None
 
 
 def _get_extract_semaphore() -> asyncio.Semaphore:
-    global _EXTRACT_SEMAPHORE, _EXTRACT_SEMAPHORE_LIMIT
+    global _EXTRACT_SEMAPHORE, _EXTRACT_SEMAPHORE_LIMIT, _EXTRACT_SEMAPHORE_LOOP
     limit = max(1, int(os.getenv("VOLKSAI_MAX_CONCURRENT_EXTRACTIONS", "2")))
-    if _EXTRACT_SEMAPHORE is None or _EXTRACT_SEMAPHORE_LIMIT != limit:
+    try:
+        current_loop_id: Optional[int] = id(asyncio.get_running_loop())
+    except RuntimeError:
+        current_loop_id = None
+    if (
+        _EXTRACT_SEMAPHORE is None
+        or _EXTRACT_SEMAPHORE_LIMIT != limit
+        or (current_loop_id is not None and _EXTRACT_SEMAPHORE_LOOP != current_loop_id)
+    ):
         _EXTRACT_SEMAPHORE = asyncio.Semaphore(limit)
         _EXTRACT_SEMAPHORE_LIMIT = limit
+        _EXTRACT_SEMAPHORE_LOOP = current_loop_id
     return _EXTRACT_SEMAPHORE
 
 
@@ -1110,6 +1120,7 @@ def _build_extract_response_from_infosheet(
 # containers) will require a shared Redis store for cross-worker job state.
 # ---------------------------------------------------------------------------
 _EXTRACTION_JOBS: Dict[str, Dict[str, Any]] = {}
+_ACTIVE_JOB_TASKS: set = set()
 
 _STAGE_PROGRESS_MAP: Dict[str, float] = {
     "queued": 0.0,
@@ -1283,7 +1294,7 @@ async def create_extract_job(
         "created_at": time.time(),
     }
 
-    asyncio.create_task(
+    task = asyncio.create_task(
         _execute_background_extraction_job(
             job_id=job_id,
             filename=filename,
@@ -1293,6 +1304,8 @@ async def create_extract_job(
             boq_path=boq_path,
         )
     )
+    _ACTIVE_JOB_TASKS.add(task)
+    task.add_done_callback(_ACTIVE_JOB_TASKS.discard)
     return {"job_id": job_id, "status": "queued"}
 
 
