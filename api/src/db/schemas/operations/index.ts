@@ -14,3 +14,4 @@ export * from "./inventory-movements.schema";
 export * from "./inventory-transfers.schema";
 export * from "./warehouses.schema";
 export * from "./project-cash-flows.schema";
+export * from "./po-approvals.schema";
