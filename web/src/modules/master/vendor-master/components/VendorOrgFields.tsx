@@ -1,9 +1,10 @@
 import { type Control, type FieldPath, type FieldValues, useFormContext, useWatch } from "react-hook-form";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
+import { NumberInput } from "@/components/form/NumberInput";
+import { SelectField } from "@/components/form/SelectField";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatVendorName } from "@/lib/vendorName";
 
@@ -61,14 +62,14 @@ export function VendorOrgFields<TFieldValues extends FieldValues>({ control, pre
 
     return (
         <>
-
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <FieldWrapper control={control} name={name("name")} label="Organization Name *">
                     {field => (
                         <Input
                             placeholder="Enter organization name"
-                            {...(field as any)}
+                            name={field.name}
                             value={String(field.value ?? "")}
+                            onChange={field.onChange}
                             onBlur={() => {
                                 field.onChange(formatVendorName(String(field.value ?? "")));
                                 field.onBlur();
@@ -76,134 +77,101 @@ export function VendorOrgFields<TFieldValues extends FieldValues>({ control, pre
                         />
                     )}
                 </FieldWrapper>
-                <FieldWrapper control={control} name={name("category")} label="Category">
-                    {field => (
-                        <Select value={String(field.value ?? "")} onValueChange={value => field.onChange(value)}>
-                            <SelectTrigger aria-label="Category">
-                                <SelectValue placeholder="Select category" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {CATEGORY_OPTIONS.map(option => (
-                                    <SelectItem key={option} value={option}>
-                                        {option}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    )}
-                </FieldWrapper>
-                <FieldWrapper control={control} name={name("registrationType")} label="Registration Type">
-                    {field => (
-                        <Select value={String(field.value ?? "")} onValueChange={value => field.onChange(value)}>
-                            <SelectTrigger aria-label="Registration Type">
-                                <SelectValue placeholder="Select registration type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {REGISTRATION_TYPE_OPTIONS.map(option => (
-                                    <SelectItem key={option.value} value={option.value}>
-                                        {option.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    )}
-                </FieldWrapper>
+
+                <SelectField
+                    control={control}
+                    name={name("category")}
+                    label="Category"
+                    options={CATEGORY_OPTIONS.map(value => ({ value, label: value }))}
+                    placeholder="Select category"
+                    valueType="string"
+                />
+
+                <SelectField
+                    control={control}
+                    name={name("registrationType")}
+                    label="Registration Type"
+                    options={REGISTRATION_TYPE_OPTIONS.map(option => ({ ...option }))}
+                    placeholder="Select registration type"
+                    valueType="string"
+                />
+
                 <FieldWrapper control={control} name={name("pan")} label="PAN">
                     {field => (
                         <Input
                             placeholder="ABCDE1234F"
-                            {...(field as any)}
+                            name={field.name}
                             value={String(field.value ?? "")}
                             onChange={e => field.onChange(e.target.value.toUpperCase())}
+                            onBlur={field.onBlur}
                         />
                     )}
                 </FieldWrapper>
+
                 <FieldWrapper control={control} name={name("msme")} label="MSME Number">
                     {field => (
                         <Input
                             placeholder="UDYAM-XX-00-0000000"
-                            {...(field as any)}
+                            name={field.name}
                             value={String(field.value ?? "")}
                             onChange={e => {
                                 handleMsmeChange(e.target.value);
                                 field.onChange(e.target.value.toUpperCase());
                             }}
-                        />
-                    )}
-                </FieldWrapper>
-                <FieldWrapper control={control} name={name("msmeSize")} label="MSME Size">
-                    {field => (
-                        <Select value={String(field.value ?? "")} onValueChange={value => field.onChange(value)}>
-                            <SelectTrigger aria-label="MSME Size">
-                                <SelectValue placeholder="Select size" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {MSME_SIZE_OPTIONS.map(option => (
-                                    <SelectItem key={option.value} value={option.value}>
-                                        {option.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    )}
-                </FieldWrapper>
-                {hasMsme && (
-                    <FieldWrapper control={control} name={msmeTypePath} label="Supply Type *">
-                        {field => (
-                            <Select value={String(field.value ?? "")} onValueChange={value => field.onChange(value)}>
-                                <SelectTrigger aria-label="Supply Type">
-                                    <SelectValue placeholder="Select type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {MSME_TYPE_OPTIONS.map(opt => (
-                                        <SelectItem key={opt.value} value={opt.value}>
-                                            {opt.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        )}
-                    </FieldWrapper>
-                )}
-                <FieldWrapper control={control} name={name("majorActivity")} label="Major Activity">
-                    {field => (
-                        <Select value={String(field.value ?? "")} onValueChange={value => field.onChange(value)}>
-                            <SelectTrigger aria-label="Major Activity">
-                                <SelectValue placeholder="Select activity" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {MAJOR_ACTIVITY_OPTIONS.map(option => (
-                                    <SelectItem key={option} value={option}>
-                                        {option}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    )}
-                </FieldWrapper>
-                <FieldWrapper control={control} name={name("creditPeriodDays")} label="Credit Period (days)">
-                    {field => (
-                        <Input
-                            type="number"
-                            min={0}
-                            placeholder="e.g. 30"
-                            name={field.name}
-                            value={String(field.value ?? "")}
-                            onChange={e => field.onChange(Number.isNaN(e.target.valueAsNumber) ? undefined : e.target.valueAsNumber)}
                             onBlur={field.onBlur}
                         />
                     )}
                 </FieldWrapper>
+
+                <SelectField
+                    control={control}
+                    name={name("msmeSize")}
+                    label="MSME Size"
+                    options={MSME_SIZE_OPTIONS.map(option => ({ ...option }))}
+                    placeholder="Select size"
+                    valueType="string"
+                />
+
+                {hasMsme && (
+                    <SelectField
+                        control={control}
+                        name={msmeTypePath}
+                        label="Supply Type *"
+                        options={MSME_TYPE_OPTIONS.map(option => ({ ...option }))}
+                        placeholder="Select type"
+                        valueType="string"
+                    />
+                )}
+
+                <SelectField
+                    control={control}
+                    name={name("majorActivity")}
+                    label="Major Activity"
+                    options={MAJOR_ACTIVITY_OPTIONS.map(value => ({ value, label: value }))}
+                    placeholder="Select activity"
+                    valueType="string"
+                />
+
+                <FieldWrapper control={control} name={name("creditPeriodDays")} label="Credit Period (days)">
+                    {field => (
+                        <NumberInput
+                            min={0}
+                            placeholder="e.g. 30"
+                            value={field.value as number | null | undefined}
+                            onChange={value => field.onChange(value ?? undefined)}
+                            onBlur={field.onBlur}
+                        />
+                    )}
+                </FieldWrapper>
+
                 <FieldWrapper control={control} name={name("creditAmount")} label="Credit Amount (INR)">
                     {field => (
-                        <Input
-                            type="number"
+                        <NumberInput
                             min={0}
                             step="0.01"
                             placeholder="e.g. 1500000"
-                            name={field.name}
-                            value={String(field.value ?? "")}
-                            onChange={e => field.onChange(Number.isNaN(e.target.valueAsNumber) ? undefined : e.target.valueAsNumber)}
+                            value={field.value as number | null | undefined}
+                            onChange={value => field.onChange(value ?? undefined)}
                             onBlur={field.onBlur}
                         />
                     )}
@@ -215,8 +183,10 @@ export function VendorOrgFields<TFieldValues extends FieldValues>({ control, pre
                     <Textarea
                         placeholder="Enter organization address"
                         rows={3}
-                        {...(field as any)}
+                        name={field.name}
                         value={String(field.value ?? "")}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
                     />
                 )}
             </FieldWrapper>
