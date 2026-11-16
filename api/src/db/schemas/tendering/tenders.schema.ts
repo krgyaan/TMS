@@ -35,7 +35,6 @@ export const tenderInfos = pgTable("tender_infos", {
     tlIncompleteRemarks: text("tl_incomplete_remarks"),
     oemNotAllowed: text("oem_not_allowed").array(),
     rfqRequired: varchar("rfq_required", { length: 10 }),
-    quotationFiles: text("quotation_files"),
 
     createdAt: timestamp("created_at", { withTimezone: true })
         .defaultNow()

@@ -150,7 +150,6 @@ describeDb('tender_extractions writers keep the cached analysis (real Postgres)'
                 "tl_incomplete_remarks" text,
                 "oem_not_allowed" text[],
                 "rfq_required" varchar(10),
-                "quotation_files" text,
                 "created_at" timestamp with time zone DEFAULT now(),
                 "updated_at" timestamp with time zone DEFAULT now()
             );

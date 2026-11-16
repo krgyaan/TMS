@@ -2,16 +2,19 @@ import { useNavigate, useParams } from "react-router-dom";
 import { AlertCircle } from "lucide-react";
 
 import { paths } from "@/app/routes/paths";
+import { useAuth } from "@/contexts/AuthContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { useCourier } from "@/hooks/api/useCourier";
+import { isCourierPrivileged } from "./helpers/courier.constants";
 import { CourierForm } from "./components/CourierForm";
 
 const CourierEditPage = () => {
     const navigate = useNavigate();
+    const { user, role, teamId } = useAuth();
     const { id } = useParams<{ id: string }>();
     const courierId = id ? parseInt(id, 10) : 0;
 
@@ -48,6 +51,20 @@ const CourierEditPage = () => {
             <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>Failed to load courier. Please try again.</AlertDescription>
+                <Button size="sm" variant="outline" onClick={() => navigate(paths.shared.couriers)}>
+                    Go Back
+                </Button>
+            </Alert>
+        );
+    }
+
+    const canEdit = isCourierPrivileged(role, teamId) || courier.userId === user?.id;
+
+    if (!canEdit) {
+        return (
+            <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>You are not authorized to edit this courier.</AlertDescription>
                 <Button size="sm" variant="outline" onClick={() => navigate(paths.shared.couriers)}>
                     Go Back
                 </Button>

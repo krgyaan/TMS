@@ -2,7 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 
 export type WriteAction = "insert" | "update";
-export type TableName = "vendor_organizations" | "vendors" | "vendor_gsts";
+export type TableName = "vendor_organizations" | "vendors" | "vendor_gsts" | "vendor_accs";
 
 export interface ManifestEntry {
     table: TableName;

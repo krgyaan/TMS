@@ -32,6 +32,12 @@ describe("inventory item conversion rules", () => {
         expect(resolveConversion("RMtr", "Sq. Mtr.", "1.0000000000", {}).conversionFactor).toBe("1");
     });
 
+    it("requires a configurable factor for Electrolyte litre/container conversion", () => {
+        expect(getConversionRule("Litre", "Container")?.factor).toBeNull();
+        expect(resolveConversion("Litre", "Container", "20", {}).conversionFactor).toBe("20");
+        expect(() => resolveConversion("Litre", "Container", null, {})).toThrow("A positive conversion factor with up to 6 decimals is required");
+    });
+
     it.each(["0", "-1", "1.1234567", "1e-3"]) ("rejects invalid manual factor %s", factor => {
         expect(() => resolveConversion("Kg", "Mtr", factor, {})).toThrow();
     });

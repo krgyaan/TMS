@@ -59,15 +59,14 @@ class VendorsApiService extends BaseApiService {
         return this.delete<void>(`/vendors/${id}`);
     }
 
-    async getAllOrganizations(): Promise<VendorOrganization[]> {
-        console.log("Fetching all vendor organizations");
-        const res = await this.get<VendorOrganization[]>("/vendor-organizations");
-        console.log(res);
-        return res;
+    async getAllOrganizations(activeOnly = false): Promise<VendorOrganization[]> {
+        const qs = activeOnly ? "?activeOnly=true" : "";
+        return this.get<VendorOrganization[]>(`/vendor-organizations${qs}`);
     }
 
-    async getAllOrganizationsWithRelations(): Promise<VendorOrganizationWithRelations[]> {
-        return this.get<VendorOrganizationWithRelations[]>("/vendor-organizations/with-relations");
+    async getAllOrganizationsWithRelations(activeOnly = false): Promise<VendorOrganizationWithRelations[]> {
+        const qs = activeOnly ? "?activeOnly=true" : "";
+        return this.get<VendorOrganizationWithRelations[]>(`/vendor-organizations/with-relations${qs}`);
     }
 
     async getOrganizationsPaginated(params: VendorOrganizationListParams): Promise<PaginatedResult<VendorOrganizationListItem>> {

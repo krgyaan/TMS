@@ -381,7 +381,6 @@ export class TenderApprovalService {
             .select({
                 tlStatus: tenderInfos.tlStatus,
                 rfqRequired: tenderInfos.rfqRequired,
-                quotationFiles: tenderInfos.quotationFiles,
                 rfqTo: tenderInfos.rfqTo,
                 processingFeeMode: tenderInfos.processingFeeMode,
                 tenderFeeMode: tenderInfos.tenderFeeMode,
@@ -410,7 +409,6 @@ export class TenderApprovalService {
         const data = result[0] as {
             tlStatus: number;
             rfqRequired: string | null;
-            quotationFiles: string | null;
             rfqTo: string | null;
             processingFeeMode: string | null;
             tenderFeeMode: string | null;
@@ -441,17 +439,6 @@ export class TenderApprovalService {
             }
         }
 
-        // Parse quotationFiles from JSON string if present
-        let quotationFilesArray: string[] = [];
-        if (data.quotationFiles) {
-            try {
-                quotationFilesArray = JSON.parse(data.quotationFiles);
-            } catch (e) {
-                // If parsing fails, treat as empty array
-                quotationFilesArray = [];
-            }
-        }
-
         // Fetch incomplete fields
         const incompleteFieldsResult = await this.db
             .select({
@@ -478,7 +465,6 @@ export class TenderApprovalService {
             ...data,
             rfqTo: vendorOrganizationIds,
             rfqToName: vendorOrganizationNames.map(v => v.name).join(", "),
-            quotationFiles: quotationFilesArray,
             incompleteFields: incompleteFieldsResult,
             oemNotAllowed: data.oemNotAllowed || [],
             oemNotAllowedName: oemNotAllowedNames.length > 0 ? oemNotAllowedNames.join(", ") : null,
@@ -500,7 +486,7 @@ export class TenderApprovalService {
         const prevStatus = currentTender.status;
         const isEditMode = String(currentTender?.tlStatus) === payload.tlStatus;
         
-        const { newStatus, statusComment, updateData } = await this.buildApprovalUpdateData(tenderId, payload, isEditMode);
+        const { newStatus, statusComment, updateData } = await this.buildApprovalUpdateData(tenderId, payload);
         await this.db.transaction(async tx => {            
             await tx.update(tenderInfos).set(updateData).where(eq(tenderInfos.id, tenderId)).returning();
             if (isEditMode && payload.tlStatus === "1" && currentTender) {
@@ -650,26 +636,21 @@ export class TenderApprovalService {
         return this.getByTenderId(tenderId);        
     }
 
-    private async buildApprovalUpdateData(tenderId: number, payload: TenderApprovalPayload, isEditMode: boolean) {
-        console.log('[buildApprovalUpdateData] START', { tenderId, tlStatus: payload.tlStatus, isEditMode });
-        
+    private async buildApprovalUpdateData(tenderId: number, payload: TenderApprovalPayload) {
         const updateData: any = { tlStatus: payload.tlStatus, updatedAt: new Date() };
         let newStatus: number | null = null;
         let statusComment = '';
 
         if (payload.tlStatus !== "3") {
             await this.db.delete(tenderIncompleteFields).where(eq(tenderIncompleteFields.tenderId, tenderId));
-            console.log('[buildApprovalUpdateData] Cleared incomplete fields');
         }
 
         switch (payload.tlStatus) {
             case "1":
                 { 
-                    console.log('[buildApprovalUpdateData] Processing APPROVED status');
                     Object.assign(updateData, {
                         rfqTo: payload.rfqTo?.join(",") || "",
                         rfqRequired: payload.rfqRequired ?? null,
-                        quotationFiles: payload.quotationFiles ? JSON.stringify(payload.quotationFiles) : null,
                         processingFeeMode: payload.processingFeeMode ?? null,
                         tenderFeeMode: payload.tenderFeeMode ?? null,
                         emdMode: payload.emdMode ?? null,
@@ -682,41 +663,37 @@ export class TenderApprovalService {
                         tlApprovalTimestamp: new Date(),
                     });
 
-                // Always reflect the incomplete state, even when re-marking an
-                // already-incomplete sheet (isEditMode). Otherwise the status
-                // stays at 2 and the info-sheet timer stop condition in
-                // TenderInfoSheetsService.update() (prevStatus === 29) is never met.
-                updateData.status = 29;
-                newStatus = 29;
-                statusComment = "Tender info sheet incomplete";
+                    updateData.status = 3;
+                    newStatus = 3;
+                    statusComment = "Tender info approved";
 
                     const infoSheet = await this.tenderInfoSheetsService.findByTenderId(tenderId);
                     if (infoSheet) {
-                        if (infoSheet.tenderValue != null && Number(infoSheet.tenderValue) > 0) updateData.gstValues = String(infoSheet.tenderValue);
-                        if (infoSheet.tenderFeeAmount != null) updateData.tenderFees = String(infoSheet.tenderFeeAmount);
-                        if (infoSheet.emdAmount != null && Number(infoSheet.emdAmount) > 0) updateData.emd = String(infoSheet.emdAmount);
+                        updateData.gstValues = infoSheet.tenderValue != null ? String(infoSheet.tenderValue) : "0";
+                        updateData.tenderFees = infoSheet.tenderFeeAmount != null ? String(infoSheet.tenderFeeAmount) : "0";
+                        updateData.emd = infoSheet.emdAmount != null ? String(infoSheet.emdAmount) : "0";
+                    }
+                    if (payload.emdMode === "exempt") {
+                        updateData.emd = "0";
                     }
                     break; 
                 }
 
             case "2":
-                console.log('[buildApprovalUpdateData] Processing REJECTED status');
                 Object.assign(updateData, {
                     tlRejectionRemarks: payload.tlRejectionRemarks ?? null,
                     oemNotAllowed: payload.oemNotAllowed,
                     tlApprovalTimestamp: new Date(),
                 });
 
-                if (payload.tenderStatus && !isEditMode) {
+                if (payload.tenderStatus) {
                     updateData.status = payload.tenderStatus;
                     newStatus = payload.tenderStatus;
                     statusComment = "Tender rejected";
                 }
-                console.log('[buildApprovalUpdateData] Rejected status set', { newStatus, tenderStatus: payload.tenderStatus });
                 break;
 
             case "3":
-                console.log('[buildApprovalUpdateData] Processing INCOMPLETE status');
                 Object.assign(updateData, {
                     tlIncompleteRemarks: payload.tlIncompleteRemarks ?? null,
                     tlApprovalTimestamp: null,
@@ -1121,15 +1098,6 @@ export class TenderApprovalService {
             });
         }
 
-        const quotationFileUrls: string[] = [];
-        if (payload.quotationFiles && payload.quotationFiles.length > 0) {
-            payload.quotationFiles.forEach((file: string) => {
-                if (file) {
-                    quotationFileUrls.push(`${apiUrl}/files/serve/${file}`);
-                }
-            });
-        }
-
         const emailData = {
             te_name: assignee.name,
             tl_name: tlName,
@@ -1155,12 +1123,9 @@ export class TenderApprovalService {
             financial_docs: originalFinancialDocs,
             technical_doc_urls: technicalDocUrls,
             financial_doc_urls: financialDocUrls,
-            quotation_file_urls: quotationFileUrls,
             alternativeTechnicalDocs: alternativeTechnicalDocNames.length > 0 ? alternativeTechnicalDocNames.join(", ") : "",
             alternativeFinancialDocs: alternativeFinancialDocNames.length > 0 ? alternativeFinancialDocNames.join(", ") : "",
         };
-
-        console.log("Email Data: ", emailData);
 
         const template = "tender-approved-by-tl";
         let subject: string;

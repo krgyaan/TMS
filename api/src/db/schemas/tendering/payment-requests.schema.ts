@@ -243,6 +243,13 @@ export const instrumentBgDetails = pgTable('instrument_bg_details', {
     extensionLetterPath: varchar('extension_letter_path', { length: 500 }), // emd_bgs.request_extension_pdf
     cancellationLetterPath: varchar('cancellation_letter_path', { length: 500 }), // emd_bgs.request_cancellation_pdf
     prefilledSignedBg: text('prefilled_signed_bg'), // emd_bgs.prefilled_signed_bg
+    // DOCX letters generated automatically when the BG create-request mail is sent
+    coverLetterDocx: varchar('cover_letter_docx', { length: 500 }), // bi-dashboard/bank-guarantee/bgcovletter/...
+    prefilledAppDocx: varchar('prefilled_app_docx', { length: 500 }), // bi-dashboard/bank-guarantee/bgprefill/...
+    authorizationLetterDocx: varchar('authorization_letter_docx', { length: 500 }), // bi-dashboard/bank-guarantee/bgauthletter/...
+    envelopeSlip: varchar('envelope_slip', { length: 500 }), // reserved: envelope slip upload
+    bgUpload: varchar('bg_upload', { length: 500 }), // Accounts Form (BG) 2 - issued BG document
+    bgSignedCoveringLetter: varchar('bg_signed_covering_letter', { length: 500 }), // Accounts Form (BG) 2 - signed covering letter
 
     // BG Basic Info
     bgNeeds: varchar('bg_needs', { length: 255 }), // emd_bgs.bg_needs
@@ -288,6 +295,7 @@ export const instrumentBgDetails = pgTable('instrument_bg_details', {
     fdrPer: decimal('fdr_per', { precision: 15, scale: 2 }), // emd_bgs.fdr_per
     fdrCopy: varchar('fdr_copy', { length: 255 }), // emd_bgs.fdr_copy
     fdrNo: varchar('fdr_no', { length: 255 }), // emd_bgs.fdr_no
+    fdrDate: date('fdr_date'), // FDR creation date captured in Accounts Form (BG) 1
     fdrValidity: date('fdr_validity'), // emd_bgs.fdr_validity
     fdrRoi: decimal('fdr_roi', { precision: 15, scale: 2 }), // emd_bgs.fdr_roi
 

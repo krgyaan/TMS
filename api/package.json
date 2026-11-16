@@ -25,6 +25,8 @@
         "drizzle:migrate": "drizzle-kit migrate --config ./drizzle.config.ts",
         "migrate:seller-parties": "tsx scripts/migrate-project-parties-sellers.ts",
         "migrate:vendor-master": "tsx scripts/migrate-vendor-master.ts",
+        "audit:vendor-duplicates": "tsx scripts/audit-vendor-duplicates.ts",
+        "merge:vendor-duplicates": "tsx -r tsconfig-paths/register scripts/merge-vendor-duplicates.ts",
         "backfill:po-seller-org": "tsx scripts/backfill-po-seller-org.ts",
         "db:seed": "tsx src/db/seed.ts",
         "cleanup:uninvoiced-inventory": "tsx src/db/cleanup-uninvoiced-inventory.ts",

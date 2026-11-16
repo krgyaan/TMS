@@ -8,6 +8,7 @@ export const validateCatalogItemValues = (
     itemType: string | null | undefined,
     specifications: Record<string, string>,
     existingSpecificationKeys: string[] = [],
+    allowMissingRequired = false,
 ): string | undefined => {
     const item = findCatalogItem(category, itemName);
     if (!item) return `Item "${itemName}" is not configured in category "${category}"`;
@@ -27,7 +28,7 @@ export const validateCatalogItemValues = (
             if (!isBlank(value)) return `${itemField.label} is not available for the selected options`;
             continue;
         }
-        if (itemField.required && isBlank(value)) return `${itemField.label} is required`;
+        if (itemField.required && isBlank(value) && !allowMissingRequired) return `${itemField.label} is required`;
         if (isBlank(value)) continue;
 
         const trimmed = value.trim();

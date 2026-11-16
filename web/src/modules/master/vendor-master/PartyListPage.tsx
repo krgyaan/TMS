@@ -63,10 +63,12 @@ const PartyViewDialog: React.FC<PartyViewDialogProps> = ({ party, open, onClose 
                             <span className="text-sm text-muted-foreground">Name</span>
                             <p className="font-medium">{party.name || "-"}</p>
                         </div>
-                        <div>
-                            <span className="text-sm text-muted-foreground">Alias</span>
-                            <p className="font-medium">{party.alias || "-"}</p>
-                        </div>
+                        {party.source === "party" && (
+                            <div>
+                                <span className="text-sm text-muted-foreground">Alias</span>
+                                <p className="font-medium">{party.alias || "-"}</p>
+                            </div>
+                        )}
                         <div>
                             <span className="text-sm text-muted-foreground">Email</span>
                             <p className="font-medium">{party.email || "-"}</p>
@@ -170,7 +172,7 @@ const VendorMasterListPage: React.FC = () => {
         try {
             const dto: CreatePartyDTO = {
                 name: partyData.name,
-                alias: partyData.alias || undefined,
+                alias: editParty.source === "party" ? partyData.alias || undefined : undefined,
                 email: partyData.email || undefined,
                 address: partyData.address || undefined,
                 gstNo: partyData.gstNo || undefined,
@@ -249,6 +251,7 @@ const VendorMasterListPage: React.FC = () => {
             sortable: true,
             filter: true,
             width: 120,
+            valueGetter: (p: { data?: VendorMasterRow }) => (p.data?.source === "party" ? p.data?.alias || "" : ""),
         },
         {
             field: "email",
@@ -487,9 +490,10 @@ const VendorMasterListPage: React.FC = () => {
                     onOpenChange={(open) => { if (!open) setEditParty(null); }}
                     onSubmit={handleEditSubmit}
                     isLoading={updateMutation.isPending}
+                    showAlias={editParty.source === "party"}
                     initialValues={{
                         name: editParty.name,
-                        alias: editParty.alias || "",
+                        alias: editParty.source === "party" ? editParty.alias || "" : "",
                         email: editParty.email || "",
                         address: editParty.address || "",
                         gstNo: editParty.gstNo || "",

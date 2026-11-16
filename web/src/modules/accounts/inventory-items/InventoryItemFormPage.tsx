@@ -9,13 +9,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useCreateInventoryItem, useInventoryItem, useItemConversionOptions, useUpdateInventoryItem } from "@/hooks/api/useInventoryItems";
+import { useCreateInventoryItem, useInventoryItem, useItemCodePreview, useItemConversionOptions, useUpdateInventoryItem } from "@/hooks/api/useInventoryItems";
 import { handleQueryError } from "@/lib/react-query";
 import { paths } from "@/app/routes/paths";
 import type { InventoryItemPayload } from "@/types/inventory-item.types";
-import { ITEM_CATALOG, fieldIsVisible, findCatalogItem, getItemMainCategory } from "./item-catalog";
-import { UNIT_OPTIONS, type Unit } from "./item-config";
-import { generateTemplatedItemCode, getItemCodePreview } from "./item-code-generator";
+import { ITEM_CATALOG, fieldIsVisible, findCatalogItem, getAllowedConversionPairs, getAllowedUnits, getDefaultUnit, getItemMainCategory } from "./item-catalog";
+import { type Unit } from "./item-config";
 import { inventoryItemFormSchema, type InventoryItemFormValues } from "./item-form-schema";
 
 const formControlClass = "h-11 w-full rounded-md border border-slate-400 bg-background px-3 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:border-slate-600 md:h-10";
@@ -30,7 +29,7 @@ export default function InventoryItemFormPage() {
     const navigate = useNavigate();
     const form = useForm<InventoryItemFormValues>({
         resolver: zodResolver(inventoryItemFormSchema) as never,
-        defaultValues: { category: "", subcategory: "", itemName: "", itemType: "", specifications: {}, makeBrand: "", modelNumber: "", description: "", unit: "Nos.", conversionEnabled: false, conversionUnit: "", conversionFactor: "", hsnCode: "", isActive: true },
+        defaultValues: { category: "", legacyCodeEdit: false, itemName: "", itemType: "", specifications: {}, makeBrand: "", modelNumber: "", description: "", unit: "Nos.", storedUnit: "", conversionEnabled: false, conversionUnit: "", conversionFactor: "", hsnCode: "", isActive: true },
     });
     const { data: item, isLoading: itemLoading, error: itemError, refetch } = useInventoryItem("master", itemId);
     const createItem = useCreateInventoryItem();
@@ -41,6 +40,7 @@ export default function InventoryItemFormPage() {
     const formUrl = useRef(window.location.href);
     const lastWidth = useRef("");
     const initializedForm = useRef("");
+    const legacyCodeCheckFor = useRef("");
     const [unitChangedNotice, setUnitChangedNotice] = useState(false);
     const unit = useWatch({ control: form.control, name: "unit" });
     const categoryName = useWatch({ control: form.control, name: "category" });
@@ -53,22 +53,30 @@ export default function InventoryItemFormPage() {
     const isDirty = form.formState.isDirty;
     const category = ITEM_CATALOG.find(candidate => candidate.name === categoryName);
     const catalogItem = findCatalogItem(categoryName, itemName);
-    const codeFieldKeys = catalogItem?.codeTemplate ? [...catalogItem.codeTemplate.matchAll(/\{([A-Za-z0-9_]+)\}/g)].map(match => match[1]) : [];
-    const isCatalogCodeEdit = Boolean(isEdit && item && catalogItem?.codeTemplate && generateTemplatedItemCode(categoryName, itemName, item.specifications || {}) === item.itemCode);
-    const itemCodePreview = isEdit && item ? item.itemCode : getItemCodePreview(categoryName, itemName, specifications);
-    const conversionOptionsQuery = useItemConversionOptions(unit, width, conversionEnabled);
+    const codePreviewQuery = useItemCodePreview(categoryName, itemName, specifications, Boolean(findCatalogItem(categoryName, itemName)));
+    const storedCategory = item ? getItemMainCategory(item.itemName, item.category) : "";
+    const storedSpecifications = item ? { ...(item.specifications || {}), ...(item.itemType && !item.specifications?.type ? { type: item.itemType } : {}) } : {};
+    const templateKeys = [...(catalogItem?.codeTemplate || "").matchAll(/\{([A-Za-z0-9_]+)\}/g)].map(match => match[1]);
+    const codeFieldsUnchanged = Boolean(isEdit && item && categoryName === storedCategory && itemName === item.itemName && templateKeys.every(key => (specifications[key] || "") === (storedSpecifications[key] || "")));
+    const itemCodePreview = codeFieldsUnchanged && item ? item.itemCode : codePreviewQuery.data?.message || (catalogItem?.codeTemplate ? "Select all options to generate the code" : itemName ? "ITM sequence assigned on save" : "Select all options to generate the code");
+    const typeField = catalogItem?.fields.find(field => field.listColumn === "type");
+    const conversionOptionsQuery = useItemConversionOptions(unit, width, conversionEnabled, categoryName, itemName, typeField ? specifications[typeField.key] : undefined);
     const conversionOptions = conversionOptionsQuery.data || [];
     const selectedConversion = conversionOptions.find(option => option.to === conversionUnit);
     const saving = createItem.isPending || updateItem.isPending;
-    const conversionApplicable = !["Nos.", "Litre", "Pair", "Set"].includes(unit);
+    const allowedConversionPairs = getAllowedConversionPairs(categoryName, itemName, specifications);
+    const conversionApplicable = allowedConversionPairs === undefined
+        ? !["Nos.", "Can", "Pair", "Pairs", "Set"].includes(unit)
+        : allowedConversionPairs.some(pair => pair.from === unit);
 
     useEffect(() => {
         if (isEdit) {
             if (!item || initializedForm.current === `edit-${itemId}`) return;
+            const editCategory = getItemMainCategory(item.itemName, item.category);
             form.reset({
-                category: getItemMainCategory(item.itemName, item.category), subcategory: "", itemName: item.itemName, itemType: item.itemType || "",
-                specifications: item.specifications || {}, makeBrand: item.makeBrand || "", modelNumber: item.modelNumber || "", description: item.description || "",
-                unit: item.unit as Unit, conversionEnabled: Boolean(item.conversionUnit), conversionUnit: item.conversionUnit || "",
+                category: editCategory, legacyCodeEdit: false, itemName: item.itemName, itemType: item.itemType || "",
+                specifications: editSpecifications, makeBrand: item.makeBrand || "", modelNumber: item.modelNumber || "", description: item.description || "",
+                unit: item.unit as Unit, storedUnit: item.unit, conversionEnabled: Boolean(item.conversionUnit), conversionUnit: item.conversionUnit || "",
                 conversionFactor: item.conversionFactor || "", hsnCode: item.hsnCode || "", isActive: item.isActive,
             });
             lastWidth.current = item.specifications?.width || "";
@@ -77,7 +85,7 @@ export default function InventoryItemFormPage() {
             setUnitChangedNotice(false);
         } else if (initializedForm.current !== "new") {
             form.reset({
-                category: "", subcategory: "", itemName: "", itemType: "", specifications: {}, makeBrand: "", modelNumber: "", description: "", unit: "Nos.", conversionEnabled: false,
+                category: "", legacyCodeEdit: false, itemName: "", itemType: "", specifications: {}, makeBrand: "", modelNumber: "", description: "", unit: "Nos.", storedUnit: "", conversionEnabled: false,
                 conversionUnit: "", conversionFactor: "", hsnCode: "", isActive: true,
             });
             lastWidth.current = "";
@@ -88,6 +96,13 @@ export default function InventoryItemFormPage() {
     }, [isEdit, itemId, item, form]);
 
     useEffect(() => {
+        if (!isEdit || !item || !codeFieldsUnchanged || !codePreviewQuery.isSuccess || legacyCodeCheckFor.current === String(item.id)) return;
+        const storedCatalogItem = findCatalogItem(storedCategory, item.itemName);
+        form.setValue("legacyCodeEdit", Boolean(storedCatalogItem?.codeTemplate && codePreviewQuery.data.itemCode !== item.itemCode), { shouldDirty: false });
+        legacyCodeCheckFor.current = String(item.id);
+    }, [isEdit, item, codeFieldsUnchanged, codePreviewQuery.isSuccess, codePreviewQuery.data, storedCategory, form]);
+
+    useEffect(() => {
         if (!catalogItem) return;
         for (const field of catalogItem.fields) {
             if (!fieldIsVisible(specifications, field) && specifications[field.key]) {
@@ -95,6 +110,18 @@ export default function InventoryItemFormPage() {
             }
         }
     }, [catalogItem, specifications, form]);
+
+    useEffect(() => {
+        if (!catalogItem) return;
+        const units = getAllowedUnits(categoryName, itemName, specifications);
+        if (!units.includes(unit)) {
+            const nextUnit = getDefaultUnit(categoryName, itemName, specifications);
+            form.setValue("unit", nextUnit as Unit, { shouldDirty: true, shouldValidate: true });
+            form.setValue("conversionEnabled", false, { shouldDirty: true });
+            form.setValue("conversionUnit", "", { shouldDirty: true });
+            form.setValue("conversionFactor", "", { shouldDirty: true });
+        }
+    }, [catalogItem, categoryName, itemName, specifications, unit, form]);
 
     useEffect(() => {
         if (!conversionEnabled || width !== (form.getValues("specifications.width") || "") || width === lastWidth.current) return;
@@ -154,7 +181,7 @@ export default function InventoryItemFormPage() {
             lastWidth.current = width;
             setUnitChangedNotice(true);
             form.clearErrors(["conversionUnit", "conversionFactor"]);
-        }
+        } 
     };
 
     const handleConversionChange = (nextUnit: string) => {
@@ -176,15 +203,19 @@ export default function InventoryItemFormPage() {
                 form.setError("conversionFactor", { type: "validate", message: "Enter a positive factor with up to 6 decimals." });
                 return;
             }
-            const typeField = catalogItem?.fields.find(field => field.listColumn === "type");
+            const visibleSpecifications = Object.fromEntries(Object.entries(values.specifications).filter(([key, value]) => {
+                const field = catalogItem?.fields.find(candidate => candidate.key === key);
+                if (!field) return values.legacyCodeEdit && Boolean(value.trim());
+                return fieldIsVisible(values.specifications, field) && Boolean(value.trim());
+            }));
             const payload: InventoryItemPayload = {
-                category: values.category, subcategory: values.subcategory || null, modelNumber: values.modelNumber?.trim() || null, itemName: values.itemName,
+                category: values.category, modelNumber: values.modelNumber?.trim() || null, itemName: values.itemName,
                 itemType: typeField ? values.specifications[typeField.key] || null : values.itemType.trim() || null,
                 makeBrand: values.makeBrand.trim() || null,
-                specifications: values.specifications, description: values.description.trim() || null,
+                specifications: visibleSpecifications, description: values.description.trim() || null,
                 unit: values.unit, conversionUnit: values.conversionEnabled ? values.conversionUnit || null : null,
                 conversionFactor: values.conversionEnabled && values.conversionUnit ? values.conversionFactor : null,
-                hsnCode: values.hsnCode.trim(), isActive: values.isActive,
+                hsnCode: values.hsnCode.trim(), isActive: values.isActive, 
             };
             if (isEdit) await updateItem.mutateAsync({ id: itemId, data: payload });
             else await createItem.mutateAsync(payload);
@@ -234,26 +265,27 @@ export default function InventoryItemFormPage() {
             <section className={sectionClass}>
                 <div><h2 className="font-semibold">Item details</h2><p className="text-sm text-muted-foreground">Choose a category, then an item name from that category.</p></div>
                 <div className="grid gap-4 md:grid-cols-2">
-                    <FormField label="Category" required helper={isCatalogCodeEdit ? "These options form the item code and cannot be changed. Create a new item instead." : "Select the item category."} error={errors.category?.message}>
-                        {isCatalogCodeEdit ? <div className={`${formControlClass} flex items-center`} aria-readonly="true">{categoryName}</div> : <select className={formControlClass} aria-invalid={Boolean(errors.category)} {...form.register("category", { onChange: event => {
+                    <FormField label="Category" required helper="Select the item category." error={errors.category?.message}>
+                        <select className={formControlClass} aria-invalid={Boolean(errors.category)} {...form.register("category", { onChange: event => {
                             form.setValue("itemName", "", { shouldDirty: true, shouldValidate: true });
                             form.setValue("itemType", "", { shouldDirty: true });
                             form.setValue("specifications", {}, { shouldDirty: true });
                         } })}>
                             <option value="">Select category</option>
                             {ITEM_CATALOG.map(option => <option key={option.name} value={option.name}>{option.name}</option>)}
-                        </select>}
+                        </select>
                     </FormField>
-                    <FormField label="Item Name" required helper={isCatalogCodeEdit ? "These options form the item code and cannot be changed. Create a new item instead." : "Select an item in this category."} error={errors.itemName?.message}>
-                        {isCatalogCodeEdit ? <div className={`${formControlClass} flex items-center`} aria-readonly="true">{itemName}</div> : <select className={formControlClass} aria-invalid={Boolean(errors.itemName)} disabled={!category} {...form.register("itemName", { onChange: event => {
+                    <FormField label="Item Name" required helper="Select an item in this category." error={errors.itemName?.message}>
+                        <select className={formControlClass} aria-invalid={Boolean(errors.itemName)} disabled={!category} {...form.register("itemName", { onChange: event => {
                             form.setValue("itemType", "", { shouldDirty: true });
                             form.setValue("specifications", {}, { shouldDirty: true });
                             const selected = category?.items.find(candidate => candidate.name === event.target.value);
-                            if (selected?.defaultUnit) form.setValue("unit", selected.defaultUnit as Unit, { shouldDirty: true });
+                            if (selected) form.setValue("unit", getDefaultUnit(categoryName, selected.name) as Unit, { shouldDirty: true });
                         } })}>
                             <option value="">Select item name</option>
+                            {isEdit && item && itemName === item.itemName && category?.name === categoryName && !category.items.some(option => option.name === item.itemName) && <option value={item.itemName}>{item.itemName} (legacy name)</option>}
                             {category && <optgroup label={category.name}>{category.items.map(option => <option key={option.name} value={option.name} disabled={option.pending}>{option.pending ? `${option.name} (pending finalization)` : option.name}</option>)}</optgroup>}
-                        </select>}
+                        </select>
                     </FormField>
                     {catalogItem?.legacyTypes && <FormField label="Type" helper="Select the legacy item type." error={errors.itemType?.message}>
                         <select className={formControlClass} aria-invalid={Boolean(errors.itemType)} {...form.register("itemType")}><option value="">Select type</option>{catalogItem.legacyTypes.map(type => <option key={type} value={type}>{type}</option>)}</select>
@@ -264,7 +296,6 @@ export default function InventoryItemFormPage() {
             <section className={sectionClass}>
                 <div><h2 className="font-semibold">Item Code (auto-generated)</h2><p className="text-sm text-muted-foreground">The server assigns the saved item code.</p></div>
                 <output className="block min-h-11 break-all rounded-md border bg-muted/40 px-3 py-3 text-sm font-medium" aria-live="polite">{itemCodePreview}</output>
-                {isCatalogCodeEdit && <p className="text-sm text-muted-foreground">These options form the item code and cannot be changed. Create a new item instead.</p>}
             </section>
 
             <section className={sectionClass}>
@@ -281,13 +312,12 @@ export default function InventoryItemFormPage() {
                     {catalogItem.fields.filter(field => fieldIsVisible(specifications, field)).map(field => {
                         const error = errors.specifications?.[field.key]?.message;
                         const name = `specifications.${field.key}` as const;
-                        const isCodeField = isCatalogCodeEdit && codeFieldKeys.includes(field.key);
                         const selectedOption = field.options?.find(option => option.value === specifications[field.key]);
                         const helper = selectedOption?.helper || (field.required ? `${field.label} is required.` : `Optional ${field.label.toLowerCase()} value.`);
-                        return <FormField key={field.key} label={field.listColumn === "type" ? "Type" : field.label} required={field.required} helper={isCodeField ? "These options form the item code and cannot be changed. Create a new item instead." : helper} error={error}>
+                        return <FormField key={field.key} label={field.listColumn === "type" ? "Type" : field.label} required={field.required} helper={helper} error={error}>
                             {field.options
-                                ? isCodeField ? <div className={`${formControlClass} flex items-center`} aria-readonly="true">{specifications[field.key]}</div> : <select className={formControlClass} aria-invalid={Boolean(error)} {...form.register(name)}><option value="">Select {field.label}</option>{field.options.map(option => <option key={option.value} value={option.value}>{option.value}</option>)}</select>
-                                : isCodeField ? <div className={`${formControlClass} flex items-center`} aria-readonly="true">{specifications[field.key]}{field.suffix ? ` ${field.suffix}` : ""}</div> : <div className="relative"><Input type={field.kind === "number" ? "number" : "text"} min={field.min} max={field.max} step={field.integer ? "1" : field.kind === "number" ? "any" : undefined} maxLength={field.kind === "text" ? 200 : undefined} className={`${formControlClass} ${field.suffix ? "pr-16" : ""}`} aria-invalid={Boolean(error)} {...form.register(name)} />{field.suffix && <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">{field.suffix}</span>}</div>}
+                                ? <select className={formControlClass} aria-invalid={Boolean(error)} {...form.register(name)}><option value="">Select {field.label}</option>{field.options.map(option => <option key={option.value} value={option.value}>{option.value}</option>)}</select>
+                                : <div className="relative"><Input type={field.kind === "number" ? "number" : "text"} min={field.min} max={field.max} step={field.integer ? "1" : field.kind === "number" ? "any" : undefined} maxLength={field.kind === "text" ? 200 : undefined} className={`${formControlClass} ${field.suffix ? "pr-16" : ""}`} aria-invalid={Boolean(error)} {...form.register(name)} />{field.suffix && <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">{field.suffix}</span>}</div>}
                         </FormField>;
                     })}
                 </div> : <p className="text-sm text-muted-foreground">Choose an item name to see its specification fields.</p>}
@@ -296,7 +326,7 @@ export default function InventoryItemFormPage() {
             <section className={sectionClass}>
                 <div><h2 className="font-semibold">Unit</h2><p className="text-sm text-muted-foreground">Choose the item’s base unit.</p></div>
                 <FormField label="Unit" required helper="This is the item’s base unit." error={errors.unit?.message}>
-                    <select className={formControlClass} aria-invalid={Boolean(errors.unit)} value={unit} onChange={event => handleUnitChange(event.target.value as Unit)}>{UNIT_OPTIONS.map(value => <option key={value} value={value}>{value}</option>)}</select>
+                    <select className={formControlClass} aria-invalid={Boolean(errors.unit)} value={unit} onChange={event => handleUnitChange(event.target.value as Unit)}>{getAllowedUnits(categoryName, itemName, specifications).map(value => <option key={value} value={value}>{value}</option>)}</select>
                 </FormField>
             </section>
 

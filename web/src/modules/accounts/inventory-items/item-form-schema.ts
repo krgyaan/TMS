@@ -1,10 +1,10 @@
 import { z } from "zod";
 // @ts-expect-error Node's test loader needs the explicit TypeScript extension.
-import { findCatalogItem, fieldIsVisible, UNIT_OPTIONS } from "./item-catalog.ts";
+import { findCatalogItem, fieldIsVisible, getAllowedUnits, UNIT_OPTIONS } from "./item-catalog.ts";
 
 export const buildInventoryItemFormSchema = () => z.object({
     category: z.string().min(1, "Category is required"),
-    subcategory: z.string(),
+    legacyCodeEdit: z.boolean().default(false),
     modelNumber: z.string().max(120).optional(),
     itemName: z.string().min(1, "Item name is required"),
     itemType: z.string().max(80).optional(),
@@ -12,18 +12,20 @@ export const buildInventoryItemFormSchema = () => z.object({
     makeBrand: z.string().max(120).optional(),
     description: z.string().max(500).optional(),
     unit: z.enum(UNIT_OPTIONS, { message: "Unit is required" }),
+    storedUnit: z.string(),
     conversionEnabled: z.boolean().default(false),
     conversionUnit: z.string(),
     conversionFactor: z.string(),
-    hsnCode: z.string().regex(/^\d{4,8}$/, "HSN code must contain 4 to 8 digits"),
+    hsnCode: z.string().max(8),
     isActive: z.boolean(),
 }).superRefine((values, context) => {
     const item = findCatalogItem(values.category, values.itemName);
     if (!item) {
         context.addIssue({ code: "custom", path: ["itemName"], message: "Choose an item from this category." });
     } else {
+        if (item.pending) context.addIssue({ code: "custom", path: ["itemName"], message: `${item.name} is pending finalization and cannot be created.` });
         const knownFields = new Set(item.fields.map(field => field.key));
-        if (values.category !== "Legacy") {
+        if (values.category !== "Legacy" && !values.legacyCodeEdit) {
             for (const key of Object.keys(values.specifications)) {
                 if (!knownFields.has(key)) context.addIssue({ code: "custom", path: ["specifications", key], message: `Unknown specification key: ${key}` });
             }
@@ -36,7 +38,7 @@ export const buildInventoryItemFormSchema = () => z.object({
                 continue;
             }
             if (!value) {
-                if (field.required) context.addIssue({ code: "custom", path: ["specifications", field.key], message: `${field.label} is required.` });
+                if (field.required && !values.legacyCodeEdit) context.addIssue({ code: "custom", path: ["specifications", field.key], message: `${field.label} is required.` });
                 continue;
             }
             if (field.options && !field.options.some(option => option.value === value)) {
@@ -52,6 +54,15 @@ export const buildInventoryItemFormSchema = () => z.object({
                     context.addIssue({ code: "custom", path: ["specifications", field.key], message: `${field.label} must be a whole number.` });
                 }
             }
+        }
+        if (!item.hsnNotApplicable && !/^\d{4,8}$/.test(values.hsnCode.trim())) {
+            context.addIssue({ code: "custom", path: ["hsnCode"], message: "HSN code must contain 4 to 8 digits." });
+        }
+        if (!getAllowedUnits(values.category, values.itemName, values.specifications).includes(values.unit) && values.unit !== values.storedUnit) {
+            context.addIssue({ code: "custom", path: ["unit"], message: `Choose a valid unit for ${values.itemName}.` });
+        }
+        if (values.itemName === "Torque Wrench" && !/^\d+(?:-\d+)?$/.test(values.specifications.torqueRange?.trim() || "")) {
+            context.addIssue({ code: "custom", path: ["specifications", "torqueRange"], message: "Enter a number or numeric range, such as 20 or 20-100." });
         }
     }
 

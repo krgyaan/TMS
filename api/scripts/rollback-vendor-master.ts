@@ -34,6 +34,7 @@ const TABLES = {
     vendor_organizations: schema.vendorOrganizations,
     vendors: schema.vendors,
     vendor_gsts: schema.vendorGsts,
+    vendor_accs: schema.vendorAccs,
 } as const;
 
 function readManifest(manifestPath: string): ManifestEntry[] {

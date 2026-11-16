@@ -1,5 +1,5 @@
 import { BaseApiService } from "./base.service";
-import type { InventoryItem, InventoryItemPayload, InventoryItemsResponse, ItemConversionOption } from "@/types/inventory-item.types";
+import type { InventoryItem, InventoryItemPayload, InventoryItemsResponse, ItemCodePreview, ItemConversionOption } from "@/types/inventory-item.types";
 
 export type ItemMasterApi = "accounts" | "operations" | "master";
 
@@ -13,8 +13,11 @@ class InventoryItemsReadService extends BaseApiService {
 }
 
 class SettingsInventoryItemsService extends InventoryItemsReadService {
-    getConversionOptions(unit: string, width?: string): Promise<ItemConversionOption[]> {
-        return this.get<ItemConversionOption[]>("/conversion-options", { params: { unit, width } });
+    previewCode(category: string, itemName: string, specifications: Record<string, string>): Promise<ItemCodePreview> {
+        return this.post<ItemCodePreview>("/code-preview", { category, itemName, specifications });
+    }
+    getConversionOptions(unit: string, width?: string, category?: string, itemName?: string, type?: string): Promise<ItemConversionOption[]> {
+        return this.get<ItemConversionOption[]>("/conversion-options", { params: { unit, width, category, itemName, type } });
     }
     create(data: InventoryItemPayload): Promise<InventoryItem> { return this.post<InventoryItem>("", data); }
     update(id: number, data: Partial<InventoryItemPayload>): Promise<InventoryItem> { return this.patch<InventoryItem>(`/${id}`, data); }

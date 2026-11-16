@@ -90,8 +90,8 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
     const tenderId = params.tenderId ? Number(params.tenderId) : null;
 
     // const { data: allowedVendors, isLoading: isLoadingVendors } = useRfqVendors(tenderData.rfqTo);
-    const { data: allVendorOrganizations, isLoading: isLoadingVendors, error: vendorOrgsError } = useVendorOrganizationsWithRelations();
-    const { data: rfqs, isLoading: isLoadingRfqData } = useRfqByTenderId(tenderId);
+    const { data: allVendorOrganizations, isLoading: isLoadingVendors, error: vendorOrgsError } = useVendorOrganizationsWithRelations(true);
+    const { data: rfqs } = useRfqByTenderId(tenderId);
 
     const isEditMode = !!initialData;
     const isSubmitting = createRfq.isPending || updateRfq.isPending;

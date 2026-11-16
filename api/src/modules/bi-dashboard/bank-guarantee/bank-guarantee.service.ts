@@ -21,7 +21,7 @@ import {
 } from '@db/schemas/tendering/payment-requests.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, like, ne, sql } from 'drizzle-orm';
 
 @Injectable()
 export class BankGuaranteeService {
@@ -39,20 +39,21 @@ export class BankGuaranteeService {
     private statusMap() {
         return {
             [BG_STATUSES.PENDING]: 'Pending',
-            [BG_STATUSES.ACCOUNTS_FORM_ACCEPTED]: 'Accepted',
+            [BG_STATUSES.ACCOUNTS_FORM_ACCEPTED]: 'Format Accepted',
             [BG_STATUSES.ACCOUNTS_FORM_REJECTED]: 'Rejected',
             [BG_STATUSES.BG_CREATED]: 'Created',
-            [BG_STATUSES.FDR_DETAILS_CAPTURED]: 'FDR Details Captured',
+            // Accounts Form 3 now captures the SFMS confirmation + charges.
+            [BG_STATUSES.FDR_DETAILS_CAPTURED]: 'SFMS Submitted',
             [BG_STATUSES.FOLLOWUP_INITIATED]: 'Followup Initiated',
-            [BG_STATUSES.EXTENSION_REQUESTED]: 'Extension Requested',
-            [BG_STATUSES.RETURN_VIA_COURIER]: 'Courier Returned',
+            [BG_STATUSES.EXTENSION_REQUESTED]: 'Extension Request',
+            [BG_STATUSES.RETURN_VIA_COURIER]: 'Returned via courier',
             [BG_STATUSES.CANCELLATION_REQUESTED]: 'Cancellation Request',
-            [BG_STATUSES.BG_CANCELLATION_CONFIRMED]: 'Cancelled at Branch',
-            [BG_STATUSES.FDR_CANCELLED_CONFIRMED]: 'FDR Cancellation Confirmed',
+            [BG_STATUSES.BG_CANCELLATION_CONFIRMED]: 'BG Cancelled',
+            [BG_STATUSES.FDR_CANCELLED_CONFIRMED]: 'FDR released',
             // Legacy rows written with pre-migration status strings.
-            RETURNED_VIA_COURIER: 'Courier Returned',
-            BG_CANCELLED: 'Cancelled at Branch',
-            FDR_CANCELLED: 'FDR Cancellation Confirmed',
+            RETURNED_VIA_COURIER: 'Returned via courier',
+            BG_CANCELLED: 'BG Cancelled',
+            FDR_CANCELLED: 'FDR released',
         };
     }
 
@@ -88,6 +89,13 @@ export class BankGuaranteeService {
             conditions.push(
                 inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
                 inArray(instrumentBgDetails.bankName, ['YESBANK_2011', 'YESBANK_0771'])
+            );
+        } else if (tab === 'live-au') {
+            // AU Small Finance Bank — bank names are stored as AU_<branch code>
+            // (AU_8316, AU_5190, AU_5180, AU_5242, …).
+            conditions.push(
+                inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
+                like(instrumentBgDetails.bankName, 'AU_%')
             );
         } else if (tab === 'cancelled') {
             conditions.push(
@@ -145,7 +153,7 @@ export class BankGuaranteeService {
                 sql`${statuses.name} ILIKE ${searchStr}`,
                 sql`${paymentInstruments.status} ILIKE ${searchStr}`,
                 // Search by BG status display label (table shows "Pending", "Accepted", etc.)
-                sql`(CASE ${paymentInstruments.status} WHEN 'PENDING' THEN 'Pending' WHEN 'ACCOUNTS_FORM_ACCEPTED' THEN 'Accepted' WHEN 'ACCOUNTS_FORM_REJECTED' THEN 'Rejected' WHEN 'BG_CREATED' THEN 'Created' WHEN 'FDR_DETAILS_CAPTURED' THEN 'FDR Details Captured' WHEN 'FOLLOWUP_INITIATED' THEN 'Followup Initiated' WHEN 'EXTENSION_REQUESTED' THEN 'Extension Requested' WHEN 'RETURN_VIA_COURIER' THEN 'Courier Returned' WHEN 'CANCELLATION_REQUESTED' THEN 'Cancellation Request' WHEN 'BG_CANCELLATION_CONFIRMED' THEN 'Cancelled at Branch' WHEN 'FDR_CANCELLED_CONFIRMED' THEN 'FDR Cancellation Confirmed' ELSE ${paymentInstruments.status}::text END)::text ILIKE ${searchStr}`,
+                sql`(CASE ${paymentInstruments.status} WHEN 'PENDING' THEN 'Pending' WHEN 'ACCOUNTS_FORM_ACCEPTED' THEN 'Format Accepted' WHEN 'ACCOUNTS_FORM_REJECTED' THEN 'Rejected' WHEN 'BG_CREATED' THEN 'Created' WHEN 'FDR_DETAILS_CAPTURED' THEN 'SFMS Submitted' WHEN 'FOLLOWUP_INITIATED' THEN 'Followup Initiated' WHEN 'EXTENSION_REQUESTED' THEN 'Extension Request' WHEN 'RETURN_VIA_COURIER' THEN 'Returned via courier' WHEN 'CANCELLATION_REQUESTED' THEN 'Cancellation Request' WHEN 'BG_CANCELLATION_CONFIRMED' THEN 'BG Cancelled' WHEN 'FDR_CANCELLED_CONFIRMED' THEN 'FDR released' ELSE ${paymentInstruments.status}::text END)::text ILIKE ${searchStr}`,
             ];
             conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
         }
@@ -186,6 +194,16 @@ export class BankGuaranteeService {
             .select({
                 id: paymentInstruments.id,
                 requestId: paymentRequests.id,
+                action: paymentInstruments.action,
+                createdAt: paymentInstruments.createdAt,
+                // Elapsed time is computed in SQL: `created_at` is a
+                // `timestamp without time zone` written in IST, so parsing it
+                // in Node (UTC) would shift it by 5h30m. Postgres compares it
+                // against `now()` in the session timezone, which is correct.
+                elapsedSeconds: sql<number>`extract(epoch from (now() - ${paymentInstruments.createdAt}))`,
+                tenderId: paymentRequests.tenderId,
+                projectId: paymentRequests.projectId,
+                bgNeeds: instrumentBgDetails.bgNeeds,
                 bgDate: instrumentBgDetails.bgDate,
                 bgNo: instrumentBgDetails.bgNo,
                 beneficiaryName: instrumentBgDetails.beneficiaryName,
@@ -244,6 +262,24 @@ export class BankGuaranteeService {
 
         const total = Number(countResult?.count || 0);
 
+        // Follow-ups that have been stopped: used to show "Followup Stopped"
+        // instead of "Followup Initiated" on the dashboard.
+        const stoppedFollowupIds = new Set<number>();
+        const instrumentIds = rows.map((row) => row.id);
+        if (instrumentIds.length > 0) {
+            const stoppedRows = await this.db
+                .select({ emdId: followUps.emdId })
+                .from(followUps)
+                .where(and(
+                    inArray(followUps.emdId, instrumentIds),
+                    isNull(followUps.deletedAt),
+                    sql`(${followUps.stopReason} is not null or ${followUps.stopRemarks} is not null)`,
+                ));
+            for (const stopped of stoppedRows) {
+                if (stopped.emdId != null) stoppedFollowupIds.add(Number(stopped.emdId));
+            }
+        }
+
         // Map rows and apply calculations using helper functions
         const data: BankGuaranteeDashboardRow[] = rows.map((row) => {
             const bgDate = row.bgDate ? new Date(row.bgDate) : null;
@@ -254,6 +290,37 @@ export class BankGuaranteeService {
                 ?? (row.bgExpiryDateBg ? new Date(row.bgExpiryDateBg) : null);
             const amount = row.amount ? Number(row.amount) : null;
 
+            // Show the real project/tender name whenever one exists; only fall
+            // back to "Accounts/Admin" when no name was captured at all.
+            const projectLabel = this.resolveProjectLabel(row.projectName, row.tenderName);
+
+            const bgStatusLabel = row.bgStatus === BG_STATUSES.FOLLOWUP_INITIATED
+                && stoppedFollowupIds.has(row.id)
+                ? 'Followup Stopped'
+                : this.statusMap()[row.bgStatus] ?? null;
+
+            // Stage 1 gets a fixed 12h window; once Stage 1 is accepted (action
+            // 1) Stage 2 counts down the "BG Needed In" hours. Both are measured
+            // from the request creation time.
+            const bgNeedsHours = Number.parseInt(String(row.bgNeeds ?? '').replace(/[^0-9]/g, ''), 10);
+            const timerHours = row.action === 0
+                ? 12
+                : row.action === 1 && Number.isFinite(bgNeedsHours) && bgNeedsHours > 0
+                    ? bgNeedsHours
+                    : null;
+            const elapsedSeconds = Number(row.elapsedSeconds ?? 0);
+            const timer: BankGuaranteeDashboardRow['timer'] = timerHours && Number.isFinite(elapsedSeconds)
+                ? (() => {
+                    const remainingSeconds = Math.floor(timerHours * 60 * 60 - elapsedSeconds);
+                    return {
+                        remainingSeconds,
+                        status: remainingSeconds < 0 ? 'OVERDUE' : 'RUNNING',
+                        // Absolute instant, so the client can tick against it.
+                        deadline: new Date(Date.now() + remainingSeconds * 1000),
+                    };
+                })()
+                : null;
+
             return {
                 id: row.id,
                 requestId: row.requestId,
@@ -261,6 +328,7 @@ export class BankGuaranteeService {
                 bgNo: row.bgNo,
                 beneficiaryName: row.beneficiaryName,
                 tenderName: row.tenderName || row.projectName,
+                projectLabel,
                 tenderNo: row.tenderNo || row.projectNo,
                 amount,
                 bgExpiryDate,
@@ -277,14 +345,15 @@ export class BankGuaranteeService {
                     amount,
                     bgDate,
                     effectiveClaimDate,
-                    row.stampCharges ? Number(row.stampCharges) : null,
-                    row.sfmsCharges ? Number(row.sfmsCharges) : null
+                    row.stampChargesDeducted ? Number(row.stampChargesDeducted) : null,
+                    row.stampCharges ? Number(row.stampCharges) : null
                 ),
                 fdrNo: row.fdrNo,
                 fdrValue: row.fdrValue ? Number(row.fdrValue) : null,
                 tenderStatus: row.tenderStatusFromTender,
                 bidValidity: row.tenderDueDate || row.requestDueDate,
-                bgStatus: this.statusMap()[row.bgStatus],
+                bgStatus: bgStatusLabel,
+                timer,
                 expiryStatus: this.calculateExpiryStatus(
                     row.bgExpiryDateBg ? new Date(row.bgExpiryDateBg) : null,
                     claimExpiryDate,
@@ -309,6 +378,8 @@ export class BankGuaranteeService {
                 bgDate: instrumentBgDetails.bgDate,
                 bgNo: instrumentBgDetails.bgNo,
                 beneficiaryName: instrumentBgDetails.beneficiaryName,
+                tenderId: paymentRequests.tenderId,
+                projectId: paymentRequests.projectId,
                 tenderDueDate: tenderInfos.dueDate,
                 requestDueDate: paymentRequests.dueDate,
                 projectName: paymentRequests.projectName,
@@ -358,6 +429,8 @@ export class BankGuaranteeService {
                 ?? (row.bgExpiryDateBg ? new Date(row.bgExpiryDateBg) : null);
             const amount = row.amount ? Number(row.amount) : null;
 
+            const projectLabel = this.resolveProjectLabel(row.projectName, null);
+
             return {
                 id: row.id,
                 requestId: row.requestId,
@@ -365,6 +438,7 @@ export class BankGuaranteeService {
                 bgNo: row.bgNo,
                 beneficiaryName: row.beneficiaryName,
                 projectName: row.projectName,
+                projectLabel,
                 projectNo: row.projectNo,
                 amount,
                 bgExpiryDate,
@@ -381,8 +455,8 @@ export class BankGuaranteeService {
                     amount,
                     bgDate,
                     effectiveClaimDate,
-                    row.stampCharges ? Number(row.stampCharges) : null,
-                    row.sfmsCharges ? Number(row.sfmsCharges) : null
+                    row.stampChargesDeducted ? Number(row.stampChargesDeducted) : null,
+                    row.stampCharges ? Number(row.stampCharges) : null
                 ),
                 fdrNo: row.fdrNo,
                 fdrValue: row.fdrValue ? Number(row.fdrValue) : null,
@@ -437,6 +511,11 @@ export class BankGuaranteeService {
             inArray(instrumentBgDetails.bankName, ['YESBANK_2011', 'YESBANK_0771']),
         );
 
+        const liveAuFilter = and(
+            inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
+            like(instrumentBgDetails.bankName, 'AU_%'),
+        );
+
         const cancelledFilter = inArray(paymentInstruments.action, [8, 9]);
 
         const rejectedFilter = and(
@@ -450,6 +529,7 @@ export class BankGuaranteeService {
             liveBgLimit: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${liveBgLimitFilter})`,
             liveSbi: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${liveSbiFilter})`,
             liveYes: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${liveYesFilter})`,
+            liveAu: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${liveAuFilter})`,
             cancelled: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${cancelledFilter})`,
             rejected: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${rejectedFilter})`,
         })
@@ -466,6 +546,7 @@ export class BankGuaranteeService {
         const liveBgLimit = Number(counts?.liveBgLimit ?? 0);
         const liveSbi = Number(counts?.liveSbi ?? 0);
         const liveYes = Number(counts?.liveYes ?? 0);
+        const liveAu = Number(counts?.liveAu ?? 0);
         const cancelled = Number(counts?.cancelled ?? 0);
         const rejected = Number(counts?.rejected ?? 0);
 
@@ -475,9 +556,10 @@ export class BankGuaranteeService {
             'live-bg-limit': liveBgLimit,
             'live-sbi': liveSbi,
             'live-yes': liveYes,
+            'live-au': liveAu,
             cancelled,
             rejected,
-            total: newRequests + livePnb + liveBgLimit + liveSbi + liveYes + cancelled + rejected,
+            total: newRequests + livePnb + liveBgLimit + liveSbi + liveYes + liveAu + cancelled + rejected,
         };
     }
 
@@ -591,33 +673,58 @@ export class BankGuaranteeService {
      * Interest: bgValue * (0.01/365) * monthsDifference * 1.18 (GST)
      * Note: Laravel uses diffInMonths which returns integer months, then multiplies by daily rate
      */
+    /**
+     * Resolve the display label for the "Project Name" column.
+     *
+     * The request's `project_name` is authoritative whenever it holds a real
+     * value; the joined tender name is the fallback. "Accounts/Admin" is only
+     * used when no name was captured at all (tender/project id presence is not
+     * a reliable signal — most Accounts/Admin rows still carry a real name).
+     */
+    private resolveProjectLabel(
+        projectName: string | null | undefined,
+        tenderName: string | null | undefined,
+    ): string {
+        const isRealName = (value: string | null | undefined) => {
+            const trimmed = value?.trim();
+            return trimmed && trimmed.toUpperCase() !== 'NA' ? trimmed : null;
+        };
+
+        return isRealName(projectName) ?? isRealName(tenderName) ?? 'Accounts/Admin';
+    }
+
+    /**
+     * Calculate the charges the bank should charge for a BG:
+     *   BG value × (0.65% / 365) × days(BG creation → claim expiry) × 1.18 (GST)
+     *   + Stamp Paper charges deducted (Accounts Form 3)
+     *   + BG stamp paper value captured on the create form (default 300)
+     *   + fixed SFMS charge (590)
+     */
     private calculateBgChargesCalculated(
         bgValue: number | null,
         bgDate: Date | null,
         claimExpiryDate: Date | null,
-        stampCharges: number | null,
-        sfmsCharges: number | null
+        stampChargesDeducted: number | null,
+        bgStampPaperValue: number | null
     ): number | null {
         if (!bgValue || !bgDate || !claimExpiryDate) {
             return null;
         }
 
-        const bgStampPaperValue = stampCharges ?? 300;
-        const sfmsChargesValue = sfmsCharges ?? 590;
+        const stampPaperCharges = stampChargesDeducted ?? 0;
+        const stampPaperValue = bgStampPaperValue ?? 300;
+        const sfmsFixedCharges = 590;
 
-        // Calculate months difference (integer months, matching Laravel's diffInMonths)
-        const monthsDifference = this.calculateMonthsDifference(bgDate, claimExpiryDate);
+        const dayMs = 1000 * 60 * 60 * 24;
+        const days = Math.max(
+            0,
+            Math.round((new Date(claimExpiryDate).getTime() - new Date(bgDate).getTime()) / dayMs),
+        );
 
-        // Daily interest rate: 0.01 / 365
-        const dailyInterestRate = 0.01 / 365;
+        // Interest at 0.65% per annum, plus 18% GST.
+        const interestWithGST = bgValue * (0.0065 / 365) * days * 1.18;
 
-        // Interest component (matching Laravel: bgValue * dailyRate * months)
-        const interestComponent = bgValue * dailyInterestRate * monthsDifference;
-
-        // Add GST (1.18)
-        const interestWithGST = interestComponent * 1.18;
-
-        return bgStampPaperValue + sfmsChargesValue + interestWithGST;
+        return stampPaperCharges + stampPaperValue + sfmsFixedCharges + interestWithGST;
     }
 
     /**
@@ -679,28 +786,6 @@ export class BankGuaranteeService {
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
         return diffDays;
-    }
-
-    /**
-     * Calculate months difference between two dates
-     * Returns integer months (matching Laravel's diffInMonths behavior)
-     */
-    private calculateMonthsDifference(startDate: Date, endDate: Date): number {
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-
-        const yearsDiff = end.getFullYear() - start.getFullYear();
-        const monthsDiff = end.getMonth() - start.getMonth();
-
-        // Calculate total months (integer, matching Laravel's diffInMonths)
-        let totalMonths = yearsDiff * 12 + monthsDiff;
-
-        // Adjust if end day is before start day (same logic as Carbon's diffInMonths)
-        if (end.getDate() < start.getDate()) {
-            totalMonths--;
-        }
-
-        return totalMonths;
     }
 
     /**
@@ -919,7 +1004,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             'bgPo', 'bgClientUser', 'bgClientCp', 'bgClientFin',
             'bgBankAcc', 'bgBankIfsc', 'bgBankAccName', 'courierNo',
             'extensionLetter', 'newBgClaim', 'approveBg',
-            'fdrAmt', 'fdrPer', 'fdrNo', 'fdrValidity', 'fdrRoi',
+            'fdrAmt', 'fdrPer', 'fdrNo', 'fdrDate', 'fdrValidity', 'fdrRoi',
             'bankMailIds', 'bankMailIdsCc',
             'bgChargeDeducted', 'newStampChargeDeducted', 'cancelRemark',
             'bgFdrCancelDate', 'bgFdrCancelAmount', 'bgFdrCancelRefNo',
@@ -1061,16 +1146,6 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             }
         } else if (body.action === 'accounts-form-2') {
             nextStatus = 'BG_CREATED';
-            if (body.req_no) updateData.reqNo = String(body.req_no);
-            if (body.courier_address_json) {
-                try {
-                    updateData.courierAddressJson = typeof body.courier_address_json === 'string'
-                        ? JSON.parse(body.courier_address_json)
-                        : body.courier_address_json;
-                } catch {
-                    updateData.courierAddressJson = null;
-                }
-            }
         } else if (body.action === 'accounts-form-3') {
             nextStatus = 'FDR_DETAILS_CAPTURED';
         } else if (body.action === 'initiate-followup') {
@@ -1151,6 +1226,22 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             const mailIdsCc = this.parseStringArray(body.bank_mail_ids_cc);
             if (mailIdsCc !== null) bgDetailsUpdate.bankMailIdsCc = mailIdsCc;
 
+            // FDR details are captured up-front in Form 1 as well. They share the
+            // same columns as Accounts Form 3, so a later Form 3 submission
+            // refines/overwrites these values.
+            if (body.fdr_no) bgDetailsUpdate.fdrNo = body.fdr_no;
+            if (body.fdr_date) bgDetailsUpdate.fdrDate = body.fdr_date;
+            if (body.fdr_validity) bgDetailsUpdate.fdrValidity = body.fdr_validity;
+            if (body.fdr_roi) bgDetailsUpdate.fdrRoi = body.fdr_roi;
+
+            const fdrCopyFile = this.getFileForField('fdr_copy', files, body, fileIndexTracker);
+            const fdrCopyPath = this.getFilePathFromBody('fdr_copy', body);
+            if (fdrCopyFile) {
+                bgDetailsUpdate.fdrCopy = this.bgFileStoredPath('bg-fdr-copy', fdrCopyFile.filename);
+            } else if (fdrCopyPath) {
+                bgDetailsUpdate.fdrCopy = fdrCopyPath;
+            }
+
             // Handle bg_format_imran file (single file)
             const bgFormatImranFile = this.getFileForField('bg_format_imran', files, body, fileIndexTracker);
             const bgFormatImranPath = this.getFilePathFromBody('bg_format_imran', body);
@@ -1185,6 +1276,24 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             if (body.bg_validity) bgDetailsUpdate.validityDate = body.bg_validity;
             if (body.bg_claim_period) bgDetailsUpdate.claimExpiryDate = body.bg_claim_period;
             if (body.bg2_remark) bgDetailsUpdate.bg2Remark = body.bg2_remark;
+
+            // The issued BG document uploaded with the form.
+            const bgUploadFile = this.getFileForField('bg_upload', files, body, fileIndexTracker);
+            const bgUploadPath = this.getFilePathFromBody('bg_upload', body);
+            if (bgUploadFile) {
+                bgDetailsUpdate.bgUpload = this.bgFileStoredPath('bg-upload', bgUploadFile.filename);
+            } else if (bgUploadPath) {
+                bgDetailsUpdate.bgUpload = bgUploadPath;
+            }
+
+            // The signed covering letter received back from the bank/client.
+            const signedCoveringFile = this.getFileForField('bg_signed_covering_letter', files, body, fileIndexTracker);
+            const signedCoveringPath = this.getFilePathFromBody('bg_signed_covering_letter', body);
+            if (signedCoveringFile) {
+                bgDetailsUpdate.bgSignedCoveringLetter = this.bgFileStoredPath('bg-signed-covering-letter', signedCoveringFile.filename);
+            } else if (signedCoveringPath) {
+                bgDetailsUpdate.bgSignedCoveringLetter = signedCoveringPath;
+            }
         } else if (body.action === 'accounts-form-3') {
             if (body.fdr_no) bgDetailsUpdate.fdrNo = body.fdr_no;
             if (body.fdr_amt) bgDetailsUpdate.fdrAmt = body.fdr_amt;
@@ -1478,6 +1587,12 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 extensionLetterPath: instrumentBgDetails.extensionLetterPath,
                 cancellationLetterPath: instrumentBgDetails.cancellationLetterPath,
                 prefilledSignedBg: instrumentBgDetails.prefilledSignedBg,
+                coverLetterDocx: instrumentBgDetails.coverLetterDocx,
+                prefilledAppDocx: instrumentBgDetails.prefilledAppDocx,
+                authorizationLetterDocx: instrumentBgDetails.authorizationLetterDocx,
+                envelopeSlip: instrumentBgDetails.envelopeSlip,
+                bgUpload: instrumentBgDetails.bgUpload,
+                bgSignedCoveringLetter: instrumentBgDetails.bgSignedCoveringLetter,
                 bgNeeds: instrumentBgDetails.bgNeeds,
                 bgPurpose: instrumentBgDetails.bgPurpose,
                 bgSoftCopy: instrumentBgDetails.bgSoftCopy,
@@ -1501,6 +1616,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 fdrPer: instrumentBgDetails.fdrPer,
                 fdrCopy: instrumentBgDetails.fdrCopy,
                 fdrNo: instrumentBgDetails.fdrNo,
+                fdrDate: instrumentBgDetails.fdrDate,
                 fdrValidity: instrumentBgDetails.fdrValidity,
                 fdrRoi: instrumentBgDetails.fdrRoi,
                 bgChargeDeducted: instrumentBgDetails.bgChargeDeducted,
@@ -1616,6 +1732,8 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 bgFormatTl: instrumentBgDetails.bgFormatTl,
                 // Accounts Form 2 (after BG creation)
                 bg2Remark: instrumentBgDetails.bg2Remark,
+                bgUpload: instrumentBgDetails.bgUpload,
+                bgSignedCoveringLetter: instrumentBgDetails.bgSignedCoveringLetter,
                 // Accounts Form 3 (capture FDR details)
                 fdrPer: instrumentBgDetails.fdrPer,
                 fdrCopy: instrumentBgDetails.fdrCopy,
@@ -1635,6 +1753,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 fdrNo: instrumentBgDetails.fdrNo,
                 fdrAmt: instrumentBgDetails.fdrAmt,
                 fdrValidity: instrumentBgDetails.fdrValidity,
+                fdrDate: instrumentBgDetails.fdrDate,
                 fdrRoi: instrumentBgDetails.fdrRoi,
                 cancelRemark: instrumentBgDetails.cancelRemark,
                 stampCoveringLetter: instrumentBgDetails.stampCoveringLetter,
@@ -1808,6 +1927,8 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             bgFormatTl: result.bgFormatTl,
             // Accounts Form 2 (after BG creation)
             bg2Remark: result.bg2Remark,
+            bgUpload: result.bgUpload,
+            bgSignedCoveringLetter: result.bgSignedCoveringLetter,
             // Accounts Form 3 (capture FDR details). fdrPer is returned as a
             // string because the form field is z.enum(['10','15','100']) and the
             // SelectField emits strings for it.
@@ -1834,6 +1955,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             newStampChargeDeducted: result.newStampChargeDeducted ? Number(result.newStampChargeDeducted) : null,
             fdrNo: result.fdrNo,
             fdrAmt: result.fdrAmt ? Number(result.fdrAmt) : null,
+            fdrDate: result.fdrDate ? new Date(result.fdrDate) : null,
             fdrValidity: result.fdrValidity ? new Date(result.fdrValidity) : null,
             fdrRoi: result.fdrRoi ? Number(result.fdrRoi) : null,
             cancelRemark: result.cancelRemark,

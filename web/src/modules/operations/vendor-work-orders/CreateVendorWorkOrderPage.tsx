@@ -196,7 +196,7 @@ export default function CreateVendorWorkOrderPage() {
         try {
             const partyDataDTO = {
                 name: partyData.name.trim(),
-                alias: partyData.alias || undefined,
+                alias: partyCreationType === "ship_to" ? partyData.alias || undefined : undefined,
                 email: partyData.email || undefined,
                 address: partyData.address || undefined,
                 gstNo: partyData.gstNo || undefined,
@@ -394,8 +394,9 @@ export default function CreateVendorWorkOrderPage() {
                                     </Button>
                                 </div>
                                 <PartyFormDialog
-                                    title="Add New Vendor"
-                                    description="Add a new party to use as a vendor."
+                                    title="Add New Seller"
+                                    description="Add a new party to use as a seller."
+                                    showAlias={false}
                                     open={isAddPartyOpen}
                                     onOpenChange={open => {
                                         setIsAddPartyOpen(open);
@@ -552,6 +553,7 @@ export default function CreateVendorWorkOrderPage() {
                                 <PartyFormDialog
                                     title="Add New Ship To"
                                     description="Add a new party to use as a shipping destination."
+                                    showAlias
                                     open={isShipToPartyOpen}
                                     onOpenChange={open => {
                                         setIsShipToPartyOpen(open);

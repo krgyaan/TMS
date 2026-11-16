@@ -9,6 +9,8 @@ export const vendorAccs = pgTable("vendor_accs", {
     bankAccountName: varchar("bank_account_name", { length: 255 }).notNull(),
     accountNum: varchar("account_num", { length: 255 }).notNull(),
     ifscCode: varchar("ifsc_code", { length: 255 }).notNull(),
+    branch: varchar("branch", { length: 255 }),
+    swiftCode: varchar("swift_code", { length: 50 }),
     createdAt: timestamp("created_at", { withTimezone: true }),
     updatedAt: timestamp("updated_at", { withTimezone: true }),
 });

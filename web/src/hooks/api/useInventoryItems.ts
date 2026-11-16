@@ -18,11 +18,19 @@ export const useInventoryItems = (team: ItemMasterTeam, filters: InventoryItemFi
 export const useInventoryItem = (team: ItemMasterTeam, id: number) =>
     useQuery({ queryKey: [...inventoryItemsKey, "detail", team, id], queryFn: () => serviceFor(team).getById(id), enabled: !!id });
 
-export const useItemConversionOptions = (unit: string, width?: string, enabled = true) =>
+export const useItemConversionOptions = (unit: string, width?: string, enabled = true, category?: string, itemName?: string, type?: string) =>
     useQuery({
-        queryKey: [...inventoryItemsKey, "conversion-options", unit, width],
-        queryFn: () => inventoryItemsService.master.getConversionOptions(unit, width),
-        enabled: enabled && Boolean(unit) && !["Nos.", "Litre", "Pair", "Set"].includes(unit),
+        queryKey: [...inventoryItemsKey, "conversion-options", unit, width, category, itemName, type],
+        queryFn: () => inventoryItemsService.master.getConversionOptions(unit, width, category, itemName, type),
+        enabled: enabled && Boolean(unit),
+    });
+
+export const useItemCodePreview = (category: string, itemName: string, specifications: Record<string, string>, enabled = true) =>
+    useQuery({
+        queryKey: [...inventoryItemsKey, "code-preview", category, itemName, specifications],
+        queryFn: () => inventoryItemsService.master.previewCode(category, itemName, specifications),
+        enabled: enabled && Boolean(category && itemName),
+        staleTime: 30_000,
     });
 
 const useItemMutation = (action: (data: InventoryItemPayload) => Promise<InventoryItem>, message: string, includeCode = false) => {

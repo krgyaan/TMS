@@ -1,10 +1,11 @@
 /**\
- * One-off data migration: reads the vendor-master workbook (first worksheet) and
- * upserts it into vendor_organizations / vendors / vendor_gsts.
+ * One-off data migration: reads the vendor-master workbook (`VM` by default) and
+ * upserts it into vendor_organizations / vendors / vendor_gsts / vendor_accs.
  *
  * Usage (from the api/ directory; DATABASE_URL is loaded from api/.env):
  *   pnpm migrate:vendor-master ../tms_sheet.xlsx --dry-run   # SELECT-only preview
  *   pnpm migrate:vendor-master ../tms_sheet.xlsx             # apply
+ *   pnpm migrate:vendor-master ../tms_sheet.xlsx --sheet VM  # explicit worksheet
  *
  * Every write this run makes is recorded to ./migration-logs/:
  *   - vendor-master-<runId>.log.txt         human-readable log of every insert/update
@@ -15,47 +16,232 @@
  *   pnpm rollback:vendor-master ./migration-logs/vendor-master-<runId>.manifest.ndjson --confirm
  * (see rollback-vendor-master.ts for details - it never touches rows outside this run's manifest)
  *
- * Safe to re-run the migration itself: organizations are upserted by (unique)
- * name, contacts are upserted by orgId, and GST rows are skipped if the same
- * (state, gstNo) already exists for that org.
+ * Safe to re-run the migration itself: organizations are matched by normalized name,
+ * contacts are never overwritten, bank accounts are matched by account number, and GST
+ * rows are skipped if the same (state, gstNo) already exists for that org.
  */
 import "dotenv/config";
-import { eq } from "drizzle-orm";
+import * as fs from "fs";
+import { eq, sql, and } from "drizzle-orm";
 import { createPool, createDb } from "../src/db";
 import { MigrationLogger } from "./migrationLogger";
 import { parseVmSheet, type ParsedVendor } from "./parseVm";
 import * as schema from "../src/db/schemas/vendors";
 
-/** Read-only preview of a run: reports insert/update counts, performs no writes. */
-async function reportDryRun(db: ReturnType<typeof createDb>, parsedVendors: ParsedVendor[], logger: MigrationLogger): Promise<void> {
-    const orgRows = await db.select({ id: schema.vendorOrganizations.id, name: schema.vendorOrganizations.name }).from(schema.vendorOrganizations);
+const normalizeKey = (value: string): string => value.toLowerCase().replace(/\s+/g, " ").trim();
+
+const LEGAL_SUFFIXES = new Set(["private", "pvt", "limited", "ltd", "llp", "co", "company", "corporation", "corp", "inc", "incorporated"]);
+
+const normalizeLoose = (value: string): string => {
+    const words = value
+        .toLowerCase()
+        .replace(/&/g, " and ")
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+    while (words.length > 1 && LEGAL_SUFFIXES.has(words[words.length - 1])) words.pop();
+    return words.join(" ") || normalizeKey(value);
+};
+
+const cleanPan = (value: string | null): string => (value ? value.toUpperCase().replace(/[^A-Z0-9]/g, "") : "");
+
+type OrgIndexEntry = {
+    id: number;
+    name: string;
+    pan: string | null;
+    status: boolean;
+    normalized: string;
+    loose: string;
+};
+
+type OrgIndex = {
+    byId: Map<number, OrgIndexEntry>;
+    byExact: Map<string, OrgIndexEntry[]>;
+    byLoose: Map<string, OrgIndexEntry[]>;
+    byPan: Map<string, OrgIndexEntry[]>;
+    byGst: Map<string, OrgIndexEntry[]>;
+};
+
+type MatchDecision = "insert" | "update" | "skip";
+
+type VendorPlan = {
+    vendorName: string;
+    decision: MatchDecision;
+    matchReason: string;
+    orgId: number | null;
+    orgName: string | null;
+    candidates: Array<{ id: number; name: string; status: boolean }>;
+};
+
+const addToIndex = (map: Map<string, OrgIndexEntry[]>, key: string, entry: OrgIndexEntry): void => {
+    if (!key) return;
+    const list = map.get(key);
+    if (list) list.push(entry);
+    else map.set(key, [entry]);
+};
+
+async function buildOrgIndex(db: ReturnType<typeof createDb>): Promise<OrgIndex> {
+    const orgRows = await db
+        .select({
+            id: schema.vendorOrganizations.id,
+            name: schema.vendorOrganizations.name,
+            pan: schema.vendorOrganizations.pan,
+            status: schema.vendorOrganizations.status,
+        })
+        .from(schema.vendorOrganizations);
+    const gstRows = await db.select({ orgId: schema.vendorGsts.orgId, gstNo: schema.vendorGsts.gstNo }).from(schema.vendorGsts);
+
+    const index: OrgIndex = {
+        byId: new Map(),
+        byExact: new Map(),
+        byLoose: new Map(),
+        byPan: new Map(),
+        byGst: new Map(),
+    };
+
+    for (const org of orgRows) {
+        const entry: OrgIndexEntry = {
+            ...org,
+            normalized: normalizeKey(org.name),
+            loose: normalizeLoose(org.name),
+        };
+        index.byId.set(org.id, entry);
+        addToIndex(index.byExact, entry.normalized, entry);
+        addToIndex(index.byLoose, entry.loose, entry);
+        addToIndex(index.byPan, cleanPan(org.pan), entry);
+    }
+
+    for (const gst of gstRows) {
+        const entry = index.byId.get(gst.orgId);
+        if (entry && gst.gstNo) addToIndex(index.byGst, gst.gstNo.trim().toUpperCase(), entry);
+    }
+
+    return index;
+}
+
+const uniqueEntries = (entries: OrgIndexEntry[]): OrgIndexEntry[] => [...new Map(entries.map(e => [e.id, e])).values()];
+
+const candidateSummary = (entries: OrgIndexEntry[]): Array<{ id: number; name: string; status: boolean }> =>
+    uniqueEntries(entries).map(e => ({ id: e.id, name: e.name, status: e.status }));
+
+function planVendor(vendor: ParsedVendor, index: OrgIndex): VendorPlan {
+    const base = { vendorName: vendor.name, orgId: null, orgName: null, candidates: [] as Array<{ id: number; name: string; status: boolean }> };
+
+    const exact = uniqueEntries(index.byExact.get(normalizeKey(vendor.name)) ?? []);
+    const exactActive = exact.filter(e => e.status);
+    if (exactActive.length === 1) return { ...base, decision: "update", matchReason: "exact name", orgId: exactActive[0].id, orgName: exactActive[0].name };
+    if (exactActive.length > 1) return { ...base, decision: "skip", matchReason: "ambiguous exact name", candidates: candidateSummary(exactActive) };
+    if (exact.length > 0) return { ...base, decision: "skip", matchReason: "inactive exact-name match", candidates: candidateSummary(exact) };
+
+    const loose = uniqueEntries(index.byLoose.get(normalizeLoose(vendor.name)) ?? []);
+    const looseActive = loose.filter(e => e.status);
+    if (looseActive.length === 1) return { ...base, decision: "update", matchReason: "normalized name (punctuation/legal suffix)", orgId: looseActive[0].id, orgName: looseActive[0].name };
+    if (looseActive.length > 1) return { ...base, decision: "skip", matchReason: "ambiguous normalized name", candidates: candidateSummary(looseActive) };
+    if (loose.length > 0) return { ...base, decision: "skip", matchReason: "inactive normalized-name match", candidates: candidateSummary(loose) };
+
+    const panKey = cleanPan(vendor.pan);
+    if (panKey) {
+        const pan = uniqueEntries(index.byPan.get(panKey) ?? []);
+        const panActive = pan.filter(e => e.status);
+        if (panActive.length === 1) return { ...base, decision: "update", matchReason: "PAN", orgId: panActive[0].id, orgName: panActive[0].name };
+        if (panActive.length > 1) return { ...base, decision: "skip", matchReason: "ambiguous PAN", candidates: candidateSummary(panActive) };
+        if (pan.length > 0) return { ...base, decision: "skip", matchReason: "inactive PAN match", candidates: candidateSummary(pan) };
+    }
+
+    const gstCandidates: OrgIndexEntry[] = [];
+    for (const gst of vendor.gsts) {
+        if (!gst.gstNo) continue;
+        gstCandidates.push(...(index.byGst.get(gst.gstNo.trim().toUpperCase()) ?? []));
+    }
+    const gstUnique = uniqueEntries(gstCandidates);
+    const gstActive = gstUnique.filter(e => e.status);
+    if (gstActive.length === 1) return { ...base, decision: "update", matchReason: "GSTIN", orgId: gstActive[0].id, orgName: gstActive[0].name };
+    if (gstActive.length > 1) return { ...base, decision: "skip", matchReason: "ambiguous GSTIN", candidates: candidateSummary(gstActive) };
+    if (gstUnique.length > 0) return { ...base, decision: "skip", matchReason: "inactive GSTIN match", candidates: candidateSummary(gstUnique) };
+
+    return { ...base, decision: "insert", matchReason: "new vendor" };
+}
+
+const csvCell = (value: unknown): string => `"${String(value ?? "").replace(/"/g, '""')}"`;
+
+function writePlanReport(plan: VendorPlan[], logger: MigrationLogger): { csvPath: string; ndjsonPath: string } {
+    const base = logger.logPath.replace(/\.log\.txt$/, "");
+    const csvPath = `${base}.plan.csv`;
+    const ndjsonPath = `${base}.plan.ndjson`;
+
+    const header = ["vendor", "decision", "match_reason", "org_id", "org_name", "candidates"];
+    const lines = [header.join(",")];
+    for (const entry of plan) {
+        lines.push(
+            [
+                csvCell(entry.vendorName),
+                csvCell(entry.decision),
+                csvCell(entry.matchReason),
+                csvCell(entry.orgId),
+                csvCell(entry.orgName),
+                csvCell(entry.candidates.map(c => `${c.id}:${c.name}${c.status ? "" : " (inactive)"}`).join(" | ")),
+            ].join(",")
+        );
+    }
+
+    fs.writeFileSync(csvPath, lines.join("\n") + "\n");
+    fs.writeFileSync(ndjsonPath, plan.map(entry => JSON.stringify(entry)).join("\n") + "\n");
+    return { csvPath, ndjsonPath };
+}
+
+/** Read-only preview of a run: reports insert/update/skip counts, performs no writes. */
+async function reportDryRun(
+    db: ReturnType<typeof createDb>,
+    parsedVendors: ParsedVendor[],
+    planByName: Map<string, VendorPlan>,
+    logger: MigrationLogger
+): Promise<void> {
     const contactRows = await db.select({ orgId: schema.vendors.orgId }).from(schema.vendors);
+    const accountRows = await db.select({ orgId: schema.vendorAccs.orgId, accountNum: schema.vendorAccs.accountNum }).from(schema.vendorAccs);
     const gstRows = await db.select({ orgId: schema.vendorGsts.orgId, gstState: schema.vendorGsts.gstState, gstNo: schema.vendorGsts.gstNo }).from(schema.vendorGsts);
 
-    const orgIdByName = new Map(orgRows.map(r => [r.name, r.id]));
     const orgsWithContact = new Set(contactRows.map(r => r.orgId));
+    const accountKeys = new Set(accountRows.map(a => `${a.orgId}|${(a.accountNum ?? "").trim().toLowerCase()}`));
     const existingGstKeys = new Set(gstRows.map(g => `${g.orgId}|${g.gstState}|${g.gstNo}`));
 
     let orgsToInsert = 0;
     let orgsToUpdate = 0;
+    let orgsToSkip = 0;
     let contactsToInsert = 0;
-    let contactsToUpdate = 0;
+    let contactsToSkip = 0;
+    let banksToInsert = 0;
+    let banksToSkip = 0;
     let gstsToInsert = 0;
     let gstsToSkip = 0;
 
     for (const vendor of parsedVendors) {
-        const orgId = orgIdByName.get(vendor.name);
+        const plan = planByName.get(vendor.name);
+        if (!plan || plan.decision === "skip") {
+            orgsToSkip++;
+            continue;
+        }
 
-        if (orgId === undefined) {
+        if (plan.decision === "insert") {
             orgsToInsert++;
             contactsToInsert++;
+            if (vendor.bank) banksToInsert++;
             gstsToInsert += vendor.gsts.length;
             continue;
         }
 
         orgsToUpdate++;
-        if (orgsWithContact.has(orgId)) contactsToUpdate++;
+        const orgId = plan.orgId;
+        if (orgId == null) continue;
+
+        if (orgsWithContact.has(orgId)) contactsToSkip++;
         else contactsToInsert++;
+
+        if (vendor.bank) {
+            const key = `${orgId}|${vendor.bank.accountNum.trim().toLowerCase()}`;
+            if (accountKeys.has(key)) banksToSkip++;
+            else banksToInsert++;
+        }
 
         for (const g of vendor.gsts) {
             if (existingGstKeys.has(`${orgId}|${g.gstState}|${g.gstNo}`)) gstsToSkip++;
@@ -64,25 +250,30 @@ async function reportDryRun(db: ReturnType<typeof createDb>, parsedVendors: Pars
     }
 
     const summary =
-        `Organizations: ${orgsToInsert} insert, ${orgsToUpdate} update\n` +
-        `Contacts:      ${contactsToInsert} insert, ${contactsToUpdate} update\n` +
+        `Organizations: ${orgsToInsert} insert, ${orgsToUpdate} update, ${orgsToSkip} skipped\n` +
+        `Contacts:      ${contactsToInsert} insert, ${contactsToSkip} skipped (existing contacts)\n` +
+        `Bank accounts: ${banksToInsert} insert, ${banksToSkip} skipped (already present)\n` +
         `GST rows:      ${gstsToInsert} insert, ${gstsToSkip} skipped (already present)`;
     console.log(`\nDry run complete - nothing was written.\n${summary}`);
     logger.summary(`Dry run complete (SELECT only, no writes).\n${summary}`);
 }
 
 async function main() {
-    const dryRun = process.argv.includes("--dry-run");
-    const filePath = process.argv.slice(2).find(a => !a.startsWith("--"));
+    const args = process.argv.slice(2);
+    const dryRun = args.includes("--dry-run");
+    const sheetIndex = args.indexOf("--sheet");
+    const requestedSheet = sheetIndex >= 0 ? args[sheetIndex + 1] : undefined;
+    if (sheetIndex >= 0) args.splice(sheetIndex, 2);
+    const filePath = args.find(a => !a.startsWith("--"));
     if (!filePath) {
-        console.error("Usage: npx tsx scripts/migrate-vendor-master.ts <path-to-xlsx> [--dry-run]");
+        console.error("Usage: npx tsx scripts/migrate-vendor-master.ts <path-to-xlsx> [--sheet VM] [--dry-run]");
         process.exit(1);
     }
 
-    const { vendors: parsedVendors, warnings, anomalies, notes } = parseVmSheet(filePath);
+    const { vendors: parsedVendors, warnings, anomalies, notes, corrections, sheetName, headerRowIndex } = parseVmSheet(filePath, { sheetName: requestedSheet });
     const logger = new MigrationLogger("./migration-logs", dryRun ? "vendor-master-dryrun" : "vendor-master");
 
-    console.log(`Parsed ${parsedVendors.length} vendors (deduped by name) from "${filePath}".`);
+    console.log(`Parsed ${parsedVendors.length} vendors from worksheet "${sheetName}" (header row ${headerRowIndex + 1}).`);
     console.log(`Log file:      ${logger.logPath}`);
     if (dryRun) {
         console.log("Mode:          DRY RUN - only SELECT statements will run.");
@@ -91,12 +282,22 @@ async function main() {
     }
 
     logger.log(`Source file: ${filePath}`);
+    logger.log(`Worksheet: ${sheetName} (header row ${headerRowIndex + 1})`);
     logger.log(`Vendors parsed: ${parsedVendors.length}`);
     logger.log(`Mode: ${dryRun ? "dry run (SELECT only)" : "apply"}`);
 
+    if (corrections.length) {
+        console.info(`\n${corrections.length} data correction(s) applied in memory:`);
+        logger.summary(`${corrections.length} data correction(s):`);
+        for (const c of corrections) {
+            console.info(` - [${c.vendorName}] ${c.message}`);
+            logger.log(`CORRECTION [${c.vendorName}] ${c.message}`);
+        }
+    }
+
     if (warnings.length) {
-        console.warn(`\n${warnings.length} GST cell(s) didn't match the expected "(GSTIN) address" pattern - stored as address-only:`);
-        logger.summary(`${warnings.length} GST parse warning(s):`);
+        console.warn(`\n${warnings.length} parse warning(s):`);
+        logger.summary(`${warnings.length} parse warning(s):`);
         for (const w of warnings) {
             console.warn(` - [${w.vendorName}] ${w.message}`);
             logger.log(`WARNING [${w.vendorName}] ${w.message}`);
@@ -104,8 +305,8 @@ async function main() {
     }
 
     if (anomalies.length) {
-        console.warn(`\n${anomalies.length} suspicious GSTIN value(s) - reported only, they are stored exactly as found in the workbook:`);
-        logger.summary(`${anomalies.length} GSTIN data anomaly(s) (stored as-is):`);
+        console.warn(`\n${anomalies.length} suspicious/incomplete value(s) - reported for review:`);
+        logger.summary(`${anomalies.length} data anomaly(s):`);
         for (const a of anomalies) {
             console.warn(` - [${a.vendorName}] ${a.message}`);
             logger.log(`ANOMALY [${a.vendorName}] ${a.message}`);
@@ -113,8 +314,8 @@ async function main() {
     }
 
     if (notes.length) {
-        console.info(`\n${notes.length} GSTIN(s) accepted under a retired state code - logged for review:`);
-        logger.summary(`${notes.length} GSTIN retirement note(s):`);
+        console.info(`\n${notes.length} GSTIN note(s):`);
+        logger.summary(`${notes.length} GSTIN note(s):`);
         for (const n of notes) {
             console.info(` - [${n.vendorName}] ${n.message}`);
             logger.log(`NOTE [${n.vendorName}] ${n.message}`);
@@ -132,91 +333,112 @@ async function main() {
 
     let orgsInserted = 0;
     let orgsUpdated = 0;
+    let orgsSkipped = 0;
     let contactsInserted = 0;
-    let contactsUpdated = 0;
+    let contactsSkipped = 0;
+    let banksInserted = 0;
+    let banksSkipped = 0;
     let gstRowsInserted = 0;
+    let gstRowsSkipped = 0;
 
     try {
+        const orgIndex = await buildOrgIndex(db);
+        const plan = parsedVendors.map(vendor => planVendor(vendor, orgIndex));
+        const planByName = new Map(plan.map(entry => [entry.vendorName, entry]));
+        const planPaths = writePlanReport(plan, logger);
+
+        console.log(`Plan report:   ${planPaths.csvPath}`);
+        console.log(`Plan JSON:     ${planPaths.ndjsonPath}`);
+        logger.log(`Plan report: ${planPaths.csvPath}`);
+        logger.log(`Plan JSON: ${planPaths.ndjsonPath}`);
+
         if (dryRun) {
-            await reportDryRun(db, parsedVendors, logger);
+            await reportDryRun(db, parsedVendors, planByName, logger);
             return;
         }
 
         for (const vendor of parsedVendors) {
+            const vendorPlan = planByName.get(vendor.name);
+            if (!vendorPlan || vendorPlan.decision === "skip") {
+                orgsSkipped++;
+                logger.log(`vendor_organizations SKIP name="${vendor.name}" reason="${vendorPlan?.matchReason ?? "no plan"}"`);
+                continue;
+            }
+
             await db.transaction(async tx => {
-                // --- 1. Organization -------------------------------------------------
-                const existingOrg = await tx.select().from(schema.vendorOrganizations).where(eq(schema.vendorOrganizations.name, vendor.name)).limit(1);
-
                 const orgUpdatedAt = new Date();
-                const [org] = await tx
-                    .insert(schema.vendorOrganizations)
-                    .values({
-                        name: vendor.name,
-                        pan: vendor.pan,
-                        msme: vendor.msme,
-                        updatedAt: orgUpdatedAt,
-                    })
-                    .onConflictDoUpdate({
-                        target: schema.vendorOrganizations.name,
-                        set: {
-                            pan: vendor.pan ?? undefined,
-                            msme: vendor.msme ?? undefined,
-                            updatedAt: orgUpdatedAt,
-                        },
-                    })
-                    .returning({ id: schema.vendorOrganizations.id });
+                const orgValues = {
+                    name: vendor.name,
+                    category: vendor.category ?? undefined,
+                    pan: vendor.pan ?? undefined,
+                    msme: vendor.msme ?? undefined,
+                    msmeSize: vendor.msmeSize ?? undefined,
+                    msmeType: vendor.msmeType ?? undefined,
+                    majorActivity: vendor.majorActivity ?? undefined,
+                    registrationType: vendor.registrationType ?? undefined,
+                    creditPeriodDays: vendor.creditPeriodDays ?? undefined,
+                    creditAmount: vendor.creditAmount ?? undefined,
+                    address: vendor.address ?? undefined,
+                    updatedAt: orgUpdatedAt,
+                };
 
-                if (existingOrg.length > 0) {
+                let orgId: number;
+                if (vendorPlan.decision === "update" && vendorPlan.orgId != null) {
+                    const [existingOrg] = await tx
+                        .select()
+                        .from(schema.vendorOrganizations)
+                        .where(eq(schema.vendorOrganizations.id, vendorPlan.orgId))
+                        .limit(1);
+                    if (!existingOrg) throw new Error(`Matched organization ${vendorPlan.orgId} disappeared during migration`);
+
+                    orgId = existingOrg.id;
+                    await tx
+                        .update(schema.vendorOrganizations)
+                        .set(orgValues)
+                        .where(eq(schema.vendorOrganizations.id, orgId));
+
                     orgsUpdated++;
-                    logger.log(`vendor_organizations id=${org.id} UPDATE name="${vendor.name}" pan="${vendor.pan}" msme="${vendor.msme}"`);
+                    logger.log(
+                        `vendor_organizations id=${orgId} UPDATE name="${vendor.name}" matched="${vendorPlan.matchReason}" pan="${vendor.pan}" msme="${vendor.msme}" category="${vendor.category}" registration="${vendor.registrationType}"`
+                    );
                     logger.record({
                         table: "vendor_organizations",
                         action: "update",
-                        id: org.id,
-                        before: existingOrg[0],
+                        id: orgId,
+                        before: existingOrg,
                         checkUpdatedAt: orgUpdatedAt.toISOString(),
                     });
                 } else {
+                    const [org] = await tx
+                        .insert(schema.vendorOrganizations)
+                        .values(orgValues)
+                        .returning({ id: schema.vendorOrganizations.id });
+                    orgId = org.id;
+
                     orgsInserted++;
-                    logger.log(`vendor_organizations id=${org.id} INSERT name="${vendor.name}" pan="${vendor.pan}" msme="${vendor.msme}"`);
+                    logger.log(
+                        `vendor_organizations id=${orgId} INSERT name="${vendor.name}" pan="${vendor.pan}" msme="${vendor.msme}" category="${vendor.category}" registration="${vendor.registrationType}"`
+                    );
                     logger.record({
                         table: "vendor_organizations",
                         action: "insert",
-                        id: org.id,
+                        id: orgId,
                         checkUpdatedAt: orgUpdatedAt.toISOString(),
                     });
                 }
 
-                // --- 2. Contact record (one per org) ----------------------------------
-                const existingContact = await tx.select().from(schema.vendors).where(eq(schema.vendors.orgId, org.id)).limit(1);
+                // --- 2. Contact record (never overwrite existing contacts) -------------
+                const existingContact = await tx.select({ id: schema.vendors.id }).from(schema.vendors).where(eq(schema.vendors.orgId, orgId)).limit(1);
 
-                const contactUpdatedAt = new Date();
                 if (existingContact.length > 0) {
-                    const contactId = existingContact[0].id;
-                    await tx
-                        .update(schema.vendors)
-                        .set({
-                            name: vendor.name,
-                            email: vendor.email,
-                            mobile: vendor.phone,
-                            updatedAt: contactUpdatedAt,
-                        })
-                        .where(eq(schema.vendors.id, contactId));
-
-                    contactsUpdated++;
-                    logger.log(`vendors id=${contactId} UPDATE orgId=${org.id} email="${vendor.email}" mobile="${vendor.phone}"`);
-                    logger.record({
-                        table: "vendors",
-                        action: "update",
-                        id: contactId,
-                        before: existingContact[0],
-                        checkUpdatedAt: contactUpdatedAt.toISOString(),
-                    });
+                    contactsSkipped++;
+                    logger.log(`vendors orgId=${orgId} SKIP existing contact id=${existingContact[0].id}`);
                 } else {
+                    const contactUpdatedAt = new Date();
                     const [contact] = await tx
                         .insert(schema.vendors)
                         .values({
-                            orgId: org.id,
+                            orgId,
                             name: vendor.name,
                             email: vendor.email,
                             mobile: vendor.phone,
@@ -226,7 +448,7 @@ async function main() {
                         .returning({ id: schema.vendors.id });
 
                     contactsInserted++;
-                    logger.log(`vendors id=${contact.id} INSERT orgId=${org.id} email="${vendor.email}" mobile="${vendor.phone}"`);
+                    logger.log(`vendors id=${contact.id} INSERT orgId=${orgId} email="${vendor.email}" mobile="${vendor.phone}"`);
                     logger.record({
                         table: "vendors",
                         action: "insert",
@@ -235,23 +457,63 @@ async function main() {
                     });
                 }
 
-                // --- 3. GST registrations (insert-only, duplicates skipped) ----------
+                // --- 3. Bank account (insert-only, matched by account number) ---------
+                if (vendor.bank) {
+                    const normalizedAccount = vendor.bank.accountNum.trim().toLowerCase();
+                    const existingAccount = await tx
+                        .select({ id: schema.vendorAccs.id })
+                        .from(schema.vendorAccs)
+                        .where(and(eq(schema.vendorAccs.orgId, orgId), sql`lower(btrim(${schema.vendorAccs.accountNum})) = ${normalizedAccount}`))
+                        .limit(1);
+
+                    if (existingAccount.length > 0) {
+                        banksSkipped++;
+                        logger.log(`vendor_accs orgId=${orgId} SKIP existing account id=${existingAccount[0].id}`);
+                    } else {
+                        const accountUpdatedAt = new Date();
+                        const [account] = await tx
+                            .insert(schema.vendorAccs)
+                            .values({
+                                orgId,
+                                bankAccountName: vendor.bank.bankAccountName,
+                                accountNum: vendor.bank.accountNum,
+                                ifscCode: vendor.bank.ifscCode,
+                                branch: vendor.bank.branch,
+                                swiftCode: vendor.bank.swiftCode,
+                                createdAt: accountUpdatedAt,
+                                updatedAt: accountUpdatedAt,
+                            })
+                            .returning({ id: schema.vendorAccs.id });
+
+                        banksInserted++;
+                        logger.log(`vendor_accs id=${account.id} INSERT orgId=${orgId} account="${vendor.bank.accountNum}" ifsc="${vendor.bank.ifscCode}"`);
+                        logger.record({
+                            table: "vendor_accs",
+                            action: "insert",
+                            id: account.id,
+                            checkUpdatedAt: accountUpdatedAt.toISOString(),
+                        });
+                    }
+                }
+
+                // --- 4. GST registrations (insert-only, duplicates skipped) ----------
                 if (vendor.gsts.length > 0) {
                     const existingGsts = await tx
                         .select({ gstState: schema.vendorGsts.gstState, gstNo: schema.vendorGsts.gstNo })
                         .from(schema.vendorGsts)
-                        .where(eq(schema.vendorGsts.orgId, org.id));
+                        .where(eq(schema.vendorGsts.orgId, orgId));
 
                     const existingKeys = new Set(existingGsts.map(g => `${g.gstState}|${g.gstNo}`));
                     const gstUpdatedAt = new Date();
 
                     const toInsert = vendor.gsts.filter(g => !existingKeys.has(`${g.gstState}|${g.gstNo}`));
+                    gstRowsSkipped += vendor.gsts.length - toInsert.length;
 
                     for (const g of toInsert) {
                         const [row] = await tx
                             .insert(schema.vendorGsts)
                             .values({
-                                orgId: org.id,
+                                orgId,
                                 gstState: g.gstState,
                                 gstNo: g.gstNo,
                                 address: g.address,
@@ -261,7 +523,7 @@ async function main() {
                             .returning({ id: schema.vendorGsts.id });
 
                         gstRowsInserted++;
-                        logger.log(`vendor_gsts id=${row.id} INSERT orgId=${org.id} state="${g.gstState}" gstNo="${g.gstNo}"`);
+                        logger.log(`vendor_gsts id=${row.id} INSERT orgId=${orgId} state="${g.gstState}" gstNo="${g.gstNo}"`);
                         logger.record({
                             table: "vendor_gsts",
                             action: "insert",
@@ -274,9 +536,10 @@ async function main() {
         }
 
         const summary =
-            `Organizations: ${orgsInserted} inserted, ${orgsUpdated} updated\n` +
-            `Contacts:      ${contactsInserted} inserted, ${contactsUpdated} updated\n` +
-            `GST rows:      ${gstRowsInserted} inserted`;
+            `Organizations: ${orgsInserted} inserted, ${orgsUpdated} updated, ${orgsSkipped} skipped\n` +
+            `Contacts:      ${contactsInserted} inserted, ${contactsSkipped} skipped (existing contacts)\n` +
+            `Bank accounts: ${banksInserted} inserted, ${banksSkipped} skipped\n` +
+            `GST rows:      ${gstRowsInserted} inserted, ${gstRowsSkipped} skipped`;
         console.log(`\nDone.\n${summary}`);
         logger.summary(`Run complete.\n${summary}`);
     } finally {

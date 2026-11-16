@@ -115,15 +115,37 @@ const VendorDirectoryShowPage = () => {
                             <TableRow>
                                 <TableCell className="font-medium text-muted-foreground align-top">Organization Name</TableCell>
                                 <TableCell className="align-top break-words">{organization.name || "-"}</TableCell>
-                                <TableCell className="font-medium text-muted-foreground align-top">Alias</TableCell>
-                                <TableCell className="align-top break-words">{organization.alias || "-"}</TableCell>
+                                <TableCell className="font-medium text-muted-foreground align-top">Category</TableCell>
+                                <TableCell className="align-top break-words">{organization.category || "-"}</TableCell>
                             </TableRow>
                             <TableRow>
+                                <TableCell className="font-medium text-muted-foreground align-top">Registration Type</TableCell>
+                                <TableCell className="align-top break-words">{organization.registrationType || "-"}</TableCell>
                                 <TableCell className="font-medium text-muted-foreground align-top">PAN</TableCell>
                                 <TableCell className="align-top break-words">{organization.pan || "-"}</TableCell>
+                            </TableRow>
+                            <TableRow>
                                 <TableCell className="font-medium text-muted-foreground align-top">MSME</TableCell>
+                                <TableCell className="align-top break-words">{organization.msme || "-"}</TableCell>
+                                <TableCell className="font-medium text-muted-foreground align-top">MSME Size</TableCell>
+                                <TableCell className="align-top break-words">{organization.msmeSize || "-"}</TableCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableCell className="font-medium text-muted-foreground align-top">Supply Type</TableCell>
                                 <TableCell className="align-top break-words">
                                     <MsmeBadge msme={organization.msme} msmeType={organization.msmeType} />
+                                </TableCell>
+                                <TableCell className="font-medium text-muted-foreground align-top">Major Activity</TableCell>
+                                <TableCell className="align-top break-words">{organization.majorActivity || "-"}</TableCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableCell className="font-medium text-muted-foreground align-top">Credit Period</TableCell>
+                                <TableCell className="align-top break-words">{organization.creditPeriodDays != null ? `${organization.creditPeriodDays} days` : "-"}</TableCell>
+                                <TableCell className="font-medium text-muted-foreground align-top">Credit Amount</TableCell>
+                                <TableCell className="align-top break-words">
+                                    {organization.creditAmount != null
+                                        ? new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(organization.creditAmount)
+                                        : "-"}
                                 </TableCell>
                             </TableRow>
                             <TableRow>
