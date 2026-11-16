@@ -1,31 +1,26 @@
 <div style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.6; color: #222; max-width: 640px;">
     <p>Dear {{data.teName}},</p>
 
-    <p>
-        The Bank Guarantee has been created and couriered. The soft copy of the BG is attached with this mail.
-    </p>
+    <p>The request for BG creation has been accepted and the BG has been created.</p>
 
     <p>
-        {{#if data.courierNo}}
-        <strong>Courier Docket no.:</strong> {{data.courierNo}}<br>
-        {{/if}}
-        {{#if data.courierProvider}}
-        <strong>Courier Provider:</strong> {{data.courierProvider}}<br>
-        {{/if}}
-        <strong>Courier Docket Slip:</strong> will be shared shortly
-    </p>
-
-    {{#if data.reasons}}
-    <p><strong>Remarks:</strong> {{data.reasons}}</p>
-    {{/if}}
-
-    <p>
-        The SFMS confirmation of the BG will be sent in the next mail.
+        {{#if data.hasSignedCoveringLetter}}Signed Covering Letter: attached below<br>{{/if}}
+        {{#if data.hasSoftCopy}}Soft copy of the BG: attached below<br>{{/if}}
+        {{#if data.courierRequestNo}}Courier Request No.: {{data.courierRequestNo}}<br>{{/if}}
+        SFMS Confirmation of the BG will be sent in the next mail.{{#if data.remarks}}<br>
+        Remarks: {{data.remarks}}{{/if}}
     </p>
 
     <p>
         Regards,<br>
-        {{data.senderName}}<br>
-        Tendering, Volks Energie Pvt. Ltd.
+        Imran Khan,<br>
+        Accounts team.
     </p>
+
+    {{#if data.attachmentNames.length}}
+    <p>
+        Attachment:<br>
+        {{#each data.attachmentNames}}{{this}}{{#unless @last}}<br>{{/unless}}{{/each}}
+    </p>
+    {{/if}}
 </div>

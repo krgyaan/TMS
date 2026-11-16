@@ -2540,13 +2540,9 @@ export class PaymentRequestsNotificationService {
         }
     }
 
-    /**
-     * Send BG creation and couriered email when Accounts Form 2 is accepted
-     */
     async sendBgCreatedCourieredEmail(instrumentId: number): Promise<void> {
         this.logger.log(`Sending BG creation and couriered email for instrument ${instrumentId}`);
 
-        // Fetch instrument + payment request + BG details
         const [instrument] = await this.db
             .select()
             .from(paymentInstruments)
@@ -2573,7 +2569,6 @@ export class PaymentRequestsNotificationService {
             return;
         }
 
-        // Get TE name and email
         const [teUser] = await this.db
             .select({ name: users.name, email: users.email })
             .from(users)
@@ -2585,7 +2580,6 @@ export class PaymentRequestsNotificationService {
             return;
         }
 
-        // Get tender team ID
         let tenderTeamId = 1;
         if (paymentReq.tenderId > 0) {
             const tenderData = await this.db
@@ -2596,27 +2590,41 @@ export class PaymentRequestsNotificationService {
             tenderTeamId = tenderData[0]?.team || 1;
         }
 
-        // Get BG details for purpose and soft copy
         const [bgDetails] = await this.db
             .select()
             .from(instrumentBgDetails)
             .where(eq(instrumentBgDetails.instrumentId, instrumentId))
             .limit(1);
 
-        // From: Imran (Accounts Leader)
         const [sender] = await this.db
             .select({ id: users.id })
             .from(users)
             .where(eq(users.email, 'imran@volksenergie.in'))
             .limit(1);
 
-        // Get CC emails
         const ccEmails: RecipientSource[] = [
             { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
             { type: 'emails', emails: ['goyal@volksenergie.in'] },
             { type: 'emails', emails: ['accounts@volksenergie.in'] },
             { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
         ];
+
+        const attachmentItems: Array<{ path: string; name: string }> = [
+            ...this.toAttachmentPaths(bgDetails?.bgSignedCoveringLetter).map((path) => ({
+                path,
+                name: 'Signed Covering Letter',
+            })),
+            ...this.toAttachmentPaths(bgDetails?.bgUpload || bgDetails?.bgSoftCopy).map((path) => ({
+                path,
+                name: 'Soft Copy of BG',
+            })),
+        ];
+
+        const stagedAttachments = this.stageBgMailAttachments(instrumentId, attachmentItems);
+        const attachmentNames = stagedAttachments.map((attachment) => attachment.name);
+        const attachedGroups = new Set(
+            attachmentNames.map((name) => name.replace(/ \(\d+\)$/, '')),
+        );
 
         try {
             const result = await this.emailService.sendPaymentEmail({
@@ -2629,15 +2637,16 @@ export class PaymentRequestsNotificationService {
                 data: {
                     teName: teUser.name || 'Tender Executive',
                     purpose: formatBgPurpose(bgDetails?.bgPurpose, 'Financial security'),
-                    courierNo: bgDetails?.courierNo || '',
-                    reasons: bgDetails?.bg2Remark || '',
+                    courierRequestNo: instrument.reqNo || '',
+                    remarks: bgDetails?.bg2Remark || '',
+                    hasSignedCoveringLetter: attachedGroups.has('Signed Covering Letter'),
+                    hasSoftCopy: attachedGroups.has('Soft Copy of BG'),
+                    attachmentNames,
                 },
                 to: [{ type: 'emails', emails: [teUser.email] }],
                 cc: ccEmails,
                 attachments: {
-                    files: this.toAttachmentPaths(bgDetails?.bgSoftCopy).map((p) =>
-                        p.startsWith('bi-dashboard/bank-guarantee/') ? p : `bi-dashboard/bank-guarantee/${p}`,
-                    ),
+                    files: stagedAttachments.map((attachment) => attachment.path),
                 },
             });
 
