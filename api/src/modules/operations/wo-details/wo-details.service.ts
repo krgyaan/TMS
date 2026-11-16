@@ -10,7 +10,7 @@ import {
 } from '@db/schemas/operations';
 import { rfqResponseDocuments, rfqResponses, rfqs, tenderCostingSheets, tenderInfos } from '@db/schemas/tendering';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, desc, eq, ilike, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, isNull, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { Page1ContactDto, SavePage1Dto, SubmitPage1Dto } from './dto/page1-handover.dto';
 import type { SavePage2Dto, SubmitPage2Dto } from './dto/page2-compliance.dto';
@@ -285,16 +285,16 @@ export class WoDetailsService {
         and(
           or(
             isNull(woAcceptance.id),
-            ne(woAcceptance.status, 'completed'),
-            ne(woAcceptance.decision, 'accepted'),
+            sql`${woAcceptance.status} is distinct from 'completed'`,
+            sql`${woAcceptance.decision} is distinct from 'accepted'`,
           ),
           and(
             or(isNull(woDetails.oeWoAmendmentNeeded), eq(woDetails.oeWoAmendmentNeeded, false)),
             or(
               isNull(woAcceptance.id),
               and(
-                ne(woAcceptance.status, 'awaiting_amendment'),
-                ne(woAcceptance.decision, 'amendment_needed'),
+                sql`${woAcceptance.status} is distinct from 'awaiting_amendment'`,
+                sql`${woAcceptance.decision} is distinct from 'amendment_needed'`,
               ),
             ),
           ),
