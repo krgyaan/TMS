@@ -17,6 +17,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { differenceInDays } from 'date-fns';
 import { and, eq, gte, isNull, lt, ne, notInArray, sql } from 'drizzle-orm';
+import { copyFileSync, existsSync, mkdirSync } from 'fs';
+import { extname, join } from 'path';
 
 /** Blank bank/beneficiary values are shown as "Not Provided" in the BG mail. */
 const orNotProvided = (value: string | null | undefined): string =>
@@ -471,6 +473,42 @@ export class PaymentRequestsNotificationService {
         }
 
         return [trimmed];
+    };
+
+    private stageBgMailAttachments = (
+        instrumentId: number,
+        items: Array<{ path: string; name: string }>,
+    ): Array<{ path: string; name: string }> => {
+        const staged: Array<{ path: string; name: string }> = [];
+        const seenSources = new Set<string>();
+        const nameCounts = new Map<string, number>();
+        const relativeDir = `bi-dashboard/bank-guarantee/mail-attachments/${instrumentId}`;
+        const targetDir = join(process.cwd(), 'uploads', relativeDir);
+
+        items.forEach((item) => {
+            const sourceRelative = item.path.replace(/\\/g, '/');
+            if (seenSources.has(sourceRelative)) return;
+
+            const sourceAbsolute = join(process.cwd(), 'uploads', sourceRelative);
+            if (!existsSync(sourceAbsolute)) return;
+
+            seenSources.add(sourceRelative);
+
+            const count = (nameCounts.get(item.name) ?? 0) + 1;
+            nameCounts.set(item.name, count);
+            const suffix = count > 1 ? ` (${count})` : '';
+            const fileName = `${item.name}${suffix}${extname(sourceRelative)}`;
+
+            mkdirSync(targetDir, { recursive: true });
+            copyFileSync(sourceAbsolute, join(targetDir, fileName));
+
+            staged.push({
+                path: `${relativeDir}/${fileName}`,
+                name: `${item.name}${suffix}`,
+            });
+        });
+
+        return staged;
     };
 
     async sendDdMailAfterChequeAction(
@@ -2617,7 +2655,6 @@ export class PaymentRequestsNotificationService {
         try {
             this.logger.log(`Preparing BG bank request email for instrument ${instrumentId}`);
 
-            // Fetch instrument + payment request + BG details
             const [result] = await this.db
                 .select({
                     instrument: paymentInstruments,
@@ -2642,10 +2679,26 @@ export class PaymentRequestsNotificationService {
                 return;
             }
 
-            // Resolve bank "To" mail ids
-            const bankMailIds = (bgDetails.bankMailIds || []).filter(
-                (email): email is string => typeof email === 'string' && email.trim().length > 0,
-            );
+            const normalizeMailIds = (value: unknown): string[] => {
+                const list = Array.isArray(value)
+                    ? value
+                    : typeof value === 'string' && value.trim().length > 0
+                        ? (() => {
+                            try {
+                                const parsed = JSON.parse(value);
+                                return Array.isArray(parsed) ? parsed : [parsed];
+                            } catch {
+                                return [value];
+                            }
+                        })()
+                        : [];
+                return list
+                    .filter((email): email is string => typeof email === 'string')
+                    .map((email) => email.trim())
+                    .filter((email) => email.length > 0);
+            };
+
+            const bankMailIds = normalizeMailIds(bgDetails.bankMailIds);
 
             if (bankMailIds.length === 0) {
                 this.logger.warn(
@@ -2656,7 +2709,6 @@ export class PaymentRequestsNotificationService {
 
             const toEmails: RecipientSource[] = [{ type: 'emails', emails: bankMailIds }];
 
-            // Resolve tender team for role-based CC recipients
             const tenderTeamId = await this.getTenderTeamId(request.tenderId || 0, request.requestedBy || 0);
 
             const ccSources: RecipientSource[] = [
@@ -2665,23 +2717,41 @@ export class PaymentRequestsNotificationService {
                 { type: 'emails', emails: ['accounts@volksenergie.in'] },
             ];
 
-            const bankMailIdsCc = (bgDetails.bankMailIdsCc || []).filter(
-                (email): email is string => typeof email === 'string' && email.trim().length > 0,
-            );
+            const bankMailIdsCc = normalizeMailIds(bgDetails.bankMailIdsCc);
 
             if (bankMailIdsCc.length > 0) {
                 ccSources.push({ type: 'emails', emails: bankMailIdsCc });
             }
 
-            // Resolve attachments: prefilled & signed BG forms, PO copy/request letter, BG Format
-            // attachments.files expects plain path strings
-            const attachmentFiles: string[] = [];
+            const supportingDoc = await this.resolveBgSupportingDocs(request, bgDetails);
+            const supportingDocName = supportingDoc.label.startsWith('WO draft')
+                ? 'WO Draft - LOA-GEM PO-LOI'
+                : supportingDoc.label.startsWith('Main tender')
+                    ? 'Tender Document'
+                    : 'PO Copy - Beneficiary Request Letter';
 
-            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.prefilledSignedBg));
-            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.bgPo));
-            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.bgFormatTe || bgDetails.bgFormatTl));
+            const attachmentItems: Array<{ path: string; name: string }> = [
+                ...this.toAttachmentPaths(bgDetails.prefilledSignedBg).map((path) => ({
+                    path,
+                    name: 'Request Letter - Signed by CEO',
+                })),
+                ...supportingDoc.paths.map((path) => ({ path, name: supportingDocName })),
+                ...this.toAttachmentPaths(
+                    bgDetails.bgFormatTe || bgDetails.bgFormatTl || bgDetails.bgSoftCopy,
+                ).map((path) => ({ path, name: 'BG Format' })),
+                ...this.toAttachmentPaths(bgDetails.fdrCopy).map((path) => ({
+                    path,
+                    name: 'FDR Copy',
+                })),
+            ];
 
-            // Resolve "From" as CEO; fall back to Imran, then hardcoded user id
+            const stagedAttachments = this.stageBgMailAttachments(instrumentId, attachmentItems);
+            const attachmentFiles = stagedAttachments.map((attachment) => attachment.path);
+            const attachmentNames = stagedAttachments.map((attachment) => attachment.name);
+            const attachedGroups = new Set(
+                attachmentNames.map((name) => name.replace(/ \(\d+\)$/, '')),
+            );
+
             let fromUserId: number;
 
             const [ceoUser] = await this.db
@@ -2703,13 +2773,18 @@ export class PaymentRequestsNotificationService {
                 fromUserId = imranUser ? imranUser.id : 33;
             }
 
-            // Compose email content fields
             const bgPurpose = bgDetails.bgPurpose
                 ? formatBgPurpose(bgDetails.bgPurpose, '')
-                : `Performance Bank Guarantee for ${request.projectName || ''}`;
+                : 'Performance Bank Guarantee';
             const beneficiaryName = bgDetails.beneficiaryName || '';
-            const beneficiaryAddress = bgDetails.beneficiaryAddress || '';
-            const timeLimit = instrument.courierDeadline || 24;
+            const timeLimit = Number(bgDetails.bgNeeds) || instrument.courierDeadline || 24;
+
+            const stampCharges = Number(bgDetails.stampCharges);
+            const fdrPer = Number(bgDetails.fdrPer);
+            const beneName = (bgDetails.bgBankAccName || '').trim();
+            const beneAcc = (bgDetails.bgBankAcc || '').trim();
+            const beneIfsc = (bgDetails.bgBankIfsc || '').trim();
+            const uniqueCode = (bgDetails.uniqueCode || '').trim();
 
             await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
@@ -2723,16 +2798,23 @@ export class PaymentRequestsNotificationService {
                 data: {
                     bgPurpose,
                     beneficiaryName,
-                    beneficiaryAddress,
                     bgExpiryDate: this.formatDateDDMMYYYY(bgDetails.bgExpiryDate),
                     claimDate: this.formatDateDDMMYYYY(bgDetails.bgClaim),
                     amount: (Number(instrument.amount) || 0).toLocaleString('en-IN'),
-                    stampPaperValue: (Number(bgDetails.stampCharges) || 300).toLocaleString('en-IN'),
-                    fdrMargin: bgDetails.fdrPer ? `${bgDetails.fdrPer}%` : '10%/100%',
-                    beneName: bgDetails.bgBankAccName || '',
-                    beneAcc: bgDetails.bgBankAcc || '',
-                    beneIfsc: bgDetails.bgBankIfsc || '',
+                    stampPaperValue: stampCharges > 0 ? stampCharges.toLocaleString('en-IN') : '',
+                    fdrMargin: fdrPer > 0 ? `${fdrPer}%` : '',
+                    hasBeneficiaryAccount: Boolean(beneName || beneAcc || beneIfsc || uniqueCode),
+                    beneName,
+                    beneAcc,
+                    beneIfsc,
+                    uniqueCode,
+                    debitAccountNo: '2502245699295242',
                     timeLimit,
+                    hasCeoRequestLetter: attachedGroups.has('Request Letter - Signed by CEO'),
+                    hasSupportingDoc: attachedGroups.has(supportingDocName),
+                    hasBgFormat: attachedGroups.has('BG Format'),
+                    hasFdrCopy: attachedGroups.has('FDR Copy'),
+                    attachmentNames,
                 },
                 attachments: { files: attachmentFiles },
             });
