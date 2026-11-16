@@ -1555,6 +1555,7 @@ class LLMFieldResolver:
             )
 
             # Execution with retry/backoff for 429/5xx/timeout and truncation recovery
+            from app.core.timing import stage_timer, call_anthropic_with_replay
             max_retries = 3
             backoff_base = 0.5
 
@@ -1562,14 +1563,16 @@ class LLMFieldResolver:
                 max_tokens_to_use = ROLE_1_MAX_TOKENS
                 try:
                     for attempt in range(2):
-                        response = self.client.messages.create(
-                            model=self.role1_model,
-                            max_tokens=max_tokens_to_use,
-                            system=system_blocks,
-                            messages=[{"role": "user", "content": user_prompt}],
-                            tools=[tool_spec],
-                            tool_choice={"type": "tool", "name": "extract_missing_fields"},
-                        )
+                        with stage_timer(f"llm_role1:{cat}"):
+                            response = call_anthropic_with_replay(
+                                self.client.messages.create,
+                                model=self.role1_model,
+                                max_tokens=max_tokens_to_use,
+                                system=system_blocks,
+                                messages=[{"role": "user", "content": user_prompt}],
+                                tools=[tool_spec],
+                                tool_choice={"type": "tool", "name": "extract_missing_fields"},
+                            )
 
                         if hasattr(response, "usage") and response.usage:
                             self.record_usage(response.usage, role="role1")
@@ -1809,14 +1812,17 @@ class LLMFieldResolver:
         )
 
         try:
-            response = self.client.messages.create(
-                model=self.role2_model,
-                max_tokens=ROLE_2_MAX_TOKENS,
-                system=system_blocks,
-                messages=[{"role": "user", "content": user_prompt}],
-                tools=[tool_spec],
-                tool_choice={"type": "auto"},
-            )
+            from app.core.timing import stage_timer, call_anthropic_with_replay
+            with stage_timer("llm_role2:ambiguity_resolution"):
+                response = call_anthropic_with_replay(
+                    self.client.messages.create,
+                    model=self.role2_model,
+                    max_tokens=ROLE_2_MAX_TOKENS,
+                    system=system_blocks,
+                    messages=[{"role": "user", "content": user_prompt}],
+                    tools=[tool_spec],
+                    tool_choice={"type": "auto"},
+                )
 
             if hasattr(response, "usage") and response.usage:
                 self.record_usage(response.usage, role="role2")

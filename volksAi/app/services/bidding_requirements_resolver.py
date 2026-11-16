@@ -310,15 +310,18 @@ def analyze_bidding_requirements(
         "%d library doc(s) supplied", resolved_model, len(library_documents),
     )
 
+    from app.core.timing import stage_timer, call_anthropic_with_replay
     try:
-        response = client.messages.create(
-            model=resolved_model,
-            max_tokens=ROLE_3_MAX_TOKENS,
-            system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
-            messages=[{"role": "user", "content": user_prompt}],
-            tools=[tool_spec],
-            tool_choice={"type": "tool", "name": "report_bidding_requirements"},
-        )
+        with stage_timer("llm_role3:bidding_requirements"):
+            response = call_anthropic_with_replay(
+                client.messages.create,
+                model=resolved_model,
+                max_tokens=ROLE_3_MAX_TOKENS,
+                system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
+                messages=[{"role": "user", "content": user_prompt}],
+                tools=[tool_spec],
+                tool_choice={"type": "tool", "name": "report_bidding_requirements"},
+            )
     except Exception as exc:
         status_code = getattr(exc, "status_code", None)
         logger.error(

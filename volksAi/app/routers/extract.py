@@ -908,6 +908,11 @@ async def extract_tender(
         )
 
     job_id = f"job_{uuid.uuid4().hex[:12]}"
+    from app.core.logging import request_id_ctx_var
+    from app.core.timing import init_stage_timings, stage_timer
+    if not request_id_ctx_var.get():
+        request_id_ctx_var.set(job_id)
+    init_stage_timings()
     start_time = time.time()
     logger.info(
         f"[EXTRACT_API] Starting extraction request for '{filename}' "
@@ -919,121 +924,122 @@ async def extract_tender(
     # (temp PDF, page PNGs in pages/{job_id}, and downloaded child PDFs)
     # are completely and reliably wiped upon request completion.
     try:
-        with tempfile.TemporaryDirectory(prefix=f"volksai_{job_id}_") as temp_dir:
-            temp_dir_path = Path(temp_dir)
-            temp_pdf_path = temp_dir_path / filename
+        with stage_timer("extract_total", request_id=job_id):
+            with tempfile.TemporaryDirectory(prefix=f"volksai_{job_id}_") as temp_dir:
+                temp_dir_path = Path(temp_dir)
+                temp_pdf_path = temp_dir_path / filename
 
-            # Write uploaded content to temp disk for PyMuPDF / Tesseract access
-            contents = await pdf_file.read()
-            temp_pdf_path.write_bytes(contents)
+                # Write uploaded content to temp disk for PyMuPDF / Tesseract access
+                contents = await pdf_file.read()
+                temp_pdf_path.write_bytes(contents)
 
-            logger.info(f"[EXTRACT_API] Uploaded PDF saved to '{temp_pdf_path}' ({len(contents)} bytes)")
+                logger.info(f"[EXTRACT_API] Uploaded PDF saved to '{temp_pdf_path}' ({len(contents)} bytes)")
 
-            # BUG FIX: atc_files/boq_file were previously accepted by the NestJS
-            # caller's multipart payload but never declared as parameters here,
-            # so FastAPI dropped them silently and the pipeline ran without ATC
-            # content on every extraction. Save them to disk and forward their
-            # paths into ingest_parent_tender_pdf() so they actually participate.
-            atc_paths: List[Path] = []
-            for idx, atc_upload in enumerate(atc_files or []):
-                if not atc_upload or not atc_upload.filename:
-                    continue
-                atc_dest = temp_dir_path / f"atc_{idx}_{atc_upload.filename}"
-                atc_contents = await atc_upload.read()
-                atc_dest.write_bytes(atc_contents)
-                atc_paths.append(atc_dest)
-                logger.info(f"[EXTRACT_API] ATC file saved to '{atc_dest}' ({len(atc_contents)} bytes)")
+                # BUG FIX: atc_files/boq_file were previously accepted by the NestJS
+                # caller's multipart payload but never declared as parameters here,
+                # so FastAPI dropped them silently and the pipeline ran without ATC
+                # content on every extraction. Save them to disk and forward their
+                # paths into ingest_parent_tender_pdf() so they actually participate.
+                atc_paths: List[Path] = []
+                for idx, atc_upload in enumerate(atc_files or []):
+                    if not atc_upload or not atc_upload.filename:
+                        continue
+                    atc_dest = temp_dir_path / f"atc_{idx}_{atc_upload.filename}"
+                    atc_contents = await atc_upload.read()
+                    atc_dest.write_bytes(atc_contents)
+                    atc_paths.append(atc_dest)
+                    logger.info(f"[EXTRACT_API] ATC file saved to '{atc_dest}' ({len(atc_contents)} bytes)")
 
-            boq_path: Optional[Path] = None
-            if boq_file and boq_file.filename:
-                boq_dest = temp_dir_path / f"boq_{boq_file.filename}"
-                boq_contents = await boq_file.read()
-                boq_dest.write_bytes(boq_contents)
-                boq_path = boq_dest
-                logger.info(f"[EXTRACT_API] BOQ file saved to '{boq_dest}' ({len(boq_contents)} bytes)")
+                boq_path: Optional[Path] = None
+                if boq_file and boq_file.filename:
+                    boq_dest = temp_dir_path / f"boq_{boq_file.filename}"
+                    boq_contents = await boq_file.read()
+                    boq_dest.write_bytes(boq_contents)
+                    boq_path = boq_dest
+                    logger.info(f"[EXTRACT_API] BOQ file saved to '{boq_dest}' ({len(boq_contents)} bytes)")
 
-            # Run orchestrator in threadpool to prevent blocking the async event loop
-            infosheet_data: Dict[str, Any] = await asyncio.to_thread(
-                ingest_parent_tender_pdf,
-                job_id=job_id,
-                pdf_path=temp_pdf_path,
-                original_filename=filename,
-                explicit_atc_paths=atc_paths,
-                explicit_boq_path=boq_path,
-            )
-
-            field_statuses: Dict[str, str] = infosheet_data.get("_info_sheet_statuses", {})
-            field_sources: Dict[str, str] = infosheet_data.get("_info_sheet_sources", {})
-            dual_sources: Dict[str, Any] = infosheet_data.get("_dual_sources", {})
-            is_self_classified_atc: bool = bool(infosheet_data.get("_self_classified_atc", False))
-            has_atc: bool = bool(infosheet_data.get("_has_atc", bool(atc_paths)))
-            ambiguous_field_conflicts: Dict[str, Any] = infosheet_data.get("_ambiguous_field_conflicts", {})
-            # Always present, including when unverifiable, so the check's own reliability is visible.
-            document_identity_check: Dict[str, Any] = infosheet_data.get("_document_identity_check") or build_document_identity_check(
-                None, None, has_atc=has_atc, same_document=is_self_classified_atc
-            )
-
-            # 1. Transform raw extraction dictionary into TMS DTO shape
-            tms_dto: Dict[str, Any] = map_to_tms_dto(infosheet_data)
-
-            fields: Dict[str, Any] = {}
-            missing_fields: List[str] = []
-
-            field_flags_map: Dict[str, List[Dict[str, Any]]] = infosheet_data.get("_field_flags", {})
-
-            # 2. Merge DTO-shaped values with confidence and source metadata
-            for tms_key, dto_val in tms_dto.items():
-                source_key = TMS_TO_SOURCE_KEY_MAP.get(tms_key)
-                if tms_key == "techEligibilityAge" and "eligibility_criterion_years_display" in field_statuses:
-                    source_key = "eligibility_criterion_years_display"
-
-                field_obj = _format_field_object(
-                    tms_key=tms_key,
-                    dto_value=dto_val,
-                    source_field_name=source_key,
-                    field_statuses=field_statuses,
-                    field_sources=field_sources,
-                    dual_sources=dual_sources,
-                    is_self_classified_atc=is_self_classified_atc,
-                    has_atc=has_atc,
-                    raw_display_value=infosheet_data.get(source_key),
-                    field_flags=list(field_flags_map.get(tms_key, [])),
+                # Run orchestrator in threadpool to prevent blocking the async event loop
+                infosheet_data: Dict[str, Any] = await asyncio.to_thread(
+                    ingest_parent_tender_pdf,
+                    job_id=job_id,
+                    pdf_path=temp_pdf_path,
+                    original_filename=filename,
+                    explicit_atc_paths=atc_paths,
+                    explicit_boq_path=boq_path,
                 )
-                fields[tms_key] = field_obj
 
-                if (
-                    field_obj.get("confidence") == "missing"
-                    or (field_obj.get("value") is None and field_obj.get("confidence") != "not_applicable")
-                    or field_obj.get("value") == []
-                ):
-                    missing_fields.append(tms_key)
+                with stage_timer("response_assembly", request_id=job_id):
+                    field_statuses: Dict[str, str] = infosheet_data.get("_info_sheet_statuses", {})
+                    field_sources: Dict[str, str] = infosheet_data.get("_info_sheet_sources", {})
+                    dual_sources: Dict[str, Any] = infosheet_data.get("_dual_sources", {})
+                    is_self_classified_atc: bool = bool(infosheet_data.get("_self_classified_atc", False))
+                    has_atc: bool = bool(infosheet_data.get("_has_atc", bool(atc_paths)))
+                    ambiguous_field_conflicts: Dict[str, Any] = infosheet_data.get("_ambiguous_field_conflicts", {})
+                    # Always present, including when unverifiable, so the check's own reliability is visible.
+                    document_identity_check: Dict[str, Any] = infosheet_data.get("_document_identity_check") or build_document_identity_check(
+                        None, None, has_atc=has_atc, same_document=is_self_classified_atc
+                    )
 
-            processing_time_ms = int((time.time() - start_time) * 1000)
+                    # 1. Transform raw extraction dictionary into TMS DTO shape
+                    tms_dto: Dict[str, Any] = map_to_tms_dto(infosheet_data)
 
-            # 3. Construct final response envelope matching TMS specification
-            response: Dict[str, Any] = {
-                "extraction_version": "1.1.0",
-                "fields": fields,
-                "missing_fields": missing_fields,
-                "processing_time_ms": processing_time_ms,
-                "llm_usage": infosheet_data.get("_llm_usage"),
-                "llm_status": infosheet_data.get("_llm_status", "ok"),
-                "failed_categories": infosheet_data.get("_failed_categories", []),
-                "last_error": infosheet_data.get("_last_error"),
-                "self_classified_atc": is_self_classified_atc,
-                "has_atc": has_atc,
-                "ambiguous_field_conflicts": ambiguous_field_conflicts,
-                "documentIdentityCheck": document_identity_check,
-            }
-            if infosheet_data.get("per_schedule_emd"):
-                response["per_schedule_emd"] = infosheet_data.get("per_schedule_emd")
+                    fields: Dict[str, Any] = {}
+                    missing_fields: List[str] = []
 
+                    field_flags_map: Dict[str, List[Dict[str, Any]]] = infosheet_data.get("_field_flags", {})
 
-            logger.info(
-                f"[EXTRACT_API] Extraction complete for '{filename}' "
-                f"({len(fields)} fields, {len(missing_fields)} missing, {processing_time_ms}ms)"
-            )
-            return response
+                    # 2. Merge DTO-shaped values with confidence and source metadata
+                    for tms_key, dto_val in tms_dto.items():
+                        source_key = TMS_TO_SOURCE_KEY_MAP.get(tms_key)
+                        if tms_key == "techEligibilityAge" and "eligibility_criterion_years_display" in field_statuses:
+                            source_key = "eligibility_criterion_years_display"
+
+                        field_obj = _format_field_object(
+                            tms_key=tms_key,
+                            dto_value=dto_val,
+                            source_field_name=source_key,
+                            field_statuses=field_statuses,
+                            field_sources=field_sources,
+                            dual_sources=dual_sources,
+                            is_self_classified_atc=is_self_classified_atc,
+                            has_atc=has_atc,
+                            raw_display_value=infosheet_data.get(source_key),
+                            field_flags=list(field_flags_map.get(tms_key, [])),
+                        )
+                        fields[tms_key] = field_obj
+
+                        if (
+                            field_obj.get("confidence") == "missing"
+                            or (field_obj.get("value") is None and field_obj.get("confidence") != "not_applicable")
+                            or field_obj.get("value") == []
+                        ):
+                            missing_fields.append(tms_key)
+
+                    processing_time_ms = int((time.time() - start_time) * 1000)
+
+                    # 3. Construct final response envelope matching TMS specification
+                    response: Dict[str, Any] = {
+                        "extraction_version": "1.1.0",
+                        "fields": fields,
+                        "missing_fields": missing_fields,
+                        "processing_time_ms": processing_time_ms,
+                        "llm_usage": infosheet_data.get("_llm_usage"),
+                        "llm_status": infosheet_data.get("_llm_status", "ok"),
+                        "failed_categories": infosheet_data.get("_failed_categories", []),
+                        "last_error": infosheet_data.get("_last_error"),
+                        "self_classified_atc": is_self_classified_atc,
+                        "has_atc": has_atc,
+                        "ambiguous_field_conflicts": ambiguous_field_conflicts,
+                        "documentIdentityCheck": document_identity_check,
+                    }
+                    if infosheet_data.get("per_schedule_emd"):
+                        response["per_schedule_emd"] = infosheet_data.get("per_schedule_emd")
+
+                logger.info(
+                    f"[EXTRACT_API] Extraction complete for '{filename}' "
+                    f"({len(fields)} fields, {len(missing_fields)} missing, {processing_time_ms}ms)"
+                )
+                return response
 
     except HTTPException:
         raise

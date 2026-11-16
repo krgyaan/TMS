@@ -416,6 +416,16 @@ def resolve_atc_anchor_fields(
       - sd_percentage (float)
       - sd_duration (int)
     """
+    from app.core.timing import stage_timer
+    with stage_timer("tender_mapper:ATC_ANCHOR"):
+        return _resolve_atc_anchor_fields_inner(full_text, checkboxes=checkboxes, page_texts=page_texts)
+
+
+def _resolve_atc_anchor_fields_inner(
+    full_text: str,
+    checkboxes: Optional[List[Dict[str, Any]]] = None,
+    page_texts: Optional[List[Dict[str, Any]]] = None
+) -> Dict[str, Any]:
     res = {}
     if not full_text:
         return res

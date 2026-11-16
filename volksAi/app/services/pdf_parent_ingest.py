@@ -364,6 +364,11 @@ def ingest_parent_tender_pdf(
     pages_dir = job_dir / "pages" / job_id
     pages_dir.mkdir(parents=True, exist_ok=True)
 
+    from app.core.timing import stage_timer
+    from app.core.logging import request_id_ctx_var
+    if not request_id_ctx_var.get():
+        request_id_ctx_var.set(job_id)
+
     logger.info(f"[INGEST_PIPELINE][Job {job_id}] Step 1: Extracting text & page structures from PDF...")
     page_texts = extract_pdf_text_hybrid(str(pdf_path), pages_dir, max_pages=MAIN_TENDER_MAX_PAGES)
     all_pages = list(page_texts)
@@ -376,7 +381,8 @@ def ingest_parent_tender_pdf(
     # If explicit ATC files were uploaded, external child downloads are unnecessary and bypassed.
     download_external = not bool(explicit_atc_paths)
     logger.info(f"[INGEST_PIPELINE][Job {job_id}] Step 2: Extracting hyperlinks & ATC document mentions (download_external={download_external})...")
-    links, mentions = extract_links_and_mentions(str(pdf_path), download_external=download_external)
+    with stage_timer("pdf_links_and_mentions", request_id=job_id):
+        links, mentions = extract_links_and_mentions(str(pdf_path), download_external=download_external)
     logger.info(f"[INGEST_PIPELINE][Job {job_id}] Step 2 complete: Found {len(links)} links, {len(mentions)} mentions")
 
     # 3. Deterministic Field Extraction
@@ -385,10 +391,12 @@ def ingest_parent_tender_pdf(
     # Classify document type using page 1 text
     page1_text = page_texts[0].get("text", "") if page_texts else ""
     from app.ocr.pipeline import classify_document_type
-    doc_type = classify_document_type(page1_text)
+    with stage_timer("page_and_doc_classification", request_id=job_id):
+        doc_type = classify_document_type(page1_text)
     
     logger.info(f"[INGEST_PIPELINE][Job {job_id}] Step 3: Running Layer 1 spatial field extraction (doc_type='{doc_type}')...")
-    sections = extract_tender_fields(page_texts, title_raw, document_type=doc_type)
+    with stage_timer("field_extractor:main_tender", request_id=job_id):
+        sections = extract_tender_fields(page_texts, title_raw, document_type=doc_type)
     main_tender_snapshot = _collect_field_snapshots(sections)
 
     # 3a. Bridge resolved ATC link URL to sections atc_document_link_present field
@@ -545,7 +553,8 @@ def ingest_parent_tender_pdf(
                 # The primary ATC's own number, before spec/schedule child PDFs are merged in.
                 atc_identity = extract_document_identity(atc_page_texts)
                 all_pages.extend(atc_page_texts)
-                atc_sections = extract_tender_fields(atc_page_texts, f"{title_raw} ATC", document_type="generic_nit")
+                with stage_timer("field_extractor:atc", request_id=job_id):
+                    atc_sections = extract_tender_fields(atc_page_texts, f"{title_raw} ATC", document_type="generic_nit")
 
             # Collect and append text from all other downloaded child PDFs (e.g. Schedule Specs sch1-sch4)
             valid_child_pdfs = []
@@ -800,15 +809,16 @@ def ingest_parent_tender_pdf(
     infosheet_data = {}
     try:
         from app.services.tender_mapper import build_infosheet_data
-        infosheet_data = build_infosheet_data(
-            sections,
-            all_pages,
-            job_id=job_id,
-            atc_full_text=atc_full_text,
-            dual_sources=dual_sources,
-            is_self_classified_atc=is_self_classified_atc,
-            has_atc=has_atc,
-        )
+        with stage_timer("tender_mapper:MAIN_ALIAS", request_id=job_id):
+            infosheet_data = build_infosheet_data(
+                sections,
+                all_pages,
+                job_id=job_id,
+                atc_full_text=atc_full_text,
+                dual_sources=dual_sources,
+                is_self_classified_atc=is_self_classified_atc,
+                has_atc=has_atc,
+            )
 
         # 4a. LLM Fallback Post-Pass — resolve remaining NA fields via LLM (Gemini / OpenAI-compatible)
         import os
