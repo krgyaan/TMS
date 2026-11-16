@@ -2614,7 +2614,7 @@ export class PaymentRequestsNotificationService {
                 path,
                 name: 'Signed Covering Letter',
             })),
-            ...this.toAttachmentPaths(bgDetails?.bgUpload || bgDetails?.bgSoftCopy).map((path) => ({
+            ...this.toAttachmentPaths(bgDetails?.bgUpload).map((path) => ({
                 path,
                 name: 'Soft Copy of BG',
             })),
