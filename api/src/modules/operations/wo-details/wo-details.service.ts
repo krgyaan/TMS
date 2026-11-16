@@ -6,7 +6,7 @@ import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import {
   woAcceptance, woAmendments, woBasicDetails, woBillingAddresses, woBillingBoq, woBuybackBoq,
-  woContacts, woDetails, woDocuments, woKickoffMeetings, woQueries, woShippingAddresses
+  woContacts, woDetails, woDetailsHistory, woDocuments, woKickoffMeetings, woQueries, woShippingAddresses
 } from '@db/schemas/operations';
 import { rfqResponseDocuments, rfqResponses, rfqs, tenderCostingSheets, tenderInfos } from '@db/schemas/tendering';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
@@ -45,6 +45,7 @@ const TENDER_CHECKLIST_ITEMS = [
 ] as const;
 
 const TOTAL_PAGES = 7;
+const ALL_PAGES = [1, 2, 3, 4, 5, 6, 7];
 
 // Type union for page data
 type PageData =
@@ -143,6 +144,30 @@ export class WoDetailsService {
       createdBy: row.createdBy,
       updatedBy: row.updatedBy,
     };
+  }
+
+  private async logHistory(entry: {
+    woDetailId: number;
+    pageNo?: number | null;
+    action: string;
+    statusAfter?: string | null;
+    remarks?: string | null;
+    metadata?: {
+      currentPage?: number | null;
+      completedPages?: number[];
+      skippedPages?: number[];
+    };
+    userId?: number;
+  }) {
+    await this.db.insert(woDetailsHistory).values({
+      woDetailId: entry.woDetailId,
+      pageNo: entry.pageNo ?? null,
+      action: entry.action,
+      statusAfter: entry.statusAfter ?? null,
+      remarks: entry.remarks ?? null,
+      metadata: entry.metadata ?? null,
+      actorId: entry.userId ?? null,
+    });
   }
 
   mapRowToResponseList(row: any): WoDetailsListResponseDto {
@@ -571,6 +596,18 @@ export class WoDetailsService {
       .set({ currentStage: 'wo_details', updatedAt: now })
       .where(eq(woBasicDetails.id, data.woBasicDetailId));
 
+    await this.logHistory({
+      woDetailId: row!.id,
+      action: 'created',
+      statusAfter: row!.status,
+      metadata: {
+        currentPage: row!.currentPage,
+        completedPages: (row!.completedPages as number[]) ?? [],
+        skippedPages: (row!.skippedPages as number[]) ?? [],
+      },
+      userId,
+    });
+
     return this.mapRowToResponse(row!);
   }
 
@@ -679,10 +716,9 @@ export class WoDetailsService {
   async getWizardProgress(id: number) {
     const detail = await this.findById(id);
 
-    const completedCount = (detail.completedPages as number[]).length;
-    const skippedCount = (detail.skippedPages as number[]).length;
+    const completedCount = ((detail.completedPages as number[]) ?? []).length;
     const percentComplete = Math.round(
-      ((completedCount + skippedCount) / TOTAL_PAGES) * 100,
+      (completedCount / TOTAL_PAGES) * 100,
     );
 
     const blockers = this.getSubmissionBlockers(detail);
@@ -847,18 +883,34 @@ export class WoDetailsService {
       }
     }
 
-    const isValid = incompletePages.length === 0;
+    const missingRequiredPages = this.getMissingPages(detail);
+    const isValid =
+      incompletePages.length === 0 && missingRequiredPages.length === 0;
 
     return {
       isValid,
-      missingRequiredPages: [],
+      missingRequiredPages,
       incompletePages,
       errors,
     };
   }
 
+  private getMissingPages(detail: any): number[] {
+    const completed = new Set<number>(
+      (detail.completedPages as number[]) ?? [],
+    );
+    return ALL_PAGES.filter((page) => !completed.has(page));
+  }
+
   private getSubmissionBlockers(detail: any): string[] {
     const blockers: string[] = [];
+
+    const missingPages = this.getMissingPages(detail);
+    if (missingPages.length > 0) {
+      blockers.push(
+        `Steps ${missingPages.join(', ')} must be completed before submission`,
+      );
+    }
 
     if (detail.oeWoAmendmentNeeded === true) {
       blockers.push('WO Amendment is pending');
@@ -906,6 +958,19 @@ export class WoDetailsService {
       data,
     );
 
+    await this.logHistory({
+      woDetailId: id,
+      pageNo: pageNum,
+      action: 'draft_saved',
+      statusAfter: row!.status,
+      metadata: {
+        currentPage: row!.currentPage,
+        completedPages: (row!.completedPages as number[]) ?? [],
+        skippedPages: (row!.skippedPages as number[]) ?? [],
+      },
+      userId,
+    });
+
     return this.mapRowToResponse(row!);
   }
 
@@ -943,6 +1008,19 @@ export class WoDetailsService {
       pageNum,
       data,
     );
+
+    await this.logHistory({
+      woDetailId: id,
+      pageNo: pageNum,
+      action: 'page_saved',
+      statusAfter: row!.status,
+      metadata: {
+        currentPage: row!.currentPage,
+        completedPages: (row!.completedPages as number[]) ?? [],
+        skippedPages: (row!.skippedPages as number[]) ?? [],
+      },
+      userId,
+    });
 
     return this.mapRowToResponse(row!);
   }
@@ -1004,6 +1082,19 @@ export class WoDetailsService {
       data,
     );
 
+    await this.logHistory({
+      woDetailId: id,
+      pageNo: pageNum,
+      action: 'page_submitted',
+      statusAfter: row!.status,
+      metadata: {
+        currentPage: row!.currentPage,
+        completedPages: (row!.completedPages as number[]) ?? [],
+        skippedPages: (row!.skippedPages as number[]) ?? [],
+      },
+      userId,
+    });
+
     return {
       ...this.mapRowToResponse(row!),
       message: `Page ${pageNum} submitted successfully`,
@@ -1054,6 +1145,20 @@ export class WoDetailsService {
       .where(eq(woDetails.id, id))
       .returning();
 
+    await this.logHistory({
+      woDetailId: id,
+      pageNo: pageNum,
+      action: 'page_skipped',
+      statusAfter: row!.status,
+      remarks: data?.reason ?? null,
+      metadata: {
+        currentPage: row!.currentPage,
+        completedPages: (row!.completedPages as number[]) ?? [],
+        skippedPages: (row!.skippedPages as number[]) ?? [],
+      },
+      userId,
+    });
+
     return {
       ...this.mapRowToResponse(row!),
       message: `Page ${pageNum} skipped`,
@@ -1100,6 +1205,18 @@ export class WoDetailsService {
       createdBy: userId ?? null,
     });
 
+    await this.logHistory({
+      woDetailId: id,
+      action: 'submitted_for_review',
+      statusAfter: row!.status,
+      metadata: {
+        currentPage: row!.currentPage,
+        completedPages: (row!.completedPages as number[]) ?? [],
+        skippedPages: (row!.skippedPages as number[]) ?? [],
+      },
+      userId,
+    });
+
     return {
       ...this.mapRowToResponse(row!),
       message: 'WO Details submitted for TL review',
@@ -1111,15 +1228,30 @@ export class WoDetailsService {
     userId?: number,
   ) {
     const detail = await this.findByIdWithRelations(id);
+    const missingRequiredPages = this.getMissingPages(detail);
+    const blockers = this.getSubmissionBlockers(detail);
+
+    if (blockers.length > 0) {
+      throw new BadRequestException({
+        message: 'Cannot submit WO Details',
+        blockers,
+        missingRequiredPages,
+      });
+    }
+
     const now = new Date();
-    const allPages = [1, 2, 3, 4, 5, 6, 7];
+    const completedPages = [
+      ...new Set((detail.completedPages as number[]) ?? []),
+    ]
+      .filter((page) => ALL_PAGES.includes(page))
+      .sort((a, b) => a - b);
 
     const [row] = await this.db
       .update(woDetails)
       .set({
         status: 'wo_details_filled',
-        currentPage: 7,
-        completedPages: allPages,
+        currentPage: TOTAL_PAGES,
+        completedPages,
         skippedPages: [],
         completedAt: now,
         updatedAt: now,
@@ -1145,6 +1277,18 @@ export class WoDetailsService {
         updatedAt: now,
         updatedBy: userId ?? null,
       },
+    });
+
+    await this.logHistory({
+      woDetailId: id,
+      action: 'all_pages_submitted',
+      statusAfter: row!.status,
+      metadata: {
+        currentPage: row!.currentPage,
+        completedPages: (row!.completedPages as number[]) ?? [],
+        skippedPages: (row!.skippedPages as number[]) ?? [],
+      },
+      userId,
     });
 
     return {
@@ -1631,6 +1775,27 @@ export class WoDetailsService {
       return sum + (isNaN(amount) ? 0 : amount);
     }, 0);
     return total.toFixed(2);
+  }
+
+  // HISTORY
+  async getHistory(woDetailId: number) {
+    return this.db
+      .select({
+        id: woDetailsHistory.id,
+        woDetailId: woDetailsHistory.woDetailId,
+        pageNo: woDetailsHistory.pageNo,
+        action: woDetailsHistory.action,
+        statusAfter: woDetailsHistory.statusAfter,
+        remarks: woDetailsHistory.remarks,
+        metadata: woDetailsHistory.metadata,
+        actorId: woDetailsHistory.actorId,
+        actorName: users.name,
+        createdAt: woDetailsHistory.createdAt,
+      })
+      .from(woDetailsHistory)
+      .leftJoin(users, eq(users.id, woDetailsHistory.actorId))
+      .where(eq(woDetailsHistory.woDetailId, woDetailId))
+      .orderBy(desc(woDetailsHistory.createdAt), desc(woDetailsHistory.id));
   }
 
   // STEP STATUSES

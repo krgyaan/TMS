@@ -75,6 +75,11 @@ export class WoDetailsController {
     return this.woDetailsService.getStepStatuses(id);
   }
 
+  @Get(':id/history')
+  async getHistory(@Param('id', ParseIntPipe) id: number) {
+    return this.woDetailsService.getHistory(id);
+  }
+
   @Get('by-basic-detail/:woBasicDetailId')
   async getByWoBasicDetailId(
     @Param('woBasicDetailId', ParseIntPipe) woBasicDetailId: number,
