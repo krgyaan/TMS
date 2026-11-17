@@ -112,10 +112,10 @@ export function FdrView({
         return null;
     }
 
-    const deriveFdrStatus = (s: string | null): string => {
+    const deriveFdrStatus = (s: string | null, fdrNo?: string | null): string => {
         const map: Record<string, string> = {
             PENDING: 'Pending',
-            ACCOUNTS_FORM_ACCEPTED: 'FDR Created',
+            ACCOUNTS_FORM_ACCEPTED: fdrNo ? 'FDR Created' : 'FDR Accepted',
             ACCOUNTS_FORM_REJECTED: 'FDR Rejected',
             FOLLOWUP_INITIATED: 'Followup Initiated',
             RETURN_VIA_COURIER: 'Returned via courier',
@@ -129,11 +129,15 @@ export function FdrView({
 
     const deriveFdrExpiryStatus = (fdrExpiryDate: string | null): string => {
         if (!fdrExpiryDate) return 'No date';
-        const expiryDate = new Date(new Date(fdrExpiryDate).getTime() + 3 * 30 * 24 * 60 * 60 * 1000);
-        return expiryDate < new Date() ? 'Expired' : 'Valid';
+        return new Date(fdrExpiryDate) < new Date() ? 'Renewed' : 'Valid';
     };
 
-    const status = deriveFdrStatus(data.fdrStatus || data.status);
+    const isFollowupStopped = Boolean(
+        followupData?.stopReason != null || followupData?.stopRemarks,
+    );
+    const status = isFollowupStopped && (data.fdrStatus === 'FOLLOWUP_INITIATED' || data.status === 'FOLLOWUP_INITIATED')
+        ? 'Followup Stopped'
+        : deriveFdrStatus(data.fdrStatus || data.status, data.fdrNo);
     const hasAccountsFormData = data.hasAccountsFormData === true;
     const isAccountsFormRejected = (data.fdrStatus === 'ACCOUNTS_FORM_REJECTED' || data.status === 'ACCOUNTS_FORM_REJECTED');
     const expiryStatus = data.fdrExpiryDate ? deriveFdrExpiryStatus(data.fdrExpiryDate) : data.expiryDate ? deriveFdrExpiryStatus(data.expiryDate) : null;
@@ -220,8 +224,8 @@ export function FdrView({
                             <TableCell className="text-sm">
                                 {expiryStatus === 'No date' ? (
                                     <Badge variant="secondary">No date</Badge>
-                                ) : expiryStatus === 'Expired' ? (
-                                    <Badge variant="destructive">Expired</Badge>
+                                ) : expiryStatus === 'Renewed' ? (
+                                    <Badge variant="outline">{expiryStatus}</Badge>
                                 ) : expiryStatus ? (
                                     <Badge variant="default">{expiryStatus}</Badge>
                                 ) : '—'}
@@ -274,7 +278,7 @@ export function FdrView({
                                 Tender Name
                             </TableCell>
                             <TableCell className="text-sm col-span-3">
-                                {data.tenderName || data.projectName || '—'}
+                                {data.tenderName || data.projectName || 'Accounts/Admin'}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -313,7 +317,7 @@ export function FdrView({
                                     <>
                                         <FieldRow
                                             label="Status"
-                                            value={<Badge variant="default">FDR Created</Badge>}
+                                            value={<Badge variant="default">{data.fdrNo ? 'FDR Created' : 'FDR Accepted'}</Badge>}
                                         />
                                         <TableRow className="hover:bg-muted/30 transition-colors">
                                             <TableCell className="text-sm font-medium text-muted-foreground">

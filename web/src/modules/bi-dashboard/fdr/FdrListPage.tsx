@@ -1,6 +1,5 @@
 import { paths } from '@/app/routes/paths';
 import { ExportExcelDropdown } from '@/components/bi-dashboard/ExportExcelDropdown';
-import { tenderNameCol } from '@/components/data-grid/columns';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -79,7 +78,7 @@ const TABS_CONFIG: Array<{ key: DashboardTab; name: string; icon: React.ReactNod
 const getStatusVariant = (status: string | null): string => {
     if (!status) return 'secondary';
     const statusLower = status.toLowerCase();
-    if (statusLower.includes('created')) {
+    if (statusLower.includes('created') || statusLower.includes('accepted')) {
         return 'default';
     }
     if (statusLower.includes('cancelled') || statusLower.includes('rejected')) {
@@ -137,12 +136,12 @@ const FdrListPage = () => {
         filenamePrefix: 'fdrs',
         flattenFormData,
         mapPendingRow: (r: any) => ({
-            'Tender Name': r.projectName || '',
+            'Tender / WO Name': r.projectLabel || r.projectName || r.tenderName || '',
             'Tender No': r.projectNo || '',
             'FDR Date': r.fdrCreationDate ? new Date(r.fdrCreationDate).toLocaleDateString('en-GB') : '',
-            'FDR No': r.fdrNo || '',
+            'FDR No.': r.fdrNo || '',
             'Beneficiary name': r.beneficiaryName || '',
-            'FDR Amount': r.fdrAmount || '',
+            'Amount': r.fdrAmount || '',
             'Tender Status': r.tenderStatus || '',
             'Member': r.member || '',
             'Expiry': r.expiry || '',
@@ -150,12 +149,12 @@ const FdrListPage = () => {
         }),
         mapRow: (r: any, isAllTab: boolean) => {
             const base: Record<string, any> = {
-                'Tender Name': r.projectName || r.tenderName || '',
+                'Tender / WO Name': r.projectLabel || r.projectName || r.tenderName || '',
                 'Tender No': r.tenderNo || r.projectNo || '',
                 'FDR Date': r.fdrCreationDate ? new Date(r.fdrCreationDate).toLocaleDateString('en-GB') : '',
-                'FDR No': r.fdrNo || '',
+                'FDR No.': r.fdrNo || '',
                 'Beneficiary name': r.beneficiaryName || '',
-                'FDR Amount': r.fdrAmount || '',
+                'Amount': r.fdrAmount || '',
                 'Tender Status': r.tenderStatus || '',
                 'Member': r.member || '',
                 'Expiry': r.expiry || '',
@@ -220,7 +219,7 @@ const FdrListPage = () => {
             },
             {
                 field: 'fdrNo',
-                headerName: 'FDR No',
+                headerName: 'FDR No.',
                 width: 130,
                 colId: 'fdrNo',
                 valueGetter: (params) => params.data?.fdrNo || '—',
@@ -238,19 +237,21 @@ const FdrListPage = () => {
             },
             {
                 field: 'fdrAmount',
-                headerName: 'FDR Amount',
+                headerName: 'Amount',
                 width: 130,
                 colId: 'fdrAmount',
                 sortable: true,
                 valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
             },
-            tenderNameCol<FdrDashboardRow>('tenderNo', {
-                field: 'tenderNo',
-                headerName: 'Tender Name',
-                width: 200,
-                colId: 'tenderNo',
+            {
+                field: 'projectLabel',
+                headerName: 'Tender / WO Name',
+                width: 220,
+                colId: 'projectLabel',
+                valueGetter: (params) => params.data?.projectLabel || params.data?.tenderName || 'Accounts/Admin',
                 sortable: true,
-            }),
+                filter: true,
+            },
             {
                 field: 'tenderStatus',
                 headerName: 'Tender Status',
@@ -287,7 +288,7 @@ const FdrListPage = () => {
             {
                 field: 'fdrStatus',
                 headerName: 'FDR Status',
-                width: 130,
+                width: 230,
                 colId: 'fdrStatus',
                 sortable: true,
                 filter: true,

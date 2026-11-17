@@ -6,6 +6,7 @@ export interface FdrDashboardRow {
     beneficiaryName: string | null;
     fdrAmount: number | null;
     tenderName: string | null;
+    projectLabel: string | null;
     tenderNo: string | null;
     tenderStatus: string | null;
     member: string | null;

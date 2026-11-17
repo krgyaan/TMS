@@ -31,10 +31,10 @@ export class FdrService {
         this.logger = this.appLogger.withContext(FdrService.name);
     }
 
-    private deriveFdrStatus(status: string | null): string {
+    private deriveFdrStatus(status: string | null, fdrNo?: string | null): string {
         const map: Record<string, string> = {
             [FDR_STATUSES.PENDING]: "Pending",
-            [FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED]: "FDR Created",
+            [FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED]: fdrNo ? "FDR Created" : "FDR Accepted",
             [FDR_STATUSES.ACCOUNTS_FORM_REJECTED]: "FDR Rejected",
             [FDR_STATUSES.FOLLOWUP_INITIATED]: "Followup Initiated",
             [FDR_STATUSES.RETURN_VIA_COURIER]: "Returned via courier",
@@ -46,10 +46,25 @@ export class FdrService {
         return map[status as string] || status || "Pending";
     }
 
+    /**
+     * Display label for the Tender / WO Name column. Uses the request's project
+     * name first, then the joined tender name, and falls back to
+     * "Accounts/Admin" when neither was captured (BI-raised FDRs).
+     */
+    private resolveFdrProjectLabel(
+        projectName: string | null | undefined,
+        tenderName: string | null | undefined,
+    ): string {
+        const isRealName = (value: string | null | undefined) => {
+            const trimmed = value?.trim();
+            return trimmed && trimmed.toUpperCase() !== 'NA' ? trimmed : null;
+        };
+        return isRealName(projectName) ?? isRealName(tenderName) ?? 'Accounts/Admin';
+    }
+
     private deriveFdrExpiryStatus(fdrExpiryDate: Date | null): string {
         if (!fdrExpiryDate) return 'No date';
-        const expiryDate = new Date(fdrExpiryDate.getTime() + 3 * 30 * 24 * 60 * 60 * 1000);
-        return expiryDate < new Date() ? 'Expired' : 'Valid';
+        return new Date(fdrExpiryDate) < new Date() ? 'Renewed' : 'Valid';
     }
 
     private buildFdrDashboardConditions(tab?: string): { conditions: any[]; needsFdrDetails: boolean } {
@@ -177,6 +192,7 @@ export class FdrService {
                 tenderName: tenderInfos.tenderName,
                 projectName: paymentRequests.projectName,
                 projectNo: paymentRequests.tenderNo,
+                requestTenderId: paymentRequests.tenderId,
                 tenderNo: tenderInfos.tenderNo,
                 tenderStatus: statuses.name,
                 teamMember: users.name,
@@ -212,6 +228,24 @@ export class FdrService {
 
         const total = Number(countResult?.count || 0);
 
+        // Follow-ups that have been stopped: shown as "Followup Stopped"
+        // instead of "Followup Initiated" on the dashboard.
+        const stoppedFollowupIds = new Set<number>();
+        const instrumentIds = rows.map((row) => row.id);
+        if (instrumentIds.length > 0) {
+            const stoppedRows = await this.db
+                .select({ emdId: followUps.emdId })
+                .from(followUps)
+                .where(and(
+                    inArray(followUps.emdId, instrumentIds),
+                    isNull(followUps.deletedAt),
+                    sql`(${followUps.stopReason} is not null or ${followUps.stopRemarks} is not null)`,
+                ));
+            for (const stopped of stoppedRows) {
+                if (stopped.emdId != null) stoppedFollowupIds.add(Number(stopped.emdId));
+            }
+        }
+
         const data: FdrDashboardRow[] = rows.map(row => ({
             id: row.id,
             requestId: row.requestId,
@@ -220,11 +254,14 @@ export class FdrService {
             beneficiaryName: row.beneficiaryName,
             fdrAmount: row.fdrAmount ? Number(row.fdrAmount) : null,
             tenderName: row.tenderName || row.projectName,
+            projectLabel: this.resolveFdrProjectLabel(row.projectName, row.tenderName),
             tenderNo: row.tenderNo || row.projectNo,
-            tenderStatus: row.tenderStatus || row.tenderStatus,
+            tenderStatus: row.requestTenderId ? (row.tenderStatus ?? 'Other than Tender') : 'Other than Tender',
             member: row.teamMember?.toString() ?? null,
             expiry: this.deriveFdrExpiryStatus(row.expiry ? new Date(row.expiry) : null),
-            fdrStatus: this.deriveFdrStatus(row.fdrStatus),
+            fdrStatus: stoppedFollowupIds.has(row.id) && row.fdrStatus === FDR_STATUSES.FOLLOWUP_INITIATED
+                ? 'Followup Stopped'
+                : this.deriveFdrStatus(row.fdrStatus, row.fdrNo),
         }));
 
         return wrapPaginatedResponse(data, total, page, limit);
@@ -253,6 +290,8 @@ export class FdrService {
                 fdrAmount: paymentInstruments.amount,
                 projectName: paymentRequests.projectName,
                 projectNo: paymentRequests.tenderNo,
+                requestTenderId: paymentRequests.tenderId,
+                tenderName: tenderInfos.tenderName,
                 tenderStatus: statuses.name,
                 teamMember: users.name,
                 source: instrumentFdrDetails.fdrSource,
@@ -280,6 +319,22 @@ export class FdrService {
             .where(and(...conditions))
             .orderBy(desc(paymentInstruments.createdAt));
 
+        const stoppedFollowupIds = new Set<number>();
+        const exportInstrumentIds = rows.map((row) => row.id);
+        if (exportInstrumentIds.length > 0) {
+            const stoppedRows = await this.db
+                .select({ emdId: followUps.emdId })
+                .from(followUps)
+                .where(and(
+                    inArray(followUps.emdId, exportInstrumentIds),
+                    isNull(followUps.deletedAt),
+                    sql`(${followUps.stopReason} is not null or ${followUps.stopRemarks} is not null)`,
+                ));
+            for (const stopped of stoppedRows) {
+                if (stopped.emdId != null) stoppedFollowupIds.add(Number(stopped.emdId));
+            }
+        }
+
         const data = rows.map(row => ({
             id: row.id,
             requestId: row.requestId,
@@ -289,10 +344,13 @@ export class FdrService {
             fdrAmount: row.fdrAmount ? Number(row.fdrAmount) : null,
             projectName: row.projectName,
             projectNo: row.projectNo,
-            tenderStatus: row.tenderStatus || row.tenderStatus,
+            projectLabel: this.resolveFdrProjectLabel(row.projectName, row.tenderName),
+            tenderStatus: row.requestTenderId ? (row.tenderStatus ?? 'Other than Tender') : 'Other than Tender',
             member: row.teamMember?.toString() ?? null,
             expiry: this.deriveFdrExpiryStatus(row.expiry ? new Date(row.expiry) : null),
-            fdrStatus: this.deriveFdrStatus(row.fdrStatus),
+            fdrStatus: stoppedFollowupIds.has(row.id) && row.fdrStatus === FDR_STATUSES.FOLLOWUP_INITIATED
+                ? 'Followup Stopped'
+                : this.deriveFdrStatus(row.fdrStatus, row.fdrNo),
             reqNo: row.reqNo,
             fdrNeeds: row.fdrNeeds,
             fdrPurpose: row.fdrPurpose,
