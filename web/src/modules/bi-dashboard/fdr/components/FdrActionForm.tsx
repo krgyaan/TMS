@@ -88,6 +88,8 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
     const navigate = useNavigate();
     const updateMutation = useUpdateFdrAction();
     const hasAccountsFormData = !!(formHistory?.accountsForm?.fdrReq);
+    const hasAccountsForm2Data = !!(formHistory?.accountsForm?.fdrNo);
+    const isAccountsFormAccepted = formHistory?.accountsForm?.fdrReq === 'Accepted';
     const hasFollowupData = !!(formHistory?.initiateFollowup?.organisationName);
     const hasReturnedCourierData = !!(formHistory?.returnedCourier?.docketNo);
     const hasReturnedBankTransferData = !!(formHistory?.returnedBankTransfer?.utr);
@@ -128,6 +130,11 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
         defaultValues.bank_mail_ids_cc = formHistory.accountsForm.bankMailIdsCc?.length
             ? formHistory.accountsForm.bankMailIdsCc
             : [{ email: '' }];
+        defaultValues.fdr_no = formHistory.accountsForm.fdrNo;
+        defaultValues.fdr_date = formHistory.accountsForm.fdrDate;
+        defaultValues.fdr_validity = formHistory.accountsForm.fdrValidity;
+        defaultValues.fdr_roi = formHistory.accountsForm.fdrRoi;
+        defaultValues.fdr_copy = formHistory.accountsForm.fdrCopy;
     }
 
     if (formHistory?.initiateFollowup) {
@@ -180,6 +187,21 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
         }
         if (formHistory?.accountsForm?.uploadDocuments) {
             form.setValue('upload_documents', formHistory.accountsForm.uploadDocuments, { shouldValidate: false });
+        }
+        if (formHistory?.accountsForm?.fdrNo) {
+            form.setValue('fdr_no', formHistory.accountsForm.fdrNo, { shouldValidate: false });
+        }
+        if (formHistory?.accountsForm?.fdrDate) {
+            form.setValue('fdr_date', formHistory.accountsForm.fdrDate, { shouldValidate: false });
+        }
+        if (formHistory?.accountsForm?.fdrValidity) {
+            form.setValue('fdr_validity', formHistory.accountsForm.fdrValidity, { shouldValidate: false });
+        }
+        if (formHistory?.accountsForm?.fdrRoi !== undefined && formHistory.accountsForm.fdrRoi !== null) {
+            form.setValue('fdr_roi', formHistory.accountsForm.fdrRoi, { shouldValidate: false });
+        }
+        if (formHistory?.accountsForm?.fdrCopy?.length) {
+            form.setValue('fdr_copy', formHistory.accountsForm.fdrCopy, { shouldValidate: false });
         }
         if (formHistory?.accountsForm?.bankMailIds?.length) {
             bankMailIds.replace(formHistory.accountsForm.bankMailIds);
@@ -258,6 +280,9 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
     }, [selectedAction, tenderId, form]);
 
     const isSubmitting = form.formState.isSubmitting || updateMutation.isPending;
+    const isSelectedStageLocked =
+        (selectedAction === 'accounts-form' && hasAccountsFormData) ||
+        (selectedAction === 'accounts-form-2' && hasAccountsForm2Data);
 
     const handleSubmit = async (values: FdrActionFormValues) => {
         try {
@@ -281,6 +306,14 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
                         .map((row) => row.email?.trim())
                         .filter(Boolean);
                 }
+            }
+
+            if (values.action === 'accounts-form-2') {
+                payload.fdr_no = values.fdr_no || '';
+                payload.fdr_date = values.fdr_date || '';
+                payload.fdr_validity = values.fdr_validity || '';
+                payload.fdr_roi = values.fdr_roi ?? '';
+                payload.fdr_copy = values.fdr_copy ?? [];
             }
 
             if (values.organisation_name) payload.organisation_name = values.organisation_name;
@@ -387,6 +420,7 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
                         {availableActions.map((option) => {
                             const hasHistory =
                                 (option.value === 'accounts-form' && hasAccountsFormData) ||
+                                (option.value === 'accounts-form-2' && hasAccountsForm2Data) ||
                                 (option.value === 'initiate-followup' && hasFollowupData) ||
                                 (option.value === 'returned-courier' && hasReturnedCourierData) ||
                                 (option.value === 'returned-bank-transfer' && hasReturnedBankTransferData) ||
@@ -394,11 +428,22 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
                                 (option.value === 'request-cancellation' && hasRequestCancellationData) ||
                                 (option.value === 'cancellation-confirmation' && hasCancellationConfirmationData);
 
+                            // Stage 2 can only be filled after Stage 1 is accepted.
+                            const isStage2Locked = option.value === 'accounts-form-2' && !isAccountsFormAccepted;
+
                             return (
                                 <div
                                     key={option.value}
-                                    className={`relative flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all hover:bg-muted/50 ${selectedAction === option.value ? 'border-primary' : ''}`}
-                                    onClick={() => form.setValue('action', option.value, { shouldValidate: true })}
+                                    className={`relative flex items-start gap-3 p-4 rounded-lg border-2 text-foreground transition-all ${isStage2Locked
+                                        ? 'opacity-50 cursor-not-allowed border-muted'
+                                        : hasHistory
+                                            ? 'bg-emerald-50 border-emerald-200 cursor-pointer hover:bg-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-800 dark:hover:bg-emerald-950/60'
+                                            : `cursor-pointer hover:bg-muted/50 ${selectedAction === option.value ? 'border-primary' : ''}`
+                                        }${!isStage2Locked && hasHistory && selectedAction === option.value ? ' border-primary' : ''}`}
+                                    onClick={() => {
+                                        if (isStage2Locked) return;
+                                        form.setValue('action', option.value, { shouldValidate: true });
+                                    }}
                                 >
                                     <div className="flex items-center gap-2">
                                         {getSubmittedBadge(hasHistory)}
@@ -416,10 +461,19 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
                 </div>
 
                 <ConditionalSection show={selectedAction === 'accounts-form'}>
+                    <fieldset disabled={hasAccountsFormData} className="min-w-0 [&_input:disabled]:opacity-100 [&_textarea:disabled]:opacity-100">
                     <div className="space-y-4 border rounded-lg p-4 bg-background">
                         <div className="flex items-center gap-2 pb-3 border-b">
                             <FileText className="h-5 w-5 text-primary" />
                             <h4 className="font-semibold text-base">Accounts Form</h4>
+                            {hasAccountsFormData && (
+                                <Badge
+                                    variant="outline"
+                                    className="ml-auto rounded-full border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
+                                >
+                                    <CheckCircle2 className="mr-1 h-3 w-3" /> Completed
+                                </Badge>
+                            )}
                         </div>
                         <p className="text-sm text-muted-foreground -mt-2">
                             Process the FDR request through accounts department
@@ -490,6 +544,54 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
                             </div>
                         )}
                     </div>
+                    </fieldset>
+                </ConditionalSection>
+
+                <ConditionalSection show={selectedAction === 'accounts-form-2'}>
+                    <fieldset disabled={hasAccountsForm2Data} className="min-w-0 [&_input:disabled]:opacity-100 [&_textarea:disabled]:opacity-100">
+                    <div className="space-y-4 border rounded-lg p-4 bg-background">
+                        <div className="flex items-center gap-2 pb-3 border-b">
+                            <CheckSquare className="h-5 w-5 text-primary" />
+                            <h4 className="font-semibold text-base">Accounts Form 2 - After FDR Creation</h4>
+                            {hasAccountsForm2Data && (
+                                <Badge
+                                    variant="outline"
+                                    className="ml-auto rounded-full border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
+                                >
+                                    <CheckCircle2 className="mr-1 h-3 w-3" /> Completed
+                                </Badge>
+                            )}
+                        </div>
+                        <p className="text-sm text-muted-foreground -mt-2">
+                            Capture the issued FDR details
+                        </p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <FieldWrapper control={form.control} name="fdr_no" label="FDR No. *">
+                                {(field) => <Input {...field} placeholder="Enter FDR number" />}
+                            </FieldWrapper>
+                            <FieldWrapper control={form.control} name="fdr_date" label="FDR Date *">
+                                {(field) => <DateInput value={field.value} onChange={field.onChange} />}
+                            </FieldWrapper>
+                            <FieldWrapper control={form.control} name="fdr_validity" label="FDR Validity *">
+                                {(field) => <DateInput value={field.value} onChange={field.onChange} />}
+                            </FieldWrapper>
+                            <FieldWrapper control={form.control} name="fdr_roi" label="FDR ROI % *">
+                                {(field) => <Input {...field} value={field.value ?? ''} type="number" step="0.01" placeholder="Enter ROI" />}
+                            </FieldWrapper>
+                        </div>
+
+                        <FieldWrapper control={form.control} name="fdr_copy" label="FDR copy *">
+                            {(field) => (
+                                <FileUploader
+                                    context="fdr-copy"
+                                    value={field.value || []}
+                                    onChange={field.onChange}
+                                />
+                            )}
+                        </FieldWrapper>
+                    </div>
+                    </fieldset>
                 </ConditionalSection>
 
                 <ConditionalSection show={selectedAction === 'initiate-followup'}>
@@ -667,7 +769,7 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
                     <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>
                         Cancel
                     </Button>
-                    <Button type="submit" disabled={isSubmitting}>
+                    <Button type="submit" disabled={isSubmitting || isSelectedStageLocked}>
                         {isSubmitting ? 'Submitting...' : 'Save Changes'}
                     </Button>
                 </div>

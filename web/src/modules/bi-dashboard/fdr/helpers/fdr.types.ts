@@ -137,6 +137,9 @@ export interface AccountsFormHistory {
     remarks?: string;
     prefilledSignedFdr?: string[];
     uploadDocuments?: string;
+    fdrValidity?: string;
+    fdrRoi?: number;
+    fdrCopy?: string[];
     bankMailIds?: Array<{ email?: string }>;
     bankMailIdsCc?: Array<{ email?: string }>;
     courierOrg?: string;
@@ -196,6 +199,7 @@ export interface FDRFormHistory {
 
 export const ALL_FDR_ACTION_OPTIONS = [
     { value: 'accounts-form', label: 'Accounts Form' },
+    { value: 'accounts-form-2', label: 'Accounts Form 2 - After FDR Creation' },
     { value: 'initiate-followup', label: 'Initiate Followup' },
     { value: 'returned-courier', label: 'Returned via Courier' },
     { value: 'returned-bank-transfer', label: 'Returned via Bank Transfer' },

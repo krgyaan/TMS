@@ -402,6 +402,7 @@ export class FdrService {
     private mapActionToNumber(action: string): number {
         const actionMap: Record<string, number> = {
             "accounts-form": 1,
+            "accounts-form-2": 1,
             "initiate-followup": 2,
             "returned-courier": 3,
             "returned-bank-transfer": 4,
@@ -423,6 +424,13 @@ export class FdrService {
 
         if (instrument.instrumentType !== "FDR") {
             throw new BadRequestException("Instrument is not an FDR");
+        }
+
+        if (
+            body.action === "accounts-form-2" &&
+            (instrument.status === FDR_STATUSES.PENDING || instrument.status === FDR_STATUSES.ACCOUNTS_FORM_REJECTED)
+        ) {
+            throw new BadRequestException("Accounts Form must be accepted before capturing FDR details");
         }
 
         const actionNumber = this.mapActionToNumber(body.action);
@@ -528,10 +536,19 @@ export class FdrService {
         await this.db.update(paymentInstruments).set(updateData).where(eq(paymentInstruments.id, instrumentId));
 
         const fdrDetailsUpdate: any = {};
-        if (body.action === "accounts-form") {
+        if (body.action === "accounts-form" || body.action === "accounts-form-2") {
             if (body.fdr_no) fdrDetailsUpdate.fdrNo = body.fdr_no;
             if (body.fdr_date) fdrDetailsUpdate.fdrDate = body.fdr_date;
             if (body.fdr_validity) fdrDetailsUpdate.fdrExpiryDate = body.fdr_validity;
+            if (body.fdr_roi !== undefined && body.fdr_roi !== '') fdrDetailsUpdate.roi = body.fdr_roi;
+            if (body.fdr_copy !== undefined) {
+                try {
+                    const copyFiles = typeof body.fdr_copy === "string" ? JSON.parse(body.fdr_copy) : body.fdr_copy;
+                    fdrDetailsUpdate.fdrCopy = Array.isArray(copyFiles) ? JSON.stringify(copyFiles) : null;
+                } catch (e) {
+                    this.logger.warn("Failed to parse fdr_copy", e);
+                }
+            }
             if (body.fdr_percentage) fdrDetailsUpdate.marginPercent = body.fdr_percentage;
             if (body.fdr_amount) fdrDetailsUpdate.fdrAmt = body.fdr_amount;
             if (body.fdr_roi) fdrDetailsUpdate.roi = body.fdr_roi;
@@ -873,6 +890,7 @@ export class FdrService {
                 id: paymentInstruments.id,
                 action: paymentInstruments.action,
                 status: paymentInstruments.status,
+                rejectionReason: paymentInstruments.rejectionReason,
                 amount: paymentInstruments.amount,
                 favouring: paymentInstruments.favouring,
                 payableAt: paymentInstruments.payableAt,
@@ -899,6 +917,8 @@ export class FdrService {
                 fdrRemark: instrumentFdrDetails.fdrRemark,
                 prefilledSignedFdr: instrumentFdrDetails.prefilledSignedFdr,
                 uploadDocuments: instrumentFdrDetails.uploadDocuments,
+                fdrRoi: instrumentFdrDetails.roi,
+                fdrCopy: instrumentFdrDetails.fdrCopy,
                 bankMailIds: instrumentFdrDetails.bankMailIds,
                 bankMailIdsCc: instrumentFdrDetails.bankMailIdsCc,
                 legacyData: paymentInstruments.legacyData,
@@ -1016,6 +1036,12 @@ export class FdrService {
             id: result.id,
             action: result.action,
             fdrStatus: this.deriveFdrStatus(result.status),
+            fdrReq: result.rejectionReason
+                ? 'Rejected'
+                : result.status === FDR_STATUSES.PENDING
+                    ? null
+                    : 'Accepted',
+            rejectionReason: result.rejectionReason,
             tenderNo: result.tenderNo,
             tenderName: result.tenderName,
             tenderId: result.tenderId,
@@ -1033,6 +1059,16 @@ export class FdrService {
             fdrExpiryDate: result.fdrExpiryDate ? new Date(result.fdrExpiryDate) : null,
             fdrNeeds: result.fdrNeeds,
             fdrRemark: result.fdrRemark,
+            fdrRoi: result.fdrRoi != null ? Number(result.fdrRoi) : null,
+            fdrCopy: (() => {
+                if (!result.fdrCopy) return [];
+                try {
+                    const parsed = JSON.parse(result.fdrCopy);
+                    return Array.isArray(parsed) ? parsed : [result.fdrCopy];
+                } catch {
+                    return [result.fdrCopy];
+                }
+            })(),
             prefilledSignedFdr,
             uploadDocuments: result.uploadDocuments,
             bankMailIds: (result.bankMailIds as string[] | null) ?? [],

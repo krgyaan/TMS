@@ -22,6 +22,9 @@ export const FdrActionFormSchema = BaseActionFormSchema.extend({
     remarks_fdr: z.string().optional(),
     prefilled_signed_fdr: z.array(z.any()).optional(),
     upload_documents: z.string().optional(),
+    fdr_validity: z.string().optional(),
+    fdr_roi: z.coerce.number().optional(),
+    fdr_copy: z.array(z.string()).optional(),
     bank_mail_ids: z.array(MailRowSchema).optional(),
     bank_mail_ids_cc: z.array(MailRowSchema).optional(),
 
@@ -73,6 +76,16 @@ export const FdrActionFormSchema = BaseActionFormSchema.extend({
         return true;
     },
     { message: 'Reason for Rejection/Changes required is required', path: ['reason_req'] }
+).refine(
+    (data) => {
+        if (data.action === 'accounts-form-2') {
+            return !!data.fdr_no && !!data.fdr_date && !!data.fdr_validity &&
+                data.fdr_roi !== undefined && !Number.isNaN(data.fdr_roi) &&
+                Array.isArray(data.fdr_copy) && data.fdr_copy.length > 0;
+        }
+        return true;
+    },
+    { message: 'FDR No., FDR Date, FDR Validity, FDR ROI and FDR copy are required', path: ['fdr_no'] }
 ).refine(
     (data) => {
         if (data.action === 'initiate-followup') {

@@ -145,12 +145,13 @@ export default function FdrActionPage() {
                     linkedBg={actionFormData?.linkedBg ?? null}
                     formHistory={{
                         accountsForm: actionFormData ? {
-                            fdrReq: actionFormData.fdrStatus === 'Rejected' ? 'Rejected' :
-                                   actionFormData.fdrStatus === 'Accepted' ? 'Accepted' :
-                                   actionFormData.fdrRemark ? 'Accepted' : undefined,
-                            reasonReq: actionFormData.fdrStatus === 'Rejected' ? (actionFormData as any).rejectionReason ?? undefined : undefined,
+                            fdrReq: actionFormData.fdrReq ?? undefined,
+                            reasonReq: actionFormData.rejectionReason ?? undefined,
                             fdrNo: actionFormData.fdrNo ?? undefined,
                             fdrDate: actionFormData.fdrDate ? new Date(actionFormData.fdrDate).toISOString() : undefined,
+                            fdrValidity: actionFormData.fdrExpiryDate ? new Date(actionFormData.fdrExpiryDate).toISOString() : undefined,
+                            fdrRoi: actionFormData.fdrRoi != null ? Number(actionFormData.fdrRoi) : undefined,
+                            fdrCopy: (actionFormData as any).fdrCopy ?? undefined,
                             reqNo: actionFormData.reqNo ?? undefined,
                             remarks: actionFormData.fdrRemark ?? undefined,
                             prefilledSignedFdr: (actionFormData as any).prefilledSignedFdr ?? undefined,

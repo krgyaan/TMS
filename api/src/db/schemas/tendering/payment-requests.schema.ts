@@ -200,6 +200,7 @@ export const instrumentFdrDetails = pgTable('instrument_fdr_details', {
     fdrRemark: text('fdr_remark'), // emd_fdrs.fdr_remark
     prefilledSignedFdr: text('prefilled_signed_fdr'), // JSON string of uploaded file paths
     uploadDocuments: text('upload_documents'), // Upload Documents path
+    fdrCopy: text('fdr_copy'), // Accounts Form (FDR) 2 - FDR copy (JSON array of paths)
     bankMailIds: jsonb('bank_mail_ids').$type<string[]>(),
     bankMailIdsCc: jsonb('bank_mail_ids_cc').$type<string[]>(),
 
