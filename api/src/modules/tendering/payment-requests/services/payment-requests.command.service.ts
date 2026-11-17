@@ -93,7 +93,7 @@ export class PaymentRequestsCommandService {
                 if (emdAmount > 0 || isBlankNonTmsCheque) {
                     const emdPurpose = (payload.projectId || payload.preserveBgPurpose) && payload.EMD.mode === 'BG'
                         ? extractProjectBgPurpose(payload.EMD.details)
-                        : payload.projectId && payload.EMD.mode === 'FDR'
+                        : (payload.projectId || payload.preserveFdrPurpose) && payload.EMD.mode === 'FDR'
                             ? extractProjectFdrPurpose(payload.EMD.details)
                             : extractPurposeFromDetails(payload.EMD.mode, payload.EMD.details, 'EMD');
                     const request = await this.createPaymentRequest(

@@ -385,6 +385,10 @@ const FdrListPage = () => {
                                     <Plus className="w-4 h-4" />
                                     Add Old Entry
                                 </Button>
+                                <Button onClick={() => navigate(paths.bi.fdrCreate())}>
+                                    <Plus className="w-4 h-4" />
+                                    Add FDR
+                                </Button>
                             </div>
                         </CardAction>
                     </div>

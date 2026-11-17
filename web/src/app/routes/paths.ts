@@ -228,6 +228,7 @@ export const paths = {
         demandDraftAction: (id: number) => `/bi-dashboard/demand-draft/action/${id}`,
         DDMeetingRemarks: (id: number) => `/bi-dashboard/demand-draft/meeting-remarks/${id}`,
         fdr: "/bi-dashboard/fdr",
+        fdrCreate: () => `/bi-dashboard/fdr/create`,
         fdrView: (requestId: number) => `/bi-dashboard/fdr/details/${requestId}`,
         fdrAction: (id: number) => `/bi-dashboard/fdr/action/${id}`,
         FdrMeetingRemarksPage: (id: number) => `/bi-dashboard/fdr/meeting-remarks/${id}`,
