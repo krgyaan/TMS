@@ -24,6 +24,7 @@
         "drizzle:generate": "drizzle-kit generate --config ./drizzle.config.ts",
         "drizzle:migrate": "drizzle-kit migrate --config ./drizzle.config.ts",
         "migrate:po-approvals": "tsx scripts/migrate-po-approvals.ts",
+        "check:po-approvals": "tsx scripts/check-po-approval.ts",
         "migrate:seller-parties": "tsx scripts/migrate-project-parties-sellers.ts",
         "migrate:vendor-master": "tsx scripts/migrate-vendor-master.ts",
         "audit:vendor-duplicates": "tsx scripts/audit-vendor-duplicates.ts",
