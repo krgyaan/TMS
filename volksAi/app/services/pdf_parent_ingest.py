@@ -349,6 +349,7 @@ def ingest_parent_tender_pdf(
     original_filename: str,
     explicit_atc_paths: Optional[List[Path]] = None,
     explicit_boq_path: Optional[Path] = None,
+    deadline_sec: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Coordinates the full OCR, hyperlink extraction, and info-sheet generation pipeline.
@@ -359,10 +360,37 @@ def ingest_parent_tender_pdf(
     signal than the heuristic hyperlink/filename-based ATC discovery below, so when
     present they take priority over it rather than being silently ignored.
     """
+    import os
+    import time as _time
+    start_monotonic = _time.monotonic()
+    effective_deadline_sec = (
+        float(deadline_sec)
+        if deadline_sec is not None
+        else float(os.getenv("VOLKSAI_EXTRACT_DEADLINE_SEC", "200.0"))
+    )
+    skipped_stages: List[str] = []
+
+    def _is_deadline_exceeded(stage_name: str) -> bool:
+        elapsed = _time.monotonic() - start_monotonic
+        if elapsed >= effective_deadline_sec:
+            if stage_name not in skipped_stages:
+                skipped_stages.append(stage_name)
+            logger.warning(
+                f"[DEADLINE_GUARD][Job {job_id}] Request deadline ({effective_deadline_sec:.1f}s) exceeded "
+                f"before stage '{stage_name}' (elapsed={elapsed:.2f}s). Skipping stage."
+            )
+            return True
+        return False
+
     logger.info(f"[INGEST_PIPELINE][Job {job_id}] Starting ingestion pipeline for '{original_filename}'")
     job_dir = pdf_path.parent
     pages_dir = job_dir / "pages" / job_id
     pages_dir.mkdir(parents=True, exist_ok=True)
+
+    from app.core.timing import stage_timer
+    from app.core.logging import request_id_ctx_var
+    if not request_id_ctx_var.get():
+        request_id_ctx_var.set(job_id)
 
     logger.info(f"[INGEST_PIPELINE][Job {job_id}] Step 1: Extracting text & page structures from PDF...")
     page_texts = extract_pdf_text_hybrid(str(pdf_path), pages_dir, max_pages=MAIN_TENDER_MAX_PAGES)
@@ -376,7 +404,8 @@ def ingest_parent_tender_pdf(
     # If explicit ATC files were uploaded, external child downloads are unnecessary and bypassed.
     download_external = not bool(explicit_atc_paths)
     logger.info(f"[INGEST_PIPELINE][Job {job_id}] Step 2: Extracting hyperlinks & ATC document mentions (download_external={download_external})...")
-    links, mentions = extract_links_and_mentions(str(pdf_path), download_external=download_external)
+    with stage_timer("pdf_links_and_mentions", request_id=job_id):
+        links, mentions = extract_links_and_mentions(str(pdf_path), download_external=download_external)
     logger.info(f"[INGEST_PIPELINE][Job {job_id}] Step 2 complete: Found {len(links)} links, {len(mentions)} mentions")
 
     # 3. Deterministic Field Extraction
@@ -385,10 +414,12 @@ def ingest_parent_tender_pdf(
     # Classify document type using page 1 text
     page1_text = page_texts[0].get("text", "") if page_texts else ""
     from app.ocr.pipeline import classify_document_type
-    doc_type = classify_document_type(page1_text)
+    with stage_timer("page_and_doc_classification", request_id=job_id):
+        doc_type = classify_document_type(page1_text)
     
     logger.info(f"[INGEST_PIPELINE][Job {job_id}] Step 3: Running Layer 1 spatial field extraction (doc_type='{doc_type}')...")
-    sections = extract_tender_fields(page_texts, title_raw, document_type=doc_type)
+    with stage_timer("field_extractor:main_tender", request_id=job_id):
+        sections = extract_tender_fields(page_texts, title_raw, document_type=doc_type)
     main_tender_snapshot = _collect_field_snapshots(sections)
 
     # 3a. Bridge resolved ATC link URL to sections atc_document_link_present field
@@ -533,21 +564,10 @@ def ingest_parent_tender_pdf(
     atc_full_text = ""  # Outer-scope ATC text — used by LLM fallback post-pass
     merged_atc_field_count = 0
     atc_snapshot: Dict[str, Dict[str, Any]] = {}
-    if atc_path:
+    if atc_path and not _is_deadline_exceeded("atc_ingest"):
         try:
             logger.info(f"[ATC_RESOLVER] Ingest pipeline parsing downloaded ATC child PDF: '{atc_path}'...")
-            if str(atc_path) == str(pdf_path):
-                atc_page_texts = page_texts
-                atc_sections = [{"id": "sec-atc", "title": "ATC-Sourced Fields", "fields": []}]
-            else:
-                atc_pages_dir = job_dir / "atc_pages"
-                atc_page_texts = extract_pdf_text_hybrid(str(atc_path), atc_pages_dir, max_pages=CHILD_PDF_MAX_PAGES)
-                # The primary ATC's own number, before spec/schedule child PDFs are merged in.
-                atc_identity = extract_document_identity(atc_page_texts)
-                all_pages.extend(atc_page_texts)
-                atc_sections = extract_tender_fields(atc_page_texts, f"{title_raw} ATC", document_type="generic_nit")
-
-            # Collect and append text from all other downloaded child PDFs (e.g. Schedule Specs sch1-sch4)
+            # Collect all other downloaded child PDFs (e.g. Schedule Specs sch1-sch4)
             valid_child_pdfs = []
             for l in links:
                 if l.get("local_path") and Path(l["local_path"]).exists() and str(l["local_path"]).lower().endswith(".pdf"):
@@ -566,19 +586,80 @@ def ingest_parent_tender_pdf(
             # extraction instead of being accepted by the API and then silently
             # dropped. (Explicit BOQ handling lives outside this `if atc_path:`
             # block below, since a tender can have a BOQ with no ATC at all.)
-            for extra_atc in explicit_atc_paths[1:]:
+            for extra_atc in (explicit_atc_paths or [])[1:]:
                 extra_atc = Path(extra_atc)
                 if extra_atc.exists() and extra_atc not in valid_child_pdfs and extra_atc != pdf_path and extra_atc != atc_path:
                     valid_child_pdfs.append(extra_atc)
 
+            if str(atc_path) == str(pdf_path):
+                atc_page_texts = list(page_texts)
+                atc_sections = [{"id": "sec-atc", "title": "ATC-Sourced Fields", "fields": []}]
+                extra_pdfs_to_extract = list(valid_child_pdfs)
+                extracted_child_map: Dict[Path, List[Dict[str, Any]]] = {}
+                if extra_pdfs_to_extract:
+                    import concurrent.futures
+                    import contextvars
+                    max_doc_workers = max(1, int(os.getenv("VOLKSAI_MAX_DOC_WORKERS", "2")))
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=min(max_doc_workers, len(extra_pdfs_to_extract))) as doc_pool:
+                        fut_map = {
+                            doc_pool.submit(
+                                contextvars.copy_context().run,
+                                extract_pdf_text_hybrid,
+                                str(c_pdf),
+                                job_dir / f"atc_pages_{idx}",
+                                CHILD_PDF_MAX_PAGES,
+                            ): c_pdf
+                            for idx, c_pdf in enumerate(extra_pdfs_to_extract)
+                        }
+                        for fut, c_pdf in fut_map.items():
+                            try:
+                                extracted_child_map[c_pdf] = fut.result()
+                            except Exception as c_err:
+                                logger.debug(f"Could not parse extra child PDF {c_pdf}: {c_err}")
+            else:
+                all_atc_pdfs = [Path(atc_path)] + list(valid_child_pdfs)
+                extracted_child_map = {}
+                if len(all_atc_pdfs) == 1:
+                    atc_pages_dir = job_dir / "atc_pages"
+                    extracted_child_map[Path(atc_path)] = extract_pdf_text_hybrid(
+                        str(atc_path), atc_pages_dir, max_pages=CHILD_PDF_MAX_PAGES
+                    )
+                else:
+                    import concurrent.futures
+                    import contextvars
+                    max_doc_workers = max(1, int(os.getenv("VOLKSAI_MAX_DOC_WORKERS", "2")))
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=min(max_doc_workers, len(all_atc_pdfs))) as doc_pool:
+                        fut_map = {
+                            doc_pool.submit(
+                                contextvars.copy_context().run,
+                                extract_pdf_text_hybrid,
+                                str(doc_p),
+                                job_dir / ("atc_pages" if idx == 0 else f"atc_pages_{idx}"),
+                                CHILD_PDF_MAX_PAGES,
+                            ): doc_p
+                            for idx, doc_p in enumerate(all_atc_pdfs)
+                        }
+                        for fut, doc_p in fut_map.items():
+                            try:
+                                extracted_child_map[doc_p] = fut.result()
+                            except Exception as c_err:
+                                if doc_p == Path(atc_path):
+                                    raise
+                                logger.debug(f"Could not parse extra child PDF {doc_p}: {c_err}")
+
+                atc_page_texts = list(extracted_child_map.get(Path(atc_path), []))
+                # The primary ATC's own number, before spec/schedule child PDFs are merged in.
+                atc_identity = extract_document_identity(atc_page_texts)
+                all_pages.extend(atc_page_texts)
+                with stage_timer("field_extractor:atc", request_id=job_id):
+                    atc_sections = extract_tender_fields(atc_page_texts, f"{title_raw} ATC", document_type="generic_nit")
+
             for c_pdf in valid_child_pdfs:
-                try:
-                    c_texts = extract_pdf_text_hybrid(str(c_pdf), job_dir / "atc_pages", max_pages=CHILD_PDF_MAX_PAGES)
+                c_texts = extracted_child_map.get(c_pdf)
+                if c_texts is not None:
                     all_pages.extend(c_texts)
                     atc_page_texts.extend(c_texts)
                     logger.info(f"[ATC_RESOLVER] Appended child PDF text: '{c_pdf.name}' ({len(c_texts)} pages)")
-                except Exception as c_err:
-                    logger.debug(f"Could not parse extra child PDF {c_pdf}: {c_err}")
 
             # Upsert standalone resolve_atc_anchor_fields output into atc_sections (Task 2)
             atc_full_text = "\n".join([f"\n--- [PAGE {p.get('page', i+1)}] ---\n" + p.get("text", "") for i, p in enumerate(atc_page_texts)])
@@ -800,15 +881,16 @@ def ingest_parent_tender_pdf(
     infosheet_data = {}
     try:
         from app.services.tender_mapper import build_infosheet_data
-        infosheet_data = build_infosheet_data(
-            sections,
-            all_pages,
-            job_id=job_id,
-            atc_full_text=atc_full_text,
-            dual_sources=dual_sources,
-            is_self_classified_atc=is_self_classified_atc,
-            has_atc=has_atc,
-        )
+        with stage_timer("tender_mapper:MAIN_ALIAS", request_id=job_id):
+            infosheet_data = build_infosheet_data(
+                sections,
+                all_pages,
+                job_id=job_id,
+                atc_full_text=atc_full_text,
+                dual_sources=dual_sources,
+                is_self_classified_atc=is_self_classified_atc,
+                has_atc=has_atc,
+            )
 
         # 4a. LLM Fallback Post-Pass — resolve remaining NA fields via LLM (Gemini / OpenAI-compatible)
         import os
@@ -955,7 +1037,7 @@ def ingest_parent_tender_pdf(
                     import concurrent.futures
 
                     # ─── ROLE 1: Missing-Field Fallback ─────────────────────────
-                    if keys_to_resolve:
+                    if keys_to_resolve and not _is_deadline_exceeded("llm_role1"):
                         logger.info("[LLM_FALLBACK][Role 1] %d fields queued for LLM resolution (has_bec=%s): %s", len(keys_to_resolve), has_bec_content, keys_to_resolve)
                         executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
                         try:
@@ -1149,7 +1231,7 @@ def ingest_parent_tender_pdf(
                         ambig_candidates[f_name] = c_val
                         ambig_dispositions[f_name] = "evaluated_role2"
 
-                    if ambig_candidates:
+                    if ambig_candidates and not _is_deadline_exceeded("llm_role2"):
                         logger.info("[LLM_AMBIGUITY][Role 2] Reviewing %d ambiguity-prone fields: %s", len(ambig_candidates), list(ambig_candidates.keys()))
                         ambig_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
                         try:
@@ -1352,6 +1434,9 @@ def ingest_parent_tender_pdf(
         else:
             logger.info("[IDENTITY_CHECK][Job %s] status=%s main=%s atc=%s", job_id,
                         identity_check["status"], identity_check["mainDocumentNumber"], identity_check["atcDocumentNumber"])
+        if skipped_stages:
+            infosheet_data["_partial"] = True
+            infosheet_data["_skipped_stages"] = list(skipped_stages)
 
     # Return built infosheet dict directly with zero side effects
     return infosheet_data

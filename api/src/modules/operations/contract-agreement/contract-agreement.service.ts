@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { and, asc, desc, eq, isNotNull, isNull, or, sql } from 'drizzle-orm';
@@ -8,7 +8,8 @@ import { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { users } from '@/db/schemas';
-import { woBasicDetails, woDetails } from '@/db/schemas/operations';
+import { woAcceptance, woBasicDetails, woDetails } from '@/db/schemas/operations';
+import { recomputeWorkflowStage } from '@/modules/operations/wo-details/helpers/workflow-stage.helper';
 
 const oeSiteVisitUser = alias(users, 'oeSiteVisitUser');
 const oeDocsPrepUser = alias(users, 'oeDocsPrepUser');
@@ -25,13 +26,17 @@ export class ContractAgreementService {
 
         const conditions: any[] = [
             eq(woDetails.isContractAgreement, true),
+            or(
+                eq(woAcceptance.decision, 'accepted'),
+                eq(woAcceptance.status, 'completed'),
+            ),
         ];
         conditions.push(...this.buildRoleFilterConditions(user, teamId));
         // Tab filter
         if (activeTab === 'not_uploaded') {
-            conditions.push(isNull(woDetails.veSigned), isNull(woDetails.clientAndVeSigned));
+            conditions.push(or(isNull(woDetails.veSigned), isNull(woDetails.clientAndVeSigned)));
         } else if (activeTab === 'uploaded') {
-            conditions.push(isNotNull(woDetails.veSigned), isNotNull(woDetails.clientAndVeSigned));
+            conditions.push(and(isNotNull(woDetails.veSigned), isNotNull(woDetails.clientAndVeSigned)));
         }
 
         // Search (optimized)
@@ -95,6 +100,7 @@ export class ContractAgreementService {
             .leftJoin(users, eq(users.id, woBasicDetails.oeFirst))
             .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
             .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep))
+            .leftJoin(woAcceptance, eq(woAcceptance.woDetailId, woDetails.id))
             .where(whereClause);
 
         const total = Number(countResult?.count || 0);
@@ -125,6 +131,7 @@ export class ContractAgreementService {
             .leftJoin(users, eq(users.id, woBasicDetails.oeFirst))
             .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
             .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep))
+            .leftJoin(woAcceptance, eq(woAcceptance.woDetailId, woDetails.id))
             .where(whereClause)
             .orderBy(orderByClause)
             .limit(limit)
@@ -154,10 +161,17 @@ export class ContractAgreementService {
     }
 
     async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{ 'uploaded': number; 'not_uploaded': number; total: number }> {
-        const baseConditions = [eq(woDetails.isContractAgreement, true), ...this.buildRoleFilterConditions(user, teamId)];
+        const baseConditions = [
+            eq(woDetails.isContractAgreement, true),
+            or(
+                eq(woAcceptance.decision, 'accepted'),
+                eq(woAcceptance.status, 'completed'),
+            ),
+            ...this.buildRoleFilterConditions(user, teamId),
+        ];
         const baseWhere = baseConditions.length ? and(...baseConditions) : undefined;
 
-        const notUploadedFilter = and(isNull(woDetails.veSigned), isNull(woDetails.clientAndVeSigned));
+        const notUploadedFilter = or(isNull(woDetails.veSigned), isNull(woDetails.clientAndVeSigned));
         const uploadedFilter = and(isNotNull(woDetails.veSigned), isNotNull(woDetails.clientAndVeSigned));
 
         const [result] = await this.db
@@ -170,6 +184,7 @@ export class ContractAgreementService {
             .leftJoin(users, eq(users.id, woBasicDetails.oeFirst))
             .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
             .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep))
+            .leftJoin(woAcceptance, eq(woAcceptance.woDetailId, woDetails.id))
             .where(baseWhere);
 
         const uploaded = Number(result?.uploaded ?? 0);
@@ -188,6 +203,25 @@ export class ContractAgreementService {
   }
 
     async saveContractAgreement(userId: number, dto: SaveContractAgreementDto) {
+        const [acceptance] = await this.db
+            .select({
+                decision: woAcceptance.decision,
+                status: woAcceptance.status,
+            })
+            .from(woAcceptance)
+            .where(eq(woAcceptance.woDetailId, dto.woDetailId))
+            .limit(1);
+
+        const isApproved =
+            acceptance?.decision === 'accepted' ||
+            acceptance?.status === 'completed';
+
+        if (!isApproved) {
+            throw new BadRequestException(
+                'WO must be approved by TL before the contract agreement can be updated',
+            );
+        }
+
         const updateData: any = {
             updatedBy: userId,
             updatedAt: new Date(),
@@ -209,6 +243,8 @@ export class ContractAgreementService {
             .set(updateData)
             .where(eq(woDetails.id, dto.woDetailId))
             .returning();
+
+        await recomputeWorkflowStage(this.db, dto.woDetailId);
 
         return updated;
     }

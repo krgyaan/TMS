@@ -450,14 +450,17 @@ def identify_annexures(
     resolved_model = model or ROLE_4_MODEL_DEFAULT
     logger.info("[LLM_ANNEXURES][Role 4] Identifying annexures via Claude (%s)", resolved_model)
 
-    response = client.messages.create(
-        model=resolved_model,
-        max_tokens=ROLE_4_MAX_TOKENS,
-        system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
-        messages=[{"role": "user", "content": user_prompt}],
-        tools=[tool_spec],
-        tool_choice={"type": "tool", "name": TOOL_NAME},
-    )
+    from app.core.timing import stage_timer, call_anthropic_with_replay
+    with stage_timer("llm_role4:annexures"):
+        response = call_anthropic_with_replay(
+            client.messages.create,
+            model=resolved_model,
+            max_tokens=ROLE_4_MAX_TOKENS,
+            system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content": user_prompt}],
+            tools=[tool_spec],
+            tool_choice={"type": "tool", "name": TOOL_NAME},
+        )
 
     usage: Optional[Dict[str, Any]] = None
     if hasattr(response, "usage") and response.usage:
@@ -483,6 +486,10 @@ def identify_annexures(
         logger.info(
             "[LLM_ANNEXURES][Role 4] Token usage: %d in / %d out (Est. cost: $%.5f USD)",
             in_tok, out_tok, cost,
+        )
+        logger.info(
+            "[LLM_SUMMARY] role=role4 model=%s calls=1 input_tokens=%d output_tokens=%d cache_creation_tokens=%d cache_read_tokens=%d cost_usd=%.6f status=ok",
+            resolved_model, in_tok, out_tok, cache_create, cache_read, cost,
         )
 
     truncated = getattr(response, "stop_reason", None) == "max_tokens"

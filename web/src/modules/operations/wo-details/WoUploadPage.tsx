@@ -4,8 +4,7 @@ import type { FileContext } from '@/components/file-upload/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useUpdateWoBasicDetail } from '@/hooks/api/useWoBasicDetails';
-import { useUpdateWoDetail, useWoDetailWithRelations } from '@/hooks/api/useWoDetails';
+import { useCompleteWoUpload, useWoDetailWithRelations } from '@/hooks/api/useWoDetails';
 import { useDeleteWoDocument, useUploadWoDocument, useWoDocumentsByType } from '@/hooks/api/useWoDocuments';
 import { formatDate } from '@/hooks/useFormatedDate';
 import { parseFileArray } from '@/lib/utils';
@@ -74,8 +73,7 @@ const WoUploadPage = () => {
 
     const { data, isLoading } = useWoDetailWithRelations(woDetailId);
     
-    const { mutateAsync: updateBasicDetail, isPending: isCompletingBasic } = useUpdateWoBasicDetail();
-    const { mutateAsync: updateWoDetail, isPending: isCompletingDetail } = useUpdateWoDetail();
+    const { mutateAsync: completeUpload, isPending: isCompleting } = useCompleteWoUpload();
 
     if (isLoading) {
         return (
@@ -92,23 +90,12 @@ const WoUploadPage = () => {
 
     const handleSubmit = async () => {
         try {
-            // Move workflow stage to completed
-            await updateBasicDetail({
-                id: data.woBasicDetailId,
-                data: { currentStage: 'completed' }
-            });
-
-            // Update WO Detail status to completed
-            await updateWoDetail({
-                id: data.id,
-                data: { status: 'wo_details_filled' }
-            });
+            await completeUpload(data.id);
 
             toast.success("WO Upload completed successfully");
             navigate(paths.operations.woDetailAcceptanceListPage);
         } catch (error) {
             console.error(error);
-            // Error toast handled implicitly by generalized hooks error boundary usually, but we can do extra here:
             toast.error("An error occurred during completion. Please check logs.");
         }
     };
@@ -207,8 +194,8 @@ const WoUploadPage = () => {
                     <Button variant="outline" onClick={() => navigate(paths.operations.woDetailAcceptanceListPage)}>
                         Cancel
                     </Button>
-                    <Button onClick={handleSubmit} disabled={isCompletingBasic || isCompletingDetail}>
-                        {isCompletingBasic || isCompletingDetail ? "Submitting..." : "Submit WO Upload"}
+                    <Button onClick={handleSubmit} disabled={isCompleting}>
+                        {isCompleting ? "Submitting..." : "Submit WO Upload"}
                     </Button>
                 </div>
             </CardContent>

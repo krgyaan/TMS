@@ -313,6 +313,36 @@ export class WoQueriesService {
     };
   }
 
+  private async syncAcceptanceQueryStatus(woDetailsId: number) {
+    const [openQuery] = await this.db
+      .select({ id: woQueries.id })
+      .from(woQueries)
+      .where(
+        and(
+          eq(woQueries.woDetailsId, woDetailsId),
+          sql`${woQueries.status} in ('pending', 'escalated')`,
+        ),
+      )
+      .limit(1);
+
+    if (openQuery) return;
+
+    const now = new Date();
+    await this.db
+      .update(woAcceptance)
+      .set({
+        status: 'pending_review',
+        queryRespondedAt: now,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(woAcceptance.woDetailId, woDetailsId),
+          eq(woAcceptance.status, 'queries_pending'),
+        ),
+      );
+  }
+
   async respond(id: number, data: RespondToQueryDto) {
     const query = await this.findById(id);
 
@@ -339,6 +369,8 @@ export class WoQueriesService {
       .where(eq(woQueries.id, id))
       .returning();
 
+    await this.syncAcceptanceQueryStatus(query.woDetailsId);
+
     return {
       ...this.mapRowToResponse(row!),
       withinSla,
@@ -359,6 +391,8 @@ export class WoQueriesService {
     if (!row) {
       throw new NotFoundException(`Query with ID ${id} not found`);
     }
+
+    await this.syncAcceptanceQueryStatus(row.woDetailsId);
 
     return {
       ...this.mapRowToResponse(row),

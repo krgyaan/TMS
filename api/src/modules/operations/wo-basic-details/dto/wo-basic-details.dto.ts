@@ -31,7 +31,7 @@ export const CreateWoBasicDetailSchema = z.object({
   orderSequence: z.number().int().positive().optional(),
 
   // Workflow state tracking
-  currentStage: z.enum(["basic_details", "wo_details", "wo_acceptance", "wo_upload", "completed"]).optional(),
+  currentStage: z.enum(["basic_details", "wo_details", "wo_acceptance", "kick_off", "contract_agreement", "wo_upload", "completed"]).optional(),
 
   // Financial details
   woValuePreGst: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format").optional(),
@@ -138,6 +138,8 @@ export const WoBasicDetailsQuerySchema = z.object({
       "basic_details",
       "wo_details",
       "wo_acceptance",
+      "kick_off",
+      "contract_agreement",
       "wo_upload",
       "completed",
     ])

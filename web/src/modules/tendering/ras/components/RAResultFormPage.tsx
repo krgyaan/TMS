@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, useWatch, type Resolver } from 'react-hook-form';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,22 +14,9 @@ import { FileUploader } from '@/components/file-upload';
 import DateTimeInput from '@/components/form/DateTimeInput';
 import { Textarea } from '@/components/ui/textarea';
 import { showErrorToast } from '@/utils/errorToast';
+import { UploadRaResultSchema, type UploadRaResultFormValues } from '../helpers/reverseAuction.schema';
 
-const UploadRaResultSchema = z.object({
-    raResult: z.enum(['Won', 'Lost', 'H1 Elimination']),
-    veL1AtStart: z.enum(['Yes', 'No']),
-    raStartPrice: z.string().optional(),
-    raClosePrice: z.string().optional(),
-    raClosePriceL2: z.string().optional(),
-    raOurPrice: z.string().optional(),
-    raCloseTime: z.string().optional(),
-    resultReason: z.string().optional(),
-    screenshotQualifiedParties: z.array(z.string()).default([]),
-    screenshotDecrements: z.array(z.string()).default([]),
-    finalResultScreenshot: z.array(z.string()).default([]),
-});
-
-type FormValues = z.infer<typeof UploadRaResultSchema>;
+type FormValues = UploadRaResultFormValues;
 
 interface RAResultFormPageProps {
     raId: number;
@@ -130,7 +116,6 @@ export default function RAResultFormPage({
                                 options={[
                                     { value: 'Won', label: 'Won' },
                                     { value: 'Lost', label: 'Lost' },
-                                    { value: 'H1 Elimination', label: 'H1 Elimination' },
                                 ]}
                                 placeholder="Select result"
                             />

@@ -44,11 +44,20 @@ class OcrEngine:
             return
         if not cls._paddle_attempted:
             cls._paddle_attempted = True
+            os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
             try:
                 from paddleocr import PaddleOCR
-                cls._paddle_instance = PaddleOCR(
-                    use_angle_cls=True, lang="en", use_gpu=False, show_log=False
-                )
+                try:
+                    cls._paddle_instance = PaddleOCR(
+                        use_textline_orientation=True, lang="en"
+                    )
+                except (TypeError, ValueError) as arg_err:
+                    if "use_textline_orientation" in str(arg_err):
+                        cls._paddle_instance = PaddleOCR(
+                            use_angle_cls=True, lang="en"
+                        )
+                    else:
+                        raise
                 import logging
                 logging.getLogger("ocr.ocr_engine").info("[OCR_DIAGNOSTICS] PaddleOCR initialized successfully as primary OCR engine.")
             except Exception as e:

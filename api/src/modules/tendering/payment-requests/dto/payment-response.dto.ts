@@ -41,6 +41,19 @@ export const FdrDetailsResponse = z.object({
   reqNo: nullishString,
   courierAddress: nullishString,
   courierDeadline: nullishString,
+  // Courier Dispatch (BG-style)
+  fdrCourierOrg: nullishString,
+  fdrCourierName: nullishString,
+  fdrCourierPhone: nullishString,
+  fdrCourierAddrLine1: nullishString,
+  fdrCourierAddrLine2: nullishString,
+  fdrCourierCity: nullishString,
+  fdrCourierState: nullishString,
+  fdrCourierPincode: nullishString,
+  fdrCourierEmpFrom: z.number().nullable().optional(),
+  fdrCourierDelDate: nullishString,
+  fdrCourierUrgency: z.number().nullable().optional(),
+  fdrCourierDocs: z.array(z.string()).optional(),
 }).nullable();
 
 export const BgDetailsResponse = z.object({
@@ -234,6 +247,19 @@ export const PaymentRequestEditResponse = z.object({
   fdrCourierAddress: nullishString,
   fdrCourierHours: z.number().nullable().optional(),
   fdrDate: nullishDate,
+  // FDR Courier Dispatch (BG-style)
+  fdrCourierOrg: nullishString,
+  fdrCourierName: nullishString,
+  fdrCourierPhone: nullishString,
+  fdrCourierAddrLine1: nullishString,
+  fdrCourierAddrLine2: nullishString,
+  fdrCourierCity: nullishString,
+  fdrCourierState: nullishString,
+  fdrCourierPincode: nullishString,
+  fdrCourierEmpFrom: z.number().nullable().optional(),
+  fdrCourierDelDate: nullishString,
+  fdrCourierUrgency: z.number().nullable().optional(),
+  fdrCourierDocs: z.array(z.string()).optional(),
 
   // BG
   bgNeededIn: nullishString,

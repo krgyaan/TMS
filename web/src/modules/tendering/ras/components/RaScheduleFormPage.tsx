@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, useWatch } from 'react-hook-form';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,41 +14,9 @@ import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { SelectField } from '@/components/form/SelectField';
 import DateTimeInput from '@/components/form/DateTimeInput';
+import { ScheduleRaSchema, type ScheduleRaFormValues } from '../helpers/reverseAuction.schema';
 
-const ScheduleRaSchema = z.object({
-    technicallyQualified: z.enum(['Yes', 'No']),
-    disqualificationReason: z.string().optional(),
-    qualifiedPartiesCount: z.string().optional(),
-    qualifiedPartiesNames: z.array(z.string()).optional(),
-    raStartTime: z.string().optional(),
-    raEndTime: z.string().optional(),
-}).refine((data) => {
-    if (data.technicallyQualified === 'No' && !data.disqualificationReason) {
-        return false;
-    }
-    return true;
-}, {
-    message: 'Disqualification reason is required when not qualified',
-    path: ['disqualificationReason'],
-}).refine((data) => {
-    if (data.technicallyQualified === 'Yes' && !data.raStartTime) {
-        return false;
-    }
-    return true;
-}, {
-    message: 'RA Start Time is required when qualified',
-    path: ['raStartTime'],
-}).refine((data) => {
-    if (data.technicallyQualified === 'Yes' && !data.raEndTime) {
-        return false;
-    }
-    return true;
-}, {
-    message: 'RA End Time is required when qualified',
-    path: ['raEndTime'],
-});
-
-type FormValues = z.infer<typeof ScheduleRaSchema>;
+type FormValues = ScheduleRaFormValues;
 
 interface RaScheduleFormPageProps {
     tenderId: number;
@@ -73,6 +40,7 @@ export default function RaScheduleFormPage({
         resolver: zodResolver(ScheduleRaSchema),
         defaultValues: {
             technicallyQualified: 'Yes',
+            raOutcome: 'RA Scheduled',
             disqualificationReason: '',
             qualifiedPartiesCount: '',
             qualifiedPartiesNames: [],
@@ -84,6 +52,11 @@ export default function RaScheduleFormPage({
     const technicallyQualified = useWatch({
         control: form.control,
         name: 'technicallyQualified',
+    });
+
+    const raOutcome = useWatch({
+        control: form.control,
+        name: 'raOutcome',
     });
 
     const qualifiedPartiesNames = useWatch({
@@ -112,16 +85,24 @@ export default function RaScheduleFormPage({
     };
 
     const onSubmit = async (data: FormValues) => {
+        const isScheduled = data.technicallyQualified === 'Yes' && data.raOutcome === 'RA Scheduled';
         try {
             await scheduleRaMutation.mutateAsync({
                 tenderId,
                 data: {
                     technicallyQualified: data.technicallyQualified,
-                    disqualificationReason: normalizeOptionalString(data.disqualificationReason),
-                    qualifiedPartiesCount: normalizeOptionalString(data.qualifiedPartiesCount),
-                    qualifiedPartiesNames: data.qualifiedPartiesNames && data.qualifiedPartiesNames.length > 0 ? data.qualifiedPartiesNames : undefined,
-                    raStartTime: normalizeOptionalString(data.raStartTime),
-                    raEndTime: normalizeOptionalString(data.raEndTime),
+                    raOutcome: data.raOutcome,
+                    disqualificationReason: data.technicallyQualified === 'No'
+                        ? normalizeOptionalString(data.disqualificationReason)
+                        : undefined,
+                    qualifiedPartiesCount: isScheduled
+                        ? normalizeOptionalString(data.qualifiedPartiesCount)
+                        : undefined,
+                    qualifiedPartiesNames: isScheduled && data.qualifiedPartiesNames && data.qualifiedPartiesNames.length > 0
+                        ? data.qualifiedPartiesNames
+                        : undefined,
+                    raStartTime: isScheduled ? normalizeOptionalString(data.raStartTime) : undefined,
+                    raEndTime: isScheduled ? normalizeOptionalString(data.raEndTime) : undefined,
                 },
             });
             if (onSuccess) {
@@ -163,6 +144,19 @@ export default function RaScheduleFormPage({
                                 ]}
                                 placeholder="Select qualification status"
                             />
+                            {/* RA Outcome (if Yes) */}
+                            {technicallyQualified === 'Yes' && (
+                                <SelectField
+                                    control={form.control}
+                                    name="raOutcome"
+                                    label="RA Outcome"
+                                    options={[
+                                        { value: 'RA Scheduled', label: 'RA is Scheduled' },
+                                        { value: 'H1 Elimination', label: 'H1 Elimination' },
+                                    ]}
+                                    placeholder="Select RA outcome"
+                                />
+                            )}
                             {/* Disqualification Reason (if No) */}
                             {technicallyQualified === 'No' && (
                                 <FieldWrapper
@@ -180,8 +174,8 @@ export default function RaScheduleFormPage({
                                 </FieldWrapper>
                             )}
 
-                            {/* Qualified Details (if Yes) */}
-                            {technicallyQualified === 'Yes' && (
+                            {/* Qualified Details (if Yes and RA is scheduled) */}
+                            {technicallyQualified === 'Yes' && raOutcome === 'RA Scheduled' && (
                                 <>
                                     <FieldWrapper
                                         control={form.control}
@@ -280,7 +274,11 @@ export default function RaScheduleFormPage({
                             <Button type="submit" disabled={isSubmitting}>
                                 {isSubmitting && <span className="animate-spin mr-2">⏳</span>}
                                 <Save className="mr-2 h-4 w-4" />
-                                {technicallyQualified === 'No' ? 'Mark Disqualified' : 'Schedule RA'}
+                                {technicallyQualified === 'No'
+                                    ? 'Mark Disqualified'
+                                    : raOutcome === 'H1 Elimination'
+                                        ? 'Mark H1 Elimination'
+                                        : 'Schedule RA'}
                             </Button>
                         </div>
                     </form>

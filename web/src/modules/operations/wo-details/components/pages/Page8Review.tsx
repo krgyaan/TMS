@@ -161,8 +161,13 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
         setSubmitError(null);
         try {
             await onSubmit();
-        } catch {
-            setSubmitError("Failed to submit for review. Please try again.");
+        } catch (error: any) {
+            const blockers = error?.response?.data?.blockers;
+            setSubmitError(
+                Array.isArray(blockers) && blockers.length > 0
+                    ? blockers.join(". ")
+                    : "Failed to submit for review. Please try again."
+            );
         } finally {
             setIsSubmitting(false);
         }
@@ -179,6 +184,9 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
     }
 
     const skipped = detail.skippedPages || [];
+    const missingPages = [1, 2, 3, 4, 5, 6, 7].filter(
+        (page) => !(detail.completedPages || []).includes(page)
+    );
     const d = detail as unknown as Record<string, unknown>;
     const pageStatus = (n: number) => ({
         isSkipped: skipped.includes(n),
@@ -200,6 +208,25 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
                     Back to Edit
                 </Button>
             </div>
+
+            {missingPages.length > 0 && (
+                <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Complete all steps before submitting</AlertTitle>
+                    <AlertDescription>
+                        <p>
+                            Steps {missingPages.join(", ")} must be completed before
+                            submitting for TL review.
+                        </p>
+                        {skipped.length > 0 && (
+                            <p className="mt-1">
+                                Skipped steps do not count as completed. Reopen and submit
+                                steps {skipped.join(", ")}.
+                            </p>
+                        )}
+                    </AlertDescription>
+                </Alert>
+            )}
 
             {submitError && (
                 <Alert variant="destructive">
@@ -387,7 +414,11 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
                     Back to Edit
                 </Button>
 
-                <Button onClick={handleSubmit} disabled={isSubmitting} size="lg">
+                <Button
+                    onClick={handleSubmit}
+                    disabled={isSubmitting || missingPages.length > 0}
+                    size="lg"
+                >
                     {isSubmitting ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (

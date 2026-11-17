@@ -694,34 +694,61 @@ export class ReverseAuctionService {
 
         const prevStatus = currentTender?.status ?? null;
 
-        //defining raStatus to be used in result 
-        let raStatus : string;
+        // Default to scheduling the RA when the caller does not send an outcome
+        const raOutcome = dto.raOutcome ?? 'RA Scheduled';
 
+        let raStatus: string;
+        let newStatus: number | null = null;
+        let statusComment = '';
 
-        let updateData: any = {
+        const values: {
+            status: string;
+            technicallyQualified: string;
+            disqualificationReason: string | null;
+            qualifiedPartiesCount: string | null;
+            qualifiedPartiesNames: string[] | null;
+            raStartTime: Date | null;
+            raEndTime: Date | null;
+            scheduledAt: Date | null;
+            raResult: string | null;
+            updatedAt: Date;
+        } = {
+            status: RA_STATUS.UNDER_EVALUATION,
             technicallyQualified: dto.technicallyQualified,
+            disqualificationReason: null,
+            qualifiedPartiesCount: null,
+            qualifiedPartiesNames: null,
+            raStartTime: null,
+            raEndTime: null,
+            scheduledAt: null,
+            raResult: null,
             updatedAt: new Date(),
         };
 
-        let newStatus: number | null = null;
-        let statusComment: string = '';
-
         if (dto.technicallyQualified === 'No') {
             // Disqualified
-            updateData.status = RA_STATUS.DISQUALIFIED;
-            updateData.disqualificationReason = dto.disqualificationReason;
-            raStatus = "Disqualified, RA Not Scheduled";
+            values.status = RA_STATUS.DISQUALIFIED;
+            values.disqualificationReason = dto.disqualificationReason ?? null;
+            raStatus = 'Disqualified, RA Not Scheduled';
             // AUTO STATUS CHANGE: Update tender status to 22 (Disqualified)
             newStatus = 22; // Status ID for "Disqualified (reason)"
             statusComment = 'Disqualified';
+        } else if (raOutcome === 'H1 Elimination') {
+            // Qualified but H1 was eliminated - no RA is conducted
+            values.status = RA_STATUS.LOST_H1;
+            values.raResult = 'H1 Elimination';
+            raStatus = 'H1 Elimination';
+            // AUTO STATUS CHANGE: Update tender status to 41 (H1 Elimination)
+            newStatus = 41; // Status ID for "H1 Elimination"
+            statusComment = 'H1 Elimination';
         } else {
             // Qualified - schedule RA
-            updateData.status = RA_STATUS.RA_SCHEDULED;
-            updateData.qualifiedPartiesCount = dto.qualifiedPartiesCount;
-            updateData.qualifiedPartiesNames = dto.qualifiedPartiesNames;
-            updateData.raStartTime = dto.raStartTime ? new Date(dto.raStartTime) : null;
-            updateData.raEndTime = dto.raEndTime ? new Date(dto.raEndTime) : null;
-            updateData.scheduledAt = dto.raStartTime ? new Date(dto.raStartTime) : new Date();
+            values.status = RA_STATUS.RA_SCHEDULED;
+            values.qualifiedPartiesCount = dto.qualifiedPartiesCount ?? null;
+            values.qualifiedPartiesNames = dto.qualifiedPartiesNames ?? null;
+            values.raStartTime = dto.raStartTime ?? null;
+            values.raEndTime = dto.raEndTime ?? null;
+            values.scheduledAt = dto.raStartTime ?? new Date();
 
             // AUTO STATUS CHANGE: Update tender status to 23 (RA scheduled)
             newStatus = 23; // Status ID for "RA scheduled"
@@ -730,27 +757,34 @@ export class ReverseAuctionService {
         }
 
         const result = await this.db.transaction(async (tx) => {
-            const [inserted] = await tx
-                .insert(reverseAuctions)
-                .values({
-                    tenderId: tenderId,
-                    tenderNo: currentTender?.tenderNo ?? '',
-                    status: updateData.status,
-                    technicallyQualified: dto.technicallyQualified,
-                    disqualificationReason: dto.disqualificationReason,
-                    qualifiedPartiesCount: dto.qualifiedPartiesCount,
-                    qualifiedPartiesNames: dto.qualifiedPartiesNames,
-                    raStartTime: dto.raStartTime ? new Date(dto.raStartTime) : null,
-                    raEndTime: dto.raEndTime ? new Date(dto.raEndTime) : null,
-                    scheduledAt: updateData.scheduledAt,
-                })
-                .returning();
+            const [existing] = await tx
+                .select({ id: reverseAuctions.id })
+                .from(reverseAuctions)
+                .where(eq(reverseAuctions.tenderId, tenderId))
+                .limit(1);
+
+            let raRecord;
+            if (existing) {
+                [raRecord] = await tx
+                    .update(reverseAuctions)
+                    .set(values)
+                    .where(eq(reverseAuctions.id, existing.id))
+                    .returning();
+            } else {
+                [raRecord] = await tx
+                    .insert(reverseAuctions)
+                    .values({
+                        tenderId: tenderId,
+                        tenderNo: currentTender?.tenderNo ?? '',
+                        ...values,
+                    })
+                    .returning();
+            }
 
             // Sync to tender_results
-            // already getting synced
-            await this.syncToTenderResult(tenderId, inserted?.id ?? 0, inserted.status, tx, raStatus, newStatus);
+            await this.syncToTenderResult(tenderId, raRecord.id, raRecord.status, tx, raStatus, newStatus ?? undefined);
 
-            // Update tender status if RA was scheduled
+            // Update tender status
             if (newStatus !== null) {
                 await tx
                     .update(tenderInfos)
@@ -768,12 +802,16 @@ export class ReverseAuctionService {
                 );
             }
 
-            return inserted;
+            return raRecord;
         });
 
-        // Send email notification if RA was scheduled (not disqualified)
-        if (dto.technicallyQualified === 'Yes' && result.status === RA_STATUS.RA_SCHEDULED) {
-            await this.sendRaScheduledEmail(tenderId, result, changedBy);
+        // Send email notification if qualified
+        if (dto.technicallyQualified === 'Yes') {
+            if (raOutcome === 'H1 Elimination') {
+                await this.sendRaResultEmail(tenderId, result, changedBy);
+            } else {
+                await this.sendRaScheduledEmail(tenderId, result, changedBy);
+            }
         }
 
         return result;
@@ -807,7 +845,7 @@ export class ReverseAuctionService {
         let raStatus;
 
         let status: string;
-        let newTenderStatus: number;
+        let newTenderStatus: number | null = null;
         let statusComment: string = '';
 
         switch (dto.raResult) {
@@ -821,13 +859,6 @@ export class ReverseAuctionService {
                 status = RA_STATUS.LOST;
                 newTenderStatus = 24; // Status ID for "Lost"
                 statusComment = 'RA Lost';
-                raStatus = statusComment;
-                break;
-            case 'H1 Elimination':
-                status = RA_STATUS.LOST_H1;
-                // AUTO STATUS CHANGE: Update tender status to 41 (H1 Elimination)
-                newTenderStatus = 41; // Status ID for "H1 Elimination"
-                statusComment = 'H1 Elimination';
                 raStatus = statusComment;
                 break;
             default:
@@ -857,9 +888,9 @@ export class ReverseAuctionService {
                 .returning();
 
             // Sync to tender_results
-            await this.syncToTenderResult(existing.tenderId, raId, status, tx, raStatus, newTenderStatus);
+            await this.syncToTenderResult(existing.tenderId, raId, status, tx, raStatus, newTenderStatus ?? undefined);
 
-            // Update tender status if H1 Elimination
+            // Update tender status
             if (newTenderStatus !== null) {
                 await tx
                     .update(tenderInfos)
@@ -881,39 +912,35 @@ export class ReverseAuctionService {
         });
 
         // Send email notification
-        if (dto.raResult === 'Won' || dto.raResult === 'Lost') {
-            const mappedDto: UploadResultDto = {
-                technicallyQualified: 'Yes',
-                disqualificationReason: null,
-                qualifiedPartiesCount: existing.qualifiedPartiesCount ?? null,
-                qualifiedPartiesNames: existing.qualifiedPartiesNames ?? [],
-                tenderCancelledScreenshot: null,
-                result: dto.raResult as 'Won' | 'Lost',
+        const mappedDto: UploadResultDto = {
+            technicallyQualified: 'Yes',
+            disqualificationReason: null,
+            qualifiedPartiesCount: existing.qualifiedPartiesCount ?? null,
+            qualifiedPartiesNames: existing.qualifiedPartiesNames ?? [],
+            tenderCancelledScreenshot: null,
+            result: dto.raResult,
+            resultReason: dto.resultReason ?? null,
+            l1Price: dto.raClosePrice ?? null,
+            l2Price: dto.raClosePriceL2 ?? null,
+            ourPrice: dto.raOurPrice ?? null,
+            qualifiedPartiesScreenshot: dto.screenshotQualifiedParties ? [dto.screenshotQualifiedParties] : null,
+            finalResultScreenshot: dto.finalResultScreenshot ? [dto.finalResultScreenshot] : null,
+        };
+
+        await this.tenderResultService.sendTenderResultEmail(
+            existing.tenderId,
+            changedBy,
+            mappedDto,
+            [{
+                result: dto.raResult,
+                l1Price: dto.raClosePrice?.toString() ?? null,
+                l2Price: dto.raClosePriceL2?.toString() ?? null,
+                ourPrice: dto.raOurPrice?.toString() ?? null,
                 resultReason: dto.resultReason ?? null,
-                l1Price: dto.raClosePrice ?? null,
-                l2Price: dto.raClosePriceL2 ?? null,
-                ourPrice: dto.raOurPrice ?? null,
                 qualifiedPartiesScreenshot: dto.screenshotQualifiedParties ? [dto.screenshotQualifiedParties] : null,
                 finalResultScreenshot: dto.finalResultScreenshot ? [dto.finalResultScreenshot] : null,
-            };
-
-            await this.tenderResultService.sendTenderResultEmail(
-                existing.tenderId,
-                changedBy,
-                mappedDto,
-                [{
-                    result: dto.raResult,
-                    l1Price: dto.raClosePrice?.toString() ?? null,
-                    l2Price: dto.raClosePriceL2?.toString() ?? null,
-                    ourPrice: dto.raOurPrice?.toString() ?? null,
-                    resultReason: dto.resultReason ?? null,
-                    qualifiedPartiesScreenshot: dto.screenshotQualifiedParties ? [dto.screenshotQualifiedParties] : null,
-                    finalResultScreenshot: dto.finalResultScreenshot ? [dto.finalResultScreenshot] : null,
-                }]
-            );
-        } else {
-            await this.sendRaResultEmail(existing.tenderId, result, changedBy, dto);
-        }
+            }]
+        );
 
         return result;
     }
@@ -1214,8 +1241,7 @@ export class ReverseAuctionService {
             screenshotDecrements: string | null;
             finalResultScreenshot: string | null;
         },
-        uploadedBy: number,
-        dto: UploadRaResultDto
+        uploadedBy: number
     ) {
         const tender = await this.tenderInfosService.findById(tenderId);
         if (!tender) return;
