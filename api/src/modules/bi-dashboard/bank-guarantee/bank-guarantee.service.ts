@@ -1121,6 +1121,14 @@ private readBodyFileValue(body: unknown, field: string): unknown {
         return { linked: true, missing };
     };
 
+    async getMailPreview(instrumentId: number, body: { stage?: number | string; files?: Record<string, string[]> } = {}) {
+        const stage = Number(body.stage);
+        if (![1, 2, 3].includes(stage)) {
+            throw new BadRequestException('mail-preview stage must be 1, 2 or 3');
+        }
+        return this.paymentRequestsNotificationService.getBgMailPreview(instrumentId, stage, body.files ?? {});
+    }
+
     async updateAction(
         instrumentId: number,
         body: any,

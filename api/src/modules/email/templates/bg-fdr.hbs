@@ -4,8 +4,8 @@
     <p>The following Bank guarantee has been issued for your organization.</p>
 
     <p>
-        {{#if data.referenceValue}}WO No./Tender No.: {{data.referenceValue}}<br>{{/if}}
-        {{#if data.referenceDate}}WO/Tender Date: {{data.referenceDate}}<br>{{/if}}
+        {{#if data.referenceValue}}{{data.referenceLabel}}: {{data.referenceValue}}<br>{{/if}}
+        {{#if data.referenceValue}}{{#if data.referenceDate}}WO/Tender Date: {{data.referenceDate}}<br>{{/if}}{{/if}}
         {{#if data.bgNo}}BG No.: {{data.bgNo}}<br>{{/if}}
         {{#if data.bgExpiryDate}}BG Expiry Date: {{data.bgExpiryDate}}<br>{{/if}}
         {{#if data.bgClaimDate}}BG Claim Date: {{data.bgClaimDate}}<br>{{/if}}
@@ -32,11 +32,4 @@
         Accounts team,<br>
         Volks Energie Pvt. Ltd.
     </p>
-
-    {{#if data.attachmentNames.length}}
-    <p>
-        Attachment:<br>
-        {{#each data.attachmentNames}}{{this}}{{#unless @last}}<br>{{/unless}}{{/each}}
-    </p>
-    {{/if}}
 </div>

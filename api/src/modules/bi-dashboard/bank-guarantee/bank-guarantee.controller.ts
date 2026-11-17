@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, ParseIntPipe, Put, Query, Req } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, ParseIntPipe, Post, Put, Query, Req } from '@nestjs/common';
 import { BankGuaranteeService } from './bank-guarantee.service';
 
 @Controller('bank-guarantees')
@@ -53,6 +53,11 @@ export class BankGuaranteeController {
     @Get('instruments/:id/followup')
     async getFollowupData(@Param('id', ParseIntPipe) id: number) {
         return this.bankGuaranteeService.getFollowupData(id);
+    }
+
+    @Post('instruments/:id/mail-preview')
+    async getMailPreview(@Param('id', ParseIntPipe) id: number, @Body() body: any) {
+        return this.bankGuaranteeService.getMailPreview(id, body);
     }
 
     @Put(':id')

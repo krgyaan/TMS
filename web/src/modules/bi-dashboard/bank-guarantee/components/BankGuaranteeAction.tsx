@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { AccountsForm1Fields } from './steps/AccountsForm1Fields';
 import { AccountsForm2Fields } from './steps/AccountsForm2Fields';
 import { AccountsForm3Fields } from './steps/AccountsForm3Fields';
+import { MailAttachmentPreview } from './steps/MailAttachmentPreview';
 import { FollowupReadOnlyView, InitiateFollowupFields } from './steps/InitiateFollowupFields';
 import { RequestExtensionFields } from './steps/RequestExtensionFields';
 import { ReturnedCourierFields } from './steps/ReturnedCourierFields';
@@ -157,6 +158,12 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
 
     const action = useWatch({ control: form.control, name: 'action' });
     const modificationRequired = useWatch({ control: form.control, name: 'modification_required' });
+    const stage1Prefilled = useWatch({ control: form.control, name: 'prefilled_signed_bg' });
+    const stage1BgFormat = useWatch({ control: form.control, name: 'bg_format_imran' });
+    const stage1FdrCopy = useWatch({ control: form.control, name: 'fdr_copy' });
+    const stage2CoveringLetter = useWatch({ control: form.control, name: 'bg_signed_covering_letter' });
+    const stage2BgUpload = useWatch({ control: form.control, name: 'bg_upload' });
+    const stage3Sfms = useWatch({ control: form.control, name: 'sfms_conf' });
 
     const bankMailIds = useFieldArray({ control: form.control, name: 'bank_mail_ids' });
     const bankMailIdsCc = useFieldArray({ control: form.control, name: 'bank_mail_ids_cc' });
@@ -387,6 +394,15 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
                                 disabled={isStepLocked('accounts-form-1')}
                                 fdrValueType="string"
                             />
+                            <MailAttachmentPreview
+                                instrumentId={instrumentId}
+                                stage={1}
+                                files={{
+                                    prefilledSignedBg: stage1Prefilled ?? [],
+                                    bgFormatImran: stage1BgFormat ?? [],
+                                    fdrCopy: stage1FdrCopy ?? [],
+                                }}
+                            />
                         </SectionCard>
                     )}
 
@@ -395,6 +411,14 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
                             <AccountsForm2Fields
                                 control={form.control}
                                 names={STEP_NAMES}
+                            />
+                            <MailAttachmentPreview
+                                instrumentId={instrumentId}
+                                stage={2}
+                                files={{
+                                    bgSignedCoveringLetter: stage2CoveringLetter ?? [],
+                                    bgUpload: stage2BgUpload ?? [],
+                                }}
                             />
                         </SectionCard>
                     )}
@@ -417,6 +441,11 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
                                 control={form.control}
                                 names={STEP_NAMES}
                                 disabled={isStepLocked('accounts-form-3')}
+                            />
+                            <MailAttachmentPreview
+                                instrumentId={instrumentId}
+                                stage={3}
+                                files={{ sfmsConf: stage3Sfms ?? [] }}
                             />
                         </SectionCard>
                     )}

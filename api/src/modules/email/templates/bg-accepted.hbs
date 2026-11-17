@@ -8,7 +8,7 @@
 
     <p>
         Please prepare the BG using the details below:<br>
-        {{#if data.referenceValue}}WO No./Tender No.: {{data.referenceValue}}<br>{{/if}}
+        {{#if data.referenceValue}}{{data.referenceLabel}}: {{data.referenceValue}}<br>{{/if}}
         BG in favor of: {{data.beneficiaryName}}<br>
         BG Expiry Date: {{data.bgExpiryDate}}<br>
         BG Claim Date: {{data.claimDate}}<br>
@@ -59,11 +59,4 @@
         CEO,<br>
         Volks Energie Pvt. Ltd.
     </p>
-
-    {{#if data.attachmentNames.length}}
-    <p>
-        Attachment:<br>
-        {{#each data.attachmentNames}}{{this}}{{#unless @last}}<br>{{/unless}}{{/each}}
-    </p>
-    {{/if}}
 </div>

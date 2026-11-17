@@ -4,7 +4,7 @@
     <p>The request for BG creation has been accepted and the BG has been created.</p>
 
     <p>
-        {{#if data.referenceValue}}WO No./Tender No.: {{data.referenceValue}}<br>{{/if}}
+        {{#if data.referenceValue}}{{data.referenceLabel}}: {{data.referenceValue}}<br>{{/if}}
         {{#if data.hasSignedCoveringLetter}}Signed Covering Letter: attached below<br>{{/if}}
         {{#if data.hasSoftCopy}}Soft copy of the BG: attached below<br>{{/if}}
         {{#if data.courierRequestNo}}Courier Request No.: {{data.courierRequestNo}}<br>{{/if}}
@@ -17,11 +17,4 @@
         Imran Khan,<br>
         Accounts team.
     </p>
-
-    {{#if data.attachmentNames.length}}
-    <p>
-        Attachment:<br>
-        {{#each data.attachmentNames}}{{this}}{{#unless @last}}<br>{{/unless}}{{/each}}
-    </p>
-    {{/if}}
 </div>

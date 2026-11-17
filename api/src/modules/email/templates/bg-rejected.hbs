@@ -2,7 +2,7 @@
     <p>Dear {{data.teName}},</p>
 
     <p>
-        {{#if data.referenceValue}}WO No./Tender No.: {{data.referenceValue}}<br>{{/if}}
+        {{#if data.referenceValue}}{{data.referenceLabel}}: {{data.referenceValue}}<br>{{/if}}
         The BG format sent for this request has been rejected. The reason mentioned is:
         {{data.reason}}
     </p>
