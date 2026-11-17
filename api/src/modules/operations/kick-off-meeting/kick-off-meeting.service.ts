@@ -25,7 +25,10 @@ export class KickOffMeetingService {
         const activeTab = tab ?? 'not_scheduled';
 
         const conditions: any[] = [
-            eq(woAcceptance.status, 'completed')
+            or(
+                eq(woAcceptance.decision, 'accepted'),
+                eq(woAcceptance.status, 'completed'),
+            ),
         ];
         conditions.push(...this.buildRoleFilterConditions(user, teamId));
         // Tab filter
@@ -212,7 +215,13 @@ export class KickOffMeetingService {
             )
             .as('latest_kickoff');
 
-        const baseConditions = [...roleFilterConditions, eq(woAcceptance.status, 'completed')];
+        const baseConditions = [
+            ...roleFilterConditions,
+            or(
+                eq(woAcceptance.decision, 'accepted'),
+                eq(woAcceptance.status, 'completed'),
+            ),
+        ];
 
         // Count not_scheduled: kickoff IS NULL
         const notScheduledConditions = [...baseConditions, isNull(sql`latest_kickoff.id`)];

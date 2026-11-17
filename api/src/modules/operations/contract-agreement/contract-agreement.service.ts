@@ -8,7 +8,7 @@ import { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { users } from '@/db/schemas';
-import { woBasicDetails, woDetails } from '@/db/schemas/operations';
+import { woAcceptance, woBasicDetails, woDetails } from '@/db/schemas/operations';
 
 const oeSiteVisitUser = alias(users, 'oeSiteVisitUser');
 const oeDocsPrepUser = alias(users, 'oeDocsPrepUser');
@@ -25,6 +25,10 @@ export class ContractAgreementService {
 
         const conditions: any[] = [
             eq(woDetails.isContractAgreement, true),
+            or(
+                eq(woAcceptance.decision, 'accepted'),
+                eq(woAcceptance.status, 'completed'),
+            ),
         ];
         conditions.push(...this.buildRoleFilterConditions(user, teamId));
         // Tab filter
@@ -95,6 +99,7 @@ export class ContractAgreementService {
             .leftJoin(users, eq(users.id, woBasicDetails.oeFirst))
             .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
             .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep))
+            .leftJoin(woAcceptance, eq(woAcceptance.woDetailId, woDetails.id))
             .where(whereClause);
 
         const total = Number(countResult?.count || 0);
@@ -125,6 +130,7 @@ export class ContractAgreementService {
             .leftJoin(users, eq(users.id, woBasicDetails.oeFirst))
             .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
             .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep))
+            .leftJoin(woAcceptance, eq(woAcceptance.woDetailId, woDetails.id))
             .where(whereClause)
             .orderBy(orderByClause)
             .limit(limit)
@@ -154,7 +160,14 @@ export class ContractAgreementService {
     }
 
     async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{ 'uploaded': number; 'not_uploaded': number; total: number }> {
-        const baseConditions = [eq(woDetails.isContractAgreement, true), ...this.buildRoleFilterConditions(user, teamId)];
+        const baseConditions = [
+            eq(woDetails.isContractAgreement, true),
+            or(
+                eq(woAcceptance.decision, 'accepted'),
+                eq(woAcceptance.status, 'completed'),
+            ),
+            ...this.buildRoleFilterConditions(user, teamId),
+        ];
         const baseWhere = baseConditions.length ? and(...baseConditions) : undefined;
 
         const notUploadedFilter = and(isNull(woDetails.veSigned), isNull(woDetails.clientAndVeSigned));
@@ -170,6 +183,7 @@ export class ContractAgreementService {
             .leftJoin(users, eq(users.id, woBasicDetails.oeFirst))
             .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
             .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep))
+            .leftJoin(woAcceptance, eq(woAcceptance.woDetailId, woDetails.id))
             .where(baseWhere);
 
         const uploaded = Number(result?.uploaded ?? 0);
