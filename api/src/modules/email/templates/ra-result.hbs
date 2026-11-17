@@ -1,5 +1,17 @@
 <div>
     <p>Dear Sir,</p>
+    {{#if data.isH1Elimination}}
+    <p>
+        The technical evaluation for Tender No.
+        {{data.tender_no}}, Tender Name
+        {{data.tender_name}}
+        has resulted in H1 Elimination.
+    </p>
+    <p>
+        The Result of the RA is
+        {{data.ra_result}}
+    </p>
+    {{else}}
     <p>
         The RA for Tender No.
         {{data.tender_no}}, Tender Name
@@ -45,6 +57,7 @@
             {{/if}}
         </li>
     </ul>
+    {{/if}}
     <p>
         {{#if data.isWon}}
             Congratulations on the win.

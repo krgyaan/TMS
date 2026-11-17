@@ -75,6 +75,9 @@ export interface FDRActionFormData {
         toAddr: string | null;
         toPin: string | null;
         toMobile: string | null;
+        empFrom?: number | null;
+        delDate?: string | null;
+        urgency?: number | null;
         trackingNumber: string | null;
         courierProvider: string | null;
         docketNo: string | null;

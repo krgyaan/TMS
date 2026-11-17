@@ -7,7 +7,7 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Eye, Calendar, Upload, FileX2, Clock, CheckCircle2, Search, RefreshCw } from 'lucide-react';
+import { AlertCircle, Eye, Calendar, Upload, FileX2, Clock, CheckCircle2, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useReverseAuctionDashboard, useReverseAuctionDashboardCounts } from '@/hooks/api/useReverseAuctions';

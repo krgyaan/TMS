@@ -46,6 +46,8 @@ const STAGES: { key: WorkflowStage; label: string }[] = [
     { key: 'basic_details', label: 'Basic Details' },
     { key: 'wo_details', label: 'WO Details' },
     { key: 'wo_acceptance', label: 'WO Acceptance' },
+    { key: 'kick_off', label: 'Kick-off' },
+    { key: 'contract_agreement', label: 'Contract Agreement' },
     { key: 'wo_upload', label: 'WO Upload' },
     { key: 'completed', label: 'Completed' },
 ];
@@ -67,6 +69,8 @@ const getStageVariant = (stage: WorkflowStage | null | undefined): string => {
             return 'success';
         case 'wo_upload':
         case 'wo_acceptance':
+        case 'kick_off':
+        case 'contract_agreement':
             return 'info';
         case 'wo_details':
         case 'basic_details':

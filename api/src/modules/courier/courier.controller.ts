@@ -38,8 +38,6 @@ export class CourierController {
             throw new BadRequestException(parsed.error.flatten());
         }
 
-        console.log("createDispatch parsed body:", parsed.data);
-
         return this.service.createDispatch(id, parsed.data, user);
     }
 

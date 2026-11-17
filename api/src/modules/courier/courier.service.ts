@@ -70,7 +70,7 @@ export class CourierService {
     }
 
     private isPrivilegedCourierUser(actor: CourierActor): boolean {
-        return actor.teamId === HR_TEAM_ID || actor.role === RoleName.ADMIN || actor.role === RoleName.SUPER_USER;
+        return Number(actor.teamId) === HR_TEAM_ID || actor.role === RoleName.ADMIN || actor.role === RoleName.SUPER_USER;
     }
 
     private assertPrivilegedCourierUser(actor: CourierActor, action: string): void {

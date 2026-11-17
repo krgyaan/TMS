@@ -416,6 +416,16 @@ def resolve_atc_anchor_fields(
       - sd_percentage (float)
       - sd_duration (int)
     """
+    from app.core.timing import stage_timer
+    with stage_timer("tender_mapper:ATC_ANCHOR"):
+        return _resolve_atc_anchor_fields_inner(full_text, checkboxes=checkboxes, page_texts=page_texts)
+
+
+def _resolve_atc_anchor_fields_inner(
+    full_text: str,
+    checkboxes: Optional[List[Dict[str, Any]]] = None,
+    page_texts: Optional[List[Dict[str, Any]]] = None
+) -> Dict[str, Any]:
     res = {}
     if not full_text:
         return res
@@ -623,21 +633,42 @@ def complete_money_unit(value: Any, full_text: str) -> Any:
     return value
 
 
-def extract_regex_safe(label: str, full_text: str) -> Optional[str]:
+import functools
+
+
+@functools.lru_cache(maxsize=2048)
+def _compile_extract_regex_safe_patterns(label: str) -> Tuple[re.Pattern, re.Pattern, re.Pattern]:
+    esc = re.escape(label)
+    p1 = re.compile(rf"{esc}[ \t]*[:\-–—\.]+[ \t]*((?:(?!\s{{2,}})[^\n])+)", re.IGNORECASE)
+    p2 = re.compile(rf"{esc}[ \t]{{1,2}}([A-Za-z0-9₹Rs](?:(?!\s{{2,}})[^\n]){{0,24}})(?:\s{{2,}}|\n|$)", re.IGNORECASE)
+    p3 = re.compile(rf"^[ \t]*{esc}[ \t]*\n[ \t]*((?:(?!\s{{2,}})[^\n])+)", re.IGNORECASE | re.MULTILINE)
+    return p1, p2, p3
+
+
+@functools.lru_cache(maxsize=4096)
+def _compile_synonym_pattern(syn_clean: str) -> re.Pattern:
+    return re.compile(rf"(?<![a-zA-Z0-9]){re.escape(syn_clean)}(?![a-zA-Z0-9])")
+
+
+def extract_regex_safe(label: str, full_text: str, full_text_lower: Optional[str] = None) -> Optional[str]:
     if not full_text or not label:
         return None
+    haystack_lower = full_text_lower if full_text_lower is not None else full_text.lower()
+    if label.lower() not in haystack_lower:
+        return None
+    p1, p2, p3 = _compile_extract_regex_safe_patterns(label)
     # Each pass stops at end of line / a large gap, which used to drop a unit word printed
     # after the number ("Rs. 61.00\nLac" -> "Rs. 61.00"); re-attach it when present.
     # 1. Match inline with colon/dash (allows any characters after colon/dash up to a large gap)
-    m1 = re.search(rf"{re.escape(label)}[ \t]*[:\-–—\.]+[ \t]*((?:(?!\s{{2,}})[^\n])+)", full_text, re.IGNORECASE)
+    m1 = p1.search(full_text)
     if m1:
         return _append_trailing_money_unit(m1.group(1).strip(), full_text[m1.end(1):m1.end(1) + 40])
     # 2. Match inline with 1-2 spaces (requires starting with alphanumeric, stops at large gaps or end of line)
-    m2 = re.search(rf"{re.escape(label)}[ \t]{{1,2}}([A-Za-z0-9₹Rs](?:(?!\s{{2,}})[^\n]){{0,24}})(?:\s{{2,}}|\n|$)", full_text, re.IGNORECASE)
+    m2 = p2.search(full_text)
     if m2:
         return _append_trailing_money_unit(m2.group(1).strip(), full_text[m2.end(1):m2.end(1) + 40])
     # 3. Match next line ONLY if label is the only thing on the line
-    m3 = re.search(rf"^[ \t]*{re.escape(label)}[ \t]*\n[ \t]*((?:(?!\s{{2,}})[^\n])+)", full_text, re.IGNORECASE | re.MULTILINE)
+    m3 = p3.search(full_text)
     if m3:
         return _append_trailing_money_unit(m3.group(1).strip(), full_text[m3.end(1):m3.end(1) + 40])
     return None
@@ -1057,6 +1088,7 @@ def resolve_field_staged(
     full_text: str,
     grid_matrix: List[List[str]],
     validator: Optional[Any] = None,
+    full_text_lower: Optional[str] = None,
 ) -> Tuple[Any, str, float]:
     """
     Executes a 4-pass resolution protocol before defaulting to NA:
@@ -1065,30 +1097,37 @@ def resolve_field_staged(
     Pass 3: Business & Exemption Rules Check
     Pass 4: Fallback Assignment (NA)
     """
-    # Pass 1: Check 2D Table Matrix for label and extract adjacent cell value
-    def _match_synonym(syn: str, cell_text: str) -> bool:
+    compiled_syns: List[Tuple[str, re.Pattern]] = []
+    for syn in synonyms:
         syn_clean = syn.strip().lower().replace("_", " ")
-        cell_clean = cell_text.strip().lower().replace("_", " ")
-        if not syn_clean or not cell_clean:
-            return False
-        pattern = rf"(?<![a-zA-Z0-9]){re.escape(syn_clean)}(?![a-zA-Z0-9])"
-        return bool(re.search(pattern, cell_clean))
+        if syn_clean:
+            compiled_syns.append((syn_clean, _compile_synonym_pattern(syn_clean)))
 
+    is_pbg_key = any(k in canonical_key.lower() for k in ("pbg_required", "pbg required"))
+
+    # Pass 1: Check 2D Table Matrix for label and extract adjacent cell value
     for row in grid_matrix:
+        row_len = len(row)
         for idx, cell in enumerate(row):
+            if not cell:
+                continue
             cell_lower = cell.lower()
-            if any(k in canonical_key.lower() for k in ["pbg_required", "pbg required"]):
-                if any(w in cell_lower for w in ["duration", "month", "माह", "percentage", "%", "5ितशत", "प्रतिशत"]):
+            if is_pbg_key:
+                if any(w in cell_lower for w in ("duration", "month", "माह", "percentage", "%", "5ितशत", "प्रतिशत")):
                     continue
-            if any(_match_synonym(syn, cell) for syn in synonyms):
-                if idx + 1 < len(row) and row[idx+1].strip():
-                    val = row[idx+1].strip()
-                    if val.lower() not in ["na", "n/a", "nil", "—"] and (validator is None or validator(val)):
+            cell_clean = cell_lower.strip().replace("_", " ")
+            if not cell_clean:
+                continue
+            if any((syn_clean in cell_clean and pat.search(cell_clean)) for syn_clean, pat in compiled_syns):
+                if idx + 1 < row_len and row[idx + 1].strip():
+                    val = row[idx + 1].strip()
+                    if val.lower() not in ("na", "n/a", "nil", "—") and (validator is None or validator(val)):
                         return val, "grid_matrix_cell", 95.0
 
     # Pass 2: Section Regex Extraction
+    haystack_lower = full_text_lower if full_text_lower is not None else (full_text.lower() if full_text else "")
     for syn in synonyms:
-        val = extract_regex_safe(syn, full_text)
+        val = extract_regex_safe(syn, full_text, full_text_lower=haystack_lower)
         if val and val.strip():
             val_clean = val.strip()
             if val_clean.lower() not in ["na", "n/a", "nil", "—"] and (validator is None or validator(val_clean)):
@@ -1439,6 +1478,8 @@ def build_infosheet_data(
         except Exception:
             pass
 
+    full_text_lower = full_text.lower() if full_text else ""
+
     # Helper to extract using regex from full_text
     def extract_regex(pattern, default: Optional[str] = "NA"):
         if not full_text or not pattern:
@@ -1449,7 +1490,7 @@ def build_infosheet_data(
         if pattern.endswith(suffix):
             label = pattern[:-len(suffix)]
             if not re.search(r"[\(\)\[\]\{\}\|\?\*\+\^\$]", label):
-                val = extract_regex_safe(label, full_text)
+                val = extract_regex_safe(label, full_text, full_text_lower=full_text_lower)
                 if val is not None:
                     return val
                 
@@ -1490,7 +1531,9 @@ def build_infosheet_data(
                 
         # Staged resolver fallback
         canonical_key = keys[0] if keys else "unknown"
-        val_staged, method, conf = resolve_field_staged(canonical_key, expanded_keys, full_text, grid_matrix, validator=validator)
+        val_staged, method, conf = resolve_field_staged(
+            canonical_key, expanded_keys, full_text, grid_matrix, validator=validator, full_text_lower=full_text_lower
+        )
         if val_staged != "NA":
             if any(k in canonical_key.lower() for k in ["client", "contact", "person"]) and any(p in str(val_staged).lower() for p in ["are as under", "is as under", "as under", "refer bds", "refer scc", "refer nit"]):
                 pass

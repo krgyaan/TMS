@@ -109,6 +109,8 @@ const BasicDetailListPage = () => {
             basic_details: { label: 'Basic Details', variant: 'secondary' },
             wo_details: { label: 'WO Details', variant: 'default' },
             wo_acceptance: { label: 'Acceptance', variant: 'outline' },
+            kick_off: { label: 'Kick-off', variant: 'default' },
+            contract_agreement: { label: 'Contract', variant: 'default' },
             wo_upload: { label: 'Upload', variant: 'default' },
             completed: { label: 'Completed', variant: 'default' },
         };
@@ -278,7 +280,6 @@ const BasicDetailListPage = () => {
                         </Tooltip>
                     );
                 },
-                hide: activeTab === 'basic_details', // Hide this column in the "Basic Details" tab
             },
             {
                 headerName: '',

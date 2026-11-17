@@ -11,7 +11,7 @@ import { DRIZZLE } from '@db/database.module';
 import { users } from '@db/schemas/auth/users.schema';
 import { woBasicDetails, woContacts, woDetails, woOrderRevisions } from '@db/schemas/operations';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { AssignOeDto, BulkAssignOeDto, CreateWoBasicDetailDto, RemoveOeAssignmentDto, ReviseOrderDto, UpdateWoBasicDetailDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
 import { computeGemChargesBreakdown, gemBreakdownToDbColumns } from './helpers/gem-charges.helper';
@@ -269,11 +269,22 @@ export class WoBasicDetailsService {
             conditions.push(eq(woBasicDetails.currentStage, currentStage));
         } else if (tab) {
             if (tab === 'basic_details') {
-                conditions.push(eq(woBasicDetails.currentStage, 'basic_details'));
+                // Keep rows here until all seven WO Details steps are submitted.
+                conditions.push(
+                    sql`${woBasicDetails.currentStage} is distinct from 'completed'`,
+                    or(
+                        isNull(woDetails.id),
+                        sql`${woDetails.status} is distinct from 'wo_details_filled'`,
+                    ),
+                );
             } else if (tab === 'completed') {
                 conditions.push(eq(woBasicDetails.currentStage, 'completed'));
             } else if (tab === 'wo_details') {
-                conditions.push(isNotNull(woDetails.id));
+                // Only show rows whose 7-step WO Details form has been submitted.
+                conditions.push(
+                    sql`${woBasicDetails.currentStage} is distinct from 'completed'`,
+                    eq(woDetails.status, 'wo_details_filled'),
+                );
             }
         }
 
@@ -298,11 +309,8 @@ export class WoBasicDetailsService {
         // 2. Get Total Count
         let countQuery: any = this.db
             .select({ count: sql<number>`count(distinct ${woBasicDetails.id})::int` })
-            .from(woBasicDetails);
-
-        if (tab === 'wo_details') {
-            countQuery = countQuery.leftJoin(woDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id));
-        }
+            .from(woBasicDetails)
+            .leftJoin(woDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id));
 
         // Add joins if search is being used (searches in joined tables)
         if (search) {
@@ -1436,8 +1444,8 @@ export class WoBasicDetailsService {
         const [stageCounts] = await this.db
             .select({
                 total: sql<number>`count(distinct ${woBasicDetails.id})::int`,
-                basicDetails: sql<number>`count(distinct ${woBasicDetails.id}) filter (where ${woBasicDetails.currentStage} = 'basic_details')::int`,
-                woDetails: sql<number>`count(distinct ${woBasicDetails.id}) filter (where ${woDetails.id} is not null)::int`,
+                basicDetails: sql<number>`count(distinct ${woBasicDetails.id}) filter (where ${woBasicDetails.currentStage} is distinct from 'completed' and (${woDetails.id} is null or ${woDetails.status} is distinct from 'wo_details_filled'))::int`,
+                woDetails: sql<number>`count(distinct ${woBasicDetails.id}) filter (where ${woBasicDetails.currentStage} is distinct from 'completed' and ${woDetails.status} = 'wo_details_filled')::int`,
                 completed: sql<number>`count(distinct ${woBasicDetails.id}) filter (where ${woBasicDetails.currentStage} = 'completed')::int`,
                 paused: sql<number>`count(distinct ${woBasicDetails.id}) filter (where ${woBasicDetails.isWorkflowPaused} = true)::int`,
             })

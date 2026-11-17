@@ -806,6 +806,13 @@
       "when": 1802000000000,
       "tag": "0182_add_authorization_letter_docx_to_instrument_bg_details",
       "breakpoints": true
+    },
+    {
+      "idx": 139,
+      "version": "7",
+      "when": 1803000000000,
+      "tag": "0183_create_wo_details_history",
+      "breakpoints": true
     }
   ]
 }

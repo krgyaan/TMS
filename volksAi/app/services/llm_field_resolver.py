@@ -1217,7 +1217,9 @@ class LLMFieldResolver:
         self.enabled = os.getenv("LLM_FALLBACK_ENABLED", "true").lower() == "true"
 
         import anthropic
+        import threading
         self.client = anthropic.Anthropic(api_key=self.api_key, timeout=self.timeout)
+        self._usage_lock = threading.Lock()
         self.llm_status: str = "ok"
         self.failed_categories: List[str] = []
         self.last_error: Optional[Dict[str, Any]] = None
@@ -1228,16 +1230,6 @@ class LLMFieldResolver:
         self.total_cache_creation_tokens: int = 0
         self.total_cache_read_tokens: int = 0
         self.total_raw_processing_tokens: int = 0
-        # STEP 4 (option b): a SEPARATE running total used only by the Role 1
-        # token-budget gate. Unlike total_raw_processing_tokens (real token
-        # counts, used for DB/cost accounting -- never discounted), this
-        # counts cache_read_tokens at their actual discounted cost ratio
-        # (cache_read_rate / input_rate) rather than full raw weight, so a
-        # cached, 90%-cheaper re-read of the static system+tools prefix
-        # doesn't eat into the budget as if it cost the same as a fresh,
-        # fully-billed read. cache_creation and everything else still counts
-        # at full weight (a cache write is not discounted -- it's actually
-        # priced ABOVE the base input rate).
         self.total_budget_weighted_tokens: float = 0.0
         self.total_cost_usd: float = 0.0
         self.role1_retries: int = 0
@@ -1279,12 +1271,12 @@ class LLMFieldResolver:
         return self.elapsed_time() >= self.time_budget_sec
 
     def _is_non_retryable_error(self, exc: Exception) -> bool:
-        """HTTP 400, 401, 403, 404 or auth/permission errors are non-retryable."""
+        """HTTP 400, 401, 403, 404, 413 or auth/permission/request-too-large errors are non-retryable."""
         status_code = getattr(exc, "status_code", None)
-        if status_code in (400, 401, 403, 404):
+        if status_code in (400, 401, 403, 404, 413):
             return True
         exc_name = type(exc).__name__
-        if any(err in exc_name for err in ("AuthenticationError", "PermissionDeniedError", "BadRequestError", "NotFoundError")):
+        if any(err in exc_name for err in ("AuthenticationError", "PermissionDeniedError", "BadRequestError", "NotFoundError", "RequestTooLargeError", "PayloadTooLargeError")):
             return True
         return False
 
@@ -1329,54 +1321,52 @@ class LLMFieldResolver:
             cache_read = int(getattr(usage, "cache_read_input_tokens", 0) or 0)
             effective_role = out_tok_or_role if isinstance(out_tok_or_role, str) else role
 
-        self.total_input_tokens += in_tok
-        self.total_output_tokens += out_tok
-        self.total_cache_creation_tokens += cache_create
-        self.total_cache_read_tokens += cache_read
+        with self._usage_lock:
+            self.total_input_tokens += in_tok
+            self.total_output_tokens += out_tok
+            self.total_cache_creation_tokens += cache_create
+            self.total_cache_read_tokens += cache_read
 
-        raw_toks = in_tok + out_tok + cache_create + cache_read
-        self.total_raw_processing_tokens += raw_toks
+            raw_toks = in_tok + out_tok + cache_create + cache_read
+            self.total_raw_processing_tokens += raw_toks
 
-        # Calculate cost based on role pricing constants
-        if effective_role == "role2":
-            in_rate = SONNET_5_INPUT_PRICE_PER_M
-            out_rate = SONNET_5_OUTPUT_PRICE_PER_M
-            cache_write_rate = SONNET_5_CACHE_WRITE_5M_PER_M
-            cache_read_rate = SONNET_5_CACHE_READ_PER_M
-            stage_key = "ambiguity_resolution"
-        else:
-            in_rate = HAIKU_45_INPUT_PRICE_PER_M
-            out_rate = HAIKU_45_OUTPUT_PRICE_PER_M
-            cache_write_rate = HAIKU_45_CACHE_WRITE_5M_PER_M
-            cache_read_rate = HAIKU_45_CACHE_READ_PER_M
-            stage_key = "missing_field_fallback"
+            # Calculate cost based on role pricing constants
+            if effective_role == "role2":
+                in_rate = SONNET_5_INPUT_PRICE_PER_M
+                out_rate = SONNET_5_OUTPUT_PRICE_PER_M
+                cache_write_rate = SONNET_5_CACHE_WRITE_5M_PER_M
+                cache_read_rate = SONNET_5_CACHE_READ_PER_M
+                stage_key = "ambiguity_resolution"
+            else:
+                in_rate = HAIKU_45_INPUT_PRICE_PER_M
+                out_rate = HAIKU_45_OUTPUT_PRICE_PER_M
+                cache_write_rate = HAIKU_45_CACHE_WRITE_5M_PER_M
+                cache_read_rate = HAIKU_45_CACHE_READ_PER_M
+                stage_key = "missing_field_fallback"
 
-        call_cost = (
-            (in_tok / 1_000_000 * in_rate)
-            + (out_tok / 1_000_000 * out_rate)
-            + (cache_create / 1_000_000 * cache_write_rate)
-            + (cache_read / 1_000_000 * cache_read_rate)
-        )
-        self.total_cost_usd += call_cost
+            call_cost = (
+                (in_tok / 1_000_000 * in_rate)
+                + (out_tok / 1_000_000 * out_rate)
+                + (cache_create / 1_000_000 * cache_write_rate)
+                + (cache_read / 1_000_000 * cache_read_rate)
+            )
+            self.total_cost_usd += call_cost
 
-        # Budget-gate weighting: discount cache_read by its real cost ratio
-        # relative to a normal (uncached) input token for this role, so the
-        # gate reflects actual spend rather than raw token count.
-        cache_read_discount = cache_read_rate / in_rate if in_rate else 1.0
-        self.total_budget_weighted_tokens += (
-            in_tok + out_tok + cache_create + (cache_read * cache_read_discount)
-        )
+            cache_read_discount = cache_read_rate / in_rate if in_rate else 1.0
+            self.total_budget_weighted_tokens += (
+                in_tok + out_tok + cache_create + (cache_read * cache_read_discount)
+            )
 
-        # Update stage-specific breakdown
-        if stage_key in self.stages_usage:
-            st = self.stages_usage[stage_key]
-            st["input_tokens"] += in_tok
-            st["output_tokens"] += out_tok
-            st["cache_creation_tokens"] += cache_create
-            st["cache_read_tokens"] += cache_read
-            st["total_tokens"] += raw_toks
-            st["estimated_cost_usd"] = round(st["estimated_cost_usd"] + call_cost, 6)
-            st["calls_count"] += 1
+            # Update stage-specific breakdown
+            if stage_key in self.stages_usage:
+                st = self.stages_usage[stage_key]
+                st["input_tokens"] += in_tok
+                st["output_tokens"] += out_tok
+                st["cache_creation_tokens"] += cache_create
+                st["cache_read_tokens"] += cache_read
+                st["total_tokens"] += raw_toks
+                st["estimated_cost_usd"] = round(st["estimated_cost_usd"] + call_cost, 6)
+                st["calls_count"] += 1
 
     def get_usage_summary(self) -> Dict[str, Any]:
         """Return cumulative token usage, cache metrics, and estimated cost."""
@@ -1463,6 +1453,195 @@ class LLMFieldResolver:
             key=lambda c: category_order.index(c) if c in category_order else 99
         )
 
+        import concurrent.futures
+        import contextvars
+        import threading
+        from app.core.timing import stage_timer, call_anthropic_with_replay
+
+        abort_event = threading.Event()
+        static_system_text = GAIL_GEM_SYSTEM_INSTRUCTION.format(few_shot_section="").rstrip()
+        tool_spec = _build_static_full_missing_fields_tool_schema()
+
+        def _run_category_call(cat: str, cat_fields: List[str], scoped_text: str) -> Dict[str, Any]:
+            cat_out: Dict[str, Any] = {"ok": False, "cat": cat, "fields": {}, "extracted_dict": {}, "scoped_text": scoped_text, "error": None, "status": "ok"}
+            if abort_event.is_set():
+                cat_out["status"] = "aborted"
+                return cat_out
+
+            few_shot_section = _build_few_shot_section(cat_fields, memory)
+            system_blocks: List[Dict[str, Any]] = [
+                {
+                    "type": "text",
+                    "text": static_system_text,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ]
+            if few_shot_section and few_shot_section.strip():
+                system_blocks.append({"type": "text", "text": few_shot_section.strip()})
+
+            field_descriptions = "\n".join(
+                f"- `{entry[0]}`: {entry[2]}"
+                for f in cat_fields
+                for entry in [FIELD_PROMPT_MAP[f]]
+            )
+            user_prompt = (
+                f"Extract the following missing fields from the scoped procurement tender section below.\n\n"
+                f"Category: {cat}\n"
+                f"Fields to extract:\n{field_descriptions}\n\n"
+                f"Scoped Tender Clauses:\n--- START OF RELEVANT CLAUSES ---\n{scoped_text}\n--- END OF RELEVANT CLAUSES ---"
+            )
+
+            max_retries = 3
+            backoff_base = 0.5
+
+            for retry_count in range(max_retries):
+                if abort_event.is_set():
+                    cat_out["status"] = "aborted"
+                    return cat_out
+                max_tokens_to_use = ROLE_1_MAX_TOKENS
+                try:
+                    for attempt in range(2):
+                        with stage_timer(f"llm_role1:{cat}"):
+                            response = call_anthropic_with_replay(
+                                self.client.messages.create,
+                                model=self.role1_model,
+                                max_tokens=max_tokens_to_use,
+                                system=system_blocks,
+                                messages=[{"role": "user", "content": user_prompt}],
+                                tools=[tool_spec],
+                                tool_choice={"type": "tool", "name": "extract_missing_fields"},
+                            )
+
+                        if hasattr(response, "usage") and response.usage:
+                            self.record_usage(response.usage, role="role1")
+                            logger.info(
+                                "[LLM_FALLBACK][Role 1] Category '%s' token usage: %d in / %d out (Est. total cost: $%.5f USD)",
+                                cat, response.usage.input_tokens, response.usage.output_tokens, self.total_cost_usd
+                            )
+
+                        stop_reason = getattr(response, "stop_reason", None)
+                        if stop_reason == "max_tokens" and attempt == 0:
+                            with self._usage_lock:
+                                self.role1_retries += 1
+                            max_tokens_to_use = ROLE_1_MAX_TOKENS_RETRY
+                            logger.warning(
+                                "[LLM_FALLBACK][Role 1] Output truncated (stop_reason='max_tokens') for category '%s'! Retrying once with max_tokens=%d...",
+                                cat, max_tokens_to_use
+                            )
+                            continue
+
+                        extracted_dict: Dict[str, Any] = {}
+                        for block in response.content:
+                            if getattr(block, "type", "") == "tool_use" and getattr(block, "name", "") == "extract_missing_fields":
+                                extracted_dict = getattr(block, "input", {}) or {}
+                                break
+
+                        cat_out["extracted_dict"] = extracted_dict
+                        for prompt_field, raw_val in extracted_dict.items():
+                            if raw_val is None:
+                                continue
+                            display_key = prompt_to_display.get(prompt_field)
+                            if not display_key or display_key not in cat_fields:
+                                continue
+
+                            formatter = FIELD_PROMPT_MAP[display_key][3]
+                            formatted_val = formatter(raw_val) if callable(formatter) else str(raw_val)
+
+                            if formatted_val is not None and str(formatted_val).strip():
+                                cat_out["fields"][display_key] = {
+                                    "value": formatted_val,
+                                    "raw_value": raw_val,
+                                    "confidence": 0.85,
+                                    "source": "llm",
+                                }
+                                _save_memory(display_key, str(raw_val), formatted_val, detected_type, confidence=0.85)
+
+                        cat_out["ok"] = True
+                        break
+                    break
+                except Exception as exc:
+                    status_code = getattr(exc, "status_code", None)
+                    err_info = classify_anthropic_error(exc)
+                    cat_out["error"] = err_info
+                    cat_out["status"] = err_info["type"]
+
+                    if self._is_non_retryable_error(exc):
+                        logger.error(
+                            "[LLM_FALLBACK][Role 1] Non-retryable error for category '%s': type=%s, status=%s, msg=%s. Stopping all LLM calls.",
+                            cat, err_info["type"], status_code, err_info["message"]
+                        )
+                        abort_event.set()
+                        return cat_out
+                    elif self._is_retryable_error(exc):
+                        if self.is_time_budget_exceeded():
+                            logger.error(
+                                "[LLM_FALLBACK][Role 1] Global LLM time budget (%.1fs) exceeded during retry for category '%s'. Giving up.",
+                                self.time_budget_sec, cat
+                            )
+                            cat_out["status"] = "timeout"
+                            cat_out["error"] = {"class": "TimeoutError", "status": 408, "type": "timeout", "message": "Global time budget exceeded during retry", "detail": "Global time budget exceeded"}
+                            abort_event.set()
+                            return cat_out
+
+                        if retry_count < max_retries - 1:
+                            sleep_sec = backoff_base * (2 ** retry_count)
+                            remaining = self.remaining_time_budget()
+                            if sleep_sec > remaining:
+                                logger.warning(
+                                    "[LLM_FALLBACK][Role 1] Backoff sleep (%.2fs) exceeds remaining budget (%.2fs) for category '%s'. Aborting retries.",
+                                    sleep_sec, remaining, cat
+                                )
+                                cat_out["status"] = "timeout"
+                                cat_out["error"] = {"class": "TimeoutError", "status": 408, "type": "timeout", "message": "Global time budget exceeded", "detail": "Global time budget exceeded"}
+                                abort_event.set()
+                                return cat_out
+
+                            logger.warning(
+                                "[LLM_FALLBACK][Role 1] Retryable error for category '%s' (attempt %d/%d): type=%s, status=%s. Backing off for %.2fs...",
+                                cat, retry_count + 1, max_retries, err_info["type"], status_code, sleep_sec
+                            )
+                            time.sleep(sleep_sec)
+                            continue
+                        else:
+                            logger.error(
+                                "[LLM_FALLBACK][Role 1] Retries exhausted for category '%s' after %d attempts: type=%s, status=%s. Giving up.",
+                                cat, max_retries, err_info["type"], status_code
+                            )
+                            abort_event.set()
+                            return cat_out
+                    else:
+                        logger.error(
+                            "[LLM_FALLBACK][Role 1] Unexpected error for category '%s': type=%s, status=%s, msg=%s. Stopping.",
+                            cat, err_info["type"], status_code, err_info["message"]
+                        )
+                        abort_event.set()
+                        return cat_out
+
+            return cat_out
+
+        def _apply_cat_outcome(cat: str, cat_out: Dict[str, Any]) -> bool:
+            if not cat_out.get("ok"):
+                err_info = cat_out.get("error")
+                status_str = cat_out.get("status", "llm_unavailable")
+                if err_info:
+                    self.last_error = err_info
+                    self.llm_status = status_str
+                    results["_llm_status"] = status_str
+                    results["_last_error"] = err_info
+                cat_idx = sorted_categories.index(cat)
+                for remaining_cat in sorted_categories[cat_idx:]:
+                    if remaining_cat not in self.failed_categories:
+                        self.failed_categories.append(remaining_cat)
+                results["_failed_categories"] = list(self.failed_categories)
+                return False
+
+            results[f"_raw_tool_call_{cat}"] = cat_out["extracted_dict"]
+            results[f"_scoped_text_{cat}"] = cat_out["scoped_text"]
+            for disp_key, val_obj in cat_out["fields"].items():
+                results[disp_key] = val_obj
+            return True
+
+        ready_categories: List[Tuple[str, List[str], str]] = []
         for cat in sorted_categories:
             cat_fields = category_batches[cat]
             if self.llm_status == "llm_unavailable":
@@ -1472,10 +1651,6 @@ class LLMFieldResolver:
                         self.failed_categories.append(remaining_cat)
                 break
 
-            # STEP 4 (option b): gate on cost-weighted tokens, not raw count --
-            # a cached re-read of the static system+tools prefix is ~90%
-            # cheaper than a fresh read and shouldn't consume budget as if it
-            # weren't. See total_budget_weighted_tokens in record_usage().
             if self.total_budget_weighted_tokens >= LLM_TOKEN_BUDGET_PER_TENDER:
                 logger.warning(
                     "[LLM_FALLBACK][Role 1] Token budget reached (%.0f / %d cost-weighted tokens, %d raw tokens). Skipping category '%s' (%d fields: %s)",
@@ -1523,204 +1698,104 @@ class LLMFieldResolver:
                 "[SCOPED_CONTEXT][Role 1] Category '%s' (%d fields: %s): Scoped %d chars from %d full doc chars",
                 cat, len(cat_fields), cat_fields, len(scoped_text), len(atc_full_text)
             )
+            ready_categories.append((cat, cat_fields, scoped_text))
 
-            few_shot_section = _build_few_shot_section(cat_fields, memory)
-            system_instruction_text = GAIL_GEM_SYSTEM_INSTRUCTION.format(few_shot_section=few_shot_section)
+        if ready_categories:
+            # Wave 1: Run the highest-priority ready category first to warm the Anthropic prompt cache
+            # and fail fast on non-retryable auth/quota errors without firing duplicate calls.
+            first_cat, first_fields, first_scoped = ready_categories[0]
+            first_out = _run_category_call(first_cat, first_fields, first_scoped)
+            if not _apply_cat_outcome(first_cat, first_out):
+                return results
 
-            system_blocks = [
-                {
-                    "type": "text",
-                    "text": system_instruction_text,
-                    "cache_control": {"type": "ephemeral"},
-                }
-            ]
-
-            # STEP 4: use the static, category-invariant tool schema so the
-            # cached system+tools prefix is actually reusable across the
-            # sequential per-category calls in this loop (see docstring on
-            # _build_static_full_missing_fields_tool_schema for why a
-            # per-category schema silently defeated caching before).
-            tool_spec = _build_static_full_missing_fields_tool_schema()
-
-            field_descriptions = "\n".join(
-                f"- `{entry[0]}`: {entry[2]}"
-                for f in cat_fields
-                for entry in [FIELD_PROMPT_MAP[f]]
-            )
-            user_prompt = (
-                f"Extract the following missing fields from the scoped procurement tender section below.\n\n"
-                f"Category: {cat}\n"
-                f"Fields to extract:\n{field_descriptions}\n\n"
-                f"Scoped Tender Clauses:\n--- START OF RELEVANT CLAUSES ---\n{scoped_text}\n--- END OF RELEVANT CLAUSES ---"
-            )
-
-            # Execution with retry/backoff for 429/5xx/timeout and truncation recovery
-            max_retries = 3
-            backoff_base = 0.5
-
-            for retry_count in range(max_retries):
-                max_tokens_to_use = ROLE_1_MAX_TOKENS
-                try:
-                    for attempt in range(2):
-                        response = self.client.messages.create(
-                            model=self.role1_model,
-                            max_tokens=max_tokens_to_use,
-                            system=system_blocks,
-                            messages=[{"role": "user", "content": user_prompt}],
-                            tools=[tool_spec],
-                            tool_choice={"type": "tool", "name": "extract_missing_fields"},
+            remaining_ready = ready_categories[1:]
+            if remaining_ready:
+                # Re-check budget and time before launching Wave 2
+                eligible_wave2: List[Tuple[str, List[str], str]] = []
+                for cat, cat_fields, scoped_text in remaining_ready:
+                    if self.total_budget_weighted_tokens >= LLM_TOKEN_BUDGET_PER_TENDER:
+                        logger.warning(
+                            "[LLM_FALLBACK][Role 1] Token budget reached (%.0f / %d cost-weighted tokens, %d raw tokens). Skipping category '%s' (%d fields: %s)",
+                            self.total_budget_weighted_tokens,
+                            LLM_TOKEN_BUDGET_PER_TENDER,
+                            self.total_raw_processing_tokens,
+                            cat,
+                            len(cat_fields),
+                            cat_fields
                         )
-
-                        if hasattr(response, "usage") and response.usage:
-                            self.record_usage(response.usage, role="role1")
-                            logger.info(
-                                "[LLM_FALLBACK][Role 1] Category '%s' token usage: %d in / %d out (Est. total cost: $%.5f USD)",
-                                cat, response.usage.input_tokens, response.usage.output_tokens, self.total_cost_usd
-                            )
-
-                        stop_reason = getattr(response, "stop_reason", None)
-                        if stop_reason == "max_tokens" and attempt == 0:
-                            self.role1_retries += 1
-                            max_tokens_to_use = ROLE_1_MAX_TOKENS_RETRY
-                            logger.warning(
-                                "[LLM_FALLBACK][Role 1] Output truncated (stop_reason='max_tokens') for category '%s'! Retrying once with max_tokens=%d...",
-                                cat, max_tokens_to_use
-                            )
-                            continue
-
-                        extracted_dict: Dict[str, Any] = {}
-                        for block in response.content:
-                            if getattr(block, "type", "") == "tool_use" and getattr(block, "name", "") == "extract_missing_fields":
-                                extracted_dict = getattr(block, "input", {}) or {}
-                                break
-
-                        results[f"_raw_tool_call_{cat}"] = extracted_dict
-                        results[f"_scoped_text_{cat}"] = scoped_text
-
-                        print(f"\n==================================================", flush=True)
-                        print(f"[CATEGORY: {cat}] RAW SCOPED TEXT & LLM TOOL CALL", flush=True)
-                        print(f"==================================================", flush=True)
-                        print(f"--- FIRST 300 CHARS OF SCOPED TEXT ---", flush=True)
-                        print(scoped_text[:300], flush=True)
-                        print(f"--- LAST 200 CHARS OF SCOPED TEXT ---", flush=True)
-                        print(scoped_text[-200:], flush=True)
-                        print(f"--- RAW LLM TOOL-CALL OUTPUT (JSON) ---", flush=True)
-                        print(json.dumps(extracted_dict, indent=2), flush=True)
-                        print(f"==================================================\n", flush=True)
-
-                        for prompt_field, raw_val in extracted_dict.items():
-                            if raw_val is None:
-                                continue
-                            display_key = prompt_to_display.get(prompt_field)
-                            if not display_key or display_key not in cat_fields:
-                                continue
-
-                            formatter = FIELD_PROMPT_MAP[display_key][3]
-                            formatted_val = formatter(raw_val) if callable(formatter) else str(raw_val)
-
-                            if formatted_val is not None and str(formatted_val).strip():
-                                results[display_key] = {
-                                    "value": formatted_val,
-                                    "raw_value": raw_val,
-                                    "confidence": 0.85,
-                                    "source": "llm",
-                                }
-                                _save_memory(display_key, str(raw_val), formatted_val, detected_type, confidence=0.85)
-
-                        break  # Successful attempt, exit truncation loop
-
-                    break  # Successful category call, exit retry loop
-
-                except Exception as exc:
-                    status_code = getattr(exc, "status_code", None)
-                    err_info = classify_anthropic_error(exc)
-                    self.last_error = err_info
-                    self.llm_status = err_info["type"]
-                    results["_llm_status"] = err_info["type"]
-                    results["_last_error"] = err_info
-
-                    if self._is_non_retryable_error(exc):
-                        logger.error(
-                            "[LLM_FALLBACK][Role 1] Non-retryable error for category '%s': type=%s, status=%s, msg=%s. Stopping all LLM calls.",
-                            cat, err_info["type"], status_code, err_info["message"]
-                        )
+                        cat_idx = sorted_categories.index(cat)
+                        for remaining_cat in sorted_categories[cat_idx:]:
+                            if remaining_cat not in self.failed_categories:
+                                self.failed_categories.append(remaining_cat)
+                        break
+                    if self.is_time_budget_exceeded():
+                        self.llm_status = "timeout"
+                        self.last_error = {"class": "TimeoutError", "status": 408, "type": "timeout", "message": "Global LLM time budget exceeded", "detail": "Global time budget exceeded"}
+                        results["_llm_status"] = "timeout"
+                        results["_last_error"] = self.last_error
                         cat_idx = sorted_categories.index(cat)
                         for remaining_cat in sorted_categories[cat_idx:]:
                             if remaining_cat not in self.failed_categories:
                                 self.failed_categories.append(remaining_cat)
                         results["_failed_categories"] = list(self.failed_categories)
                         return results
+                    eligible_wave2.append((cat, cat_fields, scoped_text))
 
-                    elif self._is_retryable_error(exc):
+                max_llm_workers = max(1, int(os.getenv("VOLKSAI_LLM_CONCURRENCY", "4")))
+                if len(eligible_wave2) == 1 or max_llm_workers == 1:
+                    for cat, cat_fields, scoped_text in eligible_wave2:
+                        if self.total_budget_weighted_tokens >= LLM_TOKEN_BUDGET_PER_TENDER:
+                            cat_idx = sorted_categories.index(cat)
+                            for remaining_cat in sorted_categories[cat_idx:]:
+                                if remaining_cat not in self.failed_categories:
+                                    self.failed_categories.append(remaining_cat)
+                            break
                         if self.is_time_budget_exceeded():
-                            logger.error(
-                                "[LLM_FALLBACK][Role 1] Global LLM time budget (%.1fs) exceeded during retry for category '%s'. Giving up.",
-                                self.time_budget_sec, cat
-                            )
                             self.llm_status = "timeout"
-                            self.last_error = {"class": "TimeoutError", "status": 408, "type": "timeout", "message": "Global time budget exceeded during retry", "detail": "Global time budget exceeded"}
+                            self.last_error = {"class": "TimeoutError", "status": 408, "type": "timeout", "message": "Global LLM time budget exceeded", "detail": "Global time budget exceeded"}
                             results["_llm_status"] = "timeout"
                             results["_last_error"] = self.last_error
-
                             cat_idx = sorted_categories.index(cat)
                             for remaining_cat in sorted_categories[cat_idx:]:
                                 if remaining_cat not in self.failed_categories:
                                     self.failed_categories.append(remaining_cat)
                             results["_failed_categories"] = list(self.failed_categories)
                             return results
-
-                        if retry_count < max_retries - 1:
-                            sleep_sec = backoff_base * (2 ** retry_count)
-                            remaining = self.remaining_time_budget()
-                            if sleep_sec > remaining:
-                                logger.warning(
-                                    "[LLM_FALLBACK][Role 1] Backoff sleep (%.2fs) exceeds remaining budget (%.2fs) for category '%s'. Aborting retries.",
-                                    sleep_sec, remaining, cat
-                                )
-                                self.llm_status = "timeout"
-                                self.last_error = {"class": "TimeoutError", "status": 408, "type": "timeout", "message": "Global time budget exceeded", "detail": "Global time budget exceeded"}
-                                results["_llm_status"] = "timeout"
-                                results["_last_error"] = self.last_error
-
-                                cat_idx = sorted_categories.index(cat)
-                                for remaining_cat in sorted_categories[cat_idx:]:
-                                    if remaining_cat not in self.failed_categories:
-                                        self.failed_categories.append(remaining_cat)
-                                results["_failed_categories"] = list(self.failed_categories)
+                        cat_out = _run_category_call(cat, cat_fields, scoped_text)
+                        if not _apply_cat_outcome(cat, cat_out):
+                            return results
+                elif eligible_wave2:
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=min(max_llm_workers, len(eligible_wave2))) as pool:
+                        fut_by_cat = {
+                            cat: pool.submit(
+                                contextvars.copy_context().run,
+                                _run_category_call,
+                                cat,
+                                cat_fields,
+                                scoped_text,
+                            )
+                            for cat, cat_fields, scoped_text in eligible_wave2
+                        }
+                        for cat, _, _ in eligible_wave2:
+                            cat_out = fut_by_cat[cat].result()
+                            if not _apply_cat_outcome(cat, cat_out):
                                 return results
-
-                            logger.warning(
-                                "[LLM_FALLBACK][Role 1] Retryable error for category '%s' (attempt %d/%d): type=%s, status=%s. Backing off for %.2fs...",
-                                cat, retry_count + 1, max_retries, err_info["type"], status_code, sleep_sec
-                            )
-                            time.sleep(sleep_sec)
-                            continue
-                        else:
-                            logger.error(
-                                "[LLM_FALLBACK][Role 1] Retries exhausted for category '%s' after %d attempts: type=%s, status=%s. Giving up.",
-                                cat, max_retries, err_info["type"], status_code
-                            )
-                            cat_idx = sorted_categories.index(cat)
-                            for remaining_cat in sorted_categories[cat_idx:]:
-                                if remaining_cat not in self.failed_categories:
-                                    self.failed_categories.append(remaining_cat)
-                            results["_failed_categories"] = list(self.failed_categories)
-                            return results
-                    else:
-                        logger.error(
-                            "[LLM_FALLBACK][Role 1] Unexpected error for category '%s': type=%s, status=%s, msg=%s. Stopping.",
-                            cat, err_info["type"], status_code, err_info["message"]
-                        )
-                        cat_idx = sorted_categories.index(cat)
-                        for remaining_cat in sorted_categories[cat_idx:]:
-                            if remaining_cat not in self.failed_categories:
-                                self.failed_categories.append(remaining_cat)
-                        results["_failed_categories"] = list(self.failed_categories)
-                        return results
 
         if self.failed_categories:
             results["_failed_categories"] = list(self.failed_categories)
 
+        st1 = self.stages_usage.get("missing_field_fallback", {})
+        logger.info(
+            "[LLM_SUMMARY] role=role1 model=%s calls=%d input_tokens=%d output_tokens=%d cache_creation_tokens=%d cache_read_tokens=%d cost_usd=%.6f status=%s",
+            self.role1_model,
+            st1.get("calls_count", 0),
+            st1.get("input_tokens", 0),
+            st1.get("output_tokens", 0),
+            st1.get("cache_creation_tokens", 0),
+            st1.get("cache_read_tokens", 0),
+            st1.get("estimated_cost_usd", 0.0),
+            self.llm_status,
+        )
         logger.info("[LLM_FALLBACK][Role 1] Successfully resolved %d/%d fields via Claude", len(results), len(known_missing))
         return results
 
@@ -1809,14 +1884,17 @@ class LLMFieldResolver:
         )
 
         try:
-            response = self.client.messages.create(
-                model=self.role2_model,
-                max_tokens=ROLE_2_MAX_TOKENS,
-                system=system_blocks,
-                messages=[{"role": "user", "content": user_prompt}],
-                tools=[tool_spec],
-                tool_choice={"type": "auto"},
-            )
+            from app.core.timing import stage_timer, call_anthropic_with_replay
+            with stage_timer("llm_role2:ambiguity_resolution"):
+                response = call_anthropic_with_replay(
+                    self.client.messages.create,
+                    model=self.role2_model,
+                    max_tokens=ROLE_2_MAX_TOKENS,
+                    system=system_blocks,
+                    messages=[{"role": "user", "content": user_prompt}],
+                    tools=[tool_spec],
+                    tool_choice={"type": "auto"},
+                )
 
             if hasattr(response, "usage") and response.usage:
                 self.record_usage(response.usage, role="role2")
@@ -1851,6 +1929,18 @@ class LLMFieldResolver:
                     "reasoning": reasoning,
                 }
 
+            st2 = self.stages_usage.get("ambiguity_resolution", {})
+            logger.info(
+                "[LLM_SUMMARY] role=role2 model=%s calls=%d input_tokens=%d output_tokens=%d cache_creation_tokens=%d cache_read_tokens=%d cost_usd=%.6f status=%s",
+                self.role2_model,
+                st2.get("calls_count", 0),
+                st2.get("input_tokens", 0),
+                st2.get("output_tokens", 0),
+                st2.get("cache_creation_tokens", 0),
+                st2.get("cache_read_tokens", 0),
+                st2.get("estimated_cost_usd", 0.0),
+                self.llm_status,
+            )
             logger.info("[LLM_AMBIGUITY][Role 2] Successfully evaluated %d decisions via Claude", len(results))
             return results
 

@@ -1,3 +1,4 @@
+import functools
 import re
 import math
 import logging
@@ -7,6 +8,36 @@ from app.schemas.schemas import ExtractedFieldSchema, SourceBlockRef, BoundingBo
 from app.services.field_registry import merge_keywords
 
 logger = logging.getLogger(__name__)
+
+_RE_SEP_TO_SPACE = re.compile(r"[/\\_.:\-]")
+_RE_MULTI_SPACE = re.compile(r"\s+")
+_RE_BIDDING_LEAD_IN = re.compile(
+    r'^(?:(?:the\s+)?(?:bidder|agency|contractor|tenderer|firm|applicant)\s+)?'
+    r'(?:should|must|shall|is\s+required\s+to|have\s+to)\s+'
+    r'(?:have|possess|submit|demonstrate|achieve)\s+(?:a\s+|an\s+|minimum\s+)?'
+)
+
+
+@functools.lru_cache(maxsize=32768)
+def _normalize_for_match_cached(text: str) -> str:
+    return _RE_MULTI_SPACE.sub(" ", _RE_SEP_TO_SPACE.sub(" ", text.lower())).strip()
+
+
+@functools.lru_cache(maxsize=32768)
+def _normalize_words_and_set_cached(text: str) -> Tuple[str, Tuple[str, ...], frozenset]:
+    norm = _normalize_for_match_cached(text)
+    words = tuple(norm.split())
+    return norm, words, frozenset(words)
+
+
+@functools.lru_cache(maxsize=16384)
+def _strip_bidding_lead_cached(text_norm: str) -> str:
+    return _RE_BIDDING_LEAD_IN.sub("", text_norm)
+
+
+@functools.lru_cache(maxsize=512)
+def _compile_word_kw_regex(kw: str) -> re.Pattern:
+    return re.compile(rf'(?<!\w){re.escape(kw)}(?!\w)')
 
 # Utility Spatial Containment checks
 def get_intersection_area(boxA: Dict[str, int], boxB: Dict[str, int]) -> int:
@@ -539,15 +570,17 @@ class FieldExtractor:
         fuzzy anchor matching. This lets "ministry/state name" match the
         anchor "ministry name" without collapsing numbers/words into false
         substring matches (e.g. "06-06-2025" stays "06 06 2025")."""
-        return re.sub(r"\s+", " ", re.sub(r"[/\\_.:\-]", " ", text.lower())).strip()
+        return _normalize_for_match_cached(text)
 
     def _anchor_matches(self, anchor: str, text: str, max_gap: int = 1) -> bool:
         """Check if the anchor words appear in order inside the text words,
         allowing small gaps (at most max_gap words between consecutive anchor words).
         This prevents broad multi-column matching like "emd" ... "value" across table headers."""
-        anchor_words = self._normalize_for_match(anchor).split()
-        text_words = self._normalize_for_match(text).split()
+        _, anchor_words, _ = _normalize_words_and_set_cached(anchor)
         if not anchor_words:
+            return False
+        _, text_words, text_word_set = _normalize_words_and_set_cached(text)
+        if anchor_words[0] not in text_word_set:
             return False
         for start_idx in range(len(text_words)):
             if text_words[start_idx] == anchor_words[0]:
@@ -576,16 +609,11 @@ class FieldExtractor:
             return False
         if len(text.strip()) < 50:
             return True
-        text_norm = self._normalize_for_match(text)
-        anchor_norm = self._normalize_for_match(anchor)
+        text_norm = _normalize_for_match_cached(text)
+        anchor_norm = _normalize_for_match_cached(anchor)
         if text_norm.startswith(anchor_norm):
             return True
-        # Strip common bidding clause lead-ins (e.g. 'Should have...', 'Bidder must have...', 'Shall have minimum...')
-        text_clean_lead = re.sub(
-            r'^(?:(?:the\s+)?(?:bidder|agency|contractor|tenderer|firm|applicant)\s+)?(?:should|must|shall|is\s+required\s+to|have\s+to)\s+(?:have|possess|submit|demonstrate|achieve)\s+(?:a\s+|an\s+|minimum\s+)?',
-            '',
-            text_norm
-        )
+        text_clean_lead = _strip_bidding_lead_cached(text_norm)
         return text_clean_lead.startswith(anchor_norm)
 
 
@@ -766,7 +794,7 @@ class FieldExtractor:
                 if len(text.strip()) < 4:
                     continue
                 for category, keywords in category_keywords.items():
-                    if not any(re.search(rf'(?<!\w){re.escape(kw)}(?!\w)', text_lower) for kw in keywords):
+                    if not any((kw in text_lower and _compile_word_kw_regex(kw).search(text_lower)) for kw in keywords):
                         continue
                     qty = None
                     unit = None
@@ -798,7 +826,7 @@ class FieldExtractor:
                         "technical_specification": text,
                         "brand_or_oem_if_present": brand,
                         "page_number": page_num,
-                        "confidence": round(0.6 + min(0.35, len([k for k in keywords if re.search(rf'(?<!\w){re.escape(k)}(?!\w)', text_lower)]) * 0.05), 2),
+                        "confidence": round(0.6 + min(0.35, len([k for k in keywords if (k in text_lower and _compile_word_kw_regex(k).search(text_lower))]) * 0.05), 2),
                         "evidence_text": text,
                     })
                     break
