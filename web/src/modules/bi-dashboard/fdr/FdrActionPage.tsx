@@ -153,7 +153,7 @@ export default function FdrActionPage() {
                             fdrDate: actionFormData.fdrDate ? new Date(actionFormData.fdrDate).toISOString() : undefined,
                             reqNo: actionFormData.reqNo ?? undefined,
                             remarks: actionFormData.fdrRemark ?? undefined,
-                            courierOrg: actionFormData.courierDetails?.toOrg ?? undefined,
+                            courierOrg: actionFormData.courierDetails?.toOrg ?? actionFormData.courierAddressJson?.org ?? undefined,
                             courierName: actionFormData.courierAddressJson?.name ?? undefined,
                             courierPhone: actionFormData.courierAddressJson?.phone ?? undefined,
                             courierAddrLine1: actionFormData.courierAddressJson?.line1 ?? undefined,
@@ -161,6 +161,10 @@ export default function FdrActionPage() {
                             courierCity: actionFormData.courierAddressJson?.city ?? undefined,
                             courierState: actionFormData.courierAddressJson?.state ?? undefined,
                             courierPincode: actionFormData.courierAddressJson?.pincode ?? undefined,
+                            empFrom: actionFormData.courierAddressJson?.empFrom ?? actionFormData.courierDetails?.empFrom ?? undefined,
+                            delDate: actionFormData.courierAddressJson?.delDate
+                                ?? (actionFormData.courierDetails?.delDate ? new Date(actionFormData.courierDetails.delDate).toISOString() : undefined),
+                            urgency: actionFormData.courierAddressJson?.urgency ?? actionFormData.courierDetails?.urgency ?? undefined,
                         } : undefined,
                         initiateFollowup: followupData ? {
                             organisationName: followupData.organisationName ?? undefined,

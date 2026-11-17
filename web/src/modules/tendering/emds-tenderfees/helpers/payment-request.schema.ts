@@ -57,16 +57,24 @@ export const PaymentDetailsSchema = z.object({
     // FDR fields
     fdrFavouring: z.string().optional(),
     fdrExpiryDate: z.string().optional(),
-    fdrDeliverBy: deliveryEnumFieldForDD(),
     fdrPurpose: z.string().optional(),
-    fdrCourierAddress: z.string().optional(),
+    fdrCourierOrg: z.string().optional(),
     fdrCourierName: z.string().optional(),
     fdrCourierPhone: z.string().optional(),
-    fdrCourierAddressLine1: z.string().optional(),
-    fdrCourierAddressLine2: z.string().optional(),
+    fdrCourierAddrLine1: z.string().optional(),
+    fdrCourierAddrLine2: z.string().optional(),
     fdrCourierCity: z.string().optional(),
     fdrCourierState: z.string().optional(),
     fdrCourierPincode: z.string().optional(),
+    fdrCourierEmpFrom: z.coerce.number().optional(),
+    fdrCourierDelDate: z.string().optional(),
+    fdrCourierUrgency: z.coerce.number().optional(),
+    fdrCourierDocs: z.array(z.string()).optional(),
+    // Legacy FDR fields kept optional so editing old records does not wipe them
+    fdrDeliverBy: z.string().optional(),
+    fdrCourierAddress: z.string().optional(),
+    fdrCourierAddressLine1: z.string().optional(),
+    fdrCourierAddressLine2: z.string().optional(),
     fdrCourierHours: z.coerce.number().optional(),
     fdrDate: z.string().optional(),
 
@@ -311,30 +319,32 @@ export const DemandDraftSchema = z.object({
     }
 });
 
-const BG_COURIER_REQUIRED_FIELDS = [
-    ['bgCourierOrg', 'Organization Name'],
-    ['bgCourierName', 'Recipient Name'],
-    ['bgCourierPhone', 'Phone'],
-    ['bgCourierAddrLine1', 'Address Line 1'],
-    ['bgCourierAddrLine2', 'Address Line 2'],
-    ['bgCourierCity', 'City'],
-    ['bgCourierState', 'State'],
-    ['bgCourierPincode', 'Pin Code'],
-    ['bgCourierEmpFrom', 'Courier From'],
-    ['bgCourierDelDate', 'Expected Delivery Date'],
-    ['bgCourierUrgency', 'Dispatch Urgency'],
+const COURIER_DISPATCH_REQUIRED_FIELDS = [
+    ['CourierOrg', 'Organization Name'],
+    ['CourierName', 'Recipient Name'],
+    ['CourierPhone', 'Phone'],
+    ['CourierAddrLine1', 'Address Line 1'],
+    ['CourierAddrLine2', 'Address Line 2'],
+    ['CourierCity', 'City'],
+    ['CourierState', 'State'],
+    ['CourierPincode', 'Pin Code'],
+    ['CourierEmpFrom', 'Courier From'],
+    ['CourierDelDate', 'Expected Delivery Date'],
+    ['CourierUrgency', 'Dispatch Urgency'],
 ] as const;
 
 /**
- * Shared BG Courier Dispatch validation — every BG form (EMD + project BI)
- * renders the dispatch block, so these fields are mandatory for mode BG.
+ * Shared Courier Dispatch validation — rendered by the BG and FDR forms.
+ * `fieldPrefix` matches the form field naming (`bg` / `fdr`).
  */
-const addBgCourierDispatchIssues = (
+const addCourierDispatchIssues = (
     details: Record<string, any>,
     ctx: z.RefinementCtx,
+    fieldPrefix: 'bg' | 'fdr',
     pathPrefix: (string | number)[] = [],
 ) => {
-    for (const [key, label] of BG_COURIER_REQUIRED_FIELDS) {
+    for (const [suffix, label] of COURIER_DISPATCH_REQUIRED_FIELDS) {
+        const key = `${fieldPrefix}${suffix}`;
         const value = details[key];
         const missing =
             value === undefined ||
@@ -350,12 +360,12 @@ const addBgCourierDispatchIssues = (
         }
     }
 
-    const pincode = details.bgCourierPincode;
+    const pincode = details[`${fieldPrefix}CourierPincode`];
     if (typeof pincode === 'string' && pincode.trim() !== '' && !/^\d{6}$/.test(pincode.trim())) {
         ctx.addIssue({
             code: 'custom',
             message: 'Pin Code must be 6 digits',
-            path: [...pathPrefix, 'bgCourierPincode'],
+            path: [...pathPrefix, `${fieldPrefix}CourierPincode`],
         });
     }
 };
@@ -467,7 +477,7 @@ export const BankGuaranteeSchema = z.object({
         });
     }
     // Courier Dispatch replaces the legacy single "Courier Address" field.
-    addBgCourierDispatchIssues(data as Record<string, any>, ctx);
+    addCourierDispatchIssues(data as Record<string, any>, ctx, 'bg');
 });
 
 export const FdrSchema = z.object({
@@ -475,15 +485,23 @@ export const FdrSchema = z.object({
     fdrAmount: z.coerce.number().optional(),
     fdrFavouring: z.string().optional(),
     fdrExpiryDate: z.string().optional(),
-    fdrDeliverBy: z.string().optional(),
-    fdrCourierAddress: z.string().optional(),
+    fdrCourierOrg: z.string().optional(),
     fdrCourierName: z.string().optional(),
     fdrCourierPhone: z.string().optional(),
-    fdrCourierAddressLine1: z.string().optional(),
-    fdrCourierAddressLine2: z.string().optional(),
+    fdrCourierAddrLine1: z.string().optional(),
+    fdrCourierAddrLine2: z.string().optional(),
     fdrCourierCity: z.string().optional(),
     fdrCourierState: z.string().optional(),
     fdrCourierPincode: z.string().optional(),
+    fdrCourierEmpFrom: z.coerce.number().optional(),
+    fdrCourierDelDate: z.string().optional(),
+    fdrCourierUrgency: z.coerce.number().optional(),
+    fdrCourierDocs: z.array(z.string()).optional(),
+    // Legacy FDR fields kept optional so editing old records does not wipe them
+    fdrDeliverBy: z.string().optional(),
+    fdrCourierAddress: z.string().optional(),
+    fdrCourierAddressLine1: z.string().optional(),
+    fdrCourierAddressLine2: z.string().optional(),
     fdrCourierHours: z.coerce.number().optional(),
     fdrDate: z.string().optional(),
 }).superRefine((data, ctx) => {
@@ -501,33 +519,11 @@ export const FdrSchema = z.object({
             path: ['fdrExpiryDate'],
         });
     }
-    if (!data.fdrDeliverBy) {
-        ctx.addIssue({
-            code: 'custom',
-            message: 'Deliver By is required',
-            path: ['fdrDeliverBy'],
-        });
-    }
     if (!data.fdrPurpose || (typeof data.fdrPurpose === 'string' && data.fdrPurpose.trim() === '')) {
         ctx.addIssue({
             code: 'custom',
             message: 'Purpose of FDR is required',
             path: ['fdrPurpose'],
-        });
-    }
-    validateCourierFields(data, ctx, 'fdr');
-    if (!data.fdrCourierHours) {
-        ctx.addIssue({
-            code: 'custom',
-            message: 'Courier Hours is required',
-            path: ['fdrCourierHours'],
-        });
-    }
-    if (!data.fdrDate || (typeof data.fdrDate === 'string' && data.fdrDate.trim() === '')) {
-        ctx.addIssue({
-            code: 'custom',
-            message: 'FDR Date is required',
-            path: ['fdrDate'],
         });
     }
     if (data.fdrAmount !== undefined && data.fdrAmount < 0) {
@@ -537,6 +533,8 @@ export const FdrSchema = z.object({
             path: ['fdrAmount'],
         });
     }
+    // Courier Dispatch block (BG-style) replaces the legacy Deliver By / Courier Hours fields.
+    addCourierDispatchIssues(data as Record<string, any>, ctx, 'fdr');
 });
 
 export const ChequeSchema = z.object({

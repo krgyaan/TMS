@@ -107,8 +107,8 @@ export function PaymentSection({
         const fields: Array<{ key: string; field: string }> = [
             { key: 'courierName', field: 'CourierName' },
             { key: 'courierPhone', field: 'CourierPhone' },
-            { key: 'courierAddressLine1', field: 'CourierAddressLine1' },
-            { key: 'courierAddressLine2', field: 'CourierAddressLine2' },
+            { key: 'courierAddressLine1', field: fp === 'fdr' ? 'CourierAddrLine1' : 'CourierAddressLine1' },
+            { key: 'courierAddressLine2', field: fp === 'fdr' ? 'CourierAddrLine2' : 'CourierAddressLine2' },
             { key: 'courierCity', field: 'CourierCity' },
             { key: 'courierState', field: 'CourierState' },
             { key: 'courierPincode', field: 'CourierPincode' },
