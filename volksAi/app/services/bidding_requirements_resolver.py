@@ -310,15 +310,18 @@ def analyze_bidding_requirements(
         "%d library doc(s) supplied", resolved_model, len(library_documents),
     )
 
+    from app.core.timing import stage_timer, call_anthropic_with_replay
     try:
-        response = client.messages.create(
-            model=resolved_model,
-            max_tokens=ROLE_3_MAX_TOKENS,
-            system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
-            messages=[{"role": "user", "content": user_prompt}],
-            tools=[tool_spec],
-            tool_choice={"type": "tool", "name": "report_bidding_requirements"},
-        )
+        with stage_timer("llm_role3:bidding_requirements"):
+            response = call_anthropic_with_replay(
+                client.messages.create,
+                model=resolved_model,
+                max_tokens=ROLE_3_MAX_TOKENS,
+                system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
+                messages=[{"role": "user", "content": user_prompt}],
+                tools=[tool_spec],
+                tool_choice={"type": "tool", "name": "report_bidding_requirements"},
+            )
     except Exception as exc:
         status_code = getattr(exc, "status_code", None)
         logger.error(
@@ -351,6 +354,10 @@ def analyze_bidding_requirements(
         logger.info(
             "[LLM_BIDDING_REQUIREMENTS][Role 3] Token usage: %d in / %d out (Est. cost: $%.5f USD)",
             in_tok, out_tok, cost,
+        )
+        logger.info(
+            "[LLM_SUMMARY] role=role3 model=%s calls=1 input_tokens=%d output_tokens=%d cache_creation_tokens=%d cache_read_tokens=%d cost_usd=%.6f status=ok",
+            usage["model"], in_tok, out_tok, cache_create, cache_read, cost,
         )
 
     requirements: List[Dict[str, Any]] = []
