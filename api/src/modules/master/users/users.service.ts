@@ -130,7 +130,7 @@ export class UsersService {
                 // Team fields
                 teamId: teams.id,
                 teamName: teams.name,
-                primaryTeamId: sql<number | null>`COALESCE(${users.primaryTeamId}, ${users.team})`,
+                primaryTeamId: sql<number | null>`COALESCE(${users.primaryTeamId}, ${users.team})::int`,
                 subTeamId: subTeams.id,
                 subTeamName: subTeams.name,
                 // Role fields (NEW)
@@ -237,7 +237,7 @@ export class UsersService {
                 email: users.email,
                 roleName: roles.name,
                 roleId: roles.id,
-                primaryTeamId: sql<number | null>`COALESCE(${users.primaryTeamId}, ${users.team})`,
+                primaryTeamId: sql<number | null>`COALESCE(${users.primaryTeamId}, ${users.team})::int`,
                 oldTeamId: users.team,
                 permissionModule: permissions.module,
                 permissionAction : permissions.action,
