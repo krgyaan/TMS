@@ -18,6 +18,8 @@ export const paymentPurposeEnum = pgEnum('payment_purpose', [
     'Counter Guarantee', // BG purpose (BI dashboard BG form)
     'DD',
     'FDR',
+    'Bank Guarantee',    // Project dashboard FDR purpose
+    'Other Security',    // Project dashboard FDR purpose
 ]);
 
 export const instrumentTypeEnum = pgEnum('instrument_type', [

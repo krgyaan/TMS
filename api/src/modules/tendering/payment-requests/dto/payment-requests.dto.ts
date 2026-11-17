@@ -23,6 +23,7 @@ const VALID_PURPOSE_VALUES = [
     'SECURITY_DEPOSIT',
     'OTHER_PAYMENT',
     'OTHER_SECURITY',
+    'BANK_GUARANTEE',
 ] as const;
 
 const optionalString = z
@@ -375,7 +376,7 @@ export type DashboardQueryDto = z.infer<typeof DashboardQuerySchema>;
 // Dashboard Response Types
 // ============================================================================
 
-export type PaymentPurpose = "EMD" | "Tender Fee" | "Processing Fee" | "Security Deposit" | "Performance BG" | "Surety Bond" | "Other Payment" | "Advance Payment" | "Security Bond/Deposit" | "Financial" | "Counter Guarantee" | "DD" | "FDR";
+export type PaymentPurpose = "EMD" | "Tender Fee" | "Processing Fee" | "Security Deposit" | "Performance BG" | "Surety Bond" | "Other Payment" | "Advance Payment" | "Security Bond/Deposit" | "Financial" | "Counter Guarantee" | "DD" | "FDR" | "Bank Guarantee" | "Other Security";
 
 export type InstrumentType =
     | "DD"
