@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BankGuaranteeActionFormSchema, type BankGuaranteeActionFormValues } from '../helpers/bankGuaranteeActionForm.schema';
 import { useUpdateBankGuaranteeAction, useBGActionFormData, useBGFollowupData } from '@/hooks/api/useBankGuarantees';
 import type { Checkpoint } from '@/components/tendering/SubmissionChecklist';
-import { CheckCircle2, XCircle } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { AccountsForm1Fields } from './steps/AccountsForm1Fields';
@@ -198,6 +198,18 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
     const prevAmount = formData?.amount;
     const prevExpiryDate = toDateString(formData?.bgExpiryDate);
     const prevClaimDate = toDateString(formData?.bgClaim);
+
+    const courierReqNo = formData?.reqNo ? String(formData.reqNo).trim() : '';
+    const courierProvider = (formData?.courierDetails?.courierProvider || '').trim();
+    const courierDocketNo = (formData?.courierDetails?.docketNo || formData?.docketNo || '').trim();
+    const courierDocketSlip = (formData?.courierDetails?.docketSlip || formData?.docketSlip || '').trim();
+    const missingCourierDetails = [
+        courierProvider ? '' : 'Courier Provider',
+        courierDocketNo ? '' : 'Docket No.',
+        courierDocketSlip ? '' : 'Docket Slip',
+    ].filter((item): item is string => item.length > 0);
+    const courierDetailsIncomplete =
+        action === 'accounts-form-3' && !isReadOnly && courierReqNo.length > 0 && missingCourierDetails.length > 0;
 
     useEffect(() => {
         if (!formData || !action) return;
@@ -389,6 +401,18 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
 
                     {action === 'accounts-form-3' && (
                         <SectionCard title="Accounts Form (BG) 3 - Charges & SFMS Confirmation">
+                            {courierDetailsIncomplete && (
+                                <div className="flex gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                                    <div className="space-y-1">
+                                        <div className="font-medium">Courier details incomplete</div>
+                                        <div>
+                                            Missing: {missingCourierDetails.join(', ')}. These are required for the
+                                            client mail sent from this stage.
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             <AccountsForm3Fields
                                 control={form.control}
                                 names={STEP_NAMES}
@@ -470,11 +494,16 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
                 </fieldset>
 
                 <div className="flex justify-end gap-4 pt-4">
+                    {courierDetailsIncomplete && (
+                        <p className="mr-auto self-center text-sm text-amber-700">
+                            Complete the courier details before submitting.
+                        </p>
+                    )}
                     <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>
                         Cancel
                     </Button>
                     {!isReadOnly && (
-                        <Button type="submit" disabled={isSubmitting}>
+                        <Button type="submit" disabled={isSubmitting || courierDetailsIncomplete}>
                             {isSubmitting ? 'Submitting...' : 'Submit'}
                         </Button>
                     )}

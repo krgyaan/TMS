@@ -1086,12 +1086,41 @@ private readBodyFileValue(body: unknown, field: string): unknown {
         };
     }
 
-    /**
-     * Update instrument action with form data
-     */
-    /**
- * Update instrument action with form data
- */
+    private getBgCourierReadiness = async (instrument: {
+        reqNo?: string | null;
+        docketNo?: string | null;
+        docketSlip?: string | null;
+    }): Promise<{ linked: boolean; missing: string[] }> => {
+        const reqNo = instrument.reqNo?.trim() || '';
+        if (!reqNo) {
+            return { linked: false, missing: [] };
+        }
+
+        const courierId = Number(reqNo);
+        const [courier] = isNaN(courierId)
+            ? []
+            : await this.db
+                .select({
+                    courierProvider: couriers.courierProvider,
+                    docketNo: couriers.docketNo,
+                    docketSlip: couriers.docketSlip,
+                })
+                .from(couriers)
+                .where(eq(couriers.id, courierId))
+                .limit(1);
+
+        const provider = courier?.courierProvider?.trim() || '';
+        const docketNo = courier?.docketNo?.trim() || instrument.docketNo?.trim() || '';
+        const docketSlip = courier?.docketSlip?.trim() || instrument.docketSlip?.trim() || '';
+
+        const missing: string[] = [];
+        if (!provider) missing.push('Courier Provider');
+        if (!docketNo) missing.push('Docket No.');
+        if (!docketSlip) missing.push('Docket Slip');
+
+        return { linked: true, missing };
+    };
+
     async updateAction(
         instrumentId: number,
         body: any,
@@ -1111,6 +1140,15 @@ private readBodyFileValue(body: unknown, field: string): unknown {
 
         if (instrument.instrumentType !== 'BG') {
             throw new BadRequestException('Instrument is not a Bank Guarantee');
+        }
+
+        if (body.action === 'accounts-form-3') {
+            const courierReadiness = await this.getBgCourierReadiness(instrument);
+            if (courierReadiness.linked && courierReadiness.missing.length > 0) {
+                throw new BadRequestException(
+                    `Courier details are incomplete for courier request ${instrument.reqNo}: ${courierReadiness.missing.join(', ')}. Update the courier request before submitting stage 3.`,
+                );
+            }
         }
 
         // Map action string to number
@@ -1890,6 +1928,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             delDate: unknown;
             urgency: number;
             courierDocs: unknown;
+            courierProvider: string | null;
             docketNo: string | null;
             docketSlip: string | null;
             status: number | null;
@@ -1925,6 +1964,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                         delDate: courier.delDate,
                         urgency: courier.urgency,
                         courierDocs: courier.courierDocs,
+                        courierProvider: courier.courierProvider,
                         docketNo: courier.docketNo,
                         docketSlip: courier.docketSlip,
                         status: courier.status,

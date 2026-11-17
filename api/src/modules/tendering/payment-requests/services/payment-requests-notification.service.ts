@@ -12,6 +12,7 @@ import { woBasicDetails, woContacts } from '@db/schemas/operations';
 import { tenderClients } from '@db/schemas/tendering/tender-info-sheet.schema';
 import { otherContacts } from '@db/schemas/shared/other-contacts.schema';
 import { BG_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
+import { FILE_CONFIGS } from '@/modules/file-upload/config';
 import { getIstDayBounds } from '@/utils/ist-date';
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -222,7 +223,9 @@ export class PaymentRequestsNotificationService {
         bgDetails: { bgPo?: string | null } | null | undefined,
     ): Promise<{ paths: string[]; label: string }> {
         // 1) Document uploaded from the BG dashboard form.
-        const uploaded = this.toAttachmentPaths(bgDetails?.bgPo);
+        const uploaded = this.toAttachmentPaths(bgDetails?.bgPo).filter((path) =>
+            this.resolveUploadAbsolutePath(path),
+        );
         if (uploaded.length > 0) {
             return { paths: uploaded, label: 'PO copy/request letter from beneficiary' };
         }
@@ -242,7 +245,9 @@ export class PaymentRequestsNotificationService {
                     .where(eq(woBasicDetails.id, project.woBasicDetailId))
                     .limit(1);
 
-                const woDraftPaths = this.toAttachmentPaths(woBasic?.woDraft);
+                const woDraftPaths = this.toAttachmentPaths(woBasic?.woDraft).filter((path) =>
+                    this.resolveUploadAbsolutePath(path),
+                );
                 if (woDraftPaths.length > 0) {
                     return { paths: woDraftPaths, label: 'WO draft document (LOA/GEM PO/LOI)' };
                 }
@@ -258,7 +263,7 @@ export class PaymentRequestsNotificationService {
                 .limit(1);
 
             const mainDoc = this.parseTenderMainDoc(tender?.documents);
-            if (mainDoc) {
+            if (mainDoc && this.resolveUploadAbsolutePath(mainDoc)) {
                 return { paths: [mainDoc], label: 'Main tender document' };
             }
         }
@@ -480,6 +485,51 @@ export class PaymentRequestsNotificationService {
         return [trimmed];
     };
 
+    private resolveUploadAbsolutePath = (value: string): string | null => {
+        const normalized = value
+            .replace(/\\/g, '/')
+            .replace(/^\/+/, '')
+            .replace(/^uploads\//, '');
+
+        if (!normalized) {
+            return null;
+        }
+
+        const segments = normalized.split('/');
+        if (segments.includes('..')) {
+            return null;
+        }
+
+        const uploadsRoot = join(process.cwd(), 'uploads');
+
+        if (normalized.startsWith('bi-dashboard/')) {
+            const absolute = join(uploadsRoot, normalized);
+            return existsSync(absolute) ? absolute : null;
+        }
+
+        const candidates: string[] = [];
+        const context = segments[0];
+
+        if (context in FILE_CONFIGS) {
+            const config = FILE_CONFIGS[context];
+            [config.storageDir, config.moduleStorageDir].forEach((dir) => {
+                if (!dir) return;
+                const absolute = join(uploadsRoot, dir, normalized);
+                if (!candidates.includes(absolute)) {
+                    candidates.push(absolute);
+                }
+            });
+        } else {
+            ['operations', 'tendering'].forEach((dir) => {
+                candidates.push(join(uploadsRoot, dir, normalized));
+            });
+        }
+
+        candidates.push(join(uploadsRoot, normalized));
+
+        return candidates.find((candidate) => existsSync(candidate)) ?? null;
+    };
+
     private stageBgMailAttachments = (
         instrumentId: number,
         items: Array<{ path: string; name: string }>,
@@ -494,8 +544,8 @@ export class PaymentRequestsNotificationService {
             const sourceRelative = item.path.replace(/\\/g, '/');
             if (seenSources.has(sourceRelative)) return;
 
-            const sourceAbsolute = join(process.cwd(), 'uploads', sourceRelative);
-            if (!existsSync(sourceAbsolute)) return;
+            const sourceAbsolute = this.resolveUploadAbsolutePath(sourceRelative);
+            if (!sourceAbsolute) return;
 
             seenSources.add(sourceRelative);
 
@@ -533,6 +583,50 @@ export class PaymentRequestsNotificationService {
             .filter((email): email is string => typeof email === 'string')
             .map((email) => email.trim())
             .filter((email) => email.length > 0);
+    };
+
+    private resolveBgMailOverride = async (
+        fromUserId: number,
+        to: RecipientSource[],
+        cc?: RecipientSource[],
+    ): Promise<{ fromUserId: number; to: RecipientSource[]; cc: RecipientSource[] }> => {
+        const raw = this.configService.get<string>('BG_MAIL_TEST_TO') ?? process.env.BG_MAIL_TEST_TO ?? '';
+        const emails = raw
+            .split(',')
+            .map((email) => email.trim())
+            .filter((email) => email.length > 0);
+
+        if (emails.length === 0) {
+            return { fromUserId, to, cc: cc ?? [] };
+        }
+
+        let testFromUserId = fromUserId;
+        const configuredSenderId = Number(
+            this.configService.get<string>('BG_MAIL_TEST_SENDER_ID') ?? process.env.BG_MAIL_TEST_SENDER_ID,
+        );
+
+        if (Number.isInteger(configuredSenderId) && configuredSenderId > 0) {
+            testFromUserId = configuredSenderId;
+        } else {
+            const [testUser] = await this.db
+                .select({ id: users.id })
+                .from(users)
+                .where(eq(users.email, emails[0]))
+                .limit(1);
+            if (testUser) {
+                testFromUserId = testUser.id;
+            }
+        }
+
+        this.logger.warn(
+            `[BG TEST MAIL] Redirecting BG mail to ${emails.join(', ')} from user ${testFromUserId} (original sender ${fromUserId})`,
+        );
+
+        return {
+            fromUserId: testFromUserId,
+            to: [{ type: 'emails', emails }],
+            cc: [],
+        };
     };
 
     async sendDdMailAfterChequeAction(
@@ -763,6 +857,8 @@ export class PaymentRequestsNotificationService {
                 requestedBy: paymentRequests.requestedBy,
                 tenderId: paymentRequests.tenderId,
                 purpose: paymentRequests.purpose,
+                tenderNo: paymentRequests.tenderNo,
+                projectId: paymentRequests.projectId,
             })
             .from(paymentRequests)
             .where(eq(paymentRequests.id, instrument.requestId))
@@ -867,6 +963,8 @@ export class PaymentRequestsNotificationService {
                 requestedBy: paymentRequests.requestedBy,
                 tenderId: paymentRequests.tenderId,
                 purpose: paymentRequests.purpose,
+                tenderNo: paymentRequests.tenderNo,
+                projectId: paymentRequests.projectId,
             })
             .from(paymentRequests)
             .where(eq(paymentRequests.id, instrument.requestId))
@@ -1676,18 +1774,20 @@ export class PaymentRequestsNotificationService {
                 ];
 
                 try {
+                    const mailTarget = await this.resolveBgMailOverride(fromUserId, toEmails, ccEmails);
                     this.logger.log(
-                        `BG create mail for instrument ${instrumentId}: to=${toEmails.map((r) => (r as { emails?: string[] }).emails?.join(',')).join(',')}, teamId=${tenderTeamId}, links=${attachmentLinks.length}`
+                        `BG create mail for instrument ${instrumentId}: to=${mailTarget.to.map((r) => (r as { emails?: string[] }).emails?.join(',')).join(',')}, teamId=${tenderTeamId}, links=${attachmentLinks.length}`
                     );
                     const result = await this.emailService.sendPaymentEmail({
                         requestId: instrument.requestId,
                         tenderId: paymentReq.tenderId || undefined,
                         eventType: 'BG_REQUEST',
-                        fromUserId,
+                        fromUserId: mailTarget.fromUserId,
                         subject,
                         template: 'bg-request',
                         data: {
                             recipientName: 'Imran',
+                            referenceValue: bgReference?.value || '',
                             bgPurpose: bgPurposeText,
                             beneficiaryName: bgDetails?.beneficiaryName || '',
                             beneficiaryAddress: bgDetails?.beneficiaryAddress || '',
@@ -1709,8 +1809,8 @@ export class PaymentRequestsNotificationService {
                             supportingDocLabel,
                             attachmentLinks,
                         },
-                        to: toEmails,
-                        cc: ccEmails,
+                        to: mailTarget.to,
+                        cc: mailTarget.cc,
                     });
 
                     if (result.success) {
@@ -2268,6 +2368,7 @@ export class PaymentRequestsNotificationService {
 
             const data = {
                 assignee: user.name || 'User',
+                referenceValue: (await this.resolveBgReference(bg.request))?.value || '',
                 bg_no: bg.bgDetails.bgNo || 'N/A',
                 favor: bg.instrument.favouring || 'N/A',
                 bg_validity: this.formatDateDDMMYYYY(bg.instrument.validityDate),
@@ -2397,9 +2498,9 @@ export class PaymentRequestsNotificationService {
             const data = {
                 days: daysUntilDue,
                 assignee: user.name || 'User',
+                referenceValue: (await this.resolveBgReference(bg.request))?.value || '',
                 bg_no: bg.bgDetails.bgNo || 'N/A',
-                project_name: bg.request.projectName || 'N/A',
-                favor: bg.instrument.favouring || 'N/A',
+                project_name: bg.request.projectName || 'N/A',                favor: bg.instrument.favouring || 'N/A',
                 bg_validity: this.formatDateDDMMYYYY(bg.instrument.validityDate),
                 bg_claim_period_expiry: bg.instrument.claimExpiryDate
                     ? this.formatDateDDMMYYYY(bg.instrument.claimExpiryDate)
@@ -2459,7 +2560,6 @@ export class PaymentRequestsNotificationService {
      */
     async sendBgRejectedEmail(instrumentId: number): Promise<void> {
         this.logger.log(`Sending BG rejection email for instrument ${instrumentId}`);
-
         // Fetch instrument + payment request + BG details
         const [instrument] = await this.db
             .select()
@@ -2477,6 +2577,8 @@ export class PaymentRequestsNotificationService {
                 requestedBy: paymentRequests.requestedBy,
                 tenderId: paymentRequests.tenderId,
                 purpose: paymentRequests.purpose,
+                tenderNo: paymentRequests.tenderNo,
+                projectId: paymentRequests.projectId,
             })
             .from(paymentRequests)
             .where(eq(paymentRequests.id, instrument.requestId))
@@ -2538,20 +2640,29 @@ export class PaymentRequestsNotificationService {
         ];
 
         try {
+            const rejectedFromUserId =
+                (await this.db.select({ id: users.id }).from(users).where(eq(users.email, 'imran@volksenergie.in')) as any)[0]?.id ?? 33;
+            const mailTarget = await this.resolveBgMailOverride(
+                rejectedFromUserId,
+                [{ type: 'emails', emails: [teUser.email] }],
+                ccEmails,
+            );
+            const reference = await this.resolveBgReference(paymentReq);
             const result = await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
                 tenderId: paymentReq.tenderId || undefined,
                 eventType: 'BG_REJECTED',
-                fromUserId: (await this.db.select({ id: users.id }).from(users).where(eq(users.email, 'imran@volksenergie.in')) as any)[0]?.id ?? 33,
+                fromUserId: mailTarget.fromUserId,
                 subject: `Bank Guarantee rejected - ${formatBgPurpose(bgDetails?.bgPurpose, 'Financial security')}`,
                 template: 'bg-rejected',
                 data: {
                     teName: teUser.name || 'Tender Executive',
+                    referenceValue: reference?.value || '',
                     reason: instrument.rejectionReason || '',
                     purpose: formatBgPurpose(bgDetails?.bgPurpose, 'Financial security'),
                 },
-                to: [{ type: 'emails', emails: [teUser.email] }],
-                cc: ccEmails,
+                to: mailTarget.to,
+                cc: mailTarget.cc,
             });
 
             if (result.success) {
@@ -2583,6 +2694,8 @@ export class PaymentRequestsNotificationService {
                 requestedBy: paymentRequests.requestedBy,
                 tenderId: paymentRequests.tenderId,
                 purpose: paymentRequests.purpose,
+                tenderNo: paymentRequests.tenderNo,
+                projectId: paymentRequests.projectId,
             })
             .from(paymentRequests)
             .where(eq(paymentRequests.id, instrument.requestId))
@@ -2651,15 +2764,22 @@ export class PaymentRequestsNotificationService {
         );
 
         try {
+            const mailTarget = await this.resolveBgMailOverride(
+                sender?.id ?? 33,
+                [{ type: 'emails', emails: [teUser.email] }],
+                ccEmails,
+            );
+            const reference = await this.resolveBgReference(paymentReq);
             const result = await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
                 tenderId: paymentReq.tenderId || undefined,
                 eventType: 'BG_CREATED_COURIERED',
-                fromUserId: sender?.id ?? 33,
+                fromUserId: mailTarget.fromUserId,
                 subject: `New BG created and Couriered - ${formatBgPurpose(bgDetails?.bgPurpose, 'Financial security')}`,
                 template: 'bg-created-couriered',
                 data: {
                     teName: teUser.name || 'Tender Executive',
+                    referenceValue: reference?.value || '',
                     purpose: formatBgPurpose(bgDetails?.bgPurpose, 'Financial security'),
                     courierRequestNo: instrument.reqNo || '',
                     remarks: bgDetails?.bg2Remark || '',
@@ -2667,8 +2787,8 @@ export class PaymentRequestsNotificationService {
                     hasSoftCopy: attachedGroups.has('Soft Copy of BG'),
                     attachmentNames,
                 },
-                to: [{ type: 'emails', emails: [teUser.email] }],
-                cc: ccEmails,
+                to: mailTarget.to,
+                cc: mailTarget.cc,
                 attachments: {
                     files: stagedAttachments.map((attachment) => attachment.path),
                 },
@@ -2743,6 +2863,7 @@ export class PaymentRequestsNotificationService {
                 : supportingDoc.label.startsWith('Main tender')
                     ? 'Tender Document'
                     : 'PO Copy - Beneficiary Request Letter';
+            const reference = await this.resolveBgReference(request);
 
             const attachmentItems: Array<{ path: string; name: string }> = [
                 ...this.toAttachmentPaths(bgDetails.prefilledSignedBg).map((path) => ({
@@ -2799,6 +2920,7 @@ export class PaymentRequestsNotificationService {
             const beneAcc = (bgDetails.bgBankAcc || '').trim();
             const beneIfsc = (bgDetails.bgBankIfsc || '').trim();
             const uniqueCode = (bgDetails.uniqueCode || '').trim();
+            const mailTarget = await this.resolveBgMailOverride(fromUserId, toEmails, ccSources);
 
             await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
@@ -2806,11 +2928,12 @@ export class PaymentRequestsNotificationService {
                 eventType: 'BG_BANK_REQUEST',
                 template: 'bg-accepted',
                 subject: `New Bank Guarantee required in ${timeLimit}Hrs.`,
-                fromUserId,
-                to: toEmails,
-                cc: ccSources,
+                fromUserId: mailTarget.fromUserId,
+                to: mailTarget.to,
+                cc: mailTarget.cc,
                 data: {
                     bgPurpose,
+                    referenceValue: reference?.value || '',
                     beneficiaryName,
                     bgExpiryDate: this.formatDateDDMMYYYY(bgDetails.bgExpiryDate),
                     claimDate: this.formatDateDDMMYYYY(bgDetails.bgClaim),
@@ -2826,6 +2949,7 @@ export class PaymentRequestsNotificationService {
                     timeLimit,
                     hasCeoRequestLetter: attachedGroups.has('Request Letter - Signed by CEO'),
                     hasSupportingDoc: attachedGroups.has(supportingDocName),
+                    supportingDocName,
                     hasBgFormat: attachedGroups.has('BG Format'),
                     hasFdrCopy: attachedGroups.has('FDR Copy'),
                     attachmentNames,
@@ -2987,6 +3111,7 @@ export class PaymentRequestsNotificationService {
                 to: toEmails,
                 cc: ccSources,
                 data: {
+                    referenceValue: (await this.resolveBgReference(request))?.value || '',
                     bgNo,
                     bgDate,
                     amount,
@@ -3178,6 +3303,7 @@ export class PaymentRequestsNotificationService {
                 to: toEmails,
                 cc: ccSources,
                 data: {
+                    referenceValue: (await this.resolveBgReference(request))?.value || '',
                     bgNo,
                     bgDate,
                     amount,
@@ -3336,6 +3462,7 @@ export class PaymentRequestsNotificationService {
             const referenceValue = reference?.value || '';
             const amount = Number(instrument.amount) || 0;
             const stampPaperValue = Number(bgDetails.stampCharges) || 0;
+            const mailTarget = await this.resolveBgMailOverride(fromUserId, toEmails, ccSources);
 
             const mailResult = await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
@@ -3343,9 +3470,9 @@ export class PaymentRequestsNotificationService {
                 eventType: 'BG_SUBMITTED',
                 template: 'bg-fdr',
                 subject: `Bank Guarantee submitted${referenceValue ? ` - ${referenceValue}` : ''} as ${purpose}`,
-                fromUserId,
-                to: toEmails,
-                cc: ccSources,
+                fromUserId: mailTarget.fromUserId,
+                to: mailTarget.to,
+                cc: mailTarget.cc,
                 data: {
                     referenceValue,
                     referenceDate,
@@ -3404,6 +3531,8 @@ export class PaymentRequestsNotificationService {
                 requestedBy: paymentRequests.requestedBy,
                 tenderId: paymentRequests.tenderId,
                 purpose: paymentRequests.purpose,
+                tenderNo: paymentRequests.tenderNo,
+                projectId: paymentRequests.projectId,
             })
             .from(paymentRequests)
             .where(eq(paymentRequests.id, instrument.requestId))
@@ -3468,8 +3597,11 @@ export class PaymentRequestsNotificationService {
             .limit(1);
 
         // Compose email data
+        const reference = await this.resolveBgReference(paymentReq);
+        const referenceValue = reference?.value || '';
         const data = {
             clientName,
+            referenceValue,
             tenderNo: tender?.tenderNo || '',
             tenderName: tender?.tenderName || '',
             status: statusLabel,
@@ -3486,7 +3618,7 @@ export class PaymentRequestsNotificationService {
                 tenderId: paymentReq.tenderId || undefined,
                 eventType: 'BG_FOLLOWUP_RELEASE',
                 fromUserId: (await this.db.select({ id: users.id }).from(users).where(eq(users.email, 'imran@volksenergie.in')) as any)[0]?.id ?? 33,
-                subject: `Bank Guarantee No. - ${bgDetails?.bgNo || ''} - ${statusLabel} - ${tender?.tenderNo || ''} against ${formatBgPurpose(bgDetails?.bgPurpose || paymentReq.purpose, '')}`,
+                subject: `Bank Guarantee No. - ${bgDetails?.bgNo || ''} - ${statusLabel}${referenceValue ? ` - ${referenceValue}` : ''} against ${formatBgPurpose(bgDetails?.bgPurpose || paymentReq.purpose, '')}`,
                 template: 'bg-followup-release',
                 data,
                 to: [{ type: 'emails', emails: clientEmails }],

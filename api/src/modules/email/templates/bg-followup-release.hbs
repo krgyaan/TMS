@@ -2,8 +2,9 @@
     <p>Dear {{data.clientName}},</p>
 
     <p>
-        Tender no. {{data.tenderNo}} ({{data.tenderName}}) is now {{data.status}}. As the EMD submitted against this
-        tender was in the form of a Bank Guarantee for Rs. {{data.amount}}, please start the process of releasing it.
+        {{#if data.referenceValue}}WO No./Tender No.: {{data.referenceValue}}{{#if data.tenderName}} ({{data.tenderName}}){{/if}} is now {{data.status}}.{{else}}The status is now {{data.status}}.{{/if}}
+        As the EMD submitted against this was in the form of a Bank Guarantee for Rs. {{data.amount}}, please start the
+        process of releasing it.
     </p>
 
     <p>
