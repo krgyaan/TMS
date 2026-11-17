@@ -10,6 +10,7 @@ import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { users } from '@/db/schemas';
 import { woAcceptance, woBasicDetails, woDetails } from '@/db/schemas/operations';
+import { recomputeWorkflowStage } from '@/modules/operations/wo-details/helpers/workflow-stage.helper';
 
 const oeSiteVisitUser = alias(users, 'oeSiteVisitUser');
 const oeDocsPrepUser = alias(users, 'oeDocsPrepUser');
@@ -258,7 +259,30 @@ export class KickOffMeetingService {
     return meeting || null;
   }
 
+  private async assertApproved(woDetailId: number) {
+    const [acceptance] = await this.db
+      .select({
+        decision: woAcceptance.decision,
+        status: woAcceptance.status,
+      })
+      .from(woAcceptance)
+      .where(eq(woAcceptance.woDetailId, woDetailId))
+      .limit(1);
+
+    const isApproved =
+      acceptance?.decision === 'accepted' ||
+      acceptance?.status === 'completed';
+
+    if (!isApproved) {
+      throw new BadRequestException(
+        'WO must be approved by TL before kick-off can be scheduled',
+      );
+    }
+  }
+
   async saveKickOffMeeting(userId: number, dto: SaveKickOffMeetingDto) {
+    await this.assertApproved(dto.woDetailId);
+
     const existing = await this.getByWoDetailId(dto.woDetailId);
 
     if (existing) {
@@ -272,6 +296,7 @@ export class KickOffMeetingService {
         })
         .where(eq(woKickoffMeetings.id, existing.id))
         .returning();
+      await recomputeWorkflowStage(this.db, dto.woDetailId);
       return updated;
     }
 
@@ -284,10 +309,27 @@ export class KickOffMeetingService {
         createdBy: userId,
       })
       .returning();
+
+    await recomputeWorkflowStage(this.db, dto.woDetailId);
     return created;
   }
 
   async updateMomFilePath(id: number, userId: number, dto: UpdateKickOffMeetingMomDto) {
+    const [meeting] = await this.db
+      .select({
+        id: woKickoffMeetings.id,
+        woDetailId: woKickoffMeetings.woDetailId,
+      })
+      .from(woKickoffMeetings)
+      .where(eq(woKickoffMeetings.id, id))
+      .limit(1);
+
+    if (!meeting) {
+      throw new NotFoundException(`Kick-off meeting with ID ${id} not found`);
+    }
+
+    await this.assertApproved(meeting.woDetailId);
+
     const [updated] = await this.db
       .update(woKickoffMeetings)
       .set({
@@ -301,9 +343,7 @@ export class KickOffMeetingService {
       .where(eq(woKickoffMeetings.id, id))
       .returning();
 
-    if (!updated) {
-      throw new NotFoundException(`Kick-off meeting with ID ${id} not found`);
-    }
+    await recomputeWorkflowStage(this.db, meeting.woDetailId);
 
     return updated;
   }

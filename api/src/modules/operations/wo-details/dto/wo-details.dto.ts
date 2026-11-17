@@ -60,6 +60,7 @@ export const WoDetailsListResponseSchema = z.object({
   status: WoDetailsStatusEnum,
   woAcceptanceId: z.number().int().positive().nullable(),
   woAcceptanceStatus: WoAcceptanceStatusEnum.nullable(),
+  woAcceptanceDecision: z.string().nullable(),
 });
 
 export type WoDetailsListResponseDto = z.infer<

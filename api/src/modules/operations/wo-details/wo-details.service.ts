@@ -23,6 +23,7 @@ import type {
   CreateWoDetailDto, ImportContactsResponse, TenderDocumentsChecklist, UpdateWoDetailDto,
   WizardValidationResult, WoDetailsListResponseDto, WoDetailsQueryDto, WoDetailsStatus
 } from './dto/wo-details.dto';
+import { recomputeWorkflowStage } from './helpers/workflow-stage.helper';
 
 const oeFirstUser = alias(users, 'oeFirstUser');
 const oeSiteVisitUser = alias(users, 'oeSiteVisitUser');
@@ -188,6 +189,7 @@ export class WoDetailsService {
       status: (row.status as WoDetailsStatus) || 'draft',
       woAcceptanceId: row.woAcceptanceId ?? null,
       woAcceptanceStatus: row.woAcceptanceStatus ?? null,
+      woAcceptanceDecision: row.woAcceptanceDecision ?? null,
     };
   }
 
@@ -272,9 +274,9 @@ export class WoDetailsService {
       );
     } else if (filters?.woAcceptance === true) {
       conditions.push(
-        and(
-          eq(woAcceptance.status, 'completed'),
+        or(
           eq(woAcceptance.decision, 'accepted'),
+          eq(woAcceptance.status, 'completed'),
         ),
       );
     } else if (
@@ -283,21 +285,11 @@ export class WoDetailsService {
     ) {
       conditions.push(
         and(
-          or(
-            isNull(woAcceptance.id),
-            sql`${woAcceptance.status} is distinct from 'completed'`,
-            sql`${woAcceptance.decision} is distinct from 'accepted'`,
-          ),
-          and(
-            or(isNull(woDetails.oeWoAmendmentNeeded), eq(woDetails.oeWoAmendmentNeeded, false)),
-            or(
-              isNull(woAcceptance.id),
-              and(
-                sql`${woAcceptance.status} is distinct from 'awaiting_amendment'`,
-                sql`${woAcceptance.decision} is distinct from 'amendment_needed'`,
-              ),
-            ),
-          ),
+          sql`${woAcceptance.decision} is distinct from 'accepted'`,
+          sql`${woAcceptance.status} is distinct from 'completed'`,
+          sql`${woAcceptance.decision} is distinct from 'amendment_needed'`,
+          sql`${woAcceptance.status} is distinct from 'awaiting_amendment'`,
+          or(isNull(woDetails.oeWoAmendmentNeeded), eq(woDetails.oeWoAmendmentNeeded, false)),
         ),
       );
     }
@@ -389,6 +381,7 @@ export class WoDetailsService {
           status: woDetails.status,
           woAcceptanceId: woAcceptance?.id,
           woAcceptanceStatus: woAcceptance?.status,
+          woAcceptanceDecision: woAcceptance?.decision,
         })
         .from(woDetails)
         .leftJoin(
@@ -1166,6 +1159,38 @@ export class WoDetailsService {
     };
   }
 
+  private async resetAcceptanceDecision(woDetailId: number, userId?: number) {
+    const [existing] = await this.db
+      .select()
+      .from(woAcceptance)
+      .where(eq(woAcceptance.woDetailId, woDetailId))
+      .limit(1);
+
+    if (!existing) return;
+    if (
+      existing.decision !== 'amendment_needed' &&
+      existing.status !== 'awaiting_amendment'
+    ) {
+      return;
+    }
+
+    const now = new Date();
+    await this.db
+      .update(woAcceptance)
+      .set({
+        status: 'pending_review',
+        decision: null,
+        decisionRemarks: null,
+        finalDecisionAt: null,
+        acceptedAt: null,
+        queryRaisedAt: null,
+        queryRespondedAt: null,
+        updatedAt: now,
+        updatedBy: userId ?? null,
+      })
+      .where(eq(woAcceptance.woDetailId, woDetailId));
+  }
+
   async submitForReview(id: number, userId?: number) {
     const detail = await this.findById(id);
 
@@ -1190,20 +1215,23 @@ export class WoDetailsService {
       .where(eq(woDetails.id, id))
       .returning();
 
-    // Update basic detail stage
-    await this.db
-      .update(woBasicDetails)
-      .set({ currentStage: 'wo_acceptance', updatedAt: now })
-      .where(eq(woBasicDetails.id, detail.woBasicDetailId));
-
-    // Create WO Acceptance record
+    // Create or reset WO Acceptance record
     await this.db.insert(woAcceptance).values({
       woDetailId: id,
       status: 'pending_review',
       createdAt: now,
       updatedAt: now,
       createdBy: userId ?? null,
+    }).onConflictDoUpdate({
+      target: woAcceptance.woDetailId,
+      set: {
+        updatedAt: now,
+        updatedBy: userId ?? null,
+      },
     });
+
+    await this.resetAcceptanceDecision(id, userId);
+    await recomputeWorkflowStage(this.db, id);
 
     await this.logHistory({
       woDetailId: id,
@@ -1260,11 +1288,6 @@ export class WoDetailsService {
       .where(eq(woDetails.id, id))
       .returning();
 
-    await this.db
-      .update(woBasicDetails)
-      .set({ currentStage: 'wo_acceptance', updatedAt: now })
-      .where(eq(woBasicDetails.id, detail.woBasicDetailId));
-
     await this.db.insert(woAcceptance).values({
       woDetailId: id,
       status: 'pending_review',
@@ -1278,6 +1301,9 @@ export class WoDetailsService {
         updatedBy: userId ?? null,
       },
     });
+
+    await this.resetAcceptanceDecision(id, userId);
+    await recomputeWorkflowStage(this.db, id);
 
     await this.logHistory({
       woDetailId: id,
@@ -1298,6 +1324,74 @@ export class WoDetailsService {
       data: this.mapRowToResponse(row!),
     };
   }
+  async completeUpload(id: number, userId?: number) {
+    const [detail] = await this.db
+      .select({
+        id: woDetails.id,
+        woBasicDetailId: woDetails.woBasicDetailId,
+      })
+      .from(woDetails)
+      .where(eq(woDetails.id, id))
+      .limit(1);
+
+    if (!detail) {
+      throw new NotFoundException(`WO Detail with ID ${id} not found`);
+    }
+
+    const [acceptance] = await this.db
+      .select({
+        id: woAcceptance.id,
+        status: woAcceptance.status,
+        decision: woAcceptance.decision,
+      })
+      .from(woAcceptance)
+      .where(eq(woAcceptance.woDetailId, id))
+      .limit(1);
+
+    if (!acceptance) {
+      throw new BadRequestException('WO acceptance record not found');
+    }
+
+    const isApproved =
+      acceptance.decision === 'accepted' ||
+      acceptance.status === 'completed';
+
+    if (!isApproved) {
+      throw new BadRequestException(
+        'WO must be accepted by TL before the upload can be completed',
+      );
+    }
+
+    const now = new Date();
+
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(woDetails)
+        .set({
+          status: 'wo_details_filled',
+          completedAt: now,
+          updatedAt: now,
+          updatedBy: userId ?? null,
+        })
+        .where(eq(woDetails.id, id));
+
+      await tx
+        .update(woAcceptance)
+        .set({
+          status: 'completed',
+          isCompleted: true,
+          completedAt: now,
+          updatedAt: now,
+          updatedBy: userId ?? null,
+        })
+        .where(eq(woAcceptance.woDetailId, id));
+    });
+
+    await recomputeWorkflowStage(this.db, id);
+
+    return { message: 'WO upload completed successfully' };
+  }
+
   // GET PAGE DATA
   async getPageData(id: number, pageNum: number) {
     const detail = await this.findByIdWithRelations(id);
@@ -1803,7 +1897,14 @@ export class WoDetailsService {
     this.logger.log(`getStepStatuses: computing step statuses for woDetailId=${woDetailId}`);
 
     const [detail] = await this.db
-      .select({ id: woDetails.id, woBasicDetailId: woDetails.woBasicDetailId, status: woDetails.status })
+      .select({
+        id: woDetails.id,
+        woBasicDetailId: woDetails.woBasicDetailId,
+        status: woDetails.status,
+        isContractAgreement: woDetails.isContractAgreement,
+        veSigned: woDetails.veSigned,
+        clientAndVeSigned: woDetails.clientAndVeSigned,
+      })
       .from(woDetails)
       .where(eq(woDetails.id, woDetailId))
       .limit(1);
@@ -1819,33 +1920,42 @@ export class WoDetailsService {
       };
     }
 
-    const [kickoff, acceptance, poCount] = await Promise.all([
+    const [kickoff, acceptance] = await Promise.all([
       this.db
-        .select({ id: woKickoffMeetings.id })
+        .select({ id: woKickoffMeetings.id, momFilePath: woKickoffMeetings.momFilePath })
         .from(woKickoffMeetings)
         .where(eq(woKickoffMeetings.woDetailId, woDetailId))
         .limit(1),
       this.db
-        .select({ id: woAcceptance.id })
+        .select({
+          id: woAcceptance.id,
+          status: woAcceptance.status,
+          decision: woAcceptance.decision,
+          isCompleted: woAcceptance.isCompleted,
+        })
         .from(woAcceptance)
         .where(eq(woAcceptance.woDetailId, woDetailId))
         .limit(1),
-      this.db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(woBasicDetails)
-        .where(eq(woBasicDetails.id, detail.woBasicDetailId)),
     ]);
 
-    // Determine wo-details step status based on actual status value
-    const woDetailsCompleted = detail.status === 'wo_details_filled';
-    const hasAcceptance = acceptance.length > 0;
+    const acceptanceRecord = acceptance[0];
+    const isApproved =
+      acceptanceRecord?.decision === 'accepted' ||
+      acceptanceRecord?.status === 'completed';
+    const isAmendmentPending =
+      acceptanceRecord?.decision === 'amendment_needed' ||
+      acceptanceRecord?.status === 'awaiting_amendment';
+    const kickoffDone = Boolean(kickoff[0]?.momFilePath);
+    const contractDone =
+      !detail.isContractAgreement ||
+      (Boolean(detail.veSigned) && Boolean(detail.clientAndVeSigned));
 
     const result = {
       'basic-details': true,
-      'wo-details': woDetailsCompleted || hasAcceptance,
-      'kick-off': kickoff.length > 0,
-      'contract-agreement': false, // will be enhanced
-      'po-dashboard': false, // will be enhanced
+      'wo-details': detail.status === 'wo_details_filled' && !isAmendmentPending,
+      'kick-off': isApproved && kickoffDone,
+      'contract-agreement': isApproved && contractDone,
+      'po-dashboard': false,
     };
 
     this.logger.log(`getStepStatuses: woDetailId=${woDetailId} → ${JSON.stringify(result)}`);
@@ -1916,7 +2026,7 @@ export class WoDetailsService {
 
     const [summary] = await this.db
       .select({
-        accepted: sql<number>`count(*) filter (where ${woAcceptance.status} = 'completed' and ${woAcceptance.decision} = 'accepted')::int`,
+        accepted: sql<number>`count(*) filter (where ${woAcceptance.decision} = 'accepted' or ${woAcceptance.status} = 'completed')::int`,
         amendmentNeeded: sql<number>`count(*) filter (where ${woDetails.oeWoAmendmentNeeded} = true or ${woAcceptance.status} = 'awaiting_amendment' or ${woAcceptance.decision} = 'amendment_needed')::int`,
         total: sql<number>`count(*)::int`,
       })
