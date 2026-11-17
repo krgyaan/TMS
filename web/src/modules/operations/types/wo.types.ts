@@ -17,6 +17,8 @@ export type WorkflowStage =
   | 'basic_details'
   | 'wo_details'
   | 'wo_acceptance'
+  | 'kick_off'
+  | 'contract_agreement'
   | 'wo_upload'
   | 'completed';
 
@@ -472,6 +474,7 @@ export interface WoDetailsListResponseDto {
   status: WoDetailsStatus;
   woAcceptanceId: number | null;
   woAcceptanceStatus: WoAcceptanceStatus | null;
+  woAcceptanceDecision: string | null;
 }
 
 export interface CreateWoDetailDto {

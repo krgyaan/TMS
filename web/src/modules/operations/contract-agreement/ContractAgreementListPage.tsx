@@ -53,7 +53,7 @@ const ContractAgreementListPage = () => {
     const tableData = useMemo(() => {
         return allRows.filter((row) => {
             if (activeTab === 'not_uploaded') {
-                return !row.veSigned && !row.clientAndVeSigned;
+                return !(row.veSigned && row.clientAndVeSigned);
             }
             return row.veSigned && row.clientAndVeSigned;
         });
