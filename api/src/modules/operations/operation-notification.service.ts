@@ -795,7 +795,14 @@ export class OperationNotificationService {
 
   async sendPoApprovalStageMessages(
     data: PoApprovalStageNotificationData,
-  ): Promise<{ dmMessageId: string | null; dmChatId: string | null }> {
+  ): Promise<{
+    dmMessageId: string | null;
+    dmChatId: string | null;
+    dmSent: boolean;
+    groupSent: boolean;
+    dmError?: string;
+    groupError?: string;
+  }> {
     let previewUrl: string | undefined;
     try {
       previewUrl = await this.publicLink.buildUrl({
@@ -859,31 +866,41 @@ export class OperationNotificationService {
 
     let dmMessageId: string | null = null;
     const dmChatId: string = data.approverJid;
+    let dmSent = false;
+    let groupSent = false;
+    let dmError: string | undefined;
+    let groupError: string | undefined;
 
     if (this.config.OPENWA_DRY_RUN) {
       this.logger.log(`[DRY_RUN] PO Approval DM to ${dmChatId}:\n${dmText}`);
       this.logger.log(`[DRY_RUN] PO Approval Group broadcast to ${groupJid}:\n${groupText}`);
       dmMessageId = `dry-run-${data.purchaseOrderId}-s${data.stageOrder}-${Date.now()}`;
+      dmSent = true;
+      groupSent = true;
     } else {
       try {
         const res = await this.openwa.sendText(dmChatId, dmText);
         dmMessageId = res?.messageId ?? null;
+        dmSent = true;
       } catch (dmErr) {
+        dmError = dmErr instanceof Error ? dmErr.message : String(dmErr);
         this.logger.warn(
-          `Failed to send PO approval DM to ${dmChatId} for PO #${data.purchaseOrderId}: ${dmErr instanceof Error ? dmErr.message : String(dmErr)}`,
+          `Failed to send PO approval DM to ${dmChatId} for PO #${data.purchaseOrderId}: ${dmError}`,
         );
       }
 
       try {
         await this.openwa.sendText(groupJid, groupText);
+        groupSent = true;
       } catch (grpErr) {
+        groupError = grpErr instanceof Error ? grpErr.message : String(grpErr);
         this.logger.warn(
-          `Failed to send PO approval group broadcast to ${groupJid} for PO #${data.purchaseOrderId}: ${grpErr instanceof Error ? grpErr.message : String(grpErr)}`,
+          `Failed to send PO approval group broadcast to ${groupJid} for PO #${data.purchaseOrderId}: ${groupError}`,
         );
       }
     }
 
-    return { dmMessageId, dmChatId };
+    return { dmMessageId, dmChatId, dmSent, groupSent, dmError, groupError };
   }
 
   async sendPoApprovalStageResult(data: PoApprovalStageResultData): Promise<void> {

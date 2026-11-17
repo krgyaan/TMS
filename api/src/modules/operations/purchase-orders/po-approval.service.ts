@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, Logger, NotFoundException, OnModuleInit } from "@nestjs/common";
+import { BadGatewayException, BadRequestException, Inject, Injectable, Logger, NotFoundException, OnModuleInit } from "@nestjs/common";
 import type { ConfigType } from "@nestjs/config";
 import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { DRIZZLE } from "@/db/database.module";
@@ -51,18 +51,23 @@ export interface StartPoApprovalWorkflowInput {
 }
 
 export interface IncomingWhatsappWebhookData {
-    messageId: string;
-    chatId: string;
-    sender: string;
+    messageId?: string;
+    id?: string;
+    chatId?: string;
+    sender?: string;
+    from?: string;
+    senderPhone?: string;
     senderPn?: string;
     participant?: string;
     author?: string;
+    contact?: { id?: string; number?: string; [key: string]: unknown };
     body?: string;
     type?: string;
     timestamp?: number;
     fromMe?: boolean;
     quotedMessageId?: string;
     quotedMsgId?: string;
+    quotedMessage?: { id?: string; body?: string };
     quotedMsg?: { id?: string; stanzaId?: string };
     contextInfo?: { stanzaId?: string };
     replyTo?: { messageId?: string; id?: string };
@@ -374,7 +379,10 @@ export class PoApprovalService implements OnModuleInit {
      * Start the 2-stage WhatsApp PO approval workflow when a PO is created or re-submitted.
      * Never throws on missing approver/mobile or WhatsApp delivery failure.
      */
-    async startWorkflowForPo(input: StartPoApprovalWorkflowInput): Promise<{ workflowId: number; status: string }> {
+    async startWorkflowForPo(
+        input: StartPoApprovalWorkflowInput,
+        options?: { throwOnDeliveryFailure?: boolean }
+    ): Promise<{ workflowId: number; status: string }> {
         await this.ensureSchemaInitialized();
         const [creator] = await this.db
             .select({
@@ -508,7 +516,7 @@ export class PoApprovalService implements OnModuleInit {
                 })
                 .where(eq(purchaseOrders.id, input.purchaseOrderId));
 
-            await this.activateStage2(workflow.id, input.purchaseOrderId, {
+            const stage2Delivery = await this.activateStage2(workflow.id, input.purchaseOrderId, {
                 poNumber: input.poNumber,
                 tenderId: input.tenderId,
                 projectName: input.projectName,
@@ -519,6 +527,11 @@ export class PoApprovalService implements OnModuleInit {
                 itemsSummary: input.itemsSummary,
                 createdBy: input.createdBy,
             });
+            if (options?.throwOnDeliveryFailure && stage2Delivery && !stage2Delivery.dmSent && !stage2Delivery.groupSent) {
+                throw new BadGatewayException(
+                    `WhatsApp Stage 2 approval notification failed to deliver via OpenWA (${this.config.OPENWA_BASE_URL}): ${stage2Delivery.dmError || stage2Delivery.groupError || "OpenWA gateway unreachable"}`
+                );
+            }
 
             return { workflowId: workflow.id, status: "in_progress" };
         }
@@ -536,6 +549,9 @@ export class PoApprovalService implements OnModuleInit {
                 status: "blocked",
                 skipReason: "missing_mobile",
             });
+            if (options?.throwOnDeliveryFailure) {
+                throw new BadRequestException(`${tl.name} does not have a mobile number configured in TMS.`);
+            }
             return { workflowId: workflow.id, status: workflow.status };
         }
 
@@ -554,7 +570,7 @@ export class PoApprovalService implements OnModuleInit {
             })
             .returning();
 
-        await this.dispatchStageNotification(workflow.id, step1, {
+        const stage1Delivery = await this.dispatchStageNotification(workflow.id, step1, {
             poNumber: input.poNumber,
             tenderId: input.tenderId,
             projectName: input.projectName,
@@ -565,6 +581,11 @@ export class PoApprovalService implements OnModuleInit {
             itemsSummary: input.itemsSummary,
             createdBy: input.createdBy,
         });
+        if (options?.throwOnDeliveryFailure && !stage1Delivery.dmSent && !stage1Delivery.groupSent) {
+            throw new BadGatewayException(
+                `WhatsApp Stage 1 approval notification failed to deliver via OpenWA (${this.config.OPENWA_BASE_URL}): ${stage1Delivery.dmError || stage1Delivery.groupError || "OpenWA gateway unreachable"}`
+            );
+        }
 
         return { workflowId: workflow.id, status: workflow.status };
     }
@@ -584,7 +605,7 @@ export class PoApprovalService implements OnModuleInit {
             itemsSummary?: string | null;
             createdBy: number;
         }
-    ): Promise<void> {
+    ): Promise<{ dmSent: boolean; groupSent: boolean; dmError?: string; groupError?: string } | void> {
         await this.db
             .update(poApprovalWorkflows)
             .set({ currentStage: 2, updatedAt: new Date() })
@@ -648,7 +669,7 @@ export class PoApprovalService implements OnModuleInit {
             return;
         }
 
-        await this.dispatchStageNotification(workflowId, activeStep2, context);
+        return this.dispatchStageNotification(workflowId, activeStep2, context);
     }
 
     private async loadPoNotificationContext(purchaseOrderId: number): Promise<{
@@ -736,8 +757,10 @@ export class PoApprovalService implements OnModuleInit {
             itemsSummary?: string | null;
             createdBy: number;
         }
-    ): Promise<void> {
-        if (!step.approverJid) return;
+    ): Promise<{ dmSent: boolean; groupSent: boolean; dmError?: string; groupError?: string }> {
+        if (!step.approverJid) {
+            return { dmSent: false, groupSent: false, dmError: "Approver JID missing" };
+        }
 
         let tenderNo: string | null = null;
         let tenderName: string | null = null;
@@ -763,7 +786,7 @@ export class PoApprovalService implements OnModuleInit {
         }
 
         const stageOrder = (step.stageOrder === 2 ? 2 : 1) as 1 | 2;
-        const { dmMessageId, dmChatId } = await this.notifications.sendPoApprovalStageMessages({
+        const delivery = await this.notifications.sendPoApprovalStageMessages({
             purchaseOrderId: step.purchaseOrderId,
             poNumber: context.poNumber,
             stageOrder,
@@ -781,36 +804,57 @@ export class PoApprovalService implements OnModuleInit {
             createdByName: context.createdByName,
         });
 
-        await this.db
-            .update(poApprovalSteps)
-            .set({
-                waMessageId: dmMessageId,
-                waChatId: dmChatId,
-                sentAt: new Date(),
-                updatedAt: new Date(),
-            })
-            .where(eq(poApprovalSteps.id, step.id));
+        const dmSent = delivery.dmSent ?? Boolean(delivery.dmMessageId);
+        const groupSent = delivery.groupSent ?? !delivery.groupError;
+
+        if (dmSent) {
+            await this.db
+                .update(poApprovalSteps)
+                .set({
+                    waMessageId: delivery.dmMessageId ?? step.waMessageId,
+                    waChatId: delivery.dmChatId ?? step.waChatId,
+                    sentAt: new Date(),
+                    updatedAt: new Date(),
+                })
+                .where(eq(poApprovalSteps.id, step.id));
+        }
 
         await this.db.insert(poApprovalAuditLogs).values([
             {
                 purchaseOrderId: step.purchaseOrderId,
                 workflowId,
                 stepId: step.id,
-                eventType: "dm_sent",
+                eventType: dmSent ? "dm_sent" : "dm_failed",
                 actorUserId: step.approverUserId,
-                senderJid: dmChatId,
-                waMessageId: dmMessageId,
-                metadata: { stageOrder, stageRole: step.stageRole },
+                senderJid: delivery.dmChatId,
+                waMessageId: delivery.dmMessageId,
+                metadata: {
+                    stageOrder,
+                    stageRole: step.stageRole,
+                    ...(delivery.dmError ? { error: delivery.dmError } : {}),
+                },
             },
             {
                 purchaseOrderId: step.purchaseOrderId,
                 workflowId,
                 stepId: step.id,
-                eventType: "group_broadcast_sent",
+                eventType: groupSent ? "group_broadcast_sent" : "group_broadcast_failed",
                 actorUserId: context.createdBy || null,
-                metadata: { stageOrder, stageRole: step.stageRole, teamId: context.teamId },
+                metadata: {
+                    stageOrder,
+                    stageRole: step.stageRole,
+                    teamId: context.teamId,
+                    ...(delivery.groupError ? { error: delivery.groupError } : {}),
+                },
             },
         ]);
+
+        return {
+            dmSent,
+            groupSent,
+            dmError: delivery.dmError,
+            groupError: delivery.groupError,
+        };
     }
 
     /** Extract quoted message ID from various OpenWA / Baileys / whatsapp-web.js payload shapes */
@@ -818,6 +862,7 @@ export class PoApprovalService implements OnModuleInit {
         const candidates = [
             data.quotedMessageId,
             data.quotedMsgId,
+            data.quotedMessage?.id,
             data.quotedMsg?.id,
             data.quotedMsg?.stanzaId,
             data.contextInfo?.stanzaId,
@@ -838,14 +883,24 @@ export class PoApprovalService implements OnModuleInit {
         activeSteps: PoApprovalStep[]
     ): Promise<SenderIdentity> {
         const identity: SenderIdentity = {
-            rawSender: data.sender || data.chatId || "",
-            chatId: data.chatId || data.sender || "",
+            rawSender: data.sender || data.from || data.senderPhone || data.contact?.id || data.chatId || "",
+            chatId: data.chatId || data.sender || data.from || "",
             phoneLast10: new Set<string>(),
             jids: new Set<string>(),
             lids: new Set<string>(),
         };
 
-        const rawCandidates = [data.sender, data.chatId, data.senderPn, data.participant, data.author];
+        const rawCandidates = [
+            data.sender,
+            data.from,
+            data.senderPhone,
+            data.senderPn,
+            data.participant,
+            data.author,
+            data.contact?.id,
+            data.contact?.number,
+            data.chatId,
+        ];
         for (const raw of rawCandidates) {
             if (typeof raw !== "string" || !raw.trim()) continue;
             const trimmed = raw.trim();
@@ -902,16 +957,34 @@ export class PoApprovalService implements OnModuleInit {
             }
         }
 
-        // 2. Query OpenWA contact endpoint for the @lid or check each unique active step's phone -> lid
+        // 2. Query OpenWA contact/phone endpoints for @lid -> phone resolution
         const baseUrl = this.config.OPENWA_BASE_URL.replace(/\/+$/, "");
         const sessionId = this.config.OPENWA_SESSION_ID;
-        const headers = { "x-api-key": this.config.OPENWA_API_KEY };
+        const headers = { "X-API-Key": this.config.OPENWA_API_KEY };
 
         try {
-            const resp = await fetch(`${baseUrl}/api/sessions/${sessionId}/contacts/${encodeURIComponent(lid)}`, {
-                method: "GET",
-                headers,
-            });
+            const phoneResp = await fetch(
+                `${baseUrl}/api/sessions/${encodeURIComponent(sessionId)}/contacts/${encodeURIComponent(lid)}/phone`,
+                { method: "GET", headers }
+            );
+            if (phoneResp.ok) {
+                const phoneData = (await phoneResp.json()) as Record<string, any>;
+                const last10 = this.normalizePhoneLast10(typeof phoneData?.phone === "string" ? phoneData.phone : null);
+                if (last10) {
+                    identity.phoneLast10.add(last10);
+                    identity.jids.add(`91${last10}@c.us`);
+                    return;
+                }
+            }
+        } catch (err) {
+            this.logger.debug(`OpenWA LID->phone lookup for ${lid} failed: ${err}`);
+        }
+
+        try {
+            const resp = await fetch(
+                `${baseUrl}/api/sessions/${encodeURIComponent(sessionId)}/contacts/${encodeURIComponent(lid)}`,
+                { method: "GET", headers }
+            );
             if (resp.ok) {
                 const contactData = (await resp.json()) as Record<string, any>;
                 const phoneCandidate =
@@ -929,37 +1002,6 @@ export class PoApprovalService implements OnModuleInit {
             }
         } catch (err) {
             this.logger.debug(`OpenWA contact lookup for LID ${lid} failed: ${err}`);
-        }
-
-        const checkedPhones = new Set<string>();
-        for (const step of activeSteps) {
-            const last10 = this.normalizePhoneLast10(step.approverMobileSnapshot || step.approverJid);
-            if (!last10) continue;
-            const fullPhone = `91${last10}`;
-            if (checkedPhones.has(fullPhone)) continue;
-            checkedPhones.add(fullPhone);
-
-            try {
-                const resp = await fetch(
-                    `${baseUrl}/api/sessions/${sessionId}/contacts/${encodeURIComponent(fullPhone)}/lid`,
-                    { method: "GET", headers }
-                );
-                if (resp.ok) {
-                    const lidData = (await resp.json()) as Record<string, any>;
-                    const resolvedLid = lidData?.lid || lidData?.id || lidData?.data?.lid;
-                    if (typeof resolvedLid === "string" && resolvedLid === lid) {
-                        identity.phoneLast10.add(last10);
-                        identity.jids.add(`91${last10}@c.us`);
-                        await this.db
-                            .update(poApprovalSteps)
-                            .set({ approverLid: lid, updatedAt: new Date() })
-                            .where(eq(poApprovalSteps.id, step.id));
-                        return;
-                    }
-                }
-            } catch (err) {
-                this.logger.debug(`OpenWA phone->LID lookup for ${fullPhone} failed: ${err}`);
-            }
         }
     }
 
@@ -1116,6 +1158,7 @@ export class PoApprovalService implements OnModuleInit {
             return { handled: false, reason: "empty_body" };
         }
 
+        const incomingMsgId = data.messageId || data.id || "";
         const quotedMessageId = this.extractQuotedMessageId(data);
         if (!quotedMessageId && !this.looksLikeApprovalReply(rawBody)) {
             return { handled: false, reason: "not_approval_command" };
@@ -1141,8 +1184,8 @@ export class PoApprovalService implements OnModuleInit {
                     workflowId: historicalStep.workflowId,
                     stepId: historicalStep.id,
                     eventType: "reply_ignored",
-                    senderJid: data.sender || data.chatId,
-                    waMessageId: data.messageId,
+                    senderJid: data.sender || data.from || data.senderPhone || data.chatId,
+                    waMessageId: incomingMsgId,
                     metadata: { reason: "step_already_processed", stepStatus: historicalStep.status, rawBody },
                 });
                 return {
@@ -1158,7 +1201,10 @@ export class PoApprovalService implements OnModuleInit {
         }
 
         const senderIdentity = await this.resolveSenderIdentity(data, activeSteps);
-        const replyChatId = data.chatId && !data.chatId.endsWith("@g.us") ? data.chatId : data.sender;
+        const replyChatId =
+            data.chatId && !data.chatId.endsWith("@g.us")
+                ? data.chatId
+                : data.sender || data.from || data.senderPhone || "";
 
         // 1. Try correlating by quotedMessageId
         let matchedStep: PoApprovalStep | null = null;
@@ -1175,7 +1221,7 @@ export class PoApprovalService implements OnModuleInit {
                         stepId: quotedStep.id,
                         eventType: "reply_ignored",
                         senderJid: senderIdentity.rawSender,
-                        waMessageId: data.messageId,
+                        waMessageId: incomingMsgId,
                         metadata: { reason: "unauthorized_sender", quotedMessageId, rawBody },
                     });
                     return { handled: false, reason: "unauthorized_sender", purchaseOrderId: quotedStep.purchaseOrderId };
@@ -1233,7 +1279,7 @@ export class PoApprovalService implements OnModuleInit {
                     eventType: "reply_ignored",
                     actorUserId: senderActiveSteps[0].approverUserId,
                     senderJid: senderIdentity.rawSender,
-                    waMessageId: data.messageId,
+                    waMessageId: incomingMsgId,
                     metadata: { reason: "ambiguous_multiple_pos", candidatePoIds: poIds, rawBody },
                 });
 
@@ -1261,7 +1307,7 @@ export class PoApprovalService implements OnModuleInit {
             eventType: "reply_received",
             actorUserId: matchedStep.approverUserId,
             senderJid: senderIdentity.rawSender,
-            waMessageId: data.messageId,
+            waMessageId: incomingMsgId,
             metadata: { rawBody, quotedMessageId },
         });
 
@@ -1275,16 +1321,16 @@ export class PoApprovalService implements OnModuleInit {
                     eventType: "reply_ignored",
                     actorUserId: matchedStep.approverUserId,
                     senderJid: senderIdentity.rawSender,
-                    waMessageId: data.messageId,
+                    waMessageId: incomingMsgId,
                     metadata: { reason: "unrecognized_stage1_command", rawBody },
                 });
                 return { handled: false, reason: "unrecognized_stage1_command", purchaseOrderId: matchedStep.purchaseOrderId };
             }
 
             if (parsed.type === "approved") {
-                return this.executeStage1Approval(matchedStep, parsed.remark, data.messageId, replyChatId);
+                return this.executeStage1Approval(matchedStep, parsed.remark, incomingMsgId, replyChatId);
             } else {
-                return this.executeStage1Rejection(matchedStep, parsed.remark, data.messageId, replyChatId);
+                return this.executeStage1Rejection(matchedStep, parsed.remark, incomingMsgId, replyChatId);
             }
         } else {
             const parsed = this.parseStage2Command(rawBody, Boolean(quotedMessageId));
@@ -1296,7 +1342,7 @@ export class PoApprovalService implements OnModuleInit {
                     eventType: "reply_ignored",
                     actorUserId: matchedStep.approverUserId,
                     senderJid: senderIdentity.rawSender,
-                    waMessageId: data.messageId,
+                    waMessageId: incomingMsgId,
                     metadata: { reason: "unrecognized_stage2_command", rawBody },
                 });
                 return { handled: false, reason: "unrecognized_stage2_command", purchaseOrderId: matchedStep.purchaseOrderId };
@@ -1322,7 +1368,7 @@ export class PoApprovalService implements OnModuleInit {
                     eventType: "reply_ignored",
                     actorUserId: matchedStep.approverUserId,
                     senderJid: senderIdentity.rawSender,
-                    waMessageId: data.messageId,
+                    waMessageId: incomingMsgId,
                     metadata: { reason: "missing_or_invalid_tds_option", rawBody },
                 });
 
@@ -1335,9 +1381,9 @@ export class PoApprovalService implements OnModuleInit {
             }
 
             if (parsed.type === "approved") {
-                return this.executeStage2Approval(matchedStep, parsed.tdsOption, parsed.remark, data.messageId, replyChatId);
+                return this.executeStage2Approval(matchedStep, parsed.tdsOption, parsed.remark, incomingMsgId, replyChatId);
             } else {
-                return this.executeStage2Rejection(matchedStep, parsed.remark, data.messageId, replyChatId);
+                return this.executeStage2Rejection(matchedStep, parsed.remark, incomingMsgId, replyChatId);
             }
         }
     }
@@ -1875,6 +1921,18 @@ export class PoApprovalService implements OnModuleInit {
      */
     async resendActiveStagePrompt(purchaseOrderId: number, actorUserId?: number) {
         await this.ensureSchemaInitialized();
+        const [po] = await this.db
+            .select({ id: purchaseOrders.id, poApproved: purchaseOrders.poApproved })
+            .from(purchaseOrders)
+            .where(eq(purchaseOrders.id, purchaseOrderId))
+            .limit(1);
+        if (!po) {
+            throw new NotFoundException("Purchase Order not found");
+        }
+        if (po.poApproved === true) {
+            throw new BadRequestException("Purchase Order is already approved");
+        }
+
         const context = await this.loadPoNotificationContext(purchaseOrderId);
         if (!context) {
             throw new NotFoundException("Purchase Order not found");
@@ -1889,17 +1947,20 @@ export class PoApprovalService implements OnModuleInit {
 
         // If no workflow exists yet or the previous workflow is not in_progress, start a fresh workflow
         if (!workflow || workflow.status !== "in_progress") {
-            return this.startWorkflowForPo({
-                purchaseOrderId,
-                poNumber: context.poNumber,
-                tenderId: context.tenderId,
-                projectName: context.projectName,
-                sellerName: context.sellerName,
-                grandTotal: context.grandTotal,
-                teamId: context.teamId,
-                createdBy: context.createdBy || actorUserId || 0,
-                itemsSummary: context.itemsSummary,
-            });
+            return this.startWorkflowForPo(
+                {
+                    purchaseOrderId,
+                    poNumber: context.poNumber,
+                    tenderId: context.tenderId,
+                    projectName: context.projectName,
+                    sellerName: context.sellerName,
+                    grandTotal: context.grandTotal,
+                    teamId: context.teamId,
+                    createdBy: context.createdBy || actorUserId || 0,
+                    itemsSummary: context.itemsSummary,
+                },
+                { throwOnDeliveryFailure: true }
+            );
         }
 
         const targetStage = workflow.currentStage ?? 1;
@@ -1940,7 +2001,12 @@ export class PoApprovalService implements OnModuleInit {
             .where(eq(poApprovalSteps.id, step.id))
             .returning();
 
-        await this.dispatchStageNotification(workflow.id, updatedStep, context);
+        const delivery = await this.dispatchStageNotification(workflow.id, updatedStep, context);
+        if (!delivery.dmSent && !delivery.groupSent) {
+            throw new BadGatewayException(
+                `WhatsApp approval notification failed to deliver via OpenWA (${this.config.OPENWA_BASE_URL}): ${delivery.dmError || delivery.groupError || "OpenWA gateway unreachable"}`
+            );
+        }
 
         await this.db.insert(poApprovalAuditLogs).values({
             purchaseOrderId,

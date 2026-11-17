@@ -448,6 +448,92 @@ describe("PoApprovalService", () => {
                 purchaseOrderId: 42,
             });
         });
+
+        it("supports native OpenWA v0.5.0 payload fields (id, from, senderPhone, quotedMessage.id)", async () => {
+            dbMock.select.mockReturnValueOnce(createQueryChain([activeStage1Step]));
+            dbMock.update.mockReturnValueOnce(
+                createQueryChain([{ ...activeStage1Step, status: "approved" }])
+            );
+            jest.spyOn(service, "activateStage2").mockResolvedValueOnce(undefined);
+
+            const res = await service.handleIncomingWhatsappMessage({
+                id: "in-msg-openwa-native",
+                from: "919876543210@c.us",
+                chatId: "919876543210@c.us",
+                senderPhone: "919876543210",
+                body: "APPROVE",
+                quotedMessage: { id: "wa-msg-stage-1", body: "PO card" },
+            });
+
+            expect(res).toEqual({
+                handled: true,
+                action: "stage1_approved",
+                purchaseOrderId: 42,
+            });
+        });
+    });
+
+    describe("Resend Approval Prompt", () => {
+        it("rejects resend when Purchase Order is already approved", async () => {
+            dbMock.select.mockReturnValueOnce(createQueryChain([{ id: 42, poApproved: true }]));
+
+            await expect(service.resendActiveStagePrompt(42, 99)).rejects.toThrow(
+                "Purchase Order is already approved"
+            );
+        });
+
+        it("throws BadGatewayException when OpenWA delivery fails on resend", async () => {
+            dbMock.select
+                .mockReturnValueOnce(createQueryChain([{ id: 42, poApproved: null }]))
+                .mockReturnValueOnce(
+                    createQueryChain([{ id: 42, poNumber: "PO0042", poRaisedBy: 101, team: 1 }])
+                )
+                .mockReturnValueOnce(createQueryChain([]))
+                .mockReturnValueOnce(createQueryChain([]))
+                .mockReturnValueOnce(createQueryChain([{ name: "Creator" }]))
+                .mockReturnValueOnce(
+                    createQueryChain([
+                        {
+                            id: 5,
+                            purchaseOrderId: 42,
+                            version: 1,
+                            status: "in_progress",
+                            currentStage: 1,
+                        },
+                    ])
+                )
+                .mockReturnValueOnce(
+                    createQueryChain([
+                        {
+                            id: 10,
+                            workflowId: 5,
+                            purchaseOrderId: 42,
+                            stageOrder: 1,
+                            stageRole: "tl",
+                            status: "active",
+                        },
+                    ])
+                );
+
+            jest.spyOn(service, "resolveStage1Tl").mockResolvedValueOnce({
+                userId: 15,
+                name: "Vikram TL",
+                mobile: "9876543210",
+                jid: "919876543210@c.us",
+            });
+            notificationsMock.sendPoApprovalStageMessages.mockResolvedValueOnce({
+                dmMessageId: null,
+                dmChatId: "919876543210@c.us",
+                dmSent: false,
+                groupSent: false,
+                dmError: "fetch failed",
+                groupError: "fetch failed",
+            });
+
+            await expect(service.resendActiveStagePrompt(42, 99)).rejects.toThrow(
+                "WhatsApp approval notification failed to deliver via OpenWA"
+            );
+        });
     });
 
     describe("In-App Lifecycle Sync", () => {

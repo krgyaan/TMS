@@ -35,7 +35,9 @@ export type PoApprovalStepStatus =
 export type PoApprovalAuditEventType =
     | "workflow_started"
     | "dm_sent"
+    | "dm_failed"
     | "group_broadcast_sent"
+    | "group_broadcast_failed"
     | "reply_received"
     | "reply_ignored"
     | "stage_approved"
