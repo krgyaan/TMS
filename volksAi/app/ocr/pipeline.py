@@ -1,5 +1,6 @@
 from typing import Optional, List, Dict, Any
-from PIL.Image import logger
+import logging
+logger = logging.getLogger(__name__)
 import time
 from pathlib import Path
 from PIL import Image

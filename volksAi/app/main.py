@@ -69,12 +69,88 @@ async def lifespan(app: FastAPI):
     verify_anthropic_api_key()
     yield
 
+import uuid
+from fastapi import HTTPException, Request
+from fastapi.responses import JSONResponse
+from app.core.logging import request_id_ctx_var
+
 app = FastAPI(
     title="VolksAI PDF Auto-Extraction Service",
     description="Internal microservice for automated tender PDF extraction and field mapping",
     version="1.0.0",
     lifespan=lifespan,
 )
+
+
+class _RequestIdASGIMiddleware:
+    """Pure ASGI middleware propagating X-Request-ID without BaseHTTPMiddleware task-group overhead."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+
+        incoming_req_id = ""
+        for k, v in scope.get("headers") or []:
+            if k.lower() == b"x-request-id":
+                incoming_req_id = v.decode("latin-1", errors="ignore").strip()
+                break
+        req_id = incoming_req_id or f"req_{uuid.uuid4().hex[:12]}"
+        token = request_id_ctx_var.set(req_id)
+
+        async def _send_with_request_id(message):
+            if message.get("type") == "http.response.start":
+                raw_headers = list(message.get("headers") or [])
+                if not any(k.lower() == b"x-request-id" for k, _ in raw_headers):
+                    raw_headers.append((b"x-request-id", req_id.encode("latin-1")))
+                message = {**message, "headers": raw_headers}
+            await send(message)
+
+        try:
+            await self.app(scope, receive, _send_with_request_id)
+        finally:
+            request_id_ctx_var.reset(token)
+
+
+app.add_middleware(_RequestIdASGIMiddleware)
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_with_request_id(request: Request, exc: HTTPException):
+    req_id = (
+        request_id_ctx_var.get()
+        or (request.headers.get("X-Request-ID") or "").strip()
+        or f"req_{uuid.uuid4().hex[:12]}"
+    )
+    headers = dict(exc.headers or {})
+    headers["X-Request-ID"] = req_id
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail, "request_id": req_id},
+        headers=headers,
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_with_request_id(request: Request, exc: Exception):
+    req_id = (
+        request_id_ctx_var.get()
+        or (request.headers.get("X-Request-ID") or "").strip()
+        or f"req_{uuid.uuid4().hex[:12]}"
+    )
+    logger.exception(
+        "[UNHANDLED_ERROR] Unhandled exception in request",
+        extra={"custom_fields": {"request_id": req_id, "path": str(request.url.path)}},
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error", "request_id": req_id},
+        headers={"X-Request-ID": req_id},
+    )
+
 
 # CORS configured to allow only requests from localhost (service is internal-only,
 # invoked solely by the TMS NestJS backend)
@@ -102,3 +178,4 @@ app.include_router(classify.router)
 app.include_router(bidding_requirements.router)
 
 app.include_router(annexures.router)
+
