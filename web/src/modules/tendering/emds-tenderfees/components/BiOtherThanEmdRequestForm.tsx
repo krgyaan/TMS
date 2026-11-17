@@ -182,6 +182,7 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
                                 allowedModes={allowedEmdModes}
                                 amount={0}
                                 type={type}
+                                tenderId={Number(tenderId) || 0}
                                 courierAddress={''}
                                 defaultPurpose=""
                             />

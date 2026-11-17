@@ -6,28 +6,22 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 
 import { Public } from '@/modules/auth/decorators/public.decorator';
+import {
+  PoApprovalService,
+  type IncomingWhatsappWebhookData,
+} from '@/modules/operations/purchase-orders/po-approval.service';
 
 interface OpenwaWebhookPayload {
   event: string;
   sessionId: string;
-  data: {
-    messageId: string;
-    chatId: string;
-    sender: string;
-    body?: string;
-    type: string;
-    timestamp: number;
-    fromMe: boolean;
-    hasMedia: boolean;
-    mentions?: string[];
-    [key: string]: unknown;
-  };
+  data: IncomingWhatsappWebhookData;
 }
 
 @Public()
@@ -35,7 +29,10 @@ interface OpenwaWebhookPayload {
 export class WebhookController {
   private readonly logger = new Logger(WebhookController.name);
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    @Optional() private readonly poApprovalService?: PoApprovalService,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.OK)
@@ -73,10 +70,23 @@ export class WebhookController {
 
     // 2. Process event
     const payload = req.body as OpenwaWebhookPayload;
+    if (!payload || typeof payload !== 'object' || !payload.data) {
+      this.logger.warn('Malformed OpenWA webhook payload: missing data');
+      return { received: false };
+    }
+
+    const messageId = payload.data.messageId || payload.data.id;
+    const sender =
+      payload.data.sender ||
+      payload.data.from ||
+      payload.data.senderPhone ||
+      payload.data.author;
+    const chatId = payload.data.chatId || sender;
+
     this.logger.debug(`Received webhook: ${payload.event}`, {
       sessionId: payload.sessionId,
-      messageId: payload.data.messageId,
-      chatId: payload.data.chatId,
+      messageId,
+      chatId,
     });
 
     await this.routeEvent(payload);
@@ -90,10 +100,10 @@ export class WebhookController {
         await this.handleIncomingMessage(payload.data);
         break;
       case 'message.sent':
-        this.logger.log(`Message sent confirmed: ${payload.data.messageId}`);
+        this.logger.log(`Message sent confirmed: ${payload.data.messageId || payload.data.id}`);
         break;
       case 'message.ack':
-        this.logger.debug(`Message ack: ${payload.data.messageId} - ${payload.data.ack}`);
+        this.logger.debug(`Message ack: ${payload.data.messageId || payload.data.id} - ${payload.data.ack}`);
         break;
       case 'session.status':
         this.logger.log(`Session status: ${payload.data.status}`);
@@ -104,18 +114,25 @@ export class WebhookController {
   }
 
   private async handleIncomingMessage(data: OpenwaWebhookPayload['data']): Promise<void> {
-    // TODO: Implement your inbound message handling logic here
-    // Examples:
-    // - Parse commands (e.g., "!status TENDER-123")
-    // - Auto-reply for specific keywords
-    // - Forward to internal ticketing system
-    // - Store in database for audit
+    const messageId = data.messageId || data.id || '';
+    const sender = data.sender || data.from || data.senderPhone || data.author || '';
+    const chatId = data.chatId || sender;
 
-    this.logger.log(`Incoming message from ${data.sender} in ${data.chatId}: ${data.body?.slice(0, 100)}`);
+    this.logger.log(`Incoming message from ${sender || 'unknown'} in ${chatId || 'unknown'}: ${data.body?.slice(0, 100)}`);
 
-    // Example: echo back for testing
-    // if (data.body?.startsWith('!echo ')) {
-    //   await this.openwa.sendText(data.chatId, `Echo: ${data.body.slice(6)}`);
-    // }
+    if (this.poApprovalService) {
+      try {
+        await this.poApprovalService.handleIncomingWhatsappMessage({
+          ...data,
+          messageId,
+          sender,
+          chatId,
+        });
+      } catch (err) {
+        this.logger.error(
+          `Failed to process incoming WhatsApp PO approval message ${messageId}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
   }
 }

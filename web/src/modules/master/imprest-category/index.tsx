@@ -13,6 +13,7 @@ import { AlertCircle, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ImprestCategoryModal } from "./components/ImprestCategoryModal";
 import { ImprestCategoryViewModal } from "./components/ImprestCategoryViewModal";
+import { useAuth } from "@/contexts/AuthContext";
 
 const rowSelection: RowSelectionOptions = {
     mode: "multiRow",
@@ -21,12 +22,13 @@ const rowSelection: RowSelectionOptions = {
 
 const ImprestCategoryPage = () => {
     const { data: categories, isLoading, error, refetch } = useImprestCategories();
+    const { canWriteMasterData } = useAuth();
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [viewModalOpen, setViewModalOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<ImprestCategory | null>(null);
 
     // Category actions
-    const categoryActions: ActionItem<ImprestCategory>[] = [
+    const categoryActions = ([
         {
             label: "View",
             onClick: row => {
@@ -55,7 +57,7 @@ const ImprestCategoryPage = () => {
                 }
             },
         },
-    ];
+    ] as ActionItem<ImprestCategory>[]).filter(action => canWriteMasterData || action.label === "View");
 
     const [colDefs] = useState<ColDef<ImprestCategory>[]>([
         {
@@ -155,18 +157,20 @@ const ImprestCategoryPage = () => {
                 <CardHeader>
                     <CardTitle>Imprest Categories</CardTitle>
                     <CardDescription>Manage imprest categories for expense tracking</CardDescription>
-                    <CardAction>
-                        <Button
-                            variant="default"
-                            onClick={() => {
-                                setSelectedCategory(null);
-                                setDrawerOpen(true);
-                            }}
-                        >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add New Category
-                        </Button>
-                    </CardAction>
+                    {canWriteMasterData && (
+                        <CardAction>
+                            <Button
+                                variant="default"
+                                onClick={() => {
+                                    setSelectedCategory(null);
+                                    setDrawerOpen(true);
+                                }}
+                            >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add New Category
+                            </Button>
+                        </CardAction>
+                    )}
                 </CardHeader>
                 <CardContent className="px-3">
                     <DataTable

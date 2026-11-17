@@ -194,6 +194,7 @@ export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'c
                             allowedModes={allowedEmdModes}
                             amount={0}
                             type={type}
+                            tenderId={Number(tenderId) || 0}
                             courierAddress={''}
                             defaultPurpose="EMD"
                             defaultMode={defaultMode}

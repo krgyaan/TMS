@@ -69,7 +69,6 @@ export interface CreatePartyDTO {
 export interface SellerOption {
     id: number;
     name: string;
-    alias?: string | null;
     gstNo?: string | null;
     msme?: string | null;
     pan?: string | null;
@@ -104,6 +103,10 @@ export interface PurchaseOrderRow {
     projectId: number;
     projectName?: string;
     poNumber: string;
+    sellerOrganizationId?: number;
+    sellerGstId?: number;
+    vendorPersonId?: number;
+    shipToPartyId?: number;
     sellerName: string;
     sellerEmail?: string;
     sellerAddress?: string;
@@ -129,6 +132,8 @@ export interface PurchaseOrderRow {
     amountAfterTds?: number | string;
     poApproved?: boolean;
     poApprovalRemark?: string;
+    tlStatus?: boolean | null;
+    tlRemark?: string | null;
     totalPaymentRequested?: number;
     totalMakerDone?: number;
     totalPaymentDone?: number;

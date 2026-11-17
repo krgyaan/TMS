@@ -252,6 +252,7 @@ export async function seedRequiredStatuses(db: DbInstance): Promise<void> {
         { id: 23, name: 'RA scheduled', tenderCategory: 'prep' },
         { id: 24, name: 'Lost (Price Bid result to be uploaded)', tenderCategory: 'prep' },
         { id: 25, name: 'Won (PO awaited)', tenderCategory: 'prep' },
+        { id: 41, name: 'H1 Elimination', tenderCategory: 'prep' },
         { id: 29, name: 'Tender Info sheet Incomplete', tenderCategory: 'prep' },
         { id: 30, name: 'Physical Docs Submitted', tenderCategory: 'prep' },
         { id: 37, name: 'Qualified', tenderCategory: 'prep' },

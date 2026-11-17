@@ -12,6 +12,7 @@ export const CreateLeadSchema = z.object({
     state: z.string().min(1, { message: 'State is required' }),
     type: z.string().optional().nullable(),
     industry: z.string().optional().nullable(),
+    itemId: z.number().int().optional().nullable(),
     team: z.string().optional().nullable(),
     bdPerson: z.number().int().optional().nullable(),
     allocatedTe: z.number().int().optional().nullable(),
@@ -28,11 +29,11 @@ export const CreateLeadSchema = z.object({
     lastVisitAt: z.string().optional().nullable(),
     lastLetterSentAt: z.string().optional().nullable(),
     lastWhatsappSentAt: z.string().optional().nullable(),
-    mailFollowupCount: z.number().int().default(0),
-    callFollowupCount: z.number().int().default(0),
-    visitFollowupCount: z.number().int().default(0),
-    letterSentCount: z.number().int().default(0),
-    whatsappFollowupCount: z.number().int().default(0),
+    mailFollowupCount: z.number().int().optional(),
+    callFollowupCount: z.number().int().optional(),
+    visitFollowupCount: z.number().int().optional(),
+    letterSentCount: z.number().int().optional(),
+    whatsappFollowupCount: z.number().int().optional(),
 });
 
 export const UpdateLeadSchema = z.object({
@@ -47,6 +48,7 @@ export const UpdateLeadSchema = z.object({
     state: z.string().min(1).optional(),
     type: z.string().optional().nullable(),
     industry: z.string().optional().nullable(),
+    itemId: z.number().int().optional().nullable(),
     team: z.string().optional().nullable(),
     bdPerson: z.number().int().optional().nullable(),
     allocatedTe: z.number().int().optional().nullable(),

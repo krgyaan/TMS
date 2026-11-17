@@ -24,7 +24,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { FileText, Users, Package, Banknote, CheckCircle2, XCircle, CheckSquare, Info, Truck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ALL_FDR_ACTION_OPTIONS, type FDRActionFormProps } from '../helpers/fdr.types';
-import { useCreateCourier } from '@/modules/shared/courier/courier.hooks';
+import { useCreateCourier } from '@/hooks/api/useCourier';
 import { FileUploader } from '@/components/file-upload';
 
 export function FdrActionForm({ instrumentId, action: propAction, tenderId, formHistory, instrumentData, linkedCheque, linkedBg }: FDRActionFormProps) {
@@ -271,6 +271,7 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
                 });
                 payload.req_no = createdCourier.id;
                 payload.courier_address_json = JSON.stringify({
+                    org: values.courierOrg || null,
                     name: values.courierName || null,
                     phone: values.courierPhone || null,
                     line1: values.courierAddrLine1 || null,
@@ -278,6 +279,10 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
                     city: values.courierCity || null,
                     state: values.courierState || null,
                     pincode: values.courierPincode || null,
+                    empFrom: values.empFrom ?? null,
+                    delDate: values.delDate || null,
+                    urgency: values.urgency ?? null,
+                    docs: values.courier_docs ?? [],
                 });
             }
             if (values.organisation_name) payload.organisation_name = values.organisation_name;

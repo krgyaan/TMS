@@ -98,7 +98,9 @@ async function bootstrap() {
         const openwa = app.get(OpenwaService);
         const config = app.get(ConfigService);
         const sessionId = config.getOrThrow<string>('OPENWA_SESSION_ID');
-        const webhookUrl = 'https://tmsv2.volksenergie.in/api/v1/webhook/openwa';
+        const webhookUrl =
+            config.get<string>('OPENWA_WEBHOOK_URL') ||
+            'https://tmsv2.volksenergie.in/api/v1/webhook/openwa';
         const secret = config.getOrThrow<string>('OPENWA_WEBHOOK_SECRET');
 
         // Check existing webhooks for this session

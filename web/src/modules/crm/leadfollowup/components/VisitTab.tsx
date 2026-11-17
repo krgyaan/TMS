@@ -1,22 +1,21 @@
-import React, { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { Form } from "@/components/ui/form";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { MapPin, MessageSquare, ClipboardList, Calendar, User, Loader2, Edit, Save, X, ChevronDown, ChevronUp } from "lucide-react";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
-import { ContactPersonFields } from "./ContactPersonFields";
-import { format } from "date-fns";
-import { 
-    useLeadFollowups, 
-    useVisitForm, 
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Form } from "@/components/ui/form";
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import {
     isToday,
     sourceFollowupPath,
-    type VisitFormValues 
+    useLeadFollowups,
+    useVisitForm,
+    type VisitFormValues
 } from "@/hooks/api/useLeadFollowups";
+import { format } from "date-fns";
+import { Calendar, ChevronDown, ChevronUp, ClipboardList, Edit, Loader2, MapPin, MessageSquare, Save, User, X } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type { BaseFollowup, FollowupSource } from "../helpers/leadfollowup.types";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -40,9 +39,6 @@ export function VisitTab({ source, mode = 'create' }: VisitTabProps) {
 function VisitCreateForm({ source }: { source: FollowupSource }) {
     const {
         form,
-        contacts,
-        setContacts,
-        lockedCount,
         isEditMode,
         saving,
         handleSubmit,
@@ -70,45 +66,38 @@ function VisitCreateForm({ source }: { source: FollowupSource }) {
             )}
 
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                <FieldWrapper<VisitFormValues, "body">
-                    control={form.control}
-                    name="body"
-                    label="Points Discussed"
-                >
-                    {(field) => (
-                        <textarea
-                            className="border-input placeholder:text-muted-foreground dark:bg-input/30 min-h-[150px] w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                            placeholder="Enter points discussed during the visit..."
-                            disabled={saving}
-                            {...field}
-                        />
-                    )}
-                </FieldWrapper>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <FieldWrapper<VisitFormValues, "body">
+                        control={form.control}
+                        name="body"
+                        label="Points Discussed"
+                    >
+                        {(field) => (
+                            <textarea
+                                className="border-input placeholder:text-muted-foreground dark:bg-input/30 min-h-[150px] w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                placeholder="Enter points discussed during the visit..."
+                                disabled={saving}
+                                {...field}
+                            />
+                        )}
+                    </FieldWrapper>
 
-                <FieldWrapper<VisitFormValues, "veResponsibility">
-                    control={form.control}
-                    name="veResponsibility"
-                    label="VE Responsibility"
-                >
-                    {(field) => (
-                        <textarea
-                            className="border-input placeholder:text-muted-foreground dark:bg-input/30 min-h-[100px] w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                            placeholder="Enter VE responsibilities..."
-                            disabled={saving}
-                            {...field}
-                            value={field.value ?? ""}
-                        />
-                    )}
-                </FieldWrapper>
+                    <FieldWrapper<VisitFormValues, "veResponsibility">
+                        control={form.control}
+                        name="veResponsibility"
+                        label="VE Responsibility"
+                    >
+                        {(field) => (
+                            <textarea
+                                className="border-input placeholder:text-muted-foreground dark:bg-input/30 min-h-[100px] w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                placeholder="Enter VE responsibilities..."
+                                disabled={saving}
+                                {...field}
+                                value={field.value ?? ""}
+                            />
+                        )}
+                    </FieldWrapper>
 
-                <ContactPersonFields
-                    contacts={contacts}
-                    onChange={setContacts}
-                    disabled={saving}
-                    lockedCount={lockedCount}
-                />
-
-                <div className="w-64">
                     <FieldWrapper<VisitFormValues, "nextFollowupDate">
                         control={form.control}
                         name="nextFollowupDate"

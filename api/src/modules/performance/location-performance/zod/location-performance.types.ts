@@ -55,6 +55,7 @@ export interface BusinessTenderRow {
     itemName: string | null;
     state: string | null;
     status: number;
+    statusName: string | null;
     tlStatus: number;
     bidStatus: "Submission Pending" | "Bid Submitted" | "Tender Missed" | null;
     hasEmdPaid: boolean | null;
@@ -95,6 +96,7 @@ export interface LocationSummary {
     tender_results_awaited: SummaryItem;
     tenders_won: SummaryItem;
     tenders_lost: SummaryItem;
+    tenders_cancelled: SummaryItem;
 }
 
 export interface MetricEntry {

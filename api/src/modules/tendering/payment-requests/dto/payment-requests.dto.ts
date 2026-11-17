@@ -79,16 +79,24 @@ const fdrDetails = z.object({
     fdrAmount: optionalNumber(z.coerce.number().min(0)),
     fdrFavouring: optionalString,
     fdrExpiryDate: optionalString,
-    fdrDeliverBy: optionalString,
     fdrPurpose: optionalString,
-    fdrCourierAddress: optionalString,
+    fdrCourierOrg: optionalString,
     fdrCourierName: optionalString,
     fdrCourierPhone: optionalString,
-    fdrCourierAddressLine1: optionalString,
-    fdrCourierAddressLine2: optionalString,
+    fdrCourierAddrLine1: optionalString,
+    fdrCourierAddrLine2: optionalString,
     fdrCourierCity: optionalString,
     fdrCourierState: optionalString,
     fdrCourierPincode: optionalString,
+    fdrCourierEmpFrom: optionalNumber(z.coerce.number()),
+    fdrCourierDelDate: optionalString,
+    fdrCourierUrgency: optionalNumber(z.coerce.number()),
+    fdrCourierDocs: z.array(z.string()).optional(),
+    // Legacy FDR fields kept optional so editing old records does not wipe them
+    fdrDeliverBy: optionalString,
+    fdrCourierAddress: optionalString,
+    fdrCourierAddressLine1: optionalString,
+    fdrCourierAddressLine2: optionalString,
     fdrCourierHours: optionalNumber(z.coerce.number().min(0)),
     fdrDate: optionalString,
 }).superRefine((data, ctx) => {
@@ -112,11 +120,25 @@ const bgDetails = z.object({
     bgStampValue: optionalNumber(z.coerce.number().min(0)),
     bgFormatFiles: z.array(z.string()).optional(),
     bgPoFiles: z.array(z.string()).optional(),
+    uniqueCode: optionalString,
+    uniqueAdviceMessage: optionalString,
     bgClientUserEmail: z.string().email().optional().or(z.literal("")),
     bgClientCpEmail: z.string().email().optional().or(z.literal("")),
     bgClientFinanceEmail: z.string().email().optional().or(z.literal("")),
     bgCourierAddress: optionalString,
     bgCourierDays: optionalNumber(z.coerce.number().min(1).max(10)),
+    bgCourierOrg: optionalString,
+    bgCourierName: optionalString,
+    bgCourierPhone: optionalString,
+    bgCourierAddrLine1: optionalString,
+    bgCourierAddrLine2: optionalString,
+    bgCourierCity: optionalString,
+    bgCourierState: optionalString,
+    bgCourierPincode: optionalString,
+    bgCourierEmpFrom: optionalNumber(z.coerce.number()),
+    bgCourierDelDate: optionalString,
+    bgCourierUrgency: optionalNumber(z.coerce.number()),
+    bgCourierDocs: z.array(z.string()).optional(),
     bgBank: optionalString,
     bgBankAccountName: optionalString,
     bgBankAccountNo: optionalString,
@@ -286,6 +308,8 @@ export const CreatePaymentRequestSchema = z.object({
     tenderName: z.string().optional(),
     dueDate: z.string().optional(),
     team: z.coerce.number().int().positive().optional(),
+    projectId: z.coerce.number().int().positive().optional(),
+    preserveBgPurpose: z.boolean().optional(),
 
     EMD: emdSection,
     TENDER_FEES: tenderFeeSection,
@@ -351,7 +375,7 @@ export type DashboardQueryDto = z.infer<typeof DashboardQuerySchema>;
 // Dashboard Response Types
 // ============================================================================
 
-export type PaymentPurpose = "EMD" | "Tender Fee" | "Processing Fee" | "Security Deposit" | "Performance BG" | "Surety Bond" | "Other Payment" | "DD" | "FDR";
+export type PaymentPurpose = "EMD" | "Tender Fee" | "Processing Fee" | "Security Deposit" | "Performance BG" | "Surety Bond" | "Other Payment" | "Advance Payment" | "Security Bond/Deposit" | "Financial" | "Counter Guarantee" | "DD" | "FDR";
 
 export type InstrumentType =
     | "DD"

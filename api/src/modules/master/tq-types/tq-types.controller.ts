@@ -1,17 +1,6 @@
-﻿import {
-    Body,
-    Controller,
-    Get,
-    Param,
-    ParseIntPipe,
-    Patch,
-    Post,
-    Query,
-    HttpCode,
-    HttpStatus,
-    NotFoundException,
-} from '@nestjs/common';
+﻿import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus, NotFoundException, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
+import { MasterWriteGuard } from '@/modules/master/common/master-write.guard';
 import { TqTypesService } from '@/modules/master/tq-types/tq-types.service';
 
 const CreateTqTypeSchema = z.object({
@@ -25,6 +14,7 @@ type CreateTqTypeDto = z.infer<typeof CreateTqTypeSchema>;
 type UpdateTqTypeDto = z.infer<typeof UpdateTqTypeSchema>;
 
 @Controller('tq-types')
+@UseGuards(MasterWriteGuard)
 export class TqTypesController {
     constructor(private readonly tqTypesService: TqTypesService) { }
 

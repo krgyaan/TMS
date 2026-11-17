@@ -14,6 +14,14 @@ class LocationsService extends BaseApiService {
         return await this.get<Location[]>("/list-true");
     }
 
+    async getStates(): Promise<string[]> {
+        return await this.get<string[]>("/states");
+    }
+
+    async getRegions(state?: string): Promise<string[]> {
+        return await this.get<string[]>("/regions", { params: { state } });
+    }
+
     async getById(id: number): Promise<Location> {
         return this.get<Location>(`/${id}`);
     }

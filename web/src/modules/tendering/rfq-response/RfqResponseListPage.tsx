@@ -242,7 +242,9 @@ export default function RfqResponseListPage() {
         );
     }
 
-    if (isLoading) {
+    // Full-page skeleton only until the first data arrives. Placeholder data from a previous
+    // search/tab must keep the page mounted so the search input keeps focus.
+    if (isLoading && !(isGlobalList ? rfqDashboard : responsesData)) {
         return (
             <Card>
                 <CardHeader>

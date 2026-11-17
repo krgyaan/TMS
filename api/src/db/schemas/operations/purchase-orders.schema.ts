@@ -1,5 +1,8 @@
 import { pgTable, bigserial, bigint, varchar, text, date, timestamp, jsonb, index, numeric, boolean } from "drizzle-orm/pg-core";
 import { vendorOrganizations } from "@/db/schemas/vendors/vendor-organizations.schema";
+import { vendorGsts } from "@/db/schemas/vendors/vendor-gsts.schema";
+import { vendors } from "@/db/schemas/vendors/vendors.schema";
+import { projectParties } from "@/db/schemas/operations/project-parties.schema";
 
 export const purchaseOrders = pgTable(
     "purchase_orders",
@@ -19,6 +22,9 @@ export const purchaseOrders = pgTable(
         vendorContactPersonPhone: varchar("vendor_contact_person_phone", { length: 20 }),
         vendorContactPersonEmail: varchar("vendor_contact_person_email", { length: 255 }),
         sellerOrganizationId: bigint("seller_organization_id", { mode: "number" }).references(() => vendorOrganizations.id),
+        sellerGstId: bigint("seller_gst_id", { mode: "number" }).references(() => vendorGsts.id, { onDelete: "set null" }),
+        vendorPersonId: bigint("vendor_person_id", { mode: "number" }).references(() => vendors.id, { onDelete: "set null" }),
+        shipToPartyId: bigint("ship_to_party_id", { mode: "number" }).references(() => projectParties.id, { onDelete: "set null" }),
         sellerName: varchar("seller_name", { length: 255 }),
         sellerAddress: text("seller_address"),
         sellerEmail: varchar("seller_email", { length: 255 }),
@@ -48,6 +54,8 @@ export const purchaseOrders = pgTable(
         amountAfterTds: numeric("amount_after_tds", { precision: 14, scale: 2 }),
         poApproved: boolean("po_approved"),
         poApprovalRemark: text("po_approval_remark"),
+        tlStatus: boolean("tl_status"),
+        tlRemark: text("tl_remark"),
         closedAt: timestamp("closed_at", { withTimezone: true }),
         closedBy: bigint("closed_by", { mode: "number" }),
         closureNote: text("closure_note"),
@@ -61,6 +69,9 @@ export const purchaseOrders = pgTable(
         index("idx_po_date").on(table.poDate),
         index("idx_po_seller_name").on(table.sellerName),
         index("idx_po_seller_organization_id").on(table.sellerOrganizationId),
+        index("idx_po_seller_gst_id").on(table.sellerGstId),
+        index("idx_po_vendor_person_id").on(table.vendorPersonId),
+        index("idx_po_ship_to_party_id").on(table.shipToPartyId),
     ]
 );
 

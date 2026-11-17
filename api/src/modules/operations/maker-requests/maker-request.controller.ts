@@ -30,19 +30,13 @@ export class MakerRequestController {
 
     @Patch(":id/status")
     @HttpCode(HttpStatus.OK)
-    updateStatus(
-        @Param("id", ParseIntPipe) id: number,
-        @Body() body: any,
-    ) {
-        return this.service.updateStatus(id, body);
+    updateStatus(@Param("id", ParseIntPipe) id: number, @Body() body: any, @CurrentUser() user: ValidatedUser) {
+        return this.service.updateStatus(id, body, user.id);
     }
 
     @Patch(":id/upload-invoice-after-payment")
     @HttpCode(HttpStatus.OK)
-    uploadInvoiceAfterPayment(
-        @Param("id", ParseIntPipe) id: number,
-        @Body() body: { files: string[] },
-    ) {
+    uploadInvoiceAfterPayment(@Param("id", ParseIntPipe) id: number, @Body() body: { files: string[] }) {
         return this.service.uploadInvoiceAfterPayment(id, body.files);
     }
 }

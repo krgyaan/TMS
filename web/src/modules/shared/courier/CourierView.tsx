@@ -4,29 +4,14 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import {
-    ArrowLeft,
-    Building,
-    User,
-    MapPin,
-    Phone,
-    FileText,
-    Package,
-    CheckCircle,
-    ExternalLink,
-    Loader2,
-    AlertCircle,
-    CalendarDays,
-    Hash,
-    Mail,
-    Download,
-    Eye,
-    Copy,
-    Truck,
-    Pencil,
+import { 
+    ArrowLeft, Building, User, MapPin, Phone, FileText, Package, CheckCircle, ExternalLink, 
+    AlertCircle, CalendarDays, Hash, Mail, Download, Eye, Copy, Truck, Pencil
 } from "lucide-react";
 import { paths } from "@/app/routes/paths";
-import { useCourier } from "@/modules/shared/courier/courier.hooks";
+import { useAuth } from "@/contexts/AuthContext";
+import { useCourier } from "@/hooks/api/useCourier";
+import { isCourierPrivileged } from "@/modules/shared/courier/helpers/courier.constants";
 import { fileUploadService } from "@/services/api/file-upload.service";
 
 const docUrl = (doc: string): string =>
@@ -49,6 +34,9 @@ const formatDate = (dateStr: string | null) => {
         year: "numeric",
     });
 };
+
+const getErrorMessage = (error: unknown): string | undefined =>
+    (error as { response?: { data?: { message?: string } } } | null)?.response?.data?.message;
 
 // Modern Information Row Component
 interface InfoRowProps {
@@ -176,6 +164,7 @@ const DocumentCard: React.FC<{
 // Main Page -------------------------------------------------
 const CourierViewPage: React.FC = () => {
     const navigate = useNavigate();
+    const { user, role, teamId } = useAuth();
     const { id } = useParams<{ id: string }>();
     const courierId = id ? parseInt(id) : 0;
 
@@ -213,7 +202,7 @@ const CourierViewPage: React.FC = () => {
                             </div>
                             <div>
                                 <h3 className="text-xl font-semibold tracking-tight">Courier Not Found</h3>
-                                <p className="text-muted-foreground mt-2">{(error as any)?.response?.data?.message || "Unable to load Courier Details"}</p>
+                                <p className="text-muted-foreground mt-2">{getErrorMessage(error) || "Unable to load Courier Details"}</p>
                             </div>
                         </div>
                         <Button onClick={() => navigate(paths.shared.couriers)} className="gap-2 w-full">
@@ -227,6 +216,7 @@ const CourierViewPage: React.FC = () => {
     }
 
     const documents = courier.courierDocs || [];
+    const canEdit = isCourierPrivileged(role, teamId) || courier.userId === user?.id;
 
     return (
         <div className={`min-h-screen ${MODERN_STYLES.gradient} py-8 px-4 sm:px-6`}>
@@ -257,13 +247,15 @@ const CourierViewPage: React.FC = () => {
                                 </div>
                             </div>
                         </div>
-                        {/* <Button
-                            onClick={() => navigate(paths.shared.courierEdit(courier.id))}
-                            className="flex items-center gap-2 rounded-lg px-4 py-2 shadow-sm hover:shadow-md transition-all"
-                        >
-                            <Pencil className="h-4 w-4" />
-                            Edit
-                        </Button> */}
+                        {canEdit && (
+                            <Button
+                                onClick={() => navigate(paths.shared.courierEdit(courier.id))}
+                                className="flex items-center gap-2 rounded-lg px-4 py-2 shadow-sm hover:shadow-md transition-all"
+                            >
+                                <Pencil className="h-4 w-4" />
+                                Edit
+                            </Button>
+                        )}
                     </div>
 
                     <Separator className="my-4" />

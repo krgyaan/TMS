@@ -13,6 +13,7 @@ import { AlertCircle, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { IndustryDrawer } from './components/IndustryDrawer';
 import { IndustryViewModal } from './components/IndustryViewModal';
+import { useAuth } from '@/contexts/AuthContext';
 
 const rowSelection: RowSelectionOptions = {
     mode: 'multiRow',
@@ -21,11 +22,12 @@ const rowSelection: RowSelectionOptions = {
 
 const IndustriesPage = () => {
     const { data: industries, isLoading, error, refetch } = useIndustries();
+    const { canWriteMasterData } = useAuth();
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [viewModalOpen, setViewModalOpen] = useState(false);
     const [selectedIndustry, setSelectedIndustry] = useState<Industry | null>(null);
 
-    const industryActions: ActionItem<Industry>[] = [
+    const industryActions = ([
         {
             label: 'View',
             onClick: (row) => {
@@ -54,7 +56,7 @@ const IndustriesPage = () => {
                 }
             },
         },
-    ];
+    ] as ActionItem<Industry>[]).filter(action => canWriteMasterData || action.label === 'View');
 
     const [colDefs] = useState<ColDef<Industry>[]>([
         {
@@ -156,18 +158,20 @@ const IndustriesPage = () => {
                 <CardHeader>
                     <CardTitle>Industries</CardTitle>
                     <CardDescription>Manage industry classifications</CardDescription>
-                    <CardAction>
-                        <Button
-                            variant="default"
-                            onClick={() => {
-                                setSelectedIndustry(null);
-                                setDrawerOpen(true);
-                            }}
-                        >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Industry
-                        </Button>
-                    </CardAction>
+                    {canWriteMasterData && (
+                        <CardAction>
+                            <Button
+                                variant="default"
+                                onClick={() => {
+                                    setSelectedIndustry(null);
+                                    setDrawerOpen(true);
+                                }}
+                            >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add Industry
+                            </Button>
+                        </CardAction>
+                    )}
                 </CardHeader>
                 <CardContent className="h-screen px-0">
                     <DataTable

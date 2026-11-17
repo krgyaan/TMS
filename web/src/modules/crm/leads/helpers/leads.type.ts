@@ -18,6 +18,7 @@ export interface Lead {
     state: string | null;
     type: string | null;
     industry: string | null;
+    itemId: number | null;
     team: string | null;
     bdPerson: number | null;
     allocatedTe: number | null;
@@ -48,6 +49,7 @@ export interface Lead {
 
 export interface LeadWithNames extends Lead {
     industryName?: string | null;
+    itemName?: string | null;
     typeName?: string | null;
     teamName?: string | null;
     bdPersonName?: string | null;
@@ -64,15 +66,16 @@ export interface LeadWithNames extends Lead {
 export interface CreateLeadRequest {
     companyName: string;
     name: string;
-    designation: string;
+    designation?: string | null;
     phone: string;
-    email: string | null;
+    email?: string | null;
     address: string;
     liveLocation?: LiveLocation | null;
     country: string;
     state: string;
     type?: string | null;
     industry?: string | null;
+    itemId?: number | null;
     team?: string | null;
     bdPerson?: number | null;
     allocatedTe?: number | null;
@@ -96,7 +99,7 @@ export interface LeadListParams {
     search?: string;
     priority?: string;
     status?: string;
-    team?: string;          // ✅ NEW
+    team?: string;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
     includeHappyCalling?: boolean;

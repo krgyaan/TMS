@@ -24,15 +24,16 @@ export class FollowupWorker implements OnModuleInit {
         const worker = new Worker(
             "followup-mail-queue",
             async job => {
-                const { followupId } = job.data;
+                const { followupId, frequency } = job.data;
 
                 this.logger.info("Processing follow-up mail job", {
                     jobId: job.id,
                     followupId,
+                    frequency,
                 });
 
                 try {
-                    await this.followUpService.processFollowupMail(followupId);
+                    await this.followUpService.processFollowupMail(followupId, frequency);
 
                     this.logger.info("Follow-up mail job completed", {
                         jobId: job.id,
@@ -49,7 +50,7 @@ export class FollowupWorker implements OnModuleInit {
                 }
             },
             {
-                connection: { host, port },
+                connection: { host, port, maxRetriesPerRequest: null },
                 concurrency: 2,
             }
         );

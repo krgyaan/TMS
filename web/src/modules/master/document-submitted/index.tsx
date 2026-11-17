@@ -13,6 +13,7 @@ import { AlertCircle, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DocumentSubmittedModal } from "./components/DocumentSubmittedModal";
 import { DocumentSubmittedViewModal } from "./components/DocumentSubmittedViewModal";
+import { useAuth } from "@/contexts/AuthContext";
 
 const rowSelection: RowSelectionOptions = {
     mode: "multiRow",
@@ -21,12 +22,13 @@ const rowSelection: RowSelectionOptions = {
 
 const DocumentsSubmittedPage = () => {
     const { data: documents, isLoading, error, refetch } = useDocumentsSubmitted();
+    const { canWriteMasterData } = useAuth();
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [viewModalOpen, setViewModalOpen] = useState(false);
     const [selectedDocument, setSelectedDocument] = useState<DocumentSubmitted | null>(null);
 
     // Document actions
-    const documentActions: ActionItem<DocumentSubmitted>[] = [
+    const documentActions = ([
         {
             label: "View",
             onClick: row => {
@@ -55,7 +57,7 @@ const DocumentsSubmittedPage = () => {
                 }
             },
         },
-    ];
+    ] as ActionItem<DocumentSubmitted>[]).filter(action => canWriteMasterData || action.label === "View");
 
     const [colDefs] = useState<ColDef<DocumentSubmitted>[]>([
         {
@@ -146,18 +148,20 @@ const DocumentsSubmittedPage = () => {
                 <CardHeader>
                     <CardTitle>Documents Submitted</CardTitle>
                     <CardDescription>Manage document types required for submissions</CardDescription>
-                    <CardAction>
-                        <Button
-                            variant="default"
-                            onClick={() => {
-                                setSelectedDocument(null);
-                                setDrawerOpen(true);
-                            }}
-                        >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Document Type
-                        </Button>
-                    </CardAction>
+                    {canWriteMasterData && (
+                        <CardAction>
+                            <Button
+                                variant="default"
+                                onClick={() => {
+                                    setSelectedDocument(null);
+                                    setDrawerOpen(true);
+                                }}
+                            >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add Document Type
+                            </Button>
+                        </CardAction>
+                    )}
                 </CardHeader>
                 <CardContent className="px-3">
                     <DataTable

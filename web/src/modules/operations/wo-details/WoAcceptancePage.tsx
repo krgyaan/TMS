@@ -1,5 +1,6 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { paths } from '@/app/routes/paths';
 import { useWoAcceptanceDetails, useSubmitAcceptanceDecision } from '@/hooks/api/useWoAcceptance';
 import { WoAcceptanceForm } from './components/WoAcceptanceForm';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -34,7 +35,7 @@ const WoAcceptancePage: React.FC = () => {
 
         submitDecision({ woDetailId, data: dto }, {
             onSuccess: () => {
-                navigate('/operations/wo-details');
+                navigate(paths.operations.woDetailAcceptanceListPage);
             }
         });
     };

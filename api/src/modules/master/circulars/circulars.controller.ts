@@ -1,9 +1,10 @@
 import { CurrentUser } from '@/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, NotFoundException, Param, ParseIntPipe, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, NotFoundException, Param, ParseIntPipe, Patch, Post, UseGuards } from '@nestjs/common';
 import { existsSync, unlinkSync } from 'fs';
 import { join, resolve } from 'path';
 import { z } from 'zod';
+import { MasterWriteGuard } from '@/modules/master/common/master-write.guard';
 import { CircularsService } from './circulars.service';
 
 const CreateCircularSchema = z.object({
@@ -17,6 +18,7 @@ const CreateCircularSchema = z.object({
 const UpdateCircularSchema = CreateCircularSchema.partial();
 
 @Controller('circular')
+@UseGuards(MasterWriteGuard)
 export class CircularsController {
     constructor(private readonly service: CircularsService) {}
 

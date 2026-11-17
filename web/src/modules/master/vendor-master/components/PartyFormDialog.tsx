@@ -17,6 +17,7 @@ interface PartyFormDialogProps {
     title?: string;
     description?: string;
     initialValues?: Partial<NewPartyForm>;
+    showAlias?: boolean;
 }
 
 export interface CreatePartyPayload {
@@ -39,6 +40,7 @@ export function PartyFormDialog({
     title = "Add New Party",
     description = "Add a new party to use as vendor or shipping destination.",
     initialValues,
+    showAlias = false,
 }: PartyFormDialogProps) {
     const [form, setForm] = useState<NewPartyForm>({
         name: "",
@@ -110,14 +112,16 @@ export function PartyFormDialog({
                                 placeholder="Enter party name"
                             />
                         </div>
-                        <div className="space-y-2">
-                            <Label>Alias</Label>
-                            <Input
-                                value={form.alias}
-                                onChange={(e) => handleChange("alias", e.target.value)}
-                                placeholder="e.g. Factory, HO, Branch"
-                            />
-                        </div>
+                        {showAlias && (
+                            <div className="space-y-2">
+                                <Label>Alias</Label>
+                                <Input
+                                    value={form.alias}
+                                    onChange={(e) => handleChange("alias", e.target.value)}
+                                    placeholder="e.g. Factory, HO, Branch"
+                                />
+                            </div>
+                        )}
                         <div className="space-y-2">
                             <Label>Email</Label>
                             <Input

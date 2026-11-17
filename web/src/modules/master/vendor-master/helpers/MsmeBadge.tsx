@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 
-export type MsmeType = "M" | "S";
+export type MsmeType = "M" | "S" | "T";
 
 type MsmeBadgeProps = {
     msme?: string | null;

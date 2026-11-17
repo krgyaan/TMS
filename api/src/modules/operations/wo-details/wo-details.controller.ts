@@ -75,6 +75,11 @@ export class WoDetailsController {
     return this.woDetailsService.getStepStatuses(id);
   }
 
+  @Get(':id/history')
+  async getHistory(@Param('id', ParseIntPipe) id: number) {
+    return this.woDetailsService.getHistory(id);
+  }
+
   @Get('by-basic-detail/:woBasicDetailId')
   async getByWoBasicDetailId(
     @Param('woBasicDetailId', ParseIntPipe) woBasicDetailId: number,
@@ -195,6 +200,15 @@ export class WoDetailsController {
     @CurrentUser() user: ValidatedUser,
   ) {
     return this.woDetailsService.submitAllPages(id, user.sub);
+  }
+
+  @Post(':id/complete-upload')
+  @HttpCode(HttpStatus.OK)
+  async completeUpload(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: ValidatedUser,
+  ) {
+    return this.woDetailsService.completeUpload(id, user.sub);
   }
   // IMPORT OPERATIONS
   @Post(':id/import-tender-contacts')

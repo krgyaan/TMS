@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TenderViewPage } from "@/modules/tendering/tenders/TenderViewPage";
 import { BasicDetailsSection } from "@/modules/operations/wo-basic-details/components/BasicDetailsSection";
 import { WoDetailsSection } from "@/modules/operations/wo-details/components/WoDetailsSection";
+import { WoDetailsHistorySection } from "@/modules/operations/wo-details/components/WoDetailsHistorySection";
 import { KickOffSection } from "@/modules/operations/kick-off/components/KickOffSection";
 import { ContractAgreementSection } from "@/modules/operations/contract-agreement/components/ContractAgreementSection";
 import { PoDashboardSection } from "@/modules/operations/purchase-orders/components/PoDashboardSection";
@@ -80,6 +81,11 @@ export default function WoDetailShowPage() {
                     onBack={() => navigate(paths.operations.woDetailAcceptanceListPage)}
                     backLabel="Back to Acceptance List"
                     renderSectionContent={renderSectionContent}
+                    rightPanel={
+                        woDetailId ? (
+                            <WoDetailsHistorySection woDetailId={woDetailId} />
+                        ) : undefined
+                    }
                 />
             </TabsContent>
             <TabsContent value="tendering">

@@ -14,6 +14,13 @@ class InfoSheetsService extends BaseApiService {
         return this.get(`/${tenderId}/contacts`)
     }
 
+    async addTenderClient(
+        tenderId: number,
+        data: { clientName: string; clientDesignation?: string; clientMobile?: string; clientEmail?: string },
+    ): Promise<{ id: number; name: string; phone: string | null; email: string | null }> {
+        return this.post(`/${tenderId}/clients`, data)
+    }
+
     async create(tenderId: number, data: SaveTenderInfoSheetDto): Promise<TenderInfoSheetResponse> {
         return this.post<TenderInfoSheetResponse, SaveTenderInfoSheetDto>(`/${tenderId}`, data)
     }

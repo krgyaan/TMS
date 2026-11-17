@@ -9,6 +9,7 @@ import {
 import { useCurrentUser } from '@/hooks/api/useAuth';
 import type { AuthUser, DataScope, RoleName } from '@/types/auth.types';
 import { getStoredActiveTeamId, setStoredActiveTeamId } from '@/lib/auth';
+import { hasMasterWriteAccess } from '@/lib/master-write';
 
 // ==================== Types ====================
 
@@ -39,6 +40,7 @@ interface AuthContextValue {
     canDelete: (module: string) => boolean;
     canApprove: (module: string) => boolean;
     canClose: (module: string) => boolean;
+    canWriteMasterData: boolean;
 
     // Role checks
     hasRole: (roleName: string) => boolean;
@@ -102,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const isSuperUser = role === 'Super User';
         const isAdmin = role === 'Admin';
         const isTeamLeader = role === 'Team Leader';
+        const canWriteMasterData = hasMasterWriteAccess(user ?? null);
 
         // Permission checker
         const hasPermission = (module: string, action: string): boolean => {
@@ -137,6 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             canDelete: (module) => hasPermission(module, 'delete'),
             canApprove: (module) => hasPermission(module, 'approve'),
             canClose: (module) => hasPermission(module, 'close'),
+            canWriteMasterData,
 
             // Role checks
             hasRole: (roleName) => role === roleName,

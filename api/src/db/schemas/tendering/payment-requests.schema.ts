@@ -1,6 +1,7 @@
-import { pgTable, varchar, text, decimal, timestamp, date, pgEnum, serial, index, integer, jsonb, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, varchar, text, decimal, timestamp, date, pgEnum, serial, index, integer, jsonb, boolean, bigint } from 'drizzle-orm/pg-core';
 import { teams } from '@/db/schemas/master/teams.schema';
 import { users } from '@/db/schemas/auth/users.schema';
+import { projects } from '@/db/schemas/master/projects.schema';
 
 // Enums
 export const paymentPurposeEnum = pgEnum('payment_purpose', [
@@ -9,8 +10,12 @@ export const paymentPurposeEnum = pgEnum('payment_purpose', [
     'Processing Fee',    // Corresponds to MySQL emds.purpose = 'Processing Fee'
     'Security Deposit',  // Corresponds to MySQL emds.purpose = 'Security Deposit'
     'Performance BG',    // Corresponds to MySQL emds.purpose = 'Performance BG'
+    'Advance Payment',   // Project dashboard BG purpose
+    'Security Bond/Deposit', // Project dashboard BG purpose
     'Surety Bond',       // Corresponds to MySQL emds.purpose = 'Surety Bond'
     'Other Payment',     // Corresponds to MySQL emds.purpose = 'Other Payment'
+    'Financial',         // BG purpose (BI dashboard BG form)
+    'Counter Guarantee', // BG purpose (BI dashboard BG form)
     'DD',
     'FDR',
 ]);
@@ -41,6 +46,7 @@ export const paymentRequests = pgTable('payment_requests', {
 
     // Direct mappings from MySQL emds table
     tenderId: integer('tender_id').notNull().default(0), // emds.tender_id
+    projectId: bigint('project_id', { mode: 'number' }).references(() => projects.id, { onDelete: 'set null' }), // Links request to a project (Request BI from project dashboard)
     type: paymentRequestTypeEnum('type').default('TMS'), // emds.type
     team: integer('team').references(() => teams.id),
     tenderNo: varchar('tender_no', { length: 500 }).default('NA'), // emds.tender_no (equal to tender.tenderNo)
@@ -63,6 +69,7 @@ export const paymentRequests = pgTable('payment_requests', {
     return [
         { purposeIdx: index('payment_requests_purpose_idx').on(table.purpose) },
         { legacyEmdIdx: index('payment_requests_legacy_emd_id_idx').on(table.legacyEmdId) },
+        { projectIdx: index('payment_requests_project_id_idx').on(table.projectId) },
     ];
 });
 
@@ -73,6 +80,7 @@ export const paymentRequests = pgTable('payment_requests', {
 export const paymentInstruments = pgTable('payment_instruments', {
     id: serial('id').primaryKey(),
     requestId: integer('request_id').notNull(), // Links to payment_requests.id
+    makerRequestId: bigint('maker_request_id', { mode: 'number' }), // Links to operations project_payment_requests.id (auto-created maker request)
 
     instrumentType: instrumentTypeEnum('instrument_type').notNull(),
     purpose: varchar('purpose', { length: 255 }),
@@ -140,6 +148,7 @@ export const paymentInstruments = pgTable('payment_instruments', {
         { typeIdx: index('instruments_type_idx').on(table.instrumentType) },
         { statusIdx: index('instruments_status_idx').on(table.status) },
         { utrIdx: index('instruments_utr_idx').on(table.utr) },
+        { makerRequestIdx: index('instruments_maker_request_id_idx').on(table.makerRequestId) },
         { legacyDdIdx: index('instruments_legacy_dd_id_idx').on(table.legacyDdId) },
         { legacyFdrIdx: index('instruments_legacy_fdr_id_idx').on(table.legacyFdrId) },
         { legacyBgIdx: index('instruments_legacy_bg_id_idx').on(table.legacyBgId) },
@@ -234,12 +243,21 @@ export const instrumentBgDetails = pgTable('instrument_bg_details', {
     extensionLetterPath: varchar('extension_letter_path', { length: 500 }), // emd_bgs.request_extension_pdf
     cancellationLetterPath: varchar('cancellation_letter_path', { length: 500 }), // emd_bgs.request_cancellation_pdf
     prefilledSignedBg: text('prefilled_signed_bg'), // emd_bgs.prefilled_signed_bg
+    // DOCX letters generated automatically when the BG create-request mail is sent
+    coverLetterDocx: varchar('cover_letter_docx', { length: 500 }), // bi-dashboard/bank-guarantee/bgcovletter/...
+    prefilledAppDocx: varchar('prefilled_app_docx', { length: 500 }), // bi-dashboard/bank-guarantee/bgprefill/...
+    authorizationLetterDocx: varchar('authorization_letter_docx', { length: 500 }), // bi-dashboard/bank-guarantee/bgauthletter/...
+    envelopeSlip: varchar('envelope_slip', { length: 500 }), // reserved: envelope slip upload
+    bgUpload: varchar('bg_upload', { length: 500 }), // Accounts Form (BG) 2 - issued BG document
+    bgSignedCoveringLetter: varchar('bg_signed_covering_letter', { length: 500 }), // Accounts Form (BG) 2 - signed covering letter
 
     // BG Basic Info
     bgNeeds: varchar('bg_needs', { length: 255 }), // emd_bgs.bg_needs
     bgPurpose: varchar('bg_purpose', { length: 255 }), // emd_bgs.bg_purpose
     bgSoftCopy: varchar('bg_soft_copy', { length: 255 }), // emd_bgs.bg_soft_copy
     bgPo: varchar('bg_po', { length: 255 }), // emd_bgs.bg_po
+    uniqueCode: varchar('unique_code', { length: 255 }),
+    uniqueAdviceMessage: text('unique_advice_message'),
 
     // Client Info
     bgClientUser: varchar('bg_client_user', { length: 255 }), // emd_bgs.bg_client_user
@@ -277,6 +295,7 @@ export const instrumentBgDetails = pgTable('instrument_bg_details', {
     fdrPer: decimal('fdr_per', { precision: 15, scale: 2 }), // emd_bgs.fdr_per
     fdrCopy: varchar('fdr_copy', { length: 255 }), // emd_bgs.fdr_copy
     fdrNo: varchar('fdr_no', { length: 255 }), // emd_bgs.fdr_no
+    fdrDate: date('fdr_date'), // FDR creation date captured in Accounts Form (BG) 1
     fdrValidity: date('fdr_validity'), // emd_bgs.fdr_validity
     fdrRoi: decimal('fdr_roi', { precision: 15, scale: 2 }), // emd_bgs.fdr_roi
 

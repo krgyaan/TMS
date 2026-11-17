@@ -11,6 +11,7 @@ import { RaSection } from "@/modules/tendering/ras/components/RaShow";
 import { TqTenderSection } from "@/modules/tendering/tq-management/components/TqView";
 import { TenderResultSection } from "@/modules/tendering/results/components/TenderResultView";
 import { TenderStepsPageLayout } from "@/modules/tendering/components/TenderStepsPageLayout";
+import { BasicDetailsSection } from "@/modules/operations/wo-basic-details/components/BasicDetailsSection";
 
 interface TenderViewPageProps {
     tenderId: number;
@@ -19,7 +20,7 @@ interface TenderViewPageProps {
 }
 
 export function TenderViewPage({ tenderId, onBack, backLabel }: TenderViewPageProps) {
-    const { steps } = useTenderStepStatuses(tenderId);
+    const { steps, basicDetails } = useTenderStepStatuses(tenderId);
 
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["tender-details"]));
 
@@ -46,9 +47,26 @@ export function TenderViewPage({ tenderId, onBack, backLabel }: TenderViewPagePr
             case "tq-management":  return <TqTenderSection tenderId={tenderId} />;
             case "ra-management":  return <RaSection tenderId={tenderId!} />;
             case "result":         return <TenderResultSection tenderId={tenderId} />;
+            case "basic-details":
+                if (!basicDetails?.length) return null;
+                return (
+                    <div className="space-y-6">
+                        {basicDetails.map((wo, idx) => (
+                            <div key={wo.id} className="space-y-3">
+                                {basicDetails.length > 1 && (
+                                    <h4 className="text-sm font-semibold text-muted-foreground">
+                                        Order {idx + 1}
+                                        {wo.orderType === "multiple" && wo.orderSequence ? ` · #${wo.orderSequence}` : ""}
+                                    </h4>
+                                )}
+                                <BasicDetailsSection woBasicDetailId={wo.id} />
+                            </div>
+                        ))}
+                    </div>
+                );
             default:               return null;
         }
-    }, [tenderId]);
+    }, [tenderId, basicDetails]);
 
     return (
         <TenderStepsPageLayout tenderId={tenderId}

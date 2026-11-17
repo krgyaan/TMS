@@ -13,6 +13,7 @@ import { AlertCircle, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LocationModal } from "./components/LocationModal";
 import { LocationViewModal } from "./components/LocationViewModal";
+import { useAuth } from "@/contexts/AuthContext";
 
 const rowSelection: RowSelectionOptions = {
     mode: "multiRow",
@@ -21,6 +22,7 @@ const rowSelection: RowSelectionOptions = {
 
 const LocationPage = () => {
     const { data: locations, isLoading, error, refetch } = useLocations();
+    const { canWriteMasterData } = useAuth();
     const deleteLocation = useDeleteLocation();
     const [drawerState, setDrawerState] = useState<{ open: boolean; location: Location | null }>({
         open: false,
@@ -31,7 +33,7 @@ const LocationPage = () => {
         location: null,
     });
 
-    const locationActions: ActionItem<Location>[] = [
+    const locationActions = ([
         {
             label: "View",
             onClick: row => setViewState({ open: true, location: row }),
@@ -54,7 +56,7 @@ const LocationPage = () => {
                 }
             },
         },
-    ];
+    ] as ActionItem<Location>[]).filter(action => canWriteMasterData || action.label === "View");
 
     const colDefs: ColDef<Location>[] = [
         { field: "acronym", headerName: "Code", width: 90 },
@@ -119,12 +121,14 @@ const LocationPage = () => {
                 <CardHeader>
                     <CardTitle>Locations</CardTitle>
                     <CardDescription>List of all Location</CardDescription>
-                    <CardAction>
-                        <Button variant="default" onClick={() => setDrawerState({ open: true, location: null })}>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add New Location
-                        </Button>
-                    </CardAction>
+                    {canWriteMasterData && (
+                        <CardAction>
+                            <Button variant="default" onClick={() => setDrawerState({ open: true, location: null })}>
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add New Location
+                            </Button>
+                        </CardAction>
+                    )}
                 </CardHeader>
                 <CardContent className="px-3">
                     <DataTable

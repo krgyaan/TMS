@@ -653,6 +653,69 @@ export class PaymentRequestsQueryService {
     // Find Methods
     // ============================================================================
 
+    /**
+     * List BI (payment) requests raised from a project dashboard.
+     * Requests are linked via payment_requests.project_id.
+     */
+    async getByProject(projectId: number) {
+        const requests = await this.db
+            .select({
+                id: paymentRequests.id,
+                tenderId: paymentRequests.tenderId,
+                projectId: paymentRequests.projectId,
+                type: paymentRequests.type,
+                tenderNo: paymentRequests.tenderNo,
+                projectName: paymentRequests.projectName,
+                dueDate: paymentRequests.dueDate,
+                requestedBy: paymentRequests.requestedBy,
+                requestedByName: users.name,
+                purpose: paymentRequests.purpose,
+                amountRequired: paymentRequests.amountRequired,
+                status: paymentRequests.status,
+                remarks: paymentRequests.remarks,
+                createdAt: paymentRequests.createdAt,
+                updatedAt: paymentRequests.updatedAt,
+            })
+            .from(paymentRequests)
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .where(eq(paymentRequests.projectId, projectId))
+            .orderBy(desc(paymentRequests.createdAt));
+
+        if (requests.length === 0) return { requests: [] };
+
+        const prInstruments = await this.db
+            .select({
+                id: paymentInstruments.id,
+                requestId: paymentInstruments.requestId,
+                instrumentType: paymentInstruments.instrumentType,
+                purpose: paymentInstruments.purpose,
+                amount: paymentInstruments.amount,
+                favouring: paymentInstruments.favouring,
+                payableAt: paymentInstruments.payableAt,
+                courierAddress: paymentInstruments.courierAddress,
+                courierAddressJson: paymentInstruments.courierAddressJson,
+                courierDeadline: paymentInstruments.courierDeadline,
+                status: paymentInstruments.status,
+                isActive: paymentInstruments.isActive,
+                reqNo: paymentInstruments.reqNo,
+            })
+            .from(paymentInstruments)
+            .where(and(
+                inArray(paymentInstruments.requestId, requests.map(r => r.id)),
+                eq(paymentInstruments.isActive, true)
+            ));
+
+        return {
+            requests: requests.map((req: any) => ({
+                ...this.mapPaymentRequest(req),
+                projectId: req.projectId,
+                instruments: prInstruments
+                    .filter(i => i.requestId === req.id)
+                    .map(i => this.mapInstrumentBase(i)),
+            })),
+        };
+    }
+
     async findByTenderId(tenderId: number) {
         const requests = await this.db
             .select({
@@ -925,6 +988,7 @@ export class PaymentRequestsQueryService {
             .select({
                 id: paymentRequests.id,
                 tenderId: paymentRequests.tenderId,
+                projectId: paymentRequests.projectId,
                 type: paymentRequests.type,
                 tenderNo: paymentRequests.tenderNo,
                 projectName: paymentRequests.projectName,
@@ -1002,6 +1066,8 @@ export class PaymentRequestsQueryService {
                     bgPurpose: instrumentBgDetails.bgPurpose,
                     bgSoftCopy: instrumentBgDetails.bgSoftCopy,
                     bgPo: instrumentBgDetails.bgPo,
+                    uniqueCode: instrumentBgDetails.uniqueCode,
+                    uniqueAdviceMessage: instrumentBgDetails.uniqueAdviceMessage,
                     bgBankAcc: instrumentBgDetails.bgBankAcc,
                     bgBankIfsc: instrumentBgDetails.bgBankIfsc,
                     bgBankAccName: instrumentBgDetails.bgBankAccName,
@@ -1139,6 +1205,8 @@ export class PaymentRequestsQueryService {
                     bgPurpose: instrumentBgDetails.bgPurpose,
                     bgSoftCopy: instrumentBgDetails.bgSoftCopy,
                     bgPo: instrumentBgDetails.bgPo,
+                    uniqueCode: instrumentBgDetails.uniqueCode,
+                    uniqueAdviceMessage: instrumentBgDetails.uniqueAdviceMessage,
                     courierNo: instrumentBgDetails.courierNo,
                     stampCharges: instrumentBgDetails.stampCharges,
                     extensionLetter: instrumentBgDetails.extensionLetter,
@@ -1340,6 +1408,7 @@ export class PaymentRequestsQueryService {
         return {
             id: request.id,
             tenderId: request.tenderId,
+            projectId: request.projectId,
             type: request.type,
             tenderNo: request.tenderNo?.toString() || '',
             projectName: request.projectName,
@@ -1366,6 +1435,7 @@ export class PaymentRequestsQueryService {
             payableAt: instrument.payableAt,
             expiryDate: instrument.expiryDate,
             courierAddress: instrument.courierAddress,
+            courierAddressJson: instrument.courierAddressJson,
             courierDeadline: instrument.courierDeadline != null ? Number(instrument.courierDeadline) : null,
             status: instrument.status,
             isActive: instrument.isActive,
@@ -1424,6 +1494,8 @@ export class PaymentRequestsQueryService {
                         bgPurpose: details.bgPurpose,
                         bgSoftCopy: details.bgSoftCopy,
                         bgPo: details.bgPo,
+                        uniqueCode: details.uniqueCode,
+                        uniqueAdviceMessage: details.uniqueAdviceMessage,
                         bgBankAcc: details.bgBankAcc,
                         bgBankIfsc: details.bgBankIfsc,
                         bgBankAccName: details.bgBankAccName,
@@ -1494,6 +1566,7 @@ export class PaymentRequestsQueryService {
         const response: any = {
             id: request.id,
             tenderId: request.tenderId,
+            projectId: request.projectId,
             tenderNo: request.tenderNo,
             tenderName: request.projectName,
             tenderDueDate: request.dueDate,
@@ -1555,22 +1628,32 @@ export class PaymentRequestsQueryService {
             fdrFavouring: instrument?.favouring || '',
             fdrAmount: amount,
             fdrExpiryDate: details?.fdrExpiryDate || instrument?.expiryDate || null,
-            fdrDeliverBy: details?.fdrNeeds || '',
             fdrPurpose: details?.fdrPurpose || '',
-            fdrCourierAddress: instrument?.courierAddress || '',
+            // BG-style Courier Dispatch
+            fdrCourierOrg: addrJson?.org || '',
             fdrCourierName: addrJson?.name || '',
             fdrCourierPhone: addrJson?.phone || '',
-            fdrCourierAddressLine1: addrJson?.line1 || '',
-            fdrCourierAddressLine2: addrJson?.line2 || '',
+            fdrCourierAddrLine1: addrJson?.line1 || '',
+            fdrCourierAddrLine2: addrJson?.line2 || '',
             fdrCourierCity: addrJson?.city || '',
             fdrCourierState: addrJson?.state || '',
             fdrCourierPincode: addrJson?.pincode || '',
+            fdrCourierEmpFrom: addrJson?.empFrom ?? null,
+            fdrCourierDelDate: addrJson?.delDate || '',
+            fdrCourierUrgency: addrJson?.urgency ?? null,
+            fdrCourierDocs: addrJson?.docs ?? [],
+            // Legacy fields (read-only passthrough for old records)
+            fdrDeliverBy: details?.fdrNeeds || '',
+            fdrCourierAddress: instrument?.courierAddress || '',
+            fdrCourierAddressLine1: addrJson?.line1 || '',
+            fdrCourierAddressLine2: addrJson?.line2 || '',
             fdrCourierHours: instrument?.courierDeadline || null,
             fdrDate: details?.fdrDate || instrument?.issueDate || null,
         };
     }
 
     private mapBgDetails(details: any, amount: string, instrument?: any) {
+        const addrJson = instrument?.courierAddressJson as Record<string, any> | null;
         return {
             bgNeededIn: details?.bgNeeds || '',
             bgAmount: amount,
@@ -1582,6 +1665,8 @@ export class PaymentRequestsQueryService {
             bgStampValue: details?.stampCharges ? Number(details.stampCharges) : null,
             bgFormatFiles: details?.bgSoftCopy ? [details.bgSoftCopy] : [],
             bgPoFiles: details?.bgPo ? [details.bgPo] : [],
+            uniqueCode: details?.uniqueCode || '',
+            uniqueAdviceMessage: details?.uniqueAdviceMessage || '',
             bgClientUserEmail: details?.bgClientUser || '',
             bgClientCpEmail: details?.bgClientCp || '',
             bgClientFinanceEmail: details?.bgClientFin || '',
@@ -1590,6 +1675,18 @@ export class PaymentRequestsQueryService {
             bgBankIfsc: details?.bgBankIfsc || '',
             bgCourierAddress: instrument?.courierAddress || '',
             bgCourierDays: instrument?.courierDeadline || null,
+            bgCourierOrg: addrJson?.org || '',
+            bgCourierName: addrJson?.name || '',
+            bgCourierPhone: addrJson?.phone || '',
+            bgCourierAddrLine1: addrJson?.line1 || instrument?.courierAddress || '',
+            bgCourierAddrLine2: addrJson?.line2 || '',
+            bgCourierCity: addrJson?.city || '',
+            bgCourierState: addrJson?.state || '',
+            bgCourierPincode: addrJson?.pincode || '',
+            bgCourierEmpFrom: addrJson?.empFrom ?? null,
+            bgCourierDelDate: addrJson?.delDate || null,
+            bgCourierUrgency: addrJson?.urgency ?? null,
+            bgCourierDocs: addrJson?.docs ?? [],
             bgBank: details?.bankName || instrument?.bankName || '',
         };
     }

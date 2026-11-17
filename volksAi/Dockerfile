@@ -6,7 +6,8 @@ ENV PYTHONUNBUFFERED=1 \
     DEBIAN_FRONTEND=noninteractive \
     OMP_NUM_THREADS=1 \
     FLAGS_allocator_strategy=naive_best_fit \
-    PADDLE_OCR_ENABLED=true
+    PADDLE_OCR_ENABLED=true \
+    PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
 
 # Install tesseract-ocr, tesseract-ocr-hin, and libgomp1 via apt-get
 # (tesseract is the fallback engine; libgomp1 is required for Paddle OpenMP CPU inference;
@@ -25,9 +26,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --default-timeout=1000 --retries 10 --no-cache-dir -r requirements.txt
 
-# Pre-bake PaddleOCR's detection/recognition/angle-classifier models into the image
+# Pre-bake PaddleOCR's detection/recognition/textline-orientation models into the image
 # so there is no live download attempt on first request in production
-RUN python -c "from paddleocr import PaddleOCR; PaddleOCR(use_angle_cls=True, lang='en')"
+RUN python -c "from paddleocr import PaddleOCR; PaddleOCR(use_textline_orientation=True, lang='en')"
 
 # Copy application source code into the image
 COPY app/ ./app

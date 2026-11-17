@@ -23,6 +23,7 @@ import { BadRequestException, ConflictException, Inject, Injectable, InternalSer
 import { ConfigService } from '@nestjs/config';
 import { eq, inArray, or } from 'drizzle-orm';
 import { countExtractionFieldKeys, extractionFieldsUpsertValue } from './extraction-fields-merge';
+import { buildFileServeUrl, resolveTenderDocumentPaths } from '@/utils/tender-documents.util';
 
 export type TechnicalDocument = {
     id: number;
@@ -226,6 +227,26 @@ export class TenderInfoSheetsService {
                 phone: c.clientMobile || null,
                 email: c.clientEmail || null,
             })),
+        };
+    }
+
+    async addClient(tenderId: number, payload: { clientName: string; clientDesignation?: string | null; clientMobile?: string | null; clientEmail?: string | null }) {
+        const [client] = await this.db
+            .insert(tenderClients)
+            .values({
+                tenderId,
+                clientName: payload.clientName,
+                clientDesignation: payload.clientDesignation ?? null,
+                clientMobile: payload.clientMobile ?? null,
+                clientEmail: payload.clientEmail ?? null,
+            })
+            .returning();
+
+        return {
+            id: client.id,
+            name: client.clientName || "",
+            phone: client.clientMobile || null,
+            email: client.clientEmail || null,
         };
     }
 
@@ -1061,12 +1082,14 @@ export class TenderInfoSheetsService {
                     })
                     .where(eq(tenderInformation.tenderId, tenderId));
 
-                // Update gstValues only when recommending and approved
-                if (!isRejection && isApproved && payload.tenderValue) {
+                // Sync financial values to the tender when the info sheet is edited after approval/rejection
+                if (!isRejection && isApproved) {
                     await tx
                         .update(tenderInfos)
                         .set({
-                            gstValues: payload.tenderValue.toString(),
+                            gstValues: payload.tenderValue != null ? payload.tenderValue.toString() : '0',
+                            tenderFees: payload.tenderFeeAmount != null ? payload.tenderFeeAmount.toString() : '0',
+                            emd: payload.emdAmount != null ? payload.emdAmount.toString() : '0',
                             updatedAt: new Date(),
                         })
                         .where(eq(tenderInfos.id, tenderId));
@@ -1142,13 +1165,16 @@ export class TenderInfoSheetsService {
             )) as TenderInfoSheetWithRelations;
 
             const prevStatus = tender?.status ?? null;
+            // A re-fill should be treated as completing an incomplete sheet if the
+            // tender status is 29 or the TL still has it flagged incomplete (3).
+            const wasIncomplete = prevStatus === 29 || tender?.tlStatus === 3;
             let newStatus = prevStatus ?? 2;
 
-            if (prevStatus === 29) {
+            if (wasIncomplete) {
                 newStatus = 2;
                 await this.db
                     .update(tenderInfos)
-                    .set({ status: newStatus, updatedAt: new Date() })
+                    .set({ status: newStatus, tlStatus: 0, updatedAt: new Date() })
                     .where(eq(tenderInfos.id, tenderId));
             }
 
@@ -1159,7 +1185,7 @@ export class TenderInfoSheetsService {
                 newStatus,
                 changedBy,
                 prevStatus,
-                prevStatus === 29
+                wasIncomplete
                     ? isRejection
                         ? 'Tender info sheet re-filled (not recommended)'
                         : 'Tender info sheet re-filled (was incomplete)'
@@ -1168,11 +1194,20 @@ export class TenderInfoSheetsService {
                         : 'Tender info sheet updated',
             );
 
-            // Timer transition: when re-filling after TL marked the sheet incomplete,
-            // stop the resumed info-sheet timer and resume the TL approval timer with
-            // its remaining time.
-            if (prevStatus === 29) {
-                try {
+            // Timer transition: stop any active info-sheet timer whenever the sheet is
+            // saved (idempotent), and when completing an incomplete sheet, resume the
+            // TL approval timer with its remaining time.
+            try {
+                const activeInfoSheetTimer = await this.timersService.getTimer(
+                    'TENDER',
+                    tenderId,
+                    'tender_info_sheet'
+                );
+
+                if (
+                    activeInfoSheetTimer &&
+                    ['running', 'paused'].includes(activeInfoSheetTimer.status)
+                ) {
                     try {
                         await this.timersService.stopTimer({
                             entityType: 'TENDER',
@@ -1191,6 +1226,9 @@ export class TenderInfoSheetsService {
                             );
                         }
                     }
+                }
+
+                if (wasIncomplete) {
                     try {
                         const prevApprovalTimer = await this.timersService.getTimer(
                             'TENDER',
@@ -1218,12 +1256,12 @@ export class TenderInfoSheetsService {
                             );
                         }
                     }
-                } catch (error) {
-                    this.logger.error(
-                        `Failed to transition timers for tender ${tenderId}:`,
-                        error
-                    );
                 }
+            } catch (error) {
+                this.logger.error(
+                    `Failed to transition timers for tender ${tenderId}:`,
+                    error
+                );
             }
 
             try {
@@ -1365,17 +1403,7 @@ export class TenderInfoSheetsService {
 
         // ── Tender documents 
 
-        let tenderDocsList: string[] = [];
-        if (tender.documents) {
-            try {
-                const parsed = JSON.parse(tender.documents);
-                tenderDocsList = Array.isArray(parsed)
-                    ? parsed.filter(Boolean).map(String)
-                    : [];
-            } catch {
-                tenderDocsList = [];
-            }
-        }
+        const tenderDocsList = resolveTenderDocumentPaths(tender.documents);
 
         // ── Resolve rejection reason 
 
@@ -1563,7 +1591,7 @@ export class TenderInfoSheetsService {
             ),
             tender_docs: tenderDocsList,
             tender_docs_urls: tenderDocsList.map(
-                (file) => `${this.configService.get<string>('app.apiUrl') || ''}/files/serve/${file}`
+                (file) => buildFileServeUrl(this.configService.get<string>('app.apiUrl') || '', file)
             ),
 
             // ── Rejection Proofs ─

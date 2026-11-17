@@ -4,7 +4,7 @@ import { followUps } from '@/db/schemas/shared/follow-ups.schema';
 import { AppLogger } from '@/logger/app-logger.service';
 import type { BankTransferDashboardCounts, BankTransferDashboardRow } from '@/modules/bi-dashboard/bank-transfer/helpers/bankTransfer.types';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
-import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
+import type { CreateFollowUpDto } from '@/modules/follow-up/dto';
 import { BT_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import { PaymentRequestsNotificationService } from '@/modules/tendering/payment-requests/services/payment-requests-notification.service';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';

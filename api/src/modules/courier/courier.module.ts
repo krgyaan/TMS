@@ -6,9 +6,10 @@ import { MailerModule } from "@/mailer/mailer.module";
 import { GoogleService } from "@/modules/integrations/google/google.service";
 import { CoreModule } from "@/core/core.module";
 import { GoogleIntegrationModule } from "@/modules/integrations/google/google.module";
+import { IntegrationsModule } from "@/modules/integrations/integrations.module";
 
 @Module({
-    imports: [MailerModule, CoreModule, GoogleIntegrationModule],
+    imports: [MailerModule, CoreModule, GoogleIntegrationModule, IntegrationsModule],
     controllers: [CourierController],
     providers: [CourierService, MailerService, GoogleService],
     exports: [CourierService],

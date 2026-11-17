@@ -39,6 +39,13 @@ export const woBasicDetails = pgTable("wo_basic_details", {
     budgetBuybackSale: numeric("budget_buyback_sale", { precision: 20, scale: 2 }),
     budgetGemCharges: numeric("budget_gem_charges", { precision: 20, scale: 2 }),
 
+    // GeM charges payment request breakdown (auto-created maker request uses net payable)
+    gemChargesPreGstAmount: numeric("gem_charges_pre_gst_amount", { precision: 20, scale: 2 }),
+    gemChargesGstAmount: numeric("gem_charges_gst_amount", { precision: 20, scale: 2 }),
+    gemChargesTotalPayable: numeric("gem_charges_total_payable", { precision: 20, scale: 2 }),
+    gemChargesTdsAmount: numeric("gem_charges_tds_amount", { precision: 20, scale: 2 }),
+    gemChargesNetPayable: numeric("gem_charges_net_payable", { precision: 20, scale: 2 }),
+
     // Document upload
     woDraft: varchar("wo_draft", { length: 255 }),
     tmsDocuments: jsonb("tms_documents"),
@@ -189,6 +196,35 @@ export const woDetails = pgTable("wo_details", {
 }, (table) => [
     uniqueIndex("uq_wo_details_basic_detail").on(table.woBasicDetailId),
     index("idx_wo_details_status").on(table.status),
+]);
+
+// WO Details History - Page-level action log for the 7-step WO Details wizard
+export const woDetailsHistory = pgTable("wo_details_history", {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    woDetailId: bigint("wo_detail_id", { mode: "number" }).notNull()
+        .references(() => woDetails.id, { onDelete: "cascade" }),
+
+    // Page number (1-7); null for overall actions like final submission
+    pageNo: integer("page_no"),
+
+    // Action: 'created' | 'draft_saved' | 'page_saved' | 'page_submitted' |
+    // 'page_skipped' | 'all_pages_submitted' | 'submitted_for_review'
+    action: varchar("action", { length: 50 }).notNull(),
+    statusAfter: varchar("status_after", { length: 50 }),
+    remarks: text("remarks"),
+
+    // Snapshot of wizard progress at the time of the action
+    metadata: jsonb("metadata").$type<{
+        currentPage?: number | null;
+        completedPages?: number[];
+        skippedPages?: number[];
+    }>(),
+
+    actorId: bigint("actor_id", { mode: "number" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+    index("idx_wo_details_history_detail").on(table.woDetailId, table.createdAt),
+    index("idx_wo_details_history_page").on(table.woDetailId, table.pageNo),
 ]);
 
 // WO Acceptance - TL review and acceptance workflow

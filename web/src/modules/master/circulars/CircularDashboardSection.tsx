@@ -13,6 +13,7 @@ import DataTable from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { CircularModal } from "./components/CircularModal";
 import { CircularViewModal } from "./components/CircularViewModal";
+import { useAuth } from "@/contexts/AuthContext";
 
 const rowSelection: RowSelectionOptions = {
     mode: "multiRow",
@@ -42,6 +43,7 @@ const formatDate = (dateStr?: string | Date | null) => {
 
 const CircularDashboardSection = () => {
     const { data: circulars, isLoading, error, refetch } = useCirculars();
+    const { canWriteMasterData } = useAuth();
     const deleteCircular = useDeleteCircular();
 
     const [drawerState, setDrawerState] = useState<{ open: boolean; circular: Circular | null }>({
@@ -53,7 +55,7 @@ const CircularDashboardSection = () => {
         circular: null,
     });
 
-    const circularActions: ActionItem<Circular>[] = [
+    const circularActions = ([
         {
             label: "View",
             onClick: row => setViewState({ open: true, circular: row }),
@@ -76,7 +78,7 @@ const CircularDashboardSection = () => {
                 }
             },
         },
-    ];
+    ] as ActionItem<Circular>[]).filter(action => canWriteMasterData || action.label === "View");
 
     const colDefs: ColDef<Circular>[] = [
         { field: "title", headerName: "Title", flex: 1.2, minWidth: 200 },
@@ -176,12 +178,14 @@ const CircularDashboardSection = () => {
                 <CardHeader>
                     <CardTitle>Circulars</CardTitle>
                     <CardDescription>List of all Circulars</CardDescription>
-                    <CardAction>
-                        <Button variant="default" onClick={() => setDrawerState({ open: true, circular: null })}>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add New Circular
-                        </Button>
-                    </CardAction>
+                    {canWriteMasterData && (
+                        <CardAction>
+                            <Button variant="default" onClick={() => setDrawerState({ open: true, circular: null })}>
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add New Circular
+                            </Button>
+                        </CardAction>
+                    )}
                 </CardHeader>
                 <CardContent className="px-3">
                     <DataTable

@@ -14,6 +14,7 @@ export const ScheduleRaSchema = z.object({
     technicallyQualified: z.enum(['Yes', 'No'], {
         required_error: 'Technical qualification status is required',
     }),
+    raOutcome: z.enum(['RA Scheduled', 'H1 Elimination']).optional(),
     disqualificationReason: optionalString,
     qualifiedPartiesCount: optionalTextField(50),
     qualifiedPartiesNames: z.array(z.string()).optional(),
@@ -27,7 +28,7 @@ export type ScheduleRaDto = z.infer<typeof ScheduleRaSchema>;
  * Upload RA Result Schema - Based on reverseAuctions table (result fields)
  */
 export const UploadRaResultSchema = z.object({
-    raResult: z.enum(['Won', 'Lost', 'H1 Elimination'], {
+    raResult: z.enum(['Won', 'Lost'], {
         required_error: 'RA result is required',
     }),
     veL1AtStart: z.enum(['Yes', 'No'], {

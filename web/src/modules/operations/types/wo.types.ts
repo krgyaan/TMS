@@ -17,6 +17,8 @@ export type WorkflowStage =
   | 'basic_details'
   | 'wo_details'
   | 'wo_acceptance'
+  | 'kick_off'
+  | 'contract_agreement'
   | 'wo_upload'
   | 'completed';
 
@@ -109,6 +111,10 @@ export interface WoBasicDetail {
   budgetGemCharges: string | null;
   requestGemCharges?: boolean;
   gemChargesAmount?: number | null;
+  gemChargesGstAmount?: number | null;
+  gemChargesTotalPayable?: number | null;
+  gemChargesTdsAmount?: number | null;
+  gemChargesNetPayable?: number | null;
   gemChargesPortalLink?: string | null;
   gemChargesInvoice?: string | null;
   woDraft: string | null;
@@ -141,6 +147,33 @@ export interface WoBasicDetail {
 export interface WoBasicDetailWithRelations extends WoBasicDetail {
   contacts: WoContact[];
   woDetail: WoDetail | null;
+}
+
+export type WoDetailsHistoryAction =
+  | 'created'
+  | 'draft_saved'
+  | 'page_saved'
+  | 'page_submitted'
+  | 'page_skipped'
+  | 'all_pages_submitted'
+  | 'submitted_for_review'
+  | 'completion_reverted';
+
+export interface WoDetailsHistoryEntry {
+  id: number;
+  woDetailId: number;
+  pageNo: number | null;
+  action: WoDetailsHistoryAction | string;
+  statusAfter: string | null;
+  remarks: string | null;
+  metadata: {
+    currentPage?: number | null;
+    completedPages?: number[];
+    skippedPages?: number[];
+  } | null;
+  actorId: number | null;
+  actorName: string | null;
+  createdAt: string;
 }
 
 export interface CreateWoBasicDetailDto {
@@ -441,6 +474,7 @@ export interface WoDetailsListResponseDto {
   status: WoDetailsStatus;
   woAcceptanceId: number | null;
   woAcceptanceStatus: WoAcceptanceStatus | null;
+  woAcceptanceDecision: string | null;
 }
 
 export interface CreateWoDetailDto {

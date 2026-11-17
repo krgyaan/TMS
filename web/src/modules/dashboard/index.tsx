@@ -42,7 +42,11 @@ const Dashboard = () => {
                 <div className="col-span-1 md:col-span-2">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
                         {quickActions
-                            .filter(action => action.title !== "New Tender" || isTenderingTeam)
+                            .filter(
+                                action =>
+                                    (action.title !== "New Tender" || isTenderingTeam) &&
+                                    (action.title !== "New Work Order" || isAdmin || isSuperUser),
+                            )
                             .map((action) => (
                             <QuickActionCard
                                 key={action.title}

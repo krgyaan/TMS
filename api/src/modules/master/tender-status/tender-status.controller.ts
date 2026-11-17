@@ -1,13 +1,6 @@
-import {
-    Body,
-    Controller,
-    Get,
-    Param,
-    ParseIntPipe,
-    Patch,
-    Post,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
+import { MasterWriteGuard } from '@/modules/master/common/master-write.guard';
 import { TenderStatusService } from '@/modules/master/tender-status/tender-status.service';
 
 const CreateTenderStatusSchema = z.object({
@@ -23,6 +16,7 @@ const UpdateTenderStatusSchema = z.object({
 });
 
 @Controller('tender-status')
+@UseGuards(MasterWriteGuard)
 export class TenderStatusController {
     constructor(private readonly service: TenderStatusService) { }
 

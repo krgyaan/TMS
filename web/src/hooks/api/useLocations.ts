@@ -34,6 +34,22 @@ export const useLocation = (id: number) => {
     });
 };
 
+export const useStates = () => {
+    return useQuery({
+        queryKey: ["locations", "states"],
+        queryFn: () => locationsService.getStates(),
+        staleTime: 10 * 60 * 1000,
+    });
+};
+
+export const useRegions = (state?: string) => {
+    return useQuery({
+        queryKey: ["locations", "regions", state ?? "all"],
+        queryFn: () => locationsService.getRegions(state),
+        staleTime: 10 * 60 * 1000,
+    });
+};
+
 export const useCreateLocation = () => {
     const queryClient = useQueryClient();
 

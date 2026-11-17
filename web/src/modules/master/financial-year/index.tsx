@@ -13,6 +13,7 @@ import { AlertCircle, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { FinancialYearModal } from "./components/FinancialYearModal";
 import { FinancialYearViewModal } from "./components/FinancialYearViewModal";
+import { useAuth } from "@/contexts/AuthContext";
 
 const rowSelection: RowSelectionOptions = {
     mode: "multiRow",
@@ -21,11 +22,12 @@ const rowSelection: RowSelectionOptions = {
 
 const FinancialYearPage = () => {
     const { data: financialYears, isLoading, error, refetch } = useFinancialYears();
+    const { canWriteMasterData } = useAuth();
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [viewModalOpen, setViewModalOpen] = useState(false);
     const [selectedFinancialYear, setSelectedFinancialYear] = useState<FinancialYear | null>(null);
 
-    const financialYearActions: ActionItem<FinancialYear>[] = [
+    const financialYearActions = ([
         {
             label: "View",
             onClick: row => {
@@ -53,7 +55,7 @@ const FinancialYearPage = () => {
                 }
             },
         },
-    ];
+    ] as ActionItem<FinancialYear>[]).filter(action => canWriteMasterData || action.label === "View");
 
     const [colDefs] = useState<ColDef<FinancialYear>[]>([
         {
@@ -142,18 +144,20 @@ const FinancialYearPage = () => {
                 <CardHeader>
                     <CardTitle>Financial Years</CardTitle>
                     <CardDescription>Manage financial year periods</CardDescription>
-                    <CardAction>
-                        <Button
-                            variant="default"
-                            onClick={() => {
-                                setSelectedFinancialYear(null);
-                                setDrawerOpen(true);
-                            }}
-                        >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Financial Year
-                        </Button>
-                    </CardAction>
+                    {canWriteMasterData && (
+                        <CardAction>
+                            <Button
+                                variant="default"
+                                onClick={() => {
+                                    setSelectedFinancialYear(null);
+                                    setDrawerOpen(true);
+                                }}
+                            >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add Financial Year
+                            </Button>
+                        </CardAction>
+                    )}
                 </CardHeader>
                 <CardContent className="px-3">
                     <DataTable

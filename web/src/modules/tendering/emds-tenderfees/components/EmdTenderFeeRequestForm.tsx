@@ -275,6 +275,7 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
                                 allowedModes={allowedEmdModes}
                                 amount={emdAmount}
                                 type="TMS"
+                                tenderId={Number(tenderId) || 0}
                                 courierAddress={data?.courierAddress || undefined}
                                 courierData={data ? {
                                     courierName: data.courierName,
@@ -296,6 +297,7 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
                                 allowedModes={allowedTenderFeeModes}
                                 amount={tenderFeeAmount}
                                 type="TMS"
+                                tenderId={Number(tenderId) || 0}
                                 courierAddress={data?.courierAddress || undefined}
                                 courierData={data ? {
                                     courierName: data.courierName,
@@ -317,6 +319,7 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
                                 allowedModes={allowedProcessingFeeModes}
                                 amount={processingFeeAmount}
                                 type="TMS"
+                                tenderId={Number(tenderId) || 0}
                                 courierAddress={data?.courierAddress || undefined}
                                 courierData={data ? {
                                     courierName: data.courierName,

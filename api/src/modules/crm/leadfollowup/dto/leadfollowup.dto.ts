@@ -44,15 +44,16 @@ export const VisitFollowupSchema = z.object({
 
 export const LetterFollowupSchema = z.object({
     type: z.literal('letter'),
-    // Courier fields
-    toOrg: z.string().min(1, { message: 'Organization name is required' }),
-    toName: z.string().min(1, { message: 'Recipient name is required' }),
-    toAddr: z.string().min(1, { message: 'Address is required' }),
-    toPin: z.string().min(1, { message: 'Pin code is required' }),
-    toMobile: z.string().min(1, { message: 'Mobile number is required' }),
-    empFrom: z.number().int().positive({ message: 'Please select an employee' }),
-    delDate: z.string().min(1, { message: 'Expected delivery date is required' }),
-    urgency: z.number().int().min(1).max(5),
+    courierId: z.number().int().positive().optional(),
+    // Courier fields (used when creating a new courier request)
+    toOrg: z.string().optional(),
+    toName: z.string().optional(),
+    toAddr: z.string().optional(),
+    toPin: z.string().optional(),
+    toMobile: z.string().optional(),
+    empFrom: z.number().int().positive().optional(),
+    delDate: z.string().optional(),
+    urgency: z.number().int().min(1).max(5).optional(),
     attachments: z.array(z.string()).default([]),
     nextFollowupDate: z.string().optional().nullable(),
 });
@@ -68,13 +69,29 @@ export const WhatsappFollowupSchema = z.object({
 
 // ─── Union Schema (discriminated by type) ─────────────────────────────────────
 
-export const CreateFollowupSchema = z.discriminatedUnion('type', [
-    MailFollowupSchema,
-    CallFollowupSchema,
-    VisitFollowupSchema,
-    LetterFollowupSchema,
-    WhatsappFollowupSchema,
-]);
+export const CreateFollowupSchema = z
+    .discriminatedUnion('type', [
+        MailFollowupSchema,
+        CallFollowupSchema,
+        VisitFollowupSchema,
+        LetterFollowupSchema,
+        WhatsappFollowupSchema,
+    ])
+    .superRefine((data, ctx) => {
+        if (data.type !== 'letter' || data.courierId) return;
+
+        const addIssue = (path: string, message: string) =>
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: [path] });
+
+        if (!data.toOrg) addIssue('toOrg', 'Organization name is required');
+        if (!data.toName) addIssue('toName', 'Recipient name is required');
+        if (!data.toAddr) addIssue('toAddr', 'Address is required');
+        if (!data.toPin) addIssue('toPin', 'Pin code is required');
+        if (!data.toMobile) addIssue('toMobile', 'Mobile number is required');
+        if (!data.empFrom) addIssue('empFrom', 'Please select an employee');
+        if (!data.delDate) addIssue('delDate', 'Expected delivery date is required');
+        if (!data.urgency) addIssue('urgency', 'Please select urgency');
+    });
 
 export type ContactDto = z.infer<typeof ContactSchema>;
 export type MailFollowupDto = z.infer<typeof MailFollowupSchema>;

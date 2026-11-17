@@ -5,7 +5,6 @@ import { useForm, type Resolver } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { useEffect } from "react";
 import { z } from "zod";
-import { toast } from "sonner";
 import { Users, AlertCircle } from "lucide-react";
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -22,8 +21,8 @@ import DateInput from "@/components/form/DateInput";
 
 import { paths } from "@/app/routes/paths";
 import { useAmcBilling } from "@/hooks/api/useAmcBilling";
-import { useCreateFollowUp } from "@/modules/shared/follow-up/follow-up.hooks";
-import type { CreateFollowUpDto } from "@/modules/shared/follow-up/follow-up.types";
+import { useCreateFollowUp } from "@/hooks/api/useFollowUps";
+import type { CreateFollowUpDto } from "@/modules/shared/follow-up/helpers/followUp.types";
 
 const AREAS = [
     { id: 1, name: "PG Personal" },
@@ -128,20 +127,10 @@ const AmcBillingFollowUpPage = () => {
 
         try {
             await createFollowup.mutateAsync(payload);
-            toast.success("Follow-up initiated successfully");
             navigate(paths.services.amcBilling);
             form.reset();
-        } catch (error: unknown) {
-            const err = error as {
-                response?: { data?: { message?: string } };
-                message?: string;
-            };
-            const message =
-                err?.response?.data?.message ||
-                err?.message ||
-                "Failed to initiate follow-up";
-            toast.error(message);
-            console.error("Error initiating follow-up:", error);
+        } catch {
+            return;
         }
     };
 

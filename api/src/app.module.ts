@@ -24,6 +24,7 @@ import { CourierModule } from "@/modules/courier/courier.module";
 import { EmailModule } from "@/modules/email/email.module";
 import { EmployeeImprestModule } from "@/modules/employee-imprest/employee-imprest.module";
 import { InsurancePolicyModule } from "@/modules/insurance/insurance-policy.module";
+import { InventoryItemsModule } from "@/modules/accounts/inventory-items/inventory-items.module";
 import { FollowupSchedulerModule } from "@/modules/follow-up/follow-up-scheduler.module";
 import { LeadFollowupSchedulerModule } from "@/modules/crm/leadfollowup/lead-followup-scheduler.module";
 import { FollowUpModule } from "@/modules/follow-up/follow-up.module";
@@ -75,6 +76,7 @@ import { WebsitesModule } from "@/modules/master/websites/websites.module";
 import { WoBasicDetailsModule } from "@/modules/operations/wo-basic-details/wo-basic-details.module";
 import { SchedulerModule } from "@/modules/scheduler/scheduler.module";
 import { ClientDirectoryModule } from "@/modules/shared/client-directory/client-directory.module";
+import { OtherContactsModule } from "@/modules/shared/other-contacts/other-contacts.module";
 import { PublicNotificationsModule } from "@/modules/public-notifications/public-notifications.module";
 import { FinanceDocumentsModule } from "@/modules/shared/finance-documents/finance-documents.module";
 import { PqrModule } from "@/modules/shared/pqr/pqr.module";
@@ -99,17 +101,20 @@ import { TimersModule } from "@/modules/timers/timers.module";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { APP_FILTER, APP_GUARD } from "@nestjs/core";
+import { ScheduleModule } from "@nestjs/schedule";
 import { ServeStaticModule } from "@nestjs/serve-static";
 import { SentryGlobalFilter, SentryModule } from "@sentry/nestjs/setup";
 import { join } from "path";
 import { AllExceptionsFilter } from "./logger/all-exception.filter";
 import { AccountChecklistModule } from "./modules/accounts/account-checklist/account-checklist.module";
 import { LoanAdvanceModule } from "./modules/accounts/loan-advance/loan-advance.module";
+import { FixedExpensesModule } from "./modules/accounts/fixed-expenses/fixed-expenses.module";
 import { TdsGstChecklistsModule } from "./modules/accounts/tds-gst-checklists/tds-gst-checklists.module";
 import { EmployeeOnboardingModule } from "./modules/hrms/employee-onboarding/employee-onboarding.module";
 import { OnboardingModule } from "./modules/hrms/onboarding/onboarding.module";
 import { TrainingModule } from "./modules/hrms/training/training.module";
 import { CircularsModule } from "./modules/master/circulars/circulars.module";
+import { PaymentCategoriesModule } from "./modules/master/payment-categories/payment-categories.module";
 import { ProjectsMasterModule } from "./modules/master/projects-master/projects-master.module";
 import { ContractAgreementModule } from "./modules/operations/contract-agreement/contract-agreement.module";
 import { KickOffMeetingModule } from "./modules/operations/kick-off-meeting/kick-off-meeting.module";
@@ -168,6 +173,7 @@ import { QueueMonitoringModule } from "./modules/queue-monitoring/queue-monitori
                 ...validateCurrencyEnv(env),
             }),
         }),
+        ScheduleModule.forRoot(),
         LoggerModule,
         DatabaseModule,
         UsersModule,
@@ -207,6 +213,7 @@ import { QueueMonitoringModule } from "./modules/queue-monitoring/queue-monitori
         TendersModule,
         EmployeeImprestModule,
         InsurancePolicyModule,
+        InventoryItemsModule,
         TenderInfoSheetsModule,
         TenderApprovalModule,
         PhysicalDocsModule,
@@ -259,6 +266,8 @@ import { QueueMonitoringModule } from "./modules/queue-monitoring/queue-monitori
         RequestExtensionsModule,
         SubmitQueriesModule,
         LoanAdvanceModule,
+        FixedExpensesModule,
+        PaymentCategoriesModule,
         TdsGstChecklistsModule,
         CustomerPerformanceModule,
         LocationPerformanceModule,
@@ -279,6 +288,7 @@ import { QueueMonitoringModule } from "./modules/queue-monitoring/queue-monitori
         EmployeeOnboardingModule,
         ProfileModule,
         ClientDirectoryModule,
+        OtherContactsModule,
         TrainingModule,
         CircularsModule,
         AmcModule,
@@ -291,7 +301,7 @@ import { QueueMonitoringModule } from "./modules/queue-monitoring/queue-monitori
         OpenwaModule,
         NotificationsModule,
         PublicNotificationsModule,
-        QueueMonitoringModule
+        QueueMonitoringModule,
     ],
     controllers: [AppController, WebhookController],
     providers: [

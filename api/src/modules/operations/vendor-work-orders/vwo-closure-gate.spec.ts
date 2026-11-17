@@ -77,7 +77,7 @@ describeDb("VWO closure equality gate", () => {
         if (!VWO_LIFECYCLE_TEST_DATABASE_URL) return;
         pool = createPool(VWO_LIFECYCLE_TEST_DATABASE_URL, 5, false);
         db = createDb(pool);
-        service = new VendorWorkOrderService(db, { info: () => {}, warn: () => {} } as any, {} as any, {} as any, {} as any, {} as any, {} as any);
+        service = new VendorWorkOrderService(db, { info: () => {}, warn: () => {} } as any, {} as any, {} as any, {} as any, {} as any);
     });
 
     afterAll(async () => {

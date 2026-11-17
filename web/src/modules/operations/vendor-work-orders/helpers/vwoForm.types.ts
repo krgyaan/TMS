@@ -9,6 +9,10 @@ export interface VendorWorkOrderRow {
     projectName?: string;
     woNumber: string;
     category?: string;
+    sellerOrganizationId?: number;
+    sellerGstId?: number;
+    vendorPersonId?: number;
+    shipToPartyId?: number;
     sellerName: string;
     sellerEmail?: string;
     sellerAddress?: string;

@@ -31,6 +31,8 @@ export interface PaymentRequestRow {
     projectName?: string;
     poNumber?: string;
     vwoNumber?: string;
+    fixedExpenseId?: number | null;
+    fixedExpenseAmountType?: string | null;
     createdAt: string;
     piCategory?: string;
     piPartyName?: string;
@@ -56,6 +58,11 @@ export interface PaymentRequestRow {
     vwoTotalPaymentRequested?: number | string;
     vwoTotalMakerDone?: number | string;
     vwoTotalPaymentDone?: number | string;
+    gemChargesPreGstAmount?: number | string | null;
+    gemChargesGstAmount?: number | string | null;
+    gemChargesTotalPayable?: number | string | null;
+    gemChargesTdsAmount?: number | string | null;
+    gemChargesNetPayable?: number | string | null;
 }
 
 export interface CreatePaymentRequestDTO {

@@ -1,17 +1,6 @@
-﻿import {
-    Body,
-    Controller,
-    Get,
-    Param,
-    ParseIntPipe,
-    Patch,
-    Post,
-    Query,
-    HttpCode,
-    HttpStatus,
-    NotFoundException,
-} from '@nestjs/common';
+﻿import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus, NotFoundException, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
+import { MasterWriteGuard } from '@/modules/master/common/master-write.guard';
 import { ImprestCategoriesService } from '@/modules/master/imprest-categories/imprest-categories.service';
 
 const CreateImprestCategorySchema = z.object({
@@ -26,6 +15,7 @@ type CreateImprestCategoryDto = z.infer<typeof CreateImprestCategorySchema>;
 type UpdateImprestCategoryDto = z.infer<typeof UpdateImprestCategorySchema>;
 
 @Controller('imprest-categories')
+@UseGuards(MasterWriteGuard)
 export class ImprestCategoriesController {
     constructor(
         private readonly imprestCategoriesService: ImprestCategoriesService,

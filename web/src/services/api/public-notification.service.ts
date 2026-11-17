@@ -17,6 +17,15 @@ export interface PublicPaymentRequestEntity {
     updatedAt: string;
 }
 
+export interface PublicOrderItemEntity {
+    description: string | null;
+    qty: string | number | null;
+    unit: string | null;
+    rate: string | null;
+    gstRate: string | null;
+    totalAmount: string | null;
+}
+
 export interface PublicOrderEntity {
     id: number;
     referenceNo: string | null;
@@ -29,6 +38,12 @@ export interface PublicOrderEntity {
     amountAfterTds: string | null;
     approvalStatus: ApprovalStatus;
     approvalRemark: string | null;
+    tlStatus?: boolean | null;
+    tlRemark?: string | null;
+    tenderNo?: string | null;
+    tenderName?: string | null;
+    organizationName?: string | null;
+    items?: PublicOrderItemEntity[];
     raisedByName: string | null;
     orderDate: string | null;
     createdAt: string;

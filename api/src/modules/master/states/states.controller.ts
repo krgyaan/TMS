@@ -1,17 +1,6 @@
-import {
-    Body,
-    Controller,
-    Get,
-    Param,
-    ParseIntPipe,
-    Patch,
-    Post,
-    Query,
-    HttpCode,
-    HttpStatus,
-    NotFoundException,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus, NotFoundException, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
+import { MasterWriteGuard } from '@/modules/master/common/master-write.guard';
 import { StatesService } from '@/modules/master/states/states.service';
 
 const CreateStateSchema = z.object({
@@ -23,6 +12,7 @@ const CreateStateSchema = z.object({
 const UpdateStateSchema = CreateStateSchema.partial();
 
 @Controller('states')
+@UseGuards(MasterWriteGuard)
 export class StatesController {
     constructor(private readonly statesService: StatesService) { }
 

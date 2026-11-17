@@ -1,17 +1,6 @@
-import {
-    Body,
-    Controller,
-    Get,
-    Param,
-    ParseIntPipe,
-    Patch,
-    Post,
-    Query,
-    HttpCode,
-    HttpStatus,
-    NotFoundException,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus, NotFoundException, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
+import { MasterWriteGuard } from '@/modules/master/common/master-write.guard';
 import { WebsitesService } from '@/modules/master/websites/websites.service';
 
 const CreateWebsiteSchema = z.object({
@@ -26,6 +15,7 @@ type CreateWebsiteDto = z.infer<typeof CreateWebsiteSchema>;
 type UpdateWebsiteDto = z.infer<typeof UpdateWebsiteSchema>;
 
 @Controller('websites')
+@UseGuards(MasterWriteGuard)
 export class WebsitesController {
     constructor(private readonly websitesService: WebsitesService) { }
 

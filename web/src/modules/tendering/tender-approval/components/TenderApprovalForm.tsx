@@ -69,7 +69,7 @@ const InfoSheetMissingAlert = ({ tenderId, onBack }: { tenderId: number, onBack:
 
 export function TenderApprovalForm({ tenderId, relationships, isLoading: isParentLoading }: TenderApprovalFormProps) {
     const navigate = useNavigate();
-    const { data: vendorOrganizations, isLoading: isVendorOrgsLoading } = useVendorOrganizations();
+    const { data: vendorOrganizations, isLoading: isVendorOrgsLoading } = useVendorOrganizations(true);
     const { data: statuses, isLoading: isStatusesLoading } = useTenderRejectionStatuses();
     const createApproval = useCreateTenderApproval();
     const updateApproval = useUpdateTenderApproval();
@@ -172,7 +172,6 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
         } else if (tlDecision === '2') {
             // Clear approval and incomplete fields
             form.setValue('rfqRequired', undefined);
-            // form.setValue('quotationFiles', []);
             form.setValue('rfqTo', []);
             form.setValue('processingFeeMode', undefined);
             form.setValue('tenderFeeMode', undefined);
@@ -187,7 +186,6 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
         } else if (tlDecision === '3') {
             // Clear approval and rejection fields
             form.setValue('rfqRequired', undefined);
-            // form.setValue('quotationFiles', []);
             form.setValue('rfqTo', []);
             form.setValue('processingFeeMode', undefined);
             form.setValue('tenderFeeMode', undefined);
@@ -203,7 +201,6 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
         } else if (tlDecision === '0') {
             // Clear all conditional fields
             form.setValue('rfqRequired', undefined);
-            // form.setValue('quotationFiles', []);
             form.setValue('rfqTo', []);
             form.setValue('processingFeeMode', undefined);
             form.setValue('tenderFeeMode', undefined);
@@ -223,14 +220,8 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
 
     // Clear fields when rfqRequired changes
     useEffect(() => {
-        if (tlDecision === '1') {
-            if (rfqRequired === 'yes') {
-                // Clear quotation files when switching to RFQ required
-                // form.setValue('quotationFiles', []);
-            } else if (rfqRequired === 'no') {
-                // Clear vendor selection when switching to quotation files
-                form.setValue('rfqTo', []);
-            }
+        if (tlDecision === '1' && rfqRequired === 'no') {
+            form.setValue('rfqTo', []);
         }
     }, [rfqRequired, tlDecision, form]);
 
@@ -501,20 +492,6 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                             placeholder="Select vendors"
                                         />
                                     )}
-
-                                    {/* {rfqRequired === 'no' && (
-                                        <div className="space-y-2">
-                                            <FileUploader
-                                                context="rfq-response-quotation"
-                                                value={form.watch('quotationFiles') || []}
-                                                onChange={(paths) => form.setValue('quotationFiles', paths)}
-                                                label="Upload quotation files"
-                                            />
-                                            {form.formState.errors.quotationFiles && (
-                                                <p className="text-sm text-destructive mt-1">{form.formState.errors.quotationFiles.message}</p>
-                                            )}
-                                        </div>
-                                    )} */}
                                 </div>
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -706,6 +683,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                         label="Tender Status"
                                         options={tenderStatusOptions}
                                         placeholder="Select tender status"
+                                        valueType="string"
                                     />
                                     {isNotAllowedByOem && (
                                         <MultiSelectField

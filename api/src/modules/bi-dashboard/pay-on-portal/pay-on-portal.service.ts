@@ -5,7 +5,7 @@ import { tenderInfos } from '@/db/schemas/tendering/tenders.schema';
 import { AppLogger } from '@/logger/app-logger.service';
 import type { PayOnPortalDashboardCounts, PayOnPortalDashboardRow } from '@/modules/bi-dashboard/pay-on-portal/helpers/payOnPortal.types';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
-import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
+import type { CreateFollowUpDto } from '@/modules/follow-up/dto';
 import { PORTAL_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import { PaymentRequestsNotificationService } from '@/modules/tendering/payment-requests/services/payment-requests-notification.service';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';

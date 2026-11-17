@@ -692,62 +692,72 @@ const AllFieldsTable = ({ infoSheet }: { infoSheet: TenderInfoSheet }) => {
                 </TableRow>
 
                 {/* Client Contacts */}
+                <TableRow className="bg-muted/50">
+                    <TableCell
+                        colSpan={4}
+                        className="font-semibold text-sm"
+                    >
+                        Client Contacts
+                    </TableCell>
+                </TableRow>
+                {infoSheet.customerInContact && (
+                    <TableRow className="hover:bg-muted/30 transition-colors">
+                        <TableCell className="text-sm font-medium text-muted-foreground">
+                            Customer in Contact
+                        </TableCell>
+                        <TableCell className="text-sm font-semibold" colSpan={3}>
+                            {formatYesNo(infoSheet.customerInContact)}
+                        </TableCell>
+                    </TableRow>
+                )}
                 {infoSheet.clients && infoSheet.clients.length > 0 ? (
-                    <>
-                        <TableRow className="bg-muted/50">
-                            <TableCell
-                                colSpan={4}
-                                className="font-semibold text-sm"
-                            >
-                                Client Contacts
-                            </TableCell>
-                        </TableRow>
-                        {infoSheet.customerInContact && (
+                    infoSheet.clients.map((client, idx) => (
+                        <React.Fragment
+                            key={`${client.clientName}-${idx}`}
+                        >
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Customer in Contact
+                                    Client {idx + 1} Name
                                 </TableCell>
-                                <TableCell className="text-sm font-semibold" colSpan={3}>
-                                    {formatYesNo(infoSheet.customerInContact)}
+                                <TableCell className="text-sm font-semibold">
+                                    {client.clientName || "—"}
+                                </TableCell>
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Designation
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                    {client.clientDesignation || "—"}
                                 </TableCell>
                             </TableRow>
-                        )}
-                        {infoSheet.clients.map((client, idx) => (
-                            <React.Fragment
-                                key={`${client.clientName}-${idx}`}
-                            >
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Client {idx + 1} Name
-                                    </TableCell>
-                                    <TableCell className="text-sm font-semibold">
-                                        {client.clientName || "—"}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Designation
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {client.clientDesignation || "—"}
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Mobile
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {client.clientMobile || "—"}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Email
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {client.clientEmail || "—"}
-                                    </TableCell>
-                                </TableRow>
-                            </React.Fragment>
-                        ))}
-                    </>
-                ) : null}
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Mobile
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                    {client.clientMobile || "—"}
+                                </TableCell>
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Email
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                    {client.clientEmail || "—"}
+                                </TableCell>
+                            </TableRow>
+                        </React.Fragment>
+                    ))
+                ) : (
+                    <TableRow className="hover:bg-muted/30 transition-colors">
+                        <TableCell className="text-sm font-medium text-muted-foreground">
+                            Client Contacts
+                        </TableCell>
+                        <TableCell
+                            className="text-sm text-muted-foreground italic"
+                            colSpan={3}
+                        >
+                            No client contact details added
+                        </TableCell>
+                    </TableRow>
+                )}
 
                 {/* Documents */}
                 <TableRow className="bg-muted/50">

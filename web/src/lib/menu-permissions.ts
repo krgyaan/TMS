@@ -60,6 +60,12 @@ function getPermissionModule(title: string, parentMenuTitle?: string): string | 
         }
     }
 
+    if (title === 'Item Master') {
+        if (parentMenuTitle === 'Accounts') return 'accounts.item-master';
+        if (parentMenuTitle === 'Operations') return 'operations.item-master';
+        if (parentMenuTitle === 'Settings') return 'master.item-master';
+    }
+
     if (title === 'Inventory') {
         if (parentMenuTitle === 'Accounts') {
             return 'accounts.inventory';
@@ -134,6 +140,7 @@ function getPermissionModule(title: string, parentMenuTitle?: string): string | 
         'Users': 'master.users',
         'Status': 'master.statuses',
         'Items': 'master.items',
+        'Item Master': 'master.item-master',
         'Locations': 'master.locations',
         'Organizations': 'master.organizations',
         'Vendors': 'master.vendors',

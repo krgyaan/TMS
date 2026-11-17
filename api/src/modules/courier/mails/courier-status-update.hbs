@@ -14,12 +14,16 @@
         <li>Courier Provider: {{courierProvider}}</li>
         <li>Docket No: {{docketNo}}</li>
         <li>Pickup date and time: {{pickup}}</li>
+        {{#if isDelivered}}
         <li>Delivery date and time: {{delivery}}</li>
         <li>Delivery within Expected time: {{withinTimeCheck}}</li>
+        {{/if}}
     </ul>
 
+    {{#if hasPod}}
     <p>The Proof of Delivery (POD) slip against the tender has been attached with the mail.</p>
+    {{/if}}
 
     <br />
-    <p>Regards,<br />{{cooName}}</p>
+    <p>Regards,<br />{{senderName}}</p>
 </div>

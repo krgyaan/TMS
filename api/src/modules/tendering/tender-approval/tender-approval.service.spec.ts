@@ -31,97 +31,131 @@ function buildService(infoSheetMock: any) {
     return { service, tenderInfoSheetsService };
 }
 
-describe('TenderApprovalService - EMD sync on TL approval', () => {
+describe('TenderApprovalService - incomplete status', () => {
+    it('sets tender status to 29 when marking incomplete for the first time', async () => {
+        const { service } = buildService(null);
+
+        const result: any = await (service as any).buildApprovalUpdateData(1001, { tlStatus: '3' });
+
+        expect(result.updateData.status).toBe(29);
+        expect(result.newStatus).toBe(29);
+    });
+
+    it('sets tender status to 29 when re-marking incomplete in edit mode', async () => {
+        const { service } = buildService(null);
+
+        const result: any = await (service as any).buildApprovalUpdateData(1001, { tlStatus: '3' });
+
+        expect(result.updateData.status).toBe(29);
+        expect(result.newStatus).toBe(29);
+    });
+});
+
+describe('TenderApprovalService - TL approval', () => {
     const basePayload: any = {
-        tlStatus: '1', // Approved
+        tlStatus: '1',
         rfqTo: [],
         rfqRequired: 'NO',
         tlApprovalRemarks: 'Approved by TL',
     };
 
-    it('does NOT overwrite emd when infoSheet.emdAmount is 0', async () => {
-        const { service } = buildService({
-            tenderValue: 500000,
-            tenderFeeAmount: 1000,
-            emdAmount: 0,
-        });
-
-        const result: any = await (service as any).buildApprovalUpdateData(1001, basePayload, false);
-
-        expect(result.updateData.emd).toBeUndefined();
-        expect(result.updateData.gstValues).toBe('500000');
-        expect(result.updateData.tenderFees).toBe('1000');
-    });
-
-    it('does NOT overwrite emd when infoSheet.emdAmount is "0" or "0.00"', async () => {
-        for (const zeroVal of ['0', '0.00', 0.0]) {
-            const { service } = buildService({
-                tenderValue: 500000,
-                tenderFeeAmount: 1000,
-                emdAmount: zeroVal,
-            });
-
-            const result: any = await (service as any).buildApprovalUpdateData(1001, basePayload, false);
-            expect(result.updateData.emd).toBeUndefined();
-        }
-    });
-
-    it('does NOT overwrite emd when infoSheet.emdAmount is null or undefined', async () => {
-        const { service } = buildService({
-            tenderValue: 500000,
-            tenderFeeAmount: null,
-            emdAmount: null,
-        });
-
-        const result: any = await (service as any).buildApprovalUpdateData(1001, basePayload, false);
-        expect(result.updateData.emd).toBeUndefined();
-    });
-
-    it('syncs emd when infoSheet.emdAmount is a positive number', async () => {
+    it('sets tender status to 3 (Tender Info approved)', async () => {
         const { service } = buildService({
             tenderValue: 500000,
             tenderFeeAmount: 1000,
             emdAmount: 50000,
         });
 
-        const result: any = await (service as any).buildApprovalUpdateData(1001, basePayload, false);
-        expect(result.updateData.emd).toBe('50000');
+        const result: any = await (service as any).buildApprovalUpdateData(1001, basePayload);
+
+        expect(result.updateData.status).toBe(3);
+        expect(result.newStatus).toBe(3);
+        expect(result.statusComment).toBe('Tender info approved');
     });
 
-    it('does NOT overwrite gstValues when infoSheet.tenderValue is 0, "0", null, or undefined', async () => {
-        for (const zeroVal of [0, '0', '0.00', null, undefined]) {
-            const { service } = buildService({
-                tenderValue: zeroVal,
-                tenderFeeAmount: 500,
-                emdAmount: 25000,
-            });
-
-            const result: any = await (service as any).buildApprovalUpdateData(1001, basePayload, false);
-            expect(result.updateData.gstValues).toBeUndefined();
-            expect(result.updateData.tenderFees).toBe('500');
-            expect(result.updateData.emd).toBe('25000');
-        }
-    });
-
-    it('syncs gstValues when infoSheet.tenderValue is a positive number', async () => {
+    it('syncs gstValues, tenderFees and emd from the info sheet', async () => {
         const { service } = buildService({
             tenderValue: 1250000,
             tenderFeeAmount: 500,
             emdAmount: 25000,
         });
 
-        const result: any = await (service as any).buildApprovalUpdateData(1001, basePayload, false);
+        const result: any = await (service as any).buildApprovalUpdateData(1001, basePayload);
+
         expect(result.updateData.gstValues).toBe('1250000');
+        expect(result.updateData.tenderFees).toBe('500');
+        expect(result.updateData.emd).toBe('25000');
     });
 
-    it('preserves tenderFees sync even when tenderFeeAmount is 0 (as 0 fees is legitimate)', async () => {
+    it('writes "0" for gstValues, tenderFees and emd when info sheet values are zero', async () => {
         const { service } = buildService({
-            tenderValue: 100000,
+            tenderValue: 0,
             tenderFeeAmount: 0,
-            emdAmount: 5000,
+            emdAmount: 0,
         });
 
-        const result: any = await (service as any).buildApprovalUpdateData(1001, basePayload, false);
+        const result: any = await (service as any).buildApprovalUpdateData(1001, basePayload);
+
+        expect(result.updateData.gstValues).toBe('0');
         expect(result.updateData.tenderFees).toBe('0');
+        expect(result.updateData.emd).toBe('0');
+    });
+
+    it('writes "0" for gstValues, tenderFees and emd when info sheet values are null or undefined', async () => {
+        for (const emptyValue of [null, undefined]) {
+            const { service } = buildService({
+                tenderValue: emptyValue,
+                tenderFeeAmount: emptyValue,
+                emdAmount: emptyValue,
+            });
+
+            const result: any = await (service as any).buildApprovalUpdateData(1001, basePayload);
+
+            expect(result.updateData.gstValues).toBe('0');
+            expect(result.updateData.tenderFees).toBe('0');
+            expect(result.updateData.emd).toBe('0');
+        }
+    });
+
+    it('forces emd to "0" when EMD mode is exempt', async () => {
+        const { service } = buildService({
+            tenderValue: 500000,
+            tenderFeeAmount: 1000,
+            emdAmount: 50000,
+        });
+
+        const result: any = await (service as any).buildApprovalUpdateData(1001, {
+            ...basePayload,
+            emdMode: 'exempt',
+        });
+
+        expect(result.updateData.emd).toBe('0');
+    });
+});
+
+describe('TenderApprovalService - rejection', () => {
+    it('updates tender status on first rejection', async () => {
+        const { service } = buildService(null);
+
+        const result: any = await (service as any).buildApprovalUpdateData(1001, {
+            tlStatus: '2',
+            tenderStatus: 10,
+        });
+
+        expect(result.updateData.status).toBe(10);
+        expect(result.newStatus).toBe(10);
+        expect(result.statusComment).toBe('Tender rejected');
+    });
+
+    it('updates tender status when editing an existing rejection', async () => {
+        const { service } = buildService(null);
+
+        const result: any = await (service as any).buildApprovalUpdateData(1001, {
+            tlStatus: '2',
+            tenderStatus: 12,
+        });
+
+        expect(result.updateData.status).toBe(12);
+        expect(result.newStatus).toBe(12);
     });
 });

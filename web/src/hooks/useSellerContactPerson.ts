@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { useSellerPersons } from "@/hooks/api/usePurchaseOrders";
 import type { SellerPersonOption } from "@/modules/operations/purchase-orders/helpers/purchaseOrder.types";
@@ -47,12 +47,7 @@ export function useSellerContactPerson<
   // (must not clobber edits).
   const lastFilledIdRef = useRef<string | null>(null);
 
-  // Edit forms pass false: a loaded document's contact wins, and we never
-  // guess one from the vendor master. Consumed on the first auto-select so it
-  // only suppresses the initial load, not an explicit seller change later.
-  const skipAutoSelectRef = useRef(options?.autoSelectFirstOnLoad === false);
-
-  const setField = (name: keyof SellerContactForm, value: string) =>
+    const setField = (name: keyof SellerContactForm, value: string) =>
     form.setValue(name as never, value as never);
 
   // Seller changed -> the previous person no longer belongs to this org.
@@ -66,7 +61,6 @@ export function useSellerContactPerson<
     if (prev === sellerId) return;
 
     lastFilledIdRef.current = null;
-    skipAutoSelectRef.current = false;
     setField("vendorPersonId", "");
     setField("vendorContactPersonName", "");
     setField("vendorContactPersonPhone", "");
@@ -92,6 +86,8 @@ export function useSellerContactPerson<
         if (lastFilledIdRef.current !== vendorPersonId) fillFrom(chosen);
         return;
       }
+      // Persons still loading: keep the saved id instead of dropping it.
+      if (persons.length === 0) return;
       // Person no longer exists in vendor master for this org.
       setField("vendorPersonId", "");
       lastFilledIdRef.current = null;
@@ -122,17 +118,20 @@ export function useSellerContactPerson<
       return;
     }
 
-    if (skipAutoSelectRef.current) {
-      skipAutoSelectRef.current = false;
-      return;
-    }
+    // Contact selection is explicit; only auto-select when a caller opts in.
+    if (options?.autoSelectFirstOnLoad !== true) return;
 
-    // Fresh form and the org has persons -> auto-select the first.
     const first = persons[0];
     setField("vendorPersonId", String(first.id));
     fillFrom(first);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orgId, persons, vendorPersonId]);
 
-  return { sellerOrgId: orgId, sellerPersons: persons };
+  // Edit pages call this after form.reset so the hydrated person is treated as
+  // already applied: the effect must not overwrite the saved contact snapshot.
+  const seedInitialSelection = useCallback((personId?: string | number | null) => {
+    lastFilledIdRef.current = personId ? String(personId) : null;
+  }, []);
+
+  return { sellerOrgId: orgId, sellerPersons: persons, seedInitialSelection };
 }

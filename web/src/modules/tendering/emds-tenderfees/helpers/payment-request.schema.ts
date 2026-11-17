@@ -57,16 +57,24 @@ export const PaymentDetailsSchema = z.object({
     // FDR fields
     fdrFavouring: z.string().optional(),
     fdrExpiryDate: z.string().optional(),
-    fdrDeliverBy: deliveryEnumFieldForDD(),
     fdrPurpose: z.string().optional(),
-    fdrCourierAddress: z.string().optional(),
+    fdrCourierOrg: z.string().optional(),
     fdrCourierName: z.string().optional(),
     fdrCourierPhone: z.string().optional(),
-    fdrCourierAddressLine1: z.string().optional(),
-    fdrCourierAddressLine2: z.string().optional(),
+    fdrCourierAddrLine1: z.string().optional(),
+    fdrCourierAddrLine2: z.string().optional(),
     fdrCourierCity: z.string().optional(),
     fdrCourierState: z.string().optional(),
     fdrCourierPincode: z.string().optional(),
+    fdrCourierEmpFrom: z.coerce.number().optional(),
+    fdrCourierDelDate: z.string().optional(),
+    fdrCourierUrgency: z.coerce.number().optional(),
+    fdrCourierDocs: z.array(z.string()).optional(),
+    // Legacy FDR fields kept optional so editing old records does not wipe them
+    fdrDeliverBy: z.string().optional(),
+    fdrCourierAddress: z.string().optional(),
+    fdrCourierAddressLine1: z.string().optional(),
+    fdrCourierAddressLine2: z.string().optional(),
     fdrCourierHours: z.coerce.number().optional(),
     fdrDate: z.string().optional(),
 
@@ -80,11 +88,26 @@ export const PaymentDetailsSchema = z.object({
     bgStampValue: z.coerce.number().optional(),
     bgFormatFiles: z.array(z.string()).optional(),
     bgPoFiles: z.array(z.string()).optional(),
+    uniqueCode: z.string().optional(),
+    uniqueAdviceMessage: z.string().optional(),
     bgClientUserEmail: z.email().optional().or(z.literal('')),
     bgClientCpEmail: z.email().optional().or(z.literal('')),
     bgClientFinanceEmail: z.email().optional().or(z.literal('')),
     bgCourierAddress: z.string().optional(),
     bgCourierDays: z.coerce.number().min(1).max(10).optional(),
+    // Courier Dispatch (mirrors BG action form step 2)
+    bgCourierOrg: z.string().optional(),
+    bgCourierName: z.string().optional(),
+    bgCourierPhone: z.string().optional(),
+    bgCourierAddrLine1: z.string().optional(),
+    bgCourierAddrLine2: z.string().optional(),
+    bgCourierCity: z.string().optional(),
+    bgCourierState: z.string().optional(),
+    bgCourierPincode: z.string().optional(),
+    bgCourierEmpFrom: z.coerce.number().optional(),
+    bgCourierDelDate: z.string().optional(),
+    bgCourierUrgency: z.coerce.number().optional(),
+    bgCourierDocs: z.array(z.string()).optional(),
     bgBank: z.string().optional(),
     bgBankAccountName: z.string().optional(),
     bgBankAccountNo: z.string().optional(),
@@ -296,6 +319,57 @@ export const DemandDraftSchema = z.object({
     }
 });
 
+const COURIER_DISPATCH_REQUIRED_FIELDS = [
+    ['CourierOrg', 'Organization Name'],
+    ['CourierName', 'Recipient Name'],
+    ['CourierPhone', 'Phone'],
+    ['CourierAddrLine1', 'Address Line 1'],
+    ['CourierAddrLine2', 'Address Line 2'],
+    ['CourierCity', 'City'],
+    ['CourierState', 'State'],
+    ['CourierPincode', 'Pin Code'],
+    ['CourierEmpFrom', 'Courier From'],
+    ['CourierDelDate', 'Expected Delivery Date'],
+    ['CourierUrgency', 'Dispatch Urgency'],
+] as const;
+
+/**
+ * Shared Courier Dispatch validation — rendered by the BG and FDR forms.
+ * `fieldPrefix` matches the form field naming (`bg` / `fdr`).
+ */
+const addCourierDispatchIssues = (
+    details: Record<string, any>,
+    ctx: z.RefinementCtx,
+    fieldPrefix: 'bg' | 'fdr',
+    pathPrefix: (string | number)[] = [],
+) => {
+    for (const [suffix, label] of COURIER_DISPATCH_REQUIRED_FIELDS) {
+        const key = `${fieldPrefix}${suffix}`;
+        const value = details[key];
+        const missing =
+            value === undefined ||
+            value === null ||
+            (typeof value === 'string' && value.trim() === '') ||
+            (typeof value === 'number' && isNaN(value));
+        if (missing) {
+            ctx.addIssue({
+                code: 'custom',
+                message: `${label} is required`,
+                path: [...pathPrefix, key],
+            });
+        }
+    }
+
+    const pincode = details[`${fieldPrefix}CourierPincode`];
+    if (typeof pincode === 'string' && pincode.trim() !== '' && !/^\d{6}$/.test(pincode.trim())) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Pin Code must be 6 digits',
+            path: [...pathPrefix, `${fieldPrefix}CourierPincode`],
+        });
+    }
+};
+
 export const BankGuaranteeSchema = z.object({
     bgPurpose: z.string().optional(),
     bgAmount: z.coerce.number().optional(),
@@ -307,6 +381,8 @@ export const BankGuaranteeSchema = z.object({
     bgStampValue: z.coerce.number().optional(),
     bgFormatFiles: z.array(z.string()).optional(),
     bgPoFiles: z.array(z.string()).optional(),
+    uniqueCode: z.string().optional(),
+    uniqueAdviceMessage: z.string().optional(),
     bgClientUserEmail: z.email().optional().or(z.literal('')),
     bgClientCpEmail: z.email().optional().or(z.literal('')),
     bgClientFinanceEmail: z.email().optional().or(z.literal('')),
@@ -316,6 +392,19 @@ export const BankGuaranteeSchema = z.object({
     bgBankAccountName: z.string().optional(),
     bgBankAccountNo: z.string().optional(),
     bgBankIfsc: z.string().optional(),
+    // Courier Dispatch (project-dashboard BG requests)
+    bgCourierOrg: z.string().optional(),
+    bgCourierName: z.string().optional(),
+    bgCourierPhone: z.string().optional(),
+    bgCourierAddrLine1: z.string().optional(),
+    bgCourierAddrLine2: z.string().optional(),
+    bgCourierCity: z.string().optional(),
+    bgCourierState: z.string().optional(),
+    bgCourierPincode: z.string().optional(),
+    bgCourierEmpFrom: z.coerce.number().optional(),
+    bgCourierDelDate: z.string().optional(),
+    bgCourierUrgency: z.coerce.number().optional(),
+    bgCourierDocs: z.array(z.string()).optional(),
 }).superRefine((data, ctx) => {
     if (!data.bgNeededIn || (typeof data.bgNeededIn === 'string' && data.bgNeededIn.trim() === '')) {
         ctx.addIssue({
@@ -352,6 +441,13 @@ export const BankGuaranteeSchema = z.object({
             path: ['bgAddress'],
         });
     }
+    if (!data.bgBankIfsc || (typeof data.bgBankIfsc === 'string' && data.bgBankIfsc.trim() === '')) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Bank IFSC Code is required',
+            path: ['bgBankIfsc'],
+        });
+    }
     if (!data.bgExpiryDate || (typeof data.bgExpiryDate === 'string' && data.bgExpiryDate.trim() === '')) {
         ctx.addIssue({
             code: 'custom',
@@ -380,13 +476,8 @@ export const BankGuaranteeSchema = z.object({
             path: ['bgBank'],
         });
     }
-    if (!data.bgCourierAddress || (typeof data.bgCourierAddress === 'string' && data.bgCourierAddress.trim() === '')) {
-        ctx.addIssue({
-            code: 'custom',
-            message: 'Courier Address is required',
-            path: ['bgCourierAddress'],
-        });
-    }
+    // Courier Dispatch replaces the legacy single "Courier Address" field.
+    addCourierDispatchIssues(data as Record<string, any>, ctx, 'bg');
 });
 
 export const FdrSchema = z.object({
@@ -394,15 +485,23 @@ export const FdrSchema = z.object({
     fdrAmount: z.coerce.number().optional(),
     fdrFavouring: z.string().optional(),
     fdrExpiryDate: z.string().optional(),
-    fdrDeliverBy: z.string().optional(),
-    fdrCourierAddress: z.string().optional(),
+    fdrCourierOrg: z.string().optional(),
     fdrCourierName: z.string().optional(),
     fdrCourierPhone: z.string().optional(),
-    fdrCourierAddressLine1: z.string().optional(),
-    fdrCourierAddressLine2: z.string().optional(),
+    fdrCourierAddrLine1: z.string().optional(),
+    fdrCourierAddrLine2: z.string().optional(),
     fdrCourierCity: z.string().optional(),
     fdrCourierState: z.string().optional(),
     fdrCourierPincode: z.string().optional(),
+    fdrCourierEmpFrom: z.coerce.number().optional(),
+    fdrCourierDelDate: z.string().optional(),
+    fdrCourierUrgency: z.coerce.number().optional(),
+    fdrCourierDocs: z.array(z.string()).optional(),
+    // Legacy FDR fields kept optional so editing old records does not wipe them
+    fdrDeliverBy: z.string().optional(),
+    fdrCourierAddress: z.string().optional(),
+    fdrCourierAddressLine1: z.string().optional(),
+    fdrCourierAddressLine2: z.string().optional(),
     fdrCourierHours: z.coerce.number().optional(),
     fdrDate: z.string().optional(),
 }).superRefine((data, ctx) => {
@@ -420,33 +519,11 @@ export const FdrSchema = z.object({
             path: ['fdrExpiryDate'],
         });
     }
-    if (!data.fdrDeliverBy) {
-        ctx.addIssue({
-            code: 'custom',
-            message: 'Deliver By is required',
-            path: ['fdrDeliverBy'],
-        });
-    }
     if (!data.fdrPurpose || (typeof data.fdrPurpose === 'string' && data.fdrPurpose.trim() === '')) {
         ctx.addIssue({
             code: 'custom',
             message: 'Purpose of FDR is required',
             path: ['fdrPurpose'],
-        });
-    }
-    validateCourierFields(data, ctx, 'fdr');
-    if (!data.fdrCourierHours) {
-        ctx.addIssue({
-            code: 'custom',
-            message: 'Courier Hours is required',
-            path: ['fdrCourierHours'],
-        });
-    }
-    if (!data.fdrDate || (typeof data.fdrDate === 'string' && data.fdrDate.trim() === '')) {
-        ctx.addIssue({
-            code: 'custom',
-            message: 'FDR Date is required',
-            path: ['fdrDate'],
         });
     }
     if (data.fdrAmount !== undefined && data.fdrAmount < 0) {
@@ -456,6 +533,8 @@ export const FdrSchema = z.object({
             path: ['fdrAmount'],
         });
     }
+    // Courier Dispatch block (BG-style) replaces the legacy Deliver By / Courier Hours fields.
+    addCourierDispatchIssues(data as Record<string, any>, ctx, 'fdr');
 });
 
 export const ChequeSchema = z.object({
@@ -651,9 +730,31 @@ export const BiOtherThanTenderRequestSchema = z.object({
     }).superRefine(validatePaymentMode).optional(),
 });
 
+
+export const ProjectBgRequestSchema = BiOtherThanTenderRequestSchema.superRefine((data, ctx) => {
+    if (data.EMD?.mode !== 'BG') return;
+    const details: Record<string, any> = data.EMD?.details ?? {};
+
+    const BG_BANK_REQUIRED_FIELDS = [
+        ['bgBankIfsc', 'Customer IFSC Code'],
+    ] as const;
+
+    for (const [key, label] of BG_BANK_REQUIRED_FIELDS) {
+        const value = details[key];
+        if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) {
+            ctx.addIssue({
+                code: 'custom',
+                message: `${label} is required`,
+                path: ['EMD', 'details', key],
+            });
+        }
+    }
+});
+
 export type PaymentRequestFormValues = z.infer<typeof PaymentRequestSchema>;
 export type OldEntryPaymentRequestFormValues = z.infer<typeof OldEntryPaymentRequestSchema>;
 export type BiOtherThanTenderRequestFormValues = z.infer<typeof BiOtherThanTenderRequestSchema>;
+export type ProjectBgRequestFormValues = z.infer<typeof ProjectBgRequestSchema>;
 export type PaymentDetailsFormValues = z.infer<typeof PaymentDetailsSchema>;
 export type BankTransferFormValues = z.infer<typeof BankTransferSchema>;
 export type PayOnPortalFormValues = z.infer<typeof PayOnPortalSchema>;

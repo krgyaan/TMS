@@ -8,13 +8,14 @@ import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { instrumentBgDetails, instrumentChequeDetails, instrumentDdDetails, instrumentFdrDetails, instrumentStatusHistory, instrumentTransferDetails, paymentInstruments, paymentRequestMom, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
 import { paymentRequests as opsPaymentRequests } from '@db/schemas/operations/payment-requests.schema';
+import { couriers } from '@db/schemas/shared/couriers.schema';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
 import { PaymentRequestService } from '@/modules/operations/payment-requests/payment-request.service';
 import { and, desc, eq, like } from 'drizzle-orm';
 import type { CreateMomRemarkDto } from '../dto/payment-mom.dto';
 import type { CreatePaymentRequestDto, PaymentPurpose, UpdatePaymentRequestDto, UpdateStatusDto } from '../dto/payment-requests.dto';
 import { PaymentRequestsNotificationService } from './payment-requests-notification.service';
-import { extractAmountFromDetails, extractPurposeFromDetails } from './payment-requests.shared';
+import { extractAmountFromDetails, extractPurposeFromDetails, extractProjectBgPurpose } from './payment-requests.shared';
 
 @Injectable()
 export class PaymentRequestsCommandService {
@@ -90,10 +91,13 @@ export class PaymentRequestsCommandService {
                 const isBlankNonTmsCheque = isNonTmsRequest && payload.EMD.mode === 'CHEQUE';
 
                 if (emdAmount > 0 || isBlankNonTmsCheque) {
+                    const emdPurpose = (payload.projectId || payload.preserveBgPurpose) && payload.EMD.mode === 'BG'
+                        ? extractProjectBgPurpose(payload.EMD.details)
+                        : extractPurposeFromDetails(payload.EMD.mode, payload.EMD.details, 'EMD');
                     const request = await this.createPaymentRequest(
                         tx,
                         tenderId,
-                        extractPurposeFromDetails(payload.EMD.mode, payload.EMD.details, 'EMD'),
+                        emdPurpose,
                         emdAmount,
                         tender,
                         userId,
@@ -102,7 +106,8 @@ export class PaymentRequestsCommandService {
                         payload.tenderName,
                         payload.dueDate,
                         emdRemarks,
-                        payload.team
+                        payload.team,
+                        payload.projectId
                     );
                     createdRequests.push(request);
 
@@ -116,8 +121,8 @@ export class PaymentRequestsCommandService {
                     );
                     results.push({ request, instrument });
 
-                    // Auto-create Cheque after DD/FDR creation
-                    if ((payload.EMD.mode === 'DD' || payload.EMD.mode === 'FDR') && instrument) {
+                    // Auto-create Cheque after DD creation (FDR no longer auto-creates a Cheque)
+                    if (payload.EMD.mode === 'DD' && instrument) {
                         const chequeResult = await this.autoCreateChequeFromDdFdr(
                             tx,
                             request,
@@ -167,7 +172,8 @@ export class PaymentRequestsCommandService {
                         payload.tenderName,
                         payload.dueDate,
                         tfRemarks,
-                        payload.team
+                        payload.team,
+                        payload.projectId
                     );
                     createdRequests.push(request);
 
@@ -236,7 +242,8 @@ export class PaymentRequestsCommandService {
                         payload.tenderName,
                         payload.dueDate,
                         pfRemarks,
-                        payload.team
+                        payload.team,
+                        payload.projectId
                     );
                     createdRequests.push(request);
 
@@ -320,8 +327,9 @@ export class PaymentRequestsCommandService {
                 try {
                     const mode = instrument.instrumentType;
                     
-                    // Skip email for DD/FDR (auto-created Cheque will send its own email)
-                    if (!isAutoCreatedCheque && (mode === 'DD' || mode === 'FDR')) {
+                    // Skip email for DD (auto-created Cheque will send its own email).
+                    // FDR is sent via the dedicated FDR branch in sendPaymentInstrumentEmail().
+                    if (!isAutoCreatedCheque && mode === 'DD') {
                         continue;
                     }
                     
@@ -404,7 +412,7 @@ export class PaymentRequestsCommandService {
         await this.db.transaction(async (tx) => {
             // Update request level fields if provided
             const purpose = existing.purpose;
-            const requestData = (payload[purpose] || payload[purpose.toLowerCase()]);
+            const requestData = (payload[purpose] || payload[purpose.toLowerCase()] || payload.EMD);
             
             if (requestData?.details) {
                 const amount = requestData.details.amountRequired || 
@@ -515,7 +523,8 @@ export class PaymentRequestsCommandService {
         tenderName?: string,
         dueDate?: string,
         remarks?: string,
-        team?: number
+        team?: number,
+        projectId?: number
     ) {
         this.logger.log(`Creating payment request: ${purpose} - Amount: ${amount}`);
         const effectiveDueDate = tender?.dueDate 
@@ -538,6 +547,7 @@ export class PaymentRequestsCommandService {
                 status: 'Pending',
                 remarks: remarks || 'Payment Request',
                 team: team || null,
+                projectId: projectId ?? null,
             })
             .returning()
             .execute();
@@ -568,7 +578,7 @@ export class PaymentRequestsCommandService {
         const shorthand = mode === 'BANK_TRANSFER' ? 'bt' : mode === 'PORTAL' ? 'portal' : mode.toLowerCase();
 
         // Build structured courier address JSONB for DD/FDR/Cheque
-        const courierAddressJson = (mode === 'DD' || mode === 'FDR' || mode === 'CHEQUE') ? {
+        const courierAddressJson = (mode === 'DD' || mode === 'CHEQUE') ? {
             name: details[`${shorthand}CourierName`] || null,
             phone: details[`${shorthand}CourierPhone`] || null,
             line1: details[`${shorthand}CourierAddressLine1`] || null,
@@ -576,7 +586,67 @@ export class PaymentRequestsCommandService {
             city: details[`${shorthand}CourierCity`] || null,
             state: details[`${shorthand}CourierState`] || null,
             pincode: details[`${shorthand}CourierPincode`] || null,
+        } : (mode === 'FDR' || mode === 'BG') ? {
+            // BG-style Courier Dispatch block (BG and FDR request forms).
+            org: details[`${shorthand}CourierOrg`] || details.bgCourierOrg || null,
+            name: details[`${shorthand}CourierName`] || details.bgCourierName || null,
+            phone: details[`${shorthand}CourierPhone`] || details.bgCourierPhone || null,
+            line1: details[`${shorthand}CourierAddrLine1`] || details.bgCourierAddrLine1 || null,
+            line2: details[`${shorthand}CourierAddrLine2`] || details.bgCourierAddrLine2 || null,
+            city: details[`${shorthand}CourierCity`] || details.bgCourierCity || null,
+            state: details[`${shorthand}CourierState`] || details.bgCourierState || null,
+            pincode: details[`${shorthand}CourierPincode`] || details.bgCourierPincode || null,
+            empFrom: details[`${shorthand}CourierEmpFrom`] ?? details.bgCourierEmpFrom ?? null,
+            delDate: details[`${shorthand}CourierDelDate`] || details.bgCourierDelDate || null,
+            urgency: details[`${shorthand}CourierUrgency`] ?? details.bgCourierUrgency ?? null,
+            docs: details[`${shorthand}CourierDocs`] ?? details.bgCourierDocs ?? [],
         } : null;
+
+        // BG and FDR requests create their courier dispatch row up-front; the
+        // instrument references it through req_no (same convention as step 2).
+        let courierId: number | null = null;
+        const courierOrg = mode === 'BG' ? details.bgCourierOrg : mode === 'FDR' ? details.fdrCourierOrg : null;
+        if ((mode === 'BG' || mode === 'FDR') && courierOrg) {
+            const org = courierOrg;
+            const toName = mode === 'BG' ? details.bgCourierName : details.fdrCourierName;
+            const addr1 = mode === 'BG' ? details.bgCourierAddrLine1 : details.fdrCourierAddrLine1;
+            const addr2 = mode === 'BG' ? details.bgCourierAddrLine2 : details.fdrCourierAddrLine2;
+            const city = mode === 'BG' ? details.bgCourierCity : details.fdrCourierCity;
+            const state = mode === 'BG' ? details.bgCourierState : details.fdrCourierState;
+            const pincode = mode === 'BG' ? details.bgCourierPincode : details.fdrCourierPincode;
+            const phone = mode === 'BG' ? details.bgCourierPhone : details.fdrCourierPhone;
+            const empFrom = mode === 'BG' ? details.bgCourierEmpFrom : details.fdrCourierEmpFrom;
+            const delDate = mode === 'BG' ? details.bgCourierDelDate : details.fdrCourierDelDate;
+            const urgency = mode === 'BG' ? details.bgCourierUrgency : details.fdrCourierUrgency;
+            const docs = mode === 'BG' ? details.bgCourierDocs : details.fdrCourierDocs;
+
+            const [courierRow] = await tx
+                .insert(couriers)
+                .values({
+                    userId: userId ?? 0,
+                    toOrg: org,
+                    toName: toName || '',
+                    toAddr: [addr1, addr2, city, state].filter(Boolean).join(', '),
+                    toPin: pincode || '',
+                    toMobile: phone || '',
+                    empFrom: Number(empFrom) || userId || 0,
+                    delDate: delDate ? new Date(delDate) : new Date(),
+                    urgency: Number(urgency) || 1,
+                    courierDocs: docs ?? [],
+                    status: 0, // Courier status: Pending
+                })
+                .returning()
+                .execute();
+            courierId = courierRow?.id ?? null;
+        }
+
+        const structuredCourierAddress = [
+            details[`${shorthand}CourierAddressLine1`] || details[`${shorthand}CourierAddrLine1`] || details.bgCourierAddrLine1,
+            details[`${shorthand}CourierAddressLine2`] || details[`${shorthand}CourierAddrLine2`] || details.bgCourierAddrLine2,
+            details[`${shorthand}CourierCity`] || details.bgCourierCity,
+            details[`${shorthand}CourierState`] || details.bgCourierState,
+            details[`${shorthand}CourierPincode`] || details.bgCourierPincode,
+        ].filter(Boolean).join(', ');
 
         const [instrument] = await tx
             .insert(paymentInstruments)
@@ -589,9 +659,10 @@ export class PaymentRequestsCommandService {
                 payableAt: (details[`${shorthand}PayableAt`] || details.bgAddress) || null,
                 issueDate: (details[`${shorthand}Date`] || details.bgDate) || null,
                 expiryDate: (details[`${shorthand}ExpiryDate`] || details.bgExpiryDate || details.fdrExpiryDate) || null,
-                courierAddress: (details[`${shorthand}CourierAddress`] || details.bgCourierAddress || details.ddCourierAddress || details.fdrCourierAddress) || null,
+                courierAddress: (details[`${shorthand}CourierAddress`] || details.bgCourierAddress || structuredCourierAddress || details.ddCourierAddress || details.fdrCourierAddress) || null,
                 courierAddressJson,
                 courierDeadline: (details[`${shorthand}CourierHours`] || details.bgCourierDays || details.ddCourierHours || details.fdrCourierHours) || null,
+                reqNo: courierId ? String(courierId) : null,
                 status: 'PENDING',
                 isActive: true,
                 createdBy: userId,
@@ -654,6 +725,8 @@ export class PaymentRequestsCommandService {
                     stampCharges: details.bgStampValue || null,
                     bgSoftCopy: details.bgFormatFiles?.[0] || null,
                     bgPo: details.bgPoFiles?.[0] || null,
+                    uniqueCode: details.uniqueCode || null,
+                    uniqueAdviceMessage: details.uniqueAdviceMessage || null,
                 }).execute();
                 break;
 
@@ -796,6 +869,7 @@ export class PaymentRequestsCommandService {
                 requestedBy: userId || 0,
             };
             const makerRequest = await this.paymentRequestService.create(makerRequestBody, userId || 0);
+            await this.linkMakerRequestToInstrument(tx, instrument.id, makerRequest?.id);
             this.logger.log(`Auto-created project payment request: ${makerRequest.requestNo} for payment request ${paymentRequest.id}`);
             return makerRequest;
         }
@@ -815,11 +889,22 @@ export class PaymentRequestsCommandService {
                 requestedBy: userId || 0,
             };
             const makerRequest = await this.paymentRequestService.create(makerRequestBody, userId || 0);
+            await this.linkMakerRequestToInstrument(tx, instrument.id, makerRequest?.id);
             this.logger.log(`Auto-created project payment request: ${makerRequest.requestNo} for payment request ${paymentRequest.id}`);
             return makerRequest;
         }
 
         return null;
+    }
+
+    private async linkMakerRequestToInstrument(tx: any, instrumentId: number, makerRequestId?: number): Promise<void> {
+        if (!makerRequestId) {
+            return;
+        }
+        await tx
+            .update(paymentInstruments)
+            .set({ makerRequestId, updatedAt: new Date() })
+            .where(eq(paymentInstruments.id, instrumentId));
     }
 
     private async generateProjectPaymentRequestNo(): Promise<string> {
@@ -868,27 +953,61 @@ export class PaymentRequestsCommandService {
         }
 
         // Update main instrument
+        const instrumentUpdate: Record<string, any> = {
+            purpose: (details[`${shorthand}Purpose`] || details.btPurpose || details.portalPurpose || details.ddPurpose || details.fdrPurpose || details.bgPurpose || details.chequePurpose) || null,
+            amount: (details[`${shorthand}Amount`] || details.amountRequired || details.btAmount || details.portalAmount || details.ddAmount || details.fdrAmount || details.bgAmount || details.chequeAmount)?.toString() || null,
+            favouring: (details[`${shorthand}Favouring`] || details.btAccountName || details.portalName || details.bgFavouring || details.ddFavouring || details.fdrFavouring || details.chequeFavouring) || null,
+            payableAt: (details[`${shorthand}PayableAt`] || details.bgAddress || details.ddPayableAt || details.fdrPayableAt || details.btPayableAt || details.portalPayableAt || details.chequePayableAt) || null,
+            issueDate: (details[`${shorthand}Date`] || details.bgDate || details.ddDate || details.fdrDate || details.btDate || details.portalDate || details.chequeDate) || null,
+            expiryDate: (details[`${shorthand}ExpiryDate`] || details.bgExpiryDate || details.fdrExpiryDate) || null,
+            courierAddress: (
+                details[`${shorthand}CourierAddress`] ||
+                details.bgCourierAddress ||
+                [
+                    details[`${shorthand}CourierAddrLine1`] || details.bgCourierAddrLine1,
+                    details[`${shorthand}CourierAddrLine2`] || details.bgCourierAddrLine2,
+                    details[`${shorthand}CourierCity`] || details.bgCourierCity,
+                    details[`${shorthand}CourierState`] || details.bgCourierState,
+                    details[`${shorthand}CourierPincode`] || details.bgCourierPincode,
+                ].filter(Boolean).join(', ') ||
+                details.ddCourierAddress ||
+                details.fdrCourierAddress
+            ) || null,
+            courierAddressJson: normalizedMode === 'DD' ? {
+                name: details[`${shorthand}CourierName`] || null,
+                phone: details[`${shorthand}CourierPhone`] || null,
+                line1: details[`${shorthand}CourierAddressLine1`] || null,
+                line2: details[`${shorthand}CourierAddressLine2`] || null,
+                city: details[`${shorthand}CourierCity`] || null,
+                state: details[`${shorthand}CourierState`] || null,
+                pincode: details[`${shorthand}CourierPincode`] || null,
+            } : (normalizedMode === 'FDR' || normalizedMode === 'BG') ? {
+                org: details[`${shorthand}CourierOrg`] || details.bgCourierOrg || null,
+                name: details[`${shorthand}CourierName`] || details.bgCourierName || null,
+                phone: details[`${shorthand}CourierPhone`] || details.bgCourierPhone || null,
+                line1: details[`${shorthand}CourierAddrLine1`] || details.bgCourierAddrLine1 || null,
+                line2: details[`${shorthand}CourierAddrLine2`] || details.bgCourierAddrLine2 || null,
+                city: details[`${shorthand}CourierCity`] || details.bgCourierCity || null,
+                state: details[`${shorthand}CourierState`] || details.bgCourierState || null,
+                pincode: details[`${shorthand}CourierPincode`] || details.bgCourierPincode || null,
+                empFrom: details[`${shorthand}CourierEmpFrom`] ?? details.bgCourierEmpFrom ?? null,
+                delDate: details[`${shorthand}CourierDelDate`] || details.bgCourierDelDate || null,
+                urgency: details[`${shorthand}CourierUrgency`] ?? details.bgCourierUrgency ?? null,
+                docs: details[`${shorthand}CourierDocs`] ?? details.bgCourierDocs ?? [],
+            } : null,
+            courierDeadline: (details[`${shorthand}CourierHours`] || details.bgCourierDays || details.ddCourierHours || details.fdrCourierHours) || null,
+        };
+
+        // The FDR request form no longer captures FDR Date / Courier Hours.
+        // Avoid nulling values that were captured elsewhere (legacy rows / BI).
+        if (normalizedMode === 'FDR') {
+            if (!details.fdrDate) delete instrumentUpdate.issueDate;
+            if (!details.fdrCourierHours) delete instrumentUpdate.courierDeadline;
+        }
+
         await tx
             .update(paymentInstruments)
-            .set({
-                purpose: (details[`${shorthand}Purpose`] || details.btPurpose || details.portalPurpose || details.ddPurpose || details.fdrPurpose || details.bgPurpose || details.chequePurpose) || null,
-                amount: (details[`${shorthand}Amount`] || details.amountRequired || details.btAmount || details.portalAmount || details.ddAmount || details.fdrAmount || details.bgAmount || details.chequeAmount)?.toString() || null,
-                favouring: (details[`${shorthand}Favouring`] || details.btAccountName || details.portalName || details.bgFavouring || details.ddFavouring || details.fdrFavouring || details.chequeFavouring) || null,
-                payableAt: (details[`${shorthand}PayableAt`] || details.bgAddress || details.ddPayableAt || details.fdrPayableAt || details.btPayableAt || details.portalPayableAt || details.chequePayableAt) || null,
-                issueDate: (details[`${shorthand}Date`] || details.bgDate || details.ddDate || details.fdrDate || details.btDate || details.portalDate || details.chequeDate) || null,
-                expiryDate: (details[`${shorthand}ExpiryDate`] || details.bgExpiryDate || details.fdrExpiryDate) || null,
-                courierAddress: (details[`${shorthand}CourierAddress`] || details.bgCourierAddress || details.ddCourierAddress || details.fdrCourierAddress) || null,
-                courierAddressJson: (normalizedMode === 'DD' || normalizedMode === 'FDR') ? {
-                    name: details[`${shorthand}CourierName`] || null,
-                    phone: details[`${shorthand}CourierPhone`] || null,
-                    line1: details[`${shorthand}CourierAddressLine1`] || null,
-                    line2: details[`${shorthand}CourierAddressLine2`] || null,
-                    city: details[`${shorthand}CourierCity`] || null,
-                    state: details[`${shorthand}CourierState`] || null,
-                    pincode: details[`${shorthand}CourierPincode`] || null,
-                } : null,
-                courierDeadline: (details[`${shorthand}CourierHours`] || details.bgCourierDays || details.ddCourierHours || details.fdrCourierHours) || null,
-            })
+            .set(instrumentUpdate)
             .where(eq(paymentInstruments.id, instrumentId));
 
         // Update type-specific details
@@ -916,17 +1035,24 @@ export class PaymentRequestsCommandService {
                 }).where(eq(instrumentDdDetails.instrumentId, instrumentId));
                 break;
 
-            case 'FDR':
-                await tx.update(instrumentFdrDetails).set({
-                    fdrNo: details.fdrNo || null,
-                    fdrDate: details.fdrDate || null,
-                    fdrPurpose: details.fdrPurpose || null,
-                    fdrExpiryDate: details.fdrExpiryDate || null,
-                    fdrNeeds: details.fdrDeliverBy || null,
-                    fdrRemark: details.fdrRemarks || null,
-                    fdrSource: details.fdrSource || null,
-                }).where(eq(instrumentFdrDetails.instrumentId, instrumentId));
+            case 'FDR': {
+                // Only update keys actually present in the payload so an edit of
+                // the request form does not wipe BI/Accounts-captured values.
+                const fdrUpdate: Record<string, any> = {};
+                if (details.fdrNo !== undefined) fdrUpdate.fdrNo = details.fdrNo || null;
+                if (details.fdrDate !== undefined) fdrUpdate.fdrDate = details.fdrDate || null;
+                if (details.fdrPurpose !== undefined) fdrUpdate.fdrPurpose = details.fdrPurpose || null;
+                if (details.fdrExpiryDate !== undefined) fdrUpdate.fdrExpiryDate = details.fdrExpiryDate || null;
+                if (details.fdrDeliverBy !== undefined) fdrUpdate.fdrNeeds = details.fdrDeliverBy || null;
+                if (details.fdrRemarks !== undefined) fdrUpdate.fdrRemark = details.fdrRemarks || null;
+                if (details.fdrSource !== undefined) fdrUpdate.fdrSource = details.fdrSource || null;
+                if (Object.keys(fdrUpdate).length > 0) {
+                    await tx.update(instrumentFdrDetails)
+                        .set(fdrUpdate)
+                        .where(eq(instrumentFdrDetails.instrumentId, instrumentId));
+                }
                 break;
+            }
 
             case 'BG':
                 await tx.update(instrumentBgDetails).set({
@@ -948,6 +1074,8 @@ export class PaymentRequestsCommandService {
                     stampCharges: details.bgStampValue || null,
                     bgSoftCopy: details.bgFormatFiles?.[0] || null,
                     bgPo: details.bgPoFiles?.[0] || null,
+                    uniqueCode: details.uniqueCode || null,
+                    uniqueAdviceMessage: details.uniqueAdviceMessage || null,
                 }).where(eq(instrumentBgDetails.instrumentId, instrumentId));
                 break;
 

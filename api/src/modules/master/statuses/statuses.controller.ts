@@ -1,16 +1,6 @@
-﻿import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    HttpCode,
-    HttpStatus,
-    Param,
-    ParseIntPipe,
-    Patch,
-    Post,
-} from '@nestjs/common';
+﻿import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
+import { MasterWriteGuard } from '@/modules/master/common/master-write.guard';
 import { StatusesService } from '@/modules/master/statuses/statuses.service';
 
 const CreateStatusSchema = z.object({
@@ -28,6 +18,7 @@ type CreateStatusDto = z.infer<typeof CreateStatusSchema>;
 type UpdateStatusDto = z.infer<typeof UpdateStatusSchema>;
 
 @Controller('statuses')
+@UseGuards(MasterWriteGuard)
 export class StatusesController {
     constructor(private readonly statusesService: StatusesService) { }
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { useSellerGsts } from "@/hooks/api/usePurchaseOrders";
 
@@ -68,6 +68,10 @@ export function useSellerGstSelection<T extends SellerGstForm>(
                 if (lastFilledIdRef.current !== sellerGstId) fillFrom(chosen);
                 return;
             }
+            // Wait for this org's GST rows before treating the hydrated id as
+            // stale; otherwise the initial load clears it and loses the
+            // selection (and the id can't be written back on save).
+            if (isLoading) return;
             // The saved selection is no longer part of this org.
             setField("sellerGstId", "");
             lastFilledIdRef.current = null;
@@ -93,7 +97,13 @@ export function useSellerGstSelection<T extends SellerGstForm>(
         setField("sellerGstId", String(first.id));
         fillFrom(first);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [orgId, sellerGsts, sellerGstId, sellerGstNo]);
+    }, [orgId, sellerGsts, sellerGstId, sellerGstNo, isLoading]);
 
-    return { sellerGsts, isLoading };
+    // Edit pages call this after form.reset so the hydrated id is treated as
+    // already applied: the effect must not overwrite the saved GST number.
+    const seedInitialSelection = useCallback((gstId?: string | number | null) => {
+        lastFilledIdRef.current = gstId ? String(gstId) : null;
+    }, []);
+
+    return { sellerGsts, isLoading, seedInitialSelection };
 }

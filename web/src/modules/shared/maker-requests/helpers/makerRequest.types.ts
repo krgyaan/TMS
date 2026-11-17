@@ -26,6 +26,7 @@ export interface MakerRequestRow {
     purchaseOrderId?: number;
     poNumber?: string;
     vendorWorkOrderId?: number;
+    fixedExpenseId?: number | null;
     vwoNumber?: string;
     poTotalAmount?: number;
     poTotalGstAmt?: number;

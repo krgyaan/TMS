@@ -25,6 +25,7 @@ export const woDetailsKeys = {
   byBasicDetail: (woBasicDetailId: number) => [...woDetailsKeys.all, 'by-basic-detail', woBasicDetailId] as const,
   acceptanceStatus: (id: number) => [...woDetailsKeys.all, 'acceptance-status', id] as const,
   timeline: (id: number) => [...woDetailsKeys.all, 'timeline', id] as const,
+  history: (id: number) => [...woDetailsKeys.all, 'history', id] as const,
 
   // Wizard-specific keys
   wizardProgress: (id: number) => [...woDetailsKeys.all, 'wizard-progress', id] as const,
@@ -50,6 +51,15 @@ export const useWoDetailByBasicDetail = (woBasicDetailId: number) => {
     queryKey: woDetailsKeys.byBasicDetail(woBasicDetailId),
     queryFn: () => woDetailsService.getByWoBasicDetailId(woBasicDetailId),
     enabled: !!woBasicDetailId && woBasicDetailId > 0,
+    staleTime: 30 * 1000,
+  });
+};
+
+export const useWoDetailsHistory = (woDetailId: number | null, enabled = true) => {
+  return useQuery({
+    queryKey: woDetailsKeys.history(woDetailId || 0),
+    queryFn: () => woDetailsService.getHistory(woDetailId!),
+    enabled: enabled && !!woDetailId && woDetailId > 0,
     staleTime: 30 * 1000,
   });
 };
@@ -142,6 +152,9 @@ export const useSavePageDraft = () => {
         queryKey: woDetailsKeys.wizardProgress(woDetailId),
         exact: true,
       });
+      queryClient.invalidateQueries({
+        queryKey: woDetailsKeys.history(woDetailId),
+      });
       // Silent success for drafts - no toast
     },
     onError: (error: any) => {
@@ -177,6 +190,9 @@ export const useSubmitPage = () => {
       queryClient.invalidateQueries({
         queryKey: woDetailsKeys.detail(woDetailId),
       });
+      queryClient.invalidateQueries({
+        queryKey: woDetailsKeys.history(woDetailId),
+      });
       toast.success(`Page ${pageNum} saved successfully`);
       return result;
     },
@@ -209,6 +225,9 @@ export const useSkipPage = () => {
         queryKey: woDetailsKeys.wizardProgress(woDetailId),
         exact: true,
       });
+      queryClient.invalidateQueries({
+        queryKey: woDetailsKeys.history(woDetailId),
+      });
       toast.info('Page skipped');
     },
     onError: (error: any) => {
@@ -236,9 +255,26 @@ export const useSubmitAllPages = () => {
   });
 };
 
-// Submit wizard for review
-export const useSubmitForReview = () => {
+export const useCompleteWoUpload = () => {
   const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (woDetailId: number) => woDetailsService.completeUpload(woDetailId),
+    onSuccess: (result, woDetailId) => {
+      queryClient.invalidateQueries({ queryKey: woDetailsKeys.all });
+      queryClient.invalidateQueries({ queryKey: woDetailsKeys.detail(woDetailId) });
+      queryClient.invalidateQueries({ queryKey: woDetailsKeys.detailWithRelations(woDetailId) });
+      queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.all });
+      toast.success(result.message);
+    },
+    onError: (error: any) => {
+      toast.error(handleQueryError(error));
+    },
+  });
+};
+
+// Submit wizard for review
+export const useSubmitForReview = () => {  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (woDetailId: number) => woDetailsService.submitForReview(woDetailId),
@@ -362,6 +398,7 @@ export const useWoDetails = (filters?: WoDetailsFilters) => {
   return useQuery({
     queryKey: woDetailsKeys.list(combinedFilters),
     queryFn: () => woDetailsService.getAll(combinedFilters),
+    placeholderData: (previousData) => previousData,
   });
 };
 
@@ -404,13 +441,6 @@ export const useWoDetailsDashboardSummary = () => {
   return useQuery({
     queryKey: woDetailsKeys.dashboardSummary(teamId ?? undefined),
     queryFn: () => woDetailsService.getDashboardSummary(teamId ?? undefined),
-  });
-};
-
-export const usePendingAcceptance = () => {
-  return useQuery({
-    queryKey: woDetailsKeys.pendingAcceptance(),
-    queryFn: () => woDetailsService.getPendingAcceptance(),
   });
 };
 

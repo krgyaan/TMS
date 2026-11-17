@@ -66,32 +66,32 @@ function WhatsappCreateForm({ source }: { source: FollowupSource }) {
             )}
 
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                <FieldWrapper<WhatsappFormValues, "body">
-                    control={form.control}
-                    name="body"
-                    label="What you have sent?"
-                >
-                    {(field) => (
-                        <textarea
-                            className="border-input placeholder:text-muted-foreground dark:bg-input/30 min-h-[150px] w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                            placeholder="Describe what you sent via WhatsApp..."
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <FieldWrapper<WhatsappFormValues, "body">
+                        control={form.control}
+                        name="body"
+                        label="What you have sent?"
+                    >
+                        {(field) => (
+                            <textarea
+                                className="border-input placeholder:text-muted-foreground dark:bg-input/30 min-h-[150px] w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                placeholder="Describe what you sent via WhatsApp..."
+                                disabled={saving}
+                                {...field}
+                            />
+                        )}
+                    </FieldWrapper>
+
+                    <div className="space-y-2">
+                        <FileUploader
+                            context="lead-followups"
+                            value={attachmentPaths}
+                            onChange={setAttachmentPaths}
+                            label="Attachments"
                             disabled={saving}
-                            {...field}
                         />
-                    )}
-                </FieldWrapper>
+                    </div>
 
-                <div className="space-y-2">
-                    <FileUploader
-                        context="lead-followups"
-                        value={attachmentPaths}
-                        onChange={setAttachmentPaths}
-                        label="Attachments"
-                        disabled={saving}
-                    />
-                </div>
-
-                <div className="w-64">
                     <FieldWrapper<WhatsappFormValues, "nextFollowupDate">
                         control={form.control}
                         name="nextFollowupDate"

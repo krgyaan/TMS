@@ -9,6 +9,7 @@ import { EmployeeImprestsSection } from "./sections/EmployeeImprestsSection";
 import { InsuranceSection } from "./sections/InsuranceSection";
 import { InventorySection } from "@/modules/operations/inventory/components/InventorySection";
 import { PaymentRequestsSection } from "./sections/PaymentRequestsSection";
+import { BiRequestsSection } from "./sections/BiRequestsSection";
 import { ProjectClosureSection } from "./sections/ProjectClosureSection";
 import { ProjectOverviewSection } from "./sections/ProjectOverviewSection";
 import { ProjectSummarySheetSection } from "./sections/ProjectSummarySheetSection";
@@ -65,6 +66,7 @@ export default function ProjectDashboardPage() {
             <InventorySection projectId={projectId} />
             <PurchaseInvoicesSection projectId={projectId} />
             <PaymentRequestsSection projectId={projectId} insuranceRequired={insuranceRequired} />
+            <BiRequestsSection projectId={projectId} />
             <InsuranceSection projectId={projectId} />
             <EmployeeImprestsSection projectId={projectId} />
             <ProjectClosureSection projectId={projectId} />

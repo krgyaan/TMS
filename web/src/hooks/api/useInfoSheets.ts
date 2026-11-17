@@ -11,6 +11,44 @@ export const infoSheetsKey = {
         [...infoSheetsKey.details(), tenderId] as const,
 }
 
+/** Contacts (tender_clients) — shared by the info sheet and BG request forms. */
+export const tenderContactsKey = {
+    all: ['tender-contacts'] as const,
+    byTender: (tenderId: number) => [...tenderContactsKey.all, tenderId] as const,
+}
+
+export const useTenderContacts = (tenderId: number | null) => {
+    return useQuery({
+        queryKey: tenderContactsKey.byTender(tenderId ?? 0),
+        queryFn: () => infoSheetsService.getTenderContacts(tenderId!),
+        enabled: !!tenderId && tenderId > 0,
+    })
+}
+
+export const useAddTenderClient = () => {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: ({
+            tenderId,
+            data,
+        }: {
+            tenderId: number
+            data: { clientName: string; clientDesignation?: string; clientMobile?: string; clientEmail?: string }
+        }) => infoSheetsService.addTenderClient(tenderId, data),
+
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: tenderContactsKey.byTender(variables.tenderId) })
+            queryClient.invalidateQueries({ queryKey: infoSheetsKey.detail(variables.tenderId) })
+            toast.success('Contact person added successfully')
+        },
+
+        onError: (error) => {
+            toast.error(handleQueryError(error))
+        },
+    })
+}
+
 export const useInfoSheet = (tenderId: number | null) => {
     return useQuery({
         queryKey: infoSheetsKey.detail(tenderId ?? 0),

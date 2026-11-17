@@ -1,5 +1,6 @@
-﻿import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query } from "@nestjs/common";
+﻿import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { z } from "zod";
+import { MasterWriteGuard } from "@/modules/master/common/master-write.guard";
 import { LocationsService } from "@/modules/master/locations/locations.service";
 
 const CreateLocationSchema = z.object({
@@ -16,6 +17,7 @@ type CreateLocationDto = z.infer<typeof CreateLocationSchema>;
 type UpdateLocationDto = z.infer<typeof UpdateLocationSchema>;
 
 @Controller("locations")
+@UseGuards(MasterWriteGuard)
 export class LocationsController {
     constructor(private readonly locationsService: LocationsService) {}
 
@@ -27,6 +29,16 @@ export class LocationsController {
     @Get("list-true")
     async listTrue() {
         return this.locationsService.findAllTrue();
+    }
+
+    @Get("states")
+    async getStates() {
+        return this.locationsService.findDistinctStates();
+    }
+
+    @Get("regions")
+    async getRegions(@Query("state") state?: string) {
+        return this.locationsService.findDistinctRegions(state);
     }
 
     @Get("search")

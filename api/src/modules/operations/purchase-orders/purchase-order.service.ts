@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Inject, Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Inject, Injectable, InternalServerErrorException, NotFoundException, Optional } from "@nestjs/common";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, like, ne, or, sql, type SQL } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, rename } from "node:fs/promises";
@@ -27,6 +27,7 @@ import { Logger } from "winston";
 import { OperationNotificationService } from "@/modules/operations/operation-notification.service";
 import { round2, CLOSURE_TOLERANCE } from "@/utils/money.util";
 import { getGstStateNameFromGstin } from "@/utils/gst-state.util";
+import { PoApprovalService } from "./po-approval.service";
 
 @Injectable()
 export class PurchaseOrderService {
@@ -40,7 +41,8 @@ export class PurchaseOrderService {
         private readonly clientDirectorySyncService: ClientDirectorySyncService,
         private readonly insuranceService: InsurancePolicyService,
         private readonly notifications: OperationNotificationService,
-        private readonly cashFlowService: CashFlowService
+        private readonly cashFlowService: CashFlowService,
+        @Optional() private readonly poApprovalService?: PoApprovalService
     ) {}
 
     async getPurchaseOrders(projectId: number) {
@@ -81,6 +83,8 @@ export class PurchaseOrderService {
                 totalPiCount: sql<number>`COALESCE((SELECT COUNT(*) FROM project_purchase_invoices WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                 poApproved: purchaseOrders.poApproved,
                 poApprovalRemark: purchaseOrders.poApprovalRemark,
+                tlStatus: purchaseOrders.tlStatus,
+                tlRemark: purchaseOrders.tlRemark,
                 closedAt: purchaseOrders.closedAt,
             })
             .from(purchaseOrders)
@@ -195,6 +199,8 @@ export class PurchaseOrderService {
                 amountAfterTds: purchaseOrders.amountAfterTds,
                 poApproved: purchaseOrders.poApproved,
                 poApprovalRemark: purchaseOrders.poApprovalRemark,
+                tlStatus: purchaseOrders.tlStatus,
+                tlRemark: purchaseOrders.tlRemark,
                 closedAt: purchaseOrders.closedAt,
                 totalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0) + COALESCE((SELECT SUM(taxable_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                 totalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0) + COALESCE((SELECT SUM(gst_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
@@ -311,6 +317,8 @@ export class PurchaseOrderService {
 
                     sellerName: normalizeVendorName(body.sellerName),
                     sellerOrganizationId: body.sellerOrganizationId || null,
+                    sellerGstId: body.sellerGstId || null,
+                    vendorPersonId: body.vendorPersonId || null,
                     sellerAddress: body.sellerAddress,
                     sellerEmail: body.sellerEmail,
                     sellerGstNo: body.sellerGstNo,
@@ -320,7 +328,11 @@ export class PurchaseOrderService {
                     contactPersonName: body.contactPersonName,
                     contactPersonPhone: body.contactPersonPhone,
                     contactPersonEmail: body.contactPersonEmail,
+                    vendorContactPersonName: body.vendorContactPersonName,
+                    vendorContactPersonPhone: body.vendorContactPersonPhone,
+                    vendorContactPersonEmail: body.vendorContactPersonEmail,
 
+                    shipToPartyId: body.shipToPartyId || null,
                     shipToName: body.shipToName,
                     shippingAddress: body.shippingAddress,
                     shipToGst: body.shipToGst,
@@ -373,25 +385,6 @@ export class PurchaseOrderService {
             }
         }
 
-        // Client directory holds external parties, so the vendor's person goes in -
-        // not our own contact, which is an internal employee.
-        await this.clientDirectorySyncService.syncToClientDirectory(
-            [
-                {
-                    name: body.vendorContactPersonName,
-                    email: body.vendorContactPersonEmail,
-                    phone: body.vendorContactPersonPhone,
-                    org: normalizeVendorName(body.sellerName),
-                },
-                {
-                    name: normalizeVendorName(body.sellerName),
-                    email: body.sellerEmail,
-                    phone: null,
-                    org: null,
-                },
-            ].filter(c => c.name)
-        );
-
         this.logger.info(`Purchase Order created: ${poNumber}`);
 
         // Compute grandTotal from products for notification
@@ -413,6 +406,26 @@ export class PurchaseOrderService {
                 createdBy: userId,
             })
             .catch(err => this.logger.warn(`WhatsApp notification failed: ${err}`));
+
+        const itemsSummary = (body.products || [])
+            .slice(0, 3)
+            .map((p: any) => p.description)
+            .filter(Boolean)
+            .join(", ");
+
+        this.poApprovalService
+            ?.startWorkflowForPo({
+                purchaseOrderId: po.id,
+                poNumber,
+                tenderId: body.tenderId,
+                projectName: body.projectName,
+                sellerName: normalizeVendorName(body.sellerName),
+                grandTotal: grandTotal.toFixed(2),
+                teamId: woBasic?.team ?? null,
+                createdBy: userId,
+                itemsSummary: itemsSummary || null,
+            })
+            .catch(err => this.logger.warn(`PO Stage 1 WhatsApp approval workflow failed: ${err}`));
 
         this.generatePdfForPO(po, body.products).catch(err => {
             this.logger.error(`Failed to generate PO PDF: ${err.message}`);
@@ -732,6 +745,10 @@ export class PurchaseOrderService {
                     .catch(err => this.logger.warn(`Cash flow creation failed for PO approval #${po.id}: ${err}`));
             }
 
+            await this.poApprovalService
+                ?.cancelWorkflowOnInAppDecision(id, userId, "approved")
+                .catch(err => this.logger.warn(`Failed to cancel PO WA workflow on in-app approve #${id}: ${err}`));
+
             return updated;
         } else {
             const [updated] = await this.db
@@ -768,6 +785,10 @@ export class PurchaseOrderService {
                     rejectedBy: userId ?? 0,
                 })
                 .catch(err => this.logger.warn(`WhatsApp PO rejection notification failed: ${err}`));
+
+            await this.poApprovalService
+                ?.cancelWorkflowOnInAppDecision(id, userId, "rejected")
+                .catch(err => this.logger.warn(`Failed to cancel PO WA workflow on in-app reject #${id}: ${err}`));
 
             this.logger.info(`TDS rejected for PO #${id}: ${remark || "no remark"}`);
             return updated;
@@ -896,6 +917,8 @@ export class PurchaseOrderService {
             .where(eq(purchaseInvoices.purchaseOrderId, id))
             .orderBy(desc(purchaseInvoices.createdAt));
 
+        const approvalWorkflow = (await this.poApprovalService?.getWorkflowForPo(id)) ?? null;
+
         return {
             ...po,
             products: enrichedProducts,
@@ -906,7 +929,20 @@ export class PurchaseOrderService {
             raisedByName,
             paymentRequests: paymentRequestsData,
             purchaseInvoices: purchaseInvoicesData,
+            approvalWorkflow,
         };
+    }
+
+    async getApprovalWorkflow(id: number) {
+        if (!this.poApprovalService) return null;
+        return this.poApprovalService.getWorkflowForPo(id);
+    }
+
+    async resendApprovalPrompt(id: number, userId?: number) {
+        if (!this.poApprovalService) {
+            throw new BadRequestException("PO WhatsApp approval service is not available");
+        }
+        return this.poApprovalService.resendActiveStagePrompt(id, userId);
     }
 
     async getPurchaseOrderPdf(id: number, version?: string): Promise<{ path: string; filename: string }> {
@@ -1029,7 +1065,6 @@ export class PurchaseOrderService {
                         .insert(vendorOrganizations)
                         .values({
                             name,
-                            alias: body.alias || null,
                             msme: body.msme || null,
                             pan: body.pan || null,
                             address: body.address || null,
@@ -1125,6 +1160,7 @@ export class PurchaseOrderService {
         // }
 
         const wasRejected = existingPO.poApproved === false;
+        const isUnapproved = existingPO.poApproved !== true;
         const [woBasic] = await this.db.select({ team: woBasicDetails.team }).from(woBasicDetails).where(eq(woBasicDetails.tenderId, existingPO.tenderId)).limit(1);
         this.logger.info(`Updating Purchase Order: ${body.poNumber} for project: ${body.projectName}, tenderId: ${body.tenderId}, team: ${woBasic?.team}`);
 
@@ -1136,6 +1172,8 @@ export class PurchaseOrderService {
 
                     sellerName: normalizeVendorName(body.sellerName),
                     sellerOrganizationId: body.sellerOrganizationId || null,
+                    sellerGstId: body.sellerGstId || null,
+                    vendorPersonId: body.vendorPersonId || null,
                     sellerAddress: body.sellerAddress,
                     sellerEmail: body.sellerEmail,
                     sellerGstNo: body.sellerGstNo,
@@ -1149,6 +1187,7 @@ export class PurchaseOrderService {
                     vendorContactPersonPhone: body.vendorContactPersonPhone,
                     vendorContactPersonEmail: body.vendorContactPersonEmail,
 
+                    shipToPartyId: body.shipToPartyId || null,
                     shipToName: body.shipToName,
                     shippingAddress: body.shippingAddress,
                     shipToGst: body.shipToGst,
@@ -1173,6 +1212,10 @@ export class PurchaseOrderService {
 
                     team: woBasic?.team ?? existingPO.team,
 
+                    ...(isUnapproved && {
+                        tlStatus: null,
+                        tlRemark: null,
+                    }),
                     ...(wasRejected && {
                         poApproved: null,
                         tdsPercentage: null,
@@ -1219,17 +1262,6 @@ export class PurchaseOrderService {
             this.logger.error(`Failed to generate PO PDF after update: ${err.message}`);
         });
 
-        await this.clientDirectorySyncService.syncToClientDirectory(
-            [
-                {
-                    name: body.vendorContactPersonName,
-                    email: body.vendorContactPersonEmail,
-                    phone: body.vendorContactPersonPhone,
-                    org: normalizeVendorName(body.sellerName),
-                },
-            ].filter(c => c.name)
-        );
-
         this.logger.info(`Purchase Order updated: ${updatedPO.poNumber}`);
 
         this.notifications
@@ -1239,6 +1271,37 @@ export class PurchaseOrderService {
                 updatedBy: userId ?? 0,
             })
             .catch(err => this.logger.warn(`WhatsApp notification failed: ${err}`));
+
+        if (isUnapproved) {
+            const grandTotal = (body.products || []).reduce((sum: number, p: any) => {
+                const qty = Number(p.qty);
+                const rate = Number(p.rate);
+                const gstRate = Number(p.gstRate);
+                const taxable = qty * rate;
+                const gst = (taxable * gstRate) / 100;
+                return sum + taxable + gst;
+            }, 0);
+
+            const itemsSummary = (body.products || [])
+                .slice(0, 3)
+                .map((p: any) => p.description)
+                .filter(Boolean)
+                .join(", ");
+
+            this.poApprovalService
+                ?.startWorkflowForPo({
+                    purchaseOrderId: id,
+                    poNumber: updatedPO.poNumber ?? `#${id}`,
+                    tenderId: updatedPO.tenderId,
+                    projectName: updatedPO.projectName,
+                    sellerName: normalizeVendorName(body.sellerName),
+                    grandTotal: grandTotal.toFixed(2),
+                    teamId: updatedPO.team ?? null,
+                    createdBy: userId ?? updatedPO.poRaisedBy ?? 0,
+                    itemsSummary: itemsSummary || null,
+                })
+                .catch(err => this.logger.warn(`PO WhatsApp approval workflow restart failed after update #${id}: ${err}`));
+        }
 
         return updatedPO;
     }
@@ -1258,7 +1321,6 @@ export class PurchaseOrderService {
                 ...(hasGst ? {} : { address: body.sellerAddress || null }),
                 updatedAt: new Date(),
             };
-            if (body.sellerAlias !== undefined) patch.alias = body.sellerAlias || null;
 
             const formattedName = normalizeVendorName(body.sellerName);
             try {
@@ -1811,7 +1873,6 @@ export class PurchaseOrderService {
             .select({
                 id: vendorOrganizations.id,
                 name: vendorOrganizations.name,
-                alias: vendorOrganizations.alias,
                 gstNo: vendorGsts.gstNo,
                 msme: vendorOrganizations.msme,
                 pan: vendorOrganizations.pan,
@@ -1872,7 +1933,6 @@ export class PurchaseOrderService {
         const matches = pattern
             ? sql`(
                 ${vendorOrganizations.name} ILIKE ${pattern} OR
-                ${vendorOrganizations.alias} ILIKE ${pattern} OR
                 ${vendorOrganizations.pan} ILIKE ${pattern} OR
                 ${vendorOrganizations.msme} ILIKE ${pattern} OR
                 ${vendorOrganizations.address} ILIKE ${pattern} OR
@@ -1893,7 +1953,6 @@ export class PurchaseOrderService {
             .select({
                 id: vendorOrganizations.id,
                 name: vendorOrganizations.name,
-                alias: vendorOrganizations.alias,
                 // vendor_gsts is 1:N (one org holds 43 rows), so a join fans 482
                 // orgs out to 1251 rows and duplicate ids reach the picker. A
                 // correlated subquery keeps exactly one row per org instead.
@@ -2026,7 +2085,6 @@ export class PurchaseOrderService {
                     .update(vendorOrganizations)
                     .set({
                         name: name ?? undefined,
-                        alias: body.alias ?? undefined,
                         msme: body.msme ?? undefined,
                         pan: body.pan ?? undefined,
                         address: body.address ?? undefined,

@@ -3,703 +3,739 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
-import type { WoDetailWithRelations } from '@/modules/operations/types/wo.types';
+import { cn } from '@/lib/utils';
+import type {
+    TenderDocumentsChecklist,
+    WoBillingAddress,
+    WoBillingBoq,
+    WoDetailsHistoryEntry,
+    WoDetailWithRelations,
+} from '@/modules/operations/types/wo.types';
 import {
-    AlertCircle,
     Building2,
     CheckCircle2,
-    Clock,
     FileEdit,
     FileText,
     Link2,
-    MapPin,
     Package,
     Pen,
+    SkipForward,
     TrendingUp,
     Truck,
-    XCircle
 } from 'lucide-react';
+import type { ReactNode } from 'react';
 
+interface PageState {
+    status: 'completed' | 'skipped' | 'draft' | 'pending';
+    actorName?: string | null;
+    at?: string | null;
+}
 
-export function WoDetailView({ data }: { data: WoDetailWithRelations }) {
+function getPageState(
+    data: WoDetailWithRelations,
+    history: WoDetailsHistoryEntry[],
+    pageNum: number
+): PageState {
+    const completedPages = data.completedPages ?? [];
+    const skippedPages = data.skippedPages ?? [];
+    const isCompleted = completedPages.includes(pageNum);
+    const isSkipped = skippedPages.includes(pageNum);
+
+    const pageEvents = history.filter((entry) => entry.pageNo === pageNum);
+    const expectedAction = isCompleted
+        ? 'page_submitted'
+        : isSkipped
+            ? 'page_skipped'
+            : null;
+    const latestEvent =
+        (expectedAction
+            ? pageEvents.find((entry) => entry.action === expectedAction)
+            : undefined) ?? pageEvents[0];
+
+    if (isCompleted) {
+        return {
+            status: 'completed',
+            actorName: latestEvent?.actorName,
+            at: latestEvent?.createdAt,
+        };
+    }
+    if (isSkipped) {
+        return {
+            status: 'skipped',
+            actorName: latestEvent?.actorName,
+            at: latestEvent?.createdAt,
+        };
+    }
+    if (latestEvent) {
+        return {
+            status: 'draft',
+            actorName: latestEvent.actorName,
+            at: latestEvent.createdAt,
+        };
+    }
+    return { status: 'pending' };
+}
+
+function PageStatusBadge({
+    data,
+    history,
+    pageNum,
+}: {
+    data: WoDetailWithRelations;
+    history: WoDetailsHistoryEntry[];
+    pageNum: number;
+}) {
+    const state = getPageState(data, history, pageNum);
+    const actor = state.actorName ? ` by ${state.actorName}` : '';
+    const title = state.at ? formatDateTime(state.at) : undefined;
+
+    if (state.status === 'completed') {
+        return (
+            <Badge
+                variant="outline"
+                className="gap-1 border-emerald-300 bg-emerald-50 text-emerald-700"
+                title={title}
+            >
+                <CheckCircle2 className="h-3 w-3" />
+                Completed{actor}
+            </Badge>
+        );
+    }
+
+    if (state.status === 'skipped') {
+        return (
+            <Badge
+                variant="outline"
+                className="gap-1 border-amber-300 bg-amber-50 text-amber-700"
+                title={title}
+            >
+                <SkipForward className="h-3 w-3" />
+                Skipped{actor}
+            </Badge>
+        );
+    }
+
+    if (state.status === 'draft') {
+        return (
+            <Badge
+                variant="outline"
+                className="gap-1 border-blue-300 bg-blue-50 text-blue-700"
+                title={title}
+            >
+                <Pen className="h-3 w-3" />
+                Draft{actor}
+            </Badge>
+        );
+    }
+
+    return <Badge variant="secondary">Pending</Badge>;
+}
+
+function SectionCard({
+    title,
+    icon,
+    status,
+    description,
+    children,
+}: {
+    title: string;
+    icon?: ReactNode;
+    status?: ReactNode;
+    description?: ReactNode;
+    children: ReactNode;
+}) {
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                        <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                            {icon}
+                            {title}
+                        </CardTitle>
+                        {description && <CardDescription>{description}</CardDescription>}
+                    </div>
+                    {status && <div className="shrink-0">{status}</div>}
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-4">{children}</CardContent>
+        </Card>
+    );
+}
+
+function InfoGrid({ children }: { children: ReactNode }) {
+    return <div className="grid gap-4 sm:grid-cols-2">{children}</div>;
+}
+
+function InfoItem({
+    label,
+    value,
+    className,
+}: {
+    label: string;
+    value: ReactNode;
+    className?: string;
+}) {
+    return (
+        <div className={cn('min-w-0 space-y-1', className)}>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {label}
+            </p>
+            <div className="text-sm">{value ?? '—'}</div>
+        </div>
+    );
+}
+
+function BoolBadge({
+    value,
+    trueLabel = 'Yes',
+    falseLabel = 'No',
+}: {
+    value: boolean;
+    trueLabel?: string;
+    falseLabel?: string;
+}) {
+    return (
+        <Badge variant={value ? 'default' : 'secondary'}>
+            {value ? trueLabel : falseLabel}
+        </Badge>
+    );
+}
+
+function ChecklistList({ checklist }: { checklist: TenderDocumentsChecklist }) {
+    return (
+        <div className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
+            {Object.entries(checklist).map(([key, value]) => (
+                <div
+                    key={key}
+                    className="flex items-center justify-between gap-3 border-b border-dashed py-2 text-sm last:border-0"
+                >
+                    <span className="capitalize">
+                        {key.replace(/([A-Z])/g, ' $1').trim()}
+                    </span>
+                    <BoolBadge value={value} />
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function BoqTable({
+    items,
+    emptyLabel,
+}: {
+    items: WoBillingBoq[];
+    emptyLabel: string;
+}) {
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead className="w-16">Sr. No.</TableHead>
+                    <TableHead>Item Description</TableHead>
+                    <TableHead className="text-right">Quantity</TableHead>
+                    <TableHead className="text-right">Rate</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {items.map((item) => (
+                    <TableRow key={item.id}>
+                        <TableCell>{item.srNo}</TableCell>
+                        <TableCell>{item.itemDescription}</TableCell>
+                        <TableCell className="text-right">{item.quantity}</TableCell>
+                        <TableCell className="text-right">
+                            {formatINR(parseFloat(item.rate))}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                            {formatINR(parseFloat(item.amount || '0'))}
+                        </TableCell>
+                    </TableRow>
+                ))}
+                {items.length === 0 && (
+                    <TableRow>
+                        <TableCell
+                            colSpan={5}
+                            className="py-6 text-center text-sm italic text-muted-foreground"
+                        >
+                            {emptyLabel}
+                        </TableCell>
+                    </TableRow>
+                )}
+            </TableBody>
+        </Table>
+    );
+}
+
+function AddressList({
+    title,
+    addresses,
+    emptyLabel,
+}: {
+    title: string;
+    addresses: WoBillingAddress[];
+    emptyLabel: string;
+}) {
+    return (
+        <div className="space-y-2">
+            <p className="text-sm font-medium">{title}</p>
+            {addresses.length === 0 ? (
+                <p className="text-sm italic text-muted-foreground">{emptyLabel}</p>
+            ) : (
+                <div className="space-y-2">
+                    {addresses.map((addr, index) => {
+                        const srNos = Array.isArray(addr.srNos)
+                            ? addr.srNos.join(', ')
+                            : addr.srNos || '—';
+
+                        return (
+                            <div
+                                key={addr.id ?? index}
+                                className="space-y-1 rounded-md border p-3 text-sm"
+                            >
+                                <p className="font-medium">{addr.customerName}</p>
+                                <p className="whitespace-pre-wrap text-muted-foreground">
+                                    {addr.address}
+                                </p>
+                                <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
+                                    <span>GST: {addr.gst || 'N/A'}</span>
+                                    <span>Sr. Nos: {srNos}</span>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function DocumentList({ documents }: { documents?: string[] | null }) {
+    if (!documents?.length) {
+        return <span className="text-sm italic text-muted-foreground">None listed</span>;
+    }
+    return (
+        <div className="flex flex-wrap gap-2">
+            {documents.map((doc, index) => (
+                <Badge key={`${doc}-${index}`} variant="outline">
+                    {doc}
+                </Badge>
+            ))}
+        </div>
+    );
+}
+
+export function WoDetailView({
+    data,
+    history = [],
+}: {
+    data: WoDetailWithRelations;
+    history?: WoDetailsHistoryEntry[];
+}) {
     if (!data) return null;
 
-    const { woBasicDetail, billingBoq = [], buybackBoq = [], billingAddresses = [], shippingAddresses = [], acceptance } = data;
+    const {
+        woBasicDetail,
+        billingBoq = [],
+        buybackBoq = [],
+        billingAddresses = [],
+        shippingAddresses = [],
+        amendments = [],
+        acceptance,
+    } = data;
+
+    const checklist = data.tenderDocumentsChecklist;
 
     return (
-        <>
-            {/* PROJECT INFORMATION */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                        <Building2 className="h-5 w-5 text-primary" />
-                        Project Information
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableBody>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="font-medium text-muted-foreground">Current Stage</TableCell>
-                                <TableCell>
-                                    <Badge variant="outline" className="capitalize">
-                                        {woBasicDetail?.currentStage?.replace(/_/g, ' ') || 'Not Started'}
-                                    </Badge>
-                                </TableCell>
-                                <TableCell className="font-medium text-muted-foreground">Progress Page</TableCell>
-                                <TableCell className="font-semibold">Page {data.currentPage} of 7</TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="font-medium text-muted-foreground">Created At</TableCell>
-                                <TableCell>{formatDateTime(data.createdAt)}</TableCell>
-                                <TableCell className="font-medium text-muted-foreground">Last Updated</TableCell>
-                                <TableCell colSpan={3}>{formatDateTime(data.updatedAt)}</TableCell>
-                            </TableRow>
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+        <div className="space-y-4">
+            <SectionCard
+                title="Project Information"
+                icon={<Building2 className="h-4 w-4 text-primary" />}
+            >
+                <InfoGrid>
+                    <InfoItem
+                        label="Current Stage"
+                        value={
+                            <Badge variant="outline" className="capitalize">
+                                {woBasicDetail?.currentStage?.replace(/_/g, ' ') || 'Not Started'}
+                            </Badge>
+                        }
+                    />
+                    <InfoItem label="Progress" value={`Page ${data.currentPage} of 7`} />
+                    <InfoItem label="Created" value={formatDateTime(data.createdAt)} />
+                    <InfoItem label="Last Updated" value={formatDateTime(data.updatedAt)} />
+                </InfoGrid>
+            </SectionCard>
 
-            {/* HANDOVER CHECKLIST */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                        <FileText className="h-5 w-5 text-orange-500" />
-                        Project Handover Checklist (Page 1)
-                    </CardTitle>
-                    {data.checklistCompletedAt && (
-                        <CardDescription>Completed on {formatDateTime(data.checklistCompletedAt)}</CardDescription>
+            <SectionCard
+                title="Project Handover (Page 1)"
+                icon={<FileText className="h-4 w-4 text-muted-foreground" />}
+                status={<PageStatusBadge data={data} history={history} pageNum={1} />}
+                description={
+                    data.checklistCompletedAt
+                        ? `Completed on ${formatDateTime(data.checklistCompletedAt)}`
+                        : undefined
+                }
+            >
+                {checklist ? (
+                    <ChecklistList checklist={checklist} />
+                ) : (
+                    <p className="text-sm italic text-muted-foreground">
+                        Checklist not yet filled.
+                    </p>
+                )}
+            </SectionCard>
+
+            <SectionCard
+                title="Compliance Obligations (Page 2)"
+                icon={<FileText className="h-4 w-4 text-muted-foreground" />}
+                status={<PageStatusBadge data={data} history={history} pageNum={2} />}
+            >
+                <InfoGrid>
+                    <InfoItem
+                        label="LD Applicable"
+                        value={<BoolBadge value={data.ldApplicable} />}
+                    />
+                    <InfoItem
+                        label="PBG Required"
+                        value={<BoolBadge value={data.isPbgApplicable} />}
+                    />
+                    {data.ldApplicable && (
+                        <>
+                            <InfoItem label="Max LD %" value={data.maxLd ? `${data.maxLd}%` : '—'} />
+                            <InfoItem
+                                label="LD Start Date"
+                                value={data.ldStartDate ? formatDateTime(data.ldStartDate) : '—'}
+                            />
+                        </>
                     )}
-                </CardHeader>
-                <CardContent className="pt-4">
-                    {data.tenderDocumentsChecklist ? (
-                        <Table>
-                            <TableBody>
-                                {Object.entries(data.tenderDocumentsChecklist).reduce((rows: any[], [key, value], index, arr) => {
-                                    if (index % 2 === 0) {
-                                        const nextEntry = arr[index + 1];
-                                        rows.push(
-                                            <TableRow key={key} className="hover:bg-muted/30 transition-colors">
-                                                <TableCell className="font-medium w-1/4 capitalize">
-                                                    {key.replace(/([A-Z])/g, ' $1').trim()}
-                                                </TableCell>
-                                                <TableCell className="w-1/4">
-                                                    {value ? (
-                                                        <Badge variant="default" className="gap-1">
-                                                            <CheckCircle2 className="h-3 w-3" /> Yes
-                                                        </Badge>
-                                                    ) : (
-                                                        <Badge variant="secondary" className="gap-1">
-                                                            <XCircle className="h-3 w-3" /> No
-                                                        </Badge>
-                                                    )}
-                                                </TableCell>
-                                                {nextEntry ? (
-                                                    <>
-                                                        <TableCell className="font-medium w-1/4 capitalize">
-                                                            {nextEntry[0].replace(/([A-Z])/g, ' $1').trim()}
-                                                        </TableCell>
-                                                        <TableCell className="w-1/4">
-                                                            {nextEntry[1] ? (
-                                                                <Badge variant="default" className="gap-1">
-                                                                    <CheckCircle2 className="h-3 w-3" /> Yes
-                                                                </Badge>
-                                                            ) : (
-                                                                <Badge variant="secondary" className="gap-1">
-                                                                    <XCircle className="h-3 w-3" /> No
-                                                                </Badge>
-                                                            )}
-                                                        </TableCell>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <TableCell className="w-1/4"></TableCell>
-                                                        <TableCell className="w-1/4"></TableCell>
-                                                    </>
-                                                )}
-                                            </TableRow>
-                                        );
-                                    }
-                                    return rows;
-                                }, [])}
-                            </TableBody>
-                        </Table>
-                    ) : (
-                        <p className="text-center py-4 text-muted-foreground italic">Checklist not yet filled</p>
+                    <InfoItem
+                        label="Contract / Agreement"
+                        value={<BoolBadge value={data.isContractAgreement} />}
+                    />
+                    <InfoItem
+                        label="Detailed PO Follow-up"
+                        value={
+                            <BoolBadge
+                                value={data.detailedPoApplicable}
+                                trueLabel="Needed"
+                                falseLabel="Not Needed"
+                            />
+                        }
+                    />
+                </InfoGrid>
+            </SectionCard>
+
+            <SectionCard
+                title="SWOT Analysis (Page 3)"
+                icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
+                status={<PageStatusBadge data={data} history={history} pageNum={3} />}
+            >
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <InfoItem
+                        label="Strengths"
+                        value={<p className="whitespace-pre-wrap">{data.swotStrengths || '—'}</p>}
+                    />
+                    <InfoItem
+                        label="Weaknesses"
+                        value={<p className="whitespace-pre-wrap">{data.swotWeaknesses || '—'}</p>}
+                    />
+                    <InfoItem
+                        label="Opportunities"
+                        value={<p className="whitespace-pre-wrap">{data.swotOpportunities || '—'}</p>}
+                    />
+                    <InfoItem
+                        label="Threats"
+                        value={<p className="whitespace-pre-wrap">{data.swotThreats || '—'}</p>}
+                    />
+                </div>
+            </SectionCard>
+
+            <SectionCard
+                title="Billing (Page 4)"
+                icon={<Package className="h-4 w-4 text-muted-foreground" />}
+                status={<PageStatusBadge data={data} history={history} pageNum={4} />}
+            >
+                <div className="space-y-2">
+                    <p className="text-sm font-medium">Billing BOQ</p>
+                    <BoqTable items={billingBoq} emptyLabel="No billing items" />
+                </div>
+
+                {buybackBoq.length > 0 && (
+                    <div className="space-y-2">
+                        <p className="text-sm font-medium">Buyback BOQ</p>
+                        <BoqTable items={buybackBoq} emptyLabel="No buyback items" />
+                    </div>
+                )}
+
+                <div className="grid gap-4 md:grid-cols-2">
+                    <AddressList
+                        title="Billing Addresses"
+                        addresses={billingAddresses}
+                        emptyLabel="No billing addresses"
+                    />
+                    <AddressList
+                        title="Shipping Addresses"
+                        addresses={shippingAddresses}
+                        emptyLabel="No shipping addresses"
+                    />
+                </div>
+            </SectionCard>
+
+            <SectionCard
+                title="Project Execution & Site Visit (Page 5)"
+                icon={<Truck className="h-4 w-4 text-muted-foreground" />}
+                status={<PageStatusBadge data={data} history={history} pageNum={5} />}
+            >
+                <InfoGrid>
+                    <InfoItem
+                        label="Site Visit Required"
+                        value={<BoolBadge value={data.siteVisitNeeded} />}
+                    />
+                    {data.siteVisitNeeded && data.siteVisitPerson && (
+                        <InfoItem
+                            label="Site Contact"
+                            value={
+                                <div className="space-y-0.5">
+                                    <p className="font-medium">{data.siteVisitPerson.name}</p>
+                                    <p className="text-muted-foreground">
+                                        {data.siteVisitPerson.phone}
+                                        {data.siteVisitPerson.phone && data.siteVisitPerson.email
+                                            ? ' | '
+                                            : ''}
+                                        {data.siteVisitPerson.email}
+                                    </p>
+                                </div>
+                            }
+                        />
                     )}
-                </CardContent>
-            </Card>
+                    <InfoItem
+                        label="Documents Needed from Client"
+                        value={<DocumentList documents={data.documentsNeeded} />}
+                        className="sm:col-span-2"
+                    />
+                    <InfoItem
+                        label="Documents Available In-House"
+                        value={<DocumentList documents={data.documentsInHouse} />}
+                        className="sm:col-span-2"
+                    />
+                </InfoGrid>
+            </SectionCard>
 
-            {/* COMPLIANCE OBLIGATIONS */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                        <FileText className="h-5 w-5 text-blue-500" />
-                        Compliance Obligations (Page 2)
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-4">
-                    <Table>
-                        <TableBody>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="font-medium text-muted-foreground w-1/4">LD Applicable</TableCell>
-                                <TableCell className="w-1/4">
-                                    <Badge variant={data.ldApplicable ? "default" : "secondary"}>
-                                        {data.ldApplicable ? 'Yes' : 'No'}
-                                    </Badge>
-                                </TableCell>
-                                <TableCell className="font-medium text-muted-foreground w-1/4">PBG Required</TableCell>
-                                <TableCell className="w-1/4">
-                                    <Badge variant={data.isPbgApplicable ? "default" : "secondary"}>
-                                        {data.isPbgApplicable ? 'Yes' : 'No'}
-                                    </Badge>
-                                </TableCell>
-                            </TableRow>
-                            {data.ldApplicable && (
-                                <>
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="font-medium text-muted-foreground">Max LD %</TableCell>
-                                        <TableCell>{data.maxLd}%</TableCell>
-                                        <TableCell className="font-medium text-muted-foreground">LD Start Date</TableCell>
-                                        <TableCell>{data.ldStartDate ? formatDateTime(data.ldStartDate) : '—'}</TableCell>
-                                    </TableRow>
-                                </>
-                            )}
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="font-medium text-muted-foreground">Contract/Agreement</TableCell>
-                                <TableCell>
-                                    <Badge variant={data.isContractAgreement ? "default" : "secondary"}>
-                                        {data.isContractAgreement ? 'Yes' : 'No'}
-                                    </Badge>
-                                </TableCell>
-                                <TableCell className="font-medium text-muted-foreground">Detailed PO Follow-up</TableCell>
-                                <TableCell>
-                                    <Badge variant={data.detailedPoApplicable ? "default" : "secondary"}>
-                                        {data.detailedPoApplicable ? 'Needed' : 'Not Needed'}
-                                    </Badge>
-                                </TableCell>
-                            </TableRow>
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+            <SectionCard
+                title="Tendering Costing (Page 6)"
+                icon={<Link2 className="h-4 w-4 text-muted-foreground" />}
+                status={<PageStatusBadge data={data} history={history} pageNum={6} />}
+            >
+                <InfoGrid>
+                    <InfoItem
+                        label="Costing Sheet Link"
+                        value={
+                            data.costingSheetLink ? (
+                                <a
+                                    href={data.costingSheetLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="break-all text-primary hover:underline"
+                                >
+                                    {data.costingSheetLink}
+                                </a>
+                            ) : (
+                                <span className="italic text-muted-foreground">No link provided</span>
+                            )
+                        }
+                        className="sm:col-span-2"
+                    />
+                    <InfoItem
+                        label="PO / WO Discrepancies"
+                        value={
+                            <BoolBadge
+                                value={data.hasDiscrepancies}
+                                trueLabel="Identified"
+                                falseLabel="None"
+                            />
+                        }
+                    />
+                    {data.hasDiscrepancies && data.discrepancyComments && (
+                        <InfoItem
+                            label="Discrepancy Comments"
+                            value={
+                                <p className="rounded-md border bg-muted/40 p-3 italic">
+                                    {data.discrepancyComments}
+                                </p>
+                            }
+                            className="sm:col-span-2"
+                        />
+                    )}
+                </InfoGrid>
+            </SectionCard>
 
-            {/* SWOT ANALYSIS */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                        <TrendingUp className="h-5 w-5 text-purple-500" />
-                        SWOT Analysis (Page 3)
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-4">
-                    <Table>
-                        <TableBody>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="font-bold text-green-700 dark:text-green-400 w-1/4">
-                                    <div className="flex items-center gap-2">
-                                        <CheckCircle2 className="h-4 w-4" /> Strengths
-                                    </div>
-                                </TableCell>
-                                <TableCell className="w-3/4">
-                                    <p className="text-sm whitespace-pre-wrap">{data.swotStrengths || '—'}</p>
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="font-bold text-red-700 dark:text-red-400">
-                                    <div className="flex items-center gap-2">
-                                        <XCircle className="h-4 w-4" /> Weaknesses
-                                    </div>
-                                </TableCell>
-                                <TableCell>
-                                    <p className="text-sm whitespace-pre-wrap">{data.swotWeaknesses || '—'}</p>
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="font-bold text-blue-700 dark:text-blue-400">
-                                    <div className="flex items-center gap-2">
-                                        <TrendingUp className="h-4 w-4" /> Opportunities
-                                    </div>
-                                </TableCell>
-                                <TableCell>
-                                    <p className="text-sm whitespace-pre-wrap">{data.swotOpportunities || '—'}</p>
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="font-bold text-orange-700 dark:text-orange-400">
-                                    <div className="flex items-center gap-2">
-                                        <AlertCircle className="h-4 w-4" /> Threats
-                                    </div>
-                                </TableCell>
-                                <TableCell>
-                                    <p className="text-sm whitespace-pre-wrap">{data.swotThreats || '—'}</p>
-                                </TableCell>
-                            </TableRow>
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+            <SectionCard
+                title="OE Submission Info (Page 7)"
+                icon={<FileEdit className="h-4 w-4 text-muted-foreground" />}
+                status={<PageStatusBadge data={data} history={history} pageNum={7} />}
+            >
+                <InfoGrid>
+                    <InfoItem
+                        label="Amendment Needed"
+                        value={<BoolBadge value={Boolean(data.oeWoAmendmentNeeded)} />}
+                    />
+                    <InfoItem
+                        label="Signature Ready"
+                        value={<BoolBadge value={data.oeSignaturePrepared} />}
+                    />
+                    <InfoItem
+                        label="Courier Notified"
+                        value={<BoolBadge value={data.courierRequestPrepared} />}
+                    />
+                    <InfoItem
+                        label="OE Submission Time"
+                        value={
+                            data.oeAmendmentSubmittedAt
+                                ? formatDateTime(data.oeAmendmentSubmittedAt)
+                                : '—'
+                        }
+                    />
+                </InfoGrid>
 
-            {/* BILLING BOQ */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                        <Package className="h-5 w-5 text-orange-500" />
-                        Billing BOQ (Page 4)
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-4">
-                    <Table>
-                        <TableHeader>
-                            <TableRow className="bg-muted/50">
-                                <TableHead className="w-16">Sr. No.</TableHead>
-                                <TableHead>Item Description</TableHead>
-                                <TableHead className="text-right">Quantity</TableHead>
-                                <TableHead className="text-right">Rate</TableHead>
-                                <TableHead className="text-right">Amount</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {billingBoq.map((item) => (
-                                <TableRow key={item.id} className="hover:bg-muted/30 transition-colors">
-                                    <TableCell>{item.srNo}</TableCell>
-                                    <TableCell>{item.itemDescription}</TableCell>
-                                    <TableCell className="text-right">{item.quantity}</TableCell>
-                                    <TableCell className="text-right">{formatINR(parseFloat(item.rate))}</TableCell>
-                                    <TableCell className="text-right font-semibold">{formatINR(parseFloat(item.amount || '0'))}</TableCell>
-                                </TableRow>
-                            ))}
-                            {billingBoq.length === 0 && (
-                                <TableRow>
-                                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground italic">
-                                        No billing items
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
-
-            {/* BUYBACK BOQ */}
-            {buybackBoq.length > 0 && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-lg">
-                            <Package className="h-5 w-5 text-blue-500" />
-                            Buyback BOQ
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-4">
+                {amendments.length > 0 && (
+                    <div className="space-y-2">
+                        <p className="text-sm font-medium">Proposed Amendments</p>
                         <Table>
                             <TableHeader>
-                                <TableRow className="bg-muted/50">
-                                    <TableHead className="w-16">Sr. No.</TableHead>
-                                    <TableHead>Item Description</TableHead>
-                                    <TableHead className="text-right">Quantity</TableHead>
-                                    <TableHead className="text-right">Rate</TableHead>
-                                    <TableHead className="text-right">Amount</TableHead>
+                                <TableRow>
+                                    <TableHead className="w-12">#</TableHead>
+                                    <TableHead className="w-28">Page / Clause</TableHead>
+                                    <TableHead>Current Statement</TableHead>
+                                    <TableHead>Corrected Statement</TableHead>
+                                    <TableHead className="w-24">Status</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {buybackBoq.map((item) => (
-                                    <TableRow key={item.id} className="hover:bg-muted/30 transition-colors">
-                                        <TableCell>{item.srNo}</TableCell>
-                                        <TableCell>{item.itemDescription}</TableCell>
-                                        <TableCell className="text-right">{item.quantity}</TableCell>
-                                        <TableCell className="text-right">{formatINR(parseFloat(item.rate))}</TableCell>
-                                        <TableCell className="text-right font-semibold">{formatINR(parseFloat(item.amount || '0'))}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* ADDRESSES */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-base">
-                            <MapPin className="h-4 w-4 text-orange-500" /> Billing Addresses
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-4">
-                        <Table>
-                            <TableBody>
-                                {billingAddresses.map((addr, idx) => (
-                                    <TableRow key={idx} className="hover:bg-muted/30 transition-colors">
+                                {amendments.map((amd, index) => (
+                                    <TableRow key={amd.id ?? index}>
+                                        <TableCell>{index + 1}</TableCell>
+                                        <TableCell className="text-xs text-muted-foreground">
+                                            <div>Page: {amd.pageNo || '—'}</div>
+                                            <div>Clause: {amd.clauseNo || '—'}</div>
+                                        </TableCell>
                                         <TableCell>
-                                            <div className="space-y-2">
-                                                <p className="font-bold">{addr.customerName}</p>
-                                                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{addr.address}</p>
-                                                <div className="flex justify-between items-center text-xs">
-                                                    <Badge variant="outline">GST: {addr.gst || 'N/A'}</Badge>
-                                                    <span className="text-muted-foreground italic">
-                                                        Sr. Nos: {Array.isArray(addr.srNos) ? addr.srNos.join(', ') : addr.srNos}
-                                                    </span>
-                                                </div>
-                                            </div>
+                                            <p className="text-sm text-muted-foreground line-through">
+                                                {amd.currentStatement}
+                                            </p>
                                         </TableCell>
-                                    </TableRow>
-                                ))}
-                                {billingAddresses.length === 0 && (
-                                    <TableRow>
-                                        <TableCell className="text-center py-4 text-muted-foreground italic">
-                                            No billing addresses
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-base">
-                            <Truck className="h-4 w-4 text-orange-500" /> Shipping Addresses
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-4">
-                        <Table>
-                            <TableBody>
-                                {shippingAddresses.map((addr, idx) => (
-                                    <TableRow key={idx} className="hover:bg-muted/30 transition-colors">
                                         <TableCell>
-                                            <div className="space-y-2">
-                                                <p className="font-bold">{addr.customerName}</p>
-                                                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{addr.address}</p>
-                                                <div className="flex justify-between items-center text-xs">
-                                                    <Badge variant="outline">GST: {addr.gst || 'N/A'}</Badge>
-                                                    <span className="text-muted-foreground italic">
-                                                        Sr. Nos: {Array.isArray(addr.srNos) ? addr.srNos.join(', ') : addr.srNos}
-                                                    </span>
-                                                </div>
-                                            </div>
+                                            <p className="text-sm font-medium">
+                                                {amd.correctedStatement}
+                                            </p>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant="outline">{amd.status}</Badge>
                                         </TableCell>
                                     </TableRow>
                                 ))}
-                                {shippingAddresses.length === 0 && (
-                                    <TableRow>
-                                        <TableCell className="text-center py-4 text-muted-foreground italic">
-                                            No shipping addresses
-                                        </TableCell>
-                                    </TableRow>
-                                )}
                             </TableBody>
                         </Table>
-                    </CardContent>
-                </Card>
-            </div>
+                    </div>
+                )}
+            </SectionCard>
 
-            {/* PROJECT EXECUTION & SITE VISIT */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                        <Truck className="h-5 w-5 text-orange-500" />
-                        Project Execution & Site Visit (Page 5)
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-4">
-                    <Table>
-                        <TableBody>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="font-medium text-muted-foreground w-1/4">Site Visit Required</TableCell>
-                                <TableCell colSpan={3}>
-                                    <Badge variant={data.siteVisitNeeded ? "default" : "secondary"}>
-                                        {data.siteVisitNeeded ? 'Yes' : 'No'}
-                                    </Badge>
-                                </TableCell>
-                            </TableRow>
-                            {data.siteVisitNeeded && data.siteVisitPerson && (
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="font-medium text-muted-foreground">Site Contact Person</TableCell>
-                                    <TableCell colSpan={3}>
-                                        <div className="space-y-1">
-                                            <p className="font-semibold">{data.siteVisitPerson.name}</p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {data.siteVisitPerson.phone} | {data.siteVisitPerson.email}
-                                            </p>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="font-medium text-muted-foreground align-top">Documents Needed from Client</TableCell>
-                                <TableCell colSpan={3}>
-                                    <div className="flex flex-wrap gap-2">
-                                        {data.documentsNeeded?.map((doc, idx) => (
-                                            <Badge key={idx} variant="outline">{doc}</Badge>
-                                        )) || <span className="text-sm text-muted-foreground italic">None listed</span>}
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="font-medium text-muted-foreground align-top">Documents Available In-House</TableCell>
-                                <TableCell colSpan={3}>
-                                    <div className="flex flex-wrap gap-2">
-                                        {data.documentsInHouse?.map((doc, idx) => (
-                                            <Badge key={idx} variant="outline">{doc}</Badge>
-                                        )) || <span className="text-sm text-muted-foreground italic">None listed</span>}
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
-
-            {/* TENDERING COSTING */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                        <Link2 className="h-5 w-5 text-orange-500" />
-                        Tendering Costing (Page 6)
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-4">
-                    <Table>
-                        <TableBody>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="font-medium text-muted-foreground w-1/4">Costing Sheet Link</TableCell>
-                                <TableCell colSpan={3}>
-                                    {data.costingSheetLink ? (
-                                        <a
-                                            href={data.costingSheetLink}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-primary hover:underline flex items-center gap-2 break-all"
-                                        >
-                                            <Link2 className="h-4 w-4 shrink-0" />
-                                            {data.costingSheetLink}
-                                        </a>
-                                    ) : (
-                                        <span className="text-sm text-muted-foreground italic">No link provided</span>
-                                    )}
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="font-medium text-muted-foreground">PO/WO Discrepancies</TableCell>
-                                <TableCell colSpan={3}>
-                                    <div className="flex items-start gap-3">
-                                        {data.hasDiscrepancies ? (
-                                            <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-1" />
-                                        ) : (
-                                            <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0 mt-1" />
-                                        )}
-                                        <div className="space-y-2">
-                                            <p className="font-semibold">
-                                                {data.hasDiscrepancies ? "Discrepancies Identified" : "No Discrepancies"}
-                                            </p>
-                                            {data.hasDiscrepancies && data.discrepancyComments && (
-                                                <p className="text-sm italic text-muted-foreground p-3 bg-muted rounded border">
-                                                    {data.discrepancyComments}
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
-
-            {/* OE SUBMISSION INFO */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                        <FileEdit className="h-5 w-5 text-primary" />
-                        OE Step: Submission Info (Page 7)
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-4 space-y-4">
-                    <Table>
-                        <TableBody>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="font-medium text-muted-foreground w-1/4">Amendment Needed</TableCell>
-                                <TableCell className="w-1/4">
-                                    <div className="flex items-center gap-2">
-                                        {data.oeWoAmendmentNeeded ? (
-                                            <FileEdit className="h-4 w-4 text-orange-500" />
-                                        ) : (
-                                            <CheckCircle2 className="h-4 w-4 text-green-500" />
-                                        )}
-                                        <span className="font-semibold">{data.oeWoAmendmentNeeded ? 'Yes' : 'No'}</span>
-                                    </div>
-                                </TableCell>
-                                <TableCell className="font-medium text-muted-foreground w-1/4">Signature Ready</TableCell>
-                                <TableCell className="w-1/4">
-                                    <div className="flex items-center gap-2">
-                                        <Pen className="h-4 w-4 text-blue-500" />
-                                        <span className="font-semibold">{data.oeSignaturePrepared ? 'Yes' : 'No'}</span>
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="font-medium text-muted-foreground">Courier Notified</TableCell>
-                                <TableCell>
-                                    <div className="flex items-center gap-2">
-                                        <Truck className="h-4 w-4 text-purple-500" />
-                                        <span className="font-semibold">{data.courierRequestPrepared ? 'Yes' : 'No'}</span>
-                                    </div>
-                                </TableCell>
-                                <TableCell className="font-medium text-muted-foreground">OE Submission Time</TableCell>
-                                <TableCell>
-                                    {data.oeAmendmentSubmittedAt ? formatDateTime(data.oeAmendmentSubmittedAt) : '—'}
-                                </TableCell>
-                            </TableRow>
-                        </TableBody>
-                    </Table>
-
-                    {data.amendments && data.amendments.length > 0 && (
-                        <div className="mt-6">
-                            <h4 className="font-bold mb-4 text-base border-b pb-2">Proposed Amendments</h4>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow className="bg-muted/50">
-                                        <TableHead className="w-12">#</TableHead>
-                                        <TableHead className="w-24">Page/Clause</TableHead>
-                                        <TableHead>Current Statement</TableHead>
-                                        <TableHead>Corrected Statement</TableHead>
-                                        <TableHead className="w-24">Status</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {data.amendments.map((amd, idx) => (
-                                        <TableRow key={idx} className="hover:bg-muted/30 transition-colors">
-                                            <TableCell className="font-bold">{idx + 1}</TableCell>
-                                            <TableCell>
-                                                <div className="text-xs">
-                                                    <div>Page: {amd.pageNo || '—'}</div>
-                                                    <div>Clause: {amd.clauseNo || '—'}</div>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <p className="text-sm line-through decoration-red-400 opacity-70">
-                                                    {amd.currentStatement}
-                                                </p>
-                                            </TableCell>
-                                            <TableCell>
-                                                <p className="text-sm font-semibold text-green-700 dark:text-green-400">
-                                                    {amd.correctedStatement}
-                                                </p>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline">{amd.status}</Badge>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-
-            {/* TL ACCEPTANCE */}
             {acceptance && (
-                <Card className="border-primary">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-lg">
-                            <CheckCircle2 className="h-5 w-5 text-primary" />
-                            TL Acceptance & Review Status
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-4">
-                        <Table>
-                            <TableBody>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="font-medium text-muted-foreground w-1/4">Final Decision</TableCell>
-                                    <TableCell className="w-1/4">
-                                        <Badge
-                                            variant={acceptance.decision === 'accepted' ? 'success' : 'secondary'}
-                                            className="text-base"
-                                        >
-                                            {acceptance.decision?.toUpperCase() || 'PENDING'}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell className="font-medium text-muted-foreground w-1/4">Decided On</TableCell>
-                                    <TableCell className="w-1/4">
-                                        {acceptance.finalDecisionAt ? formatDateTime(acceptance.finalDecisionAt) : '—'}
-                                    </TableCell>
-                                </TableRow>
-                                {acceptance.decisionRemarks && (
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="font-medium text-muted-foreground">Decision Remarks</TableCell>
-                                        <TableCell colSpan={3}>
-                                            <p className="text-sm italic border-l-4 border-primary pl-3 py-2">
-                                                "{acceptance.decisionRemarks}"
-                                            </p>
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="font-medium text-muted-foreground">OE Signature</TableCell>
-                                    <TableCell>
-                                        {acceptance.oeSignedAt ? (
-                                            <Badge variant="default" className="gap-1">
-                                                <Pen className="h-3 w-3" /> Signed {formatDateTime(acceptance.oeSignedAt)}
-                                            </Badge>
-                                        ) : (
-                                            <Badge variant="secondary">Pending</Badge>
-                                        )}
-                                    </TableCell>
-                                    <TableCell className="font-medium text-muted-foreground">TL Signature</TableCell>
-                                    <TableCell>
-                                        {acceptance.tlSignedAt ? (
-                                            <Badge variant="default" className="gap-1">
-                                                <Pen className="h-3 w-3" /> Signed {formatDateTime(acceptance.tlSignedAt)}
-                                            </Badge>
-                                        ) : (
-                                            <Badge variant="secondary">Pending</Badge>
-                                        )}
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="font-medium text-muted-foreground">Authority Letter</TableCell>
-                                    <TableCell>
-                                        {acceptance.authorityLetterGenerated ? (
-                                            <Badge variant="default" className="gap-1">
-                                                <CheckCircle2 className="h-3 w-3" /> Generated
-                                            </Badge>
-                                        ) : (
-                                            <span className="text-sm text-muted-foreground italic">Not yet</span>
-                                        )}
-                                    </TableCell>
-                                    <TableCell className="font-medium text-muted-foreground">Signed WO Upload</TableCell>
-                                    <TableCell>
-                                        {acceptance.isCompleted ? (
-                                            <Badge variant="default" className="gap-1">
-                                                <CheckCircle2 className="h-3 w-3" /> Completed
-                                            </Badge>
-                                        ) : (
-                                            <span className="text-sm text-muted-foreground italic">Pending</span>
-                                        )}
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="font-medium text-muted-foreground">Courier Request</TableCell>
-                                    <TableCell colSpan={3}>
-                                        {acceptance.courierId ? (
-                                            <Badge variant="default" className="gap-1">
-                                                <CheckCircle2 className="h-3 w-3" /> ID: {acceptance.courierId}
-                                            </Badge>
-                                        ) : (
-                                            <div className="flex items-center gap-2">
-                                                <Clock className="h-4 w-4 text-muted-foreground" />
-                                                <span className="text-sm text-muted-foreground italic">Awaiting Completion</span>
-                                            </div>
-                                        )}
-                                    </TableCell>
-                                </TableRow>
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
+                <SectionCard
+                    title="TL Acceptance & Review"
+                    icon={<CheckCircle2 className="h-4 w-4 text-primary" />}
+                >
+                    <InfoGrid>
+                        <InfoItem
+                            label="Final Decision"
+                            value={
+                                <Badge
+                                    variant={acceptance.decision === 'accepted' ? 'success' : 'secondary'}
+                                >
+                                    {acceptance.decision?.toUpperCase() || 'PENDING'}
+                                </Badge>
+                            }
+                        />
+                        <InfoItem
+                            label="Decided On"
+                            value={
+                                acceptance.finalDecisionAt
+                                    ? formatDateTime(acceptance.finalDecisionAt)
+                                    : '—'
+                            }
+                        />
+                        {acceptance.decisionRemarks && (
+                            <InfoItem
+                                label="Decision Remarks"
+                                value={
+                                    <p className="rounded-md border-l-2 border-primary bg-muted/40 p-3 italic">
+                                        {acceptance.decisionRemarks}
+                                    </p>
+                                }
+                                className="sm:col-span-2"
+                            />
+                        )}
+                        <InfoItem
+                            label="OE Signature"
+                            value={
+                                acceptance.oeSignedAt ? (
+                                    <Badge variant="default" className="gap-1">
+                                        <Pen className="h-3 w-3" />
+                                        Signed {formatDateTime(acceptance.oeSignedAt)}
+                                    </Badge>
+                                ) : (
+                                    <Badge variant="secondary">Pending</Badge>
+                                )
+                            }
+                        />
+                        <InfoItem
+                            label="TL Signature"
+                            value={
+                                acceptance.tlSignedAt ? (
+                                    <Badge variant="default" className="gap-1">
+                                        <Pen className="h-3 w-3" />
+                                        Signed {formatDateTime(acceptance.tlSignedAt)}
+                                    </Badge>
+                                ) : (
+                                    <Badge variant="secondary">Pending</Badge>
+                                )
+                            }
+                        />
+                        <InfoItem
+                            label="Authority Letter"
+                            value={
+                                <BoolBadge
+                                    value={Boolean(acceptance.authorityLetterGenerated)}
+                                    trueLabel="Generated"
+                                    falseLabel="Not yet"
+                                />
+                            }
+                        />
+                        <InfoItem
+                            label="Signed WO Upload"
+                            value={
+                                <BoolBadge
+                                    value={Boolean(acceptance.isCompleted)}
+                                    trueLabel="Completed"
+                                    falseLabel="Pending"
+                                />
+                            }
+                        />
+                        <InfoItem
+                            label="Courier Request"
+                            value={
+                                acceptance.courierId ? (
+                                    <Badge variant="default">ID: {acceptance.courierId}</Badge>
+                                ) : (
+                                    <span className="italic text-muted-foreground">
+                                        Awaiting completion
+                                    </span>
+                                )
+                            }
+                        />
+                    </InfoGrid>
+                </SectionCard>
             )}
-        </>
+        </div>
     );
 }

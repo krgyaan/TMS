@@ -1,17 +1,62 @@
-import { couriers, emdResponsibility, tenderInfos, users } from '@/db/schemas';
+import { couriers, emailLogs, emdResponsibility, projects, tenderInfos, users } from '@/db/schemas';
 import { AppLogger } from '@/logger/app-logger.service';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { PdfGeneratorService } from '@/modules/pdf/pdf-generator.service';
+import { DocxService } from '@/modules/docx/docx.service';
 import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
-import { instrumentBgDetails, instrumentChequeDetails, instrumentTransferDetails, paymentInstruments, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
+import { instrumentBgDetails, instrumentChequeDetails, instrumentFdrDetails, instrumentTransferDetails, paymentInstruments, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
+import { woBasicDetails, woContacts } from '@db/schemas/operations';
+import { tenderClients } from '@db/schemas/tendering/tender-info-sheet.schema';
+import { otherContacts } from '@db/schemas/shared/other-contacts.schema';
 import { BG_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
+import { getIstDayBounds } from '@/utils/ist-date';
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { differenceInDays } from 'date-fns';
-import { and, eq, isNull, ne, notInArray } from 'drizzle-orm';
+import { and, eq, gte, isNull, lt, ne, notInArray, sql } from 'drizzle-orm';
+import { copyFileSync, existsSync, mkdirSync } from 'fs';
+import { extname, join } from 'path';
+
+/** Blank bank/beneficiary values are shown as "Not Provided" in the BG mail. */
+const orNotProvided = (value: string | null | undefined): string =>
+    value && value.trim().length > 0 ? value.trim() : 'Not Provided';
+
+const BG_PURPOSE_LABELS: Record<string, string> = {
+    ADVANCE_PAYMENT: 'Advance Payment',
+    SECURITY_DEPOSIT: 'Security Deposit',
+    SECURITY: 'Security Deposit',
+    SECURITY_BOND_DEPOSIT: 'Security Bond/Deposit',
+    COUNTER_GUARANTEE: 'Counter Guarantee',
+    FINANCIAL: 'Financial',
+    PERFORMANCE: 'Performance BG',
+    PERFORMANCE_BG: 'Performance BG',
+    BID_BOND: 'Bid Bond',
+    PAYABLE: 'Other Payment',
+    OTHER_PAYMENT: 'Other Payment',
+    OTHER_SECURITY: 'Other Security',
+};
+
+const formatBgPurpose = (value: string | null | undefined, fallback: string): string => {
+    const raw = value?.trim();
+    if (!raw) {
+        return fallback;
+    }
+
+    const mapped = BG_PURPOSE_LABELS[raw.toUpperCase()];
+    if (mapped) {
+        return mapped;
+    }
+
+    return raw
+        .toLowerCase()
+        .split(/[_\s]+/)
+        .filter((word) => word.length > 0)
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+};
 
 @Injectable()
 export class PaymentRequestsNotificationService {
@@ -23,6 +68,7 @@ export class PaymentRequestsNotificationService {
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
         private readonly pdfGenerator: PdfGeneratorService,
+        private readonly docxService: DocxService,
         private readonly configService: ConfigService,
     ) {
         this.logger = this.appLogger.withContext(PaymentRequestsNotificationService.name);
@@ -89,7 +135,7 @@ export class PaymentRequestsNotificationService {
         return result?.userId ?? null;
     }
 
-    private formatDateDDMMYYYY = (dateStr: string | null | undefined): string => {
+    private formatDateDDMMYYYY = (dateStr: string | Date | null | undefined): string => {
         if (!dateStr) return '';
         try {
             const d = new Date(dateStr);
@@ -98,22 +144,317 @@ export class PaymentRequestsNotificationService {
             const year = d.getFullYear();
             return `${day}-${month}-${year}`;
         } catch {
-            return dateStr;
+            return String(dateStr);
         }
+    };
+
+    
+    private resolveBgDueDate(
+        paymentReq: { type?: string | null; dueDate?: Date | string | null; createdAt?: Date | string | null },
+        bgDetails: { bgNeeds?: string | null } | null | undefined,
+        instrument: { courierAddressJson?: unknown } | null | undefined,
+    ): Date | null {
+        const requestDueDate = paymentReq.dueDate ? new Date(paymentReq.dueDate) : null;
+
+        // The EMD form goes through the TMS path; the two dashboard forms send
+        // type 'Other Than Tender'.
+        if ((paymentReq.type || '') !== 'Other Than Tender') {
+            return requestDueDate && !Number.isNaN(requestDueDate.getTime()) ? requestDueDate : null;
+        }
+
+        const hours = Number(bgDetails?.bgNeeds) || 0;
+        const createdAt = paymentReq.createdAt ? new Date(paymentReq.createdAt) : null;
+
+        const fromNeededIn =
+            hours > 0 && createdAt && !Number.isNaN(createdAt.getTime())
+                ? new Date(createdAt.getTime() + hours * 60 * 60 * 1000 + 2 * 24 * 60 * 60 * 1000)
+                : null;
+
+        const courierAddress = (instrument?.courierAddressJson ?? null) as Record<string, any> | null;
+        const rawCourierDate = courierAddress?.delDate;
+        const courierDelivery = rawCourierDate ? new Date(rawCourierDate) : null;
+
+        const candidates = [fromNeededIn, courierDelivery].filter(
+            (d): d is Date => !!d && !Number.isNaN(d.getTime()),
+        );
+
+        if (candidates.length > 0) {
+            return candidates.reduce((latest, current) => (current > latest ? current : latest));
+        }
+
+        return requestDueDate && !Number.isNaN(requestDueDate.getTime()) ? requestDueDate : null;
+    };
+
+    /**
+     * Parses `tender_infos.documents` and returns the main tender document.
+     * Supports the structured shape { schemaVersion, mainTender, atc[], boq, otherDocuments[] }
+     * and the legacy flat-array shape (index 0 = main tender).
+     */
+    private parseTenderMainDoc = (raw: string | null | undefined): string | null => {
+        if (!raw || !raw.trim()) return null;
+
+        const trimmed = raw.trim();
+
+        try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) {
+                const first = parsed.find((p) => typeof p === 'string' && p.trim().length > 0);
+                return typeof first === 'string' ? first.trim() : null;
+            }
+            if (parsed && typeof parsed === 'object') {
+                const main = (parsed as Record<string, any>).mainTender;
+                return typeof main === 'string' && main.trim().length > 0 ? main.trim() : null;
+            }
+        } catch {
+            // Not JSON — treat it as a plain path.
+        }
+
+        return trimmed;
+    };
+
+    /**
+     * Second attachment of the BG creation mail.
+     * Cascade: document uploaded in the BG dashboard form -> project WO draft ->
+     * main tender document. Returns the paths plus the label for the mail line.
+     */
+    private async resolveBgSupportingDocs(
+        paymentReq: { tenderId?: number | null; projectId?: number | null },
+        bgDetails: { bgPo?: string | null } | null | undefined,
+    ): Promise<{ paths: string[]; label: string }> {
+        // 1) Document uploaded from the BG dashboard form.
+        const uploaded = this.toAttachmentPaths(bgDetails?.bgPo);
+        if (uploaded.length > 0) {
+            return { paths: uploaded, label: 'PO copy/request letter from beneficiary' };
+        }
+
+        // 2) Project dashboard: the WO draft document stored on wo_basic_details.
+        if (paymentReq.projectId) {
+            const [project] = await this.db
+                .select({ woBasicDetailId: projects.woBasicDetailId })
+                .from(projects)
+                .where(eq(projects.id, paymentReq.projectId))
+                .limit(1);
+
+            if (project?.woBasicDetailId) {
+                const [woBasic] = await this.db
+                    .select({ woDraft: woBasicDetails.woDraft })
+                    .from(woBasicDetails)
+                    .where(eq(woBasicDetails.id, project.woBasicDetailId))
+                    .limit(1);
+
+                const woDraftPaths = this.toAttachmentPaths(woBasic?.woDraft);
+                if (woDraftPaths.length > 0) {
+                    return { paths: woDraftPaths, label: 'WO draft document (LOA/GEM PO/LOI)' };
+                }
+            }
+        }
+
+        // 3) EMD / tender flow: the main tender document.
+        if (paymentReq.tenderId) {
+            const [tender] = await this.db
+                .select({ documents: tenderInfos.documents })
+                .from(tenderInfos)
+                .where(eq(tenderInfos.id, paymentReq.tenderId))
+                .limit(1);
+
+            const mainDoc = this.parseTenderMainDoc(tender?.documents);
+            if (mainDoc) {
+                return { paths: [mainDoc], label: 'Main tender document' };
+            }
+        }
+
+        return { paths: [], label: '' };
+    };
+
+    /**
+     * Builds the courier address block shown in the BG cover letter.
+     * Prefers the structured JSON saved by the forms, falls back to the
+     * free-text column (EMD flow).
+     */
+    private resolveBgCourierAddress = (
+        instrument: { courierAddressJson?: unknown; courierAddress?: string | null } | null | undefined,
+    ): string => {
+        const json = instrument?.courierAddressJson as Record<string, any> | null | undefined;
+        if (json && typeof json === 'object') {
+            const parts = [
+                json.name,
+                json.phone,
+                [json.line1, json.line2].filter(Boolean).join(', '),
+                json.city,
+                [json.state, json.pincode].filter(Boolean).join(' - '),
+            ].filter((part): part is string => typeof part === 'string' && part.trim().length > 0);
+
+            if (parts.length > 0) {
+                return parts.join('\n');
+            }
+        }
+
+        return instrument?.courierAddress?.trim() || 'Not specified';
+    };
+
+    private resolveBgReference = async (
+        paymentReq: { tenderNo?: string | null; projectId?: number | null; tenderId?: number | null },
+    ): Promise<{ label: string; value: string; date: string | Date | null } | null> => {
+        const tenderNo = paymentReq.tenderNo?.trim();
+        if (tenderNo && tenderNo.toUpperCase() !== 'NA') {
+            let tenderDate: string | Date | null = null;
+            if (paymentReq.tenderId) {
+                const [tender] = await this.db
+                    .select({ dueDate: tenderInfos.dueDate })
+                    .from(tenderInfos)
+                    .where(eq(tenderInfos.id, paymentReq.tenderId))
+                    .limit(1);
+                tenderDate = tender?.dueDate ?? null;
+            }
+            return { label: 'Tender No.', value: tenderNo, date: tenderDate };
+        }
+
+        if (paymentReq.projectId) {
+            try {
+                const [project] = await this.db
+                    .select({ woBasicDetailId: projects.woBasicDetailId })
+                    .from(projects)
+                    .where(eq(projects.id, paymentReq.projectId))
+                    .limit(1);
+
+                if (project?.woBasicDetailId) {
+                    const [woBasic] = await this.db
+                        .select({ woNumber: woBasicDetails.woNumber, woDate: woBasicDetails.woDate })
+                        .from(woBasicDetails)
+                        .where(eq(woBasicDetails.id, project.woBasicDetailId))
+                        .limit(1);
+
+                    const woNumber = woBasic?.woNumber?.trim();
+                    if (woNumber && woNumber.toUpperCase() !== 'NA') {
+                        return { label: 'Work Order No.', value: woNumber, date: woBasic?.woDate ?? null };
+                    }
+                }
+            } catch (error) {
+                this.logger.warn(
+                    `Failed to resolve WO number for BG cover letter (project ${paymentReq.projectId}): ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
+        }
+
+        return null;
+    };
+
+    /**
+     * Looks up the client C&P contact (name + designation) by the email saved
+     * in `instrument_bg_details.bg_client_cp`, across the three contact tables.
+     */
+    private resolveBgCoveringLetterCp = async (
+        email: string | null | undefined,
+    ): Promise<{ name: string; designation: string }> => {
+        const fallback = { name: 'C&P', designation: '' };
+        const normalized = email?.trim().toLowerCase();
+        if (!normalized) {
+            return fallback;
+        }
+
+        try {
+            const [wo] = await this.db
+                .select({ name: woContacts.name, designation: woContacts.designation })
+                .from(woContacts)
+                .where(sql`lower(${woContacts.email}) = ${normalized}`)
+                .limit(1);
+            if (wo?.name) {
+                return { name: wo.name, designation: wo.designation || '' };
+            }
+
+            const [tc] = await this.db
+                .select({ name: tenderClients.clientName, designation: tenderClients.clientDesignation })
+                .from(tenderClients)
+                .where(sql`lower(${tenderClients.clientEmail}) = ${normalized}`)
+                .limit(1);
+            if (tc?.name) {
+                return { name: tc.name, designation: tc.designation || '' };
+            }
+
+            const [oc] = await this.db
+                .select({ name: otherContacts.name, designation: otherContacts.designation })
+                .from(otherContacts)
+                .where(sql`lower(${otherContacts.email}) = ${normalized}`)
+                .limit(1);
+            if (oc?.name) {
+                return { name: oc.name, designation: oc.designation || '' };
+            }
+        } catch (error) {
+            this.logger.warn(
+                `Failed to resolve C&P contact for BG cover letter (email ${normalized}): ${error instanceof Error ? error.message : String(error)}`
+            );
+        }
+
+        return fallback;
+    };
+
+    /**
+     * Data for the prefilled BG application format (the AU Bank form).
+     * Undefined values fall back to the built-in sample; empty strings stay empty
+     * (used by real generation, where missing fields must render blank).
+     */
+    private buildBgPrefilledData = (
+        overrides: Partial<Record<
+            'date' | 'bgAmount' | 'beneficiaryName' | 'beneficiaryAddress' | 'bgExpiryDate' |
+            'claimExpiryDate' | 'accountNo' | 'ifsc' | 'uniqueCode',
+            string
+        >> = {},
+    ): Record<string, any> => {
+        const pick = (value: string | undefined, fallback: string): string =>
+            value === undefined ? fallback : value;
+
+        return {
+            date: pick(overrides.date, this.formatDateDDMMYYYY(new Date())),
+            bgAmount: pick(overrides.bgAmount, '75,636/-'),
+            beneficiaryName: pick(overrides.beneficiaryName, 'NHPC Limited'),
+            beneficiaryAddress: pick(
+                overrides.beneficiaryAddress,
+                'NHPC Office Complex, Sector-33, Faridabad (Haryana) -121003 (India).'
+            ),
+            bgExpiryDate: pick(overrides.bgExpiryDate, '31-01-2028'),
+            claimExpiryDate: pick(overrides.claimExpiryDate, '30-04-2028'),
+            accountNo: pick(overrides.accountNo, '2502245699295242'),
+            ifsc: pick(overrides.ifsc, 'SBIN0003704'),
+            uniqueCode: pick(overrides.uniqueCode, ''),
+        };
+    };
+
+    /**
+     * Formats a mobile number as +91-XXXXXXXXXX for the cover letter signature
+     * blocks. Accepts numbers stored with or without the country code.
+     */
+    private formatPhoneWithCountryCode = (value: string | null | undefined): string => {
+        const raw = (value || '').trim();
+        if (!raw) return '';
+
+        const digits = raw.replace(/\D/g, '');
+        if (!digits) return raw;
+
+        const local = digits.length > 10 ? digits.slice(-10) : digits;
+        return `+91-${local}`;
     };
 
     private formatCurrency = (amount: number) => {
         return `₹${amount.toLocaleString('en-IN')}`;
     };
 
-    /**
-     * Normalize a DB file-path value into a list of plain attachment paths.
-     * Multi-file upload fields are persisted either as a JSON array string
-     * (e.g. '["bi-dashboard/.../a.pdf","bi-dashboard/.../b.pdf"]') or as a
-     * single plain path, depending on how the frontend submitted them. Passing
-     * the raw JSON string to EmailService would make attachment resolution
-     * throw ("Unknown file context: [\"bi-dashboard"), killing the whole email.
-     */
+    
+    private buildPublicFileUrl = (filePath: string): string => {
+        const apiUrl = (this.configService.get<string>('app.apiUrl') || '').replace(/\/+$/, '');
+        const normalized = filePath.replace(/\\/g, '/').replace(/^\/+/, '');
+        if (!apiUrl || !normalized) {
+            return '';
+        }
+
+        const encoded = normalized
+            .split('/')
+            .filter((segment) => segment.length > 0)
+            .map((segment) => encodeURIComponent(segment))
+            .join('/');
+
+        return `${apiUrl}/files/serve/${encoded}`;
+    };
+
     private toAttachmentPaths = (value: string | null | undefined): string[] => {
         if (!value || typeof value !== 'string' || value.trim().length === 0) {
             return [];
@@ -137,6 +478,61 @@ export class PaymentRequestsNotificationService {
         }
 
         return [trimmed];
+    };
+
+    private stageBgMailAttachments = (
+        instrumentId: number,
+        items: Array<{ path: string; name: string }>,
+    ): Array<{ path: string; name: string }> => {
+        const staged: Array<{ path: string; name: string }> = [];
+        const seenSources = new Set<string>();
+        const nameCounts = new Map<string, number>();
+        const relativeDir = `bi-dashboard/bank-guarantee/mail-attachments/${instrumentId}`;
+        const targetDir = join(process.cwd(), 'uploads', relativeDir);
+
+        items.forEach((item) => {
+            const sourceRelative = item.path.replace(/\\/g, '/');
+            if (seenSources.has(sourceRelative)) return;
+
+            const sourceAbsolute = join(process.cwd(), 'uploads', sourceRelative);
+            if (!existsSync(sourceAbsolute)) return;
+
+            seenSources.add(sourceRelative);
+
+            const count = (nameCounts.get(item.name) ?? 0) + 1;
+            nameCounts.set(item.name, count);
+            const suffix = count > 1 ? ` (${count})` : '';
+            const fileName = `${item.name}${suffix}${extname(sourceRelative)}`;
+
+            mkdirSync(targetDir, { recursive: true });
+            copyFileSync(sourceAbsolute, join(targetDir, fileName));
+
+            staged.push({
+                path: `${relativeDir}/${fileName}`,
+                name: `${item.name}${suffix}`,
+            });
+        });
+
+        return staged;
+    };
+
+    private normalizeMailIds = (value: unknown): string[] => {
+        const list = Array.isArray(value)
+            ? value
+            : typeof value === 'string' && value.trim().length > 0
+                ? (() => {
+                    try {
+                        const parsed = JSON.parse(value);
+                        return Array.isArray(parsed) ? parsed : [parsed];
+                    } catch {
+                        return [value];
+                    }
+                })()
+                : [];
+        return list
+            .filter((email): email is string => typeof email === 'string')
+            .map((email) => email.trim())
+            .filter((email) => email.length > 0);
     };
 
     async sendDdMailAfterChequeAction(
@@ -914,6 +1310,63 @@ export class PaymentRequestsNotificationService {
             } catch (error) {
                 this.logger.error(`Failed to send cheque email for instrument ${instrumentId}:`, error);
             }
+        } else if (mode === 'FDR') {
+            // FDR request created directly (no auto-created Cheque).
+            // Notify the FDR responsible user so they can process the Accounts Form (FDR).
+            const [fdrDetails] = await this.db
+                .select()
+                .from(instrumentFdrDetails)
+                .where(eq(instrumentFdrDetails.instrumentId, instrumentId))
+                .limit(1);
+
+            const courierAddr = instrument.courierAddressJson as Record<string, any> | null;
+            const courierAddress = courierAddr
+                ? [
+                    courierAddr.name,
+                    courierAddr.phone,
+                    [courierAddr.line1, courierAddr.line2].filter(Boolean).join(', '),
+                    courierAddr.city,
+                    [courierAddr.state, courierAddr.pincode].filter(Boolean).join(' - '),
+                ].filter(Boolean).join('\n')
+                : (instrument.courierAddress ?? 'Not specified');
+
+            try {
+                const result = await this.emailService.sendPaymentEmail({
+                    requestId: instrument.requestId,
+                    tenderId: tenderId || undefined,
+                    eventType: 'FDR_REQUEST',
+                    fromUserId: requestedBy,
+                    subject: `Please create a new FDR - ${purpose}`,
+                    template: 'fdr-request',
+                    data: {
+                        fdrPurpose: fdrDetails?.fdrPurpose || 'Not specified',
+                        tenderNo: tender?.tenderNo || 'NA',
+                        tenderName: tender?.tenderName || 'Not specified',
+                        dueDateTime: this.formatDateDDMMYYYY(tender?.dueDate),
+                        beneficiaryName: instrument.favouring || 'Not specified',
+                        payableAt: instrument.payableAt || 'Not specified',
+                        amount: this.formatCurrency(Number(instrument.amount) || 0),
+                        fdrExpiryDate: this.formatDateDDMMYYYY(fdrDetails?.fdrExpiryDate),
+                        timeLimit: instrument.courierDeadline || 24,
+                        courierAddress,
+                        link: `${this.getFrontendUrl()}/bi-dashboard/fdr/action/${instrumentId}`,
+                        tlName: tlUser?.name || 'Team Leader',
+                    },
+                    to: [{ type: 'emails', emails: [toEmails] }],
+                    cc: [
+                        { type: 'role', role: 'Admin', teamId: tenderTeamId },
+                        { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                        { type: 'emails', emails: ['accounts@volksenergie.in']},
+                    ]
+                });
+                if (result.success) {
+                    this.logger.log(`FDR request email sent for instrument ${instrumentId} (logId: ${result.emailLogId})`);
+                } else {
+                    this.logger.warn(`FDR request email failed for instrument ${instrumentId}: ${result.error}`);
+                }
+            } catch (error) {
+                this.logger.error(`Failed to send FDR request email for instrument ${instrumentId}:`, error);
+            }
         } else if (mode === 'BG') {
             try {
                 // Fetch BG details
@@ -928,6 +1381,12 @@ export class PaymentRequestsNotificationService {
                         requestedBy: paymentRequests.requestedBy,
                         tenderId: paymentRequests.tenderId,
                         purpose: paymentRequests.purpose,
+                        type: paymentRequests.type,
+                        dueDate: paymentRequests.dueDate,
+                        createdAt: paymentRequests.createdAt,
+                        projectId: paymentRequests.projectId,
+                        tenderNo: paymentRequests.tenderNo,
+                        projectName: paymentRequests.projectName,
                     })
                     .from(paymentRequests)
                     .where(eq(paymentRequests.id, instrument.requestId))
@@ -938,6 +1397,11 @@ export class PaymentRequestsNotificationService {
                     return;
                 }
 
+                const bgDueDate = this.resolveBgDueDate(paymentReq, bgDetails, instrument);
+                const dueDateTime = bgDueDate
+                    ? `${this.formatDateDDMMYYYY(bgDueDate)} 18:00`
+                    : 'the due date';
+
                 // Get tender team ID
                 let tenderTeamId = 1;
                 if (paymentReq.tenderId > 0) {
@@ -947,11 +1411,18 @@ export class PaymentRequestsNotificationService {
                         .where(eq(tenderInfos.id, paymentReq.tenderId))
                         .limit(1);
                     tenderTeamId = tenderData[0]?.team || 1;
+                } else {
+                    const requesterData = await this.db
+                        .select({ team: users.team })
+                        .from(users)
+                        .where(eq(users.id, paymentReq.requestedBy))
+                        .limit(1);
+                    tenderTeamId = requesterData[0]?.team || 1;
                 }
 
                 // Get TL user
                 const [tlUser] = await this.db
-                    .select({ name: users.name })
+                    .select({ name: users.name, mobile: users.mobile, email: users.email })
                     .from(users)
                     .where(
                         and(
@@ -961,56 +1432,240 @@ export class PaymentRequestsNotificationService {
                     )
                     .limit(1);
 
-                // Generate covering letter PDF
-                const coveringLetterData = {
-                    date: new Date().toISOString().split('T')[0],
-                    beneficiaryName: bgDetails?.beneficiaryName || '',
-                    beneficiaryAddress: bgDetails?.beneficiaryAddress || '',
-                    amount: instrument.amount || 0,
-                    bgExpiryDate: bgDetails?.bgExpiryDate ? this.formatDateDDMMYYYY(bgDetails.bgExpiryDate) : '',
-                    claimDate: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',
-                    purpose: bgDetails?.bgPurpose || 'Financial security',
-                    stampPaperValue: bgDetails?.stampCharges || 300,
-                    courierAddress: instrument.courierAddress || '',
-                    bgPurpose: bgDetails?.bgPurpose || '',
-                    actionLink: `${this.getFrontendUrl()}/bi-dashboard/bank-guarantee/action/${instrumentId}`,
-                    actionLinkText: 'Accounts Form (BG) Stage 2: After BG Creation',
-                    recipientName: 'Imran',
-                    teamLeaderName: tlUser?.name || 'Team Leader',
-                };
-
-                const coveringLetterPaths = await this.pdfGenerator.generatePdfs(
-                    'bgCoveringLetter',
-                    coveringLetterData,
-                    instrumentId,
-                    'BG'
-                );
-
-                // Get PO copy file path
-                const [bgPo] = await this.db
-                    .select({ bgPo: instrumentBgDetails.bgPo })
-                    .from(instrumentBgDetails)
-                    .where(eq(instrumentBgDetails.instrumentId, instrumentId))
+                // Accounts Leader shown in the cover letter signature block.
+                const [accountsLeader] = await this.db
+                    .select({ name: users.name, mobile: users.mobile, email: users.email })
+                    .from(users)
+                    .where(eq(users.email, 'imran@volksenergie.in'))
                     .limit(1);
 
-                // Build attachment paths
-                const attachmentFiles: string[] = [];
-                if (coveringLetterPaths && coveringLetterPaths.length > 0) {
-                    attachmentFiles.push(coveringLetterPaths[0]);
-                }
-                if (bgPo?.bgPo) {
-                    attachmentFiles.push(...this.toAttachmentPaths(bgPo.bgPo));
+                const cpContact = await this.resolveBgCoveringLetterCp(bgDetails?.bgClientCp);
+                const bgReference = await this.resolveBgReference(paymentReq);
+                const bgPurposeText = formatBgPurpose(bgDetails?.bgPurpose, 'Financial security');
+
+                const attachmentLinks: Array<{ label: string; url: string }> = [];
+                const addAttachmentLink = (label: string, filePath: string) => {
+                    const url = this.buildPublicFileUrl(filePath);
+                    if (!url || attachmentLinks.some((link) => link.url === url)) {
+                        return;
+                    }
+                    attachmentLinks.push({ label, url });
+                };
+
+                try {
+                    const coveringLetterData = {
+                        date: this.formatDateDDMMYYYY(new Date()),
+                        cpName: cpContact.name,
+                        cpDesignation: cpContact.designation,
+                        courierAddress: this.resolveBgCourierAddress(instrument),
+                        referenceNo: bgReference?.value || '',
+                        referenceLabel: bgReference?.label || '',
+                        purpose: bgPurposeText,
+                        bgNo: '',
+                        bgDate: '',
+                        bgExpiryDate: bgDetails?.bgExpiryDate ? this.formatDateDDMMYYYY(bgDetails.bgExpiryDate) : '',
+                        claimDate: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',
+                        amount: instrument.amount ? Number(instrument.amount).toLocaleString('en-IN') : '',
+                        teamLeaderName: tlUser?.name || 'Team Leader',
+                        teamLeaderPhone: this.formatPhoneWithCountryCode(tlUser?.mobile),
+                        teamLeaderEmail: tlUser?.email || '',
+                        accountsLeaderName: accountsLeader?.name || 'Accounts Leader',
+                        accountsLeaderPhone: this.formatPhoneWithCountryCode(accountsLeader?.mobile),
+                        accountsLeaderEmail: accountsLeader?.email || 'imran@volksenergie.in',
+                    };
+
+                    await this.docxService.buildCoveringLetter(coveringLetterData, instrumentId).catch((error) => {
+                        this.logger.warn(
+                            `BG covering letter DOCX generation failed for instrument ${instrumentId}: ${error instanceof Error ? error.message : String(error)}`
+                        );
+                    });
+
+                    const [coveringLetterPath] = await this.pdfGenerator.generatePdfs(
+                        'bgCoveringLetter',
+                        { ...coveringLetterData },
+                        instrumentId,
+                        'BG'
+                    );
+
+                    if (coveringLetterPath) {
+                        addAttachmentLink('Covering Letter', coveringLetterPath);
+                        try {
+                            await this.db
+                                .update(instrumentBgDetails)
+                                .set({ coverLetterDocx: coveringLetterPath })
+                                .where(eq(instrumentBgDetails.instrumentId, instrumentId));
+                        } catch (persistError) {
+                            this.logger.warn(
+                                `Failed to persist BG cover letter path for instrument ${instrumentId}: ${persistError instanceof Error ? persistError.message : String(persistError)}`
+                            );
+                        }
+                    }
+                } catch (error) {
+                    this.logger.warn(
+                        `BG covering letter generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
+                    );
                 }
 
-                // Get recipient email - use Imran (Accounts Leader) as specified
-                // Fallback to lookup if configured, otherwise hardcode Imran
+                try {
+                    const prefilledBgData = this.buildBgPrefilledData({
+                        date: this.formatDateDDMMYYYY(new Date()),
+                        bgAmount: instrument.amount ? `${Number(instrument.amount).toLocaleString('en-IN')}/-` : '',
+                        beneficiaryName: bgDetails?.beneficiaryName || '',
+                        beneficiaryAddress: bgDetails?.beneficiaryAddress || '',
+                        bgExpiryDate: bgDetails?.bgExpiryDate ? this.formatDateDDMMYYYY(bgDetails.bgExpiryDate) : '',
+                        claimExpiryDate: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',
+                        accountNo: '2502245699295242',
+                        ifsc: bgDetails?.bgBankIfsc || '',
+                        uniqueCode: bgDetails?.uniqueCode || '',
+                    });
+
+                    await this.docxService.buildPrefilledApplication(prefilledBgData as any, instrumentId).catch((error) => {
+                        this.logger.warn(
+                            `BG prefilled application DOCX generation failed for instrument ${instrumentId}: ${error instanceof Error ? error.message : String(error)}`
+                        );
+                    });
+
+                    const [prefilledBgPath] = await this.pdfGenerator.generatePdfs(
+                        'bgPrefilledFormat',
+                        { ...prefilledBgData },
+                        instrumentId,
+                        'BG'
+                    );
+
+                    if (prefilledBgPath) {
+                        addAttachmentLink('Pre-filled Application Format', prefilledBgPath);
+                        try {
+                            await this.db
+                                .update(instrumentBgDetails)
+                                .set({ prefilledAppDocx: prefilledBgPath })
+                                .where(eq(instrumentBgDetails.instrumentId, instrumentId));
+                        } catch (persistError) {
+                            this.logger.warn(
+                                `Failed to persist BG prefilled application path for instrument ${instrumentId}: ${persistError instanceof Error ? persistError.message : String(persistError)}`
+                            );
+                        }
+                    }
+                } catch (error) {
+                    this.logger.warn(
+                        `BG prefilled application format generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
+                    );
+                }
+
+                try {
+                    const authorizationLetterData = {
+                        date: this.formatDateDDMMYYYY(new Date()),
+                        partyName: bgDetails?.beneficiaryName || '',
+                        bgAmount: instrument.amount
+                            ? `${Number(instrument.amount).toLocaleString('en-IN')}/-`
+                            : '',
+                    };
+
+                    await this.docxService.buildAuthorizationLetter(authorizationLetterData, instrumentId).catch((error) => {
+                        this.logger.warn(
+                            `BG authorization letter DOCX generation failed for instrument ${instrumentId}: ${error instanceof Error ? error.message : String(error)}`
+                        );
+                    });
+
+                    const [authorizationLetterPath] = await this.pdfGenerator.generatePdfs(
+                        'bgAuthorizationLetter',
+                        { ...authorizationLetterData },
+                        instrumentId,
+                        'BG'
+                    );
+
+                    if (authorizationLetterPath) {
+                        addAttachmentLink('Authorization Letter', authorizationLetterPath);
+                        try {
+                            await this.db
+                                .update(instrumentBgDetails)
+                                .set({ authorizationLetterDocx: authorizationLetterPath })
+                                .where(eq(instrumentBgDetails.instrumentId, instrumentId));
+                        } catch (persistError) {
+                            this.logger.warn(
+                                `Failed to persist BG authorization letter path for instrument ${instrumentId}: ${persistError instanceof Error ? persistError.message : String(persistError)}`
+                            );
+                        }
+                    }
+                } catch (error) {
+                    this.logger.warn(
+                        `BG authorization letter generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
+                    );
+                }
+
+                // Attachment — envelope slip (PDF) printed and pasted on the
+                // dispatch envelope. No letterhead / footer / watermark.
+                try {
+                    const courierJson = (instrument?.courierAddressJson ?? null) as Record<string, any> | null;
+                    const addressLines: string[] = courierJson
+                        ? [
+                            courierJson.line1,
+                            courierJson.line2,
+                            courierJson.city,
+                            [courierJson.state, courierJson.pincode].filter(Boolean).join(' - '),
+                        ].filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
+                        : (instrument?.courierAddress || '')
+                            .split(/\r?\n/)
+                            .map((line) => line.trim())
+                            .filter((line) => line.length > 0);
+
+                    const [envelopeSlipPath] = await this.pdfGenerator.generatePdfs(
+                        'bgEnvelopeSlip',
+                        {
+                            data: {
+                                to_name: courierJson?.name || '',
+                                to_address_lines: addressLines,
+                                contact_number: courierJson?.phone || '',
+                                submission_label: bgReference?.label || '',
+                                submission_ref: bgReference?.value || '',
+                            },
+                        },
+                        instrumentId,
+                        'BG'
+                    );
+
+                    if (envelopeSlipPath) {
+                        addAttachmentLink('Envelope Slip', envelopeSlipPath);
+                        try {
+                            await this.db
+                                .update(instrumentBgDetails)
+                                .set({ envelopeSlip: envelopeSlipPath })
+                                .where(eq(instrumentBgDetails.instrumentId, instrumentId));
+                        } catch (persistError) {
+                            this.logger.warn(
+                                `Failed to persist BG envelope slip path for instrument ${instrumentId}: ${persistError instanceof Error ? persistError.message : String(persistError)}`
+                            );
+                        }
+                    }
+                } catch (error) {
+                    this.logger.warn(
+                        `BG envelope slip generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
+                    );
+                }
+
+                // Attachment 1 — the BG Format uploaded in the create form
+                // (bgSoftCopy holds the first uploaded file).
+                this.toAttachmentPaths(bgDetails?.bgSoftCopy).forEach((path) => addAttachmentLink('BG Format', path));
+
+                // Attachment 2 — the PO doc uploaded in the BG dashboard form,
+                // else the project's WO draft, else the main tender document.
+                let supportingDocLabel = '';
+                try {
+                    const supportingDoc = await this.resolveBgSupportingDocs(paymentReq, bgDetails);
+                    supportingDoc.paths.forEach((path) => addAttachmentLink(supportingDoc.label || 'Supporting document', path));
+                    supportingDocLabel = supportingDoc.label;
+                } catch (error) {
+                    this.logger.warn(
+                        `Failed to resolve BG supporting documents for instrument ${instrumentId} — sending create mail without them: ${error instanceof Error ? error.message : String(error)}`
+                    );
+                }
+
                 const toEmails: RecipientSource[] = [{ type: 'emails', emails: ['imran@volksenergie.in'] }];
 
                 // From: TE (requestedBy)
                 const fromUserId = paymentReq.requestedBy;
 
                 // Subject
-                const subject = `New Bank Guarantee - ${bgDetails?.bgPurpose || 'Financial security'}`;
+                const subject = `New Bank Guarantee - ${bgPurposeText}`;
 
                 // CC: Coordinator, CEO, Accounts, TL
                 const ccEmails: RecipientSource[] = [
@@ -1021,6 +1676,9 @@ export class PaymentRequestsNotificationService {
                 ];
 
                 try {
+                    this.logger.log(
+                        `BG create mail for instrument ${instrumentId}: to=${toEmails.map((r) => (r as { emails?: string[] }).emails?.join(',')).join(',')}, teamId=${tenderTeamId}, links=${attachmentLinks.length}`
+                    );
                     const result = await this.emailService.sendPaymentEmail({
                         requestId: instrument.requestId,
                         tenderId: paymentReq.tenderId || undefined,
@@ -1030,23 +1688,29 @@ export class PaymentRequestsNotificationService {
                         template: 'bg-request',
                         data: {
                             recipientName: 'Imran',
-                            bgPurpose: bgDetails?.bgPurpose || 'Financial security',
+                            bgPurpose: bgPurposeText,
                             beneficiaryName: bgDetails?.beneficiaryName || '',
                             beneficiaryAddress: bgDetails?.beneficiaryAddress || '',
                             bgExpiryDate: bgDetails?.bgExpiryDate ? this.formatDateDDMMYYYY(bgDetails.bgExpiryDate) : '',
                             claimDate: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',
                             amount: instrument.amount ? Number(instrument.amount).toLocaleString('en-IN') : '',
                             stampPaperValue: bgDetails?.stampCharges || 300,
-                            timeLimit: instrument.courierDeadline || 24,
-                            actionLink: `${this.getFrontendUrl()}/bi-dashboard/bank-guarantee/action/${instrumentId}`,
-                            actionLinkText: 'Accounts Form (BG) Stage 2: After BG Creation',
+                            timeLimit: Number(bgDetails?.bgNeeds) || instrument.courierDeadline || 24,
+                            dueDateTime,
+                            beneName: orNotProvided(bgDetails?.bgBankAccName),
+                            beneAcc: orNotProvided(bgDetails?.bgBankAcc),
+                            beneIfsc: orNotProvided(bgDetails?.bgBankIfsc),
+                            uniqueCode: orNotProvided(bgDetails?.uniqueCode),
+                            stage1Link: `${this.getFrontendUrl()}/bi-dashboard/bank-guarantee/action/${instrumentId}?section=accounts-form-1`,
+                            actionLink: `${this.getFrontendUrl()}/bi-dashboard/bank-guarantee/action/${instrumentId}?section=accounts-form-2`,
+                            actionLinkText: 'Stage 2: After BG Creation',
                             courierAddress: instrument.courierAddress || '',
+                            hasBgFormat: this.toAttachmentPaths(bgDetails?.bgSoftCopy).length > 0,
+                            supportingDocLabel,
+                            attachmentLinks,
                         },
                         to: toEmails,
                         cc: ccEmails,
-                        attachments: {
-                            files: attachmentFiles,
-                        },
                     });
 
                     if (result.success) {
@@ -1470,7 +2134,7 @@ export class PaymentRequestsNotificationService {
                 continue;
             }
 
-            const tenderTeamId = await this.getTenderTeamId(cheque.request.tenderId || 0, cheque.request.requestedBy || 0);
+            const { start: dayStart, end: dayEnd } = getIstDayBounds();
 
             const data = {
                 purpose: cheque.chequeDetails.chequeReason || cheque.request.purpose || '',
@@ -1480,6 +2144,25 @@ export class PaymentRequestsNotificationService {
                 dueDate: this.formatDateDDMMYYYY(cheque.chequeDetails.dueDate),
                 daysLeft: daysUntilDue,
             };
+            const subject = `Cheque Due Date Reminder - ${data.chequeNo} (${data.daysLeft} days left)`;
+
+            const [existingReminder] = await this.db
+                .select({ id: emailLogs.id })
+                .from(emailLogs)
+                .where(and(
+                    eq(emailLogs.eventType, 'CHEQUE_DUE_DATE_REMINDER'),
+                    gte(emailLogs.createdAt, dayStart),
+                    lt(emailLogs.createdAt, dayEnd),
+                    eq(emailLogs.subject, subject),
+                ))
+                .limit(1);
+
+            if (existingReminder) {
+                this.logger.log(`Cheque due date reminder already logged today for Cheque #${cheque.instrument.id}, skipping`);
+                continue;
+            }
+
+            const tenderTeamId = await this.getTenderTeamId(cheque.request.tenderId || 0, cheque.request.requestedBy || 0);
 
             this.logger.log(`Sending cheque due date reminder for Cheque #${cheque.instrument.id}, ${daysUntilDue} days before due date`);
 
@@ -1489,7 +2172,7 @@ export class PaymentRequestsNotificationService {
                     tenderId: cheque.request.tenderId || undefined,
                     eventType: 'CHEQUE_DUE_DATE_REMINDER',
                     fromUserId: 8,
-                    subject: `Cheque Due Date Reminder - ${data.chequeNo} (${data.daysLeft} days left)`,
+                    subject,
                     template: 'cheque-due-date-reminder',
                     data,
                     to: [{ type: 'emails', emails: ['kailash@volksenergie.in'] }],
@@ -1860,12 +2543,12 @@ export class PaymentRequestsNotificationService {
                 tenderId: paymentReq.tenderId || undefined,
                 eventType: 'BG_REJECTED',
                 fromUserId: (await this.db.select({ id: users.id }).from(users).where(eq(users.email, 'imran@volksenergie.in')) as any)[0]?.id ?? 33,
-                subject: `Bank Guarantee rejected - ${bgDetails?.bgPurpose || 'Financial security'}`,
+                subject: `Bank Guarantee rejected - ${formatBgPurpose(bgDetails?.bgPurpose, 'Financial security')}`,
                 template: 'bg-rejected',
                 data: {
                     teName: teUser.name || 'Tender Executive',
                     reason: instrument.rejectionReason || '',
-                    purpose: bgDetails?.bgPurpose || 'Financial security',
+                    purpose: formatBgPurpose(bgDetails?.bgPurpose, 'Financial security'),
                 },
                 to: [{ type: 'emails', emails: [teUser.email] }],
                 cc: ccEmails,
@@ -1881,13 +2564,9 @@ export class PaymentRequestsNotificationService {
         }
     }
 
-    /**
-     * Send BG creation and couriered email when Accounts Form 2 is accepted
-     */
     async sendBgCreatedCourieredEmail(instrumentId: number): Promise<void> {
         this.logger.log(`Sending BG creation and couriered email for instrument ${instrumentId}`);
 
-        // Fetch instrument + payment request + BG details
         const [instrument] = await this.db
             .select()
             .from(paymentInstruments)
@@ -1914,7 +2593,6 @@ export class PaymentRequestsNotificationService {
             return;
         }
 
-        // Get TE name and email
         const [teUser] = await this.db
             .select({ name: users.name, email: users.email })
             .from(users)
@@ -1926,7 +2604,6 @@ export class PaymentRequestsNotificationService {
             return;
         }
 
-        // Get tender team ID
         let tenderTeamId = 1;
         if (paymentReq.tenderId > 0) {
             const tenderData = await this.db
@@ -1937,21 +2614,18 @@ export class PaymentRequestsNotificationService {
             tenderTeamId = tenderData[0]?.team || 1;
         }
 
-        // Get BG details for purpose and soft copy
         const [bgDetails] = await this.db
             .select()
             .from(instrumentBgDetails)
             .where(eq(instrumentBgDetails.instrumentId, instrumentId))
             .limit(1);
 
-        // From: Imran (Accounts Leader)
         const [sender] = await this.db
             .select({ id: users.id })
             .from(users)
             .where(eq(users.email, 'imran@volksenergie.in'))
             .limit(1);
 
-        // Get CC emails
         const ccEmails: RecipientSource[] = [
             { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
             { type: 'emails', emails: ['goyal@volksenergie.in'] },
@@ -1959,26 +2633,44 @@ export class PaymentRequestsNotificationService {
             { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
         ];
 
+        const attachmentItems: Array<{ path: string; name: string }> = [
+            ...this.toAttachmentPaths(bgDetails?.bgSignedCoveringLetter).map((path) => ({
+                path,
+                name: 'Signed Covering Letter',
+            })),
+            ...this.toAttachmentPaths(bgDetails?.bgUpload).map((path) => ({
+                path,
+                name: 'Soft Copy of BG',
+            })),
+        ];
+
+        const stagedAttachments = this.stageBgMailAttachments(instrumentId, attachmentItems);
+        const attachmentNames = stagedAttachments.map((attachment) => attachment.name);
+        const attachedGroups = new Set(
+            attachmentNames.map((name) => name.replace(/ \(\d+\)$/, '')),
+        );
+
         try {
             const result = await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
                 tenderId: paymentReq.tenderId || undefined,
                 eventType: 'BG_CREATED_COURIERED',
                 fromUserId: sender?.id ?? 33,
-                subject: `New BG created and Couriered - ${bgDetails?.bgPurpose || 'Financial security'}`,
+                subject: `New BG created and Couriered - ${formatBgPurpose(bgDetails?.bgPurpose, 'Financial security')}`,
                 template: 'bg-created-couriered',
                 data: {
                     teName: teUser.name || 'Tender Executive',
-                    purpose: bgDetails?.bgPurpose || 'Financial security',
-                    courierNo: bgDetails?.courierNo || '',
-                    reasons: bgDetails?.bg2Remark || '',
+                    purpose: formatBgPurpose(bgDetails?.bgPurpose, 'Financial security'),
+                    courierRequestNo: instrument.reqNo || '',
+                    remarks: bgDetails?.bg2Remark || '',
+                    hasSignedCoveringLetter: attachedGroups.has('Signed Covering Letter'),
+                    hasSoftCopy: attachedGroups.has('Soft Copy of BG'),
+                    attachmentNames,
                 },
                 to: [{ type: 'emails', emails: [teUser.email] }],
                 cc: ccEmails,
                 attachments: {
-                    files: this.toAttachmentPaths(bgDetails?.bgSoftCopy).map((p) =>
-                        p.startsWith('bi-dashboard/bank-guarantee/') ? p : `bi-dashboard/bank-guarantee/${p}`,
-                    ),
+                    files: stagedAttachments.map((attachment) => attachment.path),
                 },
             });
 
@@ -1996,7 +2688,6 @@ export class PaymentRequestsNotificationService {
         try {
             this.logger.log(`Preparing BG bank request email for instrument ${instrumentId}`);
 
-            // Fetch instrument + payment request + BG details
             const [result] = await this.db
                 .select({
                     instrument: paymentInstruments,
@@ -2021,10 +2712,7 @@ export class PaymentRequestsNotificationService {
                 return;
             }
 
-            // Resolve bank "To" mail ids
-            const bankMailIds = (bgDetails.bankMailIds || []).filter(
-                (email): email is string => typeof email === 'string' && email.trim().length > 0,
-            );
+            const bankMailIds = this.normalizeMailIds(bgDetails.bankMailIds);
 
             if (bankMailIds.length === 0) {
                 this.logger.warn(
@@ -2035,7 +2723,6 @@ export class PaymentRequestsNotificationService {
 
             const toEmails: RecipientSource[] = [{ type: 'emails', emails: bankMailIds }];
 
-            // Resolve tender team for role-based CC recipients
             const tenderTeamId = await this.getTenderTeamId(request.tenderId || 0, request.requestedBy || 0);
 
             const ccSources: RecipientSource[] = [
@@ -2044,23 +2731,41 @@ export class PaymentRequestsNotificationService {
                 { type: 'emails', emails: ['accounts@volksenergie.in'] },
             ];
 
-            const bankMailIdsCc = (bgDetails.bankMailIdsCc || []).filter(
-                (email): email is string => typeof email === 'string' && email.trim().length > 0,
-            );
+            const bankMailIdsCc = this.normalizeMailIds(bgDetails.bankMailIdsCc);
 
             if (bankMailIdsCc.length > 0) {
                 ccSources.push({ type: 'emails', emails: bankMailIdsCc });
             }
 
-            // Resolve attachments: prefilled & signed BG forms, PO copy/request letter, BG Format
-            // attachments.files expects plain path strings
-            const attachmentFiles: string[] = [];
+            const supportingDoc = await this.resolveBgSupportingDocs(request, bgDetails);
+            const supportingDocName = supportingDoc.label.startsWith('WO draft')
+                ? 'WO Draft - LOA-GEM PO-LOI'
+                : supportingDoc.label.startsWith('Main tender')
+                    ? 'Tender Document'
+                    : 'PO Copy - Beneficiary Request Letter';
 
-            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.prefilledSignedBg));
-            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.bgPo));
-            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.bgFormatTe || bgDetails.bgFormatTl));
+            const attachmentItems: Array<{ path: string; name: string }> = [
+                ...this.toAttachmentPaths(bgDetails.prefilledSignedBg).map((path) => ({
+                    path,
+                    name: 'Request Letter - Signed by CEO',
+                })),
+                ...supportingDoc.paths.map((path) => ({ path, name: supportingDocName })),
+                ...this.toAttachmentPaths(
+                    bgDetails.bgFormatTe || bgDetails.bgFormatTl || bgDetails.bgSoftCopy,
+                ).map((path) => ({ path, name: 'BG Format' })),
+                ...this.toAttachmentPaths(bgDetails.fdrCopy).map((path) => ({
+                    path,
+                    name: 'FDR Copy',
+                })),
+            ];
 
-            // Resolve "From" as CEO; fall back to Imran, then hardcoded user id
+            const stagedAttachments = this.stageBgMailAttachments(instrumentId, attachmentItems);
+            const attachmentFiles = stagedAttachments.map((attachment) => attachment.path);
+            const attachmentNames = stagedAttachments.map((attachment) => attachment.name);
+            const attachedGroups = new Set(
+                attachmentNames.map((name) => name.replace(/ \(\d+\)$/, '')),
+            );
+
             let fromUserId: number;
 
             const [ceoUser] = await this.db
@@ -2082,11 +2787,18 @@ export class PaymentRequestsNotificationService {
                 fromUserId = imranUser ? imranUser.id : 33;
             }
 
-            // Compose email content fields
-            const bgPurpose = bgDetails.bgPurpose || `Performance Bank Guarantee for ${request.projectName || ''}`;
+            const bgPurpose = bgDetails.bgPurpose
+                ? formatBgPurpose(bgDetails.bgPurpose, '')
+                : 'Performance Bank Guarantee';
             const beneficiaryName = bgDetails.beneficiaryName || '';
-            const beneficiaryAddress = bgDetails.beneficiaryAddress || '';
-            const timeLimit = instrument.courierDeadline || 24;
+            const timeLimit = Number(bgDetails.bgNeeds) || instrument.courierDeadline || 24;
+
+            const stampCharges = Number(bgDetails.stampCharges);
+            const fdrPer = Number(bgDetails.fdrPer);
+            const beneName = (bgDetails.bgBankAccName || '').trim();
+            const beneAcc = (bgDetails.bgBankAcc || '').trim();
+            const beneIfsc = (bgDetails.bgBankIfsc || '').trim();
+            const uniqueCode = (bgDetails.uniqueCode || '').trim();
 
             await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
@@ -2100,16 +2812,23 @@ export class PaymentRequestsNotificationService {
                 data: {
                     bgPurpose,
                     beneficiaryName,
-                    beneficiaryAddress,
                     bgExpiryDate: this.formatDateDDMMYYYY(bgDetails.bgExpiryDate),
                     claimDate: this.formatDateDDMMYYYY(bgDetails.bgClaim),
                     amount: (Number(instrument.amount) || 0).toLocaleString('en-IN'),
-                    stampPaperValue: (Number(bgDetails.stampCharges) || 300).toLocaleString('en-IN'),
-                    fdrMargin: bgDetails.fdrPer ? `${bgDetails.fdrPer}%` : '10%/100%',
-                    beneName: bgDetails.bgBankAccName || '',
-                    beneAcc: bgDetails.bgBankAcc || '',
-                    beneIfsc: bgDetails.bgBankIfsc || '',
+                    stampPaperValue: stampCharges > 0 ? stampCharges.toLocaleString('en-IN') : '',
+                    fdrMargin: fdrPer > 0 ? `${fdrPer}%` : '',
+                    hasBeneficiaryAccount: Boolean(beneName || beneAcc || beneIfsc || uniqueCode),
+                    beneName,
+                    beneAcc,
+                    beneIfsc,
+                    uniqueCode,
+                    debitAccountNo: '2502245699295242',
                     timeLimit,
+                    hasCeoRequestLetter: attachedGroups.has('Request Letter - Signed by CEO'),
+                    hasSupportingDoc: attachedGroups.has(supportingDocName),
+                    hasBgFormat: attachedGroups.has('BG Format'),
+                    hasFdrCopy: attachedGroups.has('FDR Copy'),
+                    attachmentNames,
                 },
                 attachments: { files: attachmentFiles },
             });
@@ -2517,16 +3236,23 @@ export class PaymentRequestsNotificationService {
                 return;
             }
 
-            const clientEmail = bgDetails.bgClientUser;
+            const clientEmails = [
+                ...this.normalizeMailIds(bgDetails.bgClientUser),
+                ...this.normalizeMailIds(bgDetails.bgClientCp),
+                ...this.normalizeMailIds(bgDetails.bgClientFin),
+            ].filter(
+                (email, index, list) =>
+                    list.findIndex((item) => item.toLowerCase() === email.toLowerCase()) === index,
+            );
 
-            if (!clientEmail) {
+            if (clientEmails.length === 0) {
                 this.logger.warn(
-                    `BG submitted email skipped: no client/department mail id (bgClientUser) saved for instrument ${instrumentId}`,
+                    `BG submitted email skipped: no client/department mail ids saved for instrument ${instrumentId}`,
                 );
                 return;
             }
 
-            const toEmails: RecipientSource[] = [{ type: 'emails', emails: [clientEmail] }];
+            const toEmails: RecipientSource[] = [{ type: 'emails', emails: clientEmails }];
 
             const tenderTeamId = await this.getTenderTeamId(request.tenderId || 0, request.requestedBy);
 
@@ -2547,9 +3273,56 @@ export class PaymentRequestsNotificationService {
                 ccSources.push({ type: 'emails', emails: [teUser.email] });
             }
 
-            const attachmentFiles: string[] = [];
-            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.bgSoftCopy));
-            attachmentFiles.push(...this.toAttachmentPaths(bgDetails.sfmsConf));
+            const reference = await this.resolveBgReference(request);
+            const referenceDate = this.formatDateDDMMYYYY(reference?.date ?? null);
+
+            let courierProvider = '';
+            let courierDocketNo = instrument.docketNo?.trim() || '';
+            let courierDocketSlip = instrument.docketSlip?.trim() || '';
+
+            const courierId = instrument.reqNo ? Number(instrument.reqNo) : NaN;
+            if (!isNaN(courierId)) {
+                const [courier] = await this.db
+                    .select({
+                        courierProvider: couriers.courierProvider,
+                        docketNo: couriers.docketNo,
+                        docketSlip: couriers.docketSlip,
+                    })
+                    .from(couriers)
+                    .where(eq(couriers.id, courierId))
+                    .limit(1);
+
+                if (courier) {
+                    courierProvider = courier.courierProvider?.trim() || '';
+                    courierDocketNo = courier.docketNo?.trim() || courierDocketNo;
+                    courierDocketSlip = courier.docketSlip?.trim() || courierDocketSlip;
+                }
+            }
+
+            const attachmentItems: Array<{ path: string; name: string }> = [
+                ...this.toAttachmentPaths(bgDetails.bgSignedCoveringLetter).map((path) => ({
+                    path,
+                    name: 'Covering Letter',
+                })),
+                ...this.toAttachmentPaths(bgDetails.bgUpload).map((path) => ({
+                    path,
+                    name: 'Soft Copy of the BG',
+                })),
+                ...this.toAttachmentPaths(courierDocketSlip).map((path) => ({
+                    path,
+                    name: 'Courier Docket Slip',
+                })),
+                ...this.toAttachmentPaths(bgDetails.sfmsConf).map((path) => ({
+                    path,
+                    name: 'SFMS Confirmation',
+                })),
+            ];
+
+            const stagedAttachments = this.stageBgMailAttachments(instrumentId, attachmentItems);
+            const attachmentNames = stagedAttachments.map((attachment) => attachment.name);
+            const attachedGroups = new Set(
+                attachmentNames.map((name) => name.replace(/ \(\d+\)$/, '')),
+            );
 
             const [imranUser] = await this.db
                 .select({ id: users.id })
@@ -2559,37 +3332,47 @@ export class PaymentRequestsNotificationService {
 
             const fromUserId = imranUser ? imranUser.id : 33;
 
-            const purpose = bgDetails.bgPurpose || request.purpose || 'Financial security';
-
-            const tenderDate = ''; // no confirmed schema field for WO/Tender Date
+            const purpose = formatBgPurpose(bgDetails.bgPurpose || request.purpose, 'Financial security');
+            const referenceValue = reference?.value || '';
+            const amount = Number(instrument.amount) || 0;
+            const stampPaperValue = Number(bgDetails.stampCharges) || 0;
 
             const mailResult = await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
                 tenderId: request.tenderId || undefined,
                 eventType: 'BG_SUBMITTED',
                 template: 'bg-fdr',
-                subject: `Bank Guarantee submitted - ${request.tenderNo || 'N/A'} against ${purpose}`,
+                subject: `Bank Guarantee submitted${referenceValue ? ` - ${referenceValue}` : ''} as ${purpose}`,
                 fromUserId,
                 to: toEmails,
                 cc: ccSources,
                 data: {
-                    tenderNo: request.tenderNo || 'N/A',
-                    tenderDate,
+                    referenceValue,
+                    referenceDate,
                     bgNo: bgDetails.bgNo || '',
                     bgExpiryDate: this.formatDateDDMMYYYY(bgDetails.bgExpiryDate),
                     bgClaimDate: this.formatDateDDMMYYYY(bgDetails.bgClaim),
                     beneficiaryName: instrument.favouring || bgDetails.beneficiaryName || '',
-                    amount: (Number(instrument.amount) || 0).toLocaleString('en-IN'),
-                    stampPaperValue: (Number(bgDetails.stampCharges) || 0).toLocaleString('en-IN'),
+                    amount: amount ? amount.toLocaleString('en-IN') : '',
+                    stampPaperValue: stampPaperValue ? stampPaperValue.toLocaleString('en-IN') : '',
+                    courierProvider,
+                    courierDocketNo,
+                    hasCoveringLetter: attachedGroups.has('Covering Letter'),
+                    hasSoftCopy: attachedGroups.has('Soft Copy of the BG'),
+                    hasDocketSlip: attachedGroups.has('Courier Docket Slip'),
+                    hasSfmsConf: attachedGroups.has('SFMS Confirmation'),
+                    attachmentNames,
                 },
-                attachments: { files: attachmentFiles },
+                attachments: {
+                    files: stagedAttachments.map((attachment) => attachment.path),
+                },
             });
 
             if (mailResult.success) {
-                this.logger.log(`BG submitted email sent for instrument ${instrumentId} to ${clientEmail} (logId: ${mailResult.emailLogId})`);
+                this.logger.log(`BG submitted email sent for instrument ${instrumentId} to ${clientEmails.join(', ')} (logId: ${mailResult.emailLogId})`);
             } else {
                 this.logger.warn(
-                    `BG submitted email failed for instrument ${instrumentId} to ${clientEmail}: ${mailResult.error}`,
+                    `BG submitted email failed for instrument ${instrumentId} to ${clientEmails.join(', ')}: ${mailResult.error}`,
                 );
             }
         } catch (error) {
@@ -2703,7 +3486,7 @@ export class PaymentRequestsNotificationService {
                 tenderId: paymentReq.tenderId || undefined,
                 eventType: 'BG_FOLLOWUP_RELEASE',
                 fromUserId: (await this.db.select({ id: users.id }).from(users).where(eq(users.email, 'imran@volksenergie.in')) as any)[0]?.id ?? 33,
-                subject: `Bank Guarantee No. - ${bgDetails?.bgNo || ''} - ${statusLabel} - ${tender?.tenderNo || ''} against ${bgDetails?.bgPurpose || paymentReq.purpose || ''}`,
+                subject: `Bank Guarantee No. - ${bgDetails?.bgNo || ''} - ${statusLabel} - ${tender?.tenderNo || ''} against ${formatBgPurpose(bgDetails?.bgPurpose || paymentReq.purpose, '')}`,
                 template: 'bg-followup-release',
                 data,
                 to: [{ type: 'emails', emails: clientEmails }],

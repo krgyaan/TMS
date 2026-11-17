@@ -11,7 +11,6 @@ import { Mail, Clock, Calendar, Paperclip, Loader2, Send, Edit, Save, X, Externa
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { FileUploader } from "@/components/file-upload";
-import { ContactPersonFields } from "./ContactPersonFields";
 import { fileUploadService } from "@/services/api/file-upload.service";
 import { format } from "date-fns";
 import {useLeadFollowups, useMailForm, useStopFollowup, useSourceRecord, seedContactsFromSource, isToday, sourceFollowupPath, type MailFormValues} from "@/hooks/api/useLeadFollowups";
@@ -49,9 +48,6 @@ function MailCreateForm({ source, initialAttachments }: { source: FollowupSource
         handleSubmit,
         handleCancelEdit,
     } = useMailForm(source);
-
-    const sourceRecord = useSourceRecord(source);
-    const contacts = useMemo(() => seedContactsFromSource(sourceRecord), [sourceRecord]);
 
     useEffect(() => {
         if (!isEditMode && initialAttachments && initialAttachments.length > 0) {
@@ -140,13 +136,6 @@ Write your mail body here..."
                         )}
                     </FieldWrapper>
                 </div>
-
-                <ContactPersonFields
-                    contacts={contacts}
-                    onChange={() => {}}
-                    disabled={true}
-                    lockedCount={contacts.length}
-                />
 
                 <div className="space-y-2">
                     <FileUploader

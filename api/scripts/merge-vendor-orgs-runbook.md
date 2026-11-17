@@ -1,7 +1,23 @@
-# Manual vendor organization merge runbook
+# Vendor organization duplicate merge runbook
 
-Replaces the retired `scripts/merge-vendor-orgs.ts` tool. Everything here is
-manual SQL against `vendor_organizations`.
+For name variants, use the automated audit + merge-plan runner first:
+
+```bash
+pnpm audit:vendor-duplicates
+
+# review migration-logs/vendor-name-variants-*.csv,
+# vendor-name-review-*.csv, vendor-different-name-matches-*.csv
+
+pnpm merge:vendor-duplicates --plan migration-logs/vendor-name-merge-plan-<runId>.json
+pnpm merge:vendor-duplicates --plan migration-logs/vendor-name-merge-plan-<runId>.json --apply
+```
+
+The audit merges only name variants and keeps the lowest id in each cluster.
+Same-PAN / shared-GSTIN groups with different names are logged, not merged.
+The merge runner uses `VendorMasterService.mergeVendors`, so it re-points the
+same references as the UI merge page and deactivates (never deletes) the drop.
+
+For everything else, the manual SQL runbook below still applies.
 
 **Rules**
 
@@ -88,7 +104,6 @@ WITH d AS (SELECT * FROM vendor_organizations WHERE id = :drop),
            'project_parties_sellers_archive.vendor_organization_id',(SELECT coalesce(json_agg(id),'[]') FROM project_parties_sellers_archive WHERE vendor_organization_id = d.id)
          ) AS moved_refs,
          jsonb_strip_nulls(jsonb_build_object(
-           'alias',     CASE WHEN k.alias     IS NULL OR btrim(k.alias)     = '' THEN d.alias     END,
            'pan',       CASE WHEN k.pan       IS NULL OR btrim(k.pan)       = '' THEN d.pan       END,
            'msme',      CASE WHEN k.msme      IS NULL OR btrim(k.msme)      = '' THEN d.msme      END,
            'msme_type', CASE WHEN k.msme_type IS NULL OR btrim(k.msme_type) = '' THEN d.msme_type END,
@@ -97,9 +112,9 @@ WITH d AS (SELECT * FROM vendor_organizations WHERE id = :drop),
        FROM d, k
      )
 INSERT INTO vendor_organizations_dups_archive
-  (id, kept_id, name, alias, address, pan, msme, msme_type, status,
+  (id, kept_id, name, address, pan, msme, msme_type, status,
    created_at, updated_at, reason, moved_refs, filled)
-SELECT d.id, k.id, d.name, d.alias, d.address, d.pan, d.msme, d.msme_type,
+SELECT d.id, k.id, d.name, d.address, d.pan, d.msme, d.msme_type,
        d.status, d.created_at, d.updated_at, 'manual merge (see runbook §3)',
        p.moved_refs, p.filled
 FROM d, k, plan p
@@ -109,8 +124,7 @@ ON CONFLICT (id) DO UPDATE
 
 -- 3b. fill the keeper's EMPTY identifying fields from the drop
 UPDATE vendor_organizations k
-SET alias     = CASE WHEN k.alias     IS NULL OR btrim(k.alias)     = '' THEN d.alias     ELSE k.alias END,
-    pan       = CASE WHEN k.pan       IS NULL OR btrim(k.pan)       = '' THEN d.pan       ELSE k.pan END,
+SET pan       = CASE WHEN k.pan       IS NULL OR btrim(k.pan)       = '' THEN d.pan       ELSE k.pan END,
     msme      = CASE WHEN k.msme      IS NULL OR btrim(k.msme)      = '' THEN d.msme      ELSE k.msme END,
     msme_type = CASE WHEN k.msme_type IS NULL OR btrim(k.msme_type) = '' THEN d.msme_type ELSE k.msme_type END,
     address   = CASE WHEN k.address   IS NULL OR btrim(k.address)   = '' THEN d.address   ELSE k.address END

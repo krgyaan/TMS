@@ -3,6 +3,7 @@ import { DatabaseModule } from "@/db/database.module";
 import { EmailModule } from "@/modules/email/email.module";
 import { PdfGeneratorModule } from "@/modules/pdf/pdf-generator.module";
 import { PaymentRequestsNotificationService } from "./services/payment-requests-notification.service";
+import { DocxModule } from "@/modules/docx/docx.module";
 
 /**
  * Service-only module (no controllers).
@@ -11,7 +12,7 @@ import { PaymentRequestsNotificationService } from "./services/payment-requests-
  * `PaymentRequestsController` / HTTP guards.
  */
 @Module({
-    imports: [DatabaseModule, EmailModule, PdfGeneratorModule],
+    imports: [DatabaseModule, EmailModule, PdfGeneratorModule, DocxModule],
     providers: [PaymentRequestsNotificationService],
     exports: [PaymentRequestsNotificationService],
 })

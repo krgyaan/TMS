@@ -49,3 +49,7 @@ export * from "./circulars.schema";
 // Transporters
 export * from "./transporters.schema";
 
+// Payment Categories
+export * from "./payment-category.schema";
+export * from "./payment-category.relations";
+

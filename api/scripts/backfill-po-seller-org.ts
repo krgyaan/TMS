@@ -362,7 +362,6 @@ async function main(): Promise<void> {
                             address: trimOrNull(spec.address),
                             msme: null,
                             msmeType: null,
-                            alias: null,
                             status: true,
                             createdAt: stamped,
                             updatedAt: stamped,

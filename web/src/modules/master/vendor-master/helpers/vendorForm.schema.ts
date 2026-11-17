@@ -2,9 +2,14 @@ import { z } from "zod";
 
 const OrgFields = z.object({
     name: z.string().min(1, "Organization name is required").max(255),
-    alias: z.string().max(255).optional(),
+    category: z.string().max(50).optional(),
     msme: z.string().max(50).optional(),
-    msmeType: z.enum(["M", "S"]).optional(),
+    msmeSize: z.enum(["Micro", "Small", "Medium"]).optional(),
+    msmeType: z.enum(["M", "S", "T"]).optional(),
+    majorActivity: z.string().max(50).optional(),
+    registrationType: z.enum(["REGULAR", "UNREGISTERED"]).optional(),
+    creditPeriodDays: z.number().int().nonnegative().optional(),
+    creditAmount: z.number().nonnegative().optional(),
     pan: z.string().max(100).optional(),
     address: z.string().max(500).optional(),
     status: z.boolean(),
@@ -36,6 +41,8 @@ export const AccountFormSchema = z.object({
     bankAccountName: z.string().min(1, "Account name is required"),
     accountNum: z.string().min(1, "Account number is required"),
     ifscCode: z.string().min(1, "IFSC code is required"),
+    branch: z.string().max(255).optional(),
+    swiftCode: z.string().max(50).optional(),
     status: z.boolean(),
 });
 

@@ -1,5 +1,6 @@
-﻿import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus, NotFoundException } from "@nestjs/common";
+﻿import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus, NotFoundException, UseGuards } from "@nestjs/common";
 import { z } from "zod";
+import { MasterWriteGuard } from "@/modules/master/common/master-write.guard";
 import { LoanPartiesService } from "@/modules/master/loan-parties/loan-parties.service";
 
 const CreateLoanPartySchema = z.object({
@@ -14,6 +15,7 @@ type CreateLoanPartyDto = z.infer<typeof CreateLoanPartySchema>;
 type UpdateLoanPartyDto = z.infer<typeof UpdateLoanPartySchema>;
 
 @Controller("loan-parties")
+@UseGuards(MasterWriteGuard)
 export class LoanPartiesController {
     constructor(private readonly loanPartiesService: LoanPartiesService) {}
 

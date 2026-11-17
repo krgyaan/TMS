@@ -4,6 +4,14 @@ import * as path from 'path';
 const isProd = process.env.NODE_ENV === 'production';
 const rootDir = isProd ? 'dist' : 'src';
 
+const BG_BG_PREFIXED_TYPES = new Set([
+    'bg',
+    'bgEnvelopeSlip',
+    'bgCoveringLetter',
+    'bgPrefilledFormat',
+    'bgAuthorizationLetter',
+]);
+
 /**
  * PDF Generation Configuration
  */
@@ -64,6 +72,19 @@ export const PDF_CONFIG = {
                 left: '0mm',
             },
         },
+        bgEnvelopeSlip: {
+            directory: 'bg',
+            templates: ['envelope-slip'],
+            storagePath: 'bgenvslip',
+            baseDir: 'bi-dashboard/bank-guarantee/bgenvslip',
+            landscape: true,
+            margin: {
+                top: '0mm',
+                right: '0mm',
+                bottom: '0mm',
+                left: '0mm',
+            },
+        },
         ddCancellation: {
             directory: 'dd',
             templates: ['dd-cancellation'],
@@ -104,6 +125,30 @@ export const PDF_CONFIG = {
             templates: ['bg-covering-letter'],
             storagePath: 'bgcovletter',
             baseDir: 'bi-dashboard/bank-guarantee/bgcovletter',
+            margin: {
+                top: '0mm',
+                right: '0mm',
+                bottom: '0mm',
+                left: '0mm',
+            },
+        },
+        bgPrefilledFormat: {
+            directory: 'letters',
+            templates: ['bg-prefilled-format'],
+            storagePath: 'bgprefill',
+            baseDir: 'bi-dashboard/bank-guarantee/bgprefill',
+            margin: {
+                top: '0mm',
+                right: '0mm',
+                bottom: '0mm',
+                left: '0mm',
+            },
+        },
+        bgAuthorizationLetter: {
+            directory: 'letters',
+            templates: ['bg-authorization-letter'],
+            storagePath: 'bgauthletter',
+            baseDir: 'bi-dashboard/bank-guarantee/bgauthletter',
             margin: {
                 top: '0mm',
                 right: '0mm',
@@ -260,7 +305,7 @@ export function getOutputPath(
     const storagePath = getStoragePath(templateType);
 
     let fileName: string;
-    if (templateType === 'bg' && instrumentId) {
+    if (BG_BG_PREFIXED_TYPES.has(templateType) && instrumentId) {
         fileName = `bg_${instrumentId}_${templateName}_${s}.pdf`;
     } else {
         const prefix = storagePath;
@@ -283,7 +328,7 @@ export function getRelativePath(
     const storagePath = getStoragePath(templateType);
 
     let fileName: string;
-    if (templateType === 'bg' && instrumentId) {
+    if (BG_BG_PREFIXED_TYPES.has(templateType) && instrumentId) {
         fileName = `bg_${instrumentId}_${templateName}_${s}.pdf`;
     } else {
         const prefix = storagePath;

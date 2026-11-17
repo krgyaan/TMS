@@ -30,6 +30,7 @@ export const leads = pgTable("leads", {
     state: varchar("state", { length: 255 }),
     type: varchar("type", { length: 255 }),
     industry: varchar("industry", { length: 255 }),
+    itemId: bigint("item_id", { mode: "number" }),
     team: varchar("team", { length: 255 }),
     bdPerson: integer("bd_person"),
     allocatedTe: bigint("allocated_te", { mode: "number" }),

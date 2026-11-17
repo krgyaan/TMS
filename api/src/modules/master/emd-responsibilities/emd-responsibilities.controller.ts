@@ -1,5 +1,6 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus, NotFoundException } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus, NotFoundException, UseGuards } from "@nestjs/common";
 import { z } from "zod";
+import { MasterWriteGuard } from "@/modules/master/common/master-write.guard";
 import { EmdResponsibilityService } from "@/modules/master/emd-responsibilities/emd-responsibilities.service";
 
 const CreateEmdResponsibilitySchema = z.object({
@@ -14,6 +15,7 @@ type CreateEmdResponsibilityDto = z.infer<typeof CreateEmdResponsibilitySchema>;
 type UpdateEmdResponsibilityDto = z.infer<typeof UpdateEmdResponsibilitySchema>;
 
 @Controller("emd-responsibilities")
+@UseGuards(MasterWriteGuard)
 export class EmdResponsibilityController {
     constructor(private readonly emdResponsibilityService: EmdResponsibilityService) {}
 

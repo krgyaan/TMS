@@ -319,28 +319,32 @@ export class LeadFollowupsService {
 
             let courierId: number | null = null;
 
-            // ── Handle Letter: create courier record first ────────────
+            // ── Handle Letter: link existing courier or create a courier ──
             if (data.type === 'letter') {
                 const letterData = data as LetterFollowupDto;
 
-                const [courier] = await tx
-                    .insert(couriers)
-                    .values({
-                        userId: createdBy,
-                        toOrg: letterData.toOrg,
-                        toName: letterData.toName,
-                        toAddr: letterData.toAddr,
-                        toPin: letterData.toPin,
-                        toMobile: letterData.toMobile,
-                        empFrom: letterData.empFrom,
-                        delDate: new Date(letterData.delDate),
-                        urgency: letterData.urgency,
-                        courierDocs: letterData.attachments ?? [],
-                        status: 0,
-                    })
-                    .returning();
+                if (letterData.courierId) {
+                    courierId = letterData.courierId;
+                } else {
+                    const [courier] = await tx
+                        .insert(couriers)
+                        .values({
+                            userId: createdBy,
+                            toOrg: letterData.toOrg!,
+                            toName: letterData.toName!,
+                            toAddr: letterData.toAddr!,
+                            toPin: letterData.toPin!,
+                            toMobile: letterData.toMobile!,
+                            empFrom: letterData.empFrom!,
+                            delDate: new Date(letterData.delDate!),
+                            urgency: letterData.urgency!,
+                            courierDocs: letterData.attachments ?? [],
+                            status: 0,
+                        })
+                        .returning();
 
-                courierId = courier.id;
+                    courierId = courier.id;
+                }
             }
 
             // ── Build followup payload ─────────────────────────────────
@@ -481,44 +485,30 @@ export class LeadFollowupsService {
         return this.db.transaction(async (tx) => {
             let courierId = existingFollowup.courierId;
 
-            // Handle Letter: update courier record if needed
+            // Handle Letter: link existing courier or create a new courier
             if (data.type === 'letter') {
                 const letterData = data as LetterFollowupDto;
 
-                if (courierId) {
-                    // Update existing courier
-                    await tx
-                        .update(couriers)
-                        .set({
-                            toOrg: letterData.toOrg,
-                            toName: letterData.toName,
-                            toAddr: letterData.toAddr,
-                            toPin: letterData.toPin,
-                            toMobile: letterData.toMobile,
-                            empFrom: letterData.empFrom,
-                            delDate: new Date(letterData.delDate),
-                            urgency: letterData.urgency,
-                            courierDocs: letterData.attachments ?? [],
-                        })
-                        .where(eq(couriers.id, courierId));
+                if (letterData.courierId) {
+                    courierId = letterData.courierId;
                 } else {
-                    // Create new courier if it didn't exist
                     const [courier] = await tx
                         .insert(couriers)
                         .values({
                             userId: updatedBy,
-                            toOrg: letterData.toOrg,
-                            toName: letterData.toName,
-                            toAddr: letterData.toAddr,
-                            toPin: letterData.toPin,
-                            toMobile: letterData.toMobile,
-                            empFrom: letterData.empFrom,
-                            delDate: new Date(letterData.delDate),
-                            urgency: letterData.urgency,
+                            toOrg: letterData.toOrg!,
+                            toName: letterData.toName!,
+                            toAddr: letterData.toAddr!,
+                            toPin: letterData.toPin!,
+                            toMobile: letterData.toMobile!,
+                            empFrom: letterData.empFrom!,
+                            delDate: new Date(letterData.delDate!),
+                            urgency: letterData.urgency!,
                             courierDocs: letterData.attachments ?? [],
                             status: 0,
                         })
                         .returning();
+
                     courierId = courier.id;
                 }
             }
@@ -548,33 +538,31 @@ export class LeadFollowupsService {
                 .where(eq(leadFollowups.id, id))
                 .returning();
 
-            // Update contacts for call/visit
+            // Update contacts for call/visit only when contacts are explicitly provided
             if (
                 (data.type === 'call' || data.type === 'visit') &&
-                'contacts' in data
+                'contacts' in data &&
+                (data as CallFollowupDto | VisitFollowupDto).contacts.length > 0
             ) {
                 // Delete old contacts
                 await tx
                     .delete(leadContacts)
                     .where(eq(leadContacts.followupId, id));
 
-                // Insert new contacts
-                if ((data as CallFollowupDto | VisitFollowupDto).contacts.length > 0) {
-                    const contactSource = data.type === 'call' ? 'call_followup' : 'visit_followup';
-                    const contactsPayload: NewLeadContact[] = (data as CallFollowupDto | VisitFollowupDto)
-                        .contacts
-                        .map((contact: ContactDto) => ({
-                            leadId: updatedFollowup.leadId ?? null,
-                            followupId: id,
-                            name: contact.name,
-                            designation: contact.designation ?? null,
-                            phone: contact.phone ?? null,
-                            email: contact.email ?? null,
-                            source: contactSource,
-                        }));
+                const contactSource = data.type === 'call' ? 'call_followup' : 'visit_followup';
+                const contactsPayload: NewLeadContact[] = (data as CallFollowupDto | VisitFollowupDto)
+                    .contacts
+                    .map((contact: ContactDto) => ({
+                        leadId: updatedFollowup.leadId ?? null,
+                        followupId: id,
+                        name: contact.name,
+                        designation: contact.designation ?? null,
+                        phone: contact.phone ?? null,
+                        email: contact.email ?? null,
+                        source: contactSource,
+                    }));
 
-                    await tx.insert(leadContacts).values(contactsPayload);
-                }
+                await tx.insert(leadContacts).values(contactsPayload);
             }
 
             return updatedFollowup;

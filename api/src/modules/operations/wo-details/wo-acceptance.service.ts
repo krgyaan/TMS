@@ -5,6 +5,7 @@ import { woAcceptance, woAmendments, woBasicDetails, woContacts, woDetails } fro
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, desc, eq } from 'drizzle-orm';
 import type { WoAcceptanceDecisionDto } from './dto/wo-acceptance.dto';
+import { recomputeWorkflowStage } from './helpers/workflow-stage.helper';
 
 @Injectable()
 export class WoAcceptanceService {
@@ -83,9 +84,13 @@ export class WoAcceptanceService {
     const now = new Date();
 
     if (decision === 'amendment_needed') {
-      return this.handleAmendmentNeeded(woDetailId, acceptance.id, data, userId, now);
+      const result = await this.handleAmendmentNeeded(woDetailId, acceptance.id, data, userId, now);
+      await recomputeWorkflowStage(this.db, woDetailId);
+      return result;
     } else {
-      return this.handleAccepted(woDetailId, acceptance.id, data, userId, now);
+      const result = await this.handleAccepted(woDetailId, acceptance.id, data, userId, now);
+      await recomputeWorkflowStage(this.db, woDetailId);
+      return result;
     }
   }
 

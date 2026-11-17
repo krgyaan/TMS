@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { TeamModal } from './components/TeamModal';
+import { useAuth } from '@/contexts/AuthContext';
 
 const rowSelection: RowSelectionOptions = {
     mode: 'multiRow',
@@ -20,11 +21,12 @@ const rowSelection: RowSelectionOptions = {
 
 const TeamsPage = () => {
     const { data: teams, isLoading, error, refetch } = useTeams();
+    const { canWriteMasterData } = useAuth();
     const deleteTeam = useDeleteTeam();
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
 
-    const teamActions: ActionItem<Team>[] = [
+    const teamActions = ([
         {
             label: 'Edit',
             onClick: (row) => {
@@ -45,7 +47,7 @@ const TeamsPage = () => {
                 }
             },
         },
-    ];
+    ] as ActionItem<Team>[]).filter(() => canWriteMasterData);
 
     const [colDefs] = useState<ColDef<Team>[]>([
         {
@@ -132,18 +134,20 @@ const TeamsPage = () => {
             <CardHeader>
                 <CardTitle>Teams</CardTitle>
                 <CardDescription>Manage organizational teams</CardDescription>
-                <CardAction>
-                    <Button
-                        variant="default"
-                        onClick={() => {
-                            setSelectedTeam(null);
-                            setModalOpen(true);
-                        }}
-                    >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Team
-                    </Button>
-                </CardAction>
+                {canWriteMasterData && (
+                    <CardAction>
+                        <Button
+                            variant="default"
+                            onClick={() => {
+                                setSelectedTeam(null);
+                                setModalOpen(true);
+                            }}
+                        >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Team
+                        </Button>
+                    </CardAction>
+                )}
             </CardHeader>
             <CardContent className="h-screen px-0">
                 <DataTable

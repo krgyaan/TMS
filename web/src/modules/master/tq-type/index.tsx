@@ -13,6 +13,7 @@ import { AlertCircle, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { TqTypeModal } from "./components/TqTypeModal";
 import { TqTypeViewModal } from "./components/TqTypeViewModal";
+import { useAuth } from "@/contexts/AuthContext";
 
 const rowSelection: RowSelectionOptions = {
     mode: "multiRow",
@@ -21,12 +22,13 @@ const rowSelection: RowSelectionOptions = {
 
 const TqTypesPage = () => {
     const { data: tqTypes, isLoading, error, refetch } = useTqTypes();
+    const { canWriteMasterData } = useAuth();
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [viewModalOpen, setViewModalOpen] = useState(false);
     const [selectedTqType, setSelectedTqType] = useState<TqType | null>(null);
 
     // TQ Type actions
-    const tqTypeActions: ActionItem<TqType>[] = [
+    const tqTypeActions = ([
         {
             label: "View",
             onClick: row => {
@@ -55,7 +57,7 @@ const TqTypesPage = () => {
                 }
             },
         },
-    ];
+    ] as ActionItem<TqType>[]).filter(action => canWriteMasterData || action.label === "View");
 
     const [colDefs] = useState<ColDef<TqType>[]>([
         {
@@ -153,18 +155,20 @@ const TqTypesPage = () => {
                 <CardHeader>
                     <CardTitle>TQ Types</CardTitle>
                     <CardDescription>Manage Technical/Quality classification types</CardDescription>
-                    <CardAction>
-                        <Button
-                            variant="default"
-                            onClick={() => {
-                                setSelectedTqType(null);
-                                setDrawerOpen(true);
-                            }}
-                        >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add TQ Type
-                        </Button>
-                    </CardAction>
+                    {canWriteMasterData && (
+                        <CardAction>
+                            <Button
+                                variant="default"
+                                onClick={() => {
+                                    setSelectedTqType(null);
+                                    setDrawerOpen(true);
+                                }}
+                            >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add TQ Type
+                            </Button>
+                        </CardAction>
+                    )}
                 </CardHeader>
                 <CardContent className="px-3">
                     <DataTable

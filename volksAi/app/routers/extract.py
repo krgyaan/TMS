@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import os
+import shutil
 import sys
 import tempfile
 import time
@@ -871,6 +873,29 @@ def _format_field_object(
     }
 
 
+_EXTRACT_SEMAPHORE: Optional[asyncio.Semaphore] = None
+_EXTRACT_SEMAPHORE_LIMIT: Optional[int] = None
+_EXTRACT_SEMAPHORE_LOOP: Optional[int] = None
+
+
+def _get_extract_semaphore() -> asyncio.Semaphore:
+    global _EXTRACT_SEMAPHORE, _EXTRACT_SEMAPHORE_LIMIT, _EXTRACT_SEMAPHORE_LOOP
+    limit = max(1, int(os.getenv("VOLKSAI_MAX_CONCURRENT_EXTRACTIONS", "2")))
+    try:
+        current_loop_id: Optional[int] = id(asyncio.get_running_loop())
+    except RuntimeError:
+        current_loop_id = None
+    if (
+        _EXTRACT_SEMAPHORE is None
+        or _EXTRACT_SEMAPHORE_LIMIT != limit
+        or (current_loop_id is not None and _EXTRACT_SEMAPHORE_LOOP != current_loop_id)
+    ):
+        _EXTRACT_SEMAPHORE = asyncio.Semaphore(limit)
+        _EXTRACT_SEMAPHORE_LIMIT = limit
+        _EXTRACT_SEMAPHORE_LOOP = current_loop_id
+    return _EXTRACT_SEMAPHORE
+
+
 @router.post("/extract")
 async def extract_tender(
     pdf_file: UploadFile = File(...),
@@ -908,6 +933,11 @@ async def extract_tender(
         )
 
     job_id = f"job_{uuid.uuid4().hex[:12]}"
+    from app.core.logging import request_id_ctx_var
+    from app.core.timing import init_stage_timings, stage_timer
+    if not request_id_ctx_var.get():
+        request_id_ctx_var.set(job_id)
+    init_stage_timings()
     start_time = time.time()
     logger.info(
         f"[EXTRACT_API] Starting extraction request for '{filename}' "
@@ -915,44 +945,255 @@ async def extract_tender(
         f"boq_file: {bool(boq_file and boq_file.filename)})"
     )
 
+    sem = _get_extract_semaphore()
+    queue_wait_sec = float(os.getenv("VOLKSAI_QUEUE_WAIT_SEC", "5.0"))
+    retry_after_sec = os.getenv("VOLKSAI_RETRY_AFTER_SEC", "15")
+    try:
+        await asyncio.wait_for(sem.acquire(), timeout=queue_wait_sec)
+    except asyncio.TimeoutError:
+        logger.warning(
+            f"[EXTRACT_API] Concurrency limit reached while queueing '{filename}' (job_id: {job_id}, wait={queue_wait_sec}s)"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Extraction service is at capacity. Please retry shortly.",
+            headers={"Retry-After": retry_after_sec},
+        )
+
     # Use TemporaryDirectory as context manager so all generated files
     # (temp PDF, page PNGs in pages/{job_id}, and downloaded child PDFs)
     # are completely and reliably wiped upon request completion.
     try:
-        with tempfile.TemporaryDirectory(prefix=f"volksai_{job_id}_") as temp_dir:
-            temp_dir_path = Path(temp_dir)
-            temp_pdf_path = temp_dir_path / filename
+        with stage_timer("extract_total", request_id=job_id):
+            with tempfile.TemporaryDirectory(prefix=f"volksai_{job_id}_") as temp_dir:
+                temp_dir_path = Path(temp_dir)
+                temp_pdf_path = temp_dir_path / filename
 
-            # Write uploaded content to temp disk for PyMuPDF / Tesseract access
-            contents = await pdf_file.read()
-            temp_pdf_path.write_bytes(contents)
+                # Write uploaded content to temp disk for PyMuPDF / Tesseract access
+                contents = await pdf_file.read()
+                temp_pdf_path.write_bytes(contents)
 
-            logger.info(f"[EXTRACT_API] Uploaded PDF saved to '{temp_pdf_path}' ({len(contents)} bytes)")
+                logger.info(f"[EXTRACT_API] Uploaded PDF saved to '{temp_pdf_path}' ({len(contents)} bytes)")
 
-            # BUG FIX: atc_files/boq_file were previously accepted by the NestJS
-            # caller's multipart payload but never declared as parameters here,
-            # so FastAPI dropped them silently and the pipeline ran without ATC
-            # content on every extraction. Save them to disk and forward their
-            # paths into ingest_parent_tender_pdf() so they actually participate.
-            atc_paths: List[Path] = []
-            for idx, atc_upload in enumerate(atc_files or []):
-                if not atc_upload or not atc_upload.filename:
-                    continue
-                atc_dest = temp_dir_path / f"atc_{idx}_{atc_upload.filename}"
-                atc_contents = await atc_upload.read()
-                atc_dest.write_bytes(atc_contents)
-                atc_paths.append(atc_dest)
-                logger.info(f"[EXTRACT_API] ATC file saved to '{atc_dest}' ({len(atc_contents)} bytes)")
+                # BUG FIX: atc_files/boq_file were previously accepted by the NestJS
+                # caller's multipart payload but never declared as parameters here,
+                # so FastAPI dropped them silently and the pipeline ran without ATC
+                # content on every extraction. Save them to disk and forward their
+                # paths into ingest_parent_tender_pdf() so they actually participate.
+                atc_paths: List[Path] = []
+                for idx, atc_upload in enumerate(atc_files or []):
+                    if not atc_upload or not atc_upload.filename:
+                        continue
+                    atc_dest = temp_dir_path / f"atc_{idx}_{atc_upload.filename}"
+                    atc_contents = await atc_upload.read()
+                    atc_dest.write_bytes(atc_contents)
+                    atc_paths.append(atc_dest)
+                    logger.info(f"[EXTRACT_API] ATC file saved to '{atc_dest}' ({len(atc_contents)} bytes)")
 
-            boq_path: Optional[Path] = None
-            if boq_file and boq_file.filename:
-                boq_dest = temp_dir_path / f"boq_{boq_file.filename}"
-                boq_contents = await boq_file.read()
-                boq_dest.write_bytes(boq_contents)
-                boq_path = boq_dest
-                logger.info(f"[EXTRACT_API] BOQ file saved to '{boq_dest}' ({len(boq_contents)} bytes)")
+                boq_path: Optional[Path] = None
+                if boq_file and boq_file.filename:
+                    boq_dest = temp_dir_path / f"boq_{boq_file.filename}"
+                    boq_contents = await boq_file.read()
+                    boq_dest.write_bytes(boq_contents)
+                    boq_path = boq_dest
+                    logger.info(f"[EXTRACT_API] BOQ file saved to '{boq_dest}' ({len(boq_contents)} bytes)")
 
-            # Run orchestrator in threadpool to prevent blocking the async event loop
+                # Run orchestrator in threadpool to prevent blocking the async event loop
+                infosheet_data: Dict[str, Any] = await asyncio.to_thread(
+                    ingest_parent_tender_pdf,
+                    job_id=job_id,
+                    pdf_path=temp_pdf_path,
+                    original_filename=filename,
+                    explicit_atc_paths=atc_paths,
+                    explicit_boq_path=boq_path,
+                )
+
+                with stage_timer("response_assembly", request_id=job_id):
+                    response = _build_extract_response_from_infosheet(
+                        infosheet_data=infosheet_data,
+                        has_atc_default=bool(atc_paths),
+                        start_time=start_time,
+                    )
+
+                logger.info(
+                    f"[EXTRACT_API] Extraction complete for '{filename}' "
+                    f"({len(response['fields'])} fields, {len(response['missing_fields'])} missing, "
+                    f"{response['processing_time_ms']}ms)"
+                )
+                return response
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception(
+            "[EXTRACT_API_ERROR] Extraction pipeline failed",
+            extra={
+                "custom_fields": {
+                    "uploaded_filename": filename,
+                    "request_id": job_id,
+                    "error_type": type(exc).__name__,
+                }
+            },
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Extraction pipeline failed for '{filename}': {str(exc)}"
+        )
+    finally:
+        sem.release()
+
+
+def _build_extract_response_from_infosheet(
+    infosheet_data: Dict[str, Any],
+    has_atc_default: bool,
+    start_time: float,
+) -> Dict[str, Any]:
+    """Build the canonical POST /extract response envelope from raw infosheet_data."""
+    field_statuses: Dict[str, str] = infosheet_data.get("_info_sheet_statuses", {})
+    field_sources: Dict[str, str] = infosheet_data.get("_info_sheet_sources", {})
+    dual_sources: Dict[str, Any] = infosheet_data.get("_dual_sources", {})
+    is_self_classified_atc: bool = bool(infosheet_data.get("_self_classified_atc", False))
+    has_atc: bool = bool(infosheet_data.get("_has_atc", has_atc_default))
+    ambiguous_field_conflicts: Dict[str, Any] = infosheet_data.get("_ambiguous_field_conflicts", {})
+    document_identity_check: Dict[str, Any] = infosheet_data.get("_document_identity_check") or build_document_identity_check(
+        None, None, has_atc=has_atc, same_document=is_self_classified_atc
+    )
+
+    tms_dto: Dict[str, Any] = map_to_tms_dto(infosheet_data)
+    fields: Dict[str, Any] = {}
+    missing_fields: List[str] = []
+    field_flags_map: Dict[str, List[Dict[str, Any]]] = infosheet_data.get("_field_flags", {})
+
+    for tms_key, dto_val in tms_dto.items():
+        source_key = TMS_TO_SOURCE_KEY_MAP.get(tms_key)
+        if tms_key == "techEligibilityAge" and "eligibility_criterion_years_display" in field_statuses:
+            source_key = "eligibility_criterion_years_display"
+
+        field_obj = _format_field_object(
+            tms_key=tms_key,
+            dto_value=dto_val,
+            source_field_name=source_key,
+            field_statuses=field_statuses,
+            field_sources=field_sources,
+            dual_sources=dual_sources,
+            is_self_classified_atc=is_self_classified_atc,
+            has_atc=has_atc,
+            raw_display_value=infosheet_data.get(source_key),
+            field_flags=list(field_flags_map.get(tms_key, [])),
+        )
+        fields[tms_key] = field_obj
+
+        if (
+            field_obj.get("confidence") == "missing"
+            or (field_obj.get("value") is None and field_obj.get("confidence") != "not_applicable")
+            or field_obj.get("value") == []
+        ):
+            missing_fields.append(tms_key)
+
+    processing_time_ms = int((time.time() - start_time) * 1000)
+    response: Dict[str, Any] = {
+        "extraction_version": "1.1.0",
+        "fields": fields,
+        "missing_fields": missing_fields,
+        "processing_time_ms": processing_time_ms,
+        "llm_usage": infosheet_data.get("_llm_usage"),
+        "llm_status": infosheet_data.get("_llm_status", "ok"),
+        "failed_categories": infosheet_data.get("_failed_categories", []),
+        "last_error": infosheet_data.get("_last_error"),
+        "self_classified_atc": is_self_classified_atc,
+        "has_atc": has_atc,
+        "ambiguous_field_conflicts": ambiguous_field_conflicts,
+        "documentIdentityCheck": document_identity_check,
+    }
+    if infosheet_data.get("per_schedule_emd"):
+        response["per_schedule_emd"] = infosheet_data.get("per_schedule_emd")
+    if infosheet_data.get("_partial"):
+        response["partial"] = True
+        response["skipped_stages"] = infosheet_data.get("_skipped_stages", [])
+    return response
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: Additive Async Extraction Job API
+# NOTE: Jobs are stored in an in-memory TTL dictionary suitable for a single
+# Uvicorn worker process. A multi-worker deployment (--workers > 1 or multiple
+# containers) will require a shared Redis store for cross-worker job state.
+# ---------------------------------------------------------------------------
+_EXTRACTION_JOBS: Dict[str, Dict[str, Any]] = {}
+_ACTIVE_JOB_TASKS: set = set()
+
+_STAGE_PROGRESS_MAP: Dict[str, float] = {
+    "queued": 0.0,
+    "parent_pdf_extract": 0.15,
+    "pdf_open": 0.18,
+    "page_text_native": 0.25,
+    "page_ocr_render": 0.30,
+    "page_ocr_engine": 0.35,
+    "checkbox_extract": 0.38,
+    "field_extractor:main_tender": 0.45,
+    "tender_mapper:MAIN_ALIAS": 0.55,
+    "child_pdf_extract_all": 0.65,
+    "field_extractor:atc": 0.72,
+    "tender_mapper:ATC_ALIAS": 0.78,
+    "llm_role1_And_role2_total": 0.85,
+    "llm_role2_consolidation": 0.92,
+    "response_assembly": 0.97,
+    "complete": 1.0,
+}
+
+
+def _prune_expired_jobs() -> None:
+    ttl_sec = float(os.getenv("VOLKSAI_JOB_TTL_SEC", "3600"))
+    max_entries = max(10, int(os.getenv("VOLKSAI_JOB_MAX_ENTRIES", "200")))
+    now = time.time()
+    expired = [
+        jid for jid, meta in list(_EXTRACTION_JOBS.items())
+        if (now - meta.get("created_at", now)) > ttl_sec
+    ]
+    for jid in expired:
+        _EXTRACTION_JOBS.pop(jid, None)
+    while len(_EXTRACTION_JOBS) > max_entries:
+        oldest_key = next(iter(_EXTRACTION_JOBS))
+        _EXTRACTION_JOBS.pop(oldest_key, None)
+
+
+async def _execute_background_extraction_job(
+    job_id: str,
+    filename: str,
+    temp_dir_path: Path,
+    temp_pdf_path: Path,
+    atc_paths: List[Path],
+    boq_path: Optional[Path],
+) -> None:
+    """Background worker coroutine executing extraction under the concurrency semaphore."""
+    from app.core.logging import request_id_ctx_var
+    from app.core.timing import init_stage_timings, stage_callback_ctx_var, stage_timer
+
+    request_id_ctx_var.set(job_id)
+    init_stage_timings()
+
+    def _on_stage(stage_name: str) -> None:
+        job_entry = _EXTRACTION_JOBS.get(job_id)
+        if not job_entry or job_entry.get("status") != "running":
+            return
+        job_entry["stage"] = stage_name
+        if stage_name in _STAGE_PROGRESS_MAP:
+            job_entry["progress"] = max(float(job_entry.get("progress", 0.0)), _STAGE_PROGRESS_MAP[stage_name])
+        elif stage_name.startswith("llm_role1_cat:"):
+            job_entry["progress"] = max(float(job_entry.get("progress", 0.0)), 0.88)
+
+    stage_callback_ctx_var.set(_on_stage)
+    sem = _get_extract_semaphore()
+    await sem.acquire()
+    start_time = time.time()
+    try:
+        job_entry = _EXTRACTION_JOBS.get(job_id)
+        if job_entry is not None:
+            job_entry["status"] = "running"
+            job_entry["stage"] = "starting"
+            job_entry["progress"] = 0.05
+
+        with stage_timer("extract_total", request_id=job_id):
             infosheet_data: Dict[str, Any] = await asyncio.to_thread(
                 ingest_parent_tender_pdf,
                 job_id=job_id,
@@ -961,88 +1202,132 @@ async def extract_tender(
                 explicit_atc_paths=atc_paths,
                 explicit_boq_path=boq_path,
             )
-
-            field_statuses: Dict[str, str] = infosheet_data.get("_info_sheet_statuses", {})
-            field_sources: Dict[str, str] = infosheet_data.get("_info_sheet_sources", {})
-            dual_sources: Dict[str, Any] = infosheet_data.get("_dual_sources", {})
-            is_self_classified_atc: bool = bool(infosheet_data.get("_self_classified_atc", False))
-            has_atc: bool = bool(infosheet_data.get("_has_atc", bool(atc_paths)))
-            ambiguous_field_conflicts: Dict[str, Any] = infosheet_data.get("_ambiguous_field_conflicts", {})
-            # Always present, including when unverifiable, so the check's own reliability is visible.
-            document_identity_check: Dict[str, Any] = infosheet_data.get("_document_identity_check") or build_document_identity_check(
-                None, None, has_atc=has_atc, same_document=is_self_classified_atc
-            )
-
-            # 1. Transform raw extraction dictionary into TMS DTO shape
-            tms_dto: Dict[str, Any] = map_to_tms_dto(infosheet_data)
-
-            fields: Dict[str, Any] = {}
-            missing_fields: List[str] = []
-
-            field_flags_map: Dict[str, List[Dict[str, Any]]] = infosheet_data.get("_field_flags", {})
-
-            # 2. Merge DTO-shaped values with confidence and source metadata
-            for tms_key, dto_val in tms_dto.items():
-                source_key = TMS_TO_SOURCE_KEY_MAP.get(tms_key)
-                if tms_key == "techEligibilityAge" and "eligibility_criterion_years_display" in field_statuses:
-                    source_key = "eligibility_criterion_years_display"
-
-                field_obj = _format_field_object(
-                    tms_key=tms_key,
-                    dto_value=dto_val,
-                    source_field_name=source_key,
-                    field_statuses=field_statuses,
-                    field_sources=field_sources,
-                    dual_sources=dual_sources,
-                    is_self_classified_atc=is_self_classified_atc,
-                    has_atc=has_atc,
-                    raw_display_value=infosheet_data.get(source_key),
-                    field_flags=list(field_flags_map.get(tms_key, [])),
+            with stage_timer("response_assembly", request_id=job_id):
+                response = _build_extract_response_from_infosheet(
+                    infosheet_data=infosheet_data,
+                    has_atc_default=bool(atc_paths),
+                    start_time=start_time,
                 )
-                fields[tms_key] = field_obj
 
-                if (
-                    field_obj.get("confidence") == "missing"
-                    or (field_obj.get("value") is None and field_obj.get("confidence") != "not_applicable")
-                    or field_obj.get("value") == []
-                ):
-                    missing_fields.append(tms_key)
-
-            processing_time_ms = int((time.time() - start_time) * 1000)
-
-            # 3. Construct final response envelope matching TMS specification
-            response: Dict[str, Any] = {
-                "extraction_version": "1.1.0",
-                "fields": fields,
-                "missing_fields": missing_fields,
-                "processing_time_ms": processing_time_ms,
-                "llm_usage": infosheet_data.get("_llm_usage"),
-                "llm_status": infosheet_data.get("_llm_status", "ok"),
-                "failed_categories": infosheet_data.get("_failed_categories", []),
-                "last_error": infosheet_data.get("_last_error"),
-                "self_classified_atc": is_self_classified_atc,
-                "has_atc": has_atc,
-                "ambiguous_field_conflicts": ambiguous_field_conflicts,
-                "documentIdentityCheck": document_identity_check,
-            }
-            if infosheet_data.get("per_schedule_emd"):
-                response["per_schedule_emd"] = infosheet_data.get("per_schedule_emd")
-
-
-            logger.info(
-                f"[EXTRACT_API] Extraction complete for '{filename}' "
-                f"({len(fields)} fields, {len(missing_fields)} missing, {processing_time_ms}ms)"
-            )
-            return response
-
-    except HTTPException:
-        raise
+        job_entry = _EXTRACTION_JOBS.get(job_id)
+        if job_entry is not None:
+            job_entry["status"] = "complete"
+            job_entry["stage"] = "complete"
+            job_entry["progress"] = 1.0
+            job_entry["result"] = response
+            job_entry["error"] = None
     except Exception as exc:
-        logger.error(
-            f"[EXTRACT_API_ERROR] Extraction pipeline failed for file '{filename}' (job_id: {job_id}): {exc}",
-            exc_info=True
+        logger.exception(
+            "[EXTRACT_JOB_ERROR] Background extraction job failed",
+            extra={
+                "custom_fields": {
+                    "uploaded_filename": filename,
+                    "request_id": job_id,
+                    "error_type": type(exc).__name__,
+                }
+            },
         )
+        job_entry = _EXTRACTION_JOBS.get(job_id)
+        if job_entry is not None:
+            job_entry["status"] = "failed"
+            job_entry["stage"] = "failed"
+            job_entry["error"] = f"Extraction pipeline failed for '{filename}': {str(exc)}"
+    finally:
+        sem.release()
+        shutil.rmtree(temp_dir_path, ignore_errors=True)
+
+
+@router.post("/extract/jobs", status_code=status.HTTP_202_ACCEPTED)
+async def create_extract_job(
+    pdf_file: UploadFile = File(...),
+    atc_files: List[UploadFile] = File(default=[]),
+    boq_file: Optional[UploadFile] = File(None),
+    user_id: Optional[int] = Form(None),
+) -> Dict[str, Any]:
+    """
+    Additive async job submission endpoint. Accepts the exact same multipart
+    input as POST /extract, persists uploaded files to a per-job temporary
+    directory, schedules extraction in the background under the concurrency
+    semaphore, and immediately returns HTTP 202 with job_id and status="queued".
+    """
+    filename = pdf_file.filename or "unknown.pdf"
+    if not filename.lower().endswith(".pdf"):
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Extraction pipeline failed for '{filename}': {str(exc)}"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid file type for '{filename}'. Only PDF files are supported."
         )
+
+    _prune_expired_jobs()
+    job_id = f"job_{uuid.uuid4().hex[:12]}"
+    temp_dir_path = Path(tempfile.mkdtemp(prefix=f"volksai_async_{job_id}_"))
+    try:
+        temp_pdf_path = temp_dir_path / filename
+        contents = await pdf_file.read()
+        temp_pdf_path.write_bytes(contents)
+
+        atc_paths: List[Path] = []
+        for idx, atc_upload in enumerate(atc_files or []):
+            if not atc_upload or not atc_upload.filename:
+                continue
+            atc_dest = temp_dir_path / f"atc_{idx}_{atc_upload.filename}"
+            atc_contents = await atc_upload.read()
+            atc_dest.write_bytes(atc_contents)
+            atc_paths.append(atc_dest)
+
+        boq_path: Optional[Path] = None
+        if boq_file and boq_file.filename:
+            boq_dest = temp_dir_path / f"boq_{boq_file.filename}"
+            boq_contents = await boq_file.read()
+            boq_dest.write_bytes(boq_contents)
+            boq_path = boq_dest
+    except Exception:
+        shutil.rmtree(temp_dir_path, ignore_errors=True)
+        raise
+
+    _EXTRACTION_JOBS[job_id] = {
+        "job_id": job_id,
+        "status": "queued",
+        "stage": "queued",
+        "progress": 0.0,
+        "result": None,
+        "error": None,
+        "created_at": time.time(),
+    }
+
+    task = asyncio.create_task(
+        _execute_background_extraction_job(
+            job_id=job_id,
+            filename=filename,
+            temp_dir_path=temp_dir_path,
+            temp_pdf_path=temp_pdf_path,
+            atc_paths=atc_paths,
+            boq_path=boq_path,
+        )
+    )
+    _ACTIVE_JOB_TASKS.add(task)
+    task.add_done_callback(_ACTIVE_JOB_TASKS.discard)
+    return {"job_id": job_id, "status": "queued"}
+
+
+@router.get("/extract/jobs/{job_id}")
+async def get_extract_job_status(job_id: str) -> Dict[str, Any]:
+    """
+    Poll status and result of an async extraction job submitted via POST /extract/jobs.
+    Returns HTTP 404 if job_id is unknown or expired.
+    """
+    _prune_expired_jobs()
+    job_entry = _EXTRACTION_JOBS.get(job_id)
+    if job_entry is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Extraction job '{job_id}' not found or expired.",
+        )
+    return {
+        "job_id": job_entry["job_id"],
+        "status": job_entry["status"],
+        "stage": job_entry["stage"],
+        "progress": job_entry["progress"],
+        "result": job_entry["result"],
+        "error": job_entry["error"],
+    }
+

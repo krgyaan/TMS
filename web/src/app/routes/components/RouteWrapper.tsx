@@ -45,14 +45,22 @@ function RouteErrorFallback({ error, resetErrorBoundary }: any) {
 export function RouteWrapper({
     children,
     permission,
+    requireMasterWrite = false,
+    redirectTo = "/",
 }: {
     children: React.ReactNode;
     permission?: { module: string; action: string };
+    requireMasterWrite?: boolean;
+    redirectTo?: string;
 }) {
-    const { hasPermission } = useAuth();
+    const { hasPermission, canWriteMasterData } = useAuth();
 
     if (permission && !hasPermission(permission.module, permission.action)) {
-        return <Navigate to="/" replace />;
+        return <Navigate to={redirectTo} replace />;
+    }
+
+    if (requireMasterWrite && !canWriteMasterData) {
+        return <Navigate to={redirectTo} replace />;
     }
 
     return (

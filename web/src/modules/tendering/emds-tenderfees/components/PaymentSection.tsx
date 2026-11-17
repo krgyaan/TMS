@@ -35,6 +35,7 @@ interface PaymentSectionProps {
     defaultPurpose?: string;
     isEditMode?: boolean;
     defaultMode?: string;
+    tenderId?: number;
 }
 
 const OLD_ENTRY_MODES = ['DD', 'FDR', 'BG', 'CHEQUE'];
@@ -49,6 +50,7 @@ export function PaymentSection({
     defaultPurpose = purpose,
     isEditMode = false,
     defaultMode,
+    tenderId = 0,
 }: PaymentSectionProps) {
     console.log("PaymentSection Props:", { purpose, allowedModes, amount, type, courierData, defaultPurpose, isEditMode, defaultMode });
     const { control, watch, setValue } = useFormContext();
@@ -105,8 +107,8 @@ export function PaymentSection({
         const fields: Array<{ key: string; field: string }> = [
             { key: 'courierName', field: 'CourierName' },
             { key: 'courierPhone', field: 'CourierPhone' },
-            { key: 'courierAddressLine1', field: 'CourierAddressLine1' },
-            { key: 'courierAddressLine2', field: 'CourierAddressLine2' },
+            { key: 'courierAddressLine1', field: fp === 'fdr' ? 'CourierAddrLine1' : 'CourierAddressLine1' },
+            { key: 'courierAddressLine2', field: fp === 'fdr' ? 'CourierAddrLine2' : 'CourierAddressLine2' },
             { key: 'courierCity', field: 'CourierCity' },
             { key: 'courierState', field: 'CourierState' },
             { key: 'courierPincode', field: 'CourierPincode' },
@@ -175,7 +177,7 @@ export function PaymentSection({
                     {(selectedMode === 'PORTAL' || selectedMode === 'POP') && <PayOnPortalForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} />}
                     {(selectedMode === 'BANK_TRANSFER' || selectedMode === 'BT') && <BankTransferForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} />}
                     {selectedMode === 'DD' && <DemandDraftForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} />}
-                    {selectedMode === 'BG' && <BankGuaranteeForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} />}
+                    {selectedMode === 'BG' && <BankGuaranteeForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} tenderId={tenderId} />}
                     {selectedMode === 'FDR' && <FdrForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} />}
                     {selectedMode === 'CHEQUE' && <ChequeForm prefix={prefix} readOnly={!isEditMode && amount > 0} />}
                 </div>

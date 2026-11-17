@@ -52,7 +52,7 @@ const BasicDetailListPage = () => {
 
     // Fetch data
     const { data: dashboardSummary } = useWoBasicDetailsDashboardSummary();
-    const { data: apiResponse, isLoading: loading, error } = useWoBasicDetails(filters);
+    const { data: apiResponse, isLoading: loading, isFetching, error } = useWoBasicDetails(filters);
 
     const tableData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
@@ -109,6 +109,8 @@ const BasicDetailListPage = () => {
             basic_details: { label: 'Basic Details', variant: 'secondary' },
             wo_details: { label: 'WO Details', variant: 'default' },
             wo_acceptance: { label: 'Acceptance', variant: 'outline' },
+            kick_off: { label: 'Kick-off', variant: 'default' },
+            contract_agreement: { label: 'Contract', variant: 'default' },
             wo_upload: { label: 'Upload', variant: 'default' },
             completed: { label: 'Completed', variant: 'default' },
         };
@@ -278,7 +280,6 @@ const BasicDetailListPage = () => {
                         </Tooltip>
                     );
                 },
-                hide: activeTab === 'basic_details', // Hide this column in the "Basic Details" tab
             },
             {
                 headerName: '',
@@ -292,8 +293,8 @@ const BasicDetailListPage = () => {
         [rowActions]
     );
 
-    // Loading state
-    if (loading && !tableData.length) {
+    // Loading state (initial load only; keep the page mounted on subsequent searches)
+    if (loading && !apiResponse) {
         return (
             <Card>
                 <CardHeader>
@@ -417,7 +418,7 @@ const BasicDetailListPage = () => {
                                         <DataTable
                                             data={tableData}
                                             columnDefs={colDefs as ColDef<any>[]}
-                                            loading={loading}
+                                            loading={isFetching}
                                             manualPagination={true}
                                             rowCount={totalRows}
                                             paginationState={pagination}

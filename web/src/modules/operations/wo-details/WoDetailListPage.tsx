@@ -73,7 +73,7 @@ const WoDetailListPage = () => {
 
     // Fetch data
     const { data: dashboardSummary } = useWoDetailsDashboardSummary();
-    const { data: apiResponse, isLoading: loading, error } = useWoDetails(filters);
+    const { data: apiResponse, isLoading: loading, isFetching, error } = useWoDetails(filters);
 
     const tableData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
@@ -108,6 +108,9 @@ const WoDetailListPage = () => {
             label: 'Wo Uploads',
             onClick: (row) => navigate(paths.operations.woUploadPage(row.id)),
             icon: <FileText className="h-4 w-4" />,
+            visible: (row) =>
+                row.woAcceptanceDecision === 'accepted' &&
+                row.woAcceptanceStatus !== 'completed',
         },
         {
             label: 'View Details',
@@ -270,8 +273,8 @@ const WoDetailListPage = () => {
         [rowActions, navigate]
     );
 
-    // Loading state
-    if (loading && !tableData.length) {
+    // Loading state (initial load only; keep the page mounted on subsequent searches)
+    if (loading && !apiResponse) {
         return (
             <Card>
                 <CardHeader>
@@ -400,7 +403,7 @@ const WoDetailListPage = () => {
                                         <DataTable
                                             data={tableData}
                                             columnDefs={colDefs as ColDef<any>[]}
-                                            loading={loading}
+                                            loading={isFetching}
                                             manualPagination={true}
                                             rowCount={totalRows}
                                             paginationState={pagination}

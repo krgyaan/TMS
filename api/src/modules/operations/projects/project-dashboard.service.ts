@@ -52,6 +52,7 @@ export class ProjectDashboardService {
         const [project] = await this.db
             .select({
                 projectName: projects.projectName,
+                poNo: projects.poNo,
                 tenderId: projects.tenderId,
                 insuranceRequired: projects.insuranceRequired,
                 insuranceRequiredRemark: projects.insuranceRequiredRemark,
@@ -151,6 +152,7 @@ export class ProjectDashboardService {
         return {
             project: {
                 projectName: project.projectName,
+                poNo: project.poNo,
                 insuranceRequired: project.insuranceRequired,
                 insuranceRequiredRemark: project.insuranceRequiredRemark,
             },

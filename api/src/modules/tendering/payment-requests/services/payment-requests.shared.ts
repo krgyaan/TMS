@@ -268,6 +268,23 @@ const PURPOSE_VALUE_MAP: Record<string, PaymentPurpose> = {
     'FDR': 'FDR',
 };
 
+// Project-dashboard BI requests surface the exact BG purpose chosen in the form
+// instead of collapsing it into the generic EMD buckets.
+const PROJECT_BG_PURPOSE_MAP: Record<string, PaymentPurpose> = {
+    'ADVANCE_PAYMENT': 'Advance Payment',
+    'SECURITY_BOND_DEPOSIT': 'Security Bond/Deposit',
+    'SECURITY_DEPOSIT': 'Security Deposit',
+    'PERFORMANCE_BG': 'Performance BG',
+    'PERFORMANCE': 'Performance BG',
+    'FINANCIAL': 'Financial',
+    'COUNTER_GUARANTEE': 'Counter Guarantee',
+};
+
+export function extractProjectBgPurpose(details: any, defaultPurpose: PaymentPurpose = 'Other Payment'): PaymentPurpose {
+    const rawPurpose = details?.bgPurpose ? String(details.bgPurpose) : '';
+    return PROJECT_BG_PURPOSE_MAP[rawPurpose] || defaultPurpose;
+}
+
 export function extractPurposeFromDetails(mode: string, details: any, defaultPurpose: PaymentPurpose): PaymentPurpose {
     if (!details) return defaultPurpose;
 

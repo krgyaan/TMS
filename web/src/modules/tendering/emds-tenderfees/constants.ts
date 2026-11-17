@@ -83,7 +83,6 @@ export const CHEQUE_PURPOSE = [
 ];
 
 export const BG_NEEDED_IN_OPTIONS = [
-    { value: '48', label: '48 Hours' },
     { value: '72', label: '72 Hours' },
     { value: '96', label: '96 Hours' },
     { value: '120', label: '120 Hours' },

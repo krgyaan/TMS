@@ -13,6 +13,7 @@ import { AlertCircle, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LeadTypeModal } from "./components/LeadTypeModal";
 import { LeadTypeViewModal } from "./components/LeadTypeViewModal";
+import { useAuth } from "@/contexts/AuthContext";
 
 const rowSelection: RowSelectionOptions = {
     mode: "multiRow",
@@ -21,12 +22,13 @@ const rowSelection: RowSelectionOptions = {
 
 const LeadTypesPage = () => {
     const { data: leadTypes, isLoading, error, refetch } = useLeadTypes();
+    const { canWriteMasterData } = useAuth();
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [viewModalOpen, setViewModalOpen] = useState(false);
     const [selectedLeadType, setSelectedLeadType] = useState<LeadType | null>(null);
 
     // Lead Type actions
-    const leadTypeActions: ActionItem<LeadType>[] = [
+    const leadTypeActions = ([
         {
             label: "View",
             onClick: row => {
@@ -55,7 +57,7 @@ const LeadTypesPage = () => {
                 }
             },
         },
-    ];
+    ] as ActionItem<LeadType>[]).filter(action => canWriteMasterData || action.label === "View");
 
     const [colDefs] = useState<ColDef<LeadType>[]>([
         {
@@ -155,18 +157,20 @@ const LeadTypesPage = () => {
                 <CardHeader>
                     <CardTitle>Lead Types</CardTitle>
                     <CardDescription>Manage lead source and classification types</CardDescription>
-                    <CardAction>
-                        <Button
-                            variant="default"
-                            onClick={() => {
-                                setSelectedLeadType(null);
-                                setDrawerOpen(true);
-                            }}
-                        >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Lead Type
-                        </Button>
-                    </CardAction>
+                    {canWriteMasterData && (
+                        <CardAction>
+                            <Button
+                                variant="default"
+                                onClick={() => {
+                                    setSelectedLeadType(null);
+                                    setDrawerOpen(true);
+                                }}
+                            >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add Lead Type
+                            </Button>
+                        </CardAction>
+                    )}
                 </CardHeader>
                 <CardContent className="px-3">
                     <DataTable

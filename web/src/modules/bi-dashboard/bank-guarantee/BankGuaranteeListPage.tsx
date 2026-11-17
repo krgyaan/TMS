@@ -1,6 +1,5 @@
 import { paths } from '@/app/routes/paths';
 import { ExportExcelDropdown } from '@/components/bi-dashboard/ExportExcelDropdown';
-import { tenderNameCol } from '@/components/data-grid/columns';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -11,6 +10,7 @@ import DataTable from '@/components/ui/data-table';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 import { useBankGuaranteeCardStats, useBankGuaranteeDashboard, useBankGuaranteeDashboardCounts } from '@/hooks/api/useBankGuarantees';
 import { useBiExport } from '@/hooks/useBiExport';
 
@@ -29,37 +29,49 @@ const TABS_CONFIG: Array<{ key: BankGuaranteeDashboardTab; name: string; icon: R
     {
         key: 'new-requests',
         name: 'New Requests',
-        icon: <FileText className="h-4 w-4" />,
+        icon: <FileText className="h-3.5 w-3.5" />,
         description: 'New bank guarantee requests',
     },
     {
         key: 'live-pnb',
         name: 'Live PNB',
-        icon: <Shield className="h-4 w-4" />,
+        icon: <Shield className="h-3.5 w-3.5" />,
         description: 'Live bank guarantees from PNB',
     },
     {
         key: 'live-bg-limit',
         name: 'Live BG Limit',
-        icon: <Shield className="h-4 w-4" />,
+        icon: <Shield className="h-3.5 w-3.5" />,
         description: 'Live bank guarantees within limit',
     },
     {
         key: 'live-sbi',
         name: 'Live SBI',
-        icon: <Shield className="h-4 w-4" />,
+        icon: <Shield className="h-3.5 w-3.5" />,
         description: 'Live bank guarantees from SBI',
+    },
+    {
+        key: 'live-yes',
+        name: 'Live YES',
+        icon: <Shield className="h-3.5 w-3.5" />,
+        description: 'Live bank guarantees from YES Bank',
+    },
+    {
+        key: 'live-au',
+        name: 'Live AU',
+        icon: <Shield className="h-3.5 w-3.5" />,
+        description: 'Live bank guarantees from AU Bank',
     },
     {
         key: 'cancelled',
         name: 'Cancelled',
-        icon: <XCircle className="h-4 w-4" />,
+        icon: <XCircle className="h-3.5 w-3.5" />,
         description: 'Cancelled bank guarantees',
     },
     {
         key: 'rejected',
         name: 'Rejected',
-        icon: <XCircle className="h-4 w-4" />,
+        icon: <XCircle className="h-3.5 w-3.5" />,
         description: 'Rejected bank guarantees',
     }
 ];
@@ -74,10 +86,21 @@ const compareDates = (dateA: Date | string | null, dateB: Date | string | null):
 const getStatusVariant = (status: string | null): string => {
     if (!status) return 'secondary';
     const statusLower = status.toLowerCase();
-    if (statusLower.includes('live') || statusLower.includes('active')) {
+    if (
+        statusLower.includes('format accepted')
+        || statusLower.includes('created')
+        || statusLower.includes('sfms submitted')
+        || statusLower.includes('fdr released')
+        || statusLower.includes('live')
+        || statusLower.includes('active')
+    ) {
         return 'default';
     }
-    if (statusLower.includes('cancelled') || statusLower.includes('rejected')) {
+    if (
+        statusLower.includes('cancelled')
+        || statusLower.includes('rejected')
+        || statusLower.includes('expired')
+    ) {
         return 'destructive';
     }
     return 'secondary';
@@ -118,20 +141,20 @@ const BankGuaranteeListPage = () => {
         getExportDataFn: (params) => bankGuaranteesService.getExportData(params),
         tabsConfig: TABS_CONFIG,
         pendingTabKey: 'new-requests',
-        tabsWithForm: ['live-pnb', 'live-bg-limit', 'live-sbi', 'cancelled', 'rejected'],
+        tabsWithForm: ['live-pnb', 'live-bg-limit', 'live-sbi', 'live-yes', 'live-au', 'cancelled', 'rejected'],
         filenamePrefix: 'bank-guarantees',
         flattenFormData,
         mapPendingRow: (r: any) => ({
-            'Tender Name': r.projectName || '',
+            'Project Name': r.projectLabel || r.projectName || '',
             'Tender No': r.projectNo || '',
             'BG Creation Date': r.bgDate ? new Date(r.bgDate).toLocaleDateString('en-GB') : '',
             'BG No': r.bgNo || '',
             'Beneficiary Name': r.beneficiaryName || r.favouring || '',
             'Amount': r.amount || '',
-            'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
-            'Expiry Date': r.bgExpiryDateCoalesced ? new Date(r.bgExpiryDateCoalesced).toLocaleDateString('en-GB') : '',
-            'Claim Expiry Date': r.bgClaimExpiryDate ? new Date(r.bgClaimExpiryDate).toLocaleDateString('en-GB') : '',
-            'Charges Paid': r.bgChargesPaid || '',
+            'BG Expiry Date': r.bgExpiryDateCoalesced ? new Date(r.bgExpiryDateCoalesced).toLocaleDateString('en-GB') : '',
+            'BG Claim Period Expiry Date': r.bgClaimExpiryDate ? new Date(r.bgClaimExpiryDate).toLocaleDateString('en-GB') : '',
+            'BG Charges paid': r.bgChargesPaid || '',
+            'BG Charges Calculated': r.bgChargesCalculated || '',
             'FDR No': r.fdrNo || '',
             'FDR Value': r.fdrValue || '',
             'Tender Status': r.tenderStatus || '',
@@ -140,15 +163,16 @@ const BankGuaranteeListPage = () => {
         }),
         mapRow: (r: any, isAllTab: boolean) => {
             const base: Record<string, any> = {
-                'Tender Name': r.projectName || r.tenderName || '',
-                'Tender No': r.tenderNo || r.projectNo || '',
+                'Project Name': r.projectLabel || r.projectName || r.tenderName || '',
+                'Tender No': r.projectNo || r.tenderNo || '',
                 'BG Creation Date': r.bgDate ? new Date(r.bgDate).toLocaleDateString('en-GB') : '',
                 'BG No': r.bgNo || '',
                 'Beneficiary Name': r.beneficiaryName || r.favouring || '',
                 'Amount': r.amount || '',
                 'BG Expiry Date': r.bgExpiryDateCoalesced ? new Date(r.bgExpiryDateCoalesced).toLocaleDateString('en-GB') : '',
                 'BG Claim Period Expiry Date': r.bgClaimExpiryDate ? new Date(r.bgClaimExpiryDate).toLocaleDateString('en-GB') : '',
-                'Charges Paid': r.bgChargesPaid || '',
+                'BG Charges paid': r.bgChargesPaid || '',
+                'BG Charges Calculated': r.bgChargesCalculated || '',
                 'FDR No': r.fdrNo || '',
                 'FDR Value': r.fdrValue || '',
                 'Tender Status': r.tenderStatus || '',
@@ -231,12 +255,28 @@ const BankGuaranteeListPage = () => {
                 sortable: true,
                 filter: true,
             },
-            tenderNameCol<BankGuaranteeDashboardRow>('tenderNo', {
-                headerName: 'Tender Name',
+            {
+                field: 'projectLabel',
+                headerName: 'Project Name',
+                width: 220,
+                maxWidth: 220,
+                colId: 'projectLabel',
+                sortable: true,
                 filter: true,
-                width: 200,
-                maxWidth: 200,
-            }),
+                valueGetter: (params) => params.data?.projectLabel || params.data?.tenderName || '—',
+                cellRenderer: (params: any) => {
+                    const tenderNo = params.data?.tenderNo;
+                    const hasTenderNo = Boolean(tenderNo && (tenderNo as string).trim() && (tenderNo as string).trim().toUpperCase() !== 'NA');
+                    return (
+                        <div className="flex flex-col gap-0.5">
+                            <p className="text-xs">{params.value}</p>
+                            {hasTenderNo && (
+                                <p className="text-xs text-[10px] text-muted-foreground truncate">{tenderNo}</p>
+                            )}
+                        </div>
+                    );
+                },
+            },
             {
                 field: 'amount',
                 headerName: 'Amount',
@@ -246,16 +286,8 @@ const BankGuaranteeListPage = () => {
                 valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
             },
             {
-                field: 'bidValidity',
-                headerName: 'Bid Validity',
-                width: 130,
-                colId: 'bidValidity',
-                sortable: false,
-                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
-            },
-            {
                 field: 'bgExpiryDateCoalesced',
-                headerName: 'Expiry Date',
+                headerName: 'BG Expiry Date',
                 width: 130,
                 colId: 'bgExpiryDateCoalesced',
                 sortable: true,
@@ -264,7 +296,7 @@ const BankGuaranteeListPage = () => {
             },
             {
                 field: 'bgClaimExpiryDate',
-                headerName: 'Claim Expiry Date',
+                headerName: 'BG Claim Period Expiry Date',
                 width: 200,
                 colId: 'bgClaimExpiryDate',
                 sortable: true,
@@ -273,9 +305,17 @@ const BankGuaranteeListPage = () => {
             },
             {
                 field: 'bgChargesPaid',
-                headerName: 'Charges Paid',
-                width: 100,
+                headerName: 'BG Charges paid',
+                width: 120,
                 colId: 'bgChargesPaid',
+                sortable: true,
+                valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
+            },
+            {
+                field: 'bgChargesCalculated',
+                headerName: 'BG Charges Calculated',
+                width: 150,
+                colId: 'bgChargesCalculated',
                 sortable: true,
                 valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
             },
@@ -323,7 +363,7 @@ const BankGuaranteeListPage = () => {
             {
                 field: 'bgStatus',
                 headerName: 'BG Status',
-                width: 130,
+                width: 150,
                 colId: 'bgStatus',
                 sortable: true,
                 filter: true,
@@ -331,6 +371,24 @@ const BankGuaranteeListPage = () => {
                     const status = params.value;
                     if (!status) return '—';
                     return <Badge variant={getStatusVariant(status) as any}>{status}</Badge>;
+                },
+            },
+            {
+                headerName: 'Timer',
+                width: 120,
+                colId: 'timer',
+                sortable: false,
+                filter: false,
+                cellRenderer: (params: any) => {
+                    const timer = params.data?.timer;
+                    if (!timer) return '—';
+                    return (
+                        <TenderTimerDisplay
+                            remainingSeconds={timer.remainingSeconds}
+                            status={timer.status}
+                            deadline={timer.deadline ? new Date(timer.deadline) : null}
+                        />
+                    );
                 },
             },
             {
@@ -422,9 +480,9 @@ const BankGuaranteeListPage = () => {
                                     exporting={exporting}
                                     handleExport={handleExport}
                                 />
-                                <Button variant="outline" onClick={() => navigate(paths.tendering.oldEmdsForBG())}>
+                                <Button variant="outline" onClick={() => navigate(paths.bi.bankGuaranteeCreate())}>
                                     <Plus className="w-4 h-4" />
-                                    Add Old Entry
+                                    Add BG
                                 </Button>
                             </div>
                         </CardAction>
@@ -435,17 +493,17 @@ const BankGuaranteeListPage = () => {
                         value={activeTab}
                         onValueChange={(value) => setActiveTab(value as BankGuaranteeDashboardTab)}
                     >
-                        <TabsList className="m-auto mb-4">
+                        <TabsList className="m-auto mb-4 h-auto flex-wrap gap-0.5 p-1">
                             {tabsWithData.map((tab) => (
                                 <TabsTrigger
                                     key={tab.key}
                                     value={tab.key}
-                                    className="data-[state=active]:shadow-md flex items-center gap-2"
+                                    className="data-[state=active]:shadow-md flex items-center gap-1 px-2.5 py-1 text-xs"
                                 >
                                     {tab.icon}
-                                    <span className="font-semibold text-sm">{tab.name}</span>
+                                    <span className="font-semibold text-xs">{tab.name}</span>
                                     {tab.count > 0 && (
-                                        <Badge variant="secondary" className="text-xs ml-1">
+                                        <Badge variant="secondary" className="ml-0.5 px-1.5 py-0 text-[10px] leading-4">
                                             {tab.count}
                                         </Badge>
                                     )}

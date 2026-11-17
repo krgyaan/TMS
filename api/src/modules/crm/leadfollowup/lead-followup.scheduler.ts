@@ -1,6 +1,7 @@
 import { Injectable, Inject, Logger } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { Queue } from "bullmq";
+import { getIstDateKey } from "@/utils/ist-date";
 import { LeadFollowupsService } from "./leadfollowups.service";
 
 @Injectable()
@@ -19,6 +20,7 @@ export class LeadFollowupScheduler {
         this.logger.log("Lead followup scheduler: checking for due followups");
 
         try {
+            const today = getIstDateKey();
             const due = await this.leadFollowupsService.getDueLeadFollowups();
             this.logger.log(`Found ${due.length} due lead followups to enqueue`);
 
@@ -27,6 +29,7 @@ export class LeadFollowupScheduler {
                     "send-lead-followup",
                     { followupId: fu.id },
                     {
+                        jobId: `lead-followup-${fu.id}-${today}`,
                         attempts: 5,
                         backoff: { type: "exponential", delay: 30000 },
                     },

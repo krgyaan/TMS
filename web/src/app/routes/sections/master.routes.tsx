@@ -1,6 +1,7 @@
 import { lazy } from "react";
 import { Routes, Route } from "react-router-dom";
 import { RouteWrapper } from "../components/RouteWrapper";
+import { paths } from "../paths";
 
 // ==================== LAZY IMPORTS ====================
 // Users
@@ -24,6 +25,10 @@ const Master_Organization_Edit = lazy(() => import("@/modules/master/organizatio
 const Master_Item = lazy(() => import("@/modules/master/item"));
 const Master_Item_Create = lazy(() => import("@/modules/master/item/create"));
 const Master_Item_Edit = lazy(() => import("@/modules/master/item/edit"));
+
+// New shared Item Master
+const Master_InventoryItem_List = lazy(() => import("@/modules/accounts/inventory-items/InventoryItemListPage"));
+const Master_InventoryItem_Form = lazy(() => import("@/modules/accounts/inventory-items/InventoryItemFormPage"));
 
 // Websites
 const Master_Website = lazy(() => import("@/modules/master/website"));
@@ -175,7 +180,7 @@ export default function MasterRoutes() {
                 <Route
                     path="create"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.statuses}>
                             <Master_Status_Create />
                         </RouteWrapper>
                     }
@@ -183,7 +188,7 @@ export default function MasterRoutes() {
                 <Route
                     path=":id/edit"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.statuses}>
                             <Master_Status_Edit />
                         </RouteWrapper>
                     }
@@ -203,7 +208,7 @@ export default function MasterRoutes() {
                 <Route
                     path="create"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.organizations}>
                             <Master_Organization_Create />
                         </RouteWrapper>
                     }
@@ -211,7 +216,7 @@ export default function MasterRoutes() {
                 <Route
                     path=":id/edit"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.organizations}>
                             <Master_Organization_Edit />
                         </RouteWrapper>
                     }
@@ -233,7 +238,7 @@ export default function MasterRoutes() {
                 <Route
                     path="create"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.items}>
                             <Master_Item_Create />
                         </RouteWrapper>
                     }
@@ -241,8 +246,36 @@ export default function MasterRoutes() {
                 <Route
                     path=":id/edit"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.items}>
                             <Master_Item_Edit />
+                        </RouteWrapper>
+                    }
+                />
+            </Route>
+
+            {/* Item Master */}
+            <Route path="item-master">
+                <Route
+                    index
+                    element={
+                        <RouteWrapper permission={{ module: "master.item-master", action: "read" }}>
+                            <Master_InventoryItem_List team="master" />
+                        </RouteWrapper>
+                    }
+                />
+                <Route
+                    path="new"
+                    element={
+                        <RouteWrapper permission={{ module: "master.item-master", action: "create" }}>
+                            <Master_InventoryItem_Form />
+                        </RouteWrapper>
+                    }
+                />
+                <Route
+                    path=":id/edit"
+                    element={
+                        <RouteWrapper permission={{ module: "master.item-master", action: "update" }}>
+                            <Master_InventoryItem_Form />
                         </RouteWrapper>
                     }
                 />
@@ -261,7 +294,7 @@ export default function MasterRoutes() {
                 <Route
                     path="create"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.websites}>
                             <Master_Website_Create />
                         </RouteWrapper>
                     }
@@ -269,7 +302,7 @@ export default function MasterRoutes() {
                 <Route
                     path=":id/edit"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.websites}>
                             <Master_Website_Edit />
                         </RouteWrapper>
                     }
@@ -289,7 +322,7 @@ export default function MasterRoutes() {
                 <Route
                     path="create"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.locations}>
                             <Master_Location_Create />
                         </RouteWrapper>
                     }
@@ -297,7 +330,7 @@ export default function MasterRoutes() {
                 <Route
                     path=":id/edit"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.locations}>
                             <Master_Location_Edit />
                         </RouteWrapper>
                     }
@@ -317,7 +350,7 @@ export default function MasterRoutes() {
                 <Route
                     path="create"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.documentSubmitted}>
                             <Master_DocumentSubmitted_Create />
                         </RouteWrapper>
                     }
@@ -325,7 +358,7 @@ export default function MasterRoutes() {
                 <Route
                     path=":id/edit"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.documentSubmitted}>
                             <Master_DocumentSubmitted_Edit />
                         </RouteWrapper>
                     }
@@ -345,7 +378,7 @@ export default function MasterRoutes() {
                 <Route
                     path="create"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.imprestCategories}>
                             <Master_ImprestCategory_Create />
                         </RouteWrapper>
                     }
@@ -353,7 +386,7 @@ export default function MasterRoutes() {
                 <Route
                     path=":id/edit"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.imprestCategories}>
                             <Master_ImprestCategory_Edit />
                         </RouteWrapper>
                     }
@@ -373,7 +406,7 @@ export default function MasterRoutes() {
                 <Route
                     path="create"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.documentType}>
                             <Master_DocumentType_Create />
                         </RouteWrapper>
                     }
@@ -381,7 +414,7 @@ export default function MasterRoutes() {
                 <Route
                     path=":id/edit"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.documentType}>
                             <Master_DocumentType_Edit />
                         </RouteWrapper>
                     }
@@ -401,7 +434,7 @@ export default function MasterRoutes() {
                 <Route
                     path="create"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.financialYears}>
                             <Master_FinancialYear_Create />
                         </RouteWrapper>
                     }
@@ -409,7 +442,7 @@ export default function MasterRoutes() {
                 <Route
                     path=":id/edit"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.financialYears}>
                             <Master_FinancialYear_Edit />
                         </RouteWrapper>
                     }
@@ -429,7 +462,7 @@ export default function MasterRoutes() {
                 <Route
                     path="create"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.followupCategories}>
                             <Master_FollowupCategory_Create />
                         </RouteWrapper>
                     }
@@ -437,7 +470,7 @@ export default function MasterRoutes() {
                 <Route
                     path=":id/edit"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.followupCategories}>
                             <Master_FollowupCategory_Edit />
                         </RouteWrapper>
                     }
@@ -457,7 +490,7 @@ export default function MasterRoutes() {
                 <Route
                     path="create"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.emdsResponsibilities}>
                             <Master_EMDResponsibility_Create />
                         </RouteWrapper>
                     }
@@ -465,7 +498,7 @@ export default function MasterRoutes() {
                 <Route
                     path=":id/edit"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.emdsResponsibilities}>
                             <Master_EMDResponsibility_Edit />
                         </RouteWrapper>
                     }
@@ -505,7 +538,7 @@ export default function MasterRoutes() {
                 <Route
                     path="create"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.industries}>
                             <Master_Industry_Create />
                         </RouteWrapper>
                     }
@@ -513,7 +546,7 @@ export default function MasterRoutes() {
                 <Route
                     path=":id/edit"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.industries}>
                             <Master_Industry_Edit />
                         </RouteWrapper>
                     }
@@ -533,7 +566,7 @@ export default function MasterRoutes() {
                 <Route
                     path="create"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.tqTypes}>
                             <Master_TqType_Create />
                         </RouteWrapper>
                     }
@@ -541,7 +574,7 @@ export default function MasterRoutes() {
                 <Route
                     path=":id/edit"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.tqTypes}>
                             <Master_TqType_Edit />
                         </RouteWrapper>
                     }
@@ -561,7 +594,7 @@ export default function MasterRoutes() {
                 <Route
                     path="create"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.loanParties}>
                             <Master_LoanParty_Create />
                         </RouteWrapper>
                     }
@@ -569,7 +602,7 @@ export default function MasterRoutes() {
                 <Route
                     path=":id/edit"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.loanParties}>
                             <Master_LoanParty_Edit />
                         </RouteWrapper>
                     }
@@ -617,7 +650,7 @@ export default function MasterRoutes() {
                 <Route
                     path="create"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.states}>
                             <Master_State_Create />
                         </RouteWrapper>
                     }
@@ -625,7 +658,7 @@ export default function MasterRoutes() {
                 <Route
                     path=":id/edit"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.states}>
                             <Master_State_Edit />
                         </RouteWrapper>
                     }
@@ -655,7 +688,7 @@ export default function MasterRoutes() {
                 <Route
                     path="create"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.leadTypes}>
                             <Master_LeadType_Create />
                         </RouteWrapper>
                     }
@@ -663,7 +696,7 @@ export default function MasterRoutes() {
                 <Route
                     path=":id/edit"
                     element={
-                        <RouteWrapper>
+                        <RouteWrapper requireMasterWrite redirectTo={paths.master.leadTypes}>
                             <Master_LeadType_Edit />
                         </RouteWrapper>
                     }

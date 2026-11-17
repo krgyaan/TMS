@@ -1,19 +1,19 @@
 import { lazy } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { RouteWrapper } from "../components/RouteWrapper";
 
 // Follow-ups
-const Shared_FollowUps = lazy(() => import("@/modules/shared/follow-up/FollowUpPage"));
+const Shared_FollowUps = lazy(() => import("@/modules/shared/follow-up/FollowUpListPage"));
 const FollowUpCreatePage = lazy(() => import("@/modules/shared/follow-up/FollowUpCreatePage"));
 const FollowUpEditPage = lazy(() => import("@/modules/shared/follow-up/FollowUpEditPage"));
-const FollowUpShowPage = lazy(() => import("@/modules/shared/follow-up/FollowUpViewPage"));
+const FollowUpShowPage = lazy(() => import("@/modules/shared/follow-up/FollowUpShowPage"));
 
 // Courier
-const Shared_Courier = lazy(() => import("@/modules/shared/courier"));
-const CourierCreatePage = lazy(() => import("@/modules/shared/courier/create"));
-const CourierDispatchPage = lazy(() => import("@/modules/shared/courier/dispatch"));
+const Shared_Courier = lazy(() => import("@/modules/shared/courier/CourierListPage"));
+const CourierCreatePage = lazy(() => import("@/modules/shared/courier/CourierCreatePage"));
+const CourierDispatchPage = lazy(() => import("@/modules/shared/courier/CourierDispatchPage"));
 const CourierViewPage = lazy(() => import("@/modules/shared/courier/CourierView"));
-const CourierEditPage = lazy(() => import("@/modules/shared/courier/CourierEdit"));
+const CourierEditPage = lazy(() => import("@/modules/shared/courier/CourierEditPage"));
 
 // Imprests
 const Shared_Imprest = lazy(() => import("@/modules/imprest/UserImprestsPage"));
@@ -30,9 +30,9 @@ const MakerRequestCreatePage = lazy(() => import("@/modules/shared/maker-request
 export default function SharedRoutes() {
     return (
         <Routes>
-            {/* Follow-ups Routes */}
+            {/* Follow-up Routes */}
             <Route
-                path="follow-ups"
+                path="follow-up"
                 element={
                     <RouteWrapper>
                         <Shared_FollowUps />
@@ -42,6 +42,7 @@ export default function SharedRoutes() {
             <Route path="follow-up/create" element={<FollowUpCreatePage />} />
             <Route path="follow-up/edit/:id" element={<FollowUpEditPage />} />
             <Route path="follow-up/show/:id" element={<FollowUpShowPage />} />
+            <Route path="follow-ups" element={<Navigate to="/shared/follow-up" replace />} />
             {/* Courier Routes */}
             <Route
                 path="couriers"

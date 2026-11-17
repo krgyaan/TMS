@@ -49,7 +49,7 @@ const TqManagementListPage = () => {
     const navigate = useNavigate();
 
     // Fetch paginated data for active tab using tabKey
-    const { data: apiResponse, isLoading: loading, error } = useTqManagement(
+    const { data: apiResponse, isLoading: loading, isFetching, error } = useTqManagement(
         activeTab,
         {
             page: pagination.pageIndex + 1,
@@ -355,7 +355,8 @@ const TqManagementListPage = () => {
         },
     ], [tqManagementActions]);
 
-    if (loading) {
+    // Loading state (initial load only; keep the page mounted on subsequent searches)
+    if (loading && !apiResponse) {
         return (
             <Card>
                 <CardHeader>
@@ -477,7 +478,7 @@ const TqManagementListPage = () => {
                                         <DataTable
                                             data={tqManagementData}
                                             columnDefs={colDefs as ColDef<any>[]}
-                                            loading={loading}
+                                            loading={isFetching}
                                             manualPagination={true}
                                             rowCount={totalRows}
                                             paginationState={pagination}

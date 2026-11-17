@@ -22,3 +22,4 @@ volksAi/app/storage/
 
 # Vendor master workbooks - contain vendor emails, phone numbers and PANs
 *.xlsx
+tally/
