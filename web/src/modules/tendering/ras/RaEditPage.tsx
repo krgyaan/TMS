@@ -7,6 +7,7 @@ import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { paths } from '@/app/routes/paths';
 
 const RA_STATUS = {
     UNDER_EVALUATION: 'Under Evaluation',
@@ -97,9 +98,9 @@ export default function RaEditPage() {
     if (isUnderEvaluation) {
         return (
             <RaScheduleFormPage
-                raId={raId}
+                tenderId={ra.tenderId}
                 tenderDetails={tenderDetails}
-                onSuccess={() => navigate(`/tendering/ras/${raId}`)}
+                onSuccess={() => navigate(paths.tendering.rasShow(ra.tenderId))}
             />
         );
     }
@@ -109,7 +110,7 @@ export default function RaEditPage() {
             <RAResultFormPage
                 raId={raId}
                 tenderDetails={tenderDetails}
-                onSuccess={() => navigate(`/tendering/ras/${raId}`)}
+                onSuccess={() => navigate(paths.tendering.rasShow(ra.tenderId))}
             />
         );
     }

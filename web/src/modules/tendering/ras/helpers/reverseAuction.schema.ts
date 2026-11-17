@@ -5,6 +5,7 @@ import { z } from 'zod';
  */
 export const ScheduleRaSchema = z.object({
     technicallyQualified: z.enum(['Yes', 'No']),
+    raOutcome: z.enum(['RA Scheduled', 'H1 Elimination']),
     disqualificationReason: z.string().optional(),
     qualifiedPartiesCount: z.string().optional(),
     qualifiedPartiesNames: z.array(z.string()).optional(),
@@ -19,7 +20,7 @@ export const ScheduleRaSchema = z.object({
     message: 'Disqualification reason is required when not qualified',
     path: ['disqualificationReason'],
 }).refine((data) => {
-    if (data.technicallyQualified === 'Yes' && !data.raStartTime) {
+    if (data.technicallyQualified === 'Yes' && data.raOutcome === 'RA Scheduled' && !data.raStartTime) {
         return false;
     }
     return true;
@@ -27,7 +28,7 @@ export const ScheduleRaSchema = z.object({
     message: 'RA Start Time is required when qualified',
     path: ['raStartTime'],
 }).refine((data) => {
-    if (data.technicallyQualified === 'Yes' && !data.raEndTime) {
+    if (data.technicallyQualified === 'Yes' && data.raOutcome === 'RA Scheduled' && !data.raEndTime) {
         return false;
     }
     return true;
@@ -42,7 +43,7 @@ export type ScheduleRaFormValues = z.infer<typeof ScheduleRaSchema>;
  * Schema for uploading RA result
  */
 export const UploadRaResultSchema = z.object({
-    raResult: z.enum(['Won', 'Lost', 'H1 Elimination']),
+    raResult: z.enum(['Won', 'Lost']),
     veL1AtStart: z.enum(['Yes', 'No']),
     raStartPrice: z.string().optional(),
     raClosePrice: z.string().optional(),

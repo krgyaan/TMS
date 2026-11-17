@@ -1,15 +1,5 @@
 import type { ScheduleRaFormValues, UploadRaResultFormValues } from './reverseAuction.schema';
 
-/**
- * Props for RAResultForm component
- */
-export interface RAResultFormProps {
-    open: boolean;
-    onClose: () => void;
-    raId: number;
-    raData?: RaDashboardRow;
-}
-
 export type UploadResultDto = {
     technicallyQualified: 'Yes' | 'No';
     disqualificationReason?: string;
@@ -58,6 +48,7 @@ export type ReverseAuction = {
 
 export type ScheduleRaDto = {
     technicallyQualified: 'Yes' | 'No';
+    raOutcome?: 'RA Scheduled' | 'H1 Elimination';
     disqualificationReason?: string;
     qualifiedPartiesCount?: string;
     qualifiedPartiesNames?: string[];
@@ -66,7 +57,7 @@ export type ScheduleRaDto = {
 };
 
 export type UploadRaResultDto = {
-    raResult: 'Won' | 'Lost' | 'H1 Elimination';
+    raResult: 'Won' | 'Lost';
     veL1AtStart: 'Yes' | 'No';
     raStartPrice?: string;
     raClosePrice?: string;
@@ -126,4 +117,5 @@ export type RaDashboardListParams = {
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
     search?: string;
+    teamId?: number;
 };
