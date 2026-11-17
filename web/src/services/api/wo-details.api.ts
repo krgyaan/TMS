@@ -146,6 +146,10 @@ class WoDetailsService extends BaseApiService {
     return this.post(`/${woDetailId}/wizard/submit-all`);
   }
 
+  async completeUpload(woDetailId: number): Promise<{ message: string }> {
+    return this.post<{ message: string }>(`/${woDetailId}/complete-upload`);
+  }
+
   // STEP STATUSES FOR SHOW PAGE
   async getStepStatuses(woDetailId: number): Promise<Record<string, boolean>> {
     return this.get<Record<string, boolean>>(`/${woDetailId}/step-statuses`);
@@ -224,10 +228,6 @@ class WoDetailsService extends BaseApiService {
   async getDashboardSummary(teamId?: number): Promise<WoDetailsDashboardSummary> {
     const query = teamId ? `?teamId=${teamId}` : '';
     return this.get<WoDetailsDashboardSummary>(`/dashboard/summary${query}`);
-  }
-
-  async getPendingAcceptance(): Promise<{ count: number; data: WoDetail[] }> {
-    return this.get<{ count: number; data: WoDetail[] }>('/dashboard/pending-acceptance');
   }
 
   async getAllPendingQueries(): Promise<PendingQueriesResponse> {

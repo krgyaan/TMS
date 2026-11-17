@@ -255,9 +255,26 @@ export const useSubmitAllPages = () => {
   });
 };
 
-// Submit wizard for review
-export const useSubmitForReview = () => {
+export const useCompleteWoUpload = () => {
   const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (woDetailId: number) => woDetailsService.completeUpload(woDetailId),
+    onSuccess: (result, woDetailId) => {
+      queryClient.invalidateQueries({ queryKey: woDetailsKeys.all });
+      queryClient.invalidateQueries({ queryKey: woDetailsKeys.detail(woDetailId) });
+      queryClient.invalidateQueries({ queryKey: woDetailsKeys.detailWithRelations(woDetailId) });
+      queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.all });
+      toast.success(result.message);
+    },
+    onError: (error: any) => {
+      toast.error(handleQueryError(error));
+    },
+  });
+};
+
+// Submit wizard for review
+export const useSubmitForReview = () => {  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (woDetailId: number) => woDetailsService.submitForReview(woDetailId),
@@ -424,13 +441,6 @@ export const useWoDetailsDashboardSummary = () => {
   return useQuery({
     queryKey: woDetailsKeys.dashboardSummary(teamId ?? undefined),
     queryFn: () => woDetailsService.getDashboardSummary(teamId ?? undefined),
-  });
-};
-
-export const usePendingAcceptance = () => {
-  return useQuery({
-    queryKey: woDetailsKeys.pendingAcceptance(),
-    queryFn: () => woDetailsService.getPendingAcceptance(),
   });
 };
 
