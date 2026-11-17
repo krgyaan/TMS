@@ -1,12 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, type Resolver } from 'react-hook-form';
+import { useFieldArray, useForm, type Control, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
-import { SelectField } from '@/components/form/SelectField';
 import { ContactPersonFields } from '@/components/form/ContactPersonFields';
 import { FollowUpFrequencySelect } from '@/components/form/FollowUpFrequencySelect';
 import { FollowupEmailEditor } from '@/components/form/FollowupEmailEditor';
@@ -15,23 +14,79 @@ import { infoSheetsService } from '@/services/api/info-sheet.service';
 import DateInput from '@/components/form/DateInput';
 import { FdrActionFormSchema, type FdrActionFormValues } from '../helpers/fdrActionForm.schema';
 import { useUpdateFdrAction } from '@/hooks/api/useFdrs';
-import { useUsers } from '@/hooks/api/useUsers';
 import { toast } from 'sonner';
 import { useWatch } from 'react-hook-form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { FileText, Users, Package, Banknote, CheckCircle2, XCircle, CheckSquare, Info, Truck } from 'lucide-react';
+import { FileText, Users, Package, Banknote, CheckCircle2, XCircle, CheckSquare, Info, Plus, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ALL_FDR_ACTION_OPTIONS, type FDRActionFormProps } from '../helpers/fdr.types';
-import { useCreateCourier } from '@/hooks/api/useCourier';
 import { FileUploader } from '@/components/file-upload';
+
+interface MailIdRows {
+    fields: Array<{ id: string }>;
+    append: (value: { email?: string }) => void;
+    remove: (index: number) => void;
+}
+
+function MailIdList({
+    control,
+    name,
+    rows,
+    heading,
+    placeholder,
+    removeLabel,
+}: {
+    control: Control<FdrActionFormValues>;
+    name: 'bank_mail_ids' | 'bank_mail_ids_cc';
+    rows: MailIdRows;
+    heading: string;
+    placeholder: string;
+    removeLabel: string;
+}) {
+    return (
+        <div className="space-y-3">
+            <div className="flex items-center justify-between border-b pb-2">
+                <h5 className="font-medium text-sm">{heading}</h5>
+                <Button type="button" variant="outline" size="sm" onClick={() => rows.append({ email: '' })}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add
+                </Button>
+            </div>
+            <div className="flex flex-wrap items-end gap-2">
+                {rows.fields.map((row, index) => (
+                    <div key={row.id} className="flex items-center gap-1 w-full sm:w-72">
+                        <FieldWrapper control={control} name={`${name}.${index}.email`} label="">
+                            {(field) => (
+                                <Input
+                                    {...field}
+                                    value={(field.value as string | undefined) ?? ''}
+                                    type="email"
+                                    placeholder={placeholder}
+                                />
+                            )}
+                        </FieldWrapper>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => rows.remove(index)}
+                            className="text-destructive hover:text-destructive shrink-0"
+                            aria-label={removeLabel}
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
 
 export function FdrActionForm({ instrumentId, action: propAction, tenderId, formHistory, instrumentData, linkedCheque, linkedBg }: FDRActionFormProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdateFdrAction();
-    const createCourierMutation = useCreateCourier();
-    const { data: employees = [] } = useUsers();
     const hasAccountsFormData = !!(formHistory?.accountsForm?.fdrReq);
     const hasFollowupData = !!(formHistory?.initiateFollowup?.organisationName);
     const hasReturnedCourierData = !!(formHistory?.returnedCourier?.docketNo);
@@ -58,25 +113,21 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
     const defaultValues: FdrActionFormValues = {
         action: '',
         contacts: [],
+        bank_mail_ids: [{ email: '' }],
+        bank_mail_ids_cc: [{ email: '' }],
     };
 
     if (formHistory?.accountsForm) {
         defaultValues.fdr_req = formHistory.accountsForm.fdrReq;
         defaultValues.reason_req = formHistory.accountsForm.reasonReq;
-        defaultValues.fdr_no = formHistory.accountsForm.fdrNo;
-        defaultValues.fdr_date = formHistory.accountsForm.fdrDate;
-        defaultValues.remarks_fdr = formHistory.accountsForm.remarks;
-        defaultValues.courierOrg = formHistory.accountsForm.courierOrg;
-        defaultValues.courierName = formHistory.accountsForm.courierName;
-        defaultValues.courierPhone = formHistory.accountsForm.courierPhone;
-        defaultValues.courierAddrLine1 = formHistory.accountsForm.courierAddrLine1;
-        defaultValues.courierAddrLine2 = formHistory.accountsForm.courierAddrLine2;
-        defaultValues.courierCity = formHistory.accountsForm.courierCity;
-        defaultValues.courierState = formHistory.accountsForm.courierState;
-        defaultValues.courierPincode = formHistory.accountsForm.courierPincode;
-        defaultValues.empFrom = formHistory.accountsForm.empFrom;
-        defaultValues.delDate = formHistory.accountsForm.delDate;
-        defaultValues.urgency = formHistory.accountsForm.urgency;
+        defaultValues.prefilled_signed_fdr = formHistory.accountsForm.prefilledSignedFdr;
+        defaultValues.upload_documents = formHistory.accountsForm.uploadDocuments;
+        defaultValues.bank_mail_ids = formHistory.accountsForm.bankMailIds?.length
+            ? formHistory.accountsForm.bankMailIds
+            : [{ email: '' }];
+        defaultValues.bank_mail_ids_cc = formHistory.accountsForm.bankMailIdsCc?.length
+            ? formHistory.accountsForm.bankMailIdsCc
+            : [{ email: '' }];
     }
 
     if (formHistory?.initiateFollowup) {
@@ -110,6 +161,9 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
         defaultValues,
     });
 
+    const bankMailIds = useFieldArray({ control: form.control, name: 'bank_mail_ids' });
+    const bankMailIdsCc = useFieldArray({ control: form.control, name: 'bank_mail_ids_cc' });
+
     const selectedAction = useWatch({ control: form.control, name: 'action' });
     const fdrReq = useWatch({ control: form.control, name: 'fdr_req' });
     const emailBody = useWatch({ control: form.control, name: 'emailBody' });
@@ -121,47 +175,17 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
         if (formHistory?.accountsForm?.reasonReq) {
             form.setValue('reason_req', formHistory.accountsForm.reasonReq, { shouldValidate: false });
         }
-        if (formHistory?.accountsForm?.fdrNo) {
-            form.setValue('fdr_no', formHistory.accountsForm.fdrNo, { shouldValidate: false });
+        if (formHistory?.accountsForm?.prefilledSignedFdr?.length) {
+            form.setValue('prefilled_signed_fdr', formHistory.accountsForm.prefilledSignedFdr, { shouldValidate: false });
         }
-        if (formHistory?.accountsForm?.fdrDate) {
-            form.setValue('fdr_date', formHistory.accountsForm.fdrDate, { shouldValidate: false });
+        if (formHistory?.accountsForm?.uploadDocuments) {
+            form.setValue('upload_documents', formHistory.accountsForm.uploadDocuments, { shouldValidate: false });
         }
-        if (formHistory?.accountsForm?.remarks) {
-            form.setValue('remarks_fdr', formHistory.accountsForm.remarks, { shouldValidate: false });
+        if (formHistory?.accountsForm?.bankMailIds?.length) {
+            bankMailIds.replace(formHistory.accountsForm.bankMailIds);
         }
-        if (formHistory?.accountsForm?.courierOrg) {
-            form.setValue('courierOrg', formHistory.accountsForm.courierOrg, { shouldValidate: false });
-        }
-        if (formHistory?.accountsForm?.courierName) {
-            form.setValue('courierName', formHistory.accountsForm.courierName, { shouldValidate: false });
-        }
-        if (formHistory?.accountsForm?.courierPhone) {
-            form.setValue('courierPhone', formHistory.accountsForm.courierPhone, { shouldValidate: false });
-        }
-        if (formHistory?.accountsForm?.courierAddrLine1) {
-            form.setValue('courierAddrLine1', formHistory.accountsForm.courierAddrLine1, { shouldValidate: false });
-        }
-        if (formHistory?.accountsForm?.courierAddrLine2) {
-            form.setValue('courierAddrLine2', formHistory.accountsForm.courierAddrLine2, { shouldValidate: false });
-        }
-        if (formHistory?.accountsForm?.courierCity) {
-            form.setValue('courierCity', formHistory.accountsForm.courierCity, { shouldValidate: false });
-        }
-        if (formHistory?.accountsForm?.courierState) {
-            form.setValue('courierState', formHistory.accountsForm.courierState, { shouldValidate: false });
-        }
-        if (formHistory?.accountsForm?.courierPincode) {
-            form.setValue('courierPincode', formHistory.accountsForm.courierPincode, { shouldValidate: false });
-        }
-        if (formHistory?.accountsForm?.empFrom) {
-            form.setValue('empFrom', formHistory.accountsForm.empFrom, { shouldValidate: false });
-        }
-        if (formHistory?.accountsForm?.delDate) {
-            form.setValue('delDate', formHistory.accountsForm.delDate, { shouldValidate: false });
-        }
-        if (formHistory?.accountsForm?.urgency) {
-            form.setValue('urgency', formHistory.accountsForm.urgency, { shouldValidate: false });
+        if (formHistory?.accountsForm?.bankMailIdsCc?.length) {
+            bankMailIdsCc.replace(formHistory.accountsForm.bankMailIdsCc);
         }
 
         if (formHistory?.initiateFollowup?.organisationName) {
@@ -209,12 +233,6 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
                 try {
                     const result = await infoSheetsService.getTenderContacts(tenderId);
                     if (result?.organisationName) {
-                        if (selectedAction === 'accounts-form') {
-                            const currentOrg = form.getValues('courierOrg');
-                            if (!currentOrg) {
-                                form.setValue('courierOrg', result.organisationName, { shouldValidate: false });
-                            }
-                        }
                         if (selectedAction === 'initiate-followup') {
                             const currentOrg = form.getValues('organisation_name');
                             if (!currentOrg) {
@@ -239,7 +257,7 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
         }
     }, [selectedAction, tenderId, form]);
 
-    const isSubmitting = form.formState.isSubmitting || updateMutation.isPending || createCourierMutation.isPending;
+    const isSubmitting = form.formState.isSubmitting || updateMutation.isPending;
 
     const handleSubmit = async (values: FdrActionFormValues) => {
         try {
@@ -252,39 +270,19 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
             if (values.fdr_date) payload.fdr_date = values.fdr_date;
             if (values.remarks_fdr) payload.remarks = values.remarks_fdr;
 
-            // Create courier dispatch if this is a fresh accounts-form accept
-            if (values.action === 'accounts-form' && values.fdr_req === 'Accepted' && values.courierOrg && !formHistory?.accountsForm?.reqNo) {
-                const toAddr = [values.courierAddrLine1, values.courierAddrLine2, values.courierCity, values.courierState]
-                    .filter(Boolean).join(', ');
-                const createdCourier = await createCourierMutation.mutateAsync({
-                    data: {
-                        toOrg: values.courierOrg,
-                        toName: values.courierName || '',
-                        toAddr: toAddr || '',
-                        toPin: values.courierPincode || '',
-                        toMobile: values.courierPhone || '',
-                        empFrom: values.empFrom || 0,
-                        delDate: values.delDate || '',
-                        urgency: values.urgency || 1,
-                    },
-                    filenames: values.courier_docs,
-                });
-                payload.req_no = createdCourier.id;
-                payload.courier_address_json = JSON.stringify({
-                    org: values.courierOrg || null,
-                    name: values.courierName || null,
-                    phone: values.courierPhone || null,
-                    line1: values.courierAddrLine1 || null,
-                    line2: values.courierAddrLine2 || null,
-                    city: values.courierCity || null,
-                    state: values.courierState || null,
-                    pincode: values.courierPincode || null,
-                    empFrom: values.empFrom ?? null,
-                    delDate: values.delDate || null,
-                    urgency: values.urgency ?? null,
-                    docs: values.courier_docs ?? [],
-                });
+            if (values.action === 'accounts-form') {
+                if (values.fdr_req === 'Accepted') {
+                    payload.prefilled_signed_fdr = values.prefilled_signed_fdr ?? [];
+                    payload.upload_documents = values.upload_documents || '';
+                    payload.bank_mail_ids = (values.bank_mail_ids ?? [])
+                        .map((row) => row.email?.trim())
+                        .filter(Boolean);
+                    payload.bank_mail_ids_cc = (values.bank_mail_ids_cc ?? [])
+                        .map((row) => row.email?.trim())
+                        .filter(Boolean);
+                }
             }
+
             if (values.organisation_name) payload.organisation_name = values.organisation_name;
             if (values.contacts) payload.contacts = values.contacts;
             if (values.followup_start_date) payload.followup_start_date = values.followup_start_date;
@@ -443,89 +441,52 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
                         </FieldWrapper>
 
                         {fdrReq === 'Rejected' && (
-                            <FieldWrapper control={form.control} name="reason_req" label="Reason for Rejection *">
-                                {(field) => <Textarea {...field} placeholder="Enter reason for rejection" className="min-h-[80px]" />}
+                            <FieldWrapper control={form.control} name="reason_req" label="Reason for Rejection/Changes required *">
+                                {(field) => <Textarea {...field} placeholder="Enter reason for rejection or changes required" className="min-h-[80px]" />}
                             </FieldWrapper>
                         )}
 
                         {fdrReq === 'Accepted' && (
                             <div className="space-y-4 pt-3 border-t">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <FieldWrapper control={form.control} name="fdr_date" label="FDR Date">
-                                        {(field) => <DateInput value={field.value} onChange={field.onChange} />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="fdr_no" label="FDR No.">
-                                        {(field) => <Input {...field} placeholder="Enter FDR number" />}
-                                    </FieldWrapper>
-                                </div>
-
-                                <div className="space-y-3">
-                                    <div className="flex items-center gap-2 pt-2 border-t">
-                                        <Truck className="h-4 w-4 text-primary" />
-                                        <h5 className="font-medium text-sm">Courier Dispatch</h5>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        <FieldWrapper control={form.control} name="courierOrg" label="Organization Name">
-                                            {(field) => <Input {...field} placeholder="Enter organization name" />}
-                                        </FieldWrapper>
-                                        <FieldWrapper control={form.control} name="courierName" label="Recipient Name">
-                                            {(field) => <Input {...field} placeholder="Enter recipient name" />}
-                                        </FieldWrapper>
-                                        <FieldWrapper control={form.control} name="courierPhone" label="Phone">
-                                            {(field) => <Input {...field} placeholder="Enter phone number" maxLength={10} />}
-                                        </FieldWrapper>
-                                        <FieldWrapper control={form.control} name="courierAddrLine1" label="Address Line 1">
-                                            {(field) => <Input {...field} placeholder="Building, Street" />}
-                                        </FieldWrapper>
-                                        <FieldWrapper control={form.control} name="courierAddrLine2" label="Address Line 2">
-                                            {(field) => <Input {...field} placeholder="Area, Locality" />}
-                                        </FieldWrapper>
-                                        <FieldWrapper control={form.control} name="courierCity" label="City">
-                                            {(field) => <Input {...field} placeholder="Enter city" />}
-                                        </FieldWrapper>
-                                        <FieldWrapper control={form.control} name="courierState" label="State">
-                                            {(field) => <Input {...field} placeholder="Enter state" />}
-                                        </FieldWrapper>
-                                        <FieldWrapper control={form.control} name="courierPincode" label="Pin Code">
-                                            {(field) => <Input {...field} placeholder="Enter 6-digit pin code" maxLength={6} />}
-                                        </FieldWrapper>
-                                        <SelectField
-                                            control={form.control}
-                                            name="empFrom"
-                                            label="Courier From"
-                                            options={employees.map(e => ({ value: String(e.id), label: e.name }))}
-                                            placeholder="Select Employee"
-                                        />
-                                        <FieldWrapper control={form.control} name="delDate" label="Delivery Date">
-                                            {(field) => <DateInput value={field.value} onChange={field.onChange} />}
-                                        </FieldWrapper>
-                                        <SelectField
-                                            control={form.control}
-                                            name="urgency"
-                                            label="Dispatch Urgency"
-                                            options={[
-                                                { value: '1', label: 'Same Day (Urgent)' },
-                                                { value: '2', label: 'Next Day' }
-                                            ]}
-                                            placeholder="Select Urgency"
-                                        />
-                                    </div>
-                                    </div>
-
-                                    {/* File Upload Section */}
-                                    <FieldWrapper control={form.control} name="courier_docs" label="Soft Copy of the documents">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FieldWrapper control={form.control} name="prefilled_signed_fdr" label="Prefilled Bank Formats, Signed by CEO">
                                         {(field) => (
                                             <FileUploader
-                                                context="courier"
+                                                context="fdr-prefilled-signed"
                                                 value={field.value || []}
                                                 onChange={field.onChange}
                                             />
                                         )}
                                     </FieldWrapper>
 
-                                <FieldWrapper control={form.control} name="remarks_fdr" label="Remarks (if any)">
-                                    {(field) => <Textarea {...field} placeholder="Enter remarks" className="min-h-[80px]" />}
-                                </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="upload_documents" label="Upload Documents">
+                                        {(field) => (
+                                            <FileUploader
+                                                context="fdr-format-imran"
+                                                value={field.value ? [field.value] : []}
+                                                onChange={(paths) => field.onChange(paths[0] || '')}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                </div>
+
+                                <MailIdList
+                                    control={form.control}
+                                    name="bank_mail_ids"
+                                    rows={bankMailIds}
+                                    heading="Bank Mail Ids"
+                                    placeholder="e.g., bank.manager@bank.com"
+                                    removeLabel="Remove mail id"
+                                />
+
+                                <MailIdList
+                                    control={form.control}
+                                    name="bank_mail_ids_cc"
+                                    rows={bankMailIdsCc}
+                                    heading="Bank Mail Ids CC"
+                                    placeholder="e.g., branch@bank.com"
+                                    removeLabel="Remove CC mail id"
+                                />
                             </div>
                         )}
                     </div>

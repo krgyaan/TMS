@@ -135,6 +135,10 @@ export interface AccountsFormHistory {
     fdrDate?: string;
     reqNo?: string;
     remarks?: string;
+    prefilledSignedFdr?: string[];
+    uploadDocuments?: string;
+    bankMailIds?: Array<{ email?: string }>;
+    bankMailIdsCc?: Array<{ email?: string }>;
     courierOrg?: string;
     courierName?: string;
     courierPhone?: string;

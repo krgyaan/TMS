@@ -153,6 +153,14 @@ export default function FdrActionPage() {
                             fdrDate: actionFormData.fdrDate ? new Date(actionFormData.fdrDate).toISOString() : undefined,
                             reqNo: actionFormData.reqNo ?? undefined,
                             remarks: actionFormData.fdrRemark ?? undefined,
+                            prefilledSignedFdr: (actionFormData as any).prefilledSignedFdr ?? undefined,
+                            uploadDocuments: (actionFormData as any).uploadDocuments ?? undefined,
+                            bankMailIds: (actionFormData as any).bankMailIds?.length
+                                ? (actionFormData as any).bankMailIds.map((email: string) => ({ email }))
+                                : undefined,
+                            bankMailIdsCc: (actionFormData as any).bankMailIdsCc?.length
+                                ? (actionFormData as any).bankMailIdsCc.map((email: string) => ({ email }))
+                                : undefined,
                             courierOrg: actionFormData.courierDetails?.toOrg ?? actionFormData.courierAddressJson?.org ?? undefined,
                             courierName: actionFormData.courierAddressJson?.name ?? undefined,
                             courierPhone: actionFormData.courierAddressJson?.phone ?? undefined,

@@ -482,27 +482,7 @@ export class FdrService {
                 updateData.status = FDR_STATUSES.ACCOUNTS_FORM_REJECTED;
                 updateData.rejectionReason = body.reason_req || null;
             }
-            if (body.fdr_format_imran && typeof body.fdr_format_imran === "string") {
-                updateData.legacyData = {
-                    ...(instrument.legacyData || {}),
-                    fdr_format_imran: body.fdr_format_imran,
-                };
-            }
-            // Store prefilled_signed_fdr files (can be array of paths or files)
-            if (body.prefilled_signed_fdr) {
-                try {
-                    const prefilledFiles = typeof body.prefilled_signed_fdr === "string" ? JSON.parse(body.prefilled_signed_fdr) : body.prefilled_signed_fdr;
-                    if (Array.isArray(prefilledFiles) && prefilledFiles.length > 0) {
-                        updateData.legacyData = {
-                            ...(instrument.legacyData || {}),
-                            ...(updateData.legacyData || {}),
-                            prefilled_signed_fdr: JSON.stringify(prefilledFiles),
-                        };
-                    }
-                } catch (e) {
-                    this.logger.warn("Failed to parse prefilled_signed_fdr", e);
-                }
-            }
+            // Upload Documents is stored on instrument_fdr_details below
         } else if (body.action === "initiate-followup") {
             updateData.status = FDR_STATUSES.FOLLOWUP_INITIATED;
         } else if (body.action === "returned-courier") {
@@ -555,6 +535,50 @@ export class FdrService {
             if (body.fdr_percentage) fdrDetailsUpdate.marginPercent = body.fdr_percentage;
             if (body.fdr_amount) fdrDetailsUpdate.fdrAmt = body.fdr_amount;
             if (body.fdr_roi) fdrDetailsUpdate.roi = body.fdr_roi;
+            if (body.upload_documents !== undefined) {
+                const raw = Array.isArray(body.upload_documents)
+                    ? body.upload_documents[0]
+                    : body.upload_documents;
+                fdrDetailsUpdate.uploadDocuments = raw ? String(raw) : null;
+            }
+            if (body.prefilled_signed_fdr !== undefined) {
+                try {
+                    const prefilledFiles = typeof body.prefilled_signed_fdr === "string"
+                        ? JSON.parse(body.prefilled_signed_fdr)
+                        : body.prefilled_signed_fdr;
+                    fdrDetailsUpdate.prefilledSignedFdr = Array.isArray(prefilledFiles)
+                        ? JSON.stringify(prefilledFiles)
+                        : null;
+                } catch (e) {
+                    this.logger.warn("Failed to parse prefilled_signed_fdr", e);
+                }
+            }
+            const parseMailIds = (value: unknown): string[] | null => {
+                try {
+                    const parsed = typeof value === "string" ? JSON.parse(value) : value;
+                    if (!Array.isArray(parsed)) return null;
+                    return parsed
+                        .map((entry) => {
+                            if (typeof entry === "string") return entry.trim();
+                            if (entry && typeof entry === "object" && "email" in entry) {
+                                return String((entry as { email?: unknown }).email ?? "").trim();
+                            }
+                            return "";
+                        })
+                        .filter(Boolean);
+                } catch (e) {
+                    this.logger.warn("Failed to parse bank mail ids", e);
+                    return null;
+                }
+            };
+            if (body.bank_mail_ids !== undefined) {
+                const ids = parseMailIds(body.bank_mail_ids);
+                if (ids !== null) fdrDetailsUpdate.bankMailIds = ids;
+            }
+            if (body.bank_mail_ids_cc !== undefined) {
+                const idsCc = parseMailIds(body.bank_mail_ids_cc);
+                if (idsCc !== null) fdrDetailsUpdate.bankMailIdsCc = idsCc;
+            }
             // Store charges in legacyData (schema doesn't have charge fields)
             if (body.fdr_charges || body.sfms_charges || body.stamp_charges || body.other_charges) {
                 updateData.legacyData = {
@@ -873,6 +897,11 @@ export class FdrService {
                 fdrExpiryDate: instrumentFdrDetails.fdrExpiryDate,
                 fdrNeeds: instrumentFdrDetails.fdrNeeds,
                 fdrRemark: instrumentFdrDetails.fdrRemark,
+                prefilledSignedFdr: instrumentFdrDetails.prefilledSignedFdr,
+                uploadDocuments: instrumentFdrDetails.uploadDocuments,
+                bankMailIds: instrumentFdrDetails.bankMailIds,
+                bankMailIdsCc: instrumentFdrDetails.bankMailIdsCc,
+                legacyData: paymentInstruments.legacyData,
                 reqNo: paymentInstruments.reqNo,
                 tenderStatusName: statuses.name,
             })
@@ -971,6 +1000,18 @@ export class FdrService {
             }
         }
 
+        const legacyData = (result.legacyData as Record<string, any> | null) ?? {};
+        let prefilledSignedFdr: string[] = [];
+        const rawPrefilled = result.prefilledSignedFdr ?? legacyData.prefilled_signed_fdr;
+        if (rawPrefilled) {
+            try {
+                const parsed = typeof rawPrefilled === 'string' ? JSON.parse(rawPrefilled) : rawPrefilled;
+                if (Array.isArray(parsed)) prefilledSignedFdr = parsed.filter((entry): entry is string => typeof entry === 'string');
+            } catch {
+                prefilledSignedFdr = [];
+            }
+        }
+
         return {
             id: result.id,
             action: result.action,
@@ -992,6 +1033,10 @@ export class FdrService {
             fdrExpiryDate: result.fdrExpiryDate ? new Date(result.fdrExpiryDate) : null,
             fdrNeeds: result.fdrNeeds,
             fdrRemark: result.fdrRemark,
+            prefilledSignedFdr,
+            uploadDocuments: result.uploadDocuments,
+            bankMailIds: (result.bankMailIds as string[] | null) ?? [],
+            bankMailIdsCc: (result.bankMailIdsCc as string[] | null) ?? [],
             reqNo: result.reqNo,
             courierDetails,
             courierAddress: result.courierAddress,
