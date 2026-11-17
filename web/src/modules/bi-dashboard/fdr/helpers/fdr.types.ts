@@ -19,6 +19,7 @@ export interface FdrDashboardRow {
     beneficiaryName: string | null;
     fdrAmount: number | null;
     tenderName: string | null;
+    projectLabel: string | null;
     tenderNo: string | null;
     tenderStatus: string | null;
     member: string | null;
@@ -135,6 +136,13 @@ export interface AccountsFormHistory {
     fdrDate?: string;
     reqNo?: string;
     remarks?: string;
+    prefilledSignedFdr?: string[];
+    uploadDocuments?: string;
+    fdrValidity?: string;
+    fdrRoi?: number;
+    fdrCopy?: string[];
+    bankMailIds?: Array<{ email?: string }>;
+    bankMailIdsCc?: Array<{ email?: string }>;
     courierOrg?: string;
     courierName?: string;
     courierPhone?: string;
@@ -192,6 +200,7 @@ export interface FDRFormHistory {
 
 export const ALL_FDR_ACTION_OPTIONS = [
     { value: 'accounts-form', label: 'Accounts Form' },
+    { value: 'accounts-form-2', label: 'Accounts Form 2 - After FDR Creation' },
     { value: 'initiate-followup', label: 'Initiate Followup' },
     { value: 'returned-courier', label: 'Returned via Courier' },
     { value: 'returned-bank-transfer', label: 'Returned via Bank Transfer' },

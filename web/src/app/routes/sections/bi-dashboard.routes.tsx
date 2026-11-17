@@ -4,6 +4,7 @@ import { RouteWrapper } from '../components/RouteWrapper';
 
 const BI_DemandDraft = lazy(() => import('@/modules/bi-dashboard/demand-draft/DemandDraftListPage'));
 const BI_FDR = lazy(() => import('@/modules/bi-dashboard/fdr/FdrListPage'));
+const BI_FDRCreate = lazy(() => import('@/modules/bi-dashboard/fdr/FdrCreatePage'));
 const BI_Cheque = lazy(() => import('@/modules/bi-dashboard/cheque/ChequeListPage'));
 const BI_BankGuarantee = lazy(() => import('@/modules/bi-dashboard/bank-guarantee/BankGuaranteeListPage'));
 const BI_BankGuaranteeCreate = lazy(() => import('@/modules/bi-dashboard/bank-guarantee/BankGuaranteeCreatePage'));
@@ -38,6 +39,7 @@ export default function BIDashboardRoutes() {
         <Routes>
             <Route path="demand-draft" element={<RouteWrapper><BI_DemandDraft /></RouteWrapper>} />
             <Route path="fdr" element={<RouteWrapper><BI_FDR /></RouteWrapper>} />
+            <Route path="fdr/create" element={<RouteWrapper><BI_FDRCreate /></RouteWrapper>} />
             <Route path="cheque" element={<RouteWrapper><BI_Cheque /></RouteWrapper>} />
             <Route path="bank-guarantee" element={<RouteWrapper><BI_BankGuarantee /></RouteWrapper>} />
             <Route path="bank-guarantee/create" element={<RouteWrapper><BI_BankGuaranteeCreate /></RouteWrapper>} />

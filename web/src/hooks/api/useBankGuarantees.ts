@@ -113,6 +113,25 @@ export const useBGFollowupData = (id: number) => {
     });
 };
 
+export const useBGMailPreview = (
+    id: number,
+    stage: number,
+    files: Record<string, string[]>,
+) => {
+    return useQuery({
+        queryKey: [...bankGuaranteesKey.all, 'mail-preview', id, stage, files] as const,
+        queryFn: async () => {
+            const result = await bankGuaranteesService.getMailPreview(id, { stage, files });
+            return result as {
+                stage: number;
+                attachments: Array<{ label: string; path: string }>;
+                missing: string[];
+            };
+        },
+        enabled: !!id && [1, 2, 3].includes(stage),
+    });
+};
+
 export const useUpdateBankGuarantee = () => {
     const queryClient = useQueryClient();
 

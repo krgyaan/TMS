@@ -15,7 +15,7 @@ import { and, desc, eq, like } from 'drizzle-orm';
 import type { CreateMomRemarkDto } from '../dto/payment-mom.dto';
 import type { CreatePaymentRequestDto, PaymentPurpose, UpdatePaymentRequestDto, UpdateStatusDto } from '../dto/payment-requests.dto';
 import { PaymentRequestsNotificationService } from './payment-requests-notification.service';
-import { extractAmountFromDetails, extractPurposeFromDetails, extractProjectBgPurpose } from './payment-requests.shared';
+import { extractAmountFromDetails, extractPurposeFromDetails, extractProjectBgPurpose, extractProjectFdrPurpose } from './payment-requests.shared';
 
 @Injectable()
 export class PaymentRequestsCommandService {
@@ -93,7 +93,9 @@ export class PaymentRequestsCommandService {
                 if (emdAmount > 0 || isBlankNonTmsCheque) {
                     const emdPurpose = (payload.projectId || payload.preserveBgPurpose) && payload.EMD.mode === 'BG'
                         ? extractProjectBgPurpose(payload.EMD.details)
-                        : extractPurposeFromDetails(payload.EMD.mode, payload.EMD.details, 'EMD');
+                        : (payload.projectId || payload.preserveFdrPurpose) && payload.EMD.mode === 'FDR'
+                            ? extractProjectFdrPurpose(payload.EMD.details)
+                            : extractPurposeFromDetails(payload.EMD.mode, payload.EMD.details, 'EMD');
                     const request = await this.createPaymentRequest(
                         tx,
                         tenderId,

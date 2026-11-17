@@ -8,6 +8,7 @@
 
     <p>
         Please prepare the BG using the details below:<br>
+        {{#if data.referenceValue}}{{data.referenceLabel}}: {{data.referenceValue}}<br>{{/if}}
         BG in favor of: {{data.beneficiaryName}}<br>
         BG Expiry Date: {{data.bgExpiryDate}}<br>
         BG Claim Date: {{data.claimDate}}<br>
@@ -15,7 +16,7 @@
         {{#if data.stampPaperValue}}BG Stamp paper value: Rs. {{data.stampPaperValue}}<br>{{/if}}
         {{#if data.fdrMargin}}FDR %age for Margin: {{data.fdrMargin}}<br>{{/if}}
         {{#if data.hasBgFormat}}BG Formats: attached.<br>{{/if}}
-        {{#if data.hasSupportingDoc}}PO copy/Tender/request letter from beneficiary: attached with the mail.<br>{{/if}}
+        {{#if data.hasSupportingDoc}}{{data.supportingDocName}}: attached with the mail.<br>{{/if}}
         {{#if data.hasCeoRequestLetter}}Request Letter, Signed by CEO: attached with the mail.{{/if}}
     </p>
 
@@ -58,11 +59,4 @@
         CEO,<br>
         Volks Energie Pvt. Ltd.
     </p>
-
-    {{#if data.attachmentNames.length}}
-    <p>
-        Attachment:<br>
-        {{#each data.attachmentNames}}{{this}}{{#unless @last}}<br>{{/unless}}{{/each}}
-    </p>
-    {{/if}}
 </div>
