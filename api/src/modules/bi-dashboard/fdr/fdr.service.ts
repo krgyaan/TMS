@@ -90,7 +90,7 @@ export class FdrService {
             );
         } else if (tab === "security-deposit") {
             needsFdrDetails = true;
-            conditions.push(inArray(paymentInstruments.action, [1, 2]), eq(instrumentFdrDetails.fdrPurpose, "deposit"));
+            conditions.push(inArray(paymentInstruments.action, [1, 2]), inArray(instrumentFdrDetails.fdrPurpose, ["deposit", "SECURITY_DEPOSIT"]));
         } else if (tab === "bond-linked") {
             conditions.push(eq(paymentInstruments.action, 8));
         }
@@ -354,7 +354,7 @@ export class FdrService {
 
         const securityDepositFilter = and(
             inArray(paymentInstruments.action, [1, 2]),
-            eq(instrumentFdrDetails.fdrPurpose, "deposit"),
+            inArray(instrumentFdrDetails.fdrPurpose, ["deposit", "SECURITY_DEPOSIT"]),
         );
 
         const bondLinkedFilter = eq(paymentInstruments.action, 8);
