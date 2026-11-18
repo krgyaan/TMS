@@ -33,10 +33,11 @@ import {
 type FormValues = BankGuaranteeOldEntryFormValues;
 
 const OLD_BG_PURPOSE_OPTIONS = [
+    { value: 'EMD', label: 'EMD' },
     { value: 'ADVANCE_PAYMENT', label: 'Advance Payment' },
     { value: 'SECURITY_BOND_DEPOSIT', label: 'Security Bond/Deposit' },
+    { value: 'BID_BOND', label: 'Bid Bond' },
     { value: 'PERFORMANCE_BG', label: 'Performance BG' },
-    { value: 'SECURITY_DEPOSIT', label: 'Security Deposit' },
     { value: 'FINANCIAL', label: 'Financial' },
     { value: 'COUNTER_GUARANTEE', label: 'Counter Guarantee' },
 ];
