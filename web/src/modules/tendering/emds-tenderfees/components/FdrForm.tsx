@@ -12,9 +12,15 @@ interface PaymentFormBaseProps {
     amount?: number;
     prefix?: string;
     readOnly?: boolean;
+    purposeOptions?: Array<{ value: string; label: string }>;
 }
 
-export function FdrForm({ amount, prefix = 'emd.details', readOnly = false }: PaymentFormBaseProps) {
+export function FdrForm({
+    amount,
+    prefix = 'emd.details',
+    readOnly = false,
+    purposeOptions = PURPOSE_OPTIONS,
+}: PaymentFormBaseProps) {
     const { control } = useFormContext();
     const { data: employees = [] } = useUsers();
 
@@ -24,7 +30,7 @@ export function FdrForm({ amount, prefix = 'emd.details', readOnly = false }: Pa
                 control={control}
                 name={`${prefix}.fdrPurpose`}
                 label="Purpose *"
-                options={PURPOSE_OPTIONS}
+                options={purposeOptions}
                 placeholder="Select Purpose"
                 disabled={readOnly}
             />

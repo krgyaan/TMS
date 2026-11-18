@@ -181,6 +181,8 @@ export const paths = {
             `/operations/project-dashboard/${projectId}/insurance/create?policyId=${policyId}`,
         biRequestBgCreate: (projectId: number) =>
             `/operations/project-dashboard/${projectId}/bi-request/bank-guarantee/create`,
+        biRequestFdrCreate: (projectId: number) =>
+            `/operations/project-dashboard/${projectId}/bi-request/fdr/create`,
         biRequestView: (projectId: number, requestId: number) =>
             `/operations/project-dashboard/${projectId}/bi-request/${requestId}`,
         paymentRequests: "/operations/payment-requests",
@@ -226,6 +228,7 @@ export const paths = {
         demandDraftAction: (id: number) => `/bi-dashboard/demand-draft/action/${id}`,
         DDMeetingRemarks: (id: number) => `/bi-dashboard/demand-draft/meeting-remarks/${id}`,
         fdr: "/bi-dashboard/fdr",
+        fdrCreate: () => `/bi-dashboard/fdr/create`,
         fdrView: (requestId: number) => `/bi-dashboard/fdr/details/${requestId}`,
         fdrAction: (id: number) => `/bi-dashboard/fdr/action/${id}`,
         FdrMeetingRemarksPage: (id: number) => `/bi-dashboard/fdr/meeting-remarks/${id}`,
