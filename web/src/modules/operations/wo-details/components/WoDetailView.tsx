@@ -1,5 +1,4 @@
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
@@ -131,7 +130,7 @@ function PageStatusBadge({
     return <Badge variant="secondary">Pending</Badge>;
 }
 
-function SectionCard({
+function DetailSection({
     title,
     icon,
     status,
@@ -145,21 +144,21 @@ function SectionCard({
     children: ReactNode;
 }) {
     return (
-        <Card>
-            <CardHeader>
-                <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 space-y-1">
-                        <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                            {icon}
-                            {title}
-                        </CardTitle>
-                        {description && <CardDescription>{description}</CardDescription>}
-                    </div>
-                    {status && <div className="shrink-0">{status}</div>}
+        <section className="space-y-4 py-6 first:pt-0 last:pb-0">
+            <header className="flex items-start justify-between gap-3">
+                <div className="min-w-0 space-y-1">
+                    <h3 className="flex items-center gap-2 text-base font-semibold">
+                        {icon}
+                        {title}
+                    </h3>
+                    {description && (
+                        <p className="text-sm text-muted-foreground">{description}</p>
+                    )}
                 </div>
-            </CardHeader>
-            <CardContent className="space-y-4">{children}</CardContent>
-        </Card>
+                {status && <div className="shrink-0">{status}</div>}
+            </header>
+            <div className="space-y-4">{children}</div>
+        </section>
     );
 }
 
@@ -347,8 +346,8 @@ export function WoDetailView({
     const checklist = data.tenderDocumentsChecklist;
 
     return (
-        <div className="space-y-4">
-            <SectionCard
+        <div className="divide-y divide-border/60">
+            <DetailSection
                 title="Project Information"
                 icon={<Building2 className="h-4 w-4 text-primary" />}
             >
@@ -365,9 +364,9 @@ export function WoDetailView({
                     <InfoItem label="Created" value={formatDateTime(data.createdAt)} />
                     <InfoItem label="Last Updated" value={formatDateTime(data.updatedAt)} />
                 </InfoGrid>
-            </SectionCard>
+            </DetailSection>
 
-            <SectionCard
+            <DetailSection
                 title="Project Handover (Page 1)"
                 icon={<FileText className="h-4 w-4 text-muted-foreground" />}
                 status={<PageStatusBadge data={data} history={history} pageNum={1} />}
@@ -384,9 +383,9 @@ export function WoDetailView({
                         Checklist not yet filled.
                     </p>
                 )}
-            </SectionCard>
+            </DetailSection>
 
-            <SectionCard
+            <DetailSection
                 title="Compliance Obligations (Page 2)"
                 icon={<FileText className="h-4 w-4 text-muted-foreground" />}
                 status={<PageStatusBadge data={data} history={history} pageNum={2} />}
@@ -424,9 +423,9 @@ export function WoDetailView({
                         }
                     />
                 </InfoGrid>
-            </SectionCard>
+            </DetailSection>
 
-            <SectionCard
+            <DetailSection
                 title="SWOT Analysis (Page 3)"
                 icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
                 status={<PageStatusBadge data={data} history={history} pageNum={3} />}
@@ -449,9 +448,9 @@ export function WoDetailView({
                         value={<p className="whitespace-pre-wrap">{data.swotThreats || '—'}</p>}
                     />
                 </div>
-            </SectionCard>
+            </DetailSection>
 
-            <SectionCard
+            <DetailSection
                 title="Billing (Page 4)"
                 icon={<Package className="h-4 w-4 text-muted-foreground" />}
                 status={<PageStatusBadge data={data} history={history} pageNum={4} />}
@@ -480,9 +479,9 @@ export function WoDetailView({
                         emptyLabel="No shipping addresses"
                     />
                 </div>
-            </SectionCard>
+            </DetailSection>
 
-            <SectionCard
+            <DetailSection
                 title="Project Execution & Site Visit (Page 5)"
                 icon={<Truck className="h-4 w-4 text-muted-foreground" />}
                 status={<PageStatusBadge data={data} history={history} pageNum={5} />}
@@ -520,9 +519,9 @@ export function WoDetailView({
                         className="sm:col-span-2"
                     />
                 </InfoGrid>
-            </SectionCard>
+            </DetailSection>
 
-            <SectionCard
+            <DetailSection
                 title="Tendering Costing (Page 6)"
                 icon={<Link2 className="h-4 w-4 text-muted-foreground" />}
                 status={<PageStatusBadge data={data} history={history} pageNum={6} />}
@@ -568,9 +567,9 @@ export function WoDetailView({
                         />
                     )}
                 </InfoGrid>
-            </SectionCard>
+            </DetailSection>
 
-            <SectionCard
+            <DetailSection
                 title="OE Submission Info (Page 7)"
                 icon={<FileEdit className="h-4 w-4 text-muted-foreground" />}
                 status={<PageStatusBadge data={data} history={history} pageNum={7} />}
@@ -638,10 +637,10 @@ export function WoDetailView({
                         </Table>
                     </div>
                 )}
-            </SectionCard>
+            </DetailSection>
 
             {acceptance && (
-                <SectionCard
+                <DetailSection
                     title="TL Acceptance & Review"
                     icon={<CheckCircle2 className="h-4 w-4 text-primary" />}
                 >
@@ -734,7 +733,7 @@ export function WoDetailView({
                             }
                         />
                     </InfoGrid>
-                </SectionCard>
+                </DetailSection>
             )}
         </div>
     );

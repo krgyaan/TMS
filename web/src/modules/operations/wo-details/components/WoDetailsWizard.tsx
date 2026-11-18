@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
 import { lazy, Suspense, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -25,15 +24,11 @@ const Page8Review = lazy(() => import("./pages/Page8Review").then((m) => ({ defa
 
 function PageSkeleton() {
     return (
-        <Card>
-            <CardContent className="p-12">
-                <div className="space-y-4 animate-pulse">
-                    <div className="h-8 bg-muted rounded w-1/3" />
-                    <div className="h-32 bg-muted rounded" />
-                    <div className="h-32 bg-muted rounded" />
-                </div>
-            </CardContent>
-        </Card>
+        <div className="space-y-4 animate-pulse">
+            <div className="h-8 bg-muted rounded w-1/3" />
+            <div className="h-32 bg-muted rounded" />
+            <div className="h-32 bg-muted rounded" />
+        </div>
     );
 }
 
@@ -241,33 +236,29 @@ export function WoDetailsWizard({
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold">
-                        {mode === "create" ? "Create" : "Edit"} WO Details
-                    </h1>
-                    <p className="text-muted-foreground">
-                        Complete all pages to submit for TL review
-                    </p>
+            <div className="space-y-4 border-b pb-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-1">
+                        <h1 className="text-2xl font-bold">
+                            {mode === "create" ? "Create" : "Edit"} WO Details
+                        </h1>
+                        <p className="text-muted-foreground">
+                            Complete all pages to submit for TL review
+                        </p>
+                    </div>
+                    <Button variant="outline" onClick={() => navigate(-1)}>
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Back to List
+                    </Button>
                 </div>
-                <Button variant="outline" onClick={() => navigate(-1)}>
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Back to List
-                </Button>
+                <WizardStepper
+                    currentPage={wizardState.currentPage}
+                    completedPages={[]}
+                    skippedPages={[]}
+                    onPageClick={handlePageClick}
+                    totalPages={WIZARD_CONFIG.TOTAL_PAGES}
+                />
             </div>
-
-            <Card className="px-0 bg-transparent border-none">
-                <CardContent>
-                    <WizardStepper
-                        currentPage={wizardState.currentPage}
-                        completedPages={[]}
-                        skippedPages={[]}
-                        onPageClick={handlePageClick}
-                        totalPages={WIZARD_CONFIG.TOTAL_PAGES}
-                    />
-                </CardContent>
-            </Card>
-
             <Suspense fallback={<PageSkeleton />}>
                 {renderCurrentPage()}
             </Suspense>
