@@ -1826,6 +1826,240 @@ private readBodyFileValue(body: unknown, field: string): unknown {
         return result;
     }
 
+    async getOldBgForEdit(requestId: number) {
+        const [request] = await this.db
+            .select()
+            .from(paymentRequests)
+            .where(eq(paymentRequests.id, requestId))
+            .limit(1);
+
+        if (!request) {
+            throw new NotFoundException(`Payment request ${requestId} not found`);
+        }
+        if (request.type !== 'Old Entries') {
+            throw new BadRequestException('Only old BG entries can be edited here');
+        }
+
+        const [instrument] = await this.db
+            .select()
+            .from(paymentInstruments)
+            .where(and(eq(paymentInstruments.requestId, requestId), eq(paymentInstruments.isActive, true)))
+            .limit(1);
+
+        if (!instrument) {
+            throw new NotFoundException(`No instrument found for payment request ${requestId}`);
+        }
+
+        const [bg] = await this.db
+            .select()
+            .from(instrumentBgDetails)
+            .where(eq(instrumentBgDetails.instrumentId, instrument.id))
+            .limit(1);
+
+        const toArray = (value: string | null) => (value ? [value] : []);
+        const toNumber = (value: any) =>
+            value === null || value === undefined || value === '' ? null : Number(value);
+
+        return {
+            id: request.id,
+            type: request.type,
+            instrumentId: instrument.id,
+            tenderId: request.tenderId ?? 0,
+            projectId: request.projectId ?? null,
+            tenderNo: request.tenderNo ?? '',
+            projectName: request.projectName ?? '',
+            purpose: bg?.bgPurpose ?? instrument.purpose ?? '',
+            bgFavour: bg?.beneficiaryName ?? instrument.favouring ?? '',
+            bgAddress: bg?.beneficiaryAddress ?? instrument.payableAt ?? '',
+            bgExpiryDate: bg?.bgExpiryDate ?? instrument.expiryDate ?? '',
+            bgClaimPeriod: bg?.bgClaim ?? instrument.claimExpiryDate ?? '',
+            amount: instrument.amount ? Number(instrument.amount) : null,
+            stampValue: toNumber(bg?.stampCharges),
+            bgPoFiles: toArray(bg?.bgPo ?? null),
+            clientUserEmail: bg?.bgClientUser ?? '',
+            clientCpEmail: bg?.bgClientCp ?? '',
+            clientFinanceEmail: bg?.bgClientFin ?? '',
+            accountName: bg?.bgBankAccName ?? '',
+            accountNo: bg?.bgBankAcc ?? '',
+            ifsc: bg?.bgBankIfsc ?? '',
+            bankName: bg?.bankName ?? '',
+            bgNo: bg?.bgNo ?? '',
+            bgDate: bg?.bgDate ?? instrument.issueDate ?? '',
+            remarks: request.remarks ?? bg?.bg2Remark ?? '',
+            fdrPer: toNumber(bg?.fdrPer),
+            fdrAmt: toNumber(bg?.fdrAmt),
+            fdrNo: bg?.fdrNo ?? '',
+            fdrValidity: bg?.fdrValidity ?? '',
+            fdrRoi: toNumber(bg?.fdrRoi),
+            bgChargeDeducted: toNumber(bg?.bgChargeDeducted),
+            sfmsChargeDeducted: toNumber(bg?.sfmsChargesDeducted),
+            stampChargeDeducted: toNumber(bg?.stampChargesDeducted),
+            otherChargeDeducted: toNumber(bg?.otherChargesDeducted),
+            courierId: instrument.reqNo ?? '',
+            bgUpload: toArray(bg?.bgUpload ?? null),
+            sfmsConf: toArray(bg?.sfmsConf ?? null),
+            fdrCopy: toArray(bg?.fdrCopy ?? null),
+        };
+    }
+
+    async updateOldBg(requestId: number, payload: Record<string, any>) {
+        const purposeCode = String(payload?.purpose || '').trim();
+        const bgNo = String(payload?.bgNo || '').trim();
+        const bankName = String(payload?.bankName || '').trim();
+        const amount = Number(payload?.amount);
+
+        if (!purposeCode) {
+            throw new BadRequestException('Purpose is required');
+        }
+        if (!bgNo) {
+            throw new BadRequestException('BG No. is required');
+        }
+        if (!bankName) {
+            throw new BadRequestException('Bank is required');
+        }
+        if (!Number.isFinite(amount) || amount <= 0) {
+            throw new BadRequestException('BG Amount must be greater than 0');
+        }
+
+        const toDate = (value: any): string | null => {
+            const text = typeof value === 'string' ? value.trim() : '';
+            return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null;
+        };
+
+        const toNumber = (value: any): number | null => {
+            if (value === '' || value === null || value === undefined) return null;
+            const parsed = Number(value);
+            return Number.isFinite(parsed) ? parsed : null;
+        };
+
+        const toDecimal = (value: any): string | null => {
+            const parsed = toNumber(value);
+            return parsed === null ? null : parsed.toString();
+        };
+
+        const toFirstPath = (value: any): string | null => {
+            if (Array.isArray(value)) {
+                const first = value.find((item) => typeof item === 'string' && item.trim().length > 0);
+                return first ? first.trim() : null;
+            }
+            if (typeof value === 'string' && value.trim().length > 0) {
+                return value.trim();
+            }
+            return null;
+        };
+
+        const toText = (value: any): string | null => {
+            const text = typeof value === 'string' ? value.trim() : '';
+            return text.length > 0 ? text : null;
+        };
+
+        const [request] = await this.db
+            .select()
+            .from(paymentRequests)
+            .where(eq(paymentRequests.id, requestId))
+            .limit(1);
+
+        if (!request) {
+            throw new NotFoundException(`Payment request ${requestId} not found`);
+        }
+        if (request.type !== 'Old Entries') {
+            throw new BadRequestException('Only old BG entries can be edited here');
+        }
+
+        const [instrument] = await this.db
+            .select()
+            .from(paymentInstruments)
+            .where(and(eq(paymentInstruments.requestId, requestId), eq(paymentInstruments.isActive, true)))
+            .limit(1);
+
+        if (!instrument) {
+            throw new NotFoundException(`No instrument found for payment request ${requestId}`);
+        }
+
+        const tenderId = Number(payload?.tenderId) > 0 ? Number(payload.tenderId) : 0;
+        const projectId = tenderId === 0 && Number(payload?.projectId) > 0 ? Number(payload.projectId) : null;
+        const tenderNo = toText(payload?.tenderNo) ?? 'NA';
+        const projectName = toText(payload?.projectName) ?? 'Accounts/Admin';
+        const purpose = extractProjectBgPurpose({ bgPurpose: purposeCode });
+        const remarks = toText(payload?.remarks);
+        const courierId = Number(payload?.courierId) > 0 ? Number(payload.courierId) : null;
+        const bgExpiryDate = toDate(payload?.bgExpiryDate);
+        const bgClaimDate = toDate(payload?.bgClaimPeriod);
+        const bgDate = toDate(payload?.bgDate);
+
+        await this.db.transaction(async (tx) => {
+            await tx
+                .update(paymentRequests)
+                .set({
+                    tenderId,
+                    projectId,
+                    tenderNo,
+                    projectName,
+                    purpose,
+                    amountRequired: amount.toString(),
+                    remarks,
+                    updatedAt: new Date(),
+                })
+                .where(eq(paymentRequests.id, requestId));
+
+            await tx
+                .update(paymentInstruments)
+                .set({
+                    purpose: purposeCode,
+                    amount: amount.toString(),
+                    favouring: toText(payload?.bgFavour),
+                    payableAt: toText(payload?.bgAddress),
+                    issueDate: bgDate,
+                    expiryDate: bgExpiryDate,
+                    claimExpiryDate: bgClaimDate,
+                    reqNo: courierId ? String(courierId) : null,
+                    updatedAt: new Date(),
+                })
+                .where(eq(paymentInstruments.id, instrument.id));
+
+            await tx
+                .update(instrumentBgDetails)
+                .set({
+                    bgNo,
+                    bgDate,
+                    bgExpiryDate,
+                    bgClaim: bgClaimDate,
+                    claimExpiryDate: bgClaimDate,
+                    beneficiaryName: toText(payload?.bgFavour),
+                    beneficiaryAddress: toText(payload?.bgAddress),
+                    bankName,
+                    bgBankAccName: toText(payload?.accountName),
+                    bgBankAcc: toText(payload?.accountNo),
+                    bgBankIfsc: toText(payload?.ifsc),
+                    bgPurpose: purposeCode,
+                    bgClientUser: toText(payload?.clientUserEmail),
+                    bgClientCp: toText(payload?.clientCpEmail),
+                    bgClientFin: toText(payload?.clientFinanceEmail),
+                    stampCharges: toDecimal(payload?.stampValue),
+                    fdrPer: toDecimal(payload?.fdrPer),
+                    fdrAmt: toDecimal(payload?.fdrAmt),
+                    fdrNo: toText(payload?.fdrNo),
+                    fdrValidity: toDate(payload?.fdrValidity),
+                    fdrRoi: toDecimal(payload?.fdrRoi),
+                    bgChargeDeducted: toDecimal(payload?.bgChargeDeducted),
+                    sfmsChargesDeducted: toDecimal(payload?.sfmsChargeDeducted),
+                    stampChargesDeducted: toDecimal(payload?.stampChargeDeducted),
+                    otherChargesDeducted: toDecimal(payload?.otherChargeDeducted),
+                    bgPo: toFirstPath(payload?.bgPoFiles),
+                    bgUpload: toFirstPath(payload?.bgUpload),
+                    sfmsConf: toFirstPath(payload?.sfmsConf),
+                    fdrCopy: toFirstPath(payload?.fdrCopy),
+                    bg2Remark: remarks,
+                    updatedAt: new Date(),
+                })
+                .where(eq(instrumentBgDetails.instrumentId, instrument.id));
+        });
+
+        this.logger.log(`Old BG updated: request ${requestId}, instrument ${instrument.id} (BG No. ${bgNo})`);
+
+        return { requestId, instrumentId: instrument.id };
+    }
+
     async getById(id: number) {
         const [result] = await this.db
             .select({

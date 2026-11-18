@@ -65,6 +65,16 @@ export class BankGuaranteeController {
         return this.bankGuaranteeService.createOldBg(body, req.user);
     }
 
+    @Get('old-bg/:requestId')
+    async getOldBgForEdit(@Param('requestId', ParseIntPipe) requestId: number) {
+        return this.bankGuaranteeService.getOldBgForEdit(requestId);
+    }
+
+    @Put('old-bg/:requestId')
+    async updateOldBg(@Param('requestId', ParseIntPipe) requestId: number, @Body() body: any) {
+        return this.bankGuaranteeService.updateOldBg(requestId, body);
+    }
+
     @Put(':id')
     async update(
         @Param('id', ParseIntPipe) id: number,

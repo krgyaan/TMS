@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, FormProvider, useWatch, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,7 +21,11 @@ import { BANKS } from '@/modules/tendering/emds-tenderfees/constants';
 import { useTenders } from '@/hooks/api/useTenders';
 import { useProjectList } from '@/hooks/api/useProjectDashboard';
 import { useCourierSelectOptions } from '@/hooks/api/useCourier';
-import { useCreateBankGuaranteeOldBg } from '@/hooks/api/useBankGuarantees';
+import {
+    useCreateBankGuaranteeOldBg,
+    useOldBgForEdit,
+    useUpdateBankGuaranteeOldBg,
+} from '@/hooks/api/useBankGuarantees';
 import { paths } from '@/app/routes/paths';
 import { toast } from 'sonner';
 import { ArrowLeft, Check, ChevronDown, Loader2, Save } from 'lucide-react';
@@ -36,7 +40,6 @@ const OLD_BG_PURPOSE_OPTIONS = [
     { value: 'EMD', label: 'EMD' },
     { value: 'ADVANCE_PAYMENT', label: 'Advance Payment' },
     { value: 'SECURITY_BOND_DEPOSIT', label: 'Security Bond/Deposit' },
-    { value: 'BID_BOND', label: 'Bid Bond' },
     { value: 'PERFORMANCE_BG', label: 'Performance BG' },
     { value: 'FINANCIAL', label: 'Financial' },
     { value: 'COUNTER_GUARANTEE', label: 'Counter Guarantee' },
@@ -114,9 +117,33 @@ type ReferenceOption = {
     description: string;
 };
 
-export function BankGuaranteeOldEntryForm() {
+const toDateOnly = (value: unknown): string => {
+    if (!value) return '';
+    const match = /^(\d{4}-\d{2}-\d{2})/.exec(String(value));
+    return match ? match[1] : '';
+};
+
+const toNumberOrUndefined = (value: unknown): number | undefined => {
+    if (value === null || value === undefined || value === '') return undefined;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+export function BankGuaranteeOldEntryForm({
+    mode = 'create',
+    requestId,
+}: {
+    mode?: 'create' | 'edit';
+    requestId?: number;
+}) {
     const navigate = useNavigate();
     const createOldBg = useCreateBankGuaranteeOldBg();
+    const updateOldBg = useUpdateBankGuaranteeOldBg();
+    const isEditMode = mode === 'edit';
+
+    const { data: existing, isLoading: isLoadingExisting, error: existingError } = useOldBgForEdit(
+        isEditMode ? requestId ?? null : null,
+    );
 
     const [referenceName, setReferenceName] = useState('');
     const [referenceNo, setReferenceNo] = useState('');
@@ -209,6 +236,74 @@ export function BankGuaranteeOldEntryForm() {
     const fdrCopy = useWatch({ control: form.control, name: 'fdrCopy' });
     const courierId = useWatch({ control: form.control, name: 'courierId' });
 
+    useEffect(() => {
+        if (!isEditMode || !existing) return;
+
+        const storedName = existing.projectName === 'Accounts/Admin' ? '' : String(existing.projectName ?? '');
+        const storedNo = existing.tenderNo === 'NA' ? '' : String(existing.tenderNo ?? '');
+        const projectId = Number(existing.projectId) > 0 ? Number(existing.projectId) : 0;
+        const tenderId = Number(existing.tenderId) > 0 ? Number(existing.tenderId) : 0;
+
+        form.reset({
+            purpose: existing.purpose ?? '',
+            bgFavour: existing.bgFavour ?? '',
+            bgAddress: existing.bgAddress ?? '',
+            bgExpiryDate: toDateOnly(existing.bgExpiryDate),
+            bgClaimPeriod: toDateOnly(existing.bgClaimPeriod),
+            amount: toNumberOrUndefined(existing.amount) as number,
+            stampValue: toNumberOrUndefined(existing.stampValue),
+            bgPoFiles: existing.bgPoFiles ?? [],
+            clientUserEmail: existing.clientUserEmail ?? '',
+            clientCpEmail: existing.clientCpEmail ?? '',
+            clientFinanceEmail: existing.clientFinanceEmail ?? '',
+            accountName: existing.accountName ?? '',
+            accountNo: existing.accountNo ?? '',
+            ifsc: existing.ifsc ?? '',
+            bankName: existing.bankName ?? '',
+            bgNo: existing.bgNo ?? '',
+            bgDate: toDateOnly(existing.bgDate),
+            remarks: existing.remarks ?? '',
+            fdrPer: toNumberOrUndefined(existing.fdrPer),
+            fdrAmt: toNumberOrUndefined(existing.fdrAmt),
+            fdrNo: existing.fdrNo ?? '',
+            fdrValidity: toDateOnly(existing.fdrValidity),
+            fdrRoi: toNumberOrUndefined(existing.fdrRoi),
+            bgChargeDeducted: toNumberOrUndefined(existing.bgChargeDeducted),
+            sfmsChargeDeducted: toNumberOrUndefined(existing.sfmsChargeDeducted),
+            stampChargeDeducted: toNumberOrUndefined(existing.stampChargeDeducted),
+            otherChargeDeducted: toNumberOrUndefined(existing.otherChargeDeducted),
+            courierId: existing.courierId ? String(existing.courierId) : '',
+            bgUpload: existing.bgUpload ?? [],
+            sfmsConf: existing.sfmsConf ?? [],
+            fdrCopy: existing.fdrCopy ?? [],
+        });
+
+        setReferenceName(storedName);
+        setReferenceNo(storedNo);
+
+        if (projectId) {
+            setLinkedReference({
+                key: `project:${projectId}`,
+                kind: 'project',
+                id: projectId,
+                name: storedName,
+                number: storedNo,
+                description: '',
+            });
+        } else if (tenderId) {
+            setLinkedReference({
+                key: `tender:${tenderId}`,
+                kind: 'tender',
+                id: tenderId,
+                name: storedName,
+                number: storedNo,
+                description: '',
+            });
+        } else {
+            setLinkedReference(null);
+        }
+    }, [isEditMode, existing, form]);
+
     const handleReferencePick = (option: ReferenceOption) => {
         setReferenceName(option.name);
         setReferenceNo(option.number);
@@ -232,43 +327,49 @@ export function BankGuaranteeOldEntryForm() {
                 projectName: referenceName.trim(),
             };
 
-        try {
-            await createOldBg.mutateAsync({
-                ...reference,
-                purpose: values.purpose,
-                bgFavour: values.bgFavour,
-                bgAddress: values.bgAddress,
-                bgExpiryDate: values.bgExpiryDate,
-                bgClaimPeriod: values.bgClaimPeriod,
-                amount: values.amount,
-                stampValue: values.stampValue,
-                bgPoFiles: values.bgPoFiles ?? [],
-                clientUserEmail: values.clientUserEmail,
-                clientCpEmail: values.clientCpEmail,
-                clientFinanceEmail: values.clientFinanceEmail,
-                accountName: values.accountName,
-                accountNo: values.accountNo,
-                ifsc: values.ifsc,
-                bankName: values.bankName,
-                bgNo: values.bgNo,
-                bgDate: values.bgDate,
-                remarks: values.remarks,
-                fdrPer: values.fdrPer,
-                fdrAmt: values.fdrAmt,
-                fdrNo: values.fdrNo,
-                fdrValidity: values.fdrValidity,
-                fdrRoi: values.fdrRoi,
-                bgChargeDeducted: values.bgChargeDeducted,
-                sfmsChargeDeducted: values.sfmsChargeDeducted,
-                stampChargeDeducted: values.stampChargeDeducted,
-                otherChargeDeducted: values.otherChargeDeducted,
-                courierId: values.courierId || undefined,
-                bgUpload: values.bgUpload ?? [],
-                sfmsConf: values.sfmsConf ?? [],
-                fdrCopy: values.fdrCopy ?? [],
-            });
+        const payload = {
+            ...reference,
+            purpose: values.purpose,
+            bgFavour: values.bgFavour,
+            bgAddress: values.bgAddress,
+            bgExpiryDate: values.bgExpiryDate,
+            bgClaimPeriod: values.bgClaimPeriod,
+            amount: values.amount,
+            stampValue: values.stampValue,
+            bgPoFiles: values.bgPoFiles ?? [],
+            clientUserEmail: values.clientUserEmail,
+            clientCpEmail: values.clientCpEmail,
+            clientFinanceEmail: values.clientFinanceEmail,
+            accountName: values.accountName,
+            accountNo: values.accountNo,
+            ifsc: values.ifsc,
+            bankName: values.bankName,
+            bgNo: values.bgNo,
+            bgDate: values.bgDate,
+            remarks: values.remarks,
+            fdrPer: values.fdrPer,
+            fdrAmt: values.fdrAmt,
+            fdrNo: values.fdrNo,
+            fdrValidity: values.fdrValidity,
+            fdrRoi: values.fdrRoi,
+            bgChargeDeducted: values.bgChargeDeducted,
+            sfmsChargeDeducted: values.sfmsChargeDeducted,
+            stampChargeDeducted: values.stampChargeDeducted,
+            otherChargeDeducted: values.otherChargeDeducted,
+            courierId: values.courierId || undefined,
+            bgUpload: values.bgUpload ?? [],
+            sfmsConf: values.sfmsConf ?? [],
+            fdrCopy: values.fdrCopy ?? [],
+        };
 
-            toast.success('Old Bank Guarantee saved successfully');
+        try {
+            if (isEditMode && requestId) {
+                await updateOldBg.mutateAsync({ requestId, payload });
+                toast.success('Old Bank Guarantee updated successfully');
+            } else {
+                await createOldBg.mutateAsync(payload);
+                toast.success('Old Bank Guarantee saved successfully');
+            }
             navigate(paths.bi.bankGuarantee);
         } catch (error) {
             console.error(error);
@@ -276,13 +377,42 @@ export function BankGuaranteeOldEntryForm() {
         }
     };
 
+    const isPending = isEditMode ? updateOldBg.isPending : createOldBg.isPending;
+
+    if (isEditMode && isLoadingExisting) {
+        return (
+            <Card>
+                <CardContent className="flex min-h-[320px] flex-col items-center justify-center gap-4">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <p className="text-muted-foreground">Loading old Bank Guarantee...</p>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (isEditMode && existingError) {
+        return (
+            <Card>
+                <CardContent className="py-8 text-center text-destructive">
+                    {existingError instanceof Error
+                        ? existingError.message
+                        : 'Failed to load the old Bank Guarantee'}
+                </CardContent>
+            </Card>
+        );
+    }
+
     return (
         <Card>
             <CardHeader>
-                <CardTitle className="text-2xl">Add Old Bank Guarantee</CardTitle>
+                <CardTitle className="text-2xl">
+                    {isEditMode ? 'Edit Old Bank Guarantee' : 'Add Old Bank Guarantee'}
+                </CardTitle>
                 <CardDescription>
                     <p className="text-muted-foreground">
-                        Record an already-issued Bank Guarantee so it is tracked as a live BG.
+                        {isEditMode
+                            ? 'Update the details recorded for this already-issued Bank Guarantee.'
+                            : 'Record an already-issued Bank Guarantee so it is tracked as a live BG.'}
                     </p>
                 </CardDescription>
                 <CardAction>
@@ -516,12 +646,12 @@ export function BankGuaranteeOldEntryForm() {
                                 variant="outline"
                                 size="lg"
                                 onClick={() => navigate(-1)}
-                                disabled={createOldBg.isPending}
+                                disabled={isPending}
                             >
                                 Cancel
                             </Button>
-                            <Button type="submit" size="lg" disabled={createOldBg.isPending} className="min-w-48">
-                                {createOldBg.isPending ? (
+                            <Button type="submit" size="lg" disabled={isPending} className="min-w-48">
+                                {isPending ? (
                                     <>
                                         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                                         Saving...
@@ -529,7 +659,7 @@ export function BankGuaranteeOldEntryForm() {
                                 ) : (
                                     <>
                                         <Save className="mr-2 h-5 w-5" />
-                                        Save Old BG
+                                        {isEditMode ? 'Update Old BG' : 'Save Old BG'}
                                     </>
                                 )}
                             </Button>
