@@ -234,27 +234,50 @@ function BoqTable({
                     <TableHead>Item Description</TableHead>
                     <TableHead className="text-right">Quantity</TableHead>
                     <TableHead className="text-right">Rate</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead className="text-right">Basic Amount</TableHead>
+                    <TableHead className="text-right">GST %</TableHead>
+                    <TableHead className="text-right">GST Amount</TableHead>
+                    <TableHead className="text-right">Total Amount</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {items.map((item) => (
-                    <TableRow key={item.id}>
-                        <TableCell>{item.srNo}</TableCell>
-                        <TableCell>{item.itemDescription}</TableCell>
-                        <TableCell className="text-right">{item.quantity}</TableCell>
-                        <TableCell className="text-right">
-                            {formatINR(parseFloat(item.rate))}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                            {formatINR(parseFloat(item.amount || '0'))}
-                        </TableCell>
-                    </TableRow>
-                ))}
+                {items.map((item) => {
+                    const quantity = parseFloat(item.quantity) || 0;
+                    const rate = parseFloat(item.rate) || 0;
+                    const basicAmount = item.amount ? parseFloat(item.amount) : quantity * rate;
+                    const gstRate = item.gstRate ? parseFloat(item.gstRate) : 0;
+                    const gstAmount = item.gstAmount
+                        ? parseFloat(item.gstAmount)
+                        : (basicAmount * gstRate) / 100;
+                    const totalAmount = item.totalAmount
+                        ? parseFloat(item.totalAmount)
+                        : basicAmount + gstAmount;
+
+                    return (
+                        <TableRow key={item.id}>
+                            <TableCell>{item.srNo}</TableCell>
+                            <TableCell>{item.itemDescription}</TableCell>
+                            <TableCell className="text-right">{item.quantity}</TableCell>
+                            <TableCell className="text-right">
+                                {formatINR(rate)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                                {formatINR(basicAmount)}
+                            </TableCell>
+                            <TableCell className="text-right">{gstRate}%</TableCell>
+                            <TableCell className="text-right">
+                                {formatINR(gstAmount)}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                                {formatINR(totalAmount)}
+                            </TableCell>
+                        </TableRow>
+                    );
+                })}
                 {items.length === 0 && (
                     <TableRow>
                         <TableCell
-                            colSpan={5}
+                            colSpan={8}
                             className="py-6 text-center text-sm italic text-muted-foreground"
                         >
                             {emptyLabel}

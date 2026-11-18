@@ -68,6 +68,14 @@ export const YES_NO_OPTIONS = [
   { value: 'false', label: 'No' },
 ];
 
+export const GST_OPTIONS = [
+  { value: '0', label: '0%' },
+  { value: '5', label: '5%' },
+  { value: '12', label: '12%' },
+  { value: '18', label: '18%' },
+  { value: '28', label: '28%' },
+];
+
 export type YesNoValue = "true" | "false";
 
 export const WIZARD_CONFIG = {

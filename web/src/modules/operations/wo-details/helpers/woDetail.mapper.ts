@@ -27,6 +27,28 @@ const emptyStringToNull = (val: string | undefined | null): string | null | unde
   return val;
 };
 
+const toOptionalNumber = (val: unknown): number | undefined => {
+  if (val === null || val === undefined || val === "") return undefined;
+  const parsed = Number(val);
+  return Number.isNaN(parsed) ? undefined : parsed;
+};
+
+const normalizeBoqItems = (items: unknown): NonNullable<Page4FormValues["billingBoq"]> => {
+  if (!Array.isArray(items)) return [];
+  return items.map((raw) => {
+    const item = raw as Record<string, unknown>;
+    return {
+      ...item,
+      quantity: toOptionalNumber(item.quantity),
+      rate: toOptionalNumber(item.rate),
+      amount: toOptionalNumber(item.amount),
+      gstRate: toOptionalNumber(item.gstRate) ?? 0,
+      gstAmount: toOptionalNumber(item.gstAmount),
+      totalAmount: toOptionalNumber(item.totalAmount),
+    } as NonNullable<Page4FormValues["billingBoq"]>[number];
+  });
+};
+
 export const formToApi = {
   page1(form: Page1FormValues) {
     return {
@@ -79,6 +101,7 @@ export const formToApi = {
           itemDescription: item.itemDescription,
           quantity: item.quantity,
           rate: item.rate,
+          gstRate: item.gstRate ?? 0,
           amount: item.amount,
           sortOrder: item.sortOrder,
         })),
@@ -90,6 +113,7 @@ export const formToApi = {
           itemDescription: item.itemDescription,
           quantity: item.quantity,
           rate: item.rate,
+          gstRate: item.gstRate ?? 0,
           amount: item.amount,
           sortOrder: item.sortOrder,
         })),
@@ -188,8 +212,8 @@ export const apiToForm = {
   page4(api: ApiResponse): Partial<Page4FormValues> {
     return {
       buybackBoqApplicable: boolToString(api.buybackBoqApplicable as boolean | undefined | null) ?? "false",
-      billingBoq: (api.billingBoq as Page4FormValues["billingBoq"]) ?? undefined,
-      buybackBoq: (api.buybackBoq as Page4FormValues["buybackBoq"]) ?? undefined,
+      billingBoq: normalizeBoqItems(api.billingBoq),
+      buybackBoq: normalizeBoqItems(api.buybackBoq),
       billingAddresses: (api.billingAddresses as Page4FormValues["billingAddresses"]) ?? undefined,
       shippingAddresses: (api.shippingAddresses as Page4FormValues["shippingAddresses"]) ?? undefined,
     };

@@ -57,6 +57,9 @@ export const BOQItemSchema = z.object({
   quantity: z.number().optional(),
   rate: z.number().optional(),
   amount: z.number().optional(),
+  gstRate: z.number().min(0).max(100).optional(),
+  gstAmount: z.number().optional(),
+  totalAmount: z.number().optional(),
   sortOrder: z.number().optional(),
 });
 
