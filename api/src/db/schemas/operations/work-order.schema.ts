@@ -413,6 +413,9 @@ export const woBillingBoq = pgTable("wo_billing_boq", {
     quantity: numeric("quantity", { precision: 20, scale: 2 }).notNull(),
     rate: numeric("rate", { precision: 20, scale: 2 }).notNull(),
     amount: numeric("amount", { precision: 20, scale: 2 }),
+    gstRate: numeric("gst_rate", { precision: 5, scale: 2 }).notNull().default("0"),
+    gstAmount: numeric("gst_amount", { precision: 20, scale: 2 }),
+    totalAmount: numeric("total_amount", { precision: 20, scale: 2 }),
     sortOrder: integer("sort_order"),
 
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -433,6 +436,9 @@ export const woBuybackBoq = pgTable("wo_buyback_boq", {
     quantity: numeric("quantity", { precision: 20, scale: 2 }).notNull(),
     rate: numeric("rate", { precision: 20, scale: 2 }).notNull(),
     amount: numeric("amount", { precision: 20, scale: 2 }),
+    gstRate: numeric("gst_rate", { precision: 5, scale: 2 }).notNull().default("0"),
+    gstAmount: numeric("gst_amount", { precision: 20, scale: 2 }),
+    totalAmount: numeric("total_amount", { precision: 20, scale: 2 }),
     sortOrder: integer("sort_order"),
 
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

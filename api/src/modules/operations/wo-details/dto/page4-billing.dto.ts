@@ -10,7 +10,10 @@ export const BOQItemSchema = z.object({
   itemDescription: z.string().min(1, "Item description is required"),
   quantity: DecimalSchema,
   rate: DecimalSchema,
-  amount: DecimalSchema.optional(), // Calculated server-side
+  amount: DecimalSchema.optional(), // Basic amount (qty * rate), calculated server-side
+  gstRate: DecimalSchema.optional(), // GST percentage input
+  gstAmount: DecimalSchema.optional(), // Calculated server-side (basic * gstRate / 100)
+  totalAmount: DecimalSchema.optional(), // Calculated server-side (basic + gstAmount)
   sortOrder: z.number().int().optional(),
 });
 
