@@ -132,6 +132,20 @@ export const useBGMailPreview = (
     });
 };
 
+export const useCreateBankGuaranteeOldBg = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (payload: Record<string, unknown>) => bankGuaranteesService.createOldBg(payload),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.all });
+            queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.counts() });
+            queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.cardStats() });
+            queryClient.invalidateQueries({ queryKey: paymentRequestsKey.all });
+        },
+    });
+};
+
 export const useUpdateBankGuarantee = () => {
     const queryClient = useQueryClient();
 

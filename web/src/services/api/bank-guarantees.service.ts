@@ -100,6 +100,10 @@ class BankGuaranteesService extends BaseApiService {
         );
     }
 
+    async createOldBg(payload: Record<string, any>): Promise<{ requestId: number; instrumentId: number }> {
+        return this.post<{ requestId: number; instrumentId: number }, Record<string, any>>('/old-bg', payload);
+    }
+
     async update(id: number, payload: Record<string, any>): Promise<any> {
         return this.put<any, Record<string, any>>(`/${id}`, payload);
     }

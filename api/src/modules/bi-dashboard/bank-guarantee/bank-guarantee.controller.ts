@@ -60,6 +60,11 @@ export class BankGuaranteeController {
         return this.bankGuaranteeService.getMailPreview(id, body);
     }
 
+    @Post('old-bg')
+    async createOldBg(@Body() body: any, @Req() req: any) {
+        return this.bankGuaranteeService.createOldBg(body, req.user);
+    }
+
     @Put(':id')
     async update(
         @Param('id', ParseIntPipe) id: number,
