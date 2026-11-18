@@ -627,17 +627,30 @@ export default function CreateSaleInvoicePage() {
                                             <Table>
                                                 <TableHeader>
                                                     <TableRow>
-                                                        <TableHead className="w-[6%]"></TableHead>
-                                                        <TableHead className="w-[8%]">SR</TableHead>
-                                                        <TableHead className="w-[46%]">Description</TableHead>
-                                                        <TableHead className="w-[12%] text-right">BOQ Qty</TableHead>
-                                                        <TableHead className="w-[14%] text-right">Rate</TableHead>
-                                                        <TableHead className="w-[14%] text-right">Amount</TableHead>
+                                                        <TableHead className="w-[5%]"></TableHead>
+                                                        <TableHead className="w-[6%]">SR</TableHead>
+                                                        <TableHead className="w-[30%]">Description</TableHead>
+                                                        <TableHead className="w-[9%] text-right">Qty</TableHead>
+                                                        <TableHead className="w-[10%] text-right">Rate</TableHead>
+                                                        <TableHead className="w-[11%] text-right">Basic Amount</TableHead>
+                                                        <TableHead className="w-[8%] text-right">GST %</TableHead>
+                                                        <TableHead className="w-[10%] text-right">GST Amount</TableHead>
+                                                        <TableHead className="w-[11%] text-right">Total Amount</TableHead>
                                                     </TableRow>
                                                 </TableHeader>
                                                 <TableBody>
                                                     {boqRows.map((b) => {
                                                         const checked = selectedLineSrNos.includes(b.srNo);
+                                                        const qty = Number(b.quantity || 0);
+                                                        const rate = Number(b.rate || 0);
+                                                        const basicAmount = b.amount ? Number(b.amount) : qty * rate;
+                                                        const gstRate = Number(b.gstRate || 0);
+                                                        const gstAmount = b.gstAmount
+                                                            ? Number(b.gstAmount)
+                                                            : (basicAmount * gstRate) / 100;
+                                                        const totalAmount = b.totalAmount
+                                                            ? Number(b.totalAmount)
+                                                            : basicAmount + gstAmount;
                                                         return (
                                                             <TableRow
                                                                 key={b.id}
@@ -650,20 +663,27 @@ export default function CreateSaleInvoicePage() {
                                                                     />
                                                                 </TableCell>
                                                                 <TableCell className="font-mono text-sm">{b.srNo}</TableCell>
-                                                                <TableCell className="text-sm">{b.itemDescription}</TableCell>
+                                                                <TableCell className="text-xs whitespace-normal [overflow-wrap:anywhere]">{b.itemDescription}</TableCell>
                                                                 <TableCell className="text-right tabular-nums">{b.quantity}</TableCell>
                                                                 <TableCell className="text-right tabular-nums">
-                                                                    {formatCurrency(Number(b.rate || 0))}
+                                                                    {formatCurrency(rate)}
+                                                                </TableCell>
+                                                                <TableCell className="text-right tabular-nums">
+                                                                    {formatCurrency(basicAmount)}
+                                                                </TableCell>
+                                                                <TableCell className="text-right tabular-nums">{gstRate}%</TableCell>
+                                                                <TableCell className="text-right tabular-nums">
+                                                                    {formatCurrency(gstAmount)}
                                                                 </TableCell>
                                                                 <TableCell className="text-right tabular-nums font-medium">
-                                                                    {b.amount ? formatCurrency(Number(b.amount)) : "-"}
+                                                                    {formatCurrency(totalAmount)}
                                                                 </TableCell>
                                                             </TableRow>
                                                         );
                                                     })}
                                                     {boqRows.length === 0 && (
                                                         <TableRow>
-                                                            <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
+                                                            <TableCell colSpan={9} className="text-center py-6 text-muted-foreground">
                                                                 No billing BOQ lines found.
                                                             </TableCell>
                                                         </TableRow>
