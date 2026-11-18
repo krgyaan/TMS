@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { MapPin, Package, Plus, Receipt, Trash2, Truck } from "lucide-react";
 import { useCallback, useEffect, useMemo } from "react";
-import { useFieldArray, useForm, type Resolver } from "react-hook-form";
+import { useFieldArray, useForm, useWatch, type Resolver } from "react-hook-form";
 
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
@@ -115,9 +115,9 @@ export function Page4Billing({ woDetailId, initialData, onSaveDraft, onSaveDraft
 
     const { autoSave, isSaving: isAutoSaving } = useAutoSave(woDetailId, 4, true, 4000, formToApi.page4);
 
-    const watchBillingBoq = form.watch("billingBoq");
-    const watchBuybackBoq = form.watch("buybackBoq");
-    const watchBuybackBoqApplicable = form.watch("buybackBoqApplicable");
+    const watchBillingBoq = useWatch({ control: form.control, name: "billingBoq" });
+    const watchBuybackBoq = useWatch({ control: form.control, name: "buybackBoq" });
+    const watchBuybackBoqApplicable = useWatch({ control: form.control, name: "buybackBoqApplicable" });
 
     const billingTotals = useMemo(() => calculateBoqTotals(watchBillingBoq), [watchBillingBoq]);
 
@@ -191,9 +191,10 @@ export function Page4Billing({ woDetailId, initialData, onSaveDraft, onSaveDraft
                     </thead>
                     <tbody className="divide-y">
                         {fields.map((field, index) => {
-                            const quantity = form.watch(`${namePrefix}.${index}.quantity`);
-                            const rate = form.watch(`${namePrefix}.${index}.rate`);
-                            const gstRate = form.watch(`${namePrefix}.${index}.gstRate`);
+                            const watchedItems = namePrefix === "billingBoq" ? watchBillingBoq : watchBuybackBoq;
+                            const quantity = watchedItems?.[index]?.quantity;
+                            const rate = watchedItems?.[index]?.rate;
+                            const gstRate = watchedItems?.[index]?.gstRate;
                             const rowTotals = calculateRowTotals(quantity, rate, gstRate);
 
                             return (
