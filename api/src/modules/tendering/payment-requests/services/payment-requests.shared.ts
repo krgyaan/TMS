@@ -271,6 +271,7 @@ const PURPOSE_VALUE_MAP: Record<string, PaymentPurpose> = {
 // Project-dashboard BI requests surface the exact BG purpose chosen in the form
 // instead of collapsing it into the generic EMD buckets.
 const PROJECT_BG_PURPOSE_MAP: Record<string, PaymentPurpose> = {
+    'EMD': 'EMD',
     'ADVANCE_PAYMENT': 'Advance Payment',
     'SECURITY_BOND_DEPOSIT': 'Security Bond/Deposit',
     'SECURITY_DEPOSIT': 'Security Deposit',

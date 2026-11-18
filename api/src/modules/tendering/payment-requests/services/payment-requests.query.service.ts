@@ -1565,6 +1565,7 @@ export class PaymentRequestsQueryService {
         // Base response with common fields
         const response: any = {
             id: request.id,
+            type: request.type,
             tenderId: request.tenderId,
             projectId: request.projectId,
             tenderNo: request.tenderNo,

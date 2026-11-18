@@ -34,7 +34,6 @@ const BG_PURPOSE_LABELS: Record<string, string> = {
     FINANCIAL: 'Financial',
     PERFORMANCE: 'Performance BG',
     PERFORMANCE_BG: 'Performance BG',
-    BID_BOND: 'Bid Bond',
     PAYABLE: 'Other Payment',
     OTHER_PAYMENT: 'Other Payment',
     OTHER_SECURITY: 'Other Security',
