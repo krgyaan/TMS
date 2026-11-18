@@ -2,6 +2,7 @@ import { useParams } from 'react-router-dom';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { BankGuaranteeRequestForm } from './components/BankGuaranteeRequestForm';
+import { BankGuaranteeOldEntryForm } from './components/BankGuaranteeOldEntryForm';
 import { usePaymentRequestForEdit } from '@/hooks/api/usePaymentRequests';
 
 export default function BankGuaranteeEditPage() {
@@ -28,6 +29,10 @@ export default function BankGuaranteeEditPage() {
                 </AlertDescription>
             </Alert>
         );
+    }
+
+    if ((data as Record<string, any>)?.type === 'Old Entries') {
+        return <BankGuaranteeOldEntryForm mode="edit" requestId={requestId} />;
     }
 
     return (
