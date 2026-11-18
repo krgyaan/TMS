@@ -363,6 +363,7 @@ export class BankGuaranteeService {
                     claimExpiryDate,
                 ),
                 expiryDate: effectiveClaimDate,
+                isOldEntry: row.requestType === 'Old Entries',
             };
         });
 

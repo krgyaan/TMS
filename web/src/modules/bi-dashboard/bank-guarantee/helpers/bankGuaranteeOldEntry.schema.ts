@@ -5,6 +5,11 @@ const optionalNumber = z.preprocess(
     z.coerce.number().min(0, 'Cannot be negative').optional(),
 );
 
+const requiredNumber = z.preprocess(
+    (value) => (value === '' || value === null || value === undefined ? undefined : value),
+    z.coerce.number({ error: 'Required' }).min(0, 'Cannot be negative'),
+);
+
 const optionalEmail = z
     .string()
     .trim()
@@ -18,7 +23,7 @@ export const BankGuaranteeOldEntrySchema = z.object({
     bgExpiryDate: z.string().trim().min(1, 'BG Expiry Date is required'),
     bgClaimPeriod: z.string().trim().min(1, 'BG Claim Period is required'),
     amount: z.coerce.number().gt(0, 'BG Amount must be greater than 0'),
-    stampValue: optionalNumber,
+    stampValue: requiredNumber,
     bgPoFiles: z.array(z.string()).optional(),
     clientUserEmail: optionalEmail,
     clientCpEmail: optionalEmail,
@@ -30,17 +35,17 @@ export const BankGuaranteeOldEntrySchema = z.object({
     bgNo: z.string().trim().min(1, 'BG No. is required'),
     bgDate: z.string().trim().min(1, 'BG Creation Date is required'),
     remarks: z.string().trim().optional(),
-    fdrPer: optionalNumber,
-    fdrAmt: optionalNumber,
-    fdrNo: z.string().trim().optional(),
-    fdrValidity: z.string().trim().optional(),
-    fdrRoi: optionalNumber,
+    fdrPer: requiredNumber,
+    fdrAmt: requiredNumber,
+    fdrNo: z.string().trim().min(1, 'FDR No. is required'),
+    fdrValidity: z.string().trim().min(1, 'FDR Validity is required'),
+    fdrRoi: requiredNumber,
     bgChargeDeducted: optionalNumber,
     sfmsChargeDeducted: optionalNumber,
     stampChargeDeducted: optionalNumber,
     otherChargeDeducted: optionalNumber,
     courierId: z.string().optional(),
-    bgUpload: z.array(z.string()).optional(),
+    bgUpload: z.array(z.string()).min(1, 'Soft copy of BG is required'),
     sfmsConf: z.array(z.string()).optional(),
     fdrCopy: z.array(z.string()).optional(),
 });

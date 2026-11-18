@@ -209,6 +209,7 @@ const BankGuaranteeListPage = () => {
             {
                 label: 'Action Form',
                 icon: <FileText className="h-4 w-4" />,
+                visible: (row: BankGuaranteeDashboardRow) => !row.isOldEntry,
                 onClick: (row: BankGuaranteeDashboardRow) => navigate(paths.bi.bankGuaranteeAction(row.id)),
             },
             {

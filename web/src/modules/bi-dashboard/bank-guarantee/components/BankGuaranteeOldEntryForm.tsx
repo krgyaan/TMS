@@ -519,7 +519,7 @@ export function BankGuaranteeOldEntryForm({
                                 <FieldWrapper control={form.control} name="amount" label="BG Amount *">
                                     {(field) => <NumberInput value={field.value} onChange={field.onChange} />}
                                 </FieldWrapper>
-                                <FieldWrapper control={form.control} name="stampValue" label="BG Stamp Paper Value">
+                                <FieldWrapper control={form.control} name="stampValue" label="BG Stamp Paper Value *">
                                     {(field) => <NumberInput value={field.value} onChange={field.onChange} />}
                                 </FieldWrapper>
                                 <FieldWrapper control={form.control} name="bgNo" label="BG No. *">
@@ -567,19 +567,19 @@ export function BankGuaranteeOldEntryForm({
 
                             <h3 className="text-lg font-semibold pt-2">FDR Details</h3>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <FieldWrapper control={form.control} name="fdrPer" label="FDR %age">
+                                <FieldWrapper control={form.control} name="fdrPer" label="FDR %age *">
                                     {(field) => <NumberInput value={field.value} onChange={field.onChange} />}
                                 </FieldWrapper>
-                                <FieldWrapper control={form.control} name="fdrAmt" label="FDR Amount">
+                                <FieldWrapper control={form.control} name="fdrAmt" label="FDR Amount *">
                                     {(field) => <NumberInput value={field.value} onChange={field.onChange} />}
                                 </FieldWrapper>
-                                <FieldWrapper control={form.control} name="fdrNo" label="FDR No.">
+                                <FieldWrapper control={form.control} name="fdrNo" label="FDR No. *">
                                     {(field) => <Input {...field} placeholder="FDR number" />}
                                 </FieldWrapper>
-                                <FieldWrapper control={form.control} name="fdrValidity" label="FDR Validity">
+                                <FieldWrapper control={form.control} name="fdrValidity" label="FDR Validity *">
                                     {(field) => <DateInput value={field.value || null} onChange={field.onChange} />}
                                 </FieldWrapper>
-                                <FieldWrapper control={form.control} name="fdrRoi" label="FDR ROI %">
+                                <FieldWrapper control={form.control} name="fdrRoi" label="FDR ROI % *">
                                     {(field) => <NumberInput value={field.value} onChange={field.onChange} />}
                                 </FieldWrapper>
                             </div>
@@ -621,7 +621,7 @@ export function BankGuaranteeOldEntryForm({
                                 )}
                                 <FileUploader
                                     context="bg-upload"
-                                    label="Soft Copy of BG"
+                                    label="Soft Copy of BG *"
                                     value={bgUpload ?? []}
                                     onChange={(paths) => form.setValue('bgUpload', paths)}
                                 />
