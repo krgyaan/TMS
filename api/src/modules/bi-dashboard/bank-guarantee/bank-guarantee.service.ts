@@ -1713,7 +1713,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
         const tenderId = Number(payload?.tenderId) > 0 ? Number(payload.tenderId) : 0;
         const projectId = tenderId === 0 && Number(payload?.projectId) > 0 ? Number(payload.projectId) : null;
         const tenderNo = toText(payload?.tenderNo) ?? 'NA';
-        const projectName = toText(payload?.projectName);
+        const projectName = toText(payload?.projectName) ?? 'Accounts/Admin';
         const purpose = extractProjectBgPurpose({ bgPurpose: purposeCode });
         const remarks = toText(payload?.remarks);
         const courierId = Number(payload?.courierId) > 0 ? Number(payload.courierId) : null;

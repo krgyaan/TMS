@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, FormProvider, useWatch, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,13 +18,13 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { BANKS } from '@/modules/tendering/emds-tenderfees/constants';
-import { useProjectOverview } from '@/hooks/api/useProjectDashboard';
+import { useTenders } from '@/hooks/api/useTenders';
+import { useProjectList } from '@/hooks/api/useProjectDashboard';
 import { useCourierSelectOptions } from '@/hooks/api/useCourier';
 import { useCreateBankGuaranteeOldBg } from '@/hooks/api/useBankGuarantees';
 import { paths } from '@/app/routes/paths';
 import { toast } from 'sonner';
 import { ArrowLeft, Check, ChevronDown, Loader2, Save } from 'lucide-react';
-import { TenderProjectSelector, type BgContext } from './BankGuaranteeRequestForm';
 import {
     BankGuaranteeOldEntrySchema,
     type BankGuaranteeOldEntryFormValues,
@@ -104,17 +104,66 @@ function CourierSelector({ value, onChange }: { value: string; onChange: (value:
     );
 }
 
+type ReferenceOption = {
+    key: string;
+    kind: 'tender' | 'project';
+    id: number;
+    name: string;
+    number: string;
+    description: string;
+};
+
 export function BankGuaranteeOldEntryForm() {
     const navigate = useNavigate();
     const createOldBg = useCreateBankGuaranteeOldBg();
 
-    const [selection, setSelection] = useState<BgContext | null>(null);
-    const [manualReference, setManualReference] = useState('');
+    const [referenceName, setReferenceName] = useState('');
+    const [referenceNo, setReferenceNo] = useState('');
+    const [linkedReference, setLinkedReference] = useState<ReferenceOption | null>(null);
+    const [referenceOpen, setReferenceOpen] = useState(false);
 
-    const selectedProjectId = selection?.kind === 'project' ? selection.id : 0;
-    const { data: overview } = useProjectOverview(selectedProjectId);
-    const projectName = overview?.project?.projectName ?? '';
-    const poNo = overview?.project?.poNo ?? '';
+    const { data: tenderList } = useTenders(undefined, undefined, { page: 1, limit: 200 });
+    const { data: projectList } = useProjectList({ page: 1, limit: 200 });
+
+    const referenceOptions = useMemo<ReferenceOption[]>(() => {
+        const options: ReferenceOption[] = [];
+
+        for (const tender of tenderList?.data ?? []) {
+            options.push({
+                key: `tender:${tender.id}`,
+                kind: 'tender',
+                id: tender.id,
+                name: tender.tenderName || tender.tenderNo || `Tender #${tender.id}`,
+                number: tender.tenderNo ?? '',
+                description: `Tender · ${tender.tenderNo}`,
+            });
+        }
+
+        for (const project of projectList?.data ?? []) {
+            options.push({
+                key: `project:${project.id}`,
+                kind: 'project',
+                id: project.id,
+                name: project.projectName || project.poNo || `Project #${project.id}`,
+                number: project.poNo ?? '',
+                description: `Project${project.poNo ? ` · WO ${project.poNo}` : ''}`,
+            });
+        }
+
+        return options;
+    }, [tenderList, projectList]);
+
+    const referenceQuery = referenceName.trim().toLowerCase();
+    const referenceMatches = useMemo(() => {
+        if (!referenceQuery) return [];
+        return referenceOptions
+            .filter(
+                (option) =>
+                    option.name.toLowerCase().includes(referenceQuery) ||
+                    option.number.toLowerCase().includes(referenceQuery),
+            )
+            .slice(0, 8);
+    }, [referenceOptions, referenceQuery]);
 
     const form = useForm<FormValues>({
         resolver: zodResolver(BankGuaranteeOldEntrySchema) as Resolver<FormValues>,
@@ -159,30 +208,28 @@ export function BankGuaranteeOldEntryForm() {
     const fdrCopy = useWatch({ control: form.control, name: 'fdrCopy' });
     const courierId = useWatch({ control: form.control, name: 'courierId' });
 
+    const handleReferencePick = (option: ReferenceOption) => {
+        setReferenceName(option.name);
+        setReferenceNo(option.number);
+        setLinkedReference(option);
+        setReferenceOpen(false);
+        form.setValue('bgPoFiles', []);
+    };
+
     const handleSubmit = async (values: FormValues) => {
-        const manual = manualReference.trim();
-        const reference = manual
+        const reference = linkedReference
             ? {
+                tenderId: linkedReference.kind === 'tender' ? linkedReference.id : 0,
+                projectId: linkedReference.kind === 'project' ? linkedReference.id : undefined,
+                tenderNo: linkedReference.number,
+                projectName: linkedReference.name,
+            }
+            : {
                 tenderId: 0,
                 projectId: undefined,
-                tenderNo: manual,
-                projectName: selection?.kind === 'project' ? projectName || undefined : selection?.kind === 'tender' ? selection.tenderName : undefined,
-            }
-            : selection?.kind === 'tender'
-                ? {
-                    tenderId: selection.id,
-                    projectId: undefined,
-                    tenderNo: selection.tenderNo,
-                    projectName: selection.tenderName,
-                }
-                : selection?.kind === 'project'
-                    ? {
-                        tenderId: 0,
-                        projectId: selection.id,
-                        tenderNo: poNo || '',
-                        projectName: projectName || undefined,
-                    }
-                    : { tenderId: 0, projectId: undefined, tenderNo: '', projectName: undefined };
+                tenderNo: referenceNo.trim(),
+                projectName: referenceName.trim(),
+            };
 
         try {
             await createOldBg.mutateAsync({
@@ -257,27 +304,62 @@ export function BankGuaranteeOldEntryForm() {
                             <h3 className="text-lg font-semibold">Reference</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">Tender / Project</label>
-                                    <TenderProjectSelector
-                                        value={selection ? `${selection.kind}:${selection.id}` : ''}
-                                        onSelect={(context) => {
-                                            setSelection(context);
-                                            form.setValue('bgPoFiles', []);
-                                        }}
-                                        onClear={() => setSelection(null)}
-                                    />
+                                    <label className="text-sm font-medium">Tender / Project Name</label>
+                                    <div className="relative">
+                                        <Input
+                                            value={referenceName}
+                                            onChange={(event) => {
+                                                setReferenceName(event.target.value);
+                                                setLinkedReference(null);
+                                                setReferenceOpen(event.target.value.trim().length > 0);
+                                            }}
+                                            onFocus={() => {
+                                                if (!linkedReference) {
+                                                    setReferenceOpen(referenceName.trim().length > 0);
+                                                }
+                                            }}
+                                            onBlur={() => setReferenceOpen(false)}
+                                            placeholder="Search tender or project name"
+                                            autoComplete="off"
+                                        />
+                                        {referenceOpen && referenceMatches.length > 0 && (
+                                            <div className="absolute z-50 mt-1 max-h-64 w-full overflow-auto rounded-md border bg-popover p-1 shadow-md">
+                                                {referenceMatches.map((option) => (
+                                                    <button
+                                                        key={option.key}
+                                                        type="button"
+                                                        onMouseDown={(event) => {
+                                                            event.preventDefault();
+                                                            handleReferencePick(option);
+                                                        }}
+                                                        className="flex w-full flex-col items-start gap-0.5 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                                                    >
+                                                        <span className="w-full truncate">{option.name}</span>
+                                                        <span className="w-full truncate text-xs text-muted-foreground">
+                                                            {option.description}
+                                                        </span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">Or enter Tender No. / WO No.</label>
+                                    <label className="text-sm font-medium">Tender No. / PO No.</label>
                                     <Input
-                                        value={manualReference}
-                                        onChange={(event) => setManualReference(event.target.value)}
-                                        placeholder="e.g. GEMC-511687785178741"
+                                        value={referenceNo}
+                                        onChange={(event) => {
+                                            setReferenceNo(event.target.value);
+                                            setLinkedReference(null);
+                                        }}
+                                        placeholder="e.g. GEM/2026/B/7830385 or GEMC-511687785178741"
+                                        autoComplete="off"
                                     />
                                 </div>
                             </div>
                             <p className="text-xs text-muted-foreground">
-                                Optional — pick a tender or project, or type the reference manually. A manual entry takes priority.
+                                Optional — type to search a tender or project, or enter the reference manually. Leave both
+                                blank to save under Accounts/Admin.
                             </p>
                         </div>
 
@@ -398,7 +480,7 @@ export function BankGuaranteeOldEntryForm() {
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {!selection && (
+                                {!linkedReference && (
                                     <FileUploader
                                         context="bg-po-files"
                                         label="PO/Tender/Request Letter (optional)"
