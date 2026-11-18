@@ -260,7 +260,10 @@ export function BankGuaranteeOldEntryForm() {
                                     <label className="text-sm font-medium">Tender / Project</label>
                                     <TenderProjectSelector
                                         value={selection ? `${selection.kind}:${selection.id}` : ''}
-                                        onSelect={(context) => setSelection(context)}
+                                        onSelect={(context) => {
+                                            setSelection(context);
+                                            form.setValue('bgPoFiles', []);
+                                        }}
                                         onClear={() => setSelection(null)}
                                     />
                                 </div>
@@ -395,12 +398,14 @@ export function BankGuaranteeOldEntryForm() {
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <FileUploader
-                                    context="bg-po-files"
-                                    label="PO/Tender/Request Letter (optional)"
-                                    value={bgPoFiles ?? []}
-                                    onChange={(paths) => form.setValue('bgPoFiles', paths)}
-                                />
+                                {!selection && (
+                                    <FileUploader
+                                        context="bg-po-files"
+                                        label="PO/Tender/Request Letter (optional)"
+                                        value={bgPoFiles ?? []}
+                                        onChange={(paths) => form.setValue('bgPoFiles', paths)}
+                                    />
+                                )}
                                 <FileUploader
                                     context="bg-upload"
                                     label="Soft Copy of BG"
