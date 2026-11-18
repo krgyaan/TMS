@@ -161,6 +161,9 @@ export interface WoBoqItem {
     quantity: string;
     rate: string;
     amount: string | null;
+    gstRate?: string | null;
+    gstAmount?: string | null;
+    totalAmount?: string | null;
 }
 
 export interface WoBillingData {
