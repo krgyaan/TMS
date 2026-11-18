@@ -132,6 +132,44 @@ export const useBGMailPreview = (
     });
 };
 
+export const useCreateBankGuaranteeOldBg = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (payload: Record<string, unknown>) => bankGuaranteesService.createOldBg(payload),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.all });
+            queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.counts() });
+            queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.cardStats() });
+            queryClient.invalidateQueries({ queryKey: paymentRequestsKey.all });
+        },
+    });
+};
+
+export const useOldBgForEdit = (requestId: number | null) => {
+    return useQuery({
+        queryKey: [...bankGuaranteesKey.details(), 'old-bg', requestId ?? 0],
+        queryFn: () => bankGuaranteesService.getOldBgForEdit(requestId!),
+        enabled: !!requestId,
+    });
+};
+
+export const useUpdateBankGuaranteeOldBg = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ requestId, payload }: { requestId: number; payload: Record<string, unknown> }) =>
+            bankGuaranteesService.updateOldBg(requestId, payload),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.all });
+            queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.counts() });
+            queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.cardStats() });
+            queryClient.invalidateQueries({ queryKey: [...bankGuaranteesKey.details(), 'old-bg', variables.requestId] });
+            queryClient.invalidateQueries({ queryKey: paymentRequestsKey.all });
+        },
+    });
+};
+
 export const useUpdateBankGuarantee = () => {
     const queryClient = useQueryClient();
 

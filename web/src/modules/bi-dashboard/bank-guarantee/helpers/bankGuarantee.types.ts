@@ -55,6 +55,7 @@ export interface BankGuaranteeDashboardRow {
         status: 'RUNNING' | 'OVERDUE';
         deadline: Date;
     } | null;
+    isOldEntry: boolean;
 }
 
 export interface BankGuaranteeDashboardCounts {

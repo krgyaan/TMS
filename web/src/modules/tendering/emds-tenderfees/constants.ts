@@ -59,7 +59,6 @@ export const BG_PURPOSE_OPTIONS = [
     { value: 'EMD', label: 'EMD' },
     { value: 'ADVANCE_PAYMENT', label: 'Advance Payment' },
     { value: 'SECURITY_BOND_DEPOSIT', label: 'Security Bond/Deposit' },
-    { value: 'BID_BOND', label: 'Bid Bond' },
     { value: 'PERFORMANCE', label: 'Performance' },
     { value: 'FINANCIAL', label: 'Financial' },
     { value: 'COUNTER_GUARANTEE', label: 'Counter Guarantee' },
