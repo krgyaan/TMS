@@ -497,7 +497,7 @@ export function BankGuaranteeOldEntryForm() {
                                 />
                                 <FileUploader
                                     context="bg-sfms-conf"
-                                    label="SFMS Copy"
+                                    label="SFMS Copy (optional)"
                                     value={sfmsConf ?? []}
                                     onChange={(paths) => form.setValue('sfmsConf', paths)}
                                 />
