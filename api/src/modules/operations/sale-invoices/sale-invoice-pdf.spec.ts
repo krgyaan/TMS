@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as Handlebars from "handlebars";
 import { getPdfMargins, isLandscape } from "@/modules/pdf/config/pdf-config";
-import { buildSaleInvoicePdfItems, buildSaleInvoiceTaxSummary, computeSaleInvoicePdfHash, getGstStateCode, isValidGstin, SaleInvoiceService } from "./sale-invoice.service";
+import { aggregateSaleInvoiceItemsByBoq, buildSaleInvoicePdfItems, buildSaleInvoiceTaxSummary, computeSaleInvoicePdfHash, getGstStateCode, isValidGstin, SaleInvoiceService } from "./sale-invoice.service";
 
 const pdfItem = (
     overrides: Partial<{
@@ -14,6 +14,8 @@ const pdfItem = (
         rate: string | number | null;
         gstRate: string | number | null;
         amount: string | number | null;
+        discountPercent: string | number | null;
+        discountAmount: string | number | null;
         gstAmount: string | number | null;
         totalAmount: string | number | null;
         unit: string | null;
@@ -28,6 +30,8 @@ const pdfItem = (
     rate: "100.00",
     gstRate: "18.00",
     amount: "200.00",
+    discountPercent: "0",
+    discountAmount: "0",
     gstAmount: "36.00",
     totalAmount: "236.00",
     unit: "EA",
@@ -57,6 +61,7 @@ describe("sale invoice PDF data helpers", () => {
                     boq_item_name: boqItemName,
                     po_item_description: "Test PO description",
                     quantity: 2,
+                    boq_quantity: 10,
                     rate: 100,
                     unit: "EA",
                     discount_percent: 0,
@@ -148,6 +153,37 @@ describe("sale invoice PDF data helpers", () => {
         expect(summary.map(row => row.tax_amount)).toEqual([5, 36]);
     });
 
+    it("applies a pre-GST discount when computing the taxable value", () => {
+        const [item] = buildSaleInvoicePdfItems(
+            [pdfItem({ amount: "200", discountPercent: "10", discountAmount: null, gstAmount: null, totalAmount: null })],
+            true,
+        );
+
+        expect(item.discount_percent).toBe(10);
+        expect(item.discount_amount).toBe(20);
+        expect(item.taxable_value).toBe(180);
+        expect(item.igst_amount).toBe(32.4);
+        expect(item.total).toBe(212.4);
+    });
+
+    it("collapses several PO mappings of one BOQ line into a single PDF row", () => {
+        const boqBySrNo = new Map([[7, { itemDescription: "BOQ line", quantity: "10", rate: "100", gstRate: "18" }]]);
+        const poDescriptionById = new Map<number, string | null>([[88, "PO A"], [99, "PO B"]]);
+        const items = [
+            pdfItem({ purchaseOrderProductId: 88, quantity: "1" }),
+            pdfItem({ purchaseOrderProductId: 99, quantity: "3", srNo: 2 }),
+        ];
+
+        const [row] = aggregateSaleInvoiceItemsByBoq(items, boqBySrNo, poDescriptionById);
+
+        expect(row.boqItemName).toBe("BOQ line");
+        expect(row.poDescriptions).toEqual(["PO A", "PO B"]);
+        expect(row.quantity).toBe(4);
+        expect(row.boqQuantity).toBe("10");
+        expect(row.rate).toBe(100);
+        expect(row.amount).toBe(400);
+    });
+
     it("produces stable hashes for identical rendered data and new hashes for changed content", () => {
         const data = { invoice_number: "SI/TEST/0001", grand_total: 236 };
 
@@ -160,12 +196,13 @@ describe("sale invoice PDF data helpers", () => {
 
         expect(html).toContain("<b>Test BOQ item</b>");
         expect(html).toContain("Test PO description");
+        expect(html).toContain("BOQ Qty");
         expect(html).toContain("Priya Manager");
         expect(html).toContain("Road");
         expect(html).toContain("Bengaluru");
         expect(html).toContain("Buyer Contact");
         expect(html).toContain("Consignee Contact");
-        expect(html).toContain(isInterstate ? 'colspan="10"' : 'colspan="11"');
+        expect(html).toContain(isInterstate ? 'colspan="12"' : 'colspan="13"');
         expect(html).toMatch(/<pre[^>]*>Buyer line one\nBuyer line two<\/pre>/);
         expect(html).toMatch(/<pre[^>]*>Consignee line one\nConsignee line two<\/pre>/);
         expect(html).toMatch(/<pre[^>]*>Dispatch line one\nDispatch line two<\/pre>/);
@@ -181,7 +218,7 @@ describe("sale invoice PDF data helpers", () => {
     it("builds the production PDF payload using billing GSTIN jurisdiction", async () => {
         const queryResults: unknown[][] = [
             [{ projectName: "Test Project", projectCode: "TP-1", poNo: "PO-123", poDate: "2026-10-20" }],
-            [{ srNo: 7, itemDescription: "WO BOQ item" }],
+            [{ srNo: 7, itemDescription: "WO BOQ item", quantity: "10", rate: "100.00", gstRate: "18.00" }],
             [{ id: 88, description: "Live PO product description" }],
         ];
         const db = {
@@ -242,6 +279,8 @@ describe("sale invoice PDF data helpers", () => {
         expect(data["transporter_mode"]).toBe("Road");
         expect(rows[0].boq_item_name).toBe("WO BOQ item");
         expect(rows[0].po_item_description).toBe("Live PO product description");
+        expect(rows[0].boq_quantity).toBe(10);
+        expect(rows[0].quantity).toBe(2);
         expect(rows[0].igst_amount).toBe(36);
         expect(rows[0].cgst_amount).toBe(0);
     });
