@@ -51,6 +51,7 @@ export interface SaleInvoiceItemDTO {
     qty: number;
     rate: number;
     gstRate: number;
+    discountPercent?: number;
     unit?: string;
     hsnSac?: string;
 }

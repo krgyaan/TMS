@@ -111,6 +111,7 @@ export function mapSaleInvoiceFormToCreateDTO(
                 qty: item.qty!,
                 rate: item.rate!,
                 gstRate: item.gstRate,
+                discountPercent: item.discountPercent ?? 0,
                 unit: item.unit,
                 hsnSac: item.hsnSac,
             })),
