@@ -17,7 +17,7 @@ export default function PerformanceRoutes() {
             <Route
                 path="tender-executive"
                 element={
-                    <RouteWrapper>
+                    <RouteWrapper permission={{ module: "performance.tender-executive", action: "read" }}>
                         <Perf_TenderExecutive />
                     </RouteWrapper>
                 }
@@ -25,7 +25,7 @@ export default function PerformanceRoutes() {
             <Route
                 path="team-leader"
                 element={
-                    <RouteWrapper>
+                    <RouteWrapper permission={{ module: "performance.team-leader", action: "read" }}>
                         <Perf_TeamLeader />
                     </RouteWrapper>
                 }
@@ -33,7 +33,7 @@ export default function PerformanceRoutes() {
             <Route
                 path="operation-team"
                 element={
-                    <RouteWrapper>
+                    <RouteWrapper permission={{ module: "performance.operation-team", action: "read" }}>
                         <Perf_OperationTeam />
                     </RouteWrapper>
                 }
@@ -41,7 +41,7 @@ export default function PerformanceRoutes() {
             <Route
                 path="account-team"
                 element={
-                    <RouteWrapper>
+                    <RouteWrapper permission={{ module: "performance.account-team", action: "read" }}>
                         <Perf_AccountTeam />
                     </RouteWrapper>
                 }
@@ -57,7 +57,7 @@ export default function PerformanceRoutes() {
             <Route
                 path="business-dashboard"
                 element={
-                    <RouteWrapper>
+                    <RouteWrapper permission={{ module: "performance.business-dashboard", action: "read" }}>
                         <Perf_Business />
                     </RouteWrapper>
                 }
@@ -65,7 +65,7 @@ export default function PerformanceRoutes() {
             <Route
                 path="customer-dashboard"
                 element={
-                    <RouteWrapper>
+                    <RouteWrapper permission={{ module: "performance.customer-dashboard", action: "read" }}>
                         <Perf_Customer />
                     </RouteWrapper>
                 }
@@ -73,7 +73,7 @@ export default function PerformanceRoutes() {
             <Route
                 path="location-dashboard"
                 element={
-                    <RouteWrapper>
+                    <RouteWrapper permission={{ module: "performance.location-dashboard", action: "read" }}>
                         <Perf_Location />
                     </RouteWrapper>
                 }

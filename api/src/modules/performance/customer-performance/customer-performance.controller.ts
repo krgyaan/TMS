@@ -20,7 +20,7 @@ export class CustomerPerformanceController {
      * i.e. no category filter applied).
      */
     @Get()
-    @CanRead("performance.customer")
+    @CanRead("performance.customer-dashboard")
     getCustomerPerformance(@Query() query: Record<string, string>) {
         const parsed = customerPerformanceQuerySchema.safeParse({
             org: query.org,
