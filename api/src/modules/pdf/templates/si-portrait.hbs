@@ -144,35 +144,39 @@
             <colgroup>
                 {{#if is_interstate}}
                 <col style="width:4%">
-                <col style="width:25%">
-                <col style="width:8%">
+                <col style="width:20%">
                 <col style="width:6%">
+                <col style="width:5%">
+                <col style="width:5%">
+                <col style="width:9%">
+                <col style="width:4%">
+                <col style="width:4%">
+                <col style="width:7%">
                 <col style="width:10%">
-                <col style="width:4%">
-                <col style="width:4%">
+                <col style="width:5%">
+                <col style="width:9%">
                 <col style="width:12%">
-                <col style="width:6%">
-                <col style="width:10%">
-                <col style="width:11%">
                 {{else}}
                 <col style="width:3%">
-                <col style="width:25%">
+                <col style="width:19%">
+                <col style="width:5%">
+                <col style="width:5%">
+                <col style="width:5%">
+                <col style="width:8%">
+                <col style="width:3%">
+                <col style="width:3%">
                 <col style="width:6%">
+                <col style="width:9%">
                 <col style="width:5%">
                 <col style="width:7%">
-                <col style="width:3%">
-                <col style="width:3%">
+                <col style="width:5%">
+                <col style="width:7%">
                 <col style="width:10%">
-                <col style="width:5%">
-                <col style="width:7%">
-                <col style="width:5%">
-                <col style="width:7%">
-                <col style="width:14%">
                 {{/if}}
             </colgroup>
             <thead>
                 <tr>
-                    <td class="blk" colspan="{{#if is_interstate}}11{{else}}13{{/if}}">
+                    <td class="blk" colspan="{{#if is_interstate}}13{{else}}15{{/if}}">
                         <table class="cb">
                             <colgroup>
                                 <col style="width:20.7%">
@@ -205,18 +209,18 @@
                                 <td>Dated<br><b>{{formatDate buyer_order_date}}</b></td>
                             </tr>
                             <tr>
-                                <td colspan="2">
-                                    <span>Transporter Name: {{transporter_name}}</span>
-                                    <span>Transporter GST No: {{transporter_gst}}</span>
-                                    <span>Transport Via: {{transporter_mode}}</span>
-                                    <span>Bill of Lading/LR-RR No: {{bill_of_lading_number}}</span>
-                                    <span>Motor Vehicle No.: {{vehicle_number}}</span>
+                                <td colspan="3">
+                                    <div>Transporter Name: {{transporter_name}}</div>
+                                    <div>Transporter GST No: {{transporter_gst}}</div>
+                                    <div>Transport Via: {{transporter_mode}}</div>
+                                    <div>Bill of Lading/LR-RR No: {{bill_of_lading_number}}</div>
+                                    <div>Motor Vehicle No.: {{vehicle_number}}</div>
                                 </td>
-                                <td colspan="2">
-                                    <span>VE Project Code: {{project_code}}</span>
-                                    <span>Project Manager: {{project_manager}}</span>
-                                    <span>Phone Number: {{project_manager_phone}}</span>
-                                    <span>Email Id: {{project_manager_email}}</span>
+                                <td colspan="3">
+                                    <div>VE Project Code: {{project_code}}</div>
+                                    <div>Project Manager: {{project_manager}}</div>
+                                    <div>Phone Number: {{project_manager_phone}}</div>
+                                    <div>Email Id: {{project_manager_email}}</div>
                                 </td>
                             </tr>
                             <tr>
@@ -266,10 +270,12 @@
                     <th rowspan="2" style="padding:3px;">Sl.<br>No.</th>
                     <th rowspan="2" style="padding:3px;">Description of Goods</th>
                     <th rowspan="2" style="padding:3px;">HSN/SAC</th>
+                    <th rowspan="2" style="padding:3px;">BOQ Qty</th>
                     <th rowspan="2" style="padding:3px;">Qty</th>
                     <th rowspan="2" style="padding:3px;">Rate</th>
                     <th rowspan="2" style="padding:3px;">Per</th>
                     <th rowspan="2" style="padding:3px;">Disc. %</th>
+                    <th rowspan="2" style="padding:3px;">Disc. (₹)</th>
                     <th rowspan="2" style="padding:3px;">Taxable Value</th>
                     {{#if is_interstate}}
                     <th colspan="2" style="padding:3px;">IGST</th>
@@ -298,17 +304,23 @@
                     <td>{{inc @index}}</td>
                     <td>
                         {{#if this.boq_item_name}}
-                        <b>{{this.boq_item_name}}</b><br>
-                        {{this.po_item_description}}
+                        <b>{{this.boq_item_name}}</b>
+                        {{#if this.po_item_descriptions}}
+                        {{#each this.po_item_descriptions}}<br>{{this}}{{/each}}
+                        {{else}}
+                        <br>{{this.po_item_description}}
+                        {{/if}}
                         {{else}}
                         <b>{{this.po_item_description}}</b>
                         {{/if}}
                     </td>
                     <td>{{this.hsn_sac}}</td>
+                    <td style="text-align:right;">{{this.boq_quantity}}</td>
                     <td style="text-align:right;"><b>{{this.quantity}}</b></td>
                     <td style="text-align:right;">{{formatCurrency this.rate}}</td>
                     <td style="text-align:center;">{{this.unit}}</td>
                     <td style="text-align:center;">{{this.discount_percent}}%</td>
+                    <td style="text-align:center;">{{formatCurrency this.discount_amount}}</td>
                     <td style="text-align:right;"><b>{{formatCurrency this.taxable_value}}</b></td>
                     {{#if ../is_interstate}}
                     <td style="text-align:center;">{{this.igst_rate}}%</td>
@@ -324,40 +336,44 @@
                 {{/each}}
 
                 <tr>
-                    <td class="blk" colspan="{{#if is_interstate}}11{{else}}13{{/if}}">
+                    <td class="blk" colspan="{{#if is_interstate}}13{{else}}15{{/if}}">
                         <div class="keep-together">
                             <table style="font-size:8px;line-height:1.3;margin-top:-1px;">
                                 <colgroup>
                                     {{#if is_interstate}}
                                     <col style="width:4%">
-                                    <col style="width:25%">
-                                    <col style="width:8%">
+                                    <col style="width:20%">
                                     <col style="width:6%">
+                                    <col style="width:5%">
+                                    <col style="width:5%">
+                                    <col style="width:9%">
+                                    <col style="width:4%">
+                                    <col style="width:4%">
+                                    <col style="width:7%">
                                     <col style="width:10%">
-                                    <col style="width:4%">
-                                    <col style="width:4%">
+                                    <col style="width:5%">
+                                    <col style="width:9%">
                                     <col style="width:12%">
-                                    <col style="width:6%">
-                                    <col style="width:10%">
-                                    <col style="width:11%">
                                     {{else}}
                                     <col style="width:3%">
-                                    <col style="width:25%">
+                                    <col style="width:19%">
+                                    <col style="width:5%">
+                                    <col style="width:5%">
+                                    <col style="width:5%">
+                                    <col style="width:8%">
+                                    <col style="width:3%">
+                                    <col style="width:3%">
                                     <col style="width:6%">
+                                    <col style="width:9%">
                                     <col style="width:5%">
                                     <col style="width:7%">
-                                    <col style="width:3%">
-                                    <col style="width:3%">
+                                    <col style="width:5%">
+                                    <col style="width:7%">
                                     <col style="width:10%">
-                                    <col style="width:5%">
-                                    <col style="width:7%">
-                                    <col style="width:5%">
-                                    <col style="width:7%">
-                                    <col style="width:14%">
                                     {{/if}}
                                 </colgroup>
                                 <tr>
-                                    <td colspan="7" style="text-align:right;"><b>Line Item Subtotal</b></td>
+                                    <td colspan="9" style="text-align:right;"><b>Line Item Subtotal</b></td>
                                     <td style="text-align:right;">{{formatCurrency line_item_subtotal}}</td>
                                     {{#if is_interstate}}
                                     <td></td>
@@ -373,7 +389,7 @@
 
                                 {{#if freight}}
                                 <tr>
-                                    <td colspan="7" style="text-align:right;">Freight</td>
+                                    <td colspan="9" style="text-align:right;">Freight</td>
                                     <td style="text-align:right;">{{formatCurrency freight}}</td>
                                     <td colspan="{{#if is_interstate}}2{{else}}4{{/if}}"></td>
                                     <td style="text-align:right;">{{formatCurrency freight}}</td>
@@ -382,7 +398,7 @@
 
                                 {{#if other_charges}}
                                 <tr>
-                                    <td colspan="7" style="text-align:right;">Other Charges</td>
+                                    <td colspan="9" style="text-align:right;">Other Charges</td>
                                     <td style="text-align:right;">{{formatCurrency other_charges}}</td>
                                     <td colspan="{{#if is_interstate}}2{{else}}4{{/if}}"></td>
                                     <td style="text-align:right;">{{formatCurrency other_charges}}</td>
@@ -391,7 +407,7 @@
 
                                 {{#if round_off}}
                                 <tr>
-                                    <td colspan="7" style="text-align:right;">Round Off</td>
+                                    <td colspan="9" style="text-align:right;">Round Off</td>
                                     <td style="text-align:right;">{{formatCurrency round_off}}</td>
                                     <td colspan="{{#if is_interstate}}2{{else}}4{{/if}}"></td>
                                     <td style="text-align:right;">{{formatCurrency round_off}}</td>
@@ -399,7 +415,7 @@
                                 {{/if}}
 
                                 <tr>
-                                    <td colspan="7" style="text-align:right;"><b>Grand Total</b></td>
+                                    <td colspan="9" style="text-align:right;"><b>Grand Total</b></td>
                                     <td style="text-align:right;"><b>{{formatCurrency taxable_value}}</b></td>
                                     {{#if is_interstate}}
                                     <td></td>
@@ -413,7 +429,7 @@
                                     <td style="text-align:right;"><b>{{formatCurrency grand_total}}</b></td>
                                 </tr>
                                 <tr>
-                                    <td colspan="{{#if is_interstate}}10{{else}}11{{/if}}">
+                                    <td colspan="{{#if is_interstate}}12{{else}}13{{/if}}">
                                         Amount Chargeable (in words): <b>{{amount_in_words}}</b>
                                     </td>
                                     <td style="text-align:right;" colspan="{{#if is_interstate}}1{{else}}2{{/if}}">E
