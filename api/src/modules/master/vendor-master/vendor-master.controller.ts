@@ -5,6 +5,7 @@ import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
 import { PermissionGuard } from "@/modules/auth/guards/permission.guard";
 import { MergeVendorsGuard } from "@/modules/master/vendor-master/merge-vendors.guard";
 import { VendorMasterService } from "@/modules/master/vendor-master/vendor-master.service";
+import { isRealMsmeNumber } from "@/modules/master/vendor-master/msme";
 
 const VendorOrganizationFields = z.object({
     name: z.string().min(1).max(255),
@@ -21,10 +22,11 @@ const VendorOrganizationFields = z.object({
     status: z.boolean().optional().default(true),
 });
 
-// An MSME number is only meaningful once its type (M/S) is known, so reject the
-// number alone. Existing rows are unaffected: this applies to incoming payloads only.
+// A real MSME number is only meaningful once its type (M/S) is known, so reject
+// the number alone. Placeholder values such as "NA" or "unknown" do not require a
+// type. Existing rows are unaffected: this applies to incoming payloads only.
 const requireMsmeType = (val: { msme?: string | null | undefined; msmeType?: "M" | "S" | "T" | null | undefined }, ctx: z.RefinementCtx) => {
-    if (val.msme?.trim() && !val.msmeType) {
+    if (isRealMsmeNumber(val.msme) && !val.msmeType) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["msmeType"],
