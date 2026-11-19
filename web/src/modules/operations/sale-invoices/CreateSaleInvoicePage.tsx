@@ -31,6 +31,7 @@ import { InventoryItemCombobox } from "./components/InventoryItemCombobox";
 import { TransporterDialog, type TransporterPayload } from "./components/TransporterDialog";
 import { WoAddressDialog, type WoAddressPayload } from "./components/WoAddressDialog";
 import { formatCurrency, formatDateForInput, getGstStateName, mapSaleInvoiceFormToCreateDTO } from "./helpers/saleInvoice.mapper";
+import { calculateSaleInvoice } from "./helpers/saleInvoice.calculations";
 import { saleInvoiceFormSchema, stepOneFields, stepTwoFields, type SaleInvoiceFormValues } from "./helpers/saleInvoice.schema";
 import type { ProjectInventoryItem } from "./helpers/saleInvoice.types";
 
@@ -276,23 +277,12 @@ export default function CreateSaleInvoicePage() {
         [inventoryItems, usedProductIds],
     );
 
-    const calculations = useMemo(() => {
-        let subtotal = 0;
-        let totalGst = 0;
-        items.forEach((item) => {
-            const qty = Number(item?.qty || 0);
-            const rate = Number(item?.rate || 0);
-            const gstRate = Number(item?.gstRate || 0);
-            const lineTotal = qty * rate;
-            subtotal += lineTotal;
-            totalGst += (lineTotal * gstRate) / 100;
-        });
-        return { subtotal, totalGst };
-    }, [items]);
+    const calculations = useMemo(() => calculateSaleInvoice(items, boqRows), [items, boqRows]);
+    const totals = calculations.totals;
 
     const grandTotal =
-        calculations.subtotal +
-        calculations.totalGst +
+        totals.subtotal +
+        totals.totalGst +
         Number(fv.freight || 0) +
         Number(fv.otherCharges || 0) +
         Number(fv.roundOff || 0);
@@ -438,17 +428,34 @@ export default function CreateSaleInvoicePage() {
 
     const appendToLine = (srNo: number, item: ProjectInventoryItem) => {
         if (usedProductIds.has(item.id)) return;
+        const boq = hasBoq ? boqRows.find((b) => b.srNo === srNo) : undefined;
+        const existingDiscount = (form.getValues("items") as any[]).find(
+            (it) => Number(it?.lineItemSrNo) === srNo,
+        )?.discountPercent;
         append({
             lineItemSrNo: srNo,
-            itemDescription: item.description,
+            itemDescription: boq?.itemDescription ?? item.description,
             qty: item.remainingQty,
-            rate: item.rate,
-            gstRate: item.gstRate,
+            rate: boq ? Number(boq.rate || 0) : item.rate,
+            gstRate: boq ? Number(boq.gstRate || 0) : item.gstRate,
+            discountPercent: Number(existingDiscount) || 0,
             purchaseOrderProductId: item.id,
             unit: item.unit || "NOS",
             hsnSac: item.hsnSac || undefined,
         } as any);
         void form.trigger([...stepOneFields]);
+    };
+
+    const setGroupDiscount = (srNo: number, value: number) => {
+        const clamped = Math.min(100, Math.max(0, Number.isFinite(value) ? value : 0));
+        (form.getValues("items") as any[]).forEach((item, index) => {
+            if (Number(item?.lineItemSrNo) === srNo) {
+                form.setValue(`items.${index}.discountPercent` as any, clamped, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                });
+            }
+        });
     };
 
     const goNext = async () => {
@@ -561,8 +568,10 @@ export default function CreateSaleInvoicePage() {
         }
     };
 
-    const groupAmount = (indexes: number[]) =>
-        indexes.reduce((sum, i) => sum + Number(items[i]?.qty || 0) * Number(items[i]?.rate || 0), 0);
+    const groupAmount = (indexes: number[]) => {
+        const srNo = Number(items[indexes[0]]?.lineItemSrNo ?? 0);
+        return calculations.lines.get(srNo)?.taxable ?? 0;
+    };
 
     const isLoading = isProjectLoading || isWoDataLoading;
 
@@ -627,17 +636,30 @@ export default function CreateSaleInvoicePage() {
                                             <Table>
                                                 <TableHeader>
                                                     <TableRow>
-                                                        <TableHead className="w-[6%]"></TableHead>
-                                                        <TableHead className="w-[8%]">SR</TableHead>
-                                                        <TableHead className="w-[46%]">Description</TableHead>
-                                                        <TableHead className="w-[12%] text-right">BOQ Qty</TableHead>
-                                                        <TableHead className="w-[14%] text-right">Rate</TableHead>
-                                                        <TableHead className="w-[14%] text-right">Amount</TableHead>
+                                                        <TableHead className="w-[5%]"></TableHead>
+                                                        <TableHead className="w-[6%]">SR</TableHead>
+                                                        <TableHead className="w-[30%]">Description</TableHead>
+                                                        <TableHead className="w-[9%] text-right">Qty</TableHead>
+                                                        <TableHead className="w-[10%] text-right">Rate</TableHead>
+                                                        <TableHead className="w-[11%] text-right">Basic Amount</TableHead>
+                                                        <TableHead className="w-[8%] text-right">GST %</TableHead>
+                                                        <TableHead className="w-[10%] text-right">GST Amount</TableHead>
+                                                        <TableHead className="w-[11%] text-right">Total Amount</TableHead>
                                                     </TableRow>
                                                 </TableHeader>
                                                 <TableBody>
                                                     {boqRows.map((b) => {
                                                         const checked = selectedLineSrNos.includes(b.srNo);
+                                                        const qty = Number(b.quantity || 0);
+                                                        const rate = Number(b.rate || 0);
+                                                        const basicAmount = b.amount ? Number(b.amount) : qty * rate;
+                                                        const gstRate = Number(b.gstRate || 0);
+                                                        const gstAmount = b.gstAmount
+                                                            ? Number(b.gstAmount)
+                                                            : (basicAmount * gstRate) / 100;
+                                                        const totalAmount = b.totalAmount
+                                                            ? Number(b.totalAmount)
+                                                            : basicAmount + gstAmount;
                                                         return (
                                                             <TableRow
                                                                 key={b.id}
@@ -650,20 +672,27 @@ export default function CreateSaleInvoicePage() {
                                                                     />
                                                                 </TableCell>
                                                                 <TableCell className="font-mono text-sm">{b.srNo}</TableCell>
-                                                                <TableCell className="text-sm">{b.itemDescription}</TableCell>
+                                                                <TableCell className="text-xs whitespace-normal [overflow-wrap:anywhere]">{b.itemDescription}</TableCell>
                                                                 <TableCell className="text-right tabular-nums">{b.quantity}</TableCell>
                                                                 <TableCell className="text-right tabular-nums">
-                                                                    {formatCurrency(Number(b.rate || 0))}
+                                                                    {formatCurrency(rate)}
+                                                                </TableCell>
+                                                                <TableCell className="text-right tabular-nums">
+                                                                    {formatCurrency(basicAmount)}
+                                                                </TableCell>
+                                                                <TableCell className="text-right tabular-nums">{gstRate}%</TableCell>
+                                                                <TableCell className="text-right tabular-nums">
+                                                                    {formatCurrency(gstAmount)}
                                                                 </TableCell>
                                                                 <TableCell className="text-right tabular-nums font-medium">
-                                                                    {b.amount ? formatCurrency(Number(b.amount)) : "-"}
+                                                                    {formatCurrency(totalAmount)}
                                                                 </TableCell>
                                                             </TableRow>
                                                         );
                                                     })}
                                                     {boqRows.length === 0 && (
                                                         <TableRow>
-                                                            <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
+                                                            <TableCell colSpan={9} className="text-center py-6 text-muted-foreground">
                                                                 No billing BOQ lines found.
                                                             </TableCell>
                                                         </TableRow>
@@ -688,7 +717,16 @@ export default function CreateSaleInvoicePage() {
                                 </div>
 
                                 <div className="space-y-4">
-                                    {groups.map((g) => (
+                                    {groups.map((g) => {
+                                        const lineCalc = calculations.lines.get(g.srNo);
+                                        const groupQty = g.indexes.reduce(
+                                            (sum, i) => sum + Number(items[i]?.qty || 0),
+                                            0,
+                                        );
+                                        const boqRate = lineCalc?.rate ?? Number(g.boq?.rate || 0);
+                                        const groupDiscount = lineCalc?.discountPercent ?? Number(items[g.indexes[0]]?.discountPercent || 0);
+                                        const groupDiscountAmount = lineCalc?.discount ?? 0;
+                                        return (
                                         <div key={g.srNo} className="rounded-lg border p-4 space-y-3">
                                             <div className="flex items-start justify-between gap-3 flex-wrap">
                                                 <div>
@@ -699,7 +737,7 @@ export default function CreateSaleInvoicePage() {
                                                     {g.boq && (
                                                         <p className="text-xs text-muted-foreground">
                                                             BOQ Qty {g.boq.quantity} × Rate{" "}
-                                                            {formatCurrency(Number(g.boq.rate || 0))}
+                                                            {formatCurrency(boqRate)}
                                                             {g.boq.amount ? ` = ${formatCurrency(Number(g.boq.amount))}` : ""}
                                                         </p>
                                                     )}
@@ -727,20 +765,60 @@ export default function CreateSaleInvoicePage() {
                                                 <Table>
                                                     <TableHeader>
                                                         <TableRow>
-                                                            <TableHead className="w-[5%]">#</TableHead>
-                                                            <TableHead className="w-[40%]">PO Item</TableHead>
-                                                            <TableHead className="w-[10%]">Qty *</TableHead>
-                                                            <TableHead className="w-[12%]">Rate (₹) *</TableHead>
-                                                            <TableHead className="w-[9%]">GST %</TableHead>
-                                                            <TableHead className="w-[14%] text-right">Amount</TableHead>
-                                                            <TableHead className="w-[5%]"></TableHead>
+                                                            <TableHead className="w-[4%]">#</TableHead>
+                                                            <TableHead className={hasBoq ? "w-[34%]" : "w-[56%]"}>Description</TableHead>
+                                                            {hasBoq && <TableHead className="w-[8%] text-right">BOQ Qty</TableHead>}
+                                                            <TableHead className="w-[8%] text-right">{hasBoq ? "Mapped Qty *" : "Qty *"}</TableHead>
+                                                            <TableHead className="w-[9%] text-right">Rate (₹)</TableHead>
+                                                            <TableHead className="w-[7%] text-right">GST %</TableHead>
+                                                            {hasBoq && <TableHead className="w-[7%] text-right">Disc %</TableHead>}
+                                                            {hasBoq && <TableHead className="w-[8%] text-right">Disc Amt</TableHead>}
+                                                            <TableHead className="w-[11%] text-right">Amount</TableHead>
+                                                            <TableHead className="w-[4%]"></TableHead>
                                                         </TableRow>
                                                     </TableHeader>
                                                     <TableBody>
+                                                        {hasBoq && g.boq && g.indexes.length > 0 && (
+                                                            <TableRow className="bg-muted/40 hover:bg-muted/50">
+                                                                <TableCell />
+                                                                <TableCell className="text-sm font-medium">
+                                                                    <span className="inline-flex items-center gap-1.5">
+                                                                        {g.boq.itemDescription}
+                                                                        <Badge variant="secondary" className="text-[10px]">BOQ</Badge>
+                                                                    </span>
+                                                                </TableCell>
+                                                                <TableCell className="text-right tabular-nums">{g.boq.quantity}</TableCell>
+                                                                <TableCell className="text-right tabular-nums">{groupQty}</TableCell>
+                                                                <TableCell className="text-right tabular-nums">
+                                                                    {formatCurrency(boqRate)}
+                                                                </TableCell>
+                                                                <TableCell className="text-right tabular-nums">
+                                                                    {Number(g.boq.gstRate || 0)}%
+                                                                </TableCell>
+                                                                <TableCell className="p-1 text-right">
+                                                                    <NumberInput
+                                                                        value={groupDiscount}
+                                                                        onChange={(v) => setGroupDiscount(g.srNo, Number(v ?? 0))}
+                                                                        min={0}
+                                                                        max={100}
+                                                                        step={0.01}
+                                                                        placeholder="0"
+                                                                        className="h-8 text-right"
+                                                                    />
+                                                                </TableCell>
+                                                                <TableCell className="text-right tabular-nums text-muted-foreground">
+                                                                    {formatCurrency(groupDiscountAmount)}
+                                                                </TableCell>
+                                                                <TableCell className="text-right tabular-nums font-medium">
+                                                                    {formatCurrency(lineCalc?.taxable ?? 0)}
+                                                                </TableCell>
+                                                                <TableCell />
+                                                            </TableRow>
+                                                        )}
                                                         {g.indexes.length === 0 && (
                                                             <TableRow>
                                                                 <TableCell
-                                                                    colSpan={7}
+                                                                    colSpan={hasBoq ? 10 : 7}
                                                                     className="text-center py-6 text-sm text-muted-foreground"
                                                                 >
                                                                     No PO items mapped to this line yet.
@@ -756,6 +834,10 @@ export default function CreateSaleInvoicePage() {
                                                                 : undefined;
                                                             const qty = Number(item?.qty ?? 0);
                                                             const rate = Number(item?.rate ?? 0);
+                                                            const discountPercent = Number(item?.discountPercent ?? 0);
+                                                            const rowCalc = calculations.rowCalcs.get(index);
+                                                            const rowDiscount = rowCalc?.discount ?? 0;
+                                                            const rowAmount = rowCalc?.taxable ?? 0;
                                                             const rowIssues = rowErrorMessages(index);
                                                             return (
                                                                 <TableRow key={fields[index]?.id ?? index} className="group">
@@ -763,20 +845,7 @@ export default function CreateSaleInvoicePage() {
                                                                         {rowIndex + 1}
                                                                     </TableCell>
                                                                     <TableCell className="p-1 align-top pt-2">
-                                                                        <FieldWrapper
-                                                                            control={form.control}
-                                                                            name={`items.${index}.itemDescription` as any}
-                                                                            label=""
-                                                                        >
-                                                                            {(fieldProps) => (
-                                                                                <Textarea
-                                                                                    readOnly
-                                                                                    {...fieldProps}
-                                                                                    rows={2}
-                                                                                    className="min-h-[36px]"
-                                                                                />
-                                                                            )}
-                                                                        </FieldWrapper>
+                                                                        <p className="text-sm">{linkedItem?.description ?? item.itemDescription}</p>
                                                                         <div className="flex flex-wrap items-center gap-1.5 mt-1">
                                                                             {linkedItem && (
                                                                                 <Badge
@@ -799,6 +868,7 @@ export default function CreateSaleInvoicePage() {
                                                                             </p>
                                                                         ))}
                                                                     </TableCell>
+                                                                    {hasBoq && <TableCell />}
                                                                     <TableCell className="p-1 align-top pt-2">
                                                                         <FieldWrapper
                                                                             control={form.control}
@@ -827,34 +897,56 @@ export default function CreateSaleInvoicePage() {
                                                                         </FieldWrapper>
                                                                     </TableCell>
                                                                     <TableCell className="p-1 align-top pt-2">
-                                                                        <FieldWrapper
-                                                                            control={form.control}
-                                                                            name={`items.${index}.rate` as any}
-                                                                            label=""
-                                                                        >
-                                                                            {(fieldProps) => (
-                                                                                <NumberInput
-                                                                                    value={fieldProps.value}
-                                                                                    onChange={fieldProps.onChange}
-                                                                                    min={0}
-                                                                                    step={0.01}
-                                                                                    placeholder="0"
-                                                                                    className="h-9 text-right"
-                                                                                />
-                                                                            )}
-                                                                        </FieldWrapper>
+                                                                        {hasBoq ? (
+                                                                            <div className="pt-2 text-right text-sm tabular-nums">
+                                                                                {formatCurrency(rate)}
+                                                                            </div>
+                                                                        ) : (
+                                                                            <FieldWrapper
+                                                                                control={form.control}
+                                                                                name={`items.${index}.rate` as any}
+                                                                                label=""
+                                                                            >
+                                                                                {(fieldProps) => (
+                                                                                    <NumberInput
+                                                                                        value={fieldProps.value}
+                                                                                        onChange={fieldProps.onChange}
+                                                                                        min={0}
+                                                                                        step={0.01}
+                                                                                        placeholder="0"
+                                                                                        className="h-9 text-right"
+                                                                                    />
+                                                                                )}
+                                                                            </FieldWrapper>
+                                                                        )}
                                                                     </TableCell>
                                                                     <TableCell className="p-1 align-top pt-2">
-                                                                        <SelectField
-                                                                            control={form.control}
-                                                                            name={`items.${index}.gstRate` as any}
-                                                                            label=""
-                                                                            options={GST_OPTIONS}
-                                                                            placeholder="GST"
-                                                                        />
+                                                                        {hasBoq ? (
+                                                                            <div className="pt-2 text-right text-sm tabular-nums">
+                                                                                {Number(item?.gstRate || 0)}%
+                                                                            </div>
+                                                                        ) : (
+                                                                            <SelectField
+                                                                                control={form.control}
+                                                                                name={`items.${index}.gstRate` as any}
+                                                                                label=""
+                                                                                options={GST_OPTIONS}
+                                                                                placeholder="GST"
+                                                                            />
+                                                                        )}
                                                                     </TableCell>
+                                                                    {hasBoq && (
+                                                                        <TableCell className="pt-4 text-right text-sm tabular-nums text-muted-foreground">
+                                                                            {discountPercent}%
+                                                                        </TableCell>
+                                                                    )}
+                                                                    {hasBoq && (
+                                                                        <TableCell className="pt-4 text-right text-sm tabular-nums text-muted-foreground">
+                                                                            {formatCurrency(rowDiscount)}
+                                                                        </TableCell>
+                                                                    )}
                                                                     <TableCell className="p-1 text-right align-top pt-4 font-medium tabular-nums">
-                                                                        {qty > 0 && rate > 0 ? formatCurrency(qty * rate) : "-"}
+                                                                        {qty > 0 && rate > 0 ? formatCurrency(rowAmount) : "-"}
                                                                     </TableCell>
                                                                     <TableCell className="p-1 align-top pt-2">
                                                                         <Button
@@ -874,24 +966,35 @@ export default function CreateSaleInvoicePage() {
                                                 </Table>
                                             </div>
                                         </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
 
                                 <div className="rounded-lg border bg-muted/30 p-4 flex flex-wrap justify-between gap-6">
                                     <div>
+                                        <p className="text-xs text-muted-foreground">Gross</p>
+                                        <p className="font-semibold tabular-nums">{formatCurrency(totals.gross)}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">Discount</p>
+                                        <p className="font-semibold tabular-nums text-destructive">
+                                            -{formatCurrency(totals.discount)}
+                                        </p>
+                                    </div>
+                                    <div>
                                         <p className="text-xs text-muted-foreground">Subtotal (Pre-GST)</p>
-                                        <p className="font-semibold tabular-nums">{formatCurrency(calculations.subtotal)}</p>
+                                        <p className="font-semibold tabular-nums">{formatCurrency(totals.subtotal)}</p>
                                     </div>
                                     <div>
                                         <p className="text-xs text-muted-foreground">GST</p>
                                         <p className="font-semibold tabular-nums text-blue-600">
-                                            {formatCurrency(calculations.totalGst)}
+                                            {formatCurrency(totals.totalGst)}
                                         </p>
                                     </div>
                                     <div>
                                         <p className="text-xs text-muted-foreground">Total</p>
                                         <p className="font-bold tabular-nums">
-                                            {formatCurrency(calculations.subtotal + calculations.totalGst)}
+                                            {formatCurrency(totals.subtotal + totals.totalGst)}
                                         </p>
                                     </div>
                                 </div>
@@ -1318,7 +1421,14 @@ export default function CreateSaleInvoicePage() {
                                 </div>
 
                                 <div className="space-y-4">
-                                    {groups.map((g) => (
+                                    {groups.map((g) => {
+                                        const lineCalc = calculations.lines.get(g.srNo);
+                                        const groupQty = g.indexes.reduce(
+                                            (sum, i) => sum + Number(items[i]?.qty || 0),
+                                            0,
+                                        );
+                                        const groupDiscount = lineCalc?.discountPercent ?? Number(items[g.indexes[0]]?.discountPercent || 0);
+                                        return (
                                         <div key={g.srNo} className="rounded-lg border overflow-hidden">
                                             <div className="bg-muted/50 px-4 py-2 flex items-center justify-between gap-3">
                                                 <span className="font-medium text-sm">
@@ -1331,19 +1441,50 @@ export default function CreateSaleInvoicePage() {
                                             <Table>
                                                 <TableHeader>
                                                     <TableRow>
-                                                        <TableHead className="w-[8%]">SR</TableHead>
-                                                        <TableHead className="w-[40%]">PO Item</TableHead>
-                                                        <TableHead className="w-[12%] text-right">Qty</TableHead>
-                                                        <TableHead className="w-[13%] text-right">Rate</TableHead>
-                                                        <TableHead className="w-[9%] text-right">GST</TableHead>
-                                                        <TableHead className="w-[18%] text-right">Amount</TableHead>
+                                                        <TableHead className="w-[6%]">SR</TableHead>
+                                                        <TableHead className={hasBoq ? "w-[32%]" : "w-[55%]"}>Description</TableHead>
+                                                        {hasBoq && <TableHead className="w-[8%] text-right">BOQ Qty</TableHead>}
+                                                        <TableHead className="w-[9%] text-right">{hasBoq ? "Mapped Qty" : "Qty"}</TableHead>
+                                                        <TableHead className="w-[10%] text-right">Rate</TableHead>
+                                                        <TableHead className="w-[7%] text-right">GST</TableHead>
+                                                        {hasBoq && <TableHead className="w-[7%] text-right">Disc %</TableHead>}
+                                                        {hasBoq && <TableHead className="w-[8%] text-right">Disc Amt</TableHead>}
+                                                        <TableHead className="w-[13%] text-right">Amount</TableHead>
                                                     </TableRow>
                                                 </TableHeader>
                                                 <TableBody>
                                                     {g.indexes.length === 0 && (
                                                         <TableRow>
-                                                            <TableCell colSpan={6} className="text-center py-4 text-muted-foreground text-sm">
+                                                            <TableCell colSpan={hasBoq ? 9 : 6} className="text-center py-4 text-muted-foreground text-sm">
                                                                 No items mapped to this line.
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    )}
+                                                    {hasBoq && g.boq && g.indexes.length > 0 && (
+                                                        <TableRow className="bg-muted/30">
+                                                            <TableCell className="font-mono text-sm">{g.srNo}</TableCell>
+                                                            <TableCell className="text-sm font-medium">
+                                                                <span className="inline-flex items-center gap-1.5">
+                                                                    {g.boq.itemDescription}
+                                                                    <Badge variant="secondary" className="text-[10px]">BOQ</Badge>
+                                                                </span>
+                                                            </TableCell>
+                                                            <TableCell className="text-right tabular-nums">{g.boq.quantity}</TableCell>
+                                                            <TableCell className="text-right tabular-nums">{groupQty}</TableCell>
+                                                            <TableCell className="text-right tabular-nums">
+                                                                {formatCurrency(Number(g.boq.rate || 0))}
+                                                            </TableCell>
+                                                            <TableCell className="text-right tabular-nums">
+                                                                {Number(g.boq.gstRate || 0)}%
+                                                            </TableCell>
+                                                            <TableCell className="text-right tabular-nums text-muted-foreground">
+                                                                {groupDiscount}%
+                                                            </TableCell>
+                                                            <TableCell className="text-right tabular-nums text-muted-foreground">
+                                                                {formatCurrency(lineCalc?.discount ?? 0)}
+                                                            </TableCell>
+                                                            <TableCell className="text-right tabular-nums font-medium">
+                                                                {formatCurrency(lineCalc?.taxable ?? 0)}
                                                             </TableCell>
                                                         </TableRow>
                                                     )}
@@ -1356,17 +1497,21 @@ export default function CreateSaleInvoicePage() {
                                                             : undefined;
                                                         const qty = Number(item?.qty ?? 0);
                                                         const rate = Number(item?.rate ?? 0);
+                                                        const discountPercent = Number(item?.discountPercent ?? 0);
+                                                        const rowCalc = calculations.rowCalcs.get(index);
+                                                        const rowDiscount = rowCalc?.discount ?? 0;
                                                         return (
                                                             <TableRow key={fields[index]?.id ?? index}>
                                                                 <TableCell className="font-mono text-sm">{g.srNo || "—"}</TableCell>
                                                                 <TableCell className="text-sm">
-                                                                    <span className="block">{item.itemDescription}</span>
+                                                                    <span className="block">{linkedItem?.description ?? item.itemDescription}</span>
                                                                     {linkedItem && (
                                                                         <Badge variant="secondary" className="text-[10px] font-mono mt-1">
                                                                             PO: {linkedItem.poNumber}
                                                                         </Badge>
                                                                     )}
                                                                 </TableCell>
+                                                                {hasBoq && <TableCell />}
                                                                 <TableCell className="text-right tabular-nums">
                                                                     {qty} {item.unit || ""}
                                                                 </TableCell>
@@ -1376,8 +1521,18 @@ export default function CreateSaleInvoicePage() {
                                                                 <TableCell className="text-right tabular-nums">
                                                                     {Number(item?.gstRate || 0)}%
                                                                 </TableCell>
+                                                                {hasBoq && (
+                                                                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                                                                        {discountPercent}%
+                                                                    </TableCell>
+                                                                )}
+                                                                {hasBoq && (
+                                                                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                                                                        {formatCurrency(rowDiscount)}
+                                                                    </TableCell>
+                                                                )}
                                                                 <TableCell className="text-right tabular-nums font-medium">
-                                                                    {formatCurrency(qty * rate)}
+                                                                    {formatCurrency(rowCalc?.taxable ?? 0)}
                                                                 </TableCell>
                                                             </TableRow>
                                                         );
@@ -1385,7 +1540,8 @@ export default function CreateSaleInvoicePage() {
                                                 </TableBody>
                                             </Table>
                                         </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
 
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1436,13 +1592,23 @@ export default function CreateSaleInvoicePage() {
                                     <div className="rounded-lg border p-4 space-y-2 h-fit">
                                         <h4 className="font-semibold text-sm mb-2">Totals</h4>
                                         <div className="flex items-center justify-between text-sm">
+                                            <span className="text-muted-foreground">Gross</span>
+                                            <span className="tabular-nums">{formatCurrency(totals.gross)}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span className="text-muted-foreground">Discount</span>
+                                            <span className="tabular-nums text-destructive">
+                                                -{formatCurrency(totals.discount)}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-sm">
                                             <span className="text-muted-foreground">Subtotal (Pre-GST)</span>
-                                            <span className="tabular-nums">{formatCurrency(calculations.subtotal)}</span>
+                                            <span className="tabular-nums">{formatCurrency(totals.subtotal)}</span>
                                         </div>
                                         <div className="flex items-center justify-between text-sm">
                                             <span className="text-muted-foreground">GST</span>
                                             <span className="tabular-nums text-blue-600">
-                                                {formatCurrency(calculations.totalGst)}
+                                                {formatCurrency(totals.totalGst)}
                                             </span>
                                         </div>
                                         <div className="flex items-center justify-between text-sm">

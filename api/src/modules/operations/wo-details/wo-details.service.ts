@@ -1463,6 +1463,9 @@ export class WoDetailsService {
             quantity: item.quantity,
             rate: item.rate,
             amount: item.amount,
+            gstRate: item.gstRate,
+            gstAmount: item.gstAmount,
+            totalAmount: item.totalAmount,
             sortOrder: item.sortOrder,
             createdAt: item.createdAt.toISOString(),
             updatedAt: item.updatedAt.toISOString(),
@@ -1474,6 +1477,9 @@ export class WoDetailsService {
             quantity: item.quantity,
             rate: item.rate,
             amount: item.amount,
+            gstRate: item.gstRate,
+            gstAmount: item.gstAmount,
+            totalAmount: item.totalAmount,
             sortOrder: item.sortOrder,
             createdAt: item.createdAt.toISOString(),
             updatedAt: item.updatedAt.toISOString(),
@@ -1756,6 +1762,33 @@ export class WoDetailsService {
     }
   }
 
+  private buildBoqRows(
+    items: NonNullable<SavePage4Dto['billingBoq']>,
+    woDetailId: number,
+    now: Date,
+  ) {
+    return items.map((item, index) => {
+      const basicAmount = parseFloat(item.quantity) * parseFloat(item.rate);
+      const gstRate = item.gstRate ? parseFloat(item.gstRate) : 0;
+      const gstAmount = (basicAmount * gstRate) / 100;
+
+      return {
+        woDetailId,
+        srNo: item.srNo,
+        itemDescription: item.itemDescription,
+        quantity: item.quantity,
+        rate: item.rate,
+        amount: basicAmount.toFixed(2),
+        gstRate: gstRate.toFixed(2),
+        gstAmount: gstAmount.toFixed(2),
+        totalAmount: (basicAmount + gstAmount).toFixed(2),
+        sortOrder: item.sortOrder ?? index + 1,
+        createdAt: now,
+        updatedAt: now,
+      };
+    });
+  }
+
   private async savePage4Data(woDetailId: number, data: SavePage4Dto) {
     const now = new Date();
 
@@ -1766,19 +1799,7 @@ export class WoDetailsService {
         .where(eq(woBillingBoq.woDetailId, woDetailId));
 
       if (data.billingBoq.length > 0) {
-        const billingItems = data.billingBoq.map((item, index) => ({
-          woDetailId,
-          srNo: item.srNo,
-          itemDescription: item.itemDescription,
-          quantity: item.quantity,
-          rate: item.rate,
-          amount: (
-            parseFloat(item.quantity) * parseFloat(item.rate)
-          ).toFixed(2),
-          sortOrder: item.sortOrder ?? index + 1,
-          createdAt: now,
-          updatedAt: now,
-        }));
+        const billingItems = this.buildBoqRows(data.billingBoq, woDetailId, now);
         await this.db.insert(woBillingBoq).values(billingItems);
       }
     }
@@ -1790,19 +1811,7 @@ export class WoDetailsService {
         .where(eq(woBuybackBoq.woDetailId, woDetailId));
 
       if (data.buybackBoq.length > 0) {
-        const buybackItems = data.buybackBoq.map((item, index) => ({
-          woDetailId,
-          srNo: item.srNo,
-          itemDescription: item.itemDescription,
-          quantity: item.quantity,
-          rate: item.rate,
-          amount: (
-            parseFloat(item.quantity) * parseFloat(item.rate)
-          ).toFixed(2),
-          sortOrder: item.sortOrder ?? index + 1,
-          createdAt: now,
-          updatedAt: now,
-        }));
+        const buybackItems = this.buildBoqRows(data.buybackBoq, woDetailId, now);
         await this.db.insert(woBuybackBoq).values(buybackItems);
       }
     }
@@ -1865,7 +1874,7 @@ export class WoDetailsService {
   private calculateTotal(items: any[]): string {
     if (!items || items.length === 0) return '0.00';
     const total = items.reduce((sum, item) => {
-      const amount = parseFloat(item.amount || '0');
+      const amount = parseFloat(item.totalAmount ?? item.amount ?? '0');
       return sum + (isNaN(amount) ? 0 : amount);
     }, 0);
     return total.toFixed(2);

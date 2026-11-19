@@ -19,7 +19,7 @@ export const KNOWN_CONTEXTS = [
     'bg-sfms-conf', 'bg-fdr-copy', 'bg-ext-letter', 'bg-docket-slip',
     'bg-stamp-covering-letter', 'bg-cancell-confirm', 'bg-upload',
     'bg-signed-covering-letter', 'fdr-format-imran',
-    'fdr-prefilled-signed', 'fdr-sfms-confirmation', 'fdr-request-letter-email',
+    'fdr-prefilled-signed', 'fdr-copy', 'fdr-sfms-confirmation', 'fdr-request-letter-email',
     'fdr-docket-slip', 'fdr-covering-letter', 'fdr-req-receive', 'dd-format-imran',
     'dd-prefilled-signed', 'dd-request-letter-email', 'dd-docket-slip',
     'dd-covering-letter', 'cheque-format-imran', 'cheque-prefilled-signed',

@@ -17,9 +17,18 @@ interface ProjectSummarySheetSectionProps {
 
 function BoqTable(
     { title, icon, items }: 
-    { title: string; icon: React.ReactNode; items: Array<{ srNo: number; itemDescription: string; quantity: string; rate: string; amount: string | null }>}
+    { title: string; icon: React.ReactNode; items: Array<{ srNo: number; itemDescription: string; quantity: string; rate: string; amount: string | null; gstRate: string | null; gstAmount: string | null; totalAmount: string | null }>}
 ) {
-    const total = items.reduce((sum, item) => sum + parseFloat(item.amount || "0"), 0);
+    const getRowValues = (item: (typeof items)[number]) => {
+        const quantity = parseFloat(item.quantity) || 0;
+        const rate = parseFloat(item.rate) || 0;
+        const basicAmount = item.amount ? parseFloat(item.amount) : quantity * rate;
+        const gstRate = item.gstRate ? parseFloat(item.gstRate) : 0;
+        const gstAmount = item.gstAmount ? parseFloat(item.gstAmount) : (basicAmount * gstRate) / 100;
+        const totalAmount = item.totalAmount ? parseFloat(item.totalAmount) : basicAmount + gstAmount;
+        return { basicAmount, gstRate, gstAmount, totalAmount };
+    };
+    const total = items.reduce((sum, item) => sum + getRowValues(item).totalAmount, 0);
 
     return (
         <Card>
@@ -36,22 +45,31 @@ function BoqTable(
                             <TableHead>Item Description</TableHead>
                             <TableHead className="text-right">Quantity</TableHead>
                             <TableHead className="text-right">Rate</TableHead>
-                            <TableHead className="text-right">Amount</TableHead>
+                            <TableHead className="text-right">Basic Amount</TableHead>
+                            <TableHead className="text-right">GST %</TableHead>
+                            <TableHead className="text-right">GST Amount</TableHead>
+                            <TableHead className="text-right">Total Amount</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {items.map((item, idx) => (
-                            <TableRow key={idx} className="hover:bg-muted/30 transition-colors">
-                                <TableCell>{idx + 1}</TableCell>
-                                <TableCell>{item.itemDescription}</TableCell>
-                                <TableCell className="text-right">{item.quantity}</TableCell>
-                                <TableCell className="text-right">{formatINR(parseFloat(item.rate))}</TableCell>
-                                <TableCell className="text-right font-semibold">{formatINR(parseFloat(item.amount || "0"))}</TableCell>
-                            </TableRow>
-                        ))}
+                        {items.map((item, idx) => {
+                            const row = getRowValues(item);
+                            return (
+                                <TableRow key={idx} className="hover:bg-muted/30 transition-colors">
+                                    <TableCell>{idx + 1}</TableCell>
+                                    <TableCell>{item.itemDescription}</TableCell>
+                                    <TableCell className="text-right">{item.quantity}</TableCell>
+                                    <TableCell className="text-right">{formatINR(parseFloat(item.rate))}</TableCell>
+                                    <TableCell className="text-right">{formatINR(row.basicAmount)}</TableCell>
+                                    <TableCell className="text-right">{row.gstRate}%</TableCell>
+                                    <TableCell className="text-right">{formatINR(row.gstAmount)}</TableCell>
+                                    <TableCell className="text-right font-semibold">{formatINR(row.totalAmount)}</TableCell>
+                                </TableRow>
+                            );
+                        })}
                         {items.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={5} className="text-center py-6 text-muted-foreground italic">
+                                <TableCell colSpan={8} className="text-center py-6 text-muted-foreground italic">
                                     No items
                                 </TableCell>
                             </TableRow>
@@ -59,7 +77,7 @@ function BoqTable(
                     </TableBody>
                     {items.length > 0 && (
                         <TableRow className="bg-muted/30 font-semibold">
-                            <TableCell colSpan={4} className="text-right">Total</TableCell>
+                            <TableCell colSpan={7} className="text-right">Total</TableCell>
                             <TableCell className="text-right">{formatINR(total)}</TableCell>
                         </TableRow>
                     )}

@@ -8,12 +8,12 @@ import { LocationPerformanceService } from "./location-performance.service";
 import { locationPerformanceQuerySchema } from "./zod/location-performance.dto";
 
 @Controller("performance/location")
-// @UseGuards(JwtAuthGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
 export class LocationPerformanceController {
     constructor(private readonly service: LocationPerformanceService) {}
 
     @Get()
-    @CanRead("performance.location")
+    @CanRead("performance.location-dashboard")
     getLocationPerformance(@Query() query: Record<string, string>) {
         const parsed = locationPerformanceQuerySchema.safeParse({
             team: query.team,

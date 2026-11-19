@@ -271,6 +271,7 @@ const PURPOSE_VALUE_MAP: Record<string, PaymentPurpose> = {
 // Project-dashboard BI requests surface the exact BG purpose chosen in the form
 // instead of collapsing it into the generic EMD buckets.
 const PROJECT_BG_PURPOSE_MAP: Record<string, PaymentPurpose> = {
+    'EMD': 'EMD',
     'ADVANCE_PAYMENT': 'Advance Payment',
     'SECURITY_BOND_DEPOSIT': 'Security Bond/Deposit',
     'SECURITY_DEPOSIT': 'Security Deposit',
@@ -283,6 +284,20 @@ const PROJECT_BG_PURPOSE_MAP: Record<string, PaymentPurpose> = {
 export function extractProjectBgPurpose(details: any, defaultPurpose: PaymentPurpose = 'Other Payment'): PaymentPurpose {
     const rawPurpose = details?.bgPurpose ? String(details.bgPurpose) : '';
     return PROJECT_BG_PURPOSE_MAP[rawPurpose] || defaultPurpose;
+}
+
+// Project-dashboard BI FDR requests keep the purpose chosen in the form, so the
+// project request list shows the same value the user selected.
+const PROJECT_FDR_PURPOSE_MAP: Record<string, PaymentPurpose> = {
+    'EMD': 'EMD',
+    'SECURITY_DEPOSIT': 'Security Deposit',
+    'BANK_GUARANTEE': 'Bank Guarantee',
+    'OTHER_SECURITY': 'Other Security',
+};
+
+export function extractProjectFdrPurpose(details: any, defaultPurpose: PaymentPurpose = 'Other Payment'): PaymentPurpose {
+    const rawPurpose = details?.fdrPurpose ? String(details.fdrPurpose) : '';
+    return PROJECT_FDR_PURPOSE_MAP[rawPurpose] || defaultPurpose;
 }
 
 export function extractPurposeFromDetails(mode: string, details: any, defaultPurpose: PaymentPurpose): PaymentPurpose {

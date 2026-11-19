@@ -751,10 +751,23 @@ export const ProjectBgRequestSchema = BiOtherThanTenderRequestSchema.superRefine
     }
 });
 
+export const ProjectFdrRequestSchema = BiOtherThanTenderRequestSchema.superRefine((data, ctx) => {
+    if (data.EMD?.mode !== 'FDR') return;
+    const details: Record<string, any> = data.EMD?.details ?? {};
+    if (details.fdrAmount === undefined || details.fdrAmount === null || Number(details.fdrAmount) <= 0) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'FDR Amount is required',
+            path: ['EMD', 'details', 'fdrAmount'],
+        });
+    }
+});
+
 export type PaymentRequestFormValues = z.infer<typeof PaymentRequestSchema>;
 export type OldEntryPaymentRequestFormValues = z.infer<typeof OldEntryPaymentRequestSchema>;
 export type BiOtherThanTenderRequestFormValues = z.infer<typeof BiOtherThanTenderRequestSchema>;
 export type ProjectBgRequestFormValues = z.infer<typeof ProjectBgRequestSchema>;
+export type ProjectFdrRequestFormValues = z.infer<typeof ProjectFdrRequestSchema>;
 export type PaymentDetailsFormValues = z.infer<typeof PaymentDetailsSchema>;
 export type BankTransferFormValues = z.infer<typeof BankTransferSchema>;
 export type PayOnPortalFormValues = z.infer<typeof PayOnPortalSchema>;

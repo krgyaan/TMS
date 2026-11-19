@@ -50,6 +50,7 @@ export const createSaleInvoiceSchema = z.object({
                 itemDescription: z.string().min(1, "Description is required"),
                 qty: z.number().positive("Qty must be greater than 0"),
                 rate: z.number().min(0, "Rate is required"),
+                discountPercent: z.number().min(0).max(100).optional().default(0),
                 gstRate: z.number().default(18),
                 unit: z.string().optional(),
                 hsnSac: z.string().optional(),

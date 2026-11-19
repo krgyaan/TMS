@@ -4,9 +4,11 @@ import { RouteWrapper } from '../components/RouteWrapper';
 
 const BI_DemandDraft = lazy(() => import('@/modules/bi-dashboard/demand-draft/DemandDraftListPage'));
 const BI_FDR = lazy(() => import('@/modules/bi-dashboard/fdr/FdrListPage'));
+const BI_FDRCreate = lazy(() => import('@/modules/bi-dashboard/fdr/FdrCreatePage'));
 const BI_Cheque = lazy(() => import('@/modules/bi-dashboard/cheque/ChequeListPage'));
 const BI_BankGuarantee = lazy(() => import('@/modules/bi-dashboard/bank-guarantee/BankGuaranteeListPage'));
 const BI_BankGuaranteeCreate = lazy(() => import('@/modules/bi-dashboard/bank-guarantee/BankGuaranteeCreatePage'));
+const BI_BankGuaranteeOldEntry = lazy(() => import('@/modules/bi-dashboard/bank-guarantee/BankGuaranteeOldEntryPage'));
 const BI_BankTransfer = lazy(() => import('@/modules/bi-dashboard/bank-tranfer/BankTransferListPage'));
 const BI_PayOnPortal = lazy(() => import('@/modules/bi-dashboard/pay-on-portal/PayOnPortalListPage'));
 const BI_TenderFeeAction = lazy(() => import('@/modules/bi-dashboard/tender-fee/TenderFeeActionPage'));
@@ -38,9 +40,11 @@ export default function BIDashboardRoutes() {
         <Routes>
             <Route path="demand-draft" element={<RouteWrapper><BI_DemandDraft /></RouteWrapper>} />
             <Route path="fdr" element={<RouteWrapper><BI_FDR /></RouteWrapper>} />
+            <Route path="fdr/create" element={<RouteWrapper><BI_FDRCreate /></RouteWrapper>} />
             <Route path="cheque" element={<RouteWrapper><BI_Cheque /></RouteWrapper>} />
             <Route path="bank-guarantee" element={<RouteWrapper><BI_BankGuarantee /></RouteWrapper>} />
             <Route path="bank-guarantee/create" element={<RouteWrapper><BI_BankGuaranteeCreate /></RouteWrapper>} />
+            <Route path="bank-guarantee/old-entry" element={<RouteWrapper><BI_BankGuaranteeOldEntry /></RouteWrapper>} />
             <Route path="bank-transfer" element={<RouteWrapper><BI_BankTransfer /></RouteWrapper>} />
             <Route path="pay-on-portal" element={<RouteWrapper><BI_PayOnPortal /></RouteWrapper>} />
             <Route path="tender-fee" element={<RouteWrapper><BI_TenderFee /></RouteWrapper>} />

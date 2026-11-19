@@ -128,6 +128,12 @@ export const biDashboardConfigs: Record<string, FileConfig> = {
         allowedMimeTypes: [...DOCS],
         allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
     },
+    "fdr-copy": {
+        maxFiles: 5,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+    },
     "fdr-sfms-confirmation": {
         maxFiles: 2,
         maxSizeBytes: MB(10),
