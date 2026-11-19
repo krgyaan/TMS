@@ -80,6 +80,9 @@ export interface OrderViewData {
     amountAfterTds?: number | string;
     approved?: boolean;
     approvalRemark?: string;
+    tlStatus?: number | null;
+    tlComment?: string | null;
+    creatorTeamId?: number | null;
     attachments: OrderAttachmentGroup[];
     generatedPdfVersions: Record<string, { path: string; hash: string }> | null;
 }
