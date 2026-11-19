@@ -240,12 +240,19 @@ describe("sale invoice PDF data helpers", () => {
         expect(html).toContain("Test PO description");
         expect(html).toContain(">Qty<");
         expect(html).toContain(">Discount<");
+        expect(html).toContain(">GST<");
+        if (isInterstate) {
+            expect(html).toContain("IGST@18%");
+        } else {
+            expect(html).toContain("CGST@9%");
+            expect(html).toContain("SGST@9%");
+        }
         expect(html).toContain("Priya Manager");
         expect(html).toContain("Road");
         expect(html).toContain("Bengaluru");
         expect(html).toContain("Buyer Contact");
         expect(html).toContain("Consignee Contact");
-        expect(html).toContain(isInterstate ? 'colspan="11"' : 'colspan="12"');
+        expect(html).toContain('colspan="11"');
         expect(html).toMatch(/<pre[^>]*>Buyer line one\nBuyer line two<\/pre>/);
         expect(html).toMatch(/<pre[^>]*>Consignee line one\nConsignee line two<\/pre>/);
         expect(html).toMatch(/<pre[^>]*>Dispatch line one\nDispatch line two<\/pre>/);
