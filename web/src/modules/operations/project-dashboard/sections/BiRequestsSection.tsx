@@ -3,12 +3,13 @@ import { createActionColumnRenderer } from "@/components/data-grid/renderers/Act
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import DataTable from "@/components/ui/data-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProjectBiRequests } from "@/hooks/api/usePaymentRequests";
 import { formatINR } from "@/hooks/useINRFormatter";
 import type { ColDef, ValueFormatterParams } from "ag-grid-community";
-import { Eye, Plus } from "lucide-react";
+import { ChevronDown, Eye, Plus } from "lucide-react";
 import React, { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -144,14 +145,29 @@ export const BiRequestsSection: React.FC<BiRequestsSectionProps> = ({ projectId 
                             BI Requests
                         </CardTitle>
                         <CardAction>
-                            <Button
-                                size="sm"
-                                variant="default"
-                                onClick={() => navigate(paths.operations.biRequestBgCreate(projectId))}
-                            >
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                Request BI
-                            </Button>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button size="sm" variant="default">
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        Request BI
+                                        <ChevronDown className="ml-1.5 h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                        className="cursor-pointer"
+                                        onClick={() => navigate(paths.operations.biRequestBgCreate(projectId))}
+                                    >
+                                        Bank Guarantee
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        className="cursor-pointer"
+                                        onClick={() => navigate(paths.operations.biRequestFdrCreate(projectId))}
+                                    >
+                                        FDR
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </CardAction>
                     </div>
                     <CardDescription>

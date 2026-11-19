@@ -9,12 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BankGuaranteeActionFormSchema, type BankGuaranteeActionFormValues } from '../helpers/bankGuaranteeActionForm.schema';
 import { useUpdateBankGuaranteeAction, useBGActionFormData, useBGFollowupData } from '@/hooks/api/useBankGuarantees';
 import type { Checkpoint } from '@/components/tendering/SubmissionChecklist';
-import { CheckCircle2, XCircle } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { AccountsForm1Fields } from './steps/AccountsForm1Fields';
 import { AccountsForm2Fields } from './steps/AccountsForm2Fields';
 import { AccountsForm3Fields } from './steps/AccountsForm3Fields';
+import { MailAttachmentPreview } from './steps/MailAttachmentPreview';
 import { FollowupReadOnlyView, InitiateFollowupFields } from './steps/InitiateFollowupFields';
 import { RequestExtensionFields } from './steps/RequestExtensionFields';
 import { ReturnedCourierFields } from './steps/ReturnedCourierFields';
@@ -157,6 +158,12 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
 
     const action = useWatch({ control: form.control, name: 'action' });
     const modificationRequired = useWatch({ control: form.control, name: 'modification_required' });
+    const stage1Prefilled = useWatch({ control: form.control, name: 'prefilled_signed_bg' });
+    const stage1BgFormat = useWatch({ control: form.control, name: 'bg_format_imran' });
+    const stage1FdrCopy = useWatch({ control: form.control, name: 'fdr_copy' });
+    const stage2CoveringLetter = useWatch({ control: form.control, name: 'bg_signed_covering_letter' });
+    const stage2BgUpload = useWatch({ control: form.control, name: 'bg_upload' });
+    const stage3Sfms = useWatch({ control: form.control, name: 'sfms_conf' });
 
     const bankMailIds = useFieldArray({ control: form.control, name: 'bank_mail_ids' });
     const bankMailIdsCc = useFieldArray({ control: form.control, name: 'bank_mail_ids_cc' });
@@ -198,6 +205,18 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
     const prevAmount = formData?.amount;
     const prevExpiryDate = toDateString(formData?.bgExpiryDate);
     const prevClaimDate = toDateString(formData?.bgClaim);
+
+    const courierReqNo = formData?.reqNo ? String(formData.reqNo).trim() : '';
+    const courierProvider = (formData?.courierDetails?.courierProvider || '').trim();
+    const courierDocketNo = (formData?.courierDetails?.docketNo || formData?.docketNo || '').trim();
+    const courierDocketSlip = (formData?.courierDetails?.docketSlip || formData?.docketSlip || '').trim();
+    const missingCourierDetails = [
+        courierProvider ? '' : 'Courier Provider',
+        courierDocketNo ? '' : 'Docket No.',
+        courierDocketSlip ? '' : 'Docket Slip',
+    ].filter((item): item is string => item.length > 0);
+    const courierDetailsIncomplete =
+        action === 'accounts-form-3' && !isReadOnly && courierReqNo.length > 0 && missingCourierDetails.length > 0;
 
     useEffect(() => {
         if (!formData || !action) return;
@@ -375,6 +394,15 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
                                 disabled={isStepLocked('accounts-form-1')}
                                 fdrValueType="string"
                             />
+                            <MailAttachmentPreview
+                                instrumentId={instrumentId}
+                                stage={1}
+                                files={{
+                                    prefilledSignedBg: stage1Prefilled ?? [],
+                                    bgFormatImran: stage1BgFormat ?? [],
+                                    fdrCopy: stage1FdrCopy ?? [],
+                                }}
+                            />
                         </SectionCard>
                     )}
 
@@ -384,15 +412,40 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
                                 control={form.control}
                                 names={STEP_NAMES}
                             />
+                            <MailAttachmentPreview
+                                instrumentId={instrumentId}
+                                stage={2}
+                                files={{
+                                    bgSignedCoveringLetter: stage2CoveringLetter ?? [],
+                                    bgUpload: stage2BgUpload ?? [],
+                                }}
+                            />
                         </SectionCard>
                     )}
 
                     {action === 'accounts-form-3' && (
                         <SectionCard title="Accounts Form (BG) 3 - Charges & SFMS Confirmation">
+                            {courierDetailsIncomplete && (
+                                <div className="flex gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                                    <div className="space-y-1">
+                                        <div className="font-medium">Courier details incomplete</div>
+                                        <div>
+                                            Missing: {missingCourierDetails.join(', ')}. These are required for the
+                                            client mail sent from this stage.
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             <AccountsForm3Fields
                                 control={form.control}
                                 names={STEP_NAMES}
                                 disabled={isStepLocked('accounts-form-3')}
+                            />
+                            <MailAttachmentPreview
+                                instrumentId={instrumentId}
+                                stage={3}
+                                files={{ sfmsConf: stage3Sfms ?? [] }}
                             />
                         </SectionCard>
                     )}
@@ -470,11 +523,16 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
                 </fieldset>
 
                 <div className="flex justify-end gap-4 pt-4">
+                    {courierDetailsIncomplete && (
+                        <p className="mr-auto self-center text-sm text-amber-700">
+                            Complete the courier details before submitting.
+                        </p>
+                    )}
                     <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>
                         Cancel
                     </Button>
                     {!isReadOnly && (
-                        <Button type="submit" disabled={isSubmitting}>
+                        <Button type="submit" disabled={isSubmitting || courierDetailsIncomplete}>
                             {isSubmitting ? 'Submitting...' : 'Submit'}
                         </Button>
                     )}

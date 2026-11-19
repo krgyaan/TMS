@@ -23,6 +23,7 @@ const VALID_PURPOSE_VALUES = [
     'SECURITY_DEPOSIT',
     'OTHER_PAYMENT',
     'OTHER_SECURITY',
+    'BANK_GUARANTEE',
 ] as const;
 
 const optionalString = z
@@ -310,6 +311,7 @@ export const CreatePaymentRequestSchema = z.object({
     team: z.coerce.number().int().positive().optional(),
     projectId: z.coerce.number().int().positive().optional(),
     preserveBgPurpose: z.boolean().optional(),
+    preserveFdrPurpose: z.boolean().optional(),
 
     EMD: emdSection,
     TENDER_FEES: tenderFeeSection,
@@ -375,7 +377,7 @@ export type DashboardQueryDto = z.infer<typeof DashboardQuerySchema>;
 // Dashboard Response Types
 // ============================================================================
 
-export type PaymentPurpose = "EMD" | "Tender Fee" | "Processing Fee" | "Security Deposit" | "Performance BG" | "Surety Bond" | "Other Payment" | "Advance Payment" | "Security Bond/Deposit" | "Financial" | "Counter Guarantee" | "DD" | "FDR";
+export type PaymentPurpose = "EMD" | "Tender Fee" | "Processing Fee" | "Security Deposit" | "Performance BG" | "Surety Bond" | "Other Payment" | "Advance Payment" | "Security Bond/Deposit" | "Financial" | "Counter Guarantee" | "DD" | "FDR" | "Bank Guarantee" | "Other Security";
 
 export type InstrumentType =
     | "DD"

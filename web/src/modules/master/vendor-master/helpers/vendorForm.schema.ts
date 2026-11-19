@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isRealMsmeNumber } from "./msme";
 
 const OrgFields = z.object({
     name: z.string().min(1, "Organization name is required").max(255),
@@ -15,9 +16,10 @@ const OrgFields = z.object({
     status: z.boolean(),
 });
 
-// Mirrors the API rule: an MSME number must be accompanied by its type (M/S).
+// Mirrors the API rule: a real MSME number must be accompanied by its type (M/S).
+// Placeholder values such as "NA" or "unknown" do not require a type.
 const requireMsmeType = (val: z.infer<typeof OrgFields>, ctx: z.RefinementCtx) => {
-    if (val.msme?.trim() && !val.msmeType) {
+    if (isRealMsmeNumber(val.msme) && !val.msmeType) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["msmeType"],

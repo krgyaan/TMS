@@ -7,6 +7,7 @@ import { FormControl, FormField, FormItem, FormLabel } from "@/components/ui/for
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatVendorName } from "@/lib/vendorName";
+import { isRealMsmeNumber } from "@/modules/master/vendor-master/helpers/msme";
 
 const MSME_TYPE_OPTIONS = [
     { value: "M", label: "Manufacturer" },
@@ -51,13 +52,28 @@ export function VendorOrgFields<TFieldValues extends FieldValues>({ control, pre
     const name = (key: string) => `${prefix}${key}` as FieldPath<TFieldValues>;
     const { setValue } = useFormContext<TFieldValues>();
     const watchedMsme = useWatch({ control, name: name("msme") }) as unknown as string | undefined;
-    const hasMsme = Boolean(watchedMsme?.trim());
+    const watchedMsmeSize = useWatch({ control, name: name("msmeSize") }) as unknown as string | undefined;
+    const watchedMsmeType = useWatch({ control, name: name("msmeType") }) as unknown as string | undefined;
+    const watchedMajorActivity = useWatch({ control, name: name("majorActivity") }) as unknown as string | undefined;
+
+    // Only a real MSME number toggles these fields; placeholders like "NA" or
+    // "unknown" do not. Existing values stay visible so legacy data remains editable.
+    const hasRealMsme = isRealMsmeNumber(watchedMsme);
+    const showMsmeSize = hasRealMsme || Boolean(watchedMsmeSize?.trim());
+    const showMsmeType = hasRealMsme || Boolean(watchedMsmeType?.trim());
+    const showMajorActivity = hasRealMsme || Boolean(watchedMajorActivity?.trim());
+
     const msmeTypePath = name("msmeType");
+    const msmeSizePath = name("msmeSize");
+    const majorActivityPath = name("majorActivity");
 
     const handleMsmeChange = (next: string) => {
-        const value = next.toUpperCase();
-        // Dropping the number also drops the type, so no stale type lingers behind an empty MSME field.
-        if (!value) setValue(msmeTypePath, undefined as never, { shouldDirty: true, shouldValidate: true });
+        // Dropping the number (or replacing it with a placeholder) also drops the
+        // dependent fields, so no stale values linger behind a non-real MSME field.
+        if (isRealMsmeNumber(next)) return;
+        setValue(msmeTypePath, undefined as never, { shouldDirty: true, shouldValidate: true });
+        setValue(msmeSizePath, undefined as never, { shouldDirty: true, shouldValidate: true });
+        setValue(majorActivityPath, undefined as never, { shouldDirty: true, shouldValidate: true });
     };
 
     return (
@@ -123,16 +139,18 @@ export function VendorOrgFields<TFieldValues extends FieldValues>({ control, pre
                     )}
                 </FieldWrapper>
 
-                <SelectField
-                    control={control}
-                    name={name("msmeSize")}
-                    label="MSME Size"
-                    options={MSME_SIZE_OPTIONS.map(option => ({ ...option }))}
-                    placeholder="Select size"
-                    valueType="string"
-                />
+                {showMsmeSize && (
+                    <SelectField
+                        control={control}
+                        name={name("msmeSize")}
+                        label="MSME Size"
+                        options={MSME_SIZE_OPTIONS.map(option => ({ ...option }))}
+                        placeholder="Select size"
+                        valueType="string"
+                    />
+                )}
 
-                {hasMsme && (
+                {showMsmeType && (
                     <SelectField
                         control={control}
                         name={msmeTypePath}
@@ -143,14 +161,16 @@ export function VendorOrgFields<TFieldValues extends FieldValues>({ control, pre
                     />
                 )}
 
-                <SelectField
-                    control={control}
-                    name={name("majorActivity")}
-                    label="Major Activity"
-                    options={MAJOR_ACTIVITY_OPTIONS.map(value => ({ value, label: value }))}
-                    placeholder="Select activity"
-                    valueType="string"
-                />
+                {showMajorActivity && (
+                    <SelectField
+                        control={control}
+                        name={name("majorActivity")}
+                        label="Major Activity"
+                        options={MAJOR_ACTIVITY_OPTIONS.map(value => ({ value, label: value }))}
+                        placeholder="Select activity"
+                        valueType="string"
+                    />
+                )}
 
                 <FieldWrapper control={control} name={name("creditPeriodDays")} label="Credit Period (days)">
                     {field => (

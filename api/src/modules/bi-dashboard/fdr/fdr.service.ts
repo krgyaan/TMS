@@ -31,10 +31,10 @@ export class FdrService {
         this.logger = this.appLogger.withContext(FdrService.name);
     }
 
-    private deriveFdrStatus(status: string | null): string {
+    private deriveFdrStatus(status: string | null, fdrNo?: string | null): string {
         const map: Record<string, string> = {
             [FDR_STATUSES.PENDING]: "Pending",
-            [FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED]: "FDR Created",
+            [FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED]: fdrNo ? "FDR Created" : "FDR Accepted",
             [FDR_STATUSES.ACCOUNTS_FORM_REJECTED]: "FDR Rejected",
             [FDR_STATUSES.FOLLOWUP_INITIATED]: "Followup Initiated",
             [FDR_STATUSES.RETURN_VIA_COURIER]: "Returned via courier",
@@ -46,10 +46,25 @@ export class FdrService {
         return map[status as string] || status || "Pending";
     }
 
+    /**
+     * Display label for the Tender / WO Name column. Uses the request's project
+     * name first, then the joined tender name, and falls back to
+     * "Accounts/Admin" when neither was captured (BI-raised FDRs).
+     */
+    private resolveFdrProjectLabel(
+        projectName: string | null | undefined,
+        tenderName: string | null | undefined,
+    ): string {
+        const isRealName = (value: string | null | undefined) => {
+            const trimmed = value?.trim();
+            return trimmed && trimmed.toUpperCase() !== 'NA' ? trimmed : null;
+        };
+        return isRealName(projectName) ?? isRealName(tenderName) ?? 'Accounts/Admin';
+    }
+
     private deriveFdrExpiryStatus(fdrExpiryDate: Date | null): string {
         if (!fdrExpiryDate) return 'No date';
-        const expiryDate = new Date(fdrExpiryDate.getTime() + 3 * 30 * 24 * 60 * 60 * 1000);
-        return expiryDate < new Date() ? 'Expired' : 'Valid';
+        return new Date(fdrExpiryDate) < new Date() ? 'Renewed' : 'Valid';
     }
 
     private buildFdrDashboardConditions(tab?: string): { conditions: any[]; needsFdrDetails: boolean } {
@@ -90,7 +105,7 @@ export class FdrService {
             );
         } else if (tab === "security-deposit") {
             needsFdrDetails = true;
-            conditions.push(inArray(paymentInstruments.action, [1, 2]), eq(instrumentFdrDetails.fdrPurpose, "deposit"));
+            conditions.push(inArray(paymentInstruments.action, [1, 2]), inArray(instrumentFdrDetails.fdrPurpose, ["deposit", "SECURITY_DEPOSIT"]));
         } else if (tab === "bond-linked") {
             conditions.push(eq(paymentInstruments.action, 8));
         }
@@ -177,6 +192,7 @@ export class FdrService {
                 tenderName: tenderInfos.tenderName,
                 projectName: paymentRequests.projectName,
                 projectNo: paymentRequests.tenderNo,
+                requestTenderId: paymentRequests.tenderId,
                 tenderNo: tenderInfos.tenderNo,
                 tenderStatus: statuses.name,
                 teamMember: users.name,
@@ -212,6 +228,24 @@ export class FdrService {
 
         const total = Number(countResult?.count || 0);
 
+        // Follow-ups that have been stopped: shown as "Followup Stopped"
+        // instead of "Followup Initiated" on the dashboard.
+        const stoppedFollowupIds = new Set<number>();
+        const instrumentIds = rows.map((row) => row.id);
+        if (instrumentIds.length > 0) {
+            const stoppedRows = await this.db
+                .select({ emdId: followUps.emdId })
+                .from(followUps)
+                .where(and(
+                    inArray(followUps.emdId, instrumentIds),
+                    isNull(followUps.deletedAt),
+                    sql`(${followUps.stopReason} is not null or ${followUps.stopRemarks} is not null)`,
+                ));
+            for (const stopped of stoppedRows) {
+                if (stopped.emdId != null) stoppedFollowupIds.add(Number(stopped.emdId));
+            }
+        }
+
         const data: FdrDashboardRow[] = rows.map(row => ({
             id: row.id,
             requestId: row.requestId,
@@ -220,11 +254,14 @@ export class FdrService {
             beneficiaryName: row.beneficiaryName,
             fdrAmount: row.fdrAmount ? Number(row.fdrAmount) : null,
             tenderName: row.tenderName || row.projectName,
+            projectLabel: this.resolveFdrProjectLabel(row.projectName, row.tenderName),
             tenderNo: row.tenderNo || row.projectNo,
-            tenderStatus: row.tenderStatus || row.tenderStatus,
+            tenderStatus: row.requestTenderId ? (row.tenderStatus ?? 'Other than Tender') : 'Other than Tender',
             member: row.teamMember?.toString() ?? null,
             expiry: this.deriveFdrExpiryStatus(row.expiry ? new Date(row.expiry) : null),
-            fdrStatus: this.deriveFdrStatus(row.fdrStatus),
+            fdrStatus: stoppedFollowupIds.has(row.id) && row.fdrStatus === FDR_STATUSES.FOLLOWUP_INITIATED
+                ? 'Followup Stopped'
+                : this.deriveFdrStatus(row.fdrStatus, row.fdrNo),
         }));
 
         return wrapPaginatedResponse(data, total, page, limit);
@@ -253,6 +290,8 @@ export class FdrService {
                 fdrAmount: paymentInstruments.amount,
                 projectName: paymentRequests.projectName,
                 projectNo: paymentRequests.tenderNo,
+                requestTenderId: paymentRequests.tenderId,
+                tenderName: tenderInfos.tenderName,
                 tenderStatus: statuses.name,
                 teamMember: users.name,
                 source: instrumentFdrDetails.fdrSource,
@@ -280,6 +319,22 @@ export class FdrService {
             .where(and(...conditions))
             .orderBy(desc(paymentInstruments.createdAt));
 
+        const stoppedFollowupIds = new Set<number>();
+        const exportInstrumentIds = rows.map((row) => row.id);
+        if (exportInstrumentIds.length > 0) {
+            const stoppedRows = await this.db
+                .select({ emdId: followUps.emdId })
+                .from(followUps)
+                .where(and(
+                    inArray(followUps.emdId, exportInstrumentIds),
+                    isNull(followUps.deletedAt),
+                    sql`(${followUps.stopReason} is not null or ${followUps.stopRemarks} is not null)`,
+                ));
+            for (const stopped of stoppedRows) {
+                if (stopped.emdId != null) stoppedFollowupIds.add(Number(stopped.emdId));
+            }
+        }
+
         const data = rows.map(row => ({
             id: row.id,
             requestId: row.requestId,
@@ -289,10 +344,13 @@ export class FdrService {
             fdrAmount: row.fdrAmount ? Number(row.fdrAmount) : null,
             projectName: row.projectName,
             projectNo: row.projectNo,
-            tenderStatus: row.tenderStatus || row.tenderStatus,
+            projectLabel: this.resolveFdrProjectLabel(row.projectName, row.tenderName),
+            tenderStatus: row.requestTenderId ? (row.tenderStatus ?? 'Other than Tender') : 'Other than Tender',
             member: row.teamMember?.toString() ?? null,
             expiry: this.deriveFdrExpiryStatus(row.expiry ? new Date(row.expiry) : null),
-            fdrStatus: this.deriveFdrStatus(row.fdrStatus),
+            fdrStatus: stoppedFollowupIds.has(row.id) && row.fdrStatus === FDR_STATUSES.FOLLOWUP_INITIATED
+                ? 'Followup Stopped'
+                : this.deriveFdrStatus(row.fdrStatus, row.fdrNo),
             reqNo: row.reqNo,
             fdrNeeds: row.fdrNeeds,
             fdrPurpose: row.fdrPurpose,
@@ -354,7 +412,7 @@ export class FdrService {
 
         const securityDepositFilter = and(
             inArray(paymentInstruments.action, [1, 2]),
-            eq(instrumentFdrDetails.fdrPurpose, "deposit"),
+            inArray(instrumentFdrDetails.fdrPurpose, ["deposit", "SECURITY_DEPOSIT"]),
         );
 
         const bondLinkedFilter = eq(paymentInstruments.action, 8);
@@ -402,6 +460,7 @@ export class FdrService {
     private mapActionToNumber(action: string): number {
         const actionMap: Record<string, number> = {
             "accounts-form": 1,
+            "accounts-form-2": 1,
             "initiate-followup": 2,
             "returned-courier": 3,
             "returned-bank-transfer": 4,
@@ -423,6 +482,13 @@ export class FdrService {
 
         if (instrument.instrumentType !== "FDR") {
             throw new BadRequestException("Instrument is not an FDR");
+        }
+
+        if (
+            body.action === "accounts-form-2" &&
+            (instrument.status === FDR_STATUSES.PENDING || instrument.status === FDR_STATUSES.ACCOUNTS_FORM_REJECTED)
+        ) {
+            throw new BadRequestException("Accounts Form must be accepted before capturing FDR details");
         }
 
         const actionNumber = this.mapActionToNumber(body.action);
@@ -482,27 +548,7 @@ export class FdrService {
                 updateData.status = FDR_STATUSES.ACCOUNTS_FORM_REJECTED;
                 updateData.rejectionReason = body.reason_req || null;
             }
-            if (body.fdr_format_imran && typeof body.fdr_format_imran === "string") {
-                updateData.legacyData = {
-                    ...(instrument.legacyData || {}),
-                    fdr_format_imran: body.fdr_format_imran,
-                };
-            }
-            // Store prefilled_signed_fdr files (can be array of paths or files)
-            if (body.prefilled_signed_fdr) {
-                try {
-                    const prefilledFiles = typeof body.prefilled_signed_fdr === "string" ? JSON.parse(body.prefilled_signed_fdr) : body.prefilled_signed_fdr;
-                    if (Array.isArray(prefilledFiles) && prefilledFiles.length > 0) {
-                        updateData.legacyData = {
-                            ...(instrument.legacyData || {}),
-                            ...(updateData.legacyData || {}),
-                            prefilled_signed_fdr: JSON.stringify(prefilledFiles),
-                        };
-                    }
-                } catch (e) {
-                    this.logger.warn("Failed to parse prefilled_signed_fdr", e);
-                }
-            }
+            // Upload Documents is stored on instrument_fdr_details below
         } else if (body.action === "initiate-followup") {
             updateData.status = FDR_STATUSES.FOLLOWUP_INITIATED;
         } else if (body.action === "returned-courier") {
@@ -548,13 +594,66 @@ export class FdrService {
         await this.db.update(paymentInstruments).set(updateData).where(eq(paymentInstruments.id, instrumentId));
 
         const fdrDetailsUpdate: any = {};
-        if (body.action === "accounts-form") {
+        if (body.action === "accounts-form" || body.action === "accounts-form-2") {
             if (body.fdr_no) fdrDetailsUpdate.fdrNo = body.fdr_no;
             if (body.fdr_date) fdrDetailsUpdate.fdrDate = body.fdr_date;
             if (body.fdr_validity) fdrDetailsUpdate.fdrExpiryDate = body.fdr_validity;
+            if (body.fdr_roi !== undefined && body.fdr_roi !== '') fdrDetailsUpdate.roi = body.fdr_roi;
+            if (body.fdr_copy !== undefined) {
+                try {
+                    const copyFiles = typeof body.fdr_copy === "string" ? JSON.parse(body.fdr_copy) : body.fdr_copy;
+                    fdrDetailsUpdate.fdrCopy = Array.isArray(copyFiles) ? JSON.stringify(copyFiles) : null;
+                } catch (e) {
+                    this.logger.warn("Failed to parse fdr_copy", e);
+                }
+            }
             if (body.fdr_percentage) fdrDetailsUpdate.marginPercent = body.fdr_percentage;
             if (body.fdr_amount) fdrDetailsUpdate.fdrAmt = body.fdr_amount;
             if (body.fdr_roi) fdrDetailsUpdate.roi = body.fdr_roi;
+            if (body.upload_documents !== undefined) {
+                const raw = Array.isArray(body.upload_documents)
+                    ? body.upload_documents[0]
+                    : body.upload_documents;
+                fdrDetailsUpdate.uploadDocuments = raw ? String(raw) : null;
+            }
+            if (body.prefilled_signed_fdr !== undefined) {
+                try {
+                    const prefilledFiles = typeof body.prefilled_signed_fdr === "string"
+                        ? JSON.parse(body.prefilled_signed_fdr)
+                        : body.prefilled_signed_fdr;
+                    fdrDetailsUpdate.prefilledSignedFdr = Array.isArray(prefilledFiles)
+                        ? JSON.stringify(prefilledFiles)
+                        : null;
+                } catch (e) {
+                    this.logger.warn("Failed to parse prefilled_signed_fdr", e);
+                }
+            }
+            const parseMailIds = (value: unknown): string[] | null => {
+                try {
+                    const parsed = typeof value === "string" ? JSON.parse(value) : value;
+                    if (!Array.isArray(parsed)) return null;
+                    return parsed
+                        .map((entry) => {
+                            if (typeof entry === "string") return entry.trim();
+                            if (entry && typeof entry === "object" && "email" in entry) {
+                                return String((entry as { email?: unknown }).email ?? "").trim();
+                            }
+                            return "";
+                        })
+                        .filter(Boolean);
+                } catch (e) {
+                    this.logger.warn("Failed to parse bank mail ids", e);
+                    return null;
+                }
+            };
+            if (body.bank_mail_ids !== undefined) {
+                const ids = parseMailIds(body.bank_mail_ids);
+                if (ids !== null) fdrDetailsUpdate.bankMailIds = ids;
+            }
+            if (body.bank_mail_ids_cc !== undefined) {
+                const idsCc = parseMailIds(body.bank_mail_ids_cc);
+                if (idsCc !== null) fdrDetailsUpdate.bankMailIdsCc = idsCc;
+            }
             // Store charges in legacyData (schema doesn't have charge fields)
             if (body.fdr_charges || body.sfms_charges || body.stamp_charges || body.other_charges) {
                 updateData.legacyData = {
@@ -849,6 +948,7 @@ export class FdrService {
                 id: paymentInstruments.id,
                 action: paymentInstruments.action,
                 status: paymentInstruments.status,
+                rejectionReason: paymentInstruments.rejectionReason,
                 amount: paymentInstruments.amount,
                 favouring: paymentInstruments.favouring,
                 payableAt: paymentInstruments.payableAt,
@@ -873,6 +973,13 @@ export class FdrService {
                 fdrExpiryDate: instrumentFdrDetails.fdrExpiryDate,
                 fdrNeeds: instrumentFdrDetails.fdrNeeds,
                 fdrRemark: instrumentFdrDetails.fdrRemark,
+                prefilledSignedFdr: instrumentFdrDetails.prefilledSignedFdr,
+                uploadDocuments: instrumentFdrDetails.uploadDocuments,
+                fdrRoi: instrumentFdrDetails.roi,
+                fdrCopy: instrumentFdrDetails.fdrCopy,
+                bankMailIds: instrumentFdrDetails.bankMailIds,
+                bankMailIdsCc: instrumentFdrDetails.bankMailIdsCc,
+                legacyData: paymentInstruments.legacyData,
                 reqNo: paymentInstruments.reqNo,
                 tenderStatusName: statuses.name,
             })
@@ -971,10 +1078,28 @@ export class FdrService {
             }
         }
 
+        const legacyData = (result.legacyData as Record<string, any> | null) ?? {};
+        let prefilledSignedFdr: string[] = [];
+        const rawPrefilled = result.prefilledSignedFdr ?? legacyData.prefilled_signed_fdr;
+        if (rawPrefilled) {
+            try {
+                const parsed = typeof rawPrefilled === 'string' ? JSON.parse(rawPrefilled) : rawPrefilled;
+                if (Array.isArray(parsed)) prefilledSignedFdr = parsed.filter((entry): entry is string => typeof entry === 'string');
+            } catch {
+                prefilledSignedFdr = [];
+            }
+        }
+
         return {
             id: result.id,
             action: result.action,
             fdrStatus: this.deriveFdrStatus(result.status),
+            fdrReq: result.rejectionReason
+                ? 'Rejected'
+                : result.status === FDR_STATUSES.PENDING
+                    ? null
+                    : 'Accepted',
+            rejectionReason: result.rejectionReason,
             tenderNo: result.tenderNo,
             tenderName: result.tenderName,
             tenderId: result.tenderId,
@@ -992,6 +1117,20 @@ export class FdrService {
             fdrExpiryDate: result.fdrExpiryDate ? new Date(result.fdrExpiryDate) : null,
             fdrNeeds: result.fdrNeeds,
             fdrRemark: result.fdrRemark,
+            fdrRoi: result.fdrRoi != null ? Number(result.fdrRoi) : null,
+            fdrCopy: (() => {
+                if (!result.fdrCopy) return [];
+                try {
+                    const parsed = JSON.parse(result.fdrCopy);
+                    return Array.isArray(parsed) ? parsed : [result.fdrCopy];
+                } catch {
+                    return [result.fdrCopy];
+                }
+            })(),
+            prefilledSignedFdr,
+            uploadDocuments: result.uploadDocuments,
+            bankMailIds: (result.bankMailIds as string[] | null) ?? [],
+            bankMailIdsCc: (result.bankMailIdsCc as string[] | null) ?? [],
             reqNo: result.reqNo,
             courierDetails,
             courierAddress: result.courierAddress,

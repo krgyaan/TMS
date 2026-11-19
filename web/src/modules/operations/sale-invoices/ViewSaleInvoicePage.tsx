@@ -644,6 +644,8 @@ const ViewSaleInvoicePage = () => {
                                             <TableHead className="text-xs uppercase font-semibold text-right">Amount</TableHead>
                                             <TableHead className="text-xs uppercase font-semibold text-right">GST%</TableHead>
                                             <TableHead className="text-xs uppercase font-semibold text-right">GST Amt</TableHead>
+                                            <TableHead className="text-xs uppercase font-semibold text-right">Disc %</TableHead>
+                                            <TableHead className="text-xs uppercase font-semibold text-right">Disc Amt</TableHead>
                                             <TableHead className="text-xs uppercase font-semibold text-right">Total</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -667,6 +669,8 @@ const ViewSaleInvoicePage = () => {
                                                 <TableCell className="text-sm text-right">{formatINR(Number(item.amount || 0))}</TableCell>
                                                 <TableCell className="text-sm text-right">{item.gstRate}%</TableCell>
                                                 <TableCell className="text-sm text-right">{formatINR(Number(item.gstAmount || 0))}</TableCell>
+                                                <TableCell className="text-sm text-right">{Number(item.discountPercent || 0)}%</TableCell>
+                                                <TableCell className="text-sm text-right">{formatINR(Number(item.discountAmount || 0))}</TableCell>
                                                 <TableCell className="text-sm text-right font-medium">{formatINR(Number(item.totalAmount || 0))}</TableCell>
                                             </TableRow>
                                         ))}

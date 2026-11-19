@@ -90,6 +90,34 @@ class BankGuaranteesService extends BaseApiService {
         return this.get<any>(`/instruments/${id}/followup`);
     }
 
+    async getMailPreview(
+        id: number,
+        payload: { stage: number; files: Record<string, string[]> },
+    ): Promise<any> {
+        return this.post<any, { stage: number; files: Record<string, string[]> }>(
+            `/instruments/${id}/mail-preview`,
+            payload,
+        );
+    }
+
+    async createOldBg(payload: Record<string, any>): Promise<{ requestId: number; instrumentId: number }> {
+        return this.post<{ requestId: number; instrumentId: number }, Record<string, any>>('/old-bg', payload);
+    }
+
+    async getOldBgForEdit(requestId: number): Promise<Record<string, any>> {
+        return this.get<Record<string, any>>(`/old-bg/${requestId}`);
+    }
+
+    async updateOldBg(
+        requestId: number,
+        payload: Record<string, any>,
+    ): Promise<{ requestId: number; instrumentId: number }> {
+        return this.put<{ requestId: number; instrumentId: number }, Record<string, any>>(
+            `/old-bg/${requestId}`,
+            payload,
+        );
+    }
+
     async update(id: number, payload: Record<string, any>): Promise<any> {
         return this.put<any, Record<string, any>>(`/${id}`, payload);
     }

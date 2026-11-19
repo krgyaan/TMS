@@ -7,6 +7,7 @@ const saleInvoiceItemSchema = z.object({
     qty: z.number().nullable().refine((v) => v !== null && v > 0, "Qty must be greater than 0"),
     rate: z.number().nullable().refine((v) => v !== null && v >= 0, "Rate is required"),
     gstRate: z.coerce.number().default(18),
+    discountPercent: z.coerce.number().min(0).max(100).default(0),
     unit: z.string().optional(),
     hsnSac: z.string().optional(),
 });

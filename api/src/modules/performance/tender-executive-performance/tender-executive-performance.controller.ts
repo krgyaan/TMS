@@ -3,6 +3,8 @@ import { TenderExecutiveService } from "./tender-executive-performance.service";
 import { PerformanceQuerySchema, PerformanceQueryDto } from "./zod/performance-query.dto";
 import { z } from "zod";
 import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
+import { PermissionGuard } from "@/modules/auth/guards/permission.guard";
+import { CanRead } from "@/modules/auth/decorators";
 import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
 import { DataScope } from "@/common/constants/roles.constant";
 import { TenderListQuerySchema } from "./zod/tender.dto";
@@ -28,7 +30,7 @@ function isUnrestrictedScope(user: ValidatedUser): boolean {
 
 
 @Controller("performance/tender-executive")
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
 export class TenderExecutiveController {
     constructor(private readonly tenderExecutiveService: TenderExecutiveService) {}
 
@@ -79,6 +81,7 @@ export class TenderExecutiveController {
     }
 
     @Get("context")
+    @CanRead("performance.tender-executive")
     async getContext(@Query() query: unknown, @Req() req: { user: ValidatedUser }) {
         const parsed = PerformanceQuerySchema.parse(query);
         const userId = await this.clampUserIdScope(req.user, parsed.userId);
@@ -86,6 +89,7 @@ export class TenderExecutiveController {
     }
 
     @Get("stage-matrix")
+    @CanRead("performance.tender-executive")
     async getStageMatrix(@Query() query: unknown, @Req() req: { user: ValidatedUser }) {
         const parsed = PerformanceQuerySchema.parse(query);
         const userId = await this.clampUserIdScope(req.user, parsed.userId);
@@ -93,6 +97,7 @@ export class TenderExecutiveController {
     }
 
     @Get("stages")
+    @CanRead("performance.tender-executive")
     async getStagePerformance(@Query() query: unknown, @Req() req: { user: ValidatedUser }) {
         const parsed = PerformanceQuerySchema.parse(query);
         const userId = await this.clampUserIdScope(req.user, parsed.userId);
@@ -101,6 +106,7 @@ export class TenderExecutiveController {
     }
 
     @Get("summary")
+    @CanRead("performance.tender-executive")
     async getSummary(@Query() query: unknown, @Req() req: { user: ValidatedUser }) {
         const parsed = PerformanceQuerySchema.parse(query);
         const userId = await this.clampUserIdScope(req.user, parsed.userId);
@@ -108,6 +114,7 @@ export class TenderExecutiveController {
     }
 
     @Get("outcomes")
+    @CanRead("performance.tender-executive")
     async getOutcomes(@Query() query: unknown, @Req() req: { user: ValidatedUser }) {
         const parsed = PerformanceQuerySchema.parse(query);
         const userId = await this.clampUserIdScope(req.user, parsed.userId);
@@ -115,6 +122,7 @@ export class TenderExecutiveController {
     }
 
     @Get("tenders")
+    @CanRead("performance.tender-executive")
     async getTenderList(@Query() query: unknown, @Req() req: { user: ValidatedUser }) {
         const parsed = TenderListQuerySchema.parse(query);
         const userId = await this.clampUserIdScope(req.user, parsed.userId);
@@ -122,6 +130,7 @@ export class TenderExecutiveController {
     }
 
     @Get("trends")
+    @CanRead("performance.tender-executive")
     async getTrends(@Query() query: unknown, @Req() req: { user: ValidatedUser }) {
         const parsed = PerformanceQuerySchema.extend({
             bucket: z.enum(["week", "month"]).optional(),
@@ -132,6 +141,7 @@ export class TenderExecutiveController {
     }
 
     @Get("scoring")
+    @CanRead("performance.tender-executive")
     async getScoring(@Query() query: unknown, @Req() req: { user: ValidatedUser }) {
         const parsed = PerformanceQuerySchema.parse(query);
         const userId = await this.clampUserIdScope(req.user, parsed.userId);
@@ -139,6 +149,7 @@ export class TenderExecutiveController {
     }
 
     @Get("stage-backlog")
+    @CanRead("performance.tender-executive")
     async getStageBacklog(@Query() query: unknown, @Req() req: { user: ValidatedUser }) {
         const parsed = StageBacklogQuerySchema.parse(query);
         const scoped = await this.clampToScope(req.user, parsed);
@@ -146,6 +157,7 @@ export class TenderExecutiveController {
     }
 
     @Get("emd-balance")
+    @CanRead("performance.tender-executive")
     async getEmdBalance(@Query() query: unknown, @Req() req: { user: ValidatedUser }) {
         const parsed = EmdBalanceQuerySchema.parse(query);
         const scoped = await this.clampToScope(req.user, parsed);
@@ -153,6 +165,7 @@ export class TenderExecutiveController {
     }
 
     @Get("emd-cashflow")
+    @CanRead("performance.tender-executive")
     async getEmdCashFlow(@Query() query: unknown, @Req() req: { user: ValidatedUser }) {
         const parsed = EmdBalanceQuerySchema.parse(query);
         const scoped = await this.clampToScope(req.user, parsed);

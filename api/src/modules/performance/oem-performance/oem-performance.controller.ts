@@ -21,8 +21,8 @@ export class OemPerformanceController {
     /**
      * GET /performance/oem?oem=1&fromDate=2024-01-01&toDate=2024-12-31
      *
-     * Permission: read on "performance.oem" — adjust the module string
-     * to whatever key you register in your permissions table.
+     * Permission: read on "performance.oem-dashboard" — the same key used by
+     * the frontend menu entry, so role/user grants apply to both consistently.
      */
 
     @Get("health")
@@ -35,7 +35,7 @@ export class OemPerformanceController {
     }
 
     @Get()
-    @CanRead("performance.oem")
+    @CanRead("performance.oem-dashboard")
     async getOemPerformance(@Query() query: Record<string, string>) {
         this.logger.debug({ message: "oem performance request made", query });
 

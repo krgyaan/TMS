@@ -319,6 +319,10 @@ export const BOQItemSchema = z.object({
   itemDescription: z.string().min(1, 'Item description is required'),
   quantity: DecimalSchema,
   rate: DecimalSchema,
+  amount: DecimalSchema.optional(),
+  gstRate: DecimalSchema.optional(),
+  gstAmount: DecimalSchema.optional(),
+  totalAmount: DecimalSchema.optional(),
   sortOrder: z.number().int().optional(),
 });
 

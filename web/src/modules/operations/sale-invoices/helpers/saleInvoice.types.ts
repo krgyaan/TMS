@@ -51,6 +51,7 @@ export interface SaleInvoiceItemDTO {
     qty: number;
     rate: number;
     gstRate: number;
+    discountPercent?: number;
     unit?: string;
     hsnSac?: string;
 }
@@ -161,6 +162,9 @@ export interface WoBoqItem {
     quantity: string;
     rate: string;
     amount: string | null;
+    gstRate?: string | null;
+    gstAmount?: string | null;
+    totalAmount?: string | null;
 }
 
 export interface WoBillingData {

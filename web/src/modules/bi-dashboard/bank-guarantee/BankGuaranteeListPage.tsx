@@ -18,7 +18,7 @@ import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { bankGuaranteesService } from '@/services/api/bank-guarantees.service';
 import type { ColDef } from 'ag-grid-community';
-import { AlertCircle, Edit, Eye, FileText, FileX2, MessageSquare, Plus, Search, Shield, XCircle } from 'lucide-react';
+import { AlertCircle, Edit, Eye, FileText, FileX2, History, MessageSquare, Plus, Search, Shield, XCircle } from 'lucide-react';
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BankStatsCards from './components/BankStatsCards';
@@ -209,6 +209,7 @@ const BankGuaranteeListPage = () => {
             {
                 label: 'Action Form',
                 icon: <FileText className="h-4 w-4" />,
+                visible: (row: BankGuaranteeDashboardRow) => !row.isOldEntry,
                 onClick: (row: BankGuaranteeDashboardRow) => navigate(paths.bi.bankGuaranteeAction(row.id)),
             },
             {
@@ -480,6 +481,10 @@ const BankGuaranteeListPage = () => {
                                     exporting={exporting}
                                     handleExport={handleExport}
                                 />
+                                <Button variant="outline" onClick={() => navigate(paths.bi.bankGuaranteeOldEntry())}>
+                                    <History className="w-4 h-4" />
+                                    Add Old BG
+                                </Button>
                                 <Button variant="outline" onClick={() => navigate(paths.bi.bankGuaranteeCreate())}>
                                     <Plus className="w-4 h-4" />
                                     Add BG

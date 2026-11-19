@@ -5,6 +5,7 @@
         dashboard.</p>
 
     <ul>
+        {{#if data.referenceValue}}<li>{{data.referenceLabel}}: {{data.referenceValue}}</li>{{/if}}
         <li>BG no.: {{data.bg_no}}</li>
         <li>BG Validity: {{data.bg_validity}}</li>
         <li>BG Claim Period Expiry: {{data.bg_claim_period_expiry}}</li>
