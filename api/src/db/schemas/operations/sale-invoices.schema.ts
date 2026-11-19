@@ -131,6 +131,8 @@ export const saleInvoiceItems = pgTable("sale_invoice_items", {
     quantity: numeric("quantity", { precision: 20, scale: 2 }),
     rate: numeric("rate", { precision: 20, scale: 2 }),
     amount: numeric("amount", { precision: 20, scale: 2 }),
+    discountPercent: numeric("discount_percent", { precision: 5, scale: 2 }).notNull().default("0"),
+    discountAmount: numeric("discount_amount", { precision: 20, scale: 2 }).notNull().default("0"),
     gstRate: numeric("gst_rate", { precision: 5, scale: 2 }),
     gstAmount: numeric("gst_amount", { precision: 14, scale: 2 }),
     totalAmount: numeric("total_amount", { precision: 14, scale: 2 }),
