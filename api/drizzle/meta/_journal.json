@@ -813,6 +813,13 @@
       "when": 1803000000000,
       "tag": "0183_create_wo_details_history",
       "breakpoints": true
+    },
+    {
+      "idx": 140,
+      "version": "7",
+      "when": 1804000000000,
+      "tag": "0184_add_tl_status_and_comment_to_purchase_orders",
+      "breakpoints": true
     }
   ]
 }
