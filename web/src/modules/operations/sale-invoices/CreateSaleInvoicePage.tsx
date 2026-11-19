@@ -31,6 +31,7 @@ import { InventoryItemCombobox } from "./components/InventoryItemCombobox";
 import { TransporterDialog, type TransporterPayload } from "./components/TransporterDialog";
 import { WoAddressDialog, type WoAddressPayload } from "./components/WoAddressDialog";
 import { formatCurrency, formatDateForInput, getGstStateName, mapSaleInvoiceFormToCreateDTO } from "./helpers/saleInvoice.mapper";
+import { calculateSaleInvoice } from "./helpers/saleInvoice.calculations";
 import { saleInvoiceFormSchema, stepOneFields, stepTwoFields, type SaleInvoiceFormValues } from "./helpers/saleInvoice.schema";
 import type { ProjectInventoryItem } from "./helpers/saleInvoice.types";
 
@@ -276,28 +277,12 @@ export default function CreateSaleInvoicePage() {
         [inventoryItems, usedProductIds],
     );
 
-    const calculations = useMemo(() => {
-        let gross = 0;
-        let discount = 0;
-        let totalGst = 0;
-        items.forEach((item) => {
-            const qty = Number(item?.qty || 0);
-            const rate = Number(item?.rate || 0);
-            const gstRate = Number(item?.gstRate || 0);
-            const discountPercent = Number(item?.discountPercent || 0);
-            const lineGross = qty * rate;
-            const lineDiscount = (lineGross * discountPercent) / 100;
-            const lineTaxable = lineGross - lineDiscount;
-            gross += lineGross;
-            discount += lineDiscount;
-            totalGst += (lineTaxable * gstRate) / 100;
-        });
-        return { gross, discount, subtotal: gross - discount, totalGst };
-    }, [items]);
+    const calculations = useMemo(() => calculateSaleInvoice(items, boqRows), [items, boqRows]);
+    const totals = calculations.totals;
 
     const grandTotal =
-        calculations.subtotal +
-        calculations.totalGst +
+        totals.subtotal +
+        totals.totalGst +
         Number(fv.freight || 0) +
         Number(fv.otherCharges || 0) +
         Number(fv.roundOff || 0);
@@ -583,13 +568,10 @@ export default function CreateSaleInvoicePage() {
         }
     };
 
-    const groupAmount = (indexes: number[]) =>
-        indexes.reduce((sum, i) => {
-            const qty = Number(items[i]?.qty || 0);
-            const rate = Number(items[i]?.rate || 0);
-            const discountPercent = Number(items[i]?.discountPercent || 0);
-            return sum + qty * rate * (1 - discountPercent / 100);
-        }, 0);
+    const groupAmount = (indexes: number[]) => {
+        const srNo = Number(items[indexes[0]]?.lineItemSrNo ?? 0);
+        return calculations.lines.get(srNo)?.taxable ?? 0;
+    };
 
     const isLoading = isProjectLoading || isWoDataLoading;
 
@@ -736,14 +718,14 @@ export default function CreateSaleInvoicePage() {
 
                                 <div className="space-y-4">
                                     {groups.map((g) => {
+                                        const lineCalc = calculations.lines.get(g.srNo);
                                         const groupQty = g.indexes.reduce(
                                             (sum, i) => sum + Number(items[i]?.qty || 0),
                                             0,
                                         );
-                                        const boqRate = Number(g.boq?.rate || 0);
-                                        const groupGross = groupQty * boqRate;
-                                        const groupDiscount = Number(items[g.indexes[0]]?.discountPercent || 0);
-                                        const groupDiscountAmount = (groupGross * groupDiscount) / 100;
+                                        const boqRate = lineCalc?.rate ?? Number(g.boq?.rate || 0);
+                                        const groupDiscount = lineCalc?.discountPercent ?? Number(items[g.indexes[0]]?.discountPercent || 0);
+                                        const groupDiscountAmount = lineCalc?.discount ?? 0;
                                         return (
                                         <div key={g.srNo} className="rounded-lg border p-4 space-y-3">
                                             <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -828,7 +810,7 @@ export default function CreateSaleInvoicePage() {
                                                                     {formatCurrency(groupDiscountAmount)}
                                                                 </TableCell>
                                                                 <TableCell className="text-right tabular-nums font-medium">
-                                                                    {formatCurrency(groupGross - groupDiscountAmount)}
+                                                                    {formatCurrency(lineCalc?.taxable ?? 0)}
                                                                 </TableCell>
                                                                 <TableCell />
                                                             </TableRow>
@@ -853,9 +835,9 @@ export default function CreateSaleInvoicePage() {
                                                             const qty = Number(item?.qty ?? 0);
                                                             const rate = Number(item?.rate ?? 0);
                                                             const discountPercent = Number(item?.discountPercent ?? 0);
-                                                            const rowGross = qty * rate;
-                                                            const rowDiscount = (rowGross * discountPercent) / 100;
-                                                            const rowAmount = rowGross - rowDiscount;
+                                                            const rowCalc = calculations.rowCalcs.get(index);
+                                                            const rowDiscount = rowCalc?.discount ?? 0;
+                                                            const rowAmount = rowCalc?.taxable ?? 0;
                                                             const rowIssues = rowErrorMessages(index);
                                                             return (
                                                                 <TableRow key={fields[index]?.id ?? index} className="group">
@@ -991,28 +973,28 @@ export default function CreateSaleInvoicePage() {
                                 <div className="rounded-lg border bg-muted/30 p-4 flex flex-wrap justify-between gap-6">
                                     <div>
                                         <p className="text-xs text-muted-foreground">Gross</p>
-                                        <p className="font-semibold tabular-nums">{formatCurrency(calculations.gross)}</p>
+                                        <p className="font-semibold tabular-nums">{formatCurrency(totals.gross)}</p>
                                     </div>
                                     <div>
                                         <p className="text-xs text-muted-foreground">Discount</p>
                                         <p className="font-semibold tabular-nums text-destructive">
-                                            -{formatCurrency(calculations.discount)}
+                                            -{formatCurrency(totals.discount)}
                                         </p>
                                     </div>
                                     <div>
                                         <p className="text-xs text-muted-foreground">Subtotal (Pre-GST)</p>
-                                        <p className="font-semibold tabular-nums">{formatCurrency(calculations.subtotal)}</p>
+                                        <p className="font-semibold tabular-nums">{formatCurrency(totals.subtotal)}</p>
                                     </div>
                                     <div>
                                         <p className="text-xs text-muted-foreground">GST</p>
                                         <p className="font-semibold tabular-nums text-blue-600">
-                                            {formatCurrency(calculations.totalGst)}
+                                            {formatCurrency(totals.totalGst)}
                                         </p>
                                     </div>
                                     <div>
                                         <p className="text-xs text-muted-foreground">Total</p>
                                         <p className="font-bold tabular-nums">
-                                            {formatCurrency(calculations.subtotal + calculations.totalGst)}
+                                            {formatCurrency(totals.subtotal + totals.totalGst)}
                                         </p>
                                     </div>
                                 </div>
@@ -1440,11 +1422,12 @@ export default function CreateSaleInvoicePage() {
 
                                 <div className="space-y-4">
                                     {groups.map((g) => {
+                                        const lineCalc = calculations.lines.get(g.srNo);
                                         const groupQty = g.indexes.reduce(
                                             (sum, i) => sum + Number(items[i]?.qty || 0),
                                             0,
                                         );
-                                        const groupDiscount = Number(items[g.indexes[0]]?.discountPercent || 0);
+                                        const groupDiscount = lineCalc?.discountPercent ?? Number(items[g.indexes[0]]?.discountPercent || 0);
                                         return (
                                         <div key={g.srNo} className="rounded-lg border overflow-hidden">
                                             <div className="bg-muted/50 px-4 py-2 flex items-center justify-between gap-3">
@@ -1498,10 +1481,10 @@ export default function CreateSaleInvoicePage() {
                                                                 {groupDiscount}%
                                                             </TableCell>
                                                             <TableCell className="text-right tabular-nums text-muted-foreground">
-                                                                {formatCurrency((groupQty * Number(g.boq.rate || 0) * groupDiscount) / 100)}
+                                                                {formatCurrency(lineCalc?.discount ?? 0)}
                                                             </TableCell>
                                                             <TableCell className="text-right tabular-nums font-medium">
-                                                                {formatCurrency(groupAmount(g.indexes))}
+                                                                {formatCurrency(lineCalc?.taxable ?? 0)}
                                                             </TableCell>
                                                         </TableRow>
                                                     )}
@@ -1515,8 +1498,8 @@ export default function CreateSaleInvoicePage() {
                                                         const qty = Number(item?.qty ?? 0);
                                                         const rate = Number(item?.rate ?? 0);
                                                         const discountPercent = Number(item?.discountPercent ?? 0);
-                                                        const rowGross = qty * rate;
-                                                        const rowDiscount = (rowGross * discountPercent) / 100;
+                                                        const rowCalc = calculations.rowCalcs.get(index);
+                                                        const rowDiscount = rowCalc?.discount ?? 0;
                                                         return (
                                                             <TableRow key={fields[index]?.id ?? index}>
                                                                 <TableCell className="font-mono text-sm">{g.srNo || "—"}</TableCell>
@@ -1549,7 +1532,7 @@ export default function CreateSaleInvoicePage() {
                                                                     </TableCell>
                                                                 )}
                                                                 <TableCell className="text-right tabular-nums font-medium">
-                                                                    {formatCurrency(rowGross - rowDiscount)}
+                                                                    {formatCurrency(rowCalc?.taxable ?? 0)}
                                                                 </TableCell>
                                                             </TableRow>
                                                         );
@@ -1610,22 +1593,22 @@ export default function CreateSaleInvoicePage() {
                                         <h4 className="font-semibold text-sm mb-2">Totals</h4>
                                         <div className="flex items-center justify-between text-sm">
                                             <span className="text-muted-foreground">Gross</span>
-                                            <span className="tabular-nums">{formatCurrency(calculations.gross)}</span>
+                                            <span className="tabular-nums">{formatCurrency(totals.gross)}</span>
                                         </div>
                                         <div className="flex items-center justify-between text-sm">
                                             <span className="text-muted-foreground">Discount</span>
                                             <span className="tabular-nums text-destructive">
-                                                -{formatCurrency(calculations.discount)}
+                                                -{formatCurrency(totals.discount)}
                                             </span>
                                         </div>
                                         <div className="flex items-center justify-between text-sm">
                                             <span className="text-muted-foreground">Subtotal (Pre-GST)</span>
-                                            <span className="tabular-nums">{formatCurrency(calculations.subtotal)}</span>
+                                            <span className="tabular-nums">{formatCurrency(totals.subtotal)}</span>
                                         </div>
                                         <div className="flex items-center justify-between text-sm">
                                             <span className="text-muted-foreground">GST</span>
                                             <span className="tabular-nums text-blue-600">
-                                                {formatCurrency(calculations.totalGst)}
+                                                {formatCurrency(totals.totalGst)}
                                             </span>
                                         </div>
                                         <div className="flex items-center justify-between text-sm">
