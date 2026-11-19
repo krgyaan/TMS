@@ -132,6 +132,9 @@ export interface PurchaseOrderRow {
     amountAfterTds?: number | string;
     poApproved?: boolean;
     poApprovalRemark?: string;
+    tlStatus?: number | null;
+    tlComment?: string | null;
+    creatorTeamId?: number | null;
     totalPaymentRequested?: number;
     totalMakerDone?: number;
     totalPaymentDone?: number;
@@ -139,6 +142,11 @@ export interface PurchaseOrderRow {
     totalPiCount?: number;
     purchaseInvoices?: Array<{ invoiceNo: string; totalAmount: number }>;
     poPdfVersions?: Record<string, { path: string; hash: string }>;
+}
+
+export interface SubmitTlApprovalDTO {
+    tlStatus: 1 | 2;
+    tlComment?: string;
 }
 
 export interface SetTdsDTO {

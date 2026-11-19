@@ -362,3 +362,112 @@ describe("OperationNotificationService payment request notifications", () => {
         expect(text).toContain("Category: Some New Category");
     });
 });
+
+describe("OperationNotificationService PO Team Group & TL Decision notifications", () => {
+    let service: OperationNotificationService;
+    let sendText: jest.Mock;
+    let toJid: jest.Mock;
+    let dryRun: boolean;
+
+    beforeEach(async () => {
+        sendText = jest.fn().mockResolvedValue({ messageId: "m1" });
+        toJid = jest.fn().mockReturnValue("919999999999@c.us");
+        dryRun = false;
+
+        const db = {
+            select: jest.fn().mockReturnValue({
+                from: jest.fn().mockReturnValue({
+                    where: jest.fn().mockReturnValue({
+                        limit: jest.fn().mockResolvedValue([{ name: "Rahul Sharma", team: 1, mobile: "9999999999" }]),
+                    }),
+                }),
+            }),
+        };
+
+        const module: TestingModule = await Test.createTestingModule({
+            providers: [
+                OperationNotificationService,
+                { provide: OpenwaService, useValue: { sendText } },
+                { provide: DRIZZLE, useValue: db },
+                { provide: WhatsappJidResolver, useValue: { toJid } },
+                { provide: PublicLinkService, useValue: { buildUrl: jest.fn() } },
+                {
+                    provide: openwaConfig.KEY,
+                    useFactory: () => ({
+                        get OPENWA_DRY_RUN() {
+                            return dryRun;
+                        },
+                    }),
+                },
+            ],
+        }).compile();
+
+        service = module.get(OperationNotificationService);
+    });
+
+    it("notifyPoCreated routes to the creator's Team Group with direct TMS PO URL", async () => {
+        await service.notifyPoCreated({
+            purchaseOrderId: 42,
+            poNumber: "PO/2026/0042",
+            projectName: "Solar Plant",
+            sellerName: "Acme Traders",
+            grandTotal: 125000,
+            createdBy: 1,
+            teamId: 1,
+        });
+
+        expect(sendText).toHaveBeenCalledTimes(1);
+        const [group, text] = sendText.mock.calls[0];
+        expect(group).toBe(GROUPS.ACTENDERSEARCH);
+        expect(text).toContain("PO/2026/0042");
+        expect(text).toContain("Solar Plant");
+        expect(text).toContain("Acme Traders");
+        expect(text).toContain("/operations/purchase-orders/42");
+    });
+
+    it("notifyPoTlDecision (Approve) notifies Accounts (GROUPS.PAYMENTS)", async () => {
+        await service.notifyPoTlDecision({
+            purchaseOrderId: 42,
+            poNumber: "PO/2026/0042",
+            projectName: "Solar Plant",
+            sellerName: "Acme Traders",
+            grandTotal: 125000,
+            actedBy: 2,
+            createdBy: 1,
+            teamId: 2,
+            tlStatus: 1,
+            tlComment: "Verified rates",
+        });
+
+        expect(sendText).toHaveBeenCalledTimes(1);
+        const [group, text] = sendText.mock.calls[0];
+        expect(group).toBe(GROUPS.PAYMENTS);
+        expect(text).toContain("PO Approved by TL");
+        expect(text).toContain("Verified rates");
+        expect(text).toContain("/operations/purchase-orders/42");
+    });
+
+    it("notifyPoTlDecision (Reject) notifies Team Group and DMs creator", async () => {
+        await service.notifyPoTlDecision({
+            purchaseOrderId: 42,
+            poNumber: "PO/2026/0042",
+            projectName: "Solar Plant",
+            sellerName: "Acme Traders",
+            grandTotal: 125000,
+            actedBy: 2,
+            createdBy: 1,
+            teamId: 2,
+            tlStatus: 2,
+            tlComment: "Price mismatch with quotation",
+        });
+
+        expect(sendText).toHaveBeenCalledTimes(2);
+        const [firstGroup, firstText] = sendText.mock.calls[0];
+        expect(firstGroup).toBe(GROUPS.DCTENDERSEARCH);
+        expect(firstText).toContain("PO Rejected by Team Leader");
+        expect(firstText).toContain("Price mismatch with quotation");
+
+        const [secondJid] = sendText.mock.calls[1];
+        expect(secondJid).toBe("919999999999@c.us");
+    });
+});

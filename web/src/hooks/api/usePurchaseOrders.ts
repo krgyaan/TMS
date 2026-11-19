@@ -156,6 +156,18 @@ export const useSetTdsPercentage = () => {
     });
 };
 
+export const useSubmitPoTlApproval = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }: { id: number; data: { tlStatus: 1 | 2; tlComment?: string } }) =>
+            purchaseOrderApi.submitTlApproval(id, data),
+        onSuccess: (_data, { id }) => {
+            queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.purchaseOrder(id) });
+            queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.all });
+        },
+    });
+};
+
 export const useCreatePoParty = () => {
     const queryClient = useQueryClient();
     return useMutation({
