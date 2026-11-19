@@ -309,25 +309,28 @@
         </table>
         <table style="width:100%;border-collapse:collapse;table-layout:fixed;margin-top:4mm;font-size:9px;">
             <colgroup>
-                <col style="width:16.5%">
-                <col style="width:16.5%">
-                <col style="width:16.5%">
-                <col style="width:16.5%">
-                <col style="width:16.5%">
-                <col style="width:16.5%">
+                <col style="width:18%">
+                <col style="width:16%">
+                <col style="width:10%">
+                <col style="width:14%">
+                <col style="width:14%">
+                <col style="width:14%">
+                <col style="width:14%">
             </colgroup>
             <tr>
-                <th style="border:1px solid #222;padding:3px;">GST Rate</th>
+                <th style="border:1px solid #222;padding:3px;">HSN/SAC</th>
                 <th style="border:1px solid #222;padding:3px;">Taxable Value</th>
+                <th style="border:1px solid #222;padding:3px;">GST Rate</th>
                 <th style="border:1px solid #222;padding:3px;">IGST</th>
                 <th style="border:1px solid #222;padding:3px;">CGST</th>
                 <th style="border:1px solid #222;padding:3px;">SGST</th>
                 <th style="border:1px solid #222;padding:3px;">Total Tax</th>
             </tr>
-            {{#each tax_breakdown}}
+            {{#each hsn_summary}}
             <tr>
-                <td style="border:1px solid #222;padding:3px;text-align:right;">{{rate}}%</td>
+                <td style="border:1px solid #222;padding:3px;">{{hsn_sac}}</td>
                 <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency taxable_value}}</td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;">{{rate}}%</td>
                 <td style="border:1px solid #222;padding:3px;text-align:right;">{{#if ../is_interstate}}{{formatCurrency igst_amount}}{{/if}}</td>
                 <td style="border:1px solid #222;padding:3px;text-align:right;">{{#unless ../is_interstate}}{{formatCurrency cgst_amount}}{{/unless}}</td>
                 <td style="border:1px solid #222;padding:3px;text-align:right;">{{#unless ../is_interstate}}{{formatCurrency sgst_amount}}{{/unless}}</td>
@@ -335,7 +338,7 @@
             </tr>
             {{/each}}
             <tr>
-                <td colspan="5" style="border:1px solid #222;padding:3px;text-align:right;"><b>Total Tax</b></td>
+                <td colspan="6" style="border:1px solid #222;padding:3px;text-align:right;"><b>Total Tax</b></td>
                 <td style="border:1px solid #222;padding:3px;text-align:right;"><b>{{formatCurrency total_tax_amount}}</b></td>
             </tr>
         </table>

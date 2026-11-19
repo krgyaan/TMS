@@ -290,11 +290,12 @@
                     <td style="text-align:center;">{{this.discount_percent}}%</td>
                     <td style="text-align:center;">{{formatCurrency this.discount_amount}}</td>
                     <td style="text-align:right;"><b>{{formatCurrency this.taxable_value}}</b></td>
-                    <td style="text-align:center;">
+                    <td style="text-align:center; text-style:italic;">
                         {{#if ../is_interstate}}
-                        IGST@{{this.igst_rate}}%
+                        IGST<br>@{{this.igst_rate}}%
                         {{else}}
-                        CGST@{{this.cgst_rate}}%<br>SGST@{{this.sgst_rate}}%
+                        CGST<br>@{{this.cgst_rate}}%<br>
+                        SGST<br>@{{this.sgst_rate}}%
                         {{/if}}
                     </td>
                     <td style="text-align:right;">
@@ -391,25 +392,28 @@
 
                             <table style="margin-top:-1px;font-size:8px;">
                                 <colgroup>
-                                    <col style="width:16.66%">
-                                    <col style="width:16.66%">
-                                    <col style="width:16.66%">
-                                    <col style="width:16.66%">
-                                    <col style="width:16.66%">
-                                    <col style="width:16.7%">
+                                    <col style="width:18%">
+                                    <col style="width:16%">
+                                    <col style="width:10%">
+                                    <col style="width:14%">
+                                    <col style="width:14%">
+                                    <col style="width:14%">
+                                    <col style="width:14%">
                                 </colgroup>
                                 <tr>
-                                    <th style="padding:3px;">GST Rate</th>
+                                    <th style="padding:3px;">HSN/SAC</th>
                                     <th style="padding:3px;">Taxable Value</th>
+                                    <th style="padding:3px;">GST Rate</th>
                                     <th style="padding:3px;">IGST</th>
                                     <th style="padding:3px;">CGST</th>
                                     <th style="padding:3px;">SGST</th>
                                     <th style="padding:3px;">Total Tax</th>
                                 </tr>
-                                {{#each tax_breakdown}}
+                                {{#each hsn_summary}}
                                 <tr>
-                                    <td style="text-align:right;">{{rate}}%</td>
+                                    <td style="padding:3px;">{{hsn_sac}}</td>
                                     <td style="text-align:right;">{{formatCurrency taxable_value}}</td>
+                                    <td style="text-align:right;">{{rate}}%</td>
                                     <td style="text-align:right;">{{#if ../is_interstate}}{{formatCurrency
                                         igst_amount}}{{/if}}</td>
                                     <td style="text-align:right;">{{#unless ../is_interstate}}{{formatCurrency
@@ -420,7 +424,7 @@
                                 </tr>
                                 {{/each}}
                                 <tr>
-                                    <td colspan="5" style="text-align:right;"><b>Total Tax</b></td>
+                                    <td colspan="6" style="text-align:right;"><b>Total Tax</b></td>
                                     <td style="text-align:right;"><b>{{formatCurrency total_tax_amount}}</b></td>
                                 </tr>
                             </table>

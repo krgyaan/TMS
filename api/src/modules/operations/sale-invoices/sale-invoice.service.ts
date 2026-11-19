@@ -378,12 +378,17 @@ export const resolveSaleInvoiceItems = (
     return resolved;
 };
 
-export const buildSaleInvoiceTaxSummary = (
+export const buildSaleInvoiceHsnSummary = (
     items: ReturnType<typeof buildSaleInvoicePdfItems>,
-): Array<{ rate: number; taxable_value: number; igst_amount: number; cgst_amount: number; sgst_amount: number; tax_amount: number }> => {
-    const groups = new Map<number, { rate: number; taxable_value: number; igst_amount: number; cgst_amount: number; sgst_amount: number; tax_amount: number }>();
+): Array<{ hsn_sac: string; rate: number; taxable_value: number; igst_amount: number; cgst_amount: number; sgst_amount: number; tax_amount: number }> => {
+    const groups = new Map<
+        string,
+        { hsn_sac: string; rate: number; taxable_value: number; igst_amount: number; cgst_amount: number; sgst_amount: number; tax_amount: number }
+    >();
     for (const item of items) {
-        const group = groups.get(item.gst_rate) ?? {
+        const hsnSac = item.hsn_sac?.trim() || "—";
+        const group = groups.get(hsnSac) ?? {
+            hsn_sac: hsnSac,
             rate: item.gst_rate,
             taxable_value: 0,
             igst_amount: 0,
@@ -396,13 +401,27 @@ export const buildSaleInvoiceTaxSummary = (
         group.cgst_amount += item.cgst_amount;
         group.sgst_amount += item.sgst_amount;
         group.tax_amount += item.tax_amount;
-        groups.set(item.gst_rate, group);
+        groups.set(hsnSac, group);
     }
-    return [...groups.values()].sort((a, b) => a.rate - b.rate);
+    return [...groups.values()]
+        .map((row) => ({
+            ...row,
+            taxable_value: roundCurrency(row.taxable_value),
+            igst_amount: roundCurrency(row.igst_amount),
+            cgst_amount: roundCurrency(row.cgst_amount),
+            sgst_amount: roundCurrency(row.sgst_amount),
+            tax_amount: roundCurrency(row.tax_amount),
+        }))
+        .sort((a, b) => {
+            if (a.hsn_sac === b.hsn_sac) return a.rate - b.rate;
+            if (a.hsn_sac === "—") return 1;
+            if (b.hsn_sac === "—") return -1;
+            return a.hsn_sac.localeCompare(b.hsn_sac);
+        });
 };
 
 export const computeSaleInvoicePdfHash = (data: Record<string, unknown>): string =>
-    createHash("sha256").update(JSON.stringify({ templateRevision: 3, data })).digest("hex");
+    createHash("sha256").update(JSON.stringify({ templateRevision: 4, data })).digest("hex");
 
 @Injectable()
 export class SaleInvoiceService {
@@ -1093,7 +1112,7 @@ export class SaleInvoiceService {
             dispatch_phone: "",
             is_interstate: isInterstate,
             items: rows,
-            tax_breakdown: buildSaleInvoiceTaxSummary(rows),
+            hsn_summary: buildSaleInvoiceHsnSummary(rows),
             quantity: totalQuantity,
             line_item_subtotal: lineItemSubtotal,
             taxable_value: totalTaxableValue,

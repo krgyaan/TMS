@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as Handlebars from "handlebars";
 import { getPdfMargins, isLandscape } from "@/modules/pdf/config/pdf-config";
-import { aggregateSaleInvoiceItemsByBoq, buildSaleInvoicePdfItems, buildSaleInvoiceTaxSummary, computeSaleInvoicePdfHash, getGstStateCode, isValidGstin, resolveSaleInvoiceItems, SaleInvoiceService } from "./sale-invoice.service";
+import { aggregateSaleInvoiceItemsByBoq, buildSaleInvoiceHsnSummary, buildSaleInvoicePdfItems, computeSaleInvoicePdfHash, getGstStateCode, isValidGstin, resolveSaleInvoiceItems, SaleInvoiceService } from "./sale-invoice.service";
 
 const pdfItem = (
     overrides: Partial<{
@@ -86,6 +86,17 @@ describe("sale invoice PDF data helpers", () => {
             sgst_rate: 9,
             sgst_amount: 18,
             total_tax_amount: 36,
+            hsn_summary: [
+                {
+                    hsn_sac: "1234",
+                    rate: 18,
+                    taxable_value: 200,
+                    igst_amount: 36,
+                    cgst_amount: 18,
+                    sgst_amount: 18,
+                    tax_amount: 36,
+                },
+            ],
             grand_total: 236,
             amount_in_words: "Two hundred thirty six",
             tax_amount_in_words: "Thirty six",
@@ -145,12 +156,33 @@ describe("sale invoice PDF data helpers", () => {
         expect(item.cgst_amount + item.sgst_amount).toBe(5.01);
     });
 
-    it("groups tax summary amounts by GST rate", () => {
-        const rows = buildSaleInvoicePdfItems([pdfItem(), pdfItem({ srNo: 2, gstRate: "5", amount: "100", gstAmount: "5", totalAmount: "105" })], true);
-        const summary = buildSaleInvoiceTaxSummary(rows);
+    it("groups the HSN summary by HSN/SAC", () => {
+        const rows = buildSaleInvoicePdfItems(
+            [
+                pdfItem({ hsnSac: "1234", amount: "200", gstAmount: "36" }),
+                pdfItem({ srNo: 2, hsnSac: "1234", amount: "100", gstAmount: "18" }),
+                pdfItem({ srNo: 3, hsnSac: "5678", amount: "100", gstAmount: "5", gstRate: "5" }),
+            ],
+            true,
+        );
+        const summary = buildSaleInvoiceHsnSummary(rows);
 
-        expect(summary.map(row => row.rate)).toEqual([5, 18]);
-        expect(summary.map(row => row.tax_amount)).toEqual([5, 36]);
+        expect(summary.map(row => row.hsn_sac)).toEqual(["1234", "5678"]);
+        expect(summary.map(row => row.taxable_value)).toEqual([300, 100]);
+        expect(summary.map(row => row.tax_amount)).toEqual([54, 5]);
+    });
+
+    it("uses an em dash for items without an HSN and sorts it last", () => {
+        const rows = buildSaleInvoicePdfItems(
+            [
+                pdfItem({ hsnSac: "" }),
+                pdfItem({ srNo: 2, hsnSac: "1234" }),
+            ],
+            false,
+        );
+        const summary = buildSaleInvoiceHsnSummary(rows);
+
+        expect(summary.map(row => row.hsn_sac)).toEqual(["1234", "—"]);
     });
 
     it("applies a pre-GST discount when computing the taxable value", () => {
@@ -241,6 +273,8 @@ describe("sale invoice PDF data helpers", () => {
         expect(html).toContain(">Qty<");
         expect(html).toContain(">Discount<");
         expect(html).toContain(">GST<");
+        expect(html).toContain("HSN/SAC");
+        expect(html).toContain("1234");
         if (isInterstate) {
             expect(html).toContain("IGST@18%");
         } else {
