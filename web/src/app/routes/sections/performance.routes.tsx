@@ -49,7 +49,7 @@ export default function PerformanceRoutes() {
             <Route
                 path="oem-dashboard"
                 element={
-                    <RouteWrapper>
+                    <RouteWrapper permission={{ module: "performance.oem-dashboard", action: "read" }}>
                         <Perf_OEM />
                     </RouteWrapper>
                 }
