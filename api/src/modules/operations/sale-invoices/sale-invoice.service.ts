@@ -220,6 +220,164 @@ export const aggregateSaleInvoiceItemsByBoq = (
     }));
 };
 
+export interface SaleInvoiceItemInput {
+    lineItemSrNo: number;
+    purchaseOrderProductId: number;
+    qty: number;
+    rate: number;
+    gstRate: number;
+    discountPercent?: number;
+    itemDescription: string;
+    unit?: string | null;
+    hsnSac?: string | null;
+    srNo?: number | null;
+}
+
+export interface ResolvedSaleInvoiceItem extends SaleInvoiceItemInput {
+    rate: number;
+    gstRate: number;
+    discountPercent: number;
+    grossAmount: number;
+    discountAmount: number;
+    taxableAmount: number;
+    gstAmount: number;
+    totalAmount: number;
+    purchaseRate: number;
+    purchaseAmount: number;
+    itemDescription: string;
+    unit: string | null;
+    hsnSac: string | null;
+    srNo: number | null;
+}
+
+type BoqPricingRow = {
+    itemDescription: string | null;
+    quantity: string | number | null;
+    rate: string | number | null;
+    gstRate: string | number | null;
+};
+
+type PoProductPricingRow = {
+    rate?: string | number | null;
+    unit?: string | null;
+    hsnSac?: string | null;
+};
+
+export const roundCurrency = (value: number): number => Math.round((value + Number.EPSILON) * 100) / 100;
+
+/**
+ * Resolves invoice rows for BOQ-based billing. The invoice line (qty/rate/GST)
+ * always follows the WO Billing BOQ; the BOQ line amount is allocated across
+ * the mapped PO rows so inventory consumption stays per-PO while revenue
+ * reconciles with the BOQ. Purchase rate/amount are snapshotted for P&L.
+ */
+export const resolveSaleInvoiceItems = (
+    items: SaleInvoiceItemInput[],
+    boqBySrNo: Map<number, BoqPricingRow>,
+    poProductMap: Map<number, PoProductPricingRow>,
+): ResolvedSaleInvoiceItem[] => {
+    const groups = new Map<number, SaleInvoiceItemInput[]>();
+    const order: number[] = [];
+    for (const item of items) {
+        const key = item.lineItemSrNo;
+        if (!groups.has(key)) {
+            groups.set(key, []);
+            order.push(key);
+        }
+        groups.get(key)!.push(item);
+    }
+
+    const resolved: ResolvedSaleInvoiceItem[] = [];
+
+    for (const key of order) {
+        const group = groups.get(key)!;
+        const boq = boqBySrNo.get(key);
+
+        if (!boq) {
+            for (const item of group) {
+                const prod = poProductMap.get(item.purchaseOrderProductId);
+                const discountPercent = Number(item.discountPercent ?? 0);
+                const grossAmount = roundCurrency(item.qty * item.rate);
+                const discountAmount = roundCurrency((grossAmount * discountPercent) / 100);
+                const taxableAmount = roundCurrency(grossAmount - discountAmount);
+                const gstAmount = roundCurrency((taxableAmount * item.gstRate) / 100);
+                const totalAmount = roundCurrency(taxableAmount + gstAmount);
+                const purchaseRate = Number(prod?.rate ?? 0);
+
+                resolved.push({
+                    ...item,
+                    rate: item.rate,
+                    gstRate: item.gstRate,
+                    discountPercent,
+                    grossAmount,
+                    discountAmount,
+                    taxableAmount,
+                    gstAmount,
+                    totalAmount,
+                    purchaseRate,
+                    purchaseAmount: roundCurrency(item.qty * purchaseRate),
+                    itemDescription: item.itemDescription,
+                    unit: item.unit || prod?.unit || null,
+                    hsnSac: item.hsnSac || prod?.hsnSac || null,
+                    srNo: item.srNo || item.lineItemSrNo || null,
+                });
+            }
+            continue;
+        }
+
+        const boqQty = Number(boq.quantity ?? 0);
+        const boqRate = Number(boq.rate ?? 0);
+        const boqGstRate = Number(boq.gstRate ?? 0);
+        const discountPercent = Number(group[0]?.discountPercent ?? 0);
+        const lineGross = boqQty * boqRate;
+        const lineDiscount = (lineGross * discountPercent) / 100;
+        const totalMappedQty = group.reduce((sum, item) => sum + item.qty, 0);
+
+        let allocatedGross = 0;
+        let allocatedDiscount = 0;
+
+        group.forEach((item, index) => {
+            const isLast = index === group.length - 1;
+            const share = totalMappedQty > 0 ? item.qty / totalMappedQty : 1 / group.length;
+            const grossAmount = isLast
+                ? roundCurrency(lineGross - allocatedGross)
+                : roundCurrency(lineGross * share);
+            const discountAmount = isLast
+                ? roundCurrency(lineDiscount - allocatedDiscount)
+                : roundCurrency(lineDiscount * share);
+            allocatedGross += grossAmount;
+            allocatedDiscount += discountAmount;
+
+            const taxableAmount = roundCurrency(grossAmount - discountAmount);
+            const gstAmount = roundCurrency((taxableAmount * boqGstRate) / 100);
+            const totalAmount = roundCurrency(taxableAmount + gstAmount);
+
+            const prod = poProductMap.get(item.purchaseOrderProductId);
+            const purchaseRate = Number(prod?.rate ?? 0);
+
+            resolved.push({
+                ...item,
+                rate: boqRate,
+                gstRate: boqGstRate,
+                discountPercent,
+                grossAmount,
+                discountAmount,
+                taxableAmount,
+                gstAmount,
+                totalAmount,
+                purchaseRate,
+                purchaseAmount: roundCurrency(item.qty * purchaseRate),
+                itemDescription: boq.itemDescription || item.itemDescription,
+                unit: item.unit || prod?.unit || null,
+                hsnSac: item.hsnSac || prod?.hsnSac || null,
+                srNo: item.srNo || item.lineItemSrNo || null,
+            });
+        });
+    }
+
+    return resolved;
+};
+
 export const buildSaleInvoiceTaxSummary = (
     items: ReturnType<typeof buildSaleInvoicePdfItems>,
 ): Array<{ rate: number; taxable_value: number; igst_amount: number; cgst_amount: number; sgst_amount: number; tax_amount: number }> => {
@@ -352,12 +510,13 @@ export class SaleInvoiceService {
         const invoiceNumber = await this.generateInvoiceNumber(project.projectName || undefined);
 
         // Validate BOQ line-item sr nos and snapshot BOQ pricing for this project's WO billing BOQ
-        const boqBySrNo = new Map<number, { itemDescription: string | null; rate: string | null; gstRate: string | null }>();
+        const boqBySrNo = new Map<number, { itemDescription: string | null; quantity: string | null; rate: string | null; gstRate: string | null }>();
         if (body.woDetailId) {
             const boqRows = await this.db
                 .select({
                     srNo: woBillingBoq.srNo,
                     itemDescription: woBillingBoq.itemDescription,
+                    quantity: woBillingBoq.quantity,
                     rate: woBillingBoq.rate,
                     gstRate: woBillingBoq.gstRate,
                 })
@@ -437,37 +596,20 @@ export class SaleInvoiceService {
             };
         }
 
-        // Resolve pricing from the WO Billing BOQ (rate, GST and description always
-        // follow the BOQ line for BOQ-based invoices) and apply the line discount.
-        const resolvedItems = body.items.map((item) => {
-            const qty = Number(item.qty);
-            const boq = boqBySrNo.get(item.lineItemSrNo);
-            const rate = boq ? Number(boq.rate ?? 0) : Number(item.rate);
-            const gstRate = boq ? Number(boq.gstRate ?? 0) : Number(item.gstRate);
-            const discountPercent = Number(item.discountPercent ?? 0);
-            const grossAmount = qty * rate;
-            const discountAmount = (grossAmount * discountPercent) / 100;
-            const taxableAmount = grossAmount - discountAmount;
-            const gstAmount = (taxableAmount * gstRate) / 100;
-            const totalAmount = taxableAmount + gstAmount;
-            const prod = poProductMap.get(Number(item.purchaseOrderProductId));
-            return {
+        // The invoice line follows the WO Billing BOQ (qty, rate, GST, description).
+        // The BOQ line amount is allocated across the mapped PO rows so inventory
+        // consumption stays per-PO while revenue reconciles with the BOQ.
+        const resolvedItems = resolveSaleInvoiceItems(
+            body.items.map((item) => ({
                 ...item,
-                qty,
-                rate,
-                gstRate,
-                discountPercent,
-                grossAmount,
-                discountAmount,
-                taxableAmount,
-                gstAmount,
-                totalAmount,
-                itemDescription: boq?.itemDescription || item.itemDescription,
-                unit: item.unit || prod?.unit || null,
-                hsnSac: item.hsnSac || prod?.hsnSac || null,
-                srNo: item.srNo || item.lineItemSrNo || null,
-            };
-        });
+                qty: Number(item.qty),
+                rate: Number(item.rate),
+                gstRate: Number(item.gstRate),
+                discountPercent: Number(item.discountPercent ?? 0),
+            })),
+            boqBySrNo,
+            poProductMap,
+        );
 
         let totalPreGst = 0;
         let totalGst = 0;
@@ -550,6 +692,8 @@ export class SaleInvoiceService {
                     amount: item.grossAmount.toString(),
                     discountPercent: item.discountPercent.toString(),
                     discountAmount: item.discountAmount.toString(),
+                    purchaseRate: item.purchaseRate.toString(),
+                    purchaseAmount: item.purchaseAmount.toString(),
                     gstRate: item.gstRate.toString(),
                     gstAmount: item.gstAmount.toString(),
                     totalAmount: item.totalAmount.toString(),
@@ -1477,6 +1621,8 @@ export class SaleInvoiceService {
                 amount: saleInvoiceItems.amount,
                 discountPercent: saleInvoiceItems.discountPercent,
                 discountAmount: saleInvoiceItems.discountAmount,
+                purchaseRate: saleInvoiceItems.purchaseRate,
+                purchaseAmount: saleInvoiceItems.purchaseAmount,
                 gstRate: saleInvoiceItems.gstRate,
                 gstAmount: saleInvoiceItems.gstAmount,
                 totalAmount: saleInvoiceItems.totalAmount,

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as Handlebars from "handlebars";
 import { getPdfMargins, isLandscape } from "@/modules/pdf/config/pdf-config";
-import { aggregateSaleInvoiceItemsByBoq, buildSaleInvoicePdfItems, buildSaleInvoiceTaxSummary, computeSaleInvoicePdfHash, getGstStateCode, isValidGstin, SaleInvoiceService } from "./sale-invoice.service";
+import { aggregateSaleInvoiceItemsByBoq, buildSaleInvoicePdfItems, buildSaleInvoiceTaxSummary, computeSaleInvoicePdfHash, getGstStateCode, isValidGstin, resolveSaleInvoiceItems, SaleInvoiceService } from "./sale-invoice.service";
 
 const pdfItem = (
     overrides: Partial<{
@@ -184,6 +184,48 @@ describe("sale invoice PDF data helpers", () => {
         expect(row.amount).toBe(400);
     });
 
+    it("bills the BOQ line and allocates it across the mapped PO rows", () => {
+        const boqBySrNo = new Map([[7, { itemDescription: "BOQ line", quantity: "10", rate: "100", gstRate: "18" }]]);
+        const poProductMap = new Map([
+            [88, { rate: "50", unit: "EA", hsnSac: "1111" }],
+            [99, { rate: "60", unit: "EA", hsnSac: "2222" }],
+        ]);
+        const rows = resolveSaleInvoiceItems(
+            [
+                { lineItemSrNo: 7, purchaseOrderProductId: 88, qty: 4, rate: 999, gstRate: 5, discountPercent: 10, itemDescription: "PO A" },
+                { lineItemSrNo: 7, purchaseOrderProductId: 99, qty: 6, rate: 999, gstRate: 5, discountPercent: 10, itemDescription: "PO B" },
+            ],
+            boqBySrNo,
+            poProductMap,
+        );
+
+        expect(rows.map(row => row.rate)).toEqual([100, 100]);
+        expect(rows.map(row => row.gstRate)).toEqual([18, 18]);
+        expect(rows.map(row => row.itemDescription)).toEqual(["BOQ line", "BOQ line"]);
+        expect(rows.reduce((sum, row) => sum + row.grossAmount, 0)).toBe(1000);
+        expect(rows.reduce((sum, row) => sum + row.discountAmount, 0)).toBe(100);
+        expect(rows.reduce((sum, row) => sum + row.taxableAmount, 0)).toBe(900);
+        expect(rows.reduce((sum, row) => sum + row.gstAmount, 0)).toBe(162);
+        expect(rows[0].purchaseRate).toBe(50);
+        expect(rows[0].purchaseAmount).toBe(200);
+        expect(rows[1].purchaseRate).toBe(60);
+        expect(rows[1].purchaseAmount).toBe(360);
+    });
+
+    it("keeps per-row pricing for projects without a BOQ", () => {
+        const rows = resolveSaleInvoiceItems(
+            [{ lineItemSrNo: 0, purchaseOrderProductId: 88, qty: 2, rate: 150, gstRate: 18, discountPercent: 0, itemDescription: "Free item" }],
+            new Map(),
+            new Map([[88, { rate: "100", unit: "EA", hsnSac: "1111" }]]),
+        );
+
+        expect(rows[0].rate).toBe(150);
+        expect(rows[0].grossAmount).toBe(300);
+        expect(rows[0].gstAmount).toBe(54);
+        expect(rows[0].purchaseRate).toBe(100);
+        expect(rows[0].purchaseAmount).toBe(200);
+    });
+
     it("produces stable hashes for identical rendered data and new hashes for changed content", () => {
         const data = { invoice_number: "SI/TEST/0001", grand_total: 236 };
 
@@ -196,13 +238,14 @@ describe("sale invoice PDF data helpers", () => {
 
         expect(html).toContain("<b>Test BOQ item</b>");
         expect(html).toContain("Test PO description");
-        expect(html).toContain("BOQ Qty");
+        expect(html).toContain(">Qty<");
+        expect(html).toContain(">Discount<");
         expect(html).toContain("Priya Manager");
         expect(html).toContain("Road");
         expect(html).toContain("Bengaluru");
         expect(html).toContain("Buyer Contact");
         expect(html).toContain("Consignee Contact");
-        expect(html).toContain(isInterstate ? 'colspan="12"' : 'colspan="13"');
+        expect(html).toContain(isInterstate ? 'colspan="11"' : 'colspan="12"');
         expect(html).toMatch(/<pre[^>]*>Buyer line one\nBuyer line two<\/pre>/);
         expect(html).toMatch(/<pre[^>]*>Consignee line one\nConsignee line two<\/pre>/);
         expect(html).toMatch(/<pre[^>]*>Dispatch line one\nDispatch line two<\/pre>/);
