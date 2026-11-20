@@ -79,7 +79,7 @@ export class FdrService {
             conditions.push(inArray(paymentInstruments.action, [3, 4, 5]));
         } else if (tab === "cancelled") {
             conditions.push(inArray(paymentInstruments.action, [6, 7]));
-        } else if (tab === "pnb-bg-linked") {
+        } else if (tab === "bg-linked") {
             needsFdrDetails = true;
             conditions.push(
                 inArray(paymentInstruments.action, [1, 2]),
@@ -88,26 +88,20 @@ export class FdrService {
                     INNER JOIN payment_instruments pi_bg ON pi_bg.id = bg.instrument_id
                     WHERE bg.fdr_no = ${instrumentFdrDetails.fdrNo}
                     AND pi_bg.is_active = true
-                    AND bg.bank_name = 'PNB_6011'
                 )`
             );
-        } else if (tab === "ybl-bg-linked") {
+        } else if (tab === "bg") {
             needsFdrDetails = true;
-            conditions.push(
-                inArray(paymentInstruments.action, [1, 2]),
-                sql`EXISTS (
-                    SELECT 1 FROM instrument_bg_details bg
-                    INNER JOIN payment_instruments pi_bg ON pi_bg.id = bg.instrument_id
-                    WHERE bg.fdr_no = ${instrumentFdrDetails.fdrNo}
-                    AND pi_bg.is_active = true
-                    AND bg.bank_name IN ('YESBANK_2011', 'YESBANK_0771', 'BGLIMIT_0771')
-                )`
-            );
+            conditions.push(inArray(paymentInstruments.action, [1, 2]), eq(instrumentFdrDetails.fdrPurpose, "BANK_GUARANTEE"));
+        } else if (tab === "other-security") {
+            needsFdrDetails = true;
+            conditions.push(inArray(paymentInstruments.action, [1, 2]), eq(instrumentFdrDetails.fdrPurpose, "OTHER_SECURITY"));
+        } else if (tab === "emd") {
+            needsFdrDetails = true;
+            conditions.push(inArray(paymentInstruments.action, [1, 2]), eq(instrumentFdrDetails.fdrPurpose, "EMD"));
         } else if (tab === "security-deposit") {
             needsFdrDetails = true;
             conditions.push(inArray(paymentInstruments.action, [1, 2]), inArray(instrumentFdrDetails.fdrPurpose, ["deposit", "SECURITY_DEPOSIT"]));
-        } else if (tab === "bond-linked") {
-            conditions.push(eq(paymentInstruments.action, 8));
         }
 
         return { conditions, needsFdrDetails };
@@ -388,26 +382,29 @@ export class FdrService {
 
         const cancelledFilter = inArray(paymentInstruments.action, [6, 7]);
 
-        const pnbBgLinkedFilter = and(
+        const bgLinkedFilter = and(
             inArray(paymentInstruments.action, [1, 2]),
             sql`EXISTS (
                 SELECT 1 FROM instrument_bg_details bg
                 INNER JOIN payment_instruments pi_bg ON pi_bg.id = bg.instrument_id
                 WHERE bg.fdr_no = ${instrumentFdrDetails.fdrNo}
                 AND pi_bg.is_active = true
-                AND bg.bank_name = 'PNB_6011'
             )`,
         );
 
-        const yblBgLinkedFilter = and(
+        const bgPurposeFilter = and(
             inArray(paymentInstruments.action, [1, 2]),
-            sql`EXISTS (
-                SELECT 1 FROM instrument_bg_details bg
-                INNER JOIN payment_instruments pi_bg ON pi_bg.id = bg.instrument_id
-                WHERE bg.fdr_no = ${instrumentFdrDetails.fdrNo}
-                AND pi_bg.is_active = true
-                AND bg.bank_name IN ('YESBANK_2011', 'YESBANK_0771', 'BGLIMIT_0771')
-            )`,
+            eq(instrumentFdrDetails.fdrPurpose, "BANK_GUARANTEE"),
+        );
+
+        const otherSecurityFilter = and(
+            inArray(paymentInstruments.action, [1, 2]),
+            eq(instrumentFdrDetails.fdrPurpose, "OTHER_SECURITY"),
+        );
+
+        const emdFilter = and(
+            inArray(paymentInstruments.action, [1, 2]),
+            eq(instrumentFdrDetails.fdrPurpose, "EMD"),
         );
 
         const securityDepositFilter = and(
@@ -415,17 +412,16 @@ export class FdrService {
             inArray(instrumentFdrDetails.fdrPurpose, ["deposit", "SECURITY_DEPOSIT"]),
         );
 
-        const bondLinkedFilter = eq(paymentInstruments.action, 8);
-
         const [counts] = await this.db.select({
             pending: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${pendingFilter})`,
             rejected: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${rejectedFilter})`,
             returned: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${returnedFilter})`,
             cancelled: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${cancelledFilter})`,
-            pnbBgLinked: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${pnbBgLinkedFilter})`,
-            yblBgLinked: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${yblBgLinkedFilter})`,
+            bgLinked: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${bgLinkedFilter})`,
+            bgPurpose: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${bgPurposeFilter})`,
+            otherSecurity: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${otherSecurityFilter})`,
+            emd: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${emdFilter})`,
             securityDeposit: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${securityDepositFilter})`,
-            bondLinked: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${bondLinkedFilter})`,
         })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
@@ -439,21 +435,23 @@ export class FdrService {
         const rejected = Number(counts?.rejected ?? 0);
         const returned = Number(counts?.returned ?? 0);
         const cancelled = Number(counts?.cancelled ?? 0);
-        const pnbBgLinked = Number(counts?.pnbBgLinked ?? 0);
-        const yblBgLinked = Number(counts?.yblBgLinked ?? 0);
+        const bgLinked = Number(counts?.bgLinked ?? 0);
+        const bgPurpose = Number(counts?.bgPurpose ?? 0);
+        const otherSecurity = Number(counts?.otherSecurity ?? 0);
+        const emd = Number(counts?.emd ?? 0);
         const securityDeposit = Number(counts?.securityDeposit ?? 0);
-        const bondLinked = Number(counts?.bondLinked ?? 0);
 
         return {
             pending,
             rejected,
             returned,
             cancelled,
-            "pnb-bg-linked": pnbBgLinked,
-            "ybl-bg-linked": yblBgLinked,
+            "bg-linked": bgLinked,
+            bg: bgPurpose,
+            "other-security": otherSecurity,
+            emd,
             "security-deposit": securityDeposit,
-            "bond-linked": bondLinked,
-            total: pending + rejected + returned + cancelled + pnbBgLinked + yblBgLinked + securityDeposit + bondLinked,
+            total: pending + rejected + returned + cancelled + bgLinked + bgPurpose + otherSecurity + emd + securityDeposit,
         };
     }
 
