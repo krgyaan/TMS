@@ -1123,6 +1123,69 @@ private readBodyFileValue(body: unknown, field: string): unknown {
         return { linked: true, missing };
     };
 
+    private async createBgCourierDispatch(instrument: {
+        id: number;
+        reqNo?: string | null;
+        courierAddressJson?: unknown;
+        courierAddress?: string | null;
+    }, userId: number): Promise<void> {
+        if (instrument.reqNo?.trim()) {
+            return;
+        }
+
+        let rawJson: any = instrument.courierAddressJson;
+        if (typeof rawJson === 'string') {
+            try {
+                rawJson = JSON.parse(rawJson);
+            } catch {
+                rawJson = null;
+            }
+        }
+        const json = rawJson !== null && typeof rawJson === 'object' && !Array.isArray(rawJson)
+            ? rawJson as Record<string, any>
+            : {};
+
+        const org = String(json.org ?? '').trim();
+        if (!org) {
+            return;
+        }
+
+        const toAddr = [
+            json.line1,
+            json.line2,
+            json.city,
+            json.state,
+        ].filter(Boolean).join(', ') || (instrument.courierAddress ?? '');
+
+        await this.db.transaction(async (tx) => {
+            const [row] = await tx
+                .insert(couriers)
+                .values({
+                    userId: userId || 0,
+                    toOrg: org,
+                    toName: String(json.name ?? '').trim(),
+                    toAddr,
+                    toPin: String(json.pincode ?? '').trim(),
+                    toMobile: String(json.phone ?? '').trim(),
+                    empFrom: Number(json.empFrom) || userId || 0,
+                    delDate: json.delDate ? new Date(json.delDate) : new Date(),
+                    urgency: Number(json.urgency) || 1,
+                    courierDocs: Array.isArray(json.docs) ? json.docs : [],
+                    status: 0,
+                })
+                .returning();
+
+            if (!row) {
+                return;
+            }
+
+            await tx
+                .update(paymentInstruments)
+                .set({ reqNo: String(row.id), updatedAt: new Date() })
+                .where(eq(paymentInstruments.id, instrument.id));
+        });
+    }
+
     async getMailPreview(instrumentId: number, body: { stage?: number | string; files?: Record<string, string[]> } = {}) {
         const stage = Number(body.stage);
         if (![1, 2, 3].includes(stage)) {
@@ -1452,8 +1515,8 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             await this.createOwnBankMakerRequest(instrumentId, user?.id ?? user?.sub);
         }
 
-        // NEW: Send BG creation and couriered email after Form 2 data is persisted
         if (body.action === 'accounts-form-2') {
+            await this.createBgCourierDispatch(instrument, user?.id ?? user?.sub ?? 0);
             this.paymentRequestsNotificationService
                 .sendBgCreatedCourieredEmail(instrumentId)
                 .catch((error) =>
