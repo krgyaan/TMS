@@ -241,6 +241,16 @@ export class PurchaseOrderController {
         return this.service.setTdsPercentage(id, body, user?.id);
     }
 
+    @Patch(":id/tl-approval")
+    @HttpCode(HttpStatus.OK)
+    tlApprovePurchaseOrder(
+        @Param("id", ParseIntPipe) id: number,
+        @Body() body: { tlStatus: number; tlComment?: string },
+        @CurrentUser() user: ValidatedUser
+    ) {
+        return this.service.tlApprovePurchaseOrder(id, body, user);
+    }
+
     @Post(":id/close")
     @HttpCode(HttpStatus.OK)
     @RequireAnyPermission(...eitherModule(...PURCHASE_ORDER_MODULES, "close"))

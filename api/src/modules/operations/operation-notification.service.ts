@@ -4,7 +4,7 @@ import { DRIZZLE } from '../../db/database.module';
 import type { DbInstance } from '../../db';
 import { users } from '../../db/schemas/';
 import { OpenwaService } from '../../openwa/openwa.service';
-import { GROUPS } from '../../config/groups';
+import { GROUPS, resolveTeamPoGroup } from '../../config/groups';
 import { openwaConfig } from '../../config/openwa.config';
 import type { ConfigType } from '@nestjs/config';
 import { WhatsappJidResolver } from '../notifications/helpers/whatsapp-jid.resolver';
@@ -49,11 +49,26 @@ export interface MakerDoneNotificationData {
 }
 
 export interface PoCreatedNotificationData {
+  purchaseOrderId?: number;
   poNumber: string;
   sellerName: string | null;
   grandTotal: string | number;
   projectName: string | null;
   createdBy: number;
+  teamId?: number | null;
+}
+
+export interface PoTlDecisionNotificationData {
+  purchaseOrderId: number;
+  poNumber: string;
+  sellerName: string | null;
+  grandTotal: string | number;
+  projectName?: string | null;
+  decision: 'approved' | 'rejected';
+  tlComment?: string | null;
+  actedBy: number;
+  createdBy?: number | null;
+  teamId?: number | null;
 }
 
 export interface PoApprovalNotificationData {
@@ -504,28 +519,97 @@ export class OperationNotificationService {
     }
   }
 
+  private get publicAppUrl(): string {
+    return (process.env.PUBLIC_APP_URL || process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');
+  }
+
   async notifyPoCreated(data: PoCreatedNotificationData): Promise<void> {
     try {
       const [user] = await this.db
-        .select({ name: users.name })
+        .select({
+          name: users.name,
+          primaryTeamId: users.primaryTeamId,
+          team: users.team,
+        })
         .from(users)
         .where(eq(users.id, data.createdBy))
         .limit(1);
 
       const userName = user?.name ?? 'Unknown';
+      const effectiveTeamId = data.teamId ?? user?.primaryTeamId ?? user?.team ?? null;
       const lines: string[] = [
         `*New PO Raised*`,
         `PO No: ${data.poNumber}`,
+        ...(data.projectName ? [`Project: ${data.projectName}`] : []),
         `Amount: ₹${data.grandTotal}`,
         `Party: ${data.sellerName || 'N/A'}`,
         `Raised by: ${userName}`,
-        `Kindly approve ASAP.`,
       ];
+      if (data.purchaseOrderId) {
+        lines.push(`Review & Approve: ${this.publicAppUrl}/operations/purchase-orders/${data.purchaseOrderId}`);
+      }
+      lines.push(`Kindly approve ASAP.`);
 
       const text = lines.join('\n');
-      await this.sendToTargets(text, { type: 'group', group: GROUPS.PAYMENTS });
+      const targetGroup = resolveTeamPoGroup(effectiveTeamId);
+      await this.sendToTargets(text, { type: 'group', group: targetGroup });
     } catch (err) {
       this.logger.warn(`Failed to send PO created notification: ${err}`);
+    }
+  }
+
+  async notifyPoTlDecision(data: PoTlDecisionNotificationData): Promise<void> {
+    try {
+      const [actor] = await this.db
+        .select({ name: users.name })
+        .from(users)
+        .where(eq(users.id, data.actedBy))
+        .limit(1);
+
+      let effectiveTeamId = data.teamId ?? null;
+      if (effectiveTeamId == null && data.createdBy) {
+        const [creator] = await this.db
+          .select({ primaryTeamId: users.primaryTeamId, team: users.team })
+          .from(users)
+          .where(eq(users.id, data.createdBy))
+          .limit(1);
+        effectiveTeamId = creator?.primaryTeamId ?? creator?.team ?? null;
+      }
+
+      const actorName = actor?.name ?? 'Team Leader';
+      const directUrl = `${this.publicAppUrl}/operations/purchase-orders/${data.purchaseOrderId}`;
+
+      if (data.decision === 'approved') {
+        const lines: string[] = [
+          `*PO Approved by TL* @${actorName}`,
+          `PO No: ${data.poNumber}`,
+          ...(data.projectName ? [`Project: ${data.projectName}`] : []),
+          `Amount: ₹${data.grandTotal}`,
+          `Party: ${data.sellerName || 'N/A'}`,
+          ...(data.tlComment ? [`TL Comment: ${data.tlComment}`] : []),
+          `View PO: ${directUrl}`,
+          `Pending Accounts TDS approval.`,
+        ];
+        await this.sendToTargets(lines.join('\n'), { type: 'group', group: GROUPS.PAYMENTS });
+      } else {
+        const lines: string[] = [
+          `*PO Rejected by TL* @${actorName}`,
+          `PO No: ${data.poNumber}`,
+          ...(data.projectName ? [`Project: ${data.projectName}`] : []),
+          `Amount: ₹${data.grandTotal}`,
+          `Party: ${data.sellerName || 'N/A'}`,
+          `Reason: ${data.tlComment || 'N/A'}`,
+          `View PO: ${directUrl}`,
+        ];
+        const text = lines.join('\n');
+        const teamGroup = resolveTeamPoGroup(effectiveTeamId);
+        await this.sendToTargets(text, { type: 'group', group: teamGroup });
+        if (data.createdBy) {
+          await this.sendToTargets(text, { type: 'users', userIds: [data.createdBy] });
+        }
+      }
+    } catch (err) {
+      this.logger.warn(`Failed to send PO TL decision notification: ${err}`);
     }
   }
 
