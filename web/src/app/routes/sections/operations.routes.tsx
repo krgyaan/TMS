@@ -93,6 +93,7 @@ export default function OperationsRoutes() {
             <Route path="project-dashboard/:projectId/purchase-order/:poId/edit" element={<RouteWrapper><Operations_EditPOPage /></RouteWrapper>}></Route>
             <Route path="project-dashboard/:projectId/purchase-order/:poId/pdf-versions" element={<RouteWrapper><Operations_PoPdfVersions /></RouteWrapper>} />
             <Route path="purchase-orders" element={<RouteWrapper><Operations_PurchaseOrderTabs /></RouteWrapper>} />
+            <Route path="purchase-orders/:poId" element={<RouteWrapper><Operations_ViewPoPage /></RouteWrapper>} />
             <Route path="vendor-work-orders" element={<RouteWrapper><Operations_VendorWorkOrderTabs /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/vendor-work-order/create" element={<RouteWrapper><Operations_RaiseVendorWoFormPage /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/vendor-work-order/:woId" element={<RouteWrapper><Operations_ViewVendorWoPage /></RouteWrapper>} />

@@ -38,6 +38,9 @@ export interface PurchaseOrderView {
     amountAfterTds?: number | string;
     poApproved?: boolean;
     poApprovalRemark?: string;
+    tlStatus?: number | null;
+    tlComment?: string | null;
+    creatorTeamId?: number | null;
     category?: string;
     poType?: string;
     piAttachments?: string;

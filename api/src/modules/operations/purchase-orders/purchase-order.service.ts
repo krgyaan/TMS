@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Inject, Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, like, ne, or, sql, type SQL } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, rename } from "node:fs/promises";
@@ -9,6 +9,7 @@ import { PdfGeneratorService } from "@/modules/pdf/pdf-generator.service";
 import { ClientDirectorySyncService } from "@/modules/shared/client-directory/client-directory-sync.service";
 import { InsurancePolicyService } from "@/modules/insurance/insurance-policy.service";
 import { CashFlowService } from "@/modules/operations/cash-flows/cash-flow.service";
+import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
 import { users } from "@/db/schemas";
 import { projects } from "@/db/schemas/master/projects.schema";
 import { paymentRequests, purchaseInvoices } from "@/db/schemas/operations";
@@ -63,11 +64,14 @@ export class PurchaseOrderService {
                 shipToPan: purchaseOrders.shipToPan,
                 poDate: purchaseOrders.poDate,
                 poRaisedBy: users.name,
+                creatorTeamId: sql<number | null>`COALESCE(${users.primaryTeamId}, ${users.team}, ${purchaseOrders.team})`,
                 createdAt: purchaseOrders.createdAt,
                 poPdfVersions: purchaseOrders.generatedPdfVersions,
                 tdsPercentage: purchaseOrders.tdsPercentage,
                 tdsAmount: purchaseOrders.tdsAmount,
                 amountAfterTds: purchaseOrders.amountAfterTds,
+                tlStatus: purchaseOrders.tlStatus,
+                tlComment: purchaseOrders.tlComment,
                 totalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0) + COALESCE((SELECT SUM(taxable_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                 totalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0) + COALESCE((SELECT SUM(gst_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                 grandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0) + COALESCE((SELECT SUM(total_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
@@ -188,11 +192,14 @@ export class PurchaseOrderService {
                 shipToPan: purchaseOrders.shipToPan,
                 poDate: purchaseOrders.poDate,
                 poRaisedBy: users.name,
+                creatorTeamId: sql<number | null>`COALESCE(${users.primaryTeamId}, ${users.team}, ${purchaseOrders.team})`,
                 createdAt: purchaseOrders.createdAt,
                 poPdfVersions: purchaseOrders.generatedPdfVersions,
                 tdsPercentage: purchaseOrders.tdsPercentage,
                 tdsAmount: purchaseOrders.tdsAmount,
                 amountAfterTds: purchaseOrders.amountAfterTds,
+                tlStatus: purchaseOrders.tlStatus,
+                tlComment: purchaseOrders.tlComment,
                 poApproved: purchaseOrders.poApproved,
                 poApprovalRemark: purchaseOrders.poApprovalRemark,
                 closedAt: purchaseOrders.closedAt,
@@ -393,10 +400,12 @@ export class PurchaseOrderService {
 
         this.notifications
             .notifyPoCreated({
+                purchaseOrderId: po.id,
                 poNumber,
                 sellerName: normalizeVendorName(body.sellerName),
                 grandTotal: grandTotal.toFixed(2),
                 projectName: body.projectName,
+                teamId: po.team ?? null,
                 createdBy: userId,
             })
             .catch(err => this.logger.warn(`WhatsApp notification failed: ${err}`));
@@ -761,6 +770,173 @@ export class PurchaseOrderService {
         }
     }
 
+    async submitTlApproval(
+        id: number,
+        body: { tlStatus: number; tlComment?: string },
+        user: ValidatedUser
+    ) {
+        const po = await this.db
+            .select()
+            .from(purchaseOrders)
+            .where(eq(purchaseOrders.id, id))
+            .then(rows => rows[0]);
+
+        if (!po) {
+            throw new NotFoundException("Purchase Order not found");
+        }
+
+        if (po.poApproved === true) {
+            throw new BadRequestException("Cannot change TL approval on an already finally approved Purchase Order.");
+        }
+
+        // Resolve creator's team
+        let creatorTeamId: number | null = po.team != null ? Number(po.team) : null;
+        if (po.poRaisedBy) {
+            const [creator] = await this.db
+                .select({
+                    primaryTeamId: users.primaryTeamId,
+                    team: users.team,
+                })
+                .from(users)
+                .where(eq(users.id, po.poRaisedBy))
+                .limit(1);
+
+            creatorTeamId =
+                creator?.primaryTeamId != null
+                    ? Number(creator.primaryTeamId)
+                    : creator?.team != null
+                      ? Number(creator.team)
+                      : creatorTeamId;
+        }
+
+        const roleName = (user.role ?? "").trim().toLowerCase();
+        const isSuperOrAdmin =
+            user.roleId === 1 ||
+            user.roleId === 2 ||
+            roleName === "super user" ||
+            roleName === "admin";
+        const isTeamLeader =
+            user.roleId === 3 ||
+            roleName === "team leader" ||
+            roleName === "teamleader";
+        const userTeamId = user.teamId != null ? Number(user.teamId) : null;
+        const isSameTeamTl =
+            isTeamLeader &&
+            userTeamId != null &&
+            creatorTeamId != null &&
+            userTeamId === creatorTeamId;
+
+        if (!isSuperOrAdmin && !isSameTeamTl) {
+            throw new ForbiddenException(
+                "Only the creator's Team Leader, an Admin, or a Super User can approve or reject this Purchase Order."
+            );
+        }
+
+        const tlStatus = Number(body?.tlStatus);
+        if (tlStatus !== 1 && tlStatus !== 2) {
+            throw new BadRequestException("tlStatus must be 1 (Approved) or 2 (Rejected)");
+        }
+
+        const comment = body?.tlComment?.trim() || null;
+        if (tlStatus === 2 && !comment) {
+            throw new BadRequestException("A rejection reason (tlComment) is required when rejecting a Purchase Order.");
+        }
+
+        // Compute grandTotal for notifications
+        const products = await this.db
+            .select()
+            .from(purchaseOrderProducts)
+            .where(eq(purchaseOrderProducts.purchaseOrderId, id));
+        const { totalWithGst: itemsGrandTotal } = this.getTotalProductValues(products);
+        const charges = await this.db
+            .select()
+            .from(orderExtraCharges)
+            .where(eq(orderExtraCharges.purchaseOrderId, id));
+        const chargesTotal = charges.reduce((sum, c) => sum + Number(c.totalAmount ?? 0), 0);
+        const grandTotal = itemsGrandTotal + chargesTotal;
+
+        const now = new Date();
+
+        if (tlStatus === 1) {
+            const [updated] = await this.db
+                .update(purchaseOrders)
+                .set({
+                    tlStatus: 1,
+                    tlComment: comment,
+                    // If previously rejected by TL, clear poApproved=false so it moves to pending Accounts
+                    ...(po.poApproved === false && po.tlStatus === 2
+                        ? { poApproved: null, poApprovalRemark: null }
+                        : {}),
+                    updatedAt: now,
+                })
+                .where(eq(purchaseOrders.id, id))
+                .returning();
+
+            this.notifications
+                .notifyPoTlDecision({
+                    purchaseOrderId: id,
+                    poNumber: po.poNumber ?? `#${id}`,
+                    sellerName: po.sellerName,
+                    grandTotal: round2(grandTotal).toFixed(2),
+                    projectName: po.projectName,
+                    tlStatus: 1,
+                    tlComment: comment,
+                    actedBy: user.id,
+                    createdBy: po.poRaisedBy ?? null,
+                    teamId: creatorTeamId,
+                })
+                .catch(err => this.logger.warn(`WhatsApp TL approval notification failed: ${err}`));
+
+            this.logger.info(`PO #${id} approved by TL/Admin user #${user.id}`);
+            return updated;
+        } else {
+            const [updated] = await this.db
+                .update(purchaseOrders)
+                .set({
+                    tlStatus: 2,
+                    tlComment: comment,
+                    poApproved: false,
+                    poApprovalRemark: comment,
+                    updatedAt: now,
+                })
+                .where(eq(purchaseOrders.id, id))
+                .returning();
+
+            // Reject any po_approval_pending payment requests
+            await this.db
+                .update(paymentRequests)
+                .set({
+                    status: "rejected",
+                    rejectionReason: comment || "PO Rejected by Team Leader",
+                    updatedAt: now,
+                })
+                .where(
+                    and(
+                        eq(paymentRequests.purchaseOrderId, id),
+                        eq(paymentRequests.status, "po_approval_pending")
+                    )
+                );
+
+            this.notifications
+                .notifyPoTlDecision({
+                    purchaseOrderId: id,
+                    poNumber: po.poNumber ?? `#${id}`,
+                    sellerName: po.sellerName,
+                    grandTotal: round2(grandTotal).toFixed(2),
+                    projectName: po.projectName,
+                    tlStatus: 2,
+                    tlComment: comment,
+                    actedBy: user.id,
+                    createdBy: po.poRaisedBy ?? null,
+                    teamId: creatorTeamId,
+                })
+                .catch(err => this.logger.warn(`WhatsApp TL rejection notification failed: ${err}`));
+
+            this.logger.info(`PO #${id} rejected by TL/Admin user #${user.id}: ${comment}`);
+            return updated;
+        }
+    }
+
     /**
      * Closure is an explicit, permissioned decision rather than a derived state:
      * `closed_at` is what the "Closed" tab and the approval counts read, so a PO
@@ -847,9 +1023,23 @@ export class PurchaseOrderService {
         });
 
         let raisedByName: string | null = null;
+        let creatorTeamId: number | null = po.team != null ? Number(po.team) : null;
         if (po.poRaisedBy) {
-            const [raisedByUser] = await this.db.select({ name: users.name }).from(users).where(eq(users.id, po.poRaisedBy));
+            const [raisedByUser] = await this.db
+                .select({
+                    name: users.name,
+                    primaryTeamId: users.primaryTeamId,
+                    team: users.team,
+                })
+                .from(users)
+                .where(eq(users.id, po.poRaisedBy));
             raisedByName = raisedByUser?.name ?? null;
+            creatorTeamId =
+                raisedByUser?.primaryTeamId != null
+                    ? Number(raisedByUser.primaryTeamId)
+                    : raisedByUser?.team != null
+                      ? Number(raisedByUser.team)
+                      : creatorTeamId;
         }
 
         const paymentRequestsData = await this.db
@@ -885,6 +1075,7 @@ export class PurchaseOrderService {
 
         return {
             ...po,
+            creatorTeamId,
             products: enrichedProducts,
             total,
             itemTotals,
@@ -1111,6 +1302,7 @@ export class PurchaseOrderService {
         // }
 
         const wasRejected = existingPO.poApproved === false;
+        const isUnapproved = existingPO.poApproved !== true;
         const [woBasic] = await this.db.select({ team: woBasicDetails.team }).from(woBasicDetails).where(eq(woBasicDetails.tenderId, existingPO.tenderId)).limit(1);
         this.logger.info(`Updating Purchase Order: ${body.poNumber} for project: ${body.projectName}, tenderId: ${body.tenderId}, team: ${woBasic?.team}`);
 
@@ -1162,6 +1354,11 @@ export class PurchaseOrderService {
 
                     team: woBasic?.team ?? existingPO.team,
 
+                    ...(existingPO.poApproved !== true && {
+                        tlStatus: 0,
+                        tlComment: null,
+                    }),
+
                     ...(wasRejected && {
                         poApproved: null,
                         tdsPercentage: null,
@@ -1212,8 +1409,11 @@ export class PurchaseOrderService {
 
         this.notifications
             .notifyPoUpdated({
+                purchaseOrderId: id,
                 poNumber: updatedPO.poNumber ?? `#${id}`,
                 sellerName: normalizeVendorName(body.sellerName),
+                projectName: updatedPO.projectName ?? body.projectName ?? null,
+                teamId: updatedPO.team ?? null,
                 updatedBy: userId ?? 0,
             })
             .catch(err => this.logger.warn(`WhatsApp notification failed: ${err}`));
