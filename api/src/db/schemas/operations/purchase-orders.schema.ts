@@ -1,4 +1,4 @@
-import { pgTable, bigserial, bigint, varchar, text, date, timestamp, jsonb, index, numeric, boolean } from "drizzle-orm/pg-core";
+import { pgTable, bigserial, bigint, smallint, varchar, text, date, timestamp, jsonb, index, numeric, boolean } from "drizzle-orm/pg-core";
 import { vendorOrganizations } from "@/db/schemas/vendors/vendor-organizations.schema";
 import { vendorGsts } from "@/db/schemas/vendors/vendor-gsts.schema";
 import { vendors } from "@/db/schemas/vendors/vendors.schema";
@@ -52,6 +52,9 @@ export const purchaseOrders = pgTable(
         tdsPercentage: numeric("tds_percentage", { precision: 5, scale: 2 }),
         tdsAmount: numeric("tds_amount", { precision: 14, scale: 2 }),
         amountAfterTds: numeric("amount_after_tds", { precision: 14, scale: 2 }),
+        // TL Approval: 0 = Pending, 1 = Approved, 2 = Rejected
+        tlStatus: smallint("tl_status").notNull().default(0),
+        tlComment: text("tl_comment"),
         poApproved: boolean("po_approved"),
         poApprovalRemark: text("po_approval_remark"),
         closedAt: timestamp("closed_at", { withTimezone: true }),

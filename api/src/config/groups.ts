@@ -21,3 +21,10 @@ export const TEAM_TENDER_GROUPS: Record<number, string> = {
   1: GROUPS.ACTENDERSEARCH,
   2: GROUPS.DCTENDERSEARCH,
 };
+
+export function resolveTeamPoGroup(teamId?: number | null): string {
+  if (teamId != null && TEAM_TENDER_GROUPS[teamId]) {
+    return TEAM_TENDER_GROUPS[teamId];
+  }
+  return GROUPS.POVWO;
+}

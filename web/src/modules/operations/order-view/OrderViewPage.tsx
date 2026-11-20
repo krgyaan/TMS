@@ -2,15 +2,18 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableFooter, TableRow } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/contexts/AuthContext";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { PaymentRequestDetailDialog } from "@/modules/operations/payment-requests/components/PaymentRequestDetailDialog";
 import { fileUploadService } from "@/services/api/file-upload.service";
 import { round2 } from "@/utils/money";
-import { AlertCircle, ArrowLeft, Calculator, ExternalLink, Eye, FileText } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import { AlertCircle, ArrowLeft, Calculator, CheckCircle2, ExternalLink, Eye, FileText, Loader2, ShieldCheck, XCircle } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { OrderType, OrderViewData } from "./orderView.types";
 
@@ -50,6 +53,32 @@ function PdfVersionsInline({ versions, pdfUrl }: Readonly<{ versions: Record<str
             ))}
         </div>
     );
+}
+
+function TlApprovalBadge({
+    tlStatus,
+    tlComment,
+}: Readonly<{
+    tlStatus?: number | null;
+    tlComment?: string | null;
+}>) {
+    if (tlStatus === 1) {
+        return (
+            <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="default">Approved by TL</Badge>
+                {tlComment && <span className="text-xs text-muted-foreground">{tlComment}</span>}
+            </div>
+        );
+    }
+    if (tlStatus === 2) {
+        return (
+            <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="destructive">Rejected by TL</Badge>
+                {tlComment && <span className="text-xs text-muted-foreground">{tlComment}</span>}
+            </div>
+        );
+    }
+    return <Badge variant="outline">Pending TL Approval</Badge>;
 }
 
 function ApprovalBadge({
@@ -118,11 +147,65 @@ interface OrderViewPageProps {
     notFoundMessage: string;
     loadErrorMessage: string;
     pdfUrl: (id: number, label: string) => string;
+    onSubmitTlApproval?: (payload: { tlStatus: 1 | 2; tlComment?: string }) => Promise<void>;
+    isSubmittingTlApproval?: boolean;
 }
 
-export const OrderViewPage: React.FC<OrderViewPageProps> = ({ data, isLoading, isError, error, title, amountLabel, notFoundMessage, loadErrorMessage, pdfUrl }) => {
+export const OrderViewPage: React.FC<OrderViewPageProps> = ({
+    type,
+    data,
+    isLoading,
+    isError,
+    error,
+    title,
+    amountLabel,
+    notFoundMessage,
+    loadErrorMessage,
+    pdfUrl,
+    onSubmitTlApproval,
+    isSubmittingTlApproval = false,
+}) => {
     const navigate = useNavigate();
+    const { roleId, teamId, isSuperUser, isAdmin, isTeamLeader } = useAuth();
     const [viewingPrId, setViewingPrId] = useState<number | null>(null);
+    const [tlCommentInput, setTlCommentInput] = useState<string>("");
+    const [tlActionError, setTlActionError] = useState<string | null>(null);
+
+    useEffect(() => {
+        setTlCommentInput(data?.tlComment ?? "");
+        setTlActionError(null);
+    }, [data?.id, data?.tlComment, data?.tlStatus]);
+
+    const canTlApprove = useMemo(() => {
+        if (type !== "po" || !onSubmitTlApproval || !data) return false;
+        const isSuperOrAdmin = isSuperUser || isAdmin || roleId === 1 || roleId === 2;
+        if (isSuperOrAdmin) return true;
+        const isSameTeamTl =
+            (isTeamLeader || roleId === 3) &&
+            teamId != null &&
+            data.creatorTeamId != null &&
+            Number(teamId) === Number(data.creatorTeamId);
+        return isSameTeamTl;
+    }, [type, onSubmitTlApproval, data, isSuperUser, isAdmin, isTeamLeader, roleId, teamId]);
+
+    const handleTlDecision = async (tlStatus: 1 | 2) => {
+        if (!onSubmitTlApproval) return;
+        const trimmedComment = tlCommentInput.trim();
+        if (tlStatus === 2 && !trimmedComment) {
+            setTlActionError("Please enter a rejection reason before rejecting this Purchase Order.");
+            return;
+        }
+        setTlActionError(null);
+        try {
+            await onSubmitTlApproval({
+                tlStatus,
+                tlComment: trimmedComment || undefined,
+            });
+        } catch (err: any) {
+            const msg = err?.response?.data?.message || err?.message || "Failed to save TL approval decision.";
+            setTlActionError(Array.isArray(msg) ? msg.join(", ") : String(msg));
+        }
+    };
 
     const totalPaymentRequested = useMemo(
         () => round2(data?.paymentRequests?.filter(pr => pr.status !== "rejected").reduce((s, pr) => s + Number(pr.amount), 0) ?? 0),
@@ -211,6 +294,68 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({ data, isLoading, i
             </CardHeader>
 
             <CardContent className="space-y-2">
+                {type === "po" && canTlApprove && data.approved !== true && (
+                    <Card className="border-primary/30 bg-muted/20">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center justify-between text-base">
+                                <span className="flex items-center gap-2">
+                                    <ShieldCheck className="h-5 w-5 text-primary" />
+                                    Team Leader Approval (Stage 1)
+                                </span>
+                                <TlApprovalBadge tlStatus={data.tlStatus} tlComment={data.tlComment} />
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="tl-comment" className="text-xs font-medium text-muted-foreground">
+                                    Remarks / Rejection Reason (required when rejecting)
+                                </Label>
+                                <Textarea
+                                    id="tl-comment"
+                                    value={tlCommentInput}
+                                    onChange={(e) => {
+                                        setTlCommentInput(e.target.value);
+                                        if (tlActionError) setTlActionError(null);
+                                    }}
+                                    placeholder="Add optional approval remarks or mandatory rejection reason..."
+                                    rows={2}
+                                    disabled={isSubmittingTlApproval}
+                                />
+                            </div>
+                            {tlActionError && (
+                                <Alert variant="destructive" className="py-2">
+                                    <AlertCircle className="h-4 w-4" />
+                                    <AlertDescription className="text-xs">{tlActionError}</AlertDescription>
+                                </Alert>
+                            )}
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="default"
+                                    disabled={isSubmittingTlApproval}
+                                    onClick={() => handleTlDecision(1)}
+                                    className="gap-1.5"
+                                >
+                                    {isSubmittingTlApproval ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                                    {data.tlStatus === 1 ? "Update Approval" : "Approve PO"}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="destructive"
+                                    disabled={isSubmittingTlApproval}
+                                    onClick={() => handleTlDecision(2)}
+                                    className="gap-1.5"
+                                >
+                                    {isSubmittingTlApproval ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+                                    {data.tlStatus === 2 ? "Update Rejection" : "Reject PO"}
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
                 {/* Details */}
                 <Card>
                     <CardHeader>
@@ -229,8 +374,18 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({ data, isLoading, i
                                     <TableCell className="text-sm font-medium text-muted-foreground w-1/4">Raised By</TableCell>
                                     <TableCell className="text-sm w-1/4">{data.raisedByName || "—"}</TableCell>
                                 </TableRow>
+                                {type === "po" && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">TL Approval (Stage 1)</TableCell>
+                                        <TableCell className="text-sm" colSpan={3}>
+                                            <TlApprovalBadge tlStatus={data.tlStatus} tlComment={data.tlComment} />
+                                        </TableCell>
+                                    </TableRow>
+                                )}
                                 <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">Approval Status</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        {type === "po" ? "Accounts Approval (Stage 2)" : "Approval Status"}
+                                    </TableCell>
                                     <TableCell className="text-sm" colSpan={3}>
                                         <ApprovalBadge
                                             approved={data.approved}
