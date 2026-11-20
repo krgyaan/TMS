@@ -231,6 +231,7 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
             const prefilledFiles = safeParseArray(formData.prefilledSignedBg);
             form.setValue('prefilled_signed_bg', prefilledFiles);
             form.setValue('bg_format_imran', safeParseArray(formData.bgFormatTe));
+            form.setValue('fdr_amt', formData.fdrAmt ?? undefined);
             form.setValue('fdr_no', formData.fdrNo ?? undefined);
             form.setValue('fdr_date', toDateString(formData.fdrDate));
             form.setValue('fdr_validity', toDateString(formData.fdrValidity));

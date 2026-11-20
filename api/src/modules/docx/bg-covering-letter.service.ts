@@ -76,8 +76,10 @@ export class BgCoveringLetterService extends BgDocxBase {
                                 width: { size: 60, type: WidthType.PERCENTAGE },
                                 children: [
                                     this.p('To,'),
-                                    this.p(`${data.cpName},`),
-                                    this.p(`${data.cpDesignation},`),
+                                    ...[data.cpName, data.cpDesignation]
+                                        .map((line) => (line || '').trim())
+                                        .filter((line) => line.length > 0)
+                                        .map((line) => this.p(`${line},`)),
                                     ...addressLines.map((line) => this.p(line)),
                                 ],
                             }),

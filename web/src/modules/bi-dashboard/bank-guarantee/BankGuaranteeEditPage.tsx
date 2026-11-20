@@ -4,6 +4,9 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 import { BankGuaranteeRequestForm } from './components/BankGuaranteeRequestForm';
 import { BankGuaranteeOldEntryForm } from './components/BankGuaranteeOldEntryForm';
 import { usePaymentRequestForEdit } from '@/hooks/api/usePaymentRequests';
+import { EmdTenderFeeRequestForm } from '@/modules/tendering/emds-tenderfees/components/EmdTenderFeeRequestForm';
+import { buildEmdEditFormData } from '@/modules/tendering/emds-tenderfees/helpers/buildEmdEditFormData';
+import { BiBankGuaranteeRequestForm } from '@/modules/operations/project-dashboard/components/BiBankGuaranteeRequestForm';
 
 export default function BankGuaranteeEditPage() {
     const { id } = useParams<{ id: string }>();
@@ -33,6 +36,32 @@ export default function BankGuaranteeEditPage() {
 
     if ((data as Record<string, any>)?.type === 'Old Entries') {
         return <BankGuaranteeOldEntryForm mode="edit" requestId={requestId} />;
+    }
+
+    const type = String((data as Record<string, any>)?.type ?? '');
+    const projectId = Number((data as Record<string, any>)?.projectId);
+
+    if (type === 'TMS') {
+        const { formData, requestIds } = buildEmdEditFormData(data);
+        return (
+            <EmdTenderFeeRequestForm
+                tenderId={(data as Record<string, any>).tenderId}
+                requestIds={requestIds}
+                initialData={formData}
+                mode="edit"
+            />
+        );
+    }
+
+    if (type === 'Other Than Tender' && projectId > 0) {
+        return (
+            <BiBankGuaranteeRequestForm
+                projectId={projectId}
+                mode="edit"
+                requestId={requestId}
+                initialData={data as Record<string, any>}
+            />
+        );
     }
 
     return (

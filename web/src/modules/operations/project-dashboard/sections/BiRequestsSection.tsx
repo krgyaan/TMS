@@ -36,6 +36,38 @@ interface BiRequestsSectionProps {
     projectId: number | null;
 }
 
+const BG_STATUS_LABELS: Record<string, string> = {
+    PENDING: "Pending",
+    ACCOUNTS_FORM_ACCEPTED: "Format Accepted",
+    ACCOUNTS_FORM_REJECTED: "Rejected",
+    BG_CREATED: "Created",
+    FDR_DETAILS_CAPTURED: "SFMS Submitted",
+    FOLLOWUP_INITIATED: "Followup Initiated",
+    EXTENSION_REQUESTED: "Extension Request",
+    RETURN_VIA_COURIER: "Returned via courier",
+    CANCELLATION_REQUESTED: "Cancellation Request",
+    BG_CANCELLATION_CONFIRMED: "BG Cancelled",
+    FDR_CANCELLED_CONFIRMED: "FDR released",
+    RETURNED_VIA_COURIER: "Returned via courier",
+    BG_CANCELLED: "BG Cancelled",
+    FDR_CANCELLED: "FDR released",
+};
+
+const formatStatusLabel = (status?: string | null, instrumentType?: string | null) => {
+    if (!status) return "-";
+    const label = instrumentType === "BG" ? BG_STATUS_LABELS[status] : undefined;
+    return (
+        label ??
+        status
+            .toLowerCase()
+            .replaceAll("_", " ")
+            .replace(/\b\w/g, (char) => char.toUpperCase())
+    );
+};
+
+const formatInstrumentStatus = (instrument?: BiInstrumentRow | null) =>
+    formatStatusLabel(instrument?.status, instrument?.instrumentType);
+
 export const BiRequestsSection: React.FC<BiRequestsSectionProps> = ({ projectId }) => {
     const navigate = useNavigate();
     const { data, isLoading } = useProjectBiRequests(projectId ?? 0);
@@ -95,18 +127,22 @@ export const BiRequestsSection: React.FC<BiRequestsSectionProps> = ({ projectId 
             valueFormatter: (p: ValueFormatterParams<BiRequestRow>) => formatINR(Number(p.value || 0)),
         },
         {
-            field: "status",
             headerName: "Status",
             sortable: true,
             filter: true,
-            width: 120,
-            valueFormatter: (p: ValueFormatterParams<BiRequestRow>) => p.value || "Pending",
+            width: 150,
+            valueGetter: (p) => {
+                const instrument = p.data?.instruments?.[0];
+                return instrument
+                    ? formatInstrumentStatus(instrument)
+                    : formatStatusLabel(p.data?.status);
+            },
         },
         {
             field: "createdAt",
-            headerName: "Created",
+            headerName: "Request Date",
             sortable: true,
-            width: 130,
+            width: 140,
             valueFormatter: (p: ValueFormatterParams<BiRequestRow>) =>
                 p.value ? new Date(p.value).toLocaleDateString() : "-",
         },

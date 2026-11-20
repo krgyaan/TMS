@@ -1123,6 +1123,69 @@ private readBodyFileValue(body: unknown, field: string): unknown {
         return { linked: true, missing };
     };
 
+    private async createBgCourierDispatch(instrument: {
+        id: number;
+        reqNo?: string | null;
+        courierAddressJson?: unknown;
+        courierAddress?: string | null;
+    }, userId: number): Promise<void> {
+        if (instrument.reqNo?.trim()) {
+            return;
+        }
+
+        let rawJson: any = instrument.courierAddressJson;
+        if (typeof rawJson === 'string') {
+            try {
+                rawJson = JSON.parse(rawJson);
+            } catch {
+                rawJson = null;
+            }
+        }
+        const json = rawJson !== null && typeof rawJson === 'object' && !Array.isArray(rawJson)
+            ? rawJson as Record<string, any>
+            : {};
+
+        const org = String(json.org ?? '').trim();
+        if (!org) {
+            return;
+        }
+
+        const toAddr = [
+            json.line1,
+            json.line2,
+            json.city,
+            json.state,
+        ].filter(Boolean).join(', ') || (instrument.courierAddress ?? '');
+
+        await this.db.transaction(async (tx) => {
+            const [row] = await tx
+                .insert(couriers)
+                .values({
+                    userId: userId || 0,
+                    toOrg: org,
+                    toName: String(json.name ?? '').trim(),
+                    toAddr,
+                    toPin: String(json.pincode ?? '').trim(),
+                    toMobile: String(json.phone ?? '').trim(),
+                    empFrom: Number(json.empFrom) || userId || 0,
+                    delDate: json.delDate ? new Date(json.delDate) : new Date(),
+                    urgency: Number(json.urgency) || 1,
+                    courierDocs: Array.isArray(json.docs) ? json.docs : [],
+                    status: 0,
+                })
+                .returning();
+
+            if (!row) {
+                return;
+            }
+
+            await tx
+                .update(paymentInstruments)
+                .set({ reqNo: String(row.id), updatedAt: new Date() })
+                .where(eq(paymentInstruments.id, instrument.id));
+        });
+    }
+
     async getMailPreview(instrumentId: number, body: { stage?: number | string; files?: Record<string, string[]> } = {}) {
         const stage = Number(body.stage);
         if (![1, 2, 3].includes(stage)) {
@@ -1284,6 +1347,9 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             if (body.fdr_date) bgDetailsUpdate.fdrDate = body.fdr_date;
             if (body.fdr_validity) bgDetailsUpdate.fdrValidity = body.fdr_validity;
             if (body.fdr_roi) bgDetailsUpdate.fdrRoi = body.fdr_roi;
+            if (body.fdr_amt !== undefined && body.fdr_amt !== null && body.fdr_amt !== '') {
+                bgDetailsUpdate.fdrAmt = body.fdr_amt;
+            }
 
             const fdrCopyFile = this.getFileForField('fdr_copy', files, body, fileIndexTracker);
             const fdrCopyPath = this.getFilePathFromBody('fdr_copy', body);
@@ -1452,8 +1518,8 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             await this.createOwnBankMakerRequest(instrumentId, user?.id ?? user?.sub);
         }
 
-        // NEW: Send BG creation and couriered email after Form 2 data is persisted
         if (body.action === 'accounts-form-2') {
+            await this.createBgCourierDispatch(instrument, user?.id ?? user?.sub ?? 0);
             this.paymentRequestsNotificationService
                 .sendBgCreatedCourieredEmail(instrumentId)
                 .catch((error) =>
@@ -2098,6 +2164,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 // Payment Request fields
                 requestId: paymentRequests.id,
                 tenderId: paymentRequests.tenderId,
+                projectId: paymentRequests.projectId,
                 requestType: paymentRequests.type,
                 tenderNo: paymentRequests.tenderNo,
                 projectName: paymentRequests.projectName,
@@ -2107,8 +2174,8 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 amountRequired: paymentRequests.amountRequired,
                 requestStatus: paymentRequests.status,
                 requestRemarks: paymentRequests.remarks,
-                requestCreatedAt: paymentRequests.createdAt,
-                requestUpdatedAt: paymentRequests.updatedAt,
+                requestCreatedAt: sql<string | null>`to_char(${paymentRequests.createdAt}, 'YYYY-MM-DD"T"HH24:MI:SS')`,
+                requestUpdatedAt: sql<string | null>`to_char(${paymentRequests.updatedAt}, 'YYYY-MM-DD"T"HH24:MI:SS')`,
 
                 // BG Details - all fields
                 bgDetailsId: instrumentBgDetails.id,
@@ -2243,11 +2310,12 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 tenderNo: paymentRequests.tenderNo,
                 tenderName: paymentRequests.projectName,
                 tenderId: paymentRequests.tenderId,
+                projectId: paymentRequests.projectId,
                 requestId: paymentRequests.id,
                 requestType: paymentRequests.type,
                 requestDueDate: paymentRequests.dueDate,
                 requestedByName: users.name,
-                requestCreatedAt: paymentRequests.createdAt,
+                requestCreatedAt: sql<string | null>`to_char(${paymentRequests.createdAt}, 'YYYY-MM-DD"T"HH24:MI:SS')`,
                 tenderDueDate: tenderInfos.dueDate,
                 tenderStatusName: statuses.name,
                 bgNo: instrumentBgDetails.bgNo,
@@ -2423,13 +2491,14 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             tenderNo: result.tenderNo,
             tenderName: result.tenderName,
             tenderId: result.tenderId,
+            projectId: result.projectId,
             requestId: result.requestId,
             requestType: result.requestType,
             requestDueDate: result.requestDueDate ? new Date(result.requestDueDate) : null,
             requestedByName: result.requestedByName,
             tenderDueDate: result.tenderDueDate ? new Date(result.tenderDueDate) : null,
             tenderStatusName: result.tenderStatusName,
-            requestCreatedAt: result.requestCreatedAt ? result.requestCreatedAt.toISOString() : null,
+            requestCreatedAt: result.requestCreatedAt ?? null,
             amount: result.amount ? Number(result.amount) : null,
             favouring: result.favouring,
             payableAt: result.payableAt,
