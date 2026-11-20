@@ -85,9 +85,6 @@ export class PurchaseOrderService {
                 totalPiCount: sql<number>`COALESCE((SELECT COUNT(*) FROM project_purchase_invoices WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                 poApproved: purchaseOrders.poApproved,
                 poApprovalRemark: purchaseOrders.poApprovalRemark,
-                tlStatus: purchaseOrders.tlStatus,
-                tlComment: purchaseOrders.tlComment,
-                creatorTeamId: sql<number | null>`COALESCE(${users.primaryTeamId}, ${users.team}, ${purchaseOrders.team})`,
                 closedAt: purchaseOrders.closedAt,
             })
             .from(purchaseOrders)
@@ -205,9 +202,6 @@ export class PurchaseOrderService {
                 tlComment: purchaseOrders.tlComment,
                 poApproved: purchaseOrders.poApproved,
                 poApprovalRemark: purchaseOrders.poApprovalRemark,
-                tlStatus: purchaseOrders.tlStatus,
-                tlComment: purchaseOrders.tlComment,
-                creatorTeamId: sql<number | null>`COALESCE(${users.primaryTeamId}, ${users.team}, ${purchaseOrders.team})`,
                 closedAt: purchaseOrders.closedAt,
                 totalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0) + COALESCE((SELECT SUM(taxable_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                 totalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0) + COALESCE((SELECT SUM(gst_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
@@ -413,7 +407,6 @@ export class PurchaseOrderService {
                 projectName: body.projectName,
                 teamId: po.team ?? null,
                 createdBy: userId,
-                teamId: woBasic?.team ?? null,
             })
             .catch(err => this.logger.warn(`WhatsApp notification failed: ${err}`));
 

@@ -58,20 +58,6 @@ export interface PoCreatedNotificationData {
   tenderName?: string | null;
   teamId?: number | null;
   createdBy: number;
-  teamId?: number | null;
-}
-
-export interface PoTlDecisionNotificationData {
-  purchaseOrderId: number;
-  poNumber: string;
-  sellerName: string | null;
-  grandTotal: string | number;
-  projectName?: string | null;
-  decision: 'approved' | 'rejected';
-  tlComment?: string | null;
-  actedBy: number;
-  createdBy?: number | null;
-  teamId?: number | null;
 }
 
 export interface PoTlDecisionNotificationData {
@@ -576,10 +562,6 @@ export class OperationNotificationService {
         `Grand Total: ₹${data.grandTotal}`,
         `Raised By: ${userName}`,
       ];
-      if (data.purchaseOrderId) {
-        lines.push(`Review & Approve: ${this.publicAppUrl}/operations/purchase-orders/${data.purchaseOrderId}`);
-      }
-      lines.push(`Kindly approve ASAP.`);
 
       if (poUrl) {
         lines.push(`Review & Approve in TMS: ${poUrl}`);
