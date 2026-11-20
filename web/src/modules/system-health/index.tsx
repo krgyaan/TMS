@@ -3,11 +3,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
     AlertCircle,
     Database,
-    Gauge,
     Mail,
     RefreshCw,
     Server,
@@ -17,15 +15,11 @@ import {
     Cpu,
     Bot,
 } from "lucide-react";
+import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { useSystemHealth } from "@/hooks/api/useHealth";
 import { ClaudeTelemetrySection } from "./components/ClaudeTelemetrySection";
-import type {
-    SubHealth,
-    WorkerStatusDetail,
-    QueueCounts,
-    EmailHealth,
-} from "@/services/api/health.service";
+import type { WorkerStatusDetail, QueueCounts } from "@/services/api/health.service";
 
 type StatusKind = "ok" | "degraded" | "down";
 
@@ -39,12 +33,6 @@ const statusTextClass: Record<StatusKind, string> = {
     ok: "text-emerald-600",
     degraded: "text-amber-600",
     down: "text-red-600",
-};
-
-const statusLabel: Record<StatusKind, string> = {
-    ok: "Healthy",
-    degraded: "Degraded",
-    down: "Down",
 };
 
 const overallLabel: Record<StatusKind, string> = {
@@ -95,35 +83,10 @@ function StatusDot({ status, pulse = false }: { status: StatusKind; pulse?: bool
     );
 }
 
-function StatusPill({ status }: { status: StatusKind }) {
-    const map: Record<StatusKind, "success" | "secondary" | "destructive"> = {
-        ok: "success",
-        degraded: "secondary",
-        down: "destructive",
-    };
-    return <Badge variant={map[status]}>{statusLabel[status]}</Badge>;
-}
-
 function latencyColor(latencyMs?: number): string {
     if (latencyMs == null) return "bg-muted";
     if (latencyMs < 50) return "bg-emerald-500";
     if (latencyMs < 200) return "bg-amber-500";
-    return "bg-red-500";
-}
-
-function pressurePercent(counts?: QueueCounts): number {
-    if (!counts) return 0;
-    const processed = (counts.waiting ?? 0) + (counts.active ?? 0) + (counts.delayed ?? 0) + (counts.failed ?? 0);
-    if (processed === 0) return 0;
-    return Math.min(100, Math.round(((counts.failed ?? 0) * 100) / processed));
-}
-
-function queueBarColor(counts?: QueueCounts): string {
-    if (!counts) return "bg-muted";
-    const failed = counts.failed ?? 0;
-    const total = (counts.waiting ?? 0) + (counts.active ?? 0) + (counts.delayed ?? 0) + failed;
-    if (failed === 0 || total === 0) return "bg-emerald-500";
-    if ((failed / total) < 0.1) return "bg-amber-500";
     return "bg-red-500";
 }
 
@@ -205,6 +168,7 @@ function KpiCard({
     status,
     barValue,
     barClass,
+    children,
 }: {
     icon: LucideIcon;
     label: string;
@@ -213,6 +177,7 @@ function KpiCard({
     status: StatusKind;
     barValue?: number;
     barClass?: string;
+    children?: ReactNode;
 }) {
     return (
         <Card className="gap-3 p-4">
@@ -232,259 +197,72 @@ function KpiCard({
             {barValue != null && (
                 <ToneBar value={barValue} colorClass={barClass ?? "bg-emerald-500"} />
             )}
+            {children}
         </Card>
     );
 }
 
-function QueueRow({ name, counts }: { name: string; counts?: QueueCounts }) {
-    if (!counts) {
-        return (
-            <div className="flex items-center justify-between border-b py-2.5 last:border-0">
-                <span className="font-medium">{name}</span>
-                <span className="text-xs text-muted-foreground">no data</span>
-            </div>
-        );
-    }
-
-    if (counts.error) {
-        return (
-            <div className="flex items-center justify-between border-b py-2.5 last:border-0">
-                <span className="font-medium">{name}</span>
-                <span className="text-xs text-red-600">{counts.error}</span>
-            </div>
-        );
-    }
-
-    return (
-        <div className="border-b py-2.5 last:border-0">
-            <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">{name}</span>
-                <span className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span title="Waiting">W <span className="font-medium text-foreground">{counts.waiting ?? 0}</span></span>
-                    <span title="Active">A <span className="font-medium text-foreground">{counts.active ?? 0}</span></span>
-                    <span title="Delayed">D <span className="font-medium text-foreground">{counts.delayed ?? 0}</span></span>
-                    <span title="Completed">C <span className="font-medium text-foreground">{counts.completed ?? 0}</span></span>
-                    <span title="Failed" className={counts.failed ? "text-red-600" : ""}>
-                        F <span className="font-medium">{counts.failed ?? 0}</span>
-                    </span>
-                </span>
-            </div>
-            <ToneBar value={pressurePercent(counts)} colorClass={queueBarColor(counts)} />
-        </div>
-    );
+function workerStatus(detail?: WorkerStatusDetail): StatusKind {
+    if (detail?.status === "up") return "ok";
+    if (detail?.status === "stale") return "degraded";
+    return "down";
 }
 
-function WorkerRow({ name, detail }: { name: string; detail: WorkerStatusDetail | undefined }) {
-    const status = toStatusKind(detail?.status);
-    const lastSeen = detail?.lastSeen;
-    return (
-        <div className="flex items-center justify-between border-b py-2.5 last:border-0">
-            <div className="flex items-center gap-2">
-                <StatusDot status={status} pulse={status === "ok"} />
-                <span className="text-sm font-medium">{name}</span>
-                {detail?.queue && (
-                    <Badge variant="secondary" className="text-[10px]">
-                        {detail.queue}
-                    </Badge>
-                )}
-            </div>
-            <div className="flex items-center gap-3">
-                <StatusPill status={status} />
-                <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <span className="cursor-default text-xs text-muted-foreground">
-                                {lastSeen ? relativeTime(lastSeen) : "—"}
-                            </span>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            {lastSeen ? new Date(lastSeen).toLocaleString() : "never seen"}
-                            {detail?.pid ? ` · PID ${detail.pid}` : ""}
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
-            </div>
-        </div>
-    );
-}
-
-function WorkersCard({ sub }: { sub: SubHealth<Record<string, WorkerStatusDetail>> }) {
-    const workers = sub.data ?? {};
-    const entries = Object.entries(workers);
-    return (
-        <Card className="gap-0">
-            <CardHeader className="px-5 py-4">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Cpu className="h-4 w-4 text-muted-foreground" />
-                        <CardTitle className="text-sm font-semibold">Workers</CardTitle>
-                    </div>
-                    <StatusPill status={toStatusKind(sub.status)} />
-                </div>
-            </CardHeader>
-            <CardContent className="px-5 pb-4 pt-0">
-                {entries.length === 0 ? (
-                    <div className="py-2 text-sm text-muted-foreground">{sub.error ?? "No worker data"}</div>
-                ) : (
-                    entries.map(([name, detail]) => <WorkerRow key={name} name={name} detail={detail} />)
-                )}
-            </CardContent>
-        </Card>
-    );
-}
-
-function QueuesCard({ sub }: { sub: SubHealth<Record<string, QueueCounts>> }) {
-    const queues = sub.data ?? {};
+function QueueNameList({ queues }: { queues: Record<string, QueueCounts> }) {
     const entries = Object.entries(queues);
+    if (entries.length === 0) {
+        return <div className="text-xs text-muted-foreground">No queue data</div>;
+    }
     return (
-        <Card className="gap-0">
-            <CardHeader className="px-5 py-4">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Layers className="h-4 w-4 text-muted-foreground" />
-                        <CardTitle className="text-sm font-semibold">Queues</CardTitle>
-                    </div>
-                    <StatusPill status={toStatusKind(sub.status)} />
-                </div>
-            </CardHeader>
-            <CardContent className="px-5 pb-4 pt-0">
-                {entries.length === 0 ? (
-                    <div className="py-2 text-sm text-muted-foreground">{sub.error ?? "No queue data"}</div>
-                ) : (
-                    entries.map(([name, counts]) => <QueueRow key={name} name={name} counts={counts} />)
-                )}
-            </CardContent>
-        </Card>
-    );
-}
-
-function EmailCard({ sub }: { sub: SubHealth<EmailHealth> }) {
-    const data = sub.data;
-    const metrics = data
-        ? [
-              { label: "Sent", value: data.sent, className: "" },
-              { label: "Pending", value: data.pending, className: "" },
-              { label: "Sending", value: data.sending, className: "" },
-              { label: "Failed", value: data.failed, className: data.failed ? "text-red-600" : "" },
-          ]
-        : [];
-    return (
-        <Card className="gap-0">
-            <CardHeader className="px-5 py-4">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Mail className="h-4 w-4 text-muted-foreground" />
-                        <CardTitle className="text-sm font-semibold">Email</CardTitle>
-                    </div>
-                    <StatusPill status={toStatusKind(sub.status)} />
-                </div>
-            </CardHeader>
-            <CardContent className="px-5 pb-4 pt-0">
-                {data ? (
-                    <>
-                        <div className="grid grid-cols-4 gap-2">
-                            {metrics.map((m) => (
-                                <div key={m.label} className="rounded-lg border bg-muted/30 p-2">
-                                    <div className={`text-lg font-semibold ${m.className}`}>{m.value.toLocaleString()}</div>
-                                    <div className="text-[11px] text-muted-foreground">{m.label}</div>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="mt-3 text-xs text-muted-foreground">
-                            Last attempt {data.lastAttemptAt ? relativeTime(data.lastAttemptAt) : "—"}
-                        </div>
-                    </>
-                ) : (
-                    <div className="py-2 text-sm text-muted-foreground">{sub.error ?? "unavailable"}</div>
-                )}
-            </CardContent>
-        </Card>
-    );
-}
-
-function ApiCard({ sub }: { sub: SubHealth<{ processId?: number; uptimeSeconds?: number; version?: string }> }) {
-    const data = sub.data ?? {};
-    return (
-        <Card className="gap-0">
-            <CardHeader className="px-5 py-4">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Server className="h-4 w-4 text-muted-foreground" />
-                        <CardTitle className="text-sm font-semibold">API</CardTitle>
-                    </div>
-                    <StatusPill status={toStatusKind(sub.status)} />
-                </div>
-            </CardHeader>
-            <CardContent className="px-5 pb-4 pt-0">
-                <div className="grid grid-cols-3 gap-3 text-sm">
-                    <div>
-                        <div className="text-xs text-muted-foreground">Version</div>
-                        <div className="font-medium">{data.version ?? "—"}</div>
-                    </div>
-                    <div>
-                        <div className="text-xs text-muted-foreground">Uptime</div>
-                        <div className="font-medium">{formatUptime(data.uptimeSeconds)}</div>
-                    </div>
-                    <div>
-                        <div className="text-xs text-muted-foreground">PID</div>
-                        <div className="font-medium">{data.processId ?? "—"}</div>
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
-    );
-}
-
-function DatabaseCard({ sub }: { sub: SubHealth<{ latencyMs?: number }> }) {
-    const latency = sub.data?.latencyMs;
-    return (
-        <Card className="gap-0">
-            <CardHeader className="px-5 py-4">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Database className="h-4 w-4 text-muted-foreground" />
-                        <CardTitle className="text-sm font-semibold">Database</CardTitle>
-                    </div>
-                    <StatusPill status={toStatusKind(sub.status)} />
-                </div>
-            </CardHeader>
-            <CardContent className="px-5 pb-4 pt-0">
-                <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Query latency</span>
-                    <span className="font-medium">{latency != null ? `${latency}ms` : sub.error ?? "—"}</span>
-                </div>
-                <ToneBar value={latency ?? 0} colorClass={latencyColor(latency)} />
-            </CardContent>
-        </Card>
-    );
-}
-
-function RedisCard({ sub }: { sub: SubHealth<{ ping?: string }> }) {
-    const ping = sub.data?.ping;
-    return (
-        <Card className="gap-0">
-            <CardHeader className="px-5 py-4">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Wifi className="h-4 w-4 text-muted-foreground" />
-                        <CardTitle className="text-sm font-semibold">Redis</CardTitle>
-                    </div>
-                    <StatusPill status={toStatusKind(sub.status)} />
-                </div>
-            </CardHeader>
-            <CardContent className="px-5 pb-4 pt-0">
-                <div className="text-sm text-muted-foreground">
-                    {ping ? (
-                        <span className="flex items-center gap-2 font-medium text-foreground">
-                            <Gauge className="h-4 w-4 text-emerald-500" />
-                            {ping} · reachable
-                        </span>
+        <div className="mt-2 space-y-1 border-t pt-2">
+            {entries.map(([name, counts]) => (
+                <div key={name} className="flex items-center justify-between gap-2 text-xs">
+                    <span className="truncate font-medium" title={name}>
+                        {name}
+                    </span>
+                    {counts?.error ? (
+                        <span className="shrink-0 text-red-600">{counts.error}</span>
                     ) : (
-                        sub.error ?? "unavailable"
+                        <span className="flex shrink-0 items-center gap-2 text-muted-foreground">
+                            <span title="Waiting">W <span className="font-medium text-foreground">{counts?.waiting ?? 0}</span></span>
+                            <span title="Delayed">D <span className="font-medium text-foreground">{counts?.delayed ?? 0}</span></span>
+                            <span title="Failed" className={counts?.failed ? "text-red-600" : ""}>
+                                F <span className="font-medium">{counts?.failed ?? 0}</span>
+                            </span>
+                        </span>
                     )}
                 </div>
-            </CardContent>
-        </Card>
+            ))}
+        </div>
+    );
+}
+
+function WorkerNameList({ workers }: { workers: Record<string, WorkerStatusDetail> }) {
+    const entries = Object.entries(workers);
+    if (entries.length === 0) {
+        return <div className="text-xs text-muted-foreground">No worker data</div>;
+    }
+    return (
+        <div className="mt-2 space-y-1 border-t pt-2">
+            {entries.map(([name, detail]) => {
+                const status = workerStatus(detail);
+                return (
+                    <div key={name} className="flex items-center justify-between gap-2 text-xs">
+                        <span className="flex min-w-0 items-center gap-2">
+                            <StatusDot status={status} pulse={status === "ok"} />
+                            <span className="truncate font-medium" title={name}>
+                                {name}
+                            </span>
+                        </span>
+                        {detail?.queue && (
+                            <Badge variant="secondary" className="shrink-0 text-[10px]">
+                                {detail.queue}
+                            </Badge>
+                        )}
+                    </div>
+                );
+            })}
+        </div>
     );
 }
 
@@ -500,14 +278,9 @@ function SkeletonDashboard() {
                     </div>
                 </div>
             </div>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-                {Array.from({ length: 5 }).map((_, i) => (
-                    <Skeleton key={i} className="h-28 rounded-xl" />
-                ))}
-            </div>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                {Array.from({ length: 6 }).map((_, i) => (
-                    <Skeleton key={i} className="h-36 rounded-xl" />
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+                {Array.from({ length: 7 }).map((_, i) => (
+                    <Skeleton key={i} className="h-32 rounded-xl" />
                 ))}
             </div>
         </div>
@@ -545,7 +318,10 @@ const SystemHealthPage = () => {
     const overall: StatusKind = toStatusKind(data.status);
     const apiData = overview.api.data;
     const dbData = overview.database.data;
+    const redisData = overview.redis.data;
     const emailData = overview.email.data;
+    const queueData = overview.queues.data ?? {};
+    const workerData = overview.workers.data ?? {};
 
     const queueBacklog = Object.values(overview.queues.data ?? {}).reduce(
         (sum, q) => sum + (q?.waiting ?? 0) + (q?.delayed ?? 0),
@@ -564,7 +340,7 @@ const SystemHealthPage = () => {
                 isRefreshing={isFetching}
             />
 
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
                 <KpiCard
                     icon={Server}
                     label="API"
@@ -582,6 +358,13 @@ const SystemHealthPage = () => {
                     barClass={latencyColor(dbData?.latencyMs)}
                 />
                 <KpiCard
+                    icon={Wifi}
+                    label="Redis"
+                    value={redisData?.ping ?? "—"}
+                    sub={redisData?.ping ? "reachable" : (overview.redis.error ?? "unavailable")}
+                    status={toStatusKind(overview.redis.status)}
+                />
+                <KpiCard
                     icon={Layers}
                     label="Queues"
                     value={queueBacklog.toLocaleString()}
@@ -589,14 +372,18 @@ const SystemHealthPage = () => {
                     status={toStatusKind(overview.queues.status)}
                     barValue={queueBacklog > 0 ? 100 : 0}
                     barClass={queueBacklog > 0 ? "bg-amber-500" : "bg-emerald-500"}
-                />
+                >
+                    <QueueNameList queues={queueData} />
+                </KpiCard>
                 <KpiCard
                     icon={Cpu}
                     label="Workers"
                     value={`${upWorkers}/${totalWorkers}`}
                     sub="online"
                     status={toStatusKind(overview.workers.status)}
-                />
+                >
+                    <WorkerNameList workers={workerData} />
+                </KpiCard>
                 <KpiCard
                     icon={Mail}
                     label="Email"
@@ -611,15 +398,6 @@ const SystemHealthPage = () => {
                     sub={overview.claude?.status === "ok" ? "sliding window active" : (overview.claude?.error ?? "active")}
                     status={toStatusKind(overview.claude?.status ?? "ok")}
                 />
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <ApiCard sub={overview.api} />
-                <DatabaseCard sub={overview.database} />
-                <RedisCard sub={overview.redis} />
-                <EmailCard sub={overview.email} />
-                <WorkersCard sub={overview.workers} />
-                <QueuesCard sub={overview.queues} />
             </div>
 
             {/* Claude AI Token Telemetry, Sliding TPM & Leaderboard */}
