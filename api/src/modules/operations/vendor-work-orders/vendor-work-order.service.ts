@@ -1,4 +1,5 @@
-import { BadRequestException, ConflictException, Inject, Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
+import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
 import { and, eq, like, desc, asc, sql, inArray, isNull, isNotNull, ne, or, type SQL } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
@@ -175,10 +176,12 @@ export class VendorWorkOrderService {
 
         this.notifications
             .notifyVwoCreated({
+                vendorWorkOrderId: wo.id,
                 woNumber,
                 sellerName: normalizeVendorName(body.sellerName),
                 grandTotal: grandTotal.toFixed(2),
                 projectName: body.projectName,
+                teamId: wo.team ?? null,
                 createdBy: userId,
             })
             .catch(err => this.logger.warn(`WhatsApp notification failed: ${err}`));
@@ -219,6 +222,7 @@ export class VendorWorkOrderService {
         // }
 
         const wasRejected = existing.woApproved === false;
+        const isUnapproved = existing.woApproved !== true;
 
         const updated = (
             await this.db
@@ -257,6 +261,10 @@ export class VendorWorkOrderService {
                     remarks: body.remarks,
                     certRecipient: body.certRecipient,
                     certRecipients: body.certRecipients ?? [],
+                    ...(isUnapproved && {
+                        tlStatus: 0,
+                        tlComment: null,
+                    }),
                     ...(wasRejected && {
                         woApproved: null,
                         tdsPercentage: null,
@@ -298,10 +306,23 @@ export class VendorWorkOrderService {
 
         this.logger.info(`Vendor Work Order updated: ${existing.woNumber}`);
 
+        const updatedGrandTotal = (body.products || []).reduce((sum: number, p: any) => {
+            const qty = Number(p.qty);
+            const rate = Number(p.rate);
+            const gstRate = Number(p.gstRate);
+            const taxable = qty * rate;
+            const gst = (taxable * gstRate) / 100;
+            return sum + taxable + gst;
+        }, 0);
+
         this.notifications
             .notifyVwoUpdated({
+                vendorWorkOrderId: id,
                 woNumber: existing.woNumber ?? `#${id}`,
                 sellerName: normalizeVendorName(body.sellerName),
+                projectName: existing.projectName,
+                grandTotal: updatedGrandTotal.toFixed(2),
+                teamId: existing.team ?? null,
                 updatedBy: userId,
             })
             .catch(err => this.logger.warn(`WhatsApp notification failed: ${err}`));
@@ -369,9 +390,23 @@ export class VendorWorkOrderService {
         });
 
         let raisedByName: string | null = null;
+        let creatorTeamId: number | null = wo.team != null ? Number(wo.team) : null;
         if (wo.woRaisedBy) {
-            const [raisedByUser] = await this.db.select({ name: users.name }).from(users).where(eq(users.id, wo.woRaisedBy));
+            const [raisedByUser] = await this.db
+                .select({
+                    name: users.name,
+                    primaryTeamId: users.primaryTeamId,
+                    team: users.team,
+                })
+                .from(users)
+                .where(eq(users.id, wo.woRaisedBy));
             raisedByName = raisedByUser?.name ?? null;
+            creatorTeamId =
+                raisedByUser?.primaryTeamId != null
+                    ? Number(raisedByUser.primaryTeamId)
+                    : raisedByUser?.team != null
+                      ? Number(raisedByUser.team)
+                      : creatorTeamId;
         }
 
         const paymentRequestsData = await this.db
@@ -407,6 +442,7 @@ export class VendorWorkOrderService {
 
         return {
             ...wo,
+            creatorTeamId,
             products: enrichedProducts,
             total,
             itemTotals,
@@ -467,10 +503,13 @@ export class VendorWorkOrderService {
                 shipToPan: vendorWorkOrders.shipToPan,
                 woDate: vendorWorkOrders.woDate,
                 woRaisedBy: users.name,
+                creatorTeamId: sql<number | null>`COALESCE(${users.primaryTeamId}, ${users.team}, ${vendorWorkOrders.team})`,
                 createdAt: vendorWorkOrders.createdAt,
                 tdsPercentage: vendorWorkOrders.tdsPercentage,
                 tdsAmount: vendorWorkOrders.tdsAmount,
                 amountAfterTds: vendorWorkOrders.amountAfterTds,
+                tlStatus: vendorWorkOrders.tlStatus,
+                tlComment: vendorWorkOrders.tlComment,
                 woApproved: vendorWorkOrders.woApproved,
                 woApprovalRemark: vendorWorkOrders.woApprovalRemark,
                 closedAt: vendorWorkOrders.closedAt,
@@ -669,6 +708,165 @@ export class VendorWorkOrderService {
         }
     }
 
+    async submitTlApproval(
+        id: number,
+        body: { tlStatus: number; tlComment?: string },
+        user?: ValidatedUser
+    ) {
+        if (!user) {
+            throw new ForbiddenException("Authentication is required for TL approval");
+        }
+
+        const tlStatus = Number(body?.tlStatus);
+        if (tlStatus !== 1 && tlStatus !== 2) {
+            throw new BadRequestException("tlStatus must be 1 (Approve) or 2 (Reject)");
+        }
+
+        const comment = typeof body?.tlComment === "string" ? body.tlComment.trim() || null : null;
+        if (tlStatus === 2 && !comment) {
+            throw new BadRequestException("Rejection reason (tlComment) is required when rejecting a Work Order");
+        }
+
+        const wo = await this.db
+            .select()
+            .from(vendorWorkOrders)
+            .where(eq(vendorWorkOrders.id, id))
+            .then(rows => rows[0]);
+
+        if (!wo) {
+            throw new NotFoundException("Vendor Work Order not found");
+        }
+
+        if (wo.woApproved === true) {
+            throw new BadRequestException("Cannot change TL approval after Accounts has already approved the Work Order");
+        }
+
+        // Resolve creatorTeamId: COALESCE(creator.primary_team_id, creator.team, wo.team)
+        let creatorTeamId: number | null = wo.team != null ? Number(wo.team) : null;
+        if (wo.woRaisedBy) {
+            const [creator] = await this.db
+                .select({
+                    primaryTeamId: users.primaryTeamId,
+                    team: users.team,
+                })
+                .from(users)
+                .where(eq(users.id, wo.woRaisedBy))
+                .limit(1);
+
+            creatorTeamId =
+                creator?.primaryTeamId != null
+                    ? Number(creator.primaryTeamId)
+                    : creator?.team != null
+                      ? Number(creator.team)
+                      : creatorTeamId;
+        }
+
+        const roleId = Number(user.roleId);
+        const isSuperOrAdmin = roleId === 1 || roleId === 2;
+        const isSameTeamTl =
+            roleId === 3 &&
+            user.teamId != null &&
+            creatorTeamId != null &&
+            Number(user.teamId) === Number(creatorTeamId);
+
+        if (!isSuperOrAdmin && !isSameTeamTl) {
+            throw new ForbiddenException(
+                "Only Super User, Admin, or the creator's Team Leader can perform Stage 1 TL approval on this Work Order"
+            );
+        }
+
+        const items = await this.db
+            .select()
+            .from(vendorWorkOrderItems)
+            .where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
+        const itemsGrandTotal = items.reduce((acc, item) => acc + Number(item.totalAmount), 0);
+        const charges = await this.db
+            .select()
+            .from(orderExtraCharges)
+            .where(eq(orderExtraCharges.vendorWorkOrderId, id));
+        const chargesTotal = charges.reduce((sum, c) => sum + Number(c.totalAmount ?? 0), 0);
+        const grandTotal = itemsGrandTotal + chargesTotal;
+
+        const now = new Date();
+
+        if (tlStatus === 1) {
+            const [updated] = await this.db
+                .update(vendorWorkOrders)
+                .set({
+                    tlStatus: 1,
+                    tlComment: comment,
+                    ...(wo.woApproved === false && wo.tlStatus === 2
+                        ? { woApproved: null, woApprovalRemark: null }
+                        : {}),
+                    updatedAt: now,
+                })
+                .where(eq(vendorWorkOrders.id, id))
+                .returning();
+
+            this.notifications
+                .notifyVwoTlDecision({
+                    vendorWorkOrderId: id,
+                    woNumber: wo.woNumber ?? `#${id}`,
+                    sellerName: wo.sellerName,
+                    grandTotal: round2(grandTotal).toFixed(2),
+                    projectName: wo.projectName,
+                    tlStatus: 1,
+                    tlComment: comment,
+                    actedBy: user.id,
+                    createdBy: wo.woRaisedBy ?? null,
+                    teamId: creatorTeamId,
+                })
+                .catch(err => this.logger.warn(`WhatsApp VWO TL approval notification failed: ${err}`));
+
+            this.logger.info(`VWO #${id} approved by TL/Admin user #${user.id}`);
+            return updated;
+        } else {
+            const [updated] = await this.db
+                .update(vendorWorkOrders)
+                .set({
+                    tlStatus: 2,
+                    tlComment: comment,
+                    woApproved: false,
+                    woApprovalRemark: comment,
+                    updatedAt: now,
+                })
+                .where(eq(vendorWorkOrders.id, id))
+                .returning();
+
+            await this.db
+                .update(paymentRequests)
+                .set({
+                    status: "rejected",
+                    rejectionReason: comment || "VWO Rejected by Team Leader",
+                    updatedAt: now,
+                })
+                .where(
+                    and(
+                        eq(paymentRequests.vendorWorkOrderId, id),
+                        eq(paymentRequests.status, "po_approval_pending")
+                    )
+                );
+
+            this.notifications
+                .notifyVwoTlDecision({
+                    vendorWorkOrderId: id,
+                    woNumber: wo.woNumber ?? `#${id}`,
+                    sellerName: wo.sellerName,
+                    grandTotal: round2(grandTotal).toFixed(2),
+                    projectName: wo.projectName,
+                    tlStatus: 2,
+                    tlComment: comment,
+                    actedBy: user.id,
+                    createdBy: wo.woRaisedBy ?? null,
+                    teamId: creatorTeamId,
+                })
+                .catch(err => this.logger.warn(`WhatsApp VWO TL rejection notification failed: ${err}`));
+
+            this.logger.info(`VWO #${id} rejected by TL/Admin user #${user.id}: ${comment}`);
+            return updated;
+        }
+    }
+
     async getByProject(projectId: number) {
         const rows = await this.db
             .select({
@@ -689,9 +887,12 @@ export class VendorWorkOrderService {
                 shipToGst: vendorWorkOrders.shipToGst,
                 shipToPan: vendorWorkOrders.shipToPan,
                 woRaisedBy: vendorWorkOrders.woRaisedBy,
+                team: vendorWorkOrders.team,
                 tdsPercentage: vendorWorkOrders.tdsPercentage,
                 tdsAmount: vendorWorkOrders.tdsAmount,
                 amountAfterTds: vendorWorkOrders.amountAfterTds,
+                tlStatus: vendorWorkOrders.tlStatus,
+                tlComment: vendorWorkOrders.tlComment,
                 woApproved: vendorWorkOrders.woApproved,
                 woApprovalRemark: vendorWorkOrders.woApprovalRemark,
                 closedAt: vendorWorkOrders.closedAt,
@@ -743,10 +944,29 @@ export class VendorWorkOrderService {
                     .from(paymentRequests)
                     .where(and(eq(paymentRequests.vendorWorkOrderId, wo.id), ne(paymentRequests.status, "rejected")));
 
-                const [raisedByUser] = wo.woRaisedBy ? await this.db.select({ name: users.name }).from(users).where(eq(users.id, wo.woRaisedBy)) : [];
+                const [raisedByUser] = wo.woRaisedBy
+                    ? await this.db
+                          .select({
+                              name: users.name,
+                              primaryTeamId: users.primaryTeamId,
+                              team: users.team,
+                          })
+                          .from(users)
+                          .where(eq(users.id, wo.woRaisedBy))
+                    : [];
+
+                const creatorTeamId =
+                    raisedByUser?.primaryTeamId != null
+                        ? Number(raisedByUser.primaryTeamId)
+                        : raisedByUser?.team != null
+                          ? Number(raisedByUser.team)
+                          : wo.team != null
+                            ? Number(wo.team)
+                            : null;
 
                 return {
                     ...wo,
+                    creatorTeamId,
                     products: items,
                     ...totals,
                     totalVwiAmount: invoiceTotals?.totalVwiAmount || 0,

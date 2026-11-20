@@ -209,11 +209,12 @@ export const VendorWorkOrdersSection: React.FC<VendorWorkOrdersSectionProps> = (
             headerName: "Status",
             sortable: true,
             filter: true,
-            width: 110,
+            width: 140,
             cellRenderer: (p: CustomCellRendererProps<VendorWorkOrderRow>) => {
                 const d = p.data;
                 const isApproved = d?.woApproved === true;
                 const isRejected = d?.woApproved === false;
+                const tlStatus = d?.tlStatus ?? 0;
                 const tdsPct = d?.tdsPercentage ? Number(d.tdsPercentage) : null;
 
                 let label: string;
@@ -222,12 +223,20 @@ export const VendorWorkOrdersSection: React.FC<VendorWorkOrdersSectionProps> = (
                     label = "Approved";
                     variant = "default";
                 } else if (isRejected) {
-                    label = "Rejected";
+                    label = tlStatus === 2 ? "Rejected (TL)" : "Rejected";
                     variant = "destructive";
+                } else if (tlStatus === 1) {
+                    label = "Pending Accounts";
+                    variant = "secondary";
                 } else {
-                    label = "Pending";
+                    label = "Pending TL";
                     variant = "outline";
                 }
+
+                const tlStatusLabel =
+                    tlStatus === 1 ? "Approved" : tlStatus === 2 ? "Rejected" : "Pending";
+                const accountsStatusLabel =
+                    isApproved ? "Approved" : isRejected && tlStatus !== 2 ? "Rejected" : "Pending";
 
                 return (
                     <TooltipProvider>
@@ -239,17 +248,19 @@ export const VendorWorkOrdersSection: React.FC<VendorWorkOrdersSectionProps> = (
                             </TooltipTrigger>
                             <TooltipContent side="top" align="start" className="max-w-xs dark:bg-accent">
                                 <div className="space-y-1 text-xs">
+                                    <p><strong>TL Approval:</strong> {tlStatusLabel}</p>
+                                    {d?.tlComment && (
+                                        <p><strong>TL Comment:</strong> {d.tlComment}</p>
+                                    )}
+                                    <p><strong>Accounts Approval:</strong> {accountsStatusLabel}</p>
                                     {tdsPct !== null && isApproved && (
                                         <>
                                             <p><strong>TDS:</strong> {tdsPct}% (-{formatINR(d?.tdsAmount || 0)})</p>
-                                            <p><strong>After TDS:</strong> {formatINR(d?.amountAfterTds || 0)}</p>
+                                            <p><strong>After TDS:</strong> {formatINR(d?.amountAfterTds || 0)})</p>
                                         </>
                                     )}
-                                    {d?.woApprovalRemark && (
+                                    {d?.woApprovalRemark && d?.woApprovalRemark !== d?.tlComment && (
                                         <p><strong>Remark:</strong> {d.woApprovalRemark}</p>
-                                    )}
-                                    {!d?.woApprovalRemark && !tdsPct && (
-                                        <p className="text-muted-foreground">Awaiting approval</p>
                                     )}
                                 </div>
                             </TooltipContent>

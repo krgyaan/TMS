@@ -38,6 +38,9 @@ export interface VendorWorkOrderRow {
     amountAfterTds?: number | string;
     woApproved?: boolean;
     woApprovalRemark?: string;
+    tlStatus?: number | null;
+    tlComment?: string | null;
+    creatorTeamId?: number | null;
     totalVwiAmount?: number;
     totalVwiCount?: number;
     totalPaymentRequested?: number;

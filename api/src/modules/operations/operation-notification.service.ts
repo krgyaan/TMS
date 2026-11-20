@@ -101,11 +101,28 @@ export interface PoUpdatedNotificationData {
 }
 
 export interface VwoCreatedNotificationData {
+  vendorWorkOrderId?: number;
   woNumber: string;
   sellerName: string | null;
   grandTotal: string | number;
   projectName: string | null;
+  tenderNo?: string | null;
+  tenderName?: string | null;
+  teamId?: number | null;
   createdBy: number;
+}
+
+export interface VwoTlDecisionNotificationData {
+  vendorWorkOrderId: number;
+  woNumber: string;
+  sellerName: string | null;
+  grandTotal: string | number;
+  projectName: string | null;
+  tlStatus: 1 | 2;
+  tlComment: string | null;
+  actedBy: number;
+  createdBy: number | null;
+  teamId: number | null;
 }
 
 export interface VwoApprovalNotificationData {
@@ -126,8 +143,12 @@ export interface VwoRejectedNotificationData {
 }
 
 export interface VwoUpdatedNotificationData {
+  vendorWorkOrderId?: number;
   woNumber: string;
   sellerName: string | null;
+  projectName?: string | null;
+  grandTotal?: string | number | null;
+  teamId?: number | null;
   updatedBy: number;
 }
 
@@ -535,6 +556,16 @@ export class OperationNotificationService {
     return `${baseUrl}/operations/purchase-orders/${purchaseOrderId}`;
   }
 
+  private buildDirectVwoAppUrl(vendorWorkOrderId?: number | null): string | null {
+    if (!vendorWorkOrderId) return null;
+    const baseUrl = (
+      process.env.PUBLIC_APP_URL ||
+      process.env.FRONTEND_URL ||
+      'http://localhost:5173'
+    ).replace(/\/+$/, '');
+    return `${baseUrl}/operations/vendor-work-orders/${vendorWorkOrderId}`;
+  }
+
   async notifyPoCreated(data: PoCreatedNotificationData): Promise<void> {
     try {
       const [user] = await this.db
@@ -693,19 +724,82 @@ export class OperationNotificationService {
         .limit(1);
 
       const userName = user?.name ?? 'Unknown';
+      const vwoUrl = this.buildDirectVwoAppUrl(data.vendorWorkOrderId);
+      const tenderOrProject =
+        [data.tenderNo, data.tenderName].filter(Boolean).join(' - ') ||
+        data.projectName ||
+        'N/A';
+
       const lines: string[] = [
-        `*New WO Raised*`,
+        `*New WO Raised — TL Approval Required*`,
         `WO No: ${data.woNumber}`,
-        `Amount: ₹${data.grandTotal}`,
-        `Party: ${data.sellerName || 'N/A'}`,
-        `Raised by: ${userName}`,
-        `Kindly approve ASAP.`,
+        `Tender / Project: ${tenderOrProject}`,
+        `Vendor: ${data.sellerName || 'N/A'}`,
+        `Grand Total: ₹${data.grandTotal}`,
+        `Raised By: ${userName}`,
       ];
 
+      if (vwoUrl) {
+        lines.push(`Review & Approve in TMS: ${vwoUrl}`);
+      } else {
+        lines.push(`Kindly review and approve in TMS.`);
+      }
+
       const text = lines.join('\n');
-      await this.sendToTargets(text, { type: 'group', group: GROUPS.PAYMENTS });
+      await this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO });
     } catch (err) {
       this.logger.warn(`Failed to send VWO created notification: ${err}`);
+    }
+  }
+
+  async notifyVwoTlDecision(data: VwoTlDecisionNotificationData): Promise<void> {
+    try {
+      const [actor] = await this.db
+        .select({ name: users.name })
+        .from(users)
+        .where(eq(users.id, data.actedBy))
+        .limit(1);
+
+      const actorName = actor?.name ?? 'Team Leader';
+      const vwoUrl = this.buildDirectVwoAppUrl(data.vendorWorkOrderId);
+
+      if (data.tlStatus === 1) {
+        const lines: string[] = [
+          `*WO Approved by TL — Pending Accounts Approval*`,
+          `WO No: ${data.woNumber}`,
+          `Project: ${data.projectName || 'N/A'}`,
+          `Vendor: ${data.sellerName || 'N/A'}`,
+          `Grand Total: ₹${data.grandTotal}`,
+          `TL Approved By: ${actorName}`,
+        ];
+        if (data.tlComment) {
+          lines.push(`TL Comment: ${data.tlComment}`);
+        }
+        if (vwoUrl) {
+          lines.push(`View in TMS: ${vwoUrl}`);
+        }
+
+        const text = lines.join('\n');
+        await this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO });
+      } else {
+        const lines: string[] = [
+          `*WO Rejected by Team Leader*`,
+          `WO No: ${data.woNumber}`,
+          `Project: ${data.projectName || 'N/A'}`,
+          `Vendor: ${data.sellerName || 'N/A'}`,
+          `Grand Total: ₹${data.grandTotal}`,
+          `Rejected By: ${actorName}`,
+          `Reason: ${data.tlComment || 'N/A'}`,
+        ];
+        if (vwoUrl) {
+          lines.push(`View in TMS: ${vwoUrl}`);
+        }
+
+        const text = lines.join('\n');
+        await this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO });
+      }
+    } catch (err) {
+      this.logger.warn(`Failed to send VWO TL decision notification: ${err}`);
     }
   }
 
@@ -742,14 +836,25 @@ export class OperationNotificationService {
         .limit(1);
 
       const userName = user?.name ?? 'Unknown';
+      const vwoUrl = this.buildDirectVwoAppUrl(data.vendorWorkOrderId);
+
       const lines: string[] = [
-        `*WO Updated* @${userName}`,
+        `*WO Updated — TL Approval Required* @${userName}`,
         `WO No: ${data.woNumber}`,
-        `Party: ${data.sellerName || 'N/A'}`,
+        `Vendor: ${data.sellerName || 'N/A'}`,
       ];
+      if (data.projectName) {
+        lines.push(`Project: ${data.projectName}`);
+      }
+      if (data.grandTotal != null) {
+        lines.push(`Grand Total: ₹${data.grandTotal}`);
+      }
+      if (vwoUrl) {
+        lines.push(`Review & Approve in TMS: ${vwoUrl}`);
+      }
 
       const text = lines.join('\n');
-      await this.sendToTargets(text, { type: 'group', group: GROUPS.PAYMENTS });
+      await this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO });
     } catch (err) {
       this.logger.warn(`Failed to send VWO updated notification: ${err}`);
     }
