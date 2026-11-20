@@ -4,11 +4,13 @@ import { useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Briefcase, Loader2, Mail, Phone, Save, Truck, User } from 'lucide-react';
-import { useCreatePaymentRequest } from '@/hooks/api/usePaymentRequests';
+import { useCreatePaymentRequest, useUpdatePaymentRequest } from '@/hooks/api/usePaymentRequests';
 import { useProjectOverview } from '@/hooks/api/useProjectDashboard';
 import { useCreateWoContact, useWoContactsByBasicDetail } from '@/hooks/api/useWoContacts';
 import { useTenderContacts } from '@/hooks/api/useInfoSheets';
 import { useUsers } from '@/hooks/api/useUsers';
+import { bankGuaranteesKey } from '@/hooks/api/useBankGuarantees';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import DateInput from '@/components/form/DateInput';
@@ -48,14 +50,34 @@ type EmailFieldKey = 'user' | 'cp' | 'finance';
 const EMPTY_CONTACT_DRAFT = { name: '', designation: '', email: '', phone: '' };
 type ContactDraft = typeof EMPTY_CONTACT_DRAFT;
 
+const toDateOnly = (value: string | Date | null | undefined): string => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value).split('T')[0] ?? '';
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${date.getFullYear()}-${month}-${day}`;
+};
+
 interface BiBankGuaranteeRequestFormProps {
     projectId: number;
+    mode?: 'create' | 'edit';
+    requestId?: number;
+    initialData?: Record<string, any> | null;
 }
 
 
-export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequestFormProps) {
+export function BiBankGuaranteeRequestForm({
+    projectId,
+    mode = 'create',
+    requestId,
+    initialData,
+}: BiBankGuaranteeRequestFormProps) {
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const createRequest = useCreatePaymentRequest();
+    const updateRequest = useUpdatePaymentRequest();
+    const isEditMode = mode === 'edit';
     const { data: overview } = useProjectOverview(projectId);
 
     const projectName = overview?.project?.projectName ?? '';
@@ -280,21 +302,36 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
     const form = useForm<FormValues>({
         resolver: zodResolver(ProjectBgRequestSchema) as Resolver<FormValues>,
         defaultValues: {
-            tenderName: '',
-            tenderNo: '',
-            EMD: { mode: 'BG', details: { bgBank: PROJECT_BG_BANK } },
-        },
+            tenderName: initialData?.tenderName ?? '',
+            tenderNo: initialData?.tenderNo ?? '',
+            tenderDueDate: toDateOnly(initialData?.tenderDueDate),
+            EMD: {
+                mode: 'BG',
+                details: initialData
+                    ? {
+                        ...initialData,
+                        bgBank: initialData.bgBank || PROJECT_BG_BANK,
+                        bgExpiryDate: toDateOnly(initialData.bgExpiryDate),
+                        bgClaimPeriod: toDateOnly(initialData.bgClaimPeriod),
+                        bgCourierDelDate: toDateOnly(initialData.bgCourierDelDate),
+                        bgCourierEmpFrom:
+                            initialData.bgCourierEmpFrom != null ? String(initialData.bgCourierEmpFrom) : undefined,
+                        bgCourierUrgency:
+                            initialData.bgCourierUrgency != null ? String(initialData.bgCourierUrgency) : undefined,
+                    }
+                    : { bgBank: PROJECT_BG_BANK },
+            },
+        } as FormValues,
     });
 
-    // Prefill project name + work no. once, when the overview loads.
     const prefilledRef = useRef(false);
     useEffect(() => {
-        if (prefilledRef.current) return;
+        if (prefilledRef.current || isEditMode) return;
         if (!projectName && !poNo) return;
         prefilledRef.current = true;
         form.setValue('tenderName', projectName);
         form.setValue('tenderNo', poNo);
-    }, [projectName, poNo, form]);
+    }, [projectName, poNo, form, isEditMode]);
 
     const bgFormatFiles = useWatch({ control: form.control, name: `${BG_PREFIX}.bgFormatFiles` });
 
@@ -312,6 +349,22 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
         };
 
         try {
+            if (isEditMode && requestId) {
+                await updateRequest.mutateAsync({
+                    id: requestId,
+                    data: {
+                        EMD: {
+                            mode: 'BG',
+                            details: values.EMD?.details || {},
+                        },
+                    },
+                });
+                queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.all });
+                toast.success('Bank Guarantee request updated successfully');
+                navigate(-1);
+                return;
+            }
+
             await createRequest.mutateAsync({
                 tenderId: 0,
                 data: payload,
@@ -323,13 +376,17 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
         }
     };
 
+    const isPending = isEditMode ? updateRequest.isPending : createRequest.isPending;
+
     return (
         <Card>
             <CardHeader>
-                <CardTitle className="text-2xl">Request Bank Guarantee</CardTitle>
+                <CardTitle className="text-2xl">{isEditMode ? 'Edit Bank Guarantee' : 'Request Bank Guarantee'}</CardTitle>
                 <CardDescription>
                     <p className="text-muted-foreground">
-                        Raise a Bank Guarantee request for this project. It follows the same approval flow as an EMD Bank Guarantee.
+                        {isEditMode
+                            ? 'Update the details of this Bank Guarantee request.'
+                            : 'Raise a Bank Guarantee request for this project. It follows the same approval flow as an EMD Bank Guarantee.'}
                     </p>
                 </CardDescription>
                 <CardAction>
@@ -502,22 +559,22 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
                                 variant="outline"
                                 size="lg"
                                 onClick={() => navigate(-1)}
-                                disabled={createRequest.isPending}
+                                disabled={isPending}
                             >
                                 Cancel
                             </Button>
                             <Button
                                 type="submit"
                                 size="lg"
-                                disabled={createRequest.isPending}
+                                disabled={isPending}
                                 className="min-w-48"
                             >
-                                {createRequest.isPending ? (
+                                {isPending ? (
                                     'Submitting...'
                                 ) : (
                                     <>
                                         <Save className="mr-2 h-5 w-5" />
-                                        Submit Request
+                                        {isEditMode ? 'Update Request' : 'Submit Request'}
                                     </>
                                 )}
                             </Button>
