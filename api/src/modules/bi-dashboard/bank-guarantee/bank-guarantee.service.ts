@@ -1347,6 +1347,9 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             if (body.fdr_date) bgDetailsUpdate.fdrDate = body.fdr_date;
             if (body.fdr_validity) bgDetailsUpdate.fdrValidity = body.fdr_validity;
             if (body.fdr_roi) bgDetailsUpdate.fdrRoi = body.fdr_roi;
+            if (body.fdr_amt !== undefined && body.fdr_amt !== null && body.fdr_amt !== '') {
+                bgDetailsUpdate.fdrAmt = body.fdr_amt;
+            }
 
             const fdrCopyFile = this.getFileForField('fdr_copy', files, body, fileIndexTracker);
             const fdrCopyPath = this.getFilePathFromBody('fdr_copy', body);

@@ -303,11 +303,9 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     }
 ).refine(
     (data) => {
-        // Accounts Form (BG) 1: when the BG request is accepted, the FDR details
-        // (percentage agreed for the BG, FDR number/date/validity/ROI and its
-        // copy) must be captured before the request goes to the bank.
         if (data.action !== 'accounts-form-1' || data.bg_req !== 'Accepted') return true;
         return !!data.bg_approved_fdr_per
+            && typeof data.fdr_amt === 'number'
             && !!data.fdr_no
             && !!data.fdr_date
             && !!data.fdr_validity
@@ -315,7 +313,7 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
             && hasFile(data.fdr_copy);
     },
     {
-        message: 'FDR percentage, FDR no., FDR date, FDR validity, FDR ROI and FDR copy are required',
+        message: 'FDR percentage, FDR value, FDR no., FDR date, FDR validity, FDR ROI and FDR copy are required',
         path: ['fdr_no'],
     }
 ).refine(
