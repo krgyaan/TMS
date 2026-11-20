@@ -37,6 +37,7 @@ export interface AccountsForm1Names<T extends FieldValues> {
     bankMailIds: FieldPath<T>;
     bankMailIdsCc: FieldPath<T>;
     bgApprovedFdrPer?: FieldPath<T>;
+    fdrAmt?: FieldPath<T>;
     bgFormatImran?: FieldPath<T>;
     fdrNo?: FieldPath<T>;
     fdrDate?: FieldPath<T>;
@@ -164,6 +165,17 @@ export function AccountsForm1Fields<T extends FieldValues>({
                             placeholder="Select percentage"
                             valueType={fdrValueType}
                         />
+                    )}
+                    {names.fdrAmt && (
+                        <FieldWrapper control={control} name={names.fdrAmt} label="FDR Value *">
+                            {(field) => (
+                                <NumberInput
+                                    {...field}
+                                    value={field.value as number | null | undefined}
+                                    placeholder="Enter FDR value"
+                                />
+                            )}
+                        </FieldWrapper>
                     )}
                     {names.fdrNo && (
                         <FieldWrapper control={control} name={names.fdrNo} label="FDR No. *">

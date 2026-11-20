@@ -23,6 +23,20 @@ const parseFilePaths = (file?: string | string[] | null): string[] => {
     return [file];
 };
 
+const formatDbDateTime = (value?: string | Date | null): string => {
+    if (!value) return '—';
+    if (value instanceof Date) return formatDateTime(value);
+    const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+    if (!match || /(?:Z|[+-]\d{2}:?\d{2})$/.test(String(value).trim())) {
+        return formatDateTime(value);
+    }
+    const [, year, month, day, hours, minutes] = match;
+    const hour24 = Number(hours);
+    const period = hour24 >= 12 ? 'pm' : 'am';
+    const hour12 = String(hour24 % 12 || 12).padStart(2, '0');
+    return `${day}-${month}-${year} ${hour12}:${minutes} ${period}`;
+};
+
 const FileLink = ({ file }: { file?: string | string[] | null }) => {
     const paths = parseFilePaths(file);
     if (paths.length === 0) return <span className="text-muted-foreground">Not Uploaded</span>;
@@ -178,6 +192,7 @@ export function BankGuaranteeView({
         parseFilePaths(data.cancellConfirm).length > 0);
 
     const courierSender = courierJson?.empFromName || courierDetails?.empFromName || courierJson?.empFrom || courierDetails?.empFrom;
+    const isProjectRequest = Number(data.projectId) > 0;
     const courierOrg = courierJson?.org || courierDetails?.toOrg || data.courierAddress;
     const courierRecipient = [courierJson?.name || courierDetails?.toName, (courierJson?.phone || courierDetails?.toMobile) ? `(${courierJson?.phone || courierDetails?.toMobile})` : ''].filter(Boolean).join(' ');
     const courierAddrLine = [courierJson?.line1, courierJson?.line2].filter(Boolean).join(', ') || courierDetails?.toAddr;
@@ -250,7 +265,7 @@ export function BankGuaranteeView({
                             />
                             <DataRow
                                 label1="Requested Date"
-                                value1={data.requestCreatedAt ? formatDateTime(data.requestCreatedAt) : '—'}
+                                value1={formatDbDateTime(data.requestCreatedAt)}
                             />
 
                             <DataRow
@@ -279,25 +294,48 @@ export function BankGuaranteeView({
                             />
 
                             {/* Section 3: Tender/Project Information */}
-                            <SectionHeader title="Tender/Project Information" />
-                            <DataRow
-                                label1="Tender No"
-                                value1={data.tenderNo || data.projectNo || '—'}
-                                label2="Tender Name"
-                                value2={data.tenderName || data.projectName || '—'}
-                            />
-                            <DataRow
-                                label1="Bid Validity"
-                                value1={
-                                    data.tenderDueDate
-                                        ? formatDate(data.tenderDueDate)
-                                        : data.requestDueDate
-                                            ? formatDate(data.requestDueDate)
-                                            : '—'
-                                }
-                                label2="Tender Status"
-                                value2={data.tenderStatusName || '—'}
-                            />
+                            <SectionHeader title={isProjectRequest ? 'Project Information' : 'Tender/Project Information'} />
+                            {isProjectRequest ? (
+                                <>
+                                    <DataRow
+                                        label1="Work Order No."
+                                        value1={data.tenderNo || data.projectNo || '—'}
+                                        label2="Project Name"
+                                        value2={data.projectName || data.tenderName || '—'}
+                                    />
+                                    <DataRow
+                                        label1="Bid Validity"
+                                        value1={
+                                            data.tenderDueDate
+                                                ? formatDate(data.tenderDueDate)
+                                                : data.requestDueDate
+                                                    ? formatDate(data.requestDueDate)
+                                                    : '—'
+                                        }
+                                    />
+                                </>
+                            ) : (
+                                <>
+                                    <DataRow
+                                        label1="Tender No"
+                                        value1={data.tenderNo || data.projectNo || '—'}
+                                        label2="Tender Name"
+                                        value2={data.tenderName || data.projectName || '—'}
+                                    />
+                                    <DataRow
+                                        label1="Bid Validity"
+                                        value1={
+                                            data.tenderDueDate
+                                                ? formatDate(data.tenderDueDate)
+                                                : data.requestDueDate
+                                                    ? formatDate(data.requestDueDate)
+                                                    : '—'
+                                        }
+                                        label2="Tender Status"
+                                        value2={data.tenderStatusName || '—'}
+                                    />
+                                </>
+                            )}
 
                             {/* Section 4: Beneficiary & Client Information */}
                             <SectionHeader title="Beneficiary & Client Information" />

@@ -349,7 +349,7 @@ export function BankGuaranteeForm({ amount, prefix = 'emd.details', readOnly = f
                     <FieldWrapper control={control} name={`${prefix}.bgCourierAddrLine1`} label="Address Line 1 *">
                         {(field) => <Input {...field} placeholder="Building, Street" />}
                     </FieldWrapper>
-                    <FieldWrapper control={control} name={`${prefix}.bgCourierAddrLine2`} label="Address Line 2 *">
+                    <FieldWrapper control={control} name={`${prefix}.bgCourierAddrLine2`} label="Address Line 2">
                         {(field) => <Input {...field} placeholder="Area, Locality" />}
                     </FieldWrapper>
                     <FieldWrapper control={control} name={`${prefix}.bgCourierCity`} label="City *">
