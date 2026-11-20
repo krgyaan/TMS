@@ -363,7 +363,7 @@ describe("OperationNotificationService payment request notifications", () => {
     });
 });
 
-describe("OperationNotificationService PO Team Group & TL Decision notifications", () => {
+describe("OperationNotificationService PO POVWO Group & TL Decision notifications", () => {
     let service: OperationNotificationService;
     let sendText: jest.Mock;
     let toJid: jest.Mock;
@@ -405,7 +405,7 @@ describe("OperationNotificationService PO Team Group & TL Decision notifications
         service = module.get(OperationNotificationService);
     });
 
-    it("notifyPoCreated routes to the creator's Team Group with direct TMS PO URL", async () => {
+    it("notifyPoCreated routes only to GROUPS.POVWO with direct TMS PO URL", async () => {
         await service.notifyPoCreated({
             purchaseOrderId: 42,
             poNumber: "PO/2026/0042",
@@ -418,14 +418,14 @@ describe("OperationNotificationService PO Team Group & TL Decision notifications
 
         expect(sendText).toHaveBeenCalledTimes(1);
         const [group, text] = sendText.mock.calls[0];
-        expect(group).toBe(GROUPS.ACTENDERSEARCH);
+        expect(group).toBe(GROUPS.POVWO);
         expect(text).toContain("PO/2026/0042");
         expect(text).toContain("Solar Plant");
         expect(text).toContain("Acme Traders");
         expect(text).toContain("/operations/purchase-orders/42");
     });
 
-    it("notifyPoTlDecision (Approve) notifies Accounts (GROUPS.PAYMENTS)", async () => {
+    it("notifyPoTlDecision (Approve) notifies only GROUPS.POVWO", async () => {
         await service.notifyPoTlDecision({
             purchaseOrderId: 42,
             poNumber: "PO/2026/0042",
@@ -441,13 +441,13 @@ describe("OperationNotificationService PO Team Group & TL Decision notifications
 
         expect(sendText).toHaveBeenCalledTimes(1);
         const [group, text] = sendText.mock.calls[0];
-        expect(group).toBe(GROUPS.PAYMENTS);
+        expect(group).toBe(GROUPS.POVWO);
         expect(text).toContain("PO Approved by TL");
         expect(text).toContain("Verified rates");
         expect(text).toContain("/operations/purchase-orders/42");
     });
 
-    it("notifyPoTlDecision (Reject) notifies Team Group and DMs creator", async () => {
+    it("notifyPoTlDecision (Reject) notifies only GROUPS.POVWO", async () => {
         await service.notifyPoTlDecision({
             purchaseOrderId: 42,
             poNumber: "PO/2026/0042",
@@ -461,13 +461,10 @@ describe("OperationNotificationService PO Team Group & TL Decision notifications
             tlComment: "Price mismatch with quotation",
         });
 
-        expect(sendText).toHaveBeenCalledTimes(2);
-        const [firstGroup, firstText] = sendText.mock.calls[0];
-        expect(firstGroup).toBe(GROUPS.DCTENDERSEARCH);
-        expect(firstText).toContain("PO Rejected by Team Leader");
-        expect(firstText).toContain("Price mismatch with quotation");
-
-        const [secondJid] = sendText.mock.calls[1];
-        expect(secondJid).toBe("919999999999@c.us");
+        expect(sendText).toHaveBeenCalledTimes(1);
+        const [group, text] = sendText.mock.calls[0];
+        expect(group).toBe(GROUPS.POVWO);
+        expect(text).toContain("PO Rejected by Team Leader");
+        expect(text).toContain("Price mismatch with quotation");
     });
 });

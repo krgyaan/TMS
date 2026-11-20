@@ -4,7 +4,7 @@ import { DRIZZLE } from '../../db/database.module';
 import type { DbInstance } from '../../db';
 import { users } from '../../db/schemas/';
 import { OpenwaService } from '../../openwa/openwa.service';
-import { GROUPS, resolveTeamPoGroup } from '../../config/groups';
+import { GROUPS } from '../../config/groups';
 import { openwaConfig } from '../../config/openwa.config';
 import type { ConfigType } from '@nestjs/config';
 import { WhatsappJidResolver } from '../notifications/helpers/whatsapp-jid.resolver';
@@ -538,18 +538,12 @@ export class OperationNotificationService {
   async notifyPoCreated(data: PoCreatedNotificationData): Promise<void> {
     try {
       const [user] = await this.db
-        .select({
-          name: users.name,
-          primaryTeamId: users.primaryTeamId,
-          team: users.team,
-        })
+        .select({ name: users.name })
         .from(users)
         .where(eq(users.id, data.createdBy))
         .limit(1);
 
       const userName = user?.name ?? 'Unknown';
-      const resolvedTeamId = data.teamId ?? user?.primaryTeamId ?? user?.team ?? null;
-      const teamGroup = resolveTeamPoGroup(resolvedTeamId);
       const poUrl = this.buildDirectPoAppUrl(data.purchaseOrderId);
       const tenderOrProject =
         [data.tenderNo, data.tenderName].filter(Boolean).join(' - ') ||
@@ -572,7 +566,7 @@ export class OperationNotificationService {
       }
 
       const text = lines.join('\n');
-      await this.sendToTargets(text, { type: 'group', group: teamGroup });
+      await this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO });
     } catch (err) {
       this.logger.warn(`Failed to send PO created notification: ${err}`);
     }
@@ -588,7 +582,6 @@ export class OperationNotificationService {
 
       const actorName = actor?.name ?? 'Team Leader';
       const poUrl = this.buildDirectPoAppUrl(data.purchaseOrderId);
-      const teamGroup = resolveTeamPoGroup(data.teamId);
 
       if (data.tlStatus === 1) {
         const lines: string[] = [
@@ -607,7 +600,7 @@ export class OperationNotificationService {
         }
 
         const text = lines.join('\n');
-        await this.sendToTargets(text, { type: 'group', group: GROUPS.PAYMENTS });
+        await this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO });
       } else {
         const lines: string[] = [
           `*PO Rejected by Team Leader*`,
@@ -623,10 +616,7 @@ export class OperationNotificationService {
         }
 
         const text = lines.join('\n');
-        await this.sendToTargets(text, { type: 'group', group: teamGroup });
-        if (data.createdBy) {
-          await this.sendToTargets(text, { type: 'users', userIds: [data.createdBy] });
-        }
+        await this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO });
       }
     } catch (err) {
       this.logger.warn(`Failed to send PO TL decision notification: ${err}`);
@@ -660,18 +650,12 @@ export class OperationNotificationService {
   async notifyPoUpdated(data: PoUpdatedNotificationData): Promise<void> {
     try {
       const [user] = await this.db
-        .select({
-          name: users.name,
-          primaryTeamId: users.primaryTeamId,
-          team: users.team,
-        })
+        .select({ name: users.name })
         .from(users)
         .where(eq(users.id, data.updatedBy))
         .limit(1);
 
       const userName = user?.name ?? 'Unknown';
-      const resolvedTeamId = data.teamId ?? user?.primaryTeamId ?? user?.team ?? null;
-      const teamGroup = resolveTeamPoGroup(resolvedTeamId);
       const poUrl = this.buildDirectPoAppUrl(data.purchaseOrderId);
 
       const lines: string[] = [
@@ -690,7 +674,7 @@ export class OperationNotificationService {
       }
 
       const text = lines.join('\n');
-      await this.sendToTargets(text, { type: 'group', group: teamGroup });
+      await this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO });
     } catch (err) {
       this.logger.warn(`Failed to send PO updated notification: ${err}`);
     }
