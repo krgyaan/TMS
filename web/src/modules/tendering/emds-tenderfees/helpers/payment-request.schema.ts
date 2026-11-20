@@ -324,7 +324,6 @@ const COURIER_DISPATCH_REQUIRED_FIELDS = [
     ['CourierName', 'Recipient Name'],
     ['CourierPhone', 'Phone'],
     ['CourierAddrLine1', 'Address Line 1'],
-    ['CourierAddrLine2', 'Address Line 2'],
     ['CourierCity', 'City'],
     ['CourierState', 'State'],
     ['CourierPincode', 'Pin Code'],

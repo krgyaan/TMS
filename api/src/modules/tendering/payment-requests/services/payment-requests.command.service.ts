@@ -604,38 +604,28 @@ export class PaymentRequestsCommandService {
             docs: details[`${shorthand}CourierDocs`] ?? details.bgCourierDocs ?? [],
         } : null;
 
-        // BG and FDR requests create their courier dispatch row up-front; the
-        // instrument references it through req_no (same convention as step 2).
         let courierId: number | null = null;
-        const courierOrg = mode === 'BG' ? details.bgCourierOrg : mode === 'FDR' ? details.fdrCourierOrg : null;
-        if ((mode === 'BG' || mode === 'FDR') && courierOrg) {
-            const org = courierOrg;
-            const toName = mode === 'BG' ? details.bgCourierName : details.fdrCourierName;
-            const addr1 = mode === 'BG' ? details.bgCourierAddrLine1 : details.fdrCourierAddrLine1;
-            const addr2 = mode === 'BG' ? details.bgCourierAddrLine2 : details.fdrCourierAddrLine2;
-            const city = mode === 'BG' ? details.bgCourierCity : details.fdrCourierCity;
-            const state = mode === 'BG' ? details.bgCourierState : details.fdrCourierState;
-            const pincode = mode === 'BG' ? details.bgCourierPincode : details.fdrCourierPincode;
-            const phone = mode === 'BG' ? details.bgCourierPhone : details.fdrCourierPhone;
-            const empFrom = mode === 'BG' ? details.bgCourierEmpFrom : details.fdrCourierEmpFrom;
-            const delDate = mode === 'BG' ? details.bgCourierDelDate : details.fdrCourierDelDate;
-            const urgency = mode === 'BG' ? details.bgCourierUrgency : details.fdrCourierUrgency;
-            const docs = mode === 'BG' ? details.bgCourierDocs : details.fdrCourierDocs;
-
+        const courierOrg = mode === 'FDR' ? details.fdrCourierOrg : null;
+        if (mode === 'FDR' && courierOrg) {
             const [courierRow] = await tx
                 .insert(couriers)
                 .values({
                     userId: userId ?? 0,
-                    toOrg: org,
-                    toName: toName || '',
-                    toAddr: [addr1, addr2, city, state].filter(Boolean).join(', '),
-                    toPin: pincode || '',
-                    toMobile: phone || '',
-                    empFrom: Number(empFrom) || userId || 0,
-                    delDate: delDate ? new Date(delDate) : new Date(),
-                    urgency: Number(urgency) || 1,
-                    courierDocs: docs ?? [],
-                    status: 0, // Courier status: Pending
+                    toOrg: courierOrg,
+                    toName: details.fdrCourierName || '',
+                    toAddr: [
+                        details.fdrCourierAddrLine1,
+                        details.fdrCourierAddrLine2,
+                        details.fdrCourierCity,
+                        details.fdrCourierState,
+                    ].filter(Boolean).join(', '),
+                    toPin: details.fdrCourierPincode || '',
+                    toMobile: details.fdrCourierPhone || '',
+                    empFrom: Number(details.fdrCourierEmpFrom) || userId || 0,
+                    delDate: details.fdrCourierDelDate ? new Date(details.fdrCourierDelDate) : new Date(),
+                    urgency: Number(details.fdrCourierUrgency) || 1,
+                    courierDocs: details.fdrCourierDocs ?? [],
+                    status: 0,
                 })
                 .returning()
                 .execute();

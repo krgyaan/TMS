@@ -68,7 +68,7 @@ export function FdrForm({
                     <FieldWrapper control={control} name={`${prefix}.fdrCourierAddrLine1`} label="Address Line 1 *">
                         {(field) => <Input {...field} placeholder="Building, Street" />}
                     </FieldWrapper>
-                    <FieldWrapper control={control} name={`${prefix}.fdrCourierAddrLine2`} label="Address Line 2 *">
+                    <FieldWrapper control={control} name={`${prefix}.fdrCourierAddrLine2`} label="Address Line 2">
                         {(field) => <Input {...field} placeholder="Area, Locality" />}
                     </FieldWrapper>
                     <FieldWrapper control={control} name={`${prefix}.fdrCourierCity`} label="City *">
