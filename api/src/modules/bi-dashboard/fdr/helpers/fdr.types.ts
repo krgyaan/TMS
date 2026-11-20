@@ -19,9 +19,10 @@ export interface FdrDashboardCounts {
     rejected: number;
     returned: number;
     cancelled: number;
-    'pnb-bg-linked': number;
-    'ybl-bg-linked': number;
+    'bg-linked': number;
+    bg: number;
+    'other-security': number;
+    emd: number;
     'security-deposit': number;
-    'bond-linked': number;
     total: number;
 }
