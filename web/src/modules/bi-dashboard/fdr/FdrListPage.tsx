@@ -18,7 +18,7 @@ import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { fdrsService } from '@/services/api/fdrs.service';
 import type { ColDef } from 'ag-grid-community';
-import { AlertCircle, Clock, Edit, Eye, FileX2, Link, MessageSquare, Plus, RotateCcw, Search, Shield, XCircle } from 'lucide-react';
+import { AlertCircle, Banknote, Clock, Edit, Eye, FileX2, Link, MessageSquare, Plus, RotateCcw, Search, Shield, ShieldCheck, XCircle } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { DashboardTab, FdrDashboardRow } from './helpers/fdr.types';
@@ -32,28 +32,34 @@ const TABS_CONFIG: Array<{ key: DashboardTab; name: string; icon: React.ReactNod
         description: 'Pending FDRs',
     },
     {
-        key: 'pnb-bg-linked',
-        name: 'PNB BG linked',
+        key: 'bg-linked',
+        name: 'BG Linked',
         icon: <Link className="h-4 w-4" />,
-        description: 'FDRs linked to PNB bank guarantees',
+        description: 'FDRs linked to bank guarantees',
     },
     {
-        key: 'ybl-bg-linked',
-        name: 'YBL BG linked',
-        icon: <Link className="h-4 w-4" />,
-        description: 'FDRs linked to YBL bank guarantees',
+        key: 'bg',
+        name: 'Bank Guarantee',
+        icon: <Shield className="h-4 w-4" />,
+        description: 'FDRs issued for bank guarantees',
+    },
+    {
+        key: 'other-security',
+        name: 'Other Security',
+        icon: <ShieldCheck className="h-4 w-4" />,
+        description: 'FDRs issued for other security',
+    },
+    {
+        key: 'emd',
+        name: 'EMD',
+        icon: <Banknote className="h-4 w-4" />,
+        description: 'FDRs issued for EMD',
     },
     {
         key: 'security-deposit',
         name: 'Security Deposit (SD)',
         icon: <Shield className="h-4 w-4" />,
         description: 'FDRs for security deposits',
-    },
-    {
-        key: 'bond-linked',
-        name: 'Bond linked',
-        icon: <Link className="h-4 w-4" />,
-        description: 'FDRs linked to bonds',
     },
     {
         key: 'rejected',
@@ -132,7 +138,7 @@ const FdrListPage = () => {
         getExportDataFn: (params) => fdrsService.getExportData(params),
         tabsConfig: TABS_CONFIG,
         pendingTabKey: 'pending',
-        tabsWithForm: ['pnb-bg-linked', 'ybl-bg-linked', 'security-deposit', 'bond-linked', 'rejected', 'returned', 'cancelled'],
+        tabsWithForm: ['bg-linked', 'bg', 'other-security', 'emd', 'security-deposit', 'rejected', 'returned', 'cancelled'],
         filenamePrefix: 'fdrs',
         flattenFormData,
         mapPendingRow: (r: any) => ({
@@ -281,7 +287,7 @@ const FdrListPage = () => {
                     const status = params.value;
                     if (!status) return '—';
                     if (status === 'No date') return <Badge variant="secondary">No date</Badge>;
-                    if (status === 'Expired') return <Badge variant="destructive">Expired</Badge>;
+                    if (status === 'Renewed') return <Badge variant="outline">Renewed</Badge>;
                     return <Badge variant="default">{status}</Badge>;
                 },
             },

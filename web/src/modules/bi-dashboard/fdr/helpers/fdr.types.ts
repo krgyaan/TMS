@@ -1,4 +1,4 @@
-export type DashboardTab = 'pending' | 'rejected' | 'returned' | 'cancelled' | 'pnb-bg-linked' | 'ybl-bg-linked' | 'security-deposit' | 'bond-linked';
+export type DashboardTab = 'pending' | 'rejected' | 'returned' | 'cancelled' | 'bg-linked' | 'bg' | 'other-security' | 'emd' | 'security-deposit';
 export type ExportTab = DashboardTab | 'all';
 
 export interface DashboardFilters {
@@ -32,10 +32,11 @@ export interface FdrDashboardCounts {
     rejected: number;
     returned: number;
     cancelled: number;
-    'pnb-bg-linked': number;
-    'ybl-bg-linked': number;
+    'bg-linked': number;
+    bg: number;
+    'other-security': number;
+    emd: number;
     'security-deposit': number;
-    'bond-linked': number;
 }
 
 export interface FDRActionFormData {
