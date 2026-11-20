@@ -178,6 +178,7 @@ export function BankGuaranteeView({
         parseFilePaths(data.cancellConfirm).length > 0);
 
     const courierSender = courierJson?.empFromName || courierDetails?.empFromName || courierJson?.empFrom || courierDetails?.empFrom;
+    const isProjectRequest = Number(data.projectId) > 0;
     const courierOrg = courierJson?.org || courierDetails?.toOrg || data.courierAddress;
     const courierRecipient = [courierJson?.name || courierDetails?.toName, (courierJson?.phone || courierDetails?.toMobile) ? `(${courierJson?.phone || courierDetails?.toMobile})` : ''].filter(Boolean).join(' ');
     const courierAddrLine = [courierJson?.line1, courierJson?.line2].filter(Boolean).join(', ') || courierDetails?.toAddr;
@@ -279,25 +280,48 @@ export function BankGuaranteeView({
                             />
 
                             {/* Section 3: Tender/Project Information */}
-                            <SectionHeader title="Tender/Project Information" />
-                            <DataRow
-                                label1="Tender No"
-                                value1={data.tenderNo || data.projectNo || '—'}
-                                label2="Tender Name"
-                                value2={data.tenderName || data.projectName || '—'}
-                            />
-                            <DataRow
-                                label1="Bid Validity"
-                                value1={
-                                    data.tenderDueDate
-                                        ? formatDate(data.tenderDueDate)
-                                        : data.requestDueDate
-                                            ? formatDate(data.requestDueDate)
-                                            : '—'
-                                }
-                                label2="Tender Status"
-                                value2={data.tenderStatusName || '—'}
-                            />
+                            <SectionHeader title={isProjectRequest ? 'Project Information' : 'Tender/Project Information'} />
+                            {isProjectRequest ? (
+                                <>
+                                    <DataRow
+                                        label1="Work Order No."
+                                        value1={data.tenderNo || data.projectNo || '—'}
+                                        label2="Project Name"
+                                        value2={data.projectName || data.tenderName || '—'}
+                                    />
+                                    <DataRow
+                                        label1="Bid Validity"
+                                        value1={
+                                            data.tenderDueDate
+                                                ? formatDate(data.tenderDueDate)
+                                                : data.requestDueDate
+                                                    ? formatDate(data.requestDueDate)
+                                                    : '—'
+                                        }
+                                    />
+                                </>
+                            ) : (
+                                <>
+                                    <DataRow
+                                        label1="Tender No"
+                                        value1={data.tenderNo || data.projectNo || '—'}
+                                        label2="Tender Name"
+                                        value2={data.tenderName || data.projectName || '—'}
+                                    />
+                                    <DataRow
+                                        label1="Bid Validity"
+                                        value1={
+                                            data.tenderDueDate
+                                                ? formatDate(data.tenderDueDate)
+                                                : data.requestDueDate
+                                                    ? formatDate(data.requestDueDate)
+                                                    : '—'
+                                        }
+                                        label2="Tender Status"
+                                        value2={data.tenderStatusName || '—'}
+                                    />
+                                </>
+                            )}
 
                             {/* Section 4: Beneficiary & Client Information */}
                             <SectionHeader title="Beneficiary & Client Information" />

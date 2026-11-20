@@ -2161,6 +2161,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 // Payment Request fields
                 requestId: paymentRequests.id,
                 tenderId: paymentRequests.tenderId,
+                projectId: paymentRequests.projectId,
                 requestType: paymentRequests.type,
                 tenderNo: paymentRequests.tenderNo,
                 projectName: paymentRequests.projectName,
@@ -2306,6 +2307,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 tenderNo: paymentRequests.tenderNo,
                 tenderName: paymentRequests.projectName,
                 tenderId: paymentRequests.tenderId,
+                projectId: paymentRequests.projectId,
                 requestId: paymentRequests.id,
                 requestType: paymentRequests.type,
                 requestDueDate: paymentRequests.dueDate,
@@ -2486,6 +2488,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             tenderNo: result.tenderNo,
             tenderName: result.tenderName,
             tenderId: result.tenderId,
+            projectId: result.projectId,
             requestId: result.requestId,
             requestType: result.requestType,
             requestDueDate: result.requestDueDate ? new Date(result.requestDueDate) : null,
