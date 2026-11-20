@@ -1302,6 +1302,7 @@ export class PurchaseOrderService {
         // }
 
         const wasRejected = existingPO.poApproved === false;
+        const isUnapproved = existingPO.poApproved !== true;
         const [woBasic] = await this.db.select({ team: woBasicDetails.team }).from(woBasicDetails).where(eq(woBasicDetails.tenderId, existingPO.tenderId)).limit(1);
         this.logger.info(`Updating Purchase Order: ${body.poNumber} for project: ${body.projectName}, tenderId: ${body.tenderId}, team: ${woBasic?.team}`);
 

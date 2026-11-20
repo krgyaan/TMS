@@ -4,7 +4,7 @@ import { DRIZZLE } from '../../db/database.module';
 import type { DbInstance } from '../../db';
 import { users } from '../../db/schemas/';
 import { OpenwaService } from '../../openwa/openwa.service';
-import { GROUPS } from '../../config/groups';
+import { GROUPS, resolveTeamPoGroup } from '../../config/groups';
 import { openwaConfig } from '../../config/openwa.config';
 import type { ConfigType } from '@nestjs/config';
 import { WhatsappJidResolver } from '../notifications/helpers/whatsapp-jid.resolver';
@@ -569,7 +569,11 @@ export class OperationNotificationService {
   async notifyPoCreated(data: PoCreatedNotificationData): Promise<void> {
     try {
       const [user] = await this.db
-        .select({ name: users.name })
+        .select({
+          name: users.name,
+          primaryTeamId: users.primaryTeamId,
+          team: users.team,
+        })
         .from(users)
         .where(eq(users.id, data.createdBy))
         .limit(1);
