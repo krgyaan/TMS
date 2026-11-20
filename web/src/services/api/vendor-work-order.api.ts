@@ -30,6 +30,10 @@ class VendorWorkOrderApiService extends BaseApiService {
         return this.put(`/${id}/approval`, data);
     }
 
+    async submitTlApproval(id: number, data: { tlStatus: 1 | 2; tlComment?: string }): Promise<any> {
+        return this.patch(`/${id}/tl-approval`, data);
+    }
+
     async getById(id: number) {
         return this.get<any>(`/${id}`);
     }

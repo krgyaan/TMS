@@ -93,6 +93,12 @@ export class VendorWorkOrderController {
         return this.service.setVwoApproval(id, body, user?.id);
     }
 
+    @Patch(":id/tl-approval")
+    @HttpCode(HttpStatus.OK)
+    submitTlApproval(@Param("id", ParseIntPipe) id: number, @Body() body: { tlStatus: number; tlComment?: string }, @CurrentUser() user: ValidatedUser) {
+        return this.service.submitTlApproval(id, body, user);
+    }
+
     @Get(":id")
     getById(@Param("id", ParseIntPipe) id: number) {
         return this.service.getById(id);

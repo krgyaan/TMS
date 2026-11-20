@@ -33,6 +33,18 @@ export function useSetVwoApproval() {
     });
 }
 
+export function useSubmitVwoTlApproval() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }: { id: number; data: { tlStatus: 1 | 2; tlComment?: string } }) =>
+            vendorWorkOrderApi.submitTlApproval(id, data),
+        onSuccess: (_data, variables) => {
+            queryClient.invalidateQueries({ queryKey: vwoKeys.all });
+            queryClient.invalidateQueries({ queryKey: ["vendor-work-orders", variables.id] });
+        },
+    });
+}
+
 export function useVendorWorkOrderDetails(id: number) {
     return useQuery({
         queryKey: ["vendor-work-orders", id],

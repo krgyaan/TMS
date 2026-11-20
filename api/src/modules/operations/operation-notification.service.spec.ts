@@ -467,4 +467,67 @@ describe("OperationNotificationService PO POVWO Group & TL Decision notification
         expect(text).toContain("PO Rejected by Team Leader");
         expect(text).toContain("Price mismatch with quotation");
     });
+
+    it("notifyVwoCreated routes only to GROUPS.POVWO with direct TMS VWO URL", async () => {
+        await service.notifyVwoCreated({
+            vendorWorkOrderId: 99,
+            woNumber: "VE/Solar_Plant/2627/WO0099",
+            projectName: "Solar Plant",
+            sellerName: "Acme Contractors",
+            grandTotal: 250000,
+            createdBy: 1,
+            teamId: 1,
+        });
+
+        expect(sendText).toHaveBeenCalledTimes(1);
+        const [group, text] = sendText.mock.calls[0];
+        expect(group).toBe(GROUPS.POVWO);
+        expect(text).toContain("VE/Solar_Plant/2627/WO0099");
+        expect(text).toContain("Solar Plant");
+        expect(text).toContain("Acme Contractors");
+        expect(text).toContain("/operations/vendor-work-orders/99");
+    });
+
+    it("notifyVwoTlDecision (Approve & Reject) notifies only GROUPS.POVWO", async () => {
+        await service.notifyVwoTlDecision({
+            vendorWorkOrderId: 99,
+            woNumber: "VE/Solar_Plant/2627/WO0099",
+            projectName: "Solar Plant",
+            sellerName: "Acme Contractors",
+            grandTotal: 250000,
+            actedBy: 2,
+            createdBy: 1,
+            teamId: 1,
+            tlStatus: 1,
+            tlComment: "Scope verified",
+        });
+
+        expect(sendText).toHaveBeenCalledTimes(1);
+        const [group1, text1] = sendText.mock.calls[0];
+        expect(group1).toBe(GROUPS.POVWO);
+        expect(text1).toContain("WO Approved by TL");
+        expect(text1).toContain("Scope verified");
+        expect(text1).toContain("/operations/vendor-work-orders/99");
+
+        sendText.mockClear();
+
+        await service.notifyVwoTlDecision({
+            vendorWorkOrderId: 99,
+            woNumber: "VE/Solar_Plant/2627/WO0099",
+            projectName: "Solar Plant",
+            sellerName: "Acme Contractors",
+            grandTotal: 250000,
+            actedBy: 2,
+            createdBy: 1,
+            teamId: 1,
+            tlStatus: 2,
+            tlComment: "Incorrect BOQ items",
+        });
+
+        expect(sendText).toHaveBeenCalledTimes(1);
+        const [group2, text2] = sendText.mock.calls[0];
+        expect(group2).toBe(GROUPS.POVWO);
+        expect(text2).toContain("WO Rejected by Team Leader");
+        expect(text2).toContain("Incorrect BOQ items");
+    });
 });
