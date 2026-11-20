@@ -445,7 +445,7 @@ export function BiBankGuaranteeRequestForm({ projectId }: BiBankGuaranteeRequest
                                         <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgCourierAddrLine1`} label="Address Line 1 *">
                                             {(field) => <Input {...field} placeholder="Building, Street" />}
                                         </FieldWrapper>
-                                        <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgCourierAddrLine2`} label="Address Line 2 *">
+                                        <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgCourierAddrLine2`} label="Address Line 2">
                                             {(field) => <Input {...field} placeholder="Area, Locality" />}
                                         </FieldWrapper>
                                         <FieldWrapper control={form.control} name={`${BG_PREFIX}.bgCourierCity`} label="City *">

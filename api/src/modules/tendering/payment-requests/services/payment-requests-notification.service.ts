@@ -293,7 +293,7 @@ export class PaymentRequestsNotificationService {
             }
         }
 
-        return instrument?.courierAddress?.trim() || 'Not specified';
+        return instrument?.courierAddress?.trim() || '';
     };
 
     private resolveBgReference = async (
@@ -368,7 +368,7 @@ export class PaymentRequestsNotificationService {
     private resolveBgCoveringLetterCp = async (
         email: string | null | undefined,
     ): Promise<{ name: string; designation: string }> => {
-        const fallback = { name: 'C&P', designation: '' };
+        const fallback = { name: '', designation: '' };
         const normalized = email?.trim().toLowerCase();
         if (!normalized) {
             return fallback;
