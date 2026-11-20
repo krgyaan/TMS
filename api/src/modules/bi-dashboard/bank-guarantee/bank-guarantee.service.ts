@@ -2171,8 +2171,8 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 amountRequired: paymentRequests.amountRequired,
                 requestStatus: paymentRequests.status,
                 requestRemarks: paymentRequests.remarks,
-                requestCreatedAt: paymentRequests.createdAt,
-                requestUpdatedAt: paymentRequests.updatedAt,
+                requestCreatedAt: sql<string | null>`to_char(${paymentRequests.createdAt}, 'YYYY-MM-DD"T"HH24:MI:SS')`,
+                requestUpdatedAt: sql<string | null>`to_char(${paymentRequests.updatedAt}, 'YYYY-MM-DD"T"HH24:MI:SS')`,
 
                 // BG Details - all fields
                 bgDetailsId: instrumentBgDetails.id,
@@ -2312,7 +2312,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 requestType: paymentRequests.type,
                 requestDueDate: paymentRequests.dueDate,
                 requestedByName: users.name,
-                requestCreatedAt: paymentRequests.createdAt,
+                requestCreatedAt: sql<string | null>`to_char(${paymentRequests.createdAt}, 'YYYY-MM-DD"T"HH24:MI:SS')`,
                 tenderDueDate: tenderInfos.dueDate,
                 tenderStatusName: statuses.name,
                 bgNo: instrumentBgDetails.bgNo,
@@ -2495,7 +2495,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             requestedByName: result.requestedByName,
             tenderDueDate: result.tenderDueDate ? new Date(result.tenderDueDate) : null,
             tenderStatusName: result.tenderStatusName,
-            requestCreatedAt: result.requestCreatedAt ? result.requestCreatedAt.toISOString() : null,
+            requestCreatedAt: result.requestCreatedAt ?? null,
             amount: result.amount ? Number(result.amount) : null,
             favouring: result.favouring,
             payableAt: result.payableAt,

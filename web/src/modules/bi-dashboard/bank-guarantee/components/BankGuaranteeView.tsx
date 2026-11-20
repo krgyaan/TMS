@@ -23,6 +23,20 @@ const parseFilePaths = (file?: string | string[] | null): string[] => {
     return [file];
 };
 
+const formatDbDateTime = (value?: string | Date | null): string => {
+    if (!value) return '—';
+    if (value instanceof Date) return formatDateTime(value);
+    const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+    if (!match || /(?:Z|[+-]\d{2}:?\d{2})$/.test(String(value).trim())) {
+        return formatDateTime(value);
+    }
+    const [, year, month, day, hours, minutes] = match;
+    const hour24 = Number(hours);
+    const period = hour24 >= 12 ? 'pm' : 'am';
+    const hour12 = String(hour24 % 12 || 12).padStart(2, '0');
+    return `${day}-${month}-${year} ${hour12}:${minutes} ${period}`;
+};
+
 const FileLink = ({ file }: { file?: string | string[] | null }) => {
     const paths = parseFilePaths(file);
     if (paths.length === 0) return <span className="text-muted-foreground">Not Uploaded</span>;
@@ -251,7 +265,7 @@ export function BankGuaranteeView({
                             />
                             <DataRow
                                 label1="Requested Date"
-                                value1={data.requestCreatedAt ? formatDateTime(data.requestCreatedAt) : '—'}
+                                value1={formatDbDateTime(data.requestCreatedAt)}
                             />
 
                             <DataRow
