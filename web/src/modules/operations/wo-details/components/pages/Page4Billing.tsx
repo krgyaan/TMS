@@ -9,13 +9,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { MapPin, Package, Plus, Receipt, Trash2, Truck } from "lucide-react";
 import { useCallback, useEffect, useMemo } from "react";
-import { useFieldArray, useForm, type Resolver } from "react-hook-form";
+import { useFieldArray, useForm, useWatch, type Resolver } from "react-hook-form";
 
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { useAutoSave } from "@/hooks/api/useWoDetails";
 import { WizardNavigation } from "@/modules/operations/wo-details/components/WizardNavigation";
-import { WIZARD_CONFIG, YES_NO_OPTIONS } from "@/modules/operations/wo-details/helpers/constants";
+import { WIZARD_CONFIG, GST_OPTIONS, YES_NO_OPTIONS } from "@/modules/operations/wo-details/helpers/constants";
 import { Page4FormSchema } from "@/modules/operations/wo-details/helpers/woDetail.schema";
 import { formToApi } from "../../helpers/woDetail.mapper";
 
@@ -31,6 +31,7 @@ const defaultBoqItem: BOQItem = {
     itemDescription: "",
     quantity: 0,
     rate: 0,
+    gstRate: 0,
 };
 
 const defaultAddress: Address = {
@@ -40,10 +41,41 @@ const defaultAddress: Address = {
     gst: "",
 };
 
-const calculateAmount = (quantity: number | undefined, r = 0): number => {
-    const q = quantity ?? 0;
-    return Number((q * r).toFixed(2));
+interface BoqTotals {
+    basic: number;
+    gst: number;
+    total: number;
+}
+
+const roundCurrency = (value: number): number => Number(value.toFixed(2));
+
+const calculateBasicAmount = (quantity: number | undefined, rate = 0): number =>
+    roundCurrency((quantity ?? 0) * (rate ?? 0));
+
+const calculateGstAmount = (basicAmount: number, gstRate = 0): number =>
+    roundCurrency((basicAmount * (gstRate ?? 0)) / 100);
+
+const calculateRowTotals = (quantity: number | undefined, rate = 0, gstRate = 0): BoqTotals => {
+    const basic = calculateBasicAmount(quantity, rate);
+    const gst = calculateGstAmount(basic, gstRate);
+    return { basic, gst, total: roundCurrency(basic + gst) };
 };
+
+const calculateBoqTotals = (items: BOQItem[] | undefined): BoqTotals =>
+    (items ?? []).reduce<BoqTotals>(
+        (acc, item) => {
+            const row = calculateRowTotals(item.quantity, item.rate, item.gstRate);
+            return {
+                basic: roundCurrency(acc.basic + row.basic),
+                gst: roundCurrency(acc.gst + row.gst),
+                total: roundCurrency(acc.total + row.total),
+            };
+        },
+        { basic: 0, gst: 0, total: 0 }
+    );
+
+const formatAmount = (value: number): string =>
+    `₹${value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export function Page4Billing({ woDetailId, initialData, onSaveDraft, onSaveDraftOnly, onSkip, onBack, isSaving }: Page4BillingProps) {
     const form = useForm<Page4FormValues>({
@@ -83,17 +115,13 @@ export function Page4Billing({ woDetailId, initialData, onSaveDraft, onSaveDraft
 
     const { autoSave, isSaving: isAutoSaving } = useAutoSave(woDetailId, 4, true, 4000, formToApi.page4);
 
-    const watchBillingBoq = form.watch("billingBoq");
-    const watchBuybackBoq = form.watch("buybackBoq");
-    const watchBuybackBoqApplicable = form.watch("buybackBoqApplicable");
+    const watchBillingBoq = useWatch({ control: form.control, name: "billingBoq" });
+    const watchBuybackBoq = useWatch({ control: form.control, name: "buybackBoq" });
+    const watchBuybackBoqApplicable = useWatch({ control: form.control, name: "buybackBoqApplicable" });
 
-    const billingTotal = useMemo(() => {
-        return watchBillingBoq.reduce((sum, item) => sum + calculateAmount(item.quantity, item.rate), 0);
-    }, [watchBillingBoq]);
+    const billingTotals = useMemo(() => calculateBoqTotals(watchBillingBoq), [watchBillingBoq]);
 
-    const buybackTotal = useMemo(() => {
-        return (watchBuybackBoq || []).reduce((sum, item) => sum + calculateAmount(item.quantity, item.rate), 0);
-    }, [watchBuybackBoq]);
+    const buybackTotals = useMemo(() => calculateBoqTotals(watchBuybackBoq), [watchBuybackBoq]);
 
     useEffect(() => {
         const subscription = form.watch((values) => {
@@ -137,7 +165,7 @@ export function Page4Billing({ woDetailId, initialData, onSaveDraft, onSaveDraft
         namePrefix: "billingBoq" | "buybackBoq",
         onRemove: (index: number) => void,
         onAdd: () => void,
-        total: number,
+        totals: BoqTotals,
         title: string,
         minRows: number = 0
     ) => (
@@ -147,22 +175,27 @@ export function Page4Billing({ woDetailId, initialData, onSaveDraft, onSaveDraft
                 {title}
             </h3>
             <div className="border rounded-lg overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm min-w-[1040px]">
                     <thead className="bg-muted">
                         <tr>
-                            <th className="p-3 text-left w-20">Sr. No.</th>
-                            <th className="p-3 text-left">Item Description</th>
-                            <th className="p-3 text-left w-32">Quantity</th>
-                            <th className="p-3 text-left w-32">Rate</th>
-                            <th className="p-3 text-left w-32">Amount</th>
-                            <th className="p-3 text-left w-16"></th>
+                            <th className="p-3 text-left w-16">Sr. No.</th>
+                            <th className="p-3 text-left min-w-[200px]">Item Description</th>
+                            <th className="p-3 text-left w-24">Qty</th>
+                            <th className="p-3 text-left w-28">Rate</th>
+                            <th className="p-3 text-left w-40">Basic Amount</th>
+                            <th className="p-3 text-left w-28">GST %age</th>
+                            <th className="p-3 text-left w-36">GST Amount</th>
+                            <th className="p-3 text-left w-36">Total Amount</th>
+                            <th className="p-3 text-left w-12"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">
                         {fields.map((field, index) => {
-                            const quantity = form.watch(`${namePrefix}.${index}.quantity`);
-                            const rate = form.watch(`${namePrefix}.${index}.rate`);
-                            const amount = calculateAmount(quantity, rate);
+                            const watchedItems = namePrefix === "billingBoq" ? watchBillingBoq : watchBuybackBoq;
+                            const quantity = watchedItems?.[index]?.quantity;
+                            const rate = watchedItems?.[index]?.rate;
+                            const gstRate = watchedItems?.[index]?.gstRate;
+                            const rowTotals = calculateRowTotals(quantity, rate, gstRate);
 
                             return (
                                 <tr key={field.id}>
@@ -178,16 +211,32 @@ export function Page4Billing({ woDetailId, initialData, onSaveDraft, onSaveDraft
                                     </td>
                                     <td className="p-2">
                                         <FieldWrapper control={form.control} name={`${namePrefix}.${index}.quantity`} label="">
-                                            {(field) => <NumberInput className="h-8 text-xs" {...field} />}
+                                            {(field) => <NumberInput min={0} step={0.01} className="h-8 text-xs text-right" {...field} />}
                                         </FieldWrapper>
                                     </td>
                                     <td className="p-2">
                                         <FieldWrapper control={form.control} name={`${namePrefix}.${index}.rate`} label="">
-                                            {(field) => <NumberInput className="h-8 text-xs" {...field} />}
+                                            {(field) => <NumberInput min={0} step={0.01} className="h-8 text-xs text-right" {...field} />}
                                         </FieldWrapper>
                                     </td>
                                     <td className="p-2">
-                                        <span className="text-sm font-medium">₹{amount.toLocaleString()}</span>
+                                        <span className="text-sm font-medium tabular-nums">{formatAmount(rowTotals.basic)}</span>
+                                    </td>
+                                    <td className="p-2">
+                                        <SelectField
+                                            control={form.control}
+                                            name={`${namePrefix}.${index}.gstRate`}
+                                            label=""
+                                            options={GST_OPTIONS}
+                                            placeholder="GST"
+                                            valueType="number"
+                                        />
+                                    </td>
+                                    <td className="p-2">
+                                        <span className="text-sm font-medium tabular-nums text-blue-600">{formatAmount(rowTotals.gst)}</span>
+                                    </td>
+                                    <td className="p-2">
+                                        <span className="text-sm font-semibold tabular-nums">{formatAmount(rowTotals.total)}</span>
                                     </td>
                                     <td className="p-2">
                                         <Button
@@ -206,7 +255,7 @@ export function Page4Billing({ woDetailId, initialData, onSaveDraft, onSaveDraft
                         })}
                         {fields.length === 0 && (
                             <tr>
-                                <td colSpan={6} className="p-4 text-center text-muted-foreground">
+                                <td colSpan={9} className="p-4 text-center text-muted-foreground">
                                     No items. Add one using the button below.
                                 </td>
                             </tr>
@@ -216,7 +265,10 @@ export function Page4Billing({ woDetailId, initialData, onSaveDraft, onSaveDraft
                         <tfoot className="bg-muted/50">
                             <tr>
                                 <td colSpan={4} className="p-3 text-right font-semibold">Total:</td>
-                                <td className="p-3 font-bold">₹{total.toLocaleString()}</td>
+                                <td className="p-3 font-semibold tabular-nums">{formatAmount(totals.basic)}</td>
+                                <td></td>
+                                <td className="p-3 font-semibold tabular-nums text-blue-600">{formatAmount(totals.gst)}</td>
+                                <td className="p-3 font-bold tabular-nums">{formatAmount(totals.total)}</td>
                                 <td></td>
                             </tr>
                         </tfoot>
@@ -336,7 +388,7 @@ export function Page4Billing({ woDetailId, initialData, onSaveDraft, onSaveDraft
                             "billingBoq",
                             removeBillingBoq,
                             () => appendBillingBoq({ ...defaultBoqItem, srNo: billingBoqFields.length + 1 }),
-                            billingTotal,
+                            billingTotals,
                             "Billing BOQ",
                             1
                         )}
@@ -364,7 +416,7 @@ export function Page4Billing({ woDetailId, initialData, onSaveDraft, onSaveDraft
                                     "buybackBoq",
                                     removeBuybackBoq,
                                     () => appendBuybackBoq({ ...defaultBoqItem, srNo: buybackBoqFields.length + 1 }),
-                                    buybackTotal,
+                                    buybackTotals,
                                     "Buyback BOQ Items",
                                     0
                                 )

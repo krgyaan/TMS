@@ -18,6 +18,8 @@ export const paymentPurposeEnum = pgEnum('payment_purpose', [
     'Counter Guarantee', // BG purpose (BI dashboard BG form)
     'DD',
     'FDR',
+    'Bank Guarantee',    // Project dashboard FDR purpose
+    'Other Security',    // Project dashboard FDR purpose
 ]);
 
 export const instrumentTypeEnum = pgEnum('instrument_type', [
@@ -196,6 +198,11 @@ export const instrumentFdrDetails = pgTable('instrument_fdr_details', {
     fdrExpiryDate: date('fdr_expiry_date'), // emd_fdrs.fdr_expiry
     fdrNeeds: varchar('fdr_needs', { length: 255 }), // emd_fdrs.fdr_needs
     fdrRemark: text('fdr_remark'), // emd_fdrs.fdr_remark
+    prefilledSignedFdr: text('prefilled_signed_fdr'), // JSON string of uploaded file paths
+    uploadDocuments: text('upload_documents'), // Upload Documents path
+    fdrCopy: text('fdr_copy'), // Accounts Form (FDR) 2 - FDR copy (JSON array of paths)
+    bankMailIds: jsonb('bank_mail_ids').$type<string[]>(),
+    bankMailIdsCc: jsonb('bank_mail_ids_cc').$type<string[]>(),
 
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),

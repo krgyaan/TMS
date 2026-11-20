@@ -54,6 +54,9 @@ export interface PoCreatedNotificationData {
   sellerName: string | null;
   grandTotal: string | number;
   projectName: string | null;
+  tenderNo?: string | null;
+  tenderName?: string | null;
+  teamId?: number | null;
   createdBy: number;
   teamId?: number | null;
 }
@@ -69,6 +72,19 @@ export interface PoTlDecisionNotificationData {
   actedBy: number;
   createdBy?: number | null;
   teamId?: number | null;
+}
+
+export interface PoTlDecisionNotificationData {
+  purchaseOrderId: number;
+  poNumber: string;
+  sellerName: string | null;
+  grandTotal: string | number;
+  projectName: string | null;
+  tlStatus: 1 | 2;
+  tlComment: string | null;
+  actedBy: number;
+  createdBy: number | null;
+  teamId: number | null;
 }
 
 export interface PoApprovalNotificationData {
@@ -89,8 +105,12 @@ export interface PoRejectedNotificationData {
 }
 
 export interface PoUpdatedNotificationData {
+  purchaseOrderId?: number;
   poNumber: string;
   sellerName: string | null;
+  projectName?: string | null;
+  grandTotal?: string | number;
+  teamId?: number | null;
   updatedBy: number;
 }
 
@@ -519,8 +539,14 @@ export class OperationNotificationService {
     }
   }
 
-  private get publicAppUrl(): string {
-    return (process.env.PUBLIC_APP_URL || process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');
+  private buildDirectPoAppUrl(purchaseOrderId?: number | null): string | null {
+    if (!purchaseOrderId) return null;
+    const baseUrl = (
+      process.env.PUBLIC_APP_URL ||
+      process.env.FRONTEND_URL ||
+      'http://localhost:5173'
+    ).replace(/\/+$/, '');
+    return `${baseUrl}/operations/purchase-orders/${purchaseOrderId}`;
   }
 
   async notifyPoCreated(data: PoCreatedNotificationData): Promise<void> {
@@ -536,23 +562,33 @@ export class OperationNotificationService {
         .limit(1);
 
       const userName = user?.name ?? 'Unknown';
-      const effectiveTeamId = data.teamId ?? user?.primaryTeamId ?? user?.team ?? null;
+      const poUrl = this.buildDirectPoAppUrl(data.purchaseOrderId);
+      const tenderOrProject =
+        [data.tenderNo, data.tenderName].filter(Boolean).join(' - ') ||
+        data.projectName ||
+        'N/A';
+
       const lines: string[] = [
-        `*New PO Raised*`,
+        `*New PO Raised — TL Approval Required*`,
         `PO No: ${data.poNumber}`,
-        ...(data.projectName ? [`Project: ${data.projectName}`] : []),
-        `Amount: ₹${data.grandTotal}`,
-        `Party: ${data.sellerName || 'N/A'}`,
-        `Raised by: ${userName}`,
+        `Tender / Project: ${tenderOrProject}`,
+        `Vendor: ${data.sellerName || 'N/A'}`,
+        `Grand Total: ₹${data.grandTotal}`,
+        `Raised By: ${userName}`,
       ];
       if (data.purchaseOrderId) {
         lines.push(`Review & Approve: ${this.publicAppUrl}/operations/purchase-orders/${data.purchaseOrderId}`);
       }
       lines.push(`Kindly approve ASAP.`);
 
+      if (poUrl) {
+        lines.push(`Review & Approve in TMS: ${poUrl}`);
+      } else {
+        lines.push(`Kindly review and approve in TMS.`);
+      }
+
       const text = lines.join('\n');
-      const targetGroup = resolveTeamPoGroup(effectiveTeamId);
-      await this.sendToTargets(text, { type: 'group', group: targetGroup });
+      await this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO });
     } catch (err) {
       this.logger.warn(`Failed to send PO created notification: ${err}`);
     }
@@ -566,47 +602,43 @@ export class OperationNotificationService {
         .where(eq(users.id, data.actedBy))
         .limit(1);
 
-      let effectiveTeamId = data.teamId ?? null;
-      if (effectiveTeamId == null && data.createdBy) {
-        const [creator] = await this.db
-          .select({ primaryTeamId: users.primaryTeamId, team: users.team })
-          .from(users)
-          .where(eq(users.id, data.createdBy))
-          .limit(1);
-        effectiveTeamId = creator?.primaryTeamId ?? creator?.team ?? null;
-      }
-
       const actorName = actor?.name ?? 'Team Leader';
-      const directUrl = `${this.publicAppUrl}/operations/purchase-orders/${data.purchaseOrderId}`;
+      const poUrl = this.buildDirectPoAppUrl(data.purchaseOrderId);
 
-      if (data.decision === 'approved') {
+      if (data.tlStatus === 1) {
         const lines: string[] = [
-          `*PO Approved by TL* @${actorName}`,
+          `*PO Approved by TL — Pending Accounts Approval*`,
           `PO No: ${data.poNumber}`,
-          ...(data.projectName ? [`Project: ${data.projectName}`] : []),
-          `Amount: ₹${data.grandTotal}`,
-          `Party: ${data.sellerName || 'N/A'}`,
-          ...(data.tlComment ? [`TL Comment: ${data.tlComment}`] : []),
-          `View PO: ${directUrl}`,
-          `Pending Accounts TDS approval.`,
+          `Project: ${data.projectName || 'N/A'}`,
+          `Vendor: ${data.sellerName || 'N/A'}`,
+          `Grand Total: ₹${data.grandTotal}`,
+          `TL Approved By: ${actorName}`,
         ];
-        await this.sendToTargets(lines.join('\n'), { type: 'group', group: GROUPS.PAYMENTS });
+        if (data.tlComment) {
+          lines.push(`TL Comment: ${data.tlComment}`);
+        }
+        if (poUrl) {
+          lines.push(`View in TMS: ${poUrl}`);
+        }
+
+        const text = lines.join('\n');
+        await this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO });
       } else {
         const lines: string[] = [
-          `*PO Rejected by TL* @${actorName}`,
+          `*PO Rejected by Team Leader*`,
           `PO No: ${data.poNumber}`,
-          ...(data.projectName ? [`Project: ${data.projectName}`] : []),
-          `Amount: ₹${data.grandTotal}`,
-          `Party: ${data.sellerName || 'N/A'}`,
+          `Project: ${data.projectName || 'N/A'}`,
+          `Vendor: ${data.sellerName || 'N/A'}`,
+          `Grand Total: ₹${data.grandTotal}`,
+          `Rejected By: ${actorName}`,
           `Reason: ${data.tlComment || 'N/A'}`,
-          `View PO: ${directUrl}`,
         ];
-        const text = lines.join('\n');
-        const teamGroup = resolveTeamPoGroup(effectiveTeamId);
-        await this.sendToTargets(text, { type: 'group', group: teamGroup });
-        if (data.createdBy) {
-          await this.sendToTargets(text, { type: 'users', userIds: [data.createdBy] });
+        if (poUrl) {
+          lines.push(`View in TMS: ${poUrl}`);
         }
+
+        const text = lines.join('\n');
+        await this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO });
       }
     } catch (err) {
       this.logger.warn(`Failed to send PO TL decision notification: ${err}`);
@@ -646,14 +678,25 @@ export class OperationNotificationService {
         .limit(1);
 
       const userName = user?.name ?? 'Unknown';
+      const poUrl = this.buildDirectPoAppUrl(data.purchaseOrderId);
+
       const lines: string[] = [
-        `*PO Updated* @${userName}`,
+        `*PO Updated — TL Approval Required* @${userName}`,
         `PO No: ${data.poNumber}`,
-        `Party: ${data.sellerName || 'N/A'}`,
+        `Vendor: ${data.sellerName || 'N/A'}`,
       ];
+      if (data.projectName) {
+        lines.push(`Project: ${data.projectName}`);
+      }
+      if (data.grandTotal != null) {
+        lines.push(`Grand Total: ₹${data.grandTotal}`);
+      }
+      if (poUrl) {
+        lines.push(`Review & Approve in TMS: ${poUrl}`);
+      }
 
       const text = lines.join('\n');
-      await this.sendToTargets(text, { type: 'group', group: GROUPS.PAYMENTS });
+      await this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO });
     } catch (err) {
       this.logger.warn(`Failed to send PO updated notification: ${err}`);
     }

@@ -73,7 +73,11 @@ export const mapResponseToForm = (data: WoBasicDetail): WoBasicDetailFormValues 
     projectCode: data.projectCode || "",
     projectName: data.projectName || "",
     woDraft: parseFileArray(data.woDraft),
-    requestGemCharges: data.gemChargesAmount != null && Number(data.gemChargesAmount) > 0 ? "true" : "false",
+    requestGemCharges:
+      (data.gemChargesAmount != null && Number(data.gemChargesAmount) > 0) ||
+      (data.budgetGemCharges != null && Number(data.budgetGemCharges) > 0)
+        ? "true"
+        : "false",
     gemChargesAmount: data.gemChargesAmount != null ? Number(data.gemChargesAmount) : undefined,
     gemChargesPortalLink: data.gemChargesPortalLink || "",
     gemChargesInvoice: parseFileArray(data.gemChargesInvoice),
@@ -116,9 +120,13 @@ export const mapFormToCreatePayload = (values: WoBasicDetailFormValues): CreateW
   if (values.budgetAdmin !== undefined && values.budgetAdmin > 0) payload.budgetAdmin = String(values.budgetAdmin);
   if (values.budgetBuybackSale !== undefined && values.budgetBuybackSale > 0) payload.budgetBuybackSale = String(values.budgetBuybackSale);
   if (values.budgetGemCharges !== undefined && values.budgetGemCharges > 0) payload.budgetGemCharges = String(values.budgetGemCharges);
-  if (values.gemChargesAmount !== undefined && values.gemChargesAmount > 0) payload.gemChargesAmount = values.gemChargesAmount;
-  if (values.gemChargesPortalLink !== undefined && values.gemChargesPortalLink.trim()) payload.gemChargesPortalLink = values.gemChargesPortalLink;
-  if (values.gemChargesInvoice !== undefined && values.gemChargesInvoice.length > 0) payload.gemChargesInvoice = JSON.stringify(values.gemChargesInvoice);
+  if (values.requestGemCharges === "true") {
+    payload.gemChargesAmount = values.gemChargesAmount ?? 0;
+    if (values.gemChargesPortalLink?.trim()) payload.gemChargesPortalLink = values.gemChargesPortalLink;
+    if (values.gemChargesInvoice?.length) payload.gemChargesInvoice = JSON.stringify(values.gemChargesInvoice);
+  } else {
+    payload.gemChargesAmount = 0;
+  }
   if (values.woDraft && values.woDraft.length > 0) payload.woDraft = JSON.stringify(values.woDraft);
 
   return payload;

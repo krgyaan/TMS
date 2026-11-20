@@ -43,6 +43,9 @@ export interface BOQItem {
   quantity?: number;
   rate?: number;
   amount?: number;
+  gstRate?: number;
+  gstAmount?: number;
+  totalAmount?: number;
   sortOrder?: number;
 }
 

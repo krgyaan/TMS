@@ -177,152 +177,131 @@
         <table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:9px;line-height:1.3;">
             <colgroup>
                 <col style="width:2%">
-                <col style="width:27%">
-                <col style="width:6%">
+                <col style="width:24%">
+                <col style="width:5%">
                 <col style="width:5%">
                 <col style="width:7%">
                 <col style="width:3%">
                 <col style="width:3%">
-                {{#if is_interstate}}
+                <col style="width:5%">
                 <col style="width:17%">
-                <col style="width:7%">
-                <col style="width:12%">
+                <col style="width:6%">
                 <col style="width:11%">
-                {{else}}
-                <col style="width:10%">
-                <col style="width:4%">
-                <col style="width:8%">
-                <col style="width:4%">
-                <col style="width:8%">
-                <col style="width:13%">
-                {{/if}}
+                <col style="width:12%">
             </colgroup>
             <tr>
                 <th rowspan="2" style="border:1px solid #222;padding:3px;">Sl.<br>No.</th>
                 <th rowspan="2" style="border:1px solid #222;padding:3px;">Description of Goods</th>
                 <th rowspan="2" style="border:1px solid #222;padding:3px;">HSN/SAC</th>
-                <th rowspan="2" style="border:1px solid #222;padding:3px;">Quantity</th>
+                <th rowspan="2" style="border:1px solid #222;padding:3px;">Qty</th>
                 <th rowspan="2" style="border:1px solid #222;padding:3px;">Rate</th>
                 <th rowspan="2" style="border:1px solid #222;padding:3px;">Per</th>
-                <th rowspan="2" style="border:1px solid #222;padding:3px;">Disc. %</th>
-                <th rowspan="2" style="border:1px solid #222;padding:3px;">Taxable Value</th>{{#if is_interstate}}<th
-                    colspan="2" style="border:1px solid #222;padding:3px;">IGST</th>{{else}}<th colspan="2"
-                    style="border:1px solid #222;padding:3px;">CGST</th>
-                <th colspan="2" style="border:1px solid #222;padding:3px;">SGST</th>{{/if}}<th rowspan="2"
-                    style="border:1px solid #222;padding:3px;">Total Amount</th>
+                <th colspan="2" style="border:1px solid #222;padding:3px;">Discount</th>
+                <th rowspan="2" style="border:1px solid #222;padding:3px;">Taxable Value</th>
+                <th colspan="2" style="border:1px solid #222;padding:3px;">GST</th>
+                <th rowspan="2" style="border:1px solid #222;padding:3px;">Total Amount</th>
             </tr>
             <tr>
-                {{#if is_interstate}}
-                <th style="border:1px solid #222;padding:3px;">Rate</th>
-                <th style="border:1px solid #222;padding:3px;">Amount</th>
-                {{else}}
                 <th style="border:1px solid #222;padding:3px;">Rate</th>
                 <th style="border:1px solid #222;padding:3px;">Amount</th>
                 <th style="border:1px solid #222;padding:3px;">Rate</th>
                 <th style="border:1px solid #222;padding:3px;">Amount</th>
-                {{/if}}
             </tr>
             {{#each items}}
             <tr style="height:24mm;vertical-align:top;">
                 <td style="border:1px solid #222;padding:3px;">{{inc @index}}</td>
                 <td style="border:1px solid #222;padding:3px;">
                     {{#if this.boq_item_name}}
-                    <b>{{this.boq_item_name}}</b><br>
-                    {{this.po_item_description}}
+                    <b>{{this.boq_item_name}}</b>
+                    {{#if this.po_item_descriptions}}
+                    {{#each this.po_item_descriptions}}<br>{{this}}{{/each}}
+                    {{else}}
+                    <br>{{this.po_item_description}}
+                    {{/if}}
                     {{else}}
                     <b>{{this.po_item_description}}</b>
                     {{/if}}
                 </td>
                 <td style="border:1px solid #222;padding:3px;">{{this.hsn_sac}}</td>
-                <td style="border:1px solid #222;padding:3px;text-align:right;"><b>{{this.quantity}}</b></td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;"><b>{{this.boq_quantity}}</b></td>
                 <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency this.rate}}</td>
                 <td style="border:1px solid #222;padding:3px;text-align:center;">{{this.unit}}</td>
                 <td style="border:1px solid #222;padding:3px;text-align:center;">{{this.discount_percent}}%</td>
+                <td style="border:1px solid #222;padding:3px;text-align:center;">{{formatCurrency this.discount_amount}}</td>
                 <td style="border:1px solid #222;padding:3px;text-align:right;">
                     <b>{{formatCurrency this.taxable_value}}</b>
                 </td>
-                {{#if ../is_interstate}}
-                <td style="border:1px solid #222;padding:3px;text-align:center;">{{this.igst_rate}}%</td>
-                <td style="border:1px solid #222;padding:3px;text-align:right;"><b>{{formatCurrency this.igst_amount}}</b></td>
-                {{else}}
-                <td style="border:1px solid #222;padding:3px;text-align:center;">{{this.cgst_rate}}%</td>
-                <td style="border:1px solid #222;padding:3px;text-align:right;">
-                    <b>{{formatCurrency this.cgst_amount}}</b>
+                <td style="border:1px solid #222;padding:3px;text-align:center;">
+                    {{#if ../is_interstate}}
+                    IGST@{{this.igst_rate}}%
+                    {{else}}
+                    CGST@{{this.cgst_rate}}%<br>SGST@{{this.sgst_rate}}%
+                    {{/if}}
                 </td>
-                <td style="border:1px solid #222;padding:3px;text-align:center;">{{this.sgst_rate}}%</td>
-                <td style="border:1px solid #222;padding:3px;text-align:right;"><b>{{formatCurrency this.sgst_amount}}</b></td>
-                {{/if}}
+                <td style="border:1px solid #222;padding:3px;text-align:right;">
+                    {{#if ../is_interstate}}
+                    <b>{{formatCurrency this.igst_amount}}</b>
+                    {{else}}
+                    <b>{{formatCurrency this.cgst_amount}}</b><br><b>{{formatCurrency this.sgst_amount}}</b>
+                    {{/if}}
+                </td>
                 <td style="border:1px solid #222;padding:3px;text-align:right;">
                     <b>{{formatCurrency this.total}}</b>
                 </td>
             </tr>
             {{/each}}
             <tr>
-                <td colspan="7" style="border:1px solid #222;padding:3px;text-align:right;"><b>Line Item Subtotal</b></td>
-                <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency line_item_subtotal}}</td>
-                {{#if is_interstate}}
-                <td style="border:1px solid #222;padding:3px;"></td>
-                <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency igst_amount}}</td>
-                {{else}}
-                <td style="border:1px solid #222;padding:3px;"></td>
-                <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency cgst_amount}}</td>
-                <td style="border:1px solid #222;padding:3px;"></td>
-                <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency sgst_amount}}</td>
-                {{/if}}
+                <td colspan="8" style="border:1px solid #222;padding:3px;text-align:right;"><b>Line Item Subtotal</b></td>
                 <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency taxable_value}}</td>
+                <td style="border:1px solid #222;padding:3px;"></td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;">
+                    {{#if is_interstate}}
+                    {{formatCurrency igst_amount}}
+                    {{else}}
+                    {{formatCurrency cgst_amount}}<br>{{formatCurrency sgst_amount}}
+                    {{/if}}
+                </td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency line_item_subtotal}}</td>
             </tr>
             {{#if freight}}
             <tr>
-                <td colspan="7" style="border:1px solid #222;padding:3px;text-align:right;">Freight</td>
+                <td colspan="8" style="border:1px solid #222;padding:3px;text-align:right;">Freight</td>
                 <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency freight}}</td>
-                {{#if is_interstate}}
                 <td colspan="2" style="border:1px solid #222;padding:3px;"></td>
-                {{else}}
-                <td colspan="4" style="border:1px solid #222;padding:3px;"></td>
-                {{/if}}
                 <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency freight}}</td>
             </tr>
             {{/if}}
             {{#if other_charges}}
             <tr>
-                <td colspan="7" style="border:1px solid #222;padding:3px;text-align:right;">Other Charges</td>
+                <td colspan="8" style="border:1px solid #222;padding:3px;text-align:right;">Other Charges</td>
                 <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency other_charges}}</td>
-                {{#if is_interstate}}
                 <td colspan="2" style="border:1px solid #222;padding:3px;"></td>
-                {{else}}
-                <td colspan="4" style="border:1px solid #222;padding:3px;"></td>
-                {{/if}}
                 <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency other_charges}}</td>
             </tr>
             {{/if}}
             {{#if round_off}}
             <tr>
-                <td colspan="7" style="border:1px solid #222;padding:3px;text-align:right;">Round Off</td>
+                <td colspan="8" style="border:1px solid #222;padding:3px;text-align:right;">Round Off</td>
                 <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency round_off}}</td>
-                {{#if is_interstate}}
                 <td colspan="2" style="border:1px solid #222;padding:3px;"></td>
-                {{else}}
-                <td colspan="4" style="border:1px solid #222;padding:3px;"></td>
-                {{/if}}
                 <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency round_off}}</td>
             </tr>
             {{/if}}
             <tr>
-                <td colspan="7" style="border:1px solid #222;padding:3px;text-align:right;"><b>Grand Total</b></td>
+                <td colspan="8" style="border:1px solid #222;padding:3px;text-align:right;"><b>Grand Total</b></td>
                 <td style="border:1px solid #222;padding:3px;text-align:right;"><b>{{formatCurrency taxable_value}}</b></td>
-                {{#if is_interstate}}
                 <td style="border:1px solid #222;padding:3px;"></td>
-                <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency igst_amount}}</td>
-                {{else}}
-                <td style="border:1px solid #222;padding:3px;"></td>
-                <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency cgst_amount}}</td>
-                <td style="border:1px solid #222;padding:3px;"></td>
-                <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency sgst_amount}}</td>
-                {{/if}}
+                <td style="border:1px solid #222;padding:3px;text-align:right;">
+                    {{#if is_interstate}}
+                    <b>{{formatCurrency igst_amount}}</b>
+                    {{else}}
+                    <b>{{formatCurrency cgst_amount}}</b><br><b>{{formatCurrency sgst_amount}}</b>
+                    {{/if}}
+                </td>
                 <td style="border:1px solid #222;padding:3px;text-align:right;"><b>{{formatCurrency grand_total}}</b></td>
             </tr>
             <tr>
-                <td colspan="{{#if is_interstate}}10{{else}}11{{/if}}" style="border:1px solid #222;padding:3px;">
+                <td colspan="11" style="border:1px solid #222;padding:3px;">
                     Amount Chargeable (in words): <b>{{amount_in_words}}</b>
                 </td>
                 <td style="border:1px solid #222;padding:3px;text-align:right;">E &amp; O.E.</td>
@@ -330,25 +309,28 @@
         </table>
         <table style="width:100%;border-collapse:collapse;table-layout:fixed;margin-top:4mm;font-size:9px;">
             <colgroup>
-                <col style="width:16.5%">
-                <col style="width:16.5%">
-                <col style="width:16.5%">
-                <col style="width:16.5%">
-                <col style="width:16.5%">
-                <col style="width:16.5%">
+                <col style="width:18%">
+                <col style="width:16%">
+                <col style="width:10%">
+                <col style="width:14%">
+                <col style="width:14%">
+                <col style="width:14%">
+                <col style="width:14%">
             </colgroup>
             <tr>
-                <th style="border:1px solid #222;padding:3px;">GST Rate</th>
+                <th style="border:1px solid #222;padding:3px;">HSN/SAC</th>
                 <th style="border:1px solid #222;padding:3px;">Taxable Value</th>
+                <th style="border:1px solid #222;padding:3px;">GST Rate</th>
                 <th style="border:1px solid #222;padding:3px;">IGST</th>
                 <th style="border:1px solid #222;padding:3px;">CGST</th>
                 <th style="border:1px solid #222;padding:3px;">SGST</th>
                 <th style="border:1px solid #222;padding:3px;">Total Tax</th>
             </tr>
-            {{#each tax_breakdown}}
+            {{#each hsn_summary}}
             <tr>
-                <td style="border:1px solid #222;padding:3px;text-align:right;">{{rate}}%</td>
+                <td style="border:1px solid #222;padding:3px;">{{hsn_sac}}</td>
                 <td style="border:1px solid #222;padding:3px;text-align:right;">{{formatCurrency taxable_value}}</td>
+                <td style="border:1px solid #222;padding:3px;text-align:right;">{{rate}}%</td>
                 <td style="border:1px solid #222;padding:3px;text-align:right;">{{#if ../is_interstate}}{{formatCurrency igst_amount}}{{/if}}</td>
                 <td style="border:1px solid #222;padding:3px;text-align:right;">{{#unless ../is_interstate}}{{formatCurrency cgst_amount}}{{/unless}}</td>
                 <td style="border:1px solid #222;padding:3px;text-align:right;">{{#unless ../is_interstate}}{{formatCurrency sgst_amount}}{{/unless}}</td>
@@ -356,7 +338,7 @@
             </tr>
             {{/each}}
             <tr>
-                <td colspan="5" style="border:1px solid #222;padding:3px;text-align:right;"><b>Total Tax</b></td>
+                <td colspan="6" style="border:1px solid #222;padding:3px;text-align:right;"><b>Total Tax</b></td>
                 <td style="border:1px solid #222;padding:3px;text-align:right;"><b>{{formatCurrency total_tax_amount}}</b></td>
             </tr>
         </table>

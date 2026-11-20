@@ -10,12 +10,23 @@ const BaseActionFormSchema = z.object({
     action: z.string().min(1, 'Action is required'),
 });
 
+const MailRowSchema = z.object({
+    email: z.string().optional(),
+});
+
 export const FdrActionFormSchema = BaseActionFormSchema.extend({
     fdr_req: z.enum(['Accepted', 'Rejected']).optional(),
     reason_req: z.string().optional(),
     fdr_no: z.string().optional(),
     fdr_date: z.string().optional(),
     remarks_fdr: z.string().optional(),
+    prefilled_signed_fdr: z.array(z.any()).optional(),
+    upload_documents: z.string().optional(),
+    fdr_validity: z.string().optional(),
+    fdr_roi: z.coerce.number().optional(),
+    fdr_copy: z.array(z.string()).optional(),
+    bank_mail_ids: z.array(MailRowSchema).optional(),
+    bank_mail_ids_cc: z.array(MailRowSchema).optional(),
 
     courierOrg: z.string().optional(),
     courierName: z.string().optional(),
@@ -64,19 +75,17 @@ export const FdrActionFormSchema = BaseActionFormSchema.extend({
         }
         return true;
     },
-    { message: 'Reason for rejection is required', path: ['reason_req'] }
+    { message: 'Reason for Rejection/Changes required is required', path: ['reason_req'] }
 ).refine(
     (data) => {
-        if (data.action === 'accounts-form' && data.fdr_req === 'Accepted') {
-            return !!data.fdr_date && !!data.fdr_no &&
-                !!data.courierOrg && !!data.courierName && !!data.courierPhone &&
-                !!data.courierAddrLine1 && !!data.courierPincode &&
-                /^\d{6}$/.test(data.courierPincode || '') &&
-                !!data.empFrom && !!data.delDate && !!data.urgency;
+        if (data.action === 'accounts-form-2') {
+            return !!data.fdr_no && !!data.fdr_date && !!data.fdr_validity &&
+                data.fdr_roi !== undefined && !Number.isNaN(data.fdr_roi) &&
+                Array.isArray(data.fdr_copy) && data.fdr_copy.length > 0;
         }
         return true;
     },
-    { message: 'FDR date, FDR number, and courier dispatch details are required when accepted', path: ['fdr_date'] }
+    { message: 'FDR No., FDR Date, FDR Validity, FDR ROI and FDR copy are required', path: ['fdr_no'] }
 ).refine(
     (data) => {
         if (data.action === 'initiate-followup') {

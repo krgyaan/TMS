@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, ParseIntPipe, Put, Query, Req } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, ParseIntPipe, Post, Put, Query, Req } from '@nestjs/common';
 import { BankGuaranteeService } from './bank-guarantee.service';
 
 @Controller('bank-guarantees')
@@ -53,6 +53,26 @@ export class BankGuaranteeController {
     @Get('instruments/:id/followup')
     async getFollowupData(@Param('id', ParseIntPipe) id: number) {
         return this.bankGuaranteeService.getFollowupData(id);
+    }
+
+    @Post('instruments/:id/mail-preview')
+    async getMailPreview(@Param('id', ParseIntPipe) id: number, @Body() body: any) {
+        return this.bankGuaranteeService.getMailPreview(id, body);
+    }
+
+    @Post('old-bg')
+    async createOldBg(@Body() body: any, @Req() req: any) {
+        return this.bankGuaranteeService.createOldBg(body, req.user);
+    }
+
+    @Get('old-bg/:requestId')
+    async getOldBgForEdit(@Param('requestId', ParseIntPipe) requestId: number) {
+        return this.bankGuaranteeService.getOldBgForEdit(requestId);
+    }
+
+    @Put('old-bg/:requestId')
+    async updateOldBg(@Param('requestId', ParseIntPipe) requestId: number, @Body() body: any) {
+        return this.bankGuaranteeService.updateOldBg(requestId, body);
     }
 
     @Put(':id')

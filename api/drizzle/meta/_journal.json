@@ -818,7 +818,14 @@
       "idx": 140,
       "version": "7",
       "when": 1804000000000,
-      "tag": "0184_add_tl_status_and_comment_to_purchase_orders",
+      "tag": "0187_add_discount_to_sale_invoice_items",
+      "breakpoints": true
+    },
+    {
+      "idx": 141,
+      "version": "7",
+      "when": 1805000000000,
+      "tag": "0188_add_tl_status_and_comment_to_purchase_orders",
       "breakpoints": true
     }
   ]

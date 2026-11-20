@@ -63,7 +63,7 @@ const EMPTY_CONTACT_DRAFT = { name: '', designation: '', email: '', phone: '' };
 type ContactDraft = typeof EMPTY_CONTACT_DRAFT;
 
 /** The tender or project this request is being raised against. */
-type BgContext =
+export type BgContext =
     | { kind: 'tender'; id: number; tenderName: string; tenderNo: string; dueDate: string }
     | { kind: 'project'; id: number };
 
@@ -86,7 +86,7 @@ const formatDateForLabel = (value: string | null | undefined): string => {
  * Combined tender + project picker. Kept separate so the tender/project
  * lists are only fetched on this standalone page.
  */
-function TenderProjectSelector({
+export function TenderProjectSelector({
     value,
     onSelect,
     onClear,

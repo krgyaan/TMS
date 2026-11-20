@@ -585,6 +585,9 @@ export interface WoBillingBoq {
   quantity: string;
   rate: string;
   amount: string | null;
+  gstRate: string | null;
+  gstAmount: string | null;
+  totalAmount: string | null;
   sortOrder: number | null;
   createdAt: string;
   updatedAt: string;
@@ -596,6 +599,7 @@ export interface CreateWoBillingBoqDto {
   itemDescription: string;
   quantity: string;
   rate: string;
+  gstRate?: string;
   sortOrder?: number;
 }
 
@@ -604,6 +608,7 @@ export interface UpdateWoBillingBoqDto {
   itemDescription?: string;
   quantity?: string;
   rate?: string;
+  gstRate?: string;
   sortOrder?: number;
 }
 
@@ -620,6 +625,9 @@ export interface WoBuybackBoq {
   quantity: string;
   rate: string;
   amount: string | null;
+  gstRate: string | null;
+  gstAmount: string | null;
+  totalAmount: string | null;
   sortOrder: number | null;
   createdAt: string;
   updatedAt: string;
@@ -631,6 +639,7 @@ export interface CreateWoBuybackBoqDto {
   itemDescription: string;
   quantity: string;
   rate: string;
+  gstRate?: string;
   sortOrder?: number;
 }
 
@@ -639,6 +648,7 @@ export interface UpdateWoBuybackBoqDto {
   itemDescription?: string;
   quantity?: string;
   rate?: string;
+  gstRate?: string;
   sortOrder?: number;
 }
 

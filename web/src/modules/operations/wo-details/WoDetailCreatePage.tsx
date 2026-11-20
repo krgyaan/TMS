@@ -47,12 +47,10 @@ const WoDetailCreatePage = () => {
     }
 
     return (
-        <div className="flex flex-col gap-4">
-            <WoDetailsWizard
-                mode="create"
-                woBasicDetailId={Number(woBasicDetailId)}
-            />
-        </div>
+        <WoDetailsWizard
+            mode="create"
+            woBasicDetailId={Number(woBasicDetailId)}
+        />
     );
 };
 

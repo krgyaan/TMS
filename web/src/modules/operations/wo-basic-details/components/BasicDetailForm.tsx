@@ -18,7 +18,7 @@ import { formatINR } from "@/hooks/useINRFormatter";
 import type { CreateWoBasicDetailDto } from "@/modules/operations/types/wo.types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Calculator, Check, Plus, Save, Trash2, TrendingUp } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm, type Resolver, type SubmitHandler } from "react-hook-form";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -127,6 +127,41 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
     const watchOrganizationId = form.watch("organizationId");
     const watchItemId = form.watch("itemId");
     const watchLocationId = form.watch("locationId");
+    const watchBudgetGemCharges = form.watch("budgetGemCharges");
+    const previousBudgetGemCharges = useRef<number | null>(null);
+
+    useEffect(() => {
+        const budget = Number(watchBudgetGemCharges) || 0;
+        const previous = previousBudgetGemCharges.current;
+        previousBudgetGemCharges.current = budget;
+
+        if (budget > 0) {
+            if (form.getValues("requestGemCharges") !== "true") {
+                form.setValue("requestGemCharges", "true", {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                });
+            }
+
+            if (Number(form.getValues("gemChargesAmount") || 0) <= 0) {
+                form.setValue("gemChargesAmount", budget, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                });
+            }
+            return;
+        }
+
+        if (previous !== null && previous > 0) {
+            form.setValue("requestGemCharges", "false", {
+                shouldDirty: true,
+                shouldValidate: true,
+            });
+            form.setValue("gemChargesAmount", undefined, { shouldDirty: true });
+            form.setValue("gemChargesPortalLink", "", { shouldDirty: true });
+            form.setValue("gemChargesInvoice", [], { shouldDirty: true });
+        }
+    }, [watchBudgetGemCharges, form]);
 
     const { projectCode: derivedCode, projectName: derivedName } = useMemo(() => {
         if (!isNonTender) {
@@ -679,7 +714,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                 <FieldWrapper control={form.control} name="budgetBuybackSale" label="Buyback Sale (pre GST)">
                                     {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
                                 </FieldWrapper>
-                                <FieldWrapper control={form.control} name="budgetGemCharges" label="GEM Charges (pre GST)">
+                                <FieldWrapper control={form.control} name="budgetGemCharges" label="GeM Charges (pre GST)">
                                     {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
                                 </FieldWrapper>
                             </div>
@@ -693,11 +728,11 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                 <SelectField
                                     control={form.control}
                                     name="requestGemCharges"
-                                    label="Request Gem Charges Payment"
+                                    label="Request GeM Charges Payment"
                                     options={YES_NO_OPTIONS}
                                     placeholder=""
                                 />
-                                {/* Gem Charges Payment Request Section */}
+                                {/* GeM Charges Payment Request Section */}
                                 <ConditionalSection show={watchPaymentConsent === "true"} className="col-span-3">
                                     <div className="space-y-3">
                                         <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 items-start">
@@ -707,7 +742,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                             <FieldWrapper control={form.control} name="gemChargesPortalLink" label="Portal Link">
                                                 {field => <Input {...field} placeholder="Enter portal payment link..." value={field.value || ""} />}
                                             </FieldWrapper>
-                                            <FieldWrapper control={form.control} name="gemChargesInvoice" label="Invoice">
+                                            <FieldWrapper control={form.control} name="gemChargesInvoice" label="Invoice" className="col-span-2">
                                                 {field => (
                                                     <FileUploader
                                                         context="wo-draft"
@@ -717,22 +752,22 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                                 )}
                                             </FieldWrapper>
                                         </div>
-                                        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 p-4 bg-muted/30 rounded-lg border">
+                                        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 p-4 rounded-lg border">
                                             <div className="space-y-1">
                                                 <p className="text-sm text-muted-foreground">GST @ {GEM_GST_RATE}%</p>
-                                                <p className="font-semibold">{formatINR(gemChargesBreakdown.gstAmount)}</p>
+                                                <p>{formatINR(gemChargesBreakdown.gstAmount)}</p>
                                             </div>
                                             <div className="space-y-1">
                                                 <p className="text-sm text-muted-foreground">Total Payable</p>
-                                                <p className="font-semibold">{formatINR(gemChargesBreakdown.totalPayable)}</p>
+                                                <p>{formatINR(gemChargesBreakdown.totalPayable)}</p>
                                             </div>
                                             <div className="space-y-1">
-                                                <p className="text-sm text-muted-foreground">TDS @ {GEM_TDS_RATE}% (pre-GST)</p>
-                                                <p className="font-semibold text-destructive">-{formatINR(gemChargesBreakdown.tdsAmount)}</p>
+                                                <p className="text-sm text-muted-foreground">TDS @ {GEM_TDS_RATE}%</p>
+                                                <p className="text-destructive">-{formatINR(gemChargesBreakdown.tdsAmount)}</p>
                                             </div>
                                             <div className="space-y-1">
                                                 <p className="text-sm text-muted-foreground">Net Payable</p>
-                                                <p className="font-bold text-emerald-600">{formatINR(gemChargesBreakdown.netPayable)}</p>
+                                                <p className="text-emerald-600">{formatINR(gemChargesBreakdown.netPayable)}</p>
                                             </div>
                                         </div>
                                         <p className="text-xs text-muted-foreground">

@@ -8,7 +8,7 @@ import { BusinessPerformanceService } from "./business-performance.service";
 import { businessPerformanceQuerySchema } from "./zod/business-performance.dto";
 
 @Controller("performance/business")
-// @UseGuards(JwtAuthGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
 export class BusinessPerformanceController {
     constructor(private readonly service: BusinessPerformanceService) {}
 
@@ -17,7 +17,7 @@ export class BusinessPerformanceController {
      * Replaces: ItemHeading::where('status', '1')->get() in the controller
      */
     @Get("headings")
-    @CanRead("performance.business")
+    @CanRead("performance.business-dashboard")
     getItemHeadings() {
         return this.service.getItemHeadings();
     }
@@ -27,7 +27,7 @@ export class BusinessPerformanceController {
      * Replaces: POST /performance/business in Laravel
      */
     @Get()
-    @CanRead("performance.business")
+    @CanRead("performance.business-dashboard")
     getBusinessPerformance(@Query() query: Record<string, string>) {
         const parsed = businessPerformanceQuerySchema.safeParse({
             heading: query.heading,

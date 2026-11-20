@@ -243,12 +243,12 @@ export class PurchaseOrderController {
 
     @Patch(":id/tl-approval")
     @HttpCode(HttpStatus.OK)
-    tlApprovePurchaseOrder(
+    submitTlApproval(
         @Param("id", ParseIntPipe) id: number,
         @Body() body: { tlStatus: number; tlComment?: string },
         @CurrentUser() user: ValidatedUser
     ) {
-        return this.service.tlApprovePurchaseOrder(id, body, user);
+        return this.service.submitTlApproval(id, body, user);
     }
 
     @Post(":id/close")
@@ -264,3 +264,4 @@ export class PurchaseOrderController {
         return this.service.updatePurchaseOrder(id, body, user.id);
     }
 }
+

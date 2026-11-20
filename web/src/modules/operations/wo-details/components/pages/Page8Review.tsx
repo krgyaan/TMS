@@ -1,7 +1,6 @@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useWoDetailWithRelations } from "@/hooks/api/useWoDetails";
 import { fileUploadService } from "@/services/api/file-upload.service";
 import { AlertCircle, ArrowLeft, Calculator, FileCheck, FileEdit, Loader2, MapPinned, Package, Send, ShieldCheck, SkipForward, TrendingUp, Users } from "lucide-react";
@@ -98,7 +97,7 @@ function SummaryRow({ label, value }: { label: string; value: string | undefined
     );
 }
 
-function SectionCard({
+function ReviewSection({
     pageNum,
     isSkipped,
     filled,
@@ -113,40 +112,40 @@ function SectionCard({
 }) {
     const allFilled = filled >= total;
     return (
-        <Card className={isSkipped ? "opacity-60" : ""}>
-            <CardHeader className="py-3">
-                <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                        <span className="text-muted-foreground">{PAGE_ICONS[pageNum]}</span>
-                        {PAGE_TITLES[pageNum]}
-                    </CardTitle>
-                    {isSkipped ? (
-                        <Badge variant="outline" className="gap-1 text-yellow-700 border-yellow-300 bg-yellow-50">
-                            <SkipForward className="h-3 w-3" />
-                            Skipped
-                        </Badge>
-                    ) : (
-                        <Badge
-                            variant="outline"
-                            className={
-                                allFilled
-                                    ? "gap-1 text-green-700 border-green-300 bg-green-50"
-                                    : "gap-1 text-muted-foreground"
-                            }
-                        >
-                            {filled}/{total} fields
-                        </Badge>
-                    )}
-                </div>
-            </CardHeader>
-            <CardContent className="p-4">
+        <section
+            className={`space-y-3 py-5 first:pt-0 last:pb-0 ${isSkipped ? "opacity-60" : ""}`}
+        >
+            <header className="flex items-center justify-between gap-3">
+                <h3 className="flex items-center gap-2 text-sm font-semibold">
+                    <span className="text-muted-foreground">{PAGE_ICONS[pageNum]}</span>
+                    {PAGE_TITLES[pageNum]}
+                </h3>
+                {isSkipped ? (
+                    <Badge variant="outline" className="gap-1 text-yellow-700 border-yellow-300 bg-yellow-50">
+                        <SkipForward className="h-3 w-3" />
+                        Skipped
+                    </Badge>
+                ) : (
+                    <Badge
+                        variant="outline"
+                        className={
+                            allFilled
+                                ? "gap-1 text-green-700 border-green-300 bg-green-50"
+                                : "gap-1 text-muted-foreground"
+                        }
+                    >
+                        {filled}/{total} fields
+                    </Badge>
+                )}
+            </header>
+            <div>
                 {isSkipped ? (
                     <p className="text-sm text-muted-foreground italic">This page was skipped.</p>
                 ) : (
                     children
                 )}
-            </CardContent>
-        </Card>
+            </div>
+        </section>
     );
 }
 
@@ -175,11 +174,9 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
 
     if (isLoading || !detail) {
         return (
-            <Card>
-                <CardContent className="p-12 flex items-center justify-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </CardContent>
-            </Card>
+            <div className="flex items-center justify-center rounded-xl border p-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
         );
     }
 
@@ -236,8 +233,9 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
                 </Alert>
             )}
 
-            {/* Page 1: Contacts & Checklist */}
-            <SectionCard pageNum={1} {...pageStatus(1)}>
+            <div className="divide-y divide-border/60">
+                {/* Page 1: Contacts & Checklist */}
+                <ReviewSection pageNum={1} {...pageStatus(1)}>
                 {detail.contacts && detail.contacts.length > 0 ? (
                     <div className="space-y-2">
                         {detail.contacts.map((c: WoContact, i: number) => (
@@ -259,10 +257,10 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
                         Tender Checklist: {detail.tenderDocumentsChecklist ? "Submitted" : "Not filled"}
                     </p>
                 </div>
-            </SectionCard>
+            </ReviewSection>
 
             {/* Page 2: Compliance */}
-            <SectionCard pageNum={2} {...pageStatus(2)}>
+            <ReviewSection pageNum={2} {...pageStatus(2)}>
                 <SummaryRow label="LD Applicable" value={detail.ldApplicable ? "Yes" : "No"} />
                 {detail.ldApplicable && (
                     <>
@@ -302,10 +300,10 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
                     </div>
                 )}
                 <SummaryRow label="Detailed PO" value={detail.detailedPoApplicable ? "Yes" : "No"} />
-            </SectionCard>
+            </ReviewSection>
 
             {/* Page 3: SWOT */}
-            <SectionCard pageNum={3} {...pageStatus(3)}>
+            <ReviewSection pageNum={3} {...pageStatus(3)}>
                 {detail.swotStrengths || detail.swotWeaknesses || detail.swotOpportunities || detail.swotThreats ? (
                     <div className="grid grid-cols-2 gap-4">
                         {detail.swotStrengths && (
@@ -336,10 +334,10 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
                 ) : (
                     <p className="text-sm text-muted-foreground">No SWOT analysis provided</p>
                 )}
-            </SectionCard>
+            </ReviewSection>
 
             {/* Page 4: Billing */}
-            <SectionCard pageNum={4} {...pageStatus(4)}>
+            <ReviewSection pageNum={4} {...pageStatus(4)}>
                 <p className="text-sm font-medium mb-2">Billing BOQ ({detail.billingBoq?.length || 0} items)</p>
                 {detail.billingBoq && detail.billingBoq.length > 0 ? (
                     <div className="border rounded text-sm mb-3">
@@ -371,10 +369,10 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
                         )) : <p className="text-sm text-muted-foreground">None</p>}
                     </div>
                 </div>
-            </SectionCard>
+            </ReviewSection>
 
             {/* Page 5: Execution */}
-            <SectionCard pageNum={5} {...pageStatus(5)}>
+            <ReviewSection pageNum={5} {...pageStatus(5)}>
                 <SummaryRow label="Site Visit Required" value={detail.siteVisitNeeded ? "Yes" : "No"} />
                 {detail.siteVisitPerson?.name && (
                     <>
@@ -386,19 +384,19 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
                 <SummaryRow label="Documents from Tendering" value={`${detail.documentsFromTendering?.length || 0} docs`} />
                 <SummaryRow label="Additional Documents" value={`${detail.documentsNeeded?.length || 0} docs`} />
                 <SummaryRow label="In-House Documents" value={`${detail.documentsInHouse?.length || 0} docs`} />
-            </SectionCard>
+            </ReviewSection>
 
             {/* Page 6: Profitability */}
-            <SectionCard pageNum={6} {...pageStatus(6)}>
+            <ReviewSection pageNum={6} {...pageStatus(6)}>
                 {detail.costingSheetLink && (
                     <SummaryRow label="Costing Sheet" value={detail.costingSheetLink} />
                 )}
                 <SummaryRow label="Discrepancies Found" value={detail.hasDiscrepancies ? "Yes" : "No"} />
                 {detail.hasDiscrepancies && <SummaryRow label="Comments" value={detail.discrepancyComments} />}
-            </SectionCard>
+            </ReviewSection>
 
             {/* Page 7: Acceptance */}
-            <SectionCard pageNum={7} {...pageStatus(7)}>
+            <ReviewSection pageNum={7} {...pageStatus(7)}>
                 <SummaryRow label="Amendment Needed" value={detail.oeWoAmendmentNeeded === true ? "Yes" : detail.oeWoAmendmentNeeded === false ? "No" : "Not set"} />
                 {detail.oeWoAmendmentNeeded === false && (
                     <>
@@ -406,7 +404,8 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
                         <SummaryRow label="Courier Prepared" value={detail.courierRequestPrepared ? "Yes" : "No"} />
                     </>
                 )}
-            </SectionCard>
+            </ReviewSection>
+            </div>
 
             <div className="flex justify-between pt-4 border-t">
                 <Button variant="outline" onClick={onBack}>

@@ -1,0 +1,674 @@
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm, FormProvider, useWatch, type Resolver } from 'react-hook-form';
+import { useNavigate } from 'react-router-dom';
+import { useMemo, useState, useEffect } from 'react';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import DateInput from '@/components/form/DateInput';
+import FieldWrapper from '@/components/form/FieldWrapper';
+import { NumberInput } from '@/components/form/NumberInput';
+import { SelectField } from '@/components/form/SelectField';
+import { FileUploader } from '@/components/file-upload';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { BANKS } from '@/modules/tendering/emds-tenderfees/constants';
+import { useTenders } from '@/hooks/api/useTenders';
+import { useProjectList } from '@/hooks/api/useProjectDashboard';
+import { useCourierSelectOptions } from '@/hooks/api/useCourier';
+import {
+    useCreateBankGuaranteeOldBg,
+    useOldBgForEdit,
+    useUpdateBankGuaranteeOldBg,
+} from '@/hooks/api/useBankGuarantees';
+import { paths } from '@/app/routes/paths';
+import { toast } from 'sonner';
+import { ArrowLeft, Check, ChevronDown, Loader2, Save } from 'lucide-react';
+import {
+    BankGuaranteeOldEntrySchema,
+    type BankGuaranteeOldEntryFormValues,
+} from '../helpers/bankGuaranteeOldEntry.schema';
+
+type FormValues = BankGuaranteeOldEntryFormValues;
+
+const OLD_BG_PURPOSE_OPTIONS = [
+    { value: 'EMD', label: 'EMD' },
+    { value: 'ADVANCE_PAYMENT', label: 'Advance Payment' },
+    { value: 'SECURITY_BOND_DEPOSIT', label: 'Security Bond/Deposit' },
+    { value: 'PERFORMANCE_BG', label: 'Performance BG' },
+    { value: 'FINANCIAL', label: 'Financial' },
+    { value: 'COUNTER_GUARANTEE', label: 'Counter Guarantee' },
+];
+
+function CourierSelector({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+    const { options, onSearch } = useCourierSelectOptions(value);
+    const [open, setOpen] = useState(false);
+    const [query, setQuery] = useState('');
+
+    const selected = options.find((option) => option.id === value);
+
+    return (
+        <DropdownMenu
+            open={open}
+            onOpenChange={(next) => {
+                setOpen(next);
+                if (!next) {
+                    setQuery('');
+                    onSearch('');
+                }
+            }}
+        >
+            <DropdownMenuTrigger asChild>
+                <Button type="button" variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between min-w-0">
+                    <span className="truncate">{selected ? selected.name : 'Select Courier (optional)'}</span>
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-96 max-w-[90vw] p-0" align="start">
+                <div className="p-2 border-b">
+                    <Input
+                        autoFocus
+                        placeholder="Search courier..."
+                        value={query}
+                        onChange={(event) => {
+                            setQuery(event.target.value);
+                            onSearch(event.target.value);
+                        }}
+                        onKeyDown={(event) => event.stopPropagation()}
+                        className="h-8"
+                    />
+                </div>
+                <div className="max-h-64 overflow-auto py-1">
+                    {options.length === 0 && (
+                        <div className="px-2 py-2 text-sm text-muted-foreground">No couriers found</div>
+                    )}
+                    {options.map((option) => (
+                        <DropdownMenuItem
+                            key={option.id}
+                            onClick={() => {
+                                onChange(option.id === value ? '' : option.id);
+                                setOpen(false);
+                                setQuery('');
+                                onSearch('');
+                            }}
+                            className="flex items-center gap-2"
+                        >
+                            <Check className={`mr-1 h-4 w-4 shrink-0 ${option.id === value ? 'opacity-100' : 'opacity-0'}`} />
+                            <span className="flex-1 min-w-0 truncate">{option.name}</span>
+                        </DropdownMenuItem>
+                    ))}
+                </div>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
+type ReferenceOption = {
+    key: string;
+    kind: 'tender' | 'project';
+    id: number;
+    name: string;
+    number: string;
+    description: string;
+};
+
+const toDateOnly = (value: unknown): string => {
+    if (!value) return '';
+    const match = /^(\d{4}-\d{2}-\d{2})/.exec(String(value));
+    return match ? match[1] : '';
+};
+
+const toNumberOrUndefined = (value: unknown): number | undefined => {
+    if (value === null || value === undefined || value === '') return undefined;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+export function BankGuaranteeOldEntryForm({
+    mode = 'create',
+    requestId,
+}: {
+    mode?: 'create' | 'edit';
+    requestId?: number;
+}) {
+    const navigate = useNavigate();
+    const createOldBg = useCreateBankGuaranteeOldBg();
+    const updateOldBg = useUpdateBankGuaranteeOldBg();
+    const isEditMode = mode === 'edit';
+
+    const { data: existing, isLoading: isLoadingExisting, error: existingError } = useOldBgForEdit(
+        isEditMode ? requestId ?? null : null,
+    );
+
+    const [referenceName, setReferenceName] = useState('');
+    const [referenceNo, setReferenceNo] = useState('');
+    const [linkedReference, setLinkedReference] = useState<ReferenceOption | null>(null);
+    const [referenceOpen, setReferenceOpen] = useState(false);
+
+    const { data: tenderList } = useTenders(undefined, undefined, { page: 1, limit: 200 });
+    const { data: projectList } = useProjectList({ page: 1, limit: 200 });
+
+    const referenceOptions = useMemo<ReferenceOption[]>(() => {
+        const options: ReferenceOption[] = [];
+
+        for (const tender of tenderList?.data ?? []) {
+            options.push({
+                key: `tender:${tender.id}`,
+                kind: 'tender',
+                id: tender.id,
+                name: tender.tenderName || tender.tenderNo || `Tender #${tender.id}`,
+                number: tender.tenderNo ?? '',
+                description: `Tender · ${tender.tenderNo}`,
+            });
+        }
+
+        for (const project of projectList?.data ?? []) {
+            options.push({
+                key: `project:${project.id}`,
+                kind: 'project',
+                id: project.id,
+                name: project.projectName || project.poNo || `Project #${project.id}`,
+                number: project.poNo ?? '',
+                description: `Project${project.poNo ? ` · WO ${project.poNo}` : ''}`,
+            });
+        }
+
+        return options;
+    }, [tenderList, projectList]);
+
+    const referenceQuery = referenceName.trim().toLowerCase();
+    const referenceMatches = useMemo(() => {
+        if (!referenceQuery) return [];
+        return referenceOptions
+            .filter(
+                (option) =>
+                    option.name.toLowerCase().includes(referenceQuery) ||
+                    option.number.toLowerCase().includes(referenceQuery),
+            )
+            .slice(0, 8);
+    }, [referenceOptions, referenceQuery]);
+
+    const form = useForm<FormValues>({
+        resolver: zodResolver(BankGuaranteeOldEntrySchema) as Resolver<FormValues>,
+        defaultValues: {
+            purpose: '',
+            bgFavour: '',
+            bgAddress: '',
+            bgExpiryDate: '',
+            bgClaimPeriod: '',
+            amount: undefined as unknown as number,
+            stampValue: undefined,
+            bgPoFiles: [],
+            clientUserEmail: '',
+            clientCpEmail: '',
+            clientFinanceEmail: '',
+            accountName: '',
+            accountNo: '',
+            ifsc: '',
+            bankName: '',
+            bgNo: '',
+            bgDate: '',
+            remarks: '',
+            fdrPer: undefined,
+            fdrAmt: undefined,
+            fdrNo: '',
+            fdrValidity: '',
+            fdrRoi: undefined,
+            bgChargeDeducted: undefined,
+            sfmsChargeDeducted: undefined,
+            stampChargeDeducted: undefined,
+            otherChargeDeducted: undefined,
+            courierId: '',
+            bgUpload: [],
+            sfmsConf: [],
+            fdrCopy: [],
+        },
+    });
+
+    const bgPoFiles = useWatch({ control: form.control, name: 'bgPoFiles' });
+    const bgUpload = useWatch({ control: form.control, name: 'bgUpload' });
+    const sfmsConf = useWatch({ control: form.control, name: 'sfmsConf' });
+    const fdrCopy = useWatch({ control: form.control, name: 'fdrCopy' });
+    const courierId = useWatch({ control: form.control, name: 'courierId' });
+
+    useEffect(() => {
+        if (!isEditMode || !existing) return;
+
+        const storedName = existing.projectName === 'Accounts/Admin' ? '' : String(existing.projectName ?? '');
+        const storedNo = existing.tenderNo === 'NA' ? '' : String(existing.tenderNo ?? '');
+        const projectId = Number(existing.projectId) > 0 ? Number(existing.projectId) : 0;
+        const tenderId = Number(existing.tenderId) > 0 ? Number(existing.tenderId) : 0;
+
+        form.reset({
+            purpose: existing.purpose ?? '',
+            bgFavour: existing.bgFavour ?? '',
+            bgAddress: existing.bgAddress ?? '',
+            bgExpiryDate: toDateOnly(existing.bgExpiryDate),
+            bgClaimPeriod: toDateOnly(existing.bgClaimPeriod),
+            amount: toNumberOrUndefined(existing.amount) as number,
+            stampValue: toNumberOrUndefined(existing.stampValue),
+            bgPoFiles: existing.bgPoFiles ?? [],
+            clientUserEmail: existing.clientUserEmail ?? '',
+            clientCpEmail: existing.clientCpEmail ?? '',
+            clientFinanceEmail: existing.clientFinanceEmail ?? '',
+            accountName: existing.accountName ?? '',
+            accountNo: existing.accountNo ?? '',
+            ifsc: existing.ifsc ?? '',
+            bankName: existing.bankName ?? '',
+            bgNo: existing.bgNo ?? '',
+            bgDate: toDateOnly(existing.bgDate),
+            remarks: existing.remarks ?? '',
+            fdrPer: toNumberOrUndefined(existing.fdrPer),
+            fdrAmt: toNumberOrUndefined(existing.fdrAmt),
+            fdrNo: existing.fdrNo ?? '',
+            fdrValidity: toDateOnly(existing.fdrValidity),
+            fdrRoi: toNumberOrUndefined(existing.fdrRoi),
+            bgChargeDeducted: toNumberOrUndefined(existing.bgChargeDeducted),
+            sfmsChargeDeducted: toNumberOrUndefined(existing.sfmsChargeDeducted),
+            stampChargeDeducted: toNumberOrUndefined(existing.stampChargeDeducted),
+            otherChargeDeducted: toNumberOrUndefined(existing.otherChargeDeducted),
+            courierId: existing.courierId ? String(existing.courierId) : '',
+            bgUpload: existing.bgUpload ?? [],
+            sfmsConf: existing.sfmsConf ?? [],
+            fdrCopy: existing.fdrCopy ?? [],
+        });
+
+        setReferenceName(storedName);
+        setReferenceNo(storedNo);
+
+        if (projectId) {
+            setLinkedReference({
+                key: `project:${projectId}`,
+                kind: 'project',
+                id: projectId,
+                name: storedName,
+                number: storedNo,
+                description: '',
+            });
+        } else if (tenderId) {
+            setLinkedReference({
+                key: `tender:${tenderId}`,
+                kind: 'tender',
+                id: tenderId,
+                name: storedName,
+                number: storedNo,
+                description: '',
+            });
+        } else {
+            setLinkedReference(null);
+        }
+    }, [isEditMode, existing, form]);
+
+    const handleReferencePick = (option: ReferenceOption) => {
+        setReferenceName(option.name);
+        setReferenceNo(option.number);
+        setLinkedReference(option);
+        setReferenceOpen(false);
+        form.setValue('bgPoFiles', []);
+    };
+
+    const handleSubmit = async (values: FormValues) => {
+        const reference = linkedReference
+            ? {
+                tenderId: linkedReference.kind === 'tender' ? linkedReference.id : 0,
+                projectId: linkedReference.kind === 'project' ? linkedReference.id : undefined,
+                tenderNo: linkedReference.number,
+                projectName: linkedReference.name,
+            }
+            : {
+                tenderId: 0,
+                projectId: undefined,
+                tenderNo: referenceNo.trim(),
+                projectName: referenceName.trim(),
+            };
+
+        const payload = {
+            ...reference,
+            purpose: values.purpose,
+            bgFavour: values.bgFavour,
+            bgAddress: values.bgAddress,
+            bgExpiryDate: values.bgExpiryDate,
+            bgClaimPeriod: values.bgClaimPeriod,
+            amount: values.amount,
+            stampValue: values.stampValue,
+            bgPoFiles: values.bgPoFiles ?? [],
+            clientUserEmail: values.clientUserEmail,
+            clientCpEmail: values.clientCpEmail,
+            clientFinanceEmail: values.clientFinanceEmail,
+            accountName: values.accountName,
+            accountNo: values.accountNo,
+            ifsc: values.ifsc,
+            bankName: values.bankName,
+            bgNo: values.bgNo,
+            bgDate: values.bgDate,
+            remarks: values.remarks,
+            fdrPer: values.fdrPer,
+            fdrAmt: values.fdrAmt,
+            fdrNo: values.fdrNo,
+            fdrValidity: values.fdrValidity,
+            fdrRoi: values.fdrRoi,
+            bgChargeDeducted: values.bgChargeDeducted,
+            sfmsChargeDeducted: values.sfmsChargeDeducted,
+            stampChargeDeducted: values.stampChargeDeducted,
+            otherChargeDeducted: values.otherChargeDeducted,
+            courierId: values.courierId || undefined,
+            bgUpload: values.bgUpload ?? [],
+            sfmsConf: values.sfmsConf ?? [],
+            fdrCopy: values.fdrCopy ?? [],
+        };
+
+        try {
+            if (isEditMode && requestId) {
+                await updateOldBg.mutateAsync({ requestId, payload });
+                toast.success('Old Bank Guarantee updated successfully');
+            } else {
+                await createOldBg.mutateAsync(payload);
+                toast.success('Old Bank Guarantee saved successfully');
+            }
+            navigate(paths.bi.bankGuarantee);
+        } catch (error) {
+            console.error(error);
+            toast.error('Could not save the old Bank Guarantee. Please try again.');
+        }
+    };
+
+    const isPending = isEditMode ? updateOldBg.isPending : createOldBg.isPending;
+
+    if (isEditMode && isLoadingExisting) {
+        return (
+            <Card>
+                <CardContent className="flex min-h-[320px] flex-col items-center justify-center gap-4">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <p className="text-muted-foreground">Loading old Bank Guarantee...</p>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (isEditMode && existingError) {
+        return (
+            <Card>
+                <CardContent className="py-8 text-center text-destructive">
+                    {existingError instanceof Error
+                        ? existingError.message
+                        : 'Failed to load the old Bank Guarantee'}
+                </CardContent>
+            </Card>
+        );
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="text-2xl">
+                    {isEditMode ? 'Edit Old Bank Guarantee' : 'Add Old Bank Guarantee'}
+                </CardTitle>
+                <CardDescription>
+                    <p className="text-muted-foreground">
+                        {isEditMode
+                            ? 'Update the details recorded for this already-issued Bank Guarantee.'
+                            : 'Record an already-issued Bank Guarantee so it is tracked as a live BG.'}
+                    </p>
+                </CardDescription>
+                <CardAction>
+                    <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        <span className="hidden md:inline">Back</span>
+                    </Button>
+                </CardAction>
+            </CardHeader>
+
+            <CardContent>
+                <FormProvider {...form}>
+                    <form
+                        onSubmit={form.handleSubmit(handleSubmit, () => {
+                            toast.error('Please fix the errors in the form before submitting');
+                        })}
+                        className="space-y-8"
+                    >
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-semibold">Reference</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Tender / Project Name</label>
+                                    <div className="relative">
+                                        <Input
+                                            value={referenceName}
+                                            onChange={(event) => {
+                                                setReferenceName(event.target.value);
+                                                setLinkedReference(null);
+                                                setReferenceOpen(event.target.value.trim().length > 0);
+                                            }}
+                                            onFocus={() => {
+                                                if (!linkedReference) {
+                                                    setReferenceOpen(referenceName.trim().length > 0);
+                                                }
+                                            }}
+                                            onBlur={() => setReferenceOpen(false)}
+                                            placeholder="Search tender or project name"
+                                            autoComplete="off"
+                                        />
+                                        {referenceOpen && referenceMatches.length > 0 && (
+                                            <div className="absolute z-50 mt-1 max-h-64 w-full overflow-auto rounded-md border bg-popover p-1 shadow-md">
+                                                {referenceMatches.map((option) => (
+                                                    <button
+                                                        key={option.key}
+                                                        type="button"
+                                                        onMouseDown={(event) => {
+                                                            event.preventDefault();
+                                                            handleReferencePick(option);
+                                                        }}
+                                                        className="flex w-full flex-col items-start gap-0.5 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                                                    >
+                                                        <span className="w-full truncate">{option.name}</span>
+                                                        <span className="w-full truncate text-xs text-muted-foreground">
+                                                            {option.description}
+                                                        </span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Tender No. / PO No.</label>
+                                    <Input
+                                        value={referenceNo}
+                                        onChange={(event) => {
+                                            setReferenceNo(event.target.value);
+                                            setLinkedReference(null);
+                                        }}
+                                        placeholder="e.g. GEM/2026/B/7830385 or GEMC-511687785178741"
+                                        autoComplete="off"
+                                    />
+                                </div>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                Optional — type to search a tender or project, or enter the reference manually. Leave both
+                                blank to save under Accounts/Admin.
+                            </p>
+                        </div>
+
+                        <div className="border rounded-lg p-6 bg-muted/20 space-y-4">
+                            <h3 className="text-lg font-semibold">Bank Guarantee Details</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
+                                <SelectField
+                                    control={form.control}
+                                    name="purpose"
+                                    label="Purpose *"
+                                    options={OLD_BG_PURPOSE_OPTIONS}
+                                    placeholder="Select Purpose"
+                                />
+                                <FieldWrapper control={form.control} name="bgFavour" label="BG in Favour of *">
+                                    {(field) => <Input {...field} placeholder="e.g. Individual or Company Name" />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="bgAddress" label="BG Address *">
+                                    {(field) => <Textarea rows={2} {...field} placeholder="Client address to be written in the BG" />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="bgExpiryDate" label="BG Expiry Date *">
+                                    {(field) => <DateInput value={field.value || null} onChange={field.onChange} />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="bgClaimPeriod" label="BG Claim Period *">
+                                    {(field) => <DateInput value={field.value || null} onChange={field.onChange} />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="amount" label="BG Amount *">
+                                    {(field) => <NumberInput value={field.value} onChange={field.onChange} />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="stampValue" label="BG Stamp Paper Value *">
+                                    {(field) => <NumberInput value={field.value} onChange={field.onChange} />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="bgNo" label="BG No. *">
+                                    {(field) => <Input {...field} placeholder="Enter BG number" />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="bgDate" label="BG Creation Date *">
+                                    {(field) => <DateInput value={field.value || null} onChange={field.onChange} />}
+                                </FieldWrapper>
+                                <SelectField
+                                    control={form.control}
+                                    name="bankName"
+                                    label="Bank Name *"
+                                    options={BANKS}
+                                    placeholder="Select Bank"
+                                />
+                                <FieldWrapper control={form.control} name="remarks" label="Remarks">
+                                    {(field) => <Input {...field} placeholder="Any remark" />}
+                                </FieldWrapper>
+                                
+                            </div>
+
+                            <h3 className="text-lg font-semibold pt-2">Client &amp; Bank Details</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <FieldWrapper control={form.control} name="clientUserEmail" label="Client Mail Id (User)">
+                                    {(field) => <Input {...field} placeholder="user@client.com" />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="clientCpEmail" label="Client Mail Id (C&P)">
+                                    {(field) => <Input {...field} placeholder="cp@client.com" />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="clientFinanceEmail" label="Client Mail Id (Finance)">
+                                    {(field) => <Input {...field} placeholder="finance@client.com" />}
+                                </FieldWrapper>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <FieldWrapper control={form.control} name="accountName" label="Client Account Name">
+                                    {(field) => <Input {...field} placeholder="Account holder name" />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="accountNo" label="Client Account No.">
+                                    {(field) => <Input {...field} placeholder="Account number" />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="ifsc" label="IFSC">
+                                    {(field) => <Input {...field} placeholder="IFSC code" />}
+                                </FieldWrapper>
+                            </div>
+
+                            <h3 className="text-lg font-semibold pt-2">FDR Details</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <FieldWrapper control={form.control} name="fdrPer" label="FDR %age *">
+                                    {(field) => <NumberInput value={field.value} onChange={field.onChange} />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="fdrAmt" label="FDR Amount *">
+                                    {(field) => <NumberInput value={field.value} onChange={field.onChange} />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="fdrNo" label="FDR No. *">
+                                    {(field) => <Input {...field} placeholder="FDR number" />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="fdrValidity" label="FDR Validity *">
+                                    {(field) => <DateInput value={field.value || null} onChange={field.onChange} />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="fdrRoi" label="FDR ROI % *">
+                                    {(field) => <NumberInput value={field.value} onChange={field.onChange} />}
+                                </FieldWrapper>
+                            </div>
+
+                            <h3 className="text-lg font-semibold pt-2">Charges</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <FieldWrapper control={form.control} name="bgChargeDeducted" label="BG Charges Deducted">
+                                    {(field) => <NumberInput value={field.value} onChange={field.onChange} />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="sfmsChargeDeducted" label="SFMS Charges Deducted">
+                                    {(field) => <NumberInput value={field.value} onChange={field.onChange} />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="stampChargeDeducted" label="Stamp Paper Charges Deducted">
+                                    {(field) => <NumberInput value={field.value} onChange={field.onChange} />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="otherChargeDeducted" label="Other Charges Deducted">
+                                    {(field) => <NumberInput value={field.value} onChange={field.onChange} />}
+                                </FieldWrapper>
+                            </div>
+
+                            <h3 className="text-lg font-semibold pt-2">Courier &amp; Uploads</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Courier No. (optional)</label>
+                                    <CourierSelector
+                                        value={courierId ?? ''}
+                                        onChange={(value) => form.setValue('courierId', value)}
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {!linkedReference && (
+                                    <FileUploader
+                                        context="bg-po-files"
+                                        label="PO/Tender/Request Letter (optional)"
+                                        value={bgPoFiles ?? []}
+                                        onChange={(paths) => form.setValue('bgPoFiles', paths)}
+                                    />
+                                )}
+                                <FileUploader
+                                    context="bg-upload"
+                                    label="Soft Copy of BG *"
+                                    value={bgUpload ?? []}
+                                    onChange={(paths) => form.setValue('bgUpload', paths)}
+                                />
+                                <FileUploader
+                                    context="bg-sfms-conf"
+                                    label="SFMS Copy (optional)"
+                                    value={sfmsConf ?? []}
+                                    onChange={(paths) => form.setValue('sfmsConf', paths)}
+                                />
+                                <FileUploader
+                                    context="bg-fdr-copy"
+                                    label="FDR Copy"
+                                    value={fdrCopy ?? []}
+                                    onChange={(paths) => form.setValue('fdrCopy', paths)}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-4 pt-6 border-t">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="lg"
+                                onClick={() => navigate(-1)}
+                                disabled={isPending}
+                            >
+                                Cancel
+                            </Button>
+                            <Button type="submit" size="lg" disabled={isPending} className="min-w-48">
+                                {isPending ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                        Saving...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save className="mr-2 h-5 w-5" />
+                                        {isEditMode ? 'Update Old BG' : 'Save Old BG'}
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    </form>
+                </FormProvider>
+            </CardContent>
+        </Card>
+    );
+}
+
+export default BankGuaranteeOldEntryForm;

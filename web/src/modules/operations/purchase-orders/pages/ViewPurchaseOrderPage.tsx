@@ -1,5 +1,5 @@
 import { useParams } from "react-router-dom";
-import { usePurchaseOrderDetails } from "@/hooks/api/usePurchaseOrders";
+import { usePurchaseOrderDetails, useSubmitPoTlApproval } from "@/hooks/api/usePurchaseOrders";
 import { OrderViewPage } from "@/modules/operations/order-view/OrderViewPage";
 import { parseAttachments, type OrderViewData } from "@/modules/operations/order-view/orderView.types";
 import { purchaseOrderApi } from "@/services/api/purchase-order.api";
@@ -53,6 +53,9 @@ function toOrderViewData(po: PurchaseOrderView): OrderViewData {
         amountAfterTds: po.amountAfterTds,
         approved: po.poApproved,
         approvalRemark: po.poApprovalRemark,
+        tlStatus: po.tlStatus ?? 0,
+        tlComment: po.tlComment ?? null,
+        creatorTeamId: po.creatorTeamId ?? null,
         attachments: [
             ...(po.poType === "pi" ? [{ title: "Invoice Copy", paths: parseAttachments(po.piAttachments) }] : []),
             { title: "Technical Specs", paths: parseAttachments(po.technicalSpecsAttachments) },
@@ -67,6 +70,7 @@ const ViewPurchaseOrderPage = () => {
     const poId = Number(poIdParam);
 
     const { data, isLoading, isError, error } = usePurchaseOrderDetails(poId);
+    const { mutateAsync: submitTlApproval, isPending: isSubmittingTlApproval } = useSubmitPoTlApproval();
 
     return (
         <OrderViewPage
@@ -80,6 +84,10 @@ const ViewPurchaseOrderPage = () => {
             notFoundMessage="Purchase Order not found."
             loadErrorMessage="Failed to load Purchase Order"
             pdfUrl={(id, label) => purchaseOrderApi.getPurchaseOrderPdfUrl(id, label)}
+            onSubmitTlApproval={async (payload) => {
+                await submitTlApproval({ id: poId, data: payload });
+            }}
+            isSubmittingTlApproval={isSubmittingTlApproval}
         />
     );
 };
