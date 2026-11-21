@@ -39,6 +39,32 @@ const BG_PURPOSE_LABELS: Record<string, string> = {
     OTHER_SECURITY: 'Other Security',
 };
 
+const FDR_PURPOSE_LABELS: Record<string, string> = {
+    EMD: 'EMD',
+    SECURITY_DEPOSIT: 'Security Deposit',
+    BANK_GUARANTEE: 'Bank Guarantee',
+    OTHER_SECURITY: 'Other Security',
+};
+
+const formatFdrPurpose = (value: string | null | undefined, fallback = ''): string => {
+    const raw = value?.trim();
+    if (!raw) {
+        return fallback;
+    }
+
+    const mapped = FDR_PURPOSE_LABELS[raw.toUpperCase()];
+    if (mapped) {
+        return mapped;
+    }
+
+    return raw
+        .toLowerCase()
+        .split(/[_\s]+/)
+        .filter((word) => word.length > 0)
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+};
+
 const formatBgPurpose = (value: string | null | undefined, fallback: string): string => {
     const raw = value?.trim();
     if (!raw) {
@@ -1583,16 +1609,38 @@ export class PaymentRequestsNotificationService {
             }
         } else if (mode === 'FDR') {
             // FDR request created directly (no auto-created Cheque).
-            // Notify the FDR responsible user so they can process the Accounts Form (FDR).
+            // Notify the Accounts team (FDR responsible user) so they can prepare the FDR.
             const [fdrDetails] = await this.db
                 .select()
                 .from(instrumentFdrDetails)
                 .where(eq(instrumentFdrDetails.instrumentId, instrumentId))
                 .limit(1);
 
+            const [paymentReq] = await this.db
+                .select({
+                    requestedBy: paymentRequests.requestedBy,
+                    tenderId: paymentRequests.tenderId,
+                    projectName: paymentRequests.projectName,
+                    dueDate: paymentRequests.dueDate,
+                })
+                .from(paymentRequests)
+                .where(eq(paymentRequests.id, instrument.requestId))
+                .limit(1);
+
+            let requesterName = 'Tender Executive';
+            if (paymentReq?.requestedBy) {
+                const [requester] = await this.db
+                    .select({ name: users.name })
+                    .from(users)
+                    .where(eq(users.id, paymentReq.requestedBy))
+                    .limit(1);
+                requesterName = requester?.name || requesterName;
+            }
+
             const courierAddr = instrument.courierAddressJson as Record<string, any> | null;
             const courierAddress = courierAddr
                 ? [
+                    courierAddr.org,
                     courierAddr.name,
                     courierAddr.phone,
                     [courierAddr.line1, courierAddr.line2].filter(Boolean).join(', '),
@@ -1601,34 +1649,80 @@ export class PaymentRequestsNotificationService {
                 ].filter(Boolean).join('\n')
                 : (instrument.courierAddress ?? 'Not specified');
 
+            // Tender / WO name: tender first, then the project name, else NA.
+            const rawName = (tender?.tenderName || paymentReq?.projectName || '').trim();
+            const hasName = !!rawName && rawName.toUpperCase() !== 'NA';
+
+            const rawPurpose = (fdrDetails?.fdrPurpose || purpose || '').trim();
+            const isBgPurpose = rawPurpose.toUpperCase() === 'BANK_GUARANTEE';
+            const purposeLabel = formatFdrPurpose(rawPurpose, purpose || 'Other Payment');
+
+            // "Request for FDR - <Purpose> - <Name>" — the name is NA for
+            // accounts/admin FDRs and for FDRs raised against a BG.
+            const subjectName = isBgPurpose || !hasName ? 'NA' : rawName;
+
+            // FDR expiry: for BG-linked FDRs, the BG claim period expiry wins.
+            let fdrExpiryDate: Date | string | null = fdrDetails?.fdrExpiryDate ?? null;
+            if (isBgPurpose) {
+                const [bgDetails] = await this.db
+                    .select({
+                        claimExpiryDate: instrumentBgDetails.claimExpiryDate,
+                        bgClaim: instrumentBgDetails.bgClaim,
+                    })
+                    .from(instrumentBgDetails)
+                    .innerJoin(paymentInstruments, eq(paymentInstruments.id, instrumentBgDetails.instrumentId))
+                    .where(and(
+                        eq(paymentInstruments.requestId, instrument.requestId),
+                        eq(paymentInstruments.instrumentType, 'BG'),
+                        eq(paymentInstruments.isActive, true),
+                    ))
+                    .limit(1);
+                fdrExpiryDate = bgDetails?.claimExpiryDate || bgDetails?.bgClaim || fdrExpiryDate;
+            }
+
+            const requestedHours = Number(fdrDetails?.fdrNeeds) || Number(instrument.courierDeadline) || 24;
+            const timeLimit = isBgPurpose ? 12 : requestedHours;
+
+            const dueDate =
+                tender?.dueDate ||
+                paymentReq?.dueDate ||
+                (courierAddr?.delDate ? new Date(courierAddr.delDate) : null);
+            const dueDateTime = dueDate
+                ? `${this.formatDateDDMMYYYY(dueDate)} 18:00`
+                : 'the due date';
+
             try {
                 const result = await this.emailService.sendPaymentEmail({
                     requestId: instrument.requestId,
                     tenderId: tenderId || undefined,
                     eventType: 'FDR_REQUEST',
                     fromUserId: requestedBy,
-                    subject: `Please create a new FDR - ${purpose}`,
+                    subject: `Request for FDR - ${purposeLabel} - ${subjectName}`,
                     template: 'fdr-request',
                     data: {
-                        fdrPurpose: fdrDetails?.fdrPurpose || 'Not specified',
-                        tenderNo: tender?.tenderNo || 'NA',
-                        tenderName: tender?.tenderName || 'Not specified',
-                        dueDateTime: this.formatDateDDMMYYYY(tender?.dueDate),
-                        beneficiaryName: instrument.favouring || 'Not specified',
-                        payableAt: instrument.payableAt || 'Not specified',
+                        recipientName: 'Kailash',
+                        purpose: purposeLabel,
+                        isBgPurpose,
+                        fdrInFavourOf: isBgPurpose
+                            ? 'AU Small Finance Bank Ltd'
+                            : (instrument.favouring || 'Not specified'),
                         amount: this.formatCurrency(Number(instrument.amount) || 0),
-                        fdrExpiryDate: this.formatDateDDMMYYYY(fdrDetails?.fdrExpiryDate),
-                        timeLimit: instrument.courierDeadline || 24,
+                        fdrExpiryDate: this.formatDateDDMMYYYY(fdrExpiryDate),
+                        timeLimit,
+                        dueDateTime,
+                        stage1Link: `${this.getFrontendUrl()}/bi-dashboard/fdr/action/${instrumentId}?section=accounts-form`,
+                        stage2Link: `${this.getFrontendUrl()}/bi-dashboard/fdr/action/${instrumentId}?section=accounts-form-2`,
                         courierAddress,
-                        link: `${this.getFrontendUrl()}/bi-dashboard/fdr/action/${instrumentId}`,
+                        senderName: requesterName,
                         tlName: tlUser?.name || 'Team Leader',
                     },
                     to: [{ type: 'emails', emails: [toEmails] }],
                     cc: [
-                        { type: 'role', role: 'Admin', teamId: tenderTeamId },
+                        { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
+                        { type: 'emails', emails: ['goyal@volksenergie.in'] },
+                        { type: 'emails', emails: ['accounts@volksenergie.in'] },
                         { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
-                        { type: 'emails', emails: ['accounts@volksenergie.in']},
-                    ]
+                    ],
                 });
                 if (result.success) {
                     this.logger.log(`FDR request email sent for instrument ${instrumentId} (logId: ${result.emailLogId})`);
