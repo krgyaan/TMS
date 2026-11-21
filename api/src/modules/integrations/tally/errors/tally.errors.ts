@@ -2,6 +2,7 @@ export type TallyErrorCode =
     | "DISABLED"
     | "UNREACHABLE"
     | "TIMEOUT"
+    | "TLS"
     | "AUTH"
     | "RATE_LIMITED"
     | "PROTOCOL"
@@ -55,6 +56,12 @@ export class TallyUnreachable extends TallyError {
 export class TallyTimeout extends TallyError {
     constructor(message: string, options: TallyErrorOptions = {}) {
         super("TIMEOUT", message, { retryable: true, ...options });
+    }
+}
+
+export class TallyTlsError extends TallyError {
+    constructor(message: string, options: TallyErrorOptions = {}) {
+        super("TLS", message, { retryable: false, ...options });
     }
 }
 

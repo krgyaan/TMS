@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { randomUUID } from "node:crypto";
-import type { TallyConfig } from "../../../../config/tally.config";
+import type { TallyConfig } from "@config/tally.config";
 import {
     isTallyError,
     TallyAuthError,
@@ -16,7 +16,16 @@ import {
 } from "../errors/tally.errors";
 import { namesEqual } from "../masters/name.util";
 import { buildMasterCollectionRequest, type MasterKind } from "../xml/master-xml.builder";
-import { parseCompanyNames, parseImportResult, parseMasterList, type ParseImportOptions, type TallyImportResult, type TallyMasterRecord } from "../xml/response-parser";
+import {
+    parseCompanyNames,
+    parseImportResult,
+    parseLivenessBanner,
+    parseMasterList,
+    type ParseImportOptions,
+    type TallyImportResult,
+    type TallyLiveness,
+    type TallyMasterRecord,
+} from "../xml/response-parser";
 import { buildCollectionExportRequest, buildImportMastersRequest } from "../xml/xml-builder";
 import { TALLY_CONFIG, TALLY_REQUESTER } from "../tally.constants";
 import type { TallyRequester } from "../transport/tally-http.transport";
@@ -119,6 +128,18 @@ export class TallyClient {
         await this.listCompanies(options);
     }
 
+    /**
+     * Probes the proxy's liveness banner with an empty POST. Confirms the server
+     * is running without requiring a company to be open.
+     */
+    async checkLiveness(options: TallyCallOptions = {}): Promise<TallyLiveness> {
+        this.requireConfig();
+
+        const response = await this.post("liveness", "", options);
+
+        return parseLivenessBanner(response.xml);
+    }
+
     async listCompanies(options: TallyCallOptions = {}): Promise<string[]> {
         this.requireConfig();
 
@@ -201,6 +222,7 @@ export class TallyClient {
                 headers: {
                     "Content-Type": "text/xml; charset=utf-8",
                     Accept: "text/xml, application/xml",
+                    "Accept-Encoding": "identity",
                     Authorization: `Bearer ${authToken}`,
                 },
                 connectTimeoutMs: this.config.connectTimeoutMs,

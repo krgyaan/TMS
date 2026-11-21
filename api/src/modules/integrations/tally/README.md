@@ -20,6 +20,7 @@ fast and names any missing variable.
 | `TALLY_BASE_URL` | - | Required when enabled. HTTPS only, no credentials/query/fragment. |
 | `TALLY_AUTH_TOKEN` | - | Required when enabled. Bearer token for the reverse proxy. Never logged. |
 | `TALLY_COMPANY` | - | Required when enabled. Exact company name as loaded in TallyPrime. |
+| `TALLY_CA_CERT_PATH` | - | Optional. Absolute path to a PEM private CA that signs the Tally proxy certificate. Validated at startup. |
 | `TALLY_CONNECT_TIMEOUT_MS` | `5000` | TCP/TLS connect timeout. |
 | `TALLY_HTTP_TIMEOUT_MS` | `30000` | Read timeout. |
 | `TALLY_RATE_LIMIT_RPS` | `2` | Shared token-bucket rate. |
@@ -84,6 +85,10 @@ counts. It performs reads only. Exits non-zero on any failure.
   `TALLY_MAX_CONCURRENCY`).
 - HTTPS only, redirects rejected, connect/read timeouts enforced, responses
   capped at 5 MiB.
+- gzip/deflate/brotli responses are decoded with the same 5 MiB cap.
+- Certificate-trust failures raise `TallyTlsError` (shown as "secure connection
+  could not be verified"), never "unreachable". Set `TALLY_CA_CERT_PATH` to the
+  private CA; certificate verification is never disabled.
 - HTML bodies, non-`ENVELOPE`/`RESPONSE` roots, truncated XML and
   `DOCTYPE`/`ENTITY` declarations are rejected before parsing.
 - HTTP 200 is not treated as success: `HEADER/STATUS`, `ERRORS` and
@@ -102,7 +107,7 @@ counts. It performs reads only. Exits non-zero on any failure.
 `TallyDisabledError`, `TallyUnreachable`, `TallyTimeout`, `TallyAuthError`,
 `TallyRateLimited`, `TallyProtocolError`, `TallyCompanyNotOpen`,
 `TallyCompanyMismatch`, `TallyLineError`, `TallyUnknownOutcome`,
-`TallyMasterConflict`, `TallyValidationError`.
+`TallyMasterConflict`, `TallyValidationError`, `TallyTlsError`.
 
 ## Tests
 

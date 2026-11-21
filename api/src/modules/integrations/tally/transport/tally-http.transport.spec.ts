@@ -1,7 +1,8 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { TallyProtocolError, TallyTimeout } from "../errors/tally.errors";
-import { decodeXmlBuffer, nodeTallyRequester, type TallyHttpRequest } from "./tally-http.transport";
+import { gzipSync, deflateSync } from "node:zlib";
+import { TallyProtocolError, TallyTimeout, TallyTlsError, TallyUnreachable } from "../errors/tally.errors";
+import { classifyRequestError, decodeXmlBuffer, nodeTallyRequester, type TallyHttpRequest } from "./tally-http.transport";
 
 interface TestServer {
     url: URL;
@@ -155,6 +156,54 @@ describe("nodeTallyRequester", () => {
         } finally {
             await server.close();
         }
+    });
+
+    it("decodes gzip and deflate bodies", async () => {
+        const gzipServer = await startServer((_req, res) => {
+            res.writeHead(200, { "Content-Type": "text/xml", "Content-Encoding": "gzip" });
+            res.end(gzipSync(Buffer.from("<ENVELOPE>gzip</ENVELOPE>")));
+        });
+
+        try {
+            await expect(nodeTallyRequester(requestFor(gzipServer.url))).resolves.toMatchObject({
+                body: "<ENVELOPE>gzip</ENVELOPE>",
+            });
+        } finally {
+            await gzipServer.close();
+        }
+
+        const deflateServer = await startServer((_req, res) => {
+            res.writeHead(200, { "Content-Type": "text/xml", "Content-Encoding": "deflate" });
+            res.end(deflateSync(Buffer.from("<ENVELOPE>deflate</ENVELOPE>")));
+        });
+
+        try {
+            await expect(nodeTallyRequester(requestFor(deflateServer.url))).resolves.toMatchObject({
+                body: "<ENVELOPE>deflate</ENVELOPE>",
+            });
+        } finally {
+            await deflateServer.close();
+        }
+    });
+});
+
+describe("classifyRequestError", () => {
+    const errno = (code: string, message: string): NodeJS.ErrnoException => Object.assign(new Error(message), { code });
+
+    it("maps certificate trust failures to TallyTlsError", () => {
+        expect(classifyRequestError(errno("UNABLE_TO_GET_ISSUER_CERT_LOCALLY", "unable to get local issuer certificate"))).toBeInstanceOf(TallyTlsError);
+        expect(classifyRequestError(errno("SELF_SIGNED_CERT_IN_CHAIN", "self signed certificate in certificate chain"))).toBeInstanceOf(TallyTlsError);
+        expect(classifyRequestError(errno("CERT_HAS_EXPIRED", "certificate has expired"))).toBeInstanceOf(TallyTlsError);
+        expect(classifyRequestError(errno("ERR_TLS_CERT_ALTNAME_INVALID", "Hostname/IP does not match certificate's altnames"))).toBeInstanceOf(TallyTlsError);
+    });
+
+    it("falls back to message text for certificate errors", () => {
+        expect(classifyRequestError(errno("ERR_SSL_UNKNOWN", "unable to get local issuer certificate"))).toBeInstanceOf(TallyTlsError);
+    });
+
+    it("maps network failures", () => {
+        expect(classifyRequestError(errno("ECONNREFUSED", "connect ECONNREFUSED"))).toBeInstanceOf(TallyUnreachable);
+        expect(classifyRequestError(errno("ETIMEDOUT", "timeout"))).toBeInstanceOf(TallyTimeout);
     });
 });
 

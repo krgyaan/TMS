@@ -1,5 +1,5 @@
 import { TallyCompanyNotOpen, TallyLineError, TallyProtocolError } from "../errors/tally.errors";
-import { assertEnvelopeOk, parseCompanyNames, parseImportResult, parseMasterList, parseResponse } from "./response-parser";
+import { assertEnvelopeOk, parseCompanyNames, parseImportResult, parseLivenessBanner, parseMasterList, parseResponse } from "./response-parser";
 
 const envelope = (body: string, status = "1"): string => `<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>${status}</STATUS></HEADER><BODY>${body}</BODY></ENVELOPE>`;
 
@@ -141,5 +141,31 @@ describe("parseCompanyNames", () => {
 
     it("returns an empty list when no company is open", () => {
         expect(parseCompanyNames(envelope("<DATA><COLLECTION></COLLECTION></DATA>"))).toEqual([]);
+    });
+
+    it("rejects a liveness banner where a company list is expected", () => {
+        expect(() => parseCompanyNames("<RESPONSE>TallyPrime Server is Running</RESPONSE>")).toThrow(/RESPONSE banner/);
+    });
+});
+
+describe("parseLivenessBanner", () => {
+    it("recognises the proxy banner", () => {
+        expect(parseLivenessBanner("<RESPONSE>TallyPrime Server is Running</RESPONSE>")).toEqual({
+            running: true,
+            message: "TallyPrime Server is Running",
+        });
+    });
+
+    it("reports an unrecognised banner without throwing", () => {
+        expect(parseLivenessBanner("<RESPONSE>Something else</RESPONSE>")).toEqual({
+            running: false,
+            message: "Something else",
+        });
+    });
+
+    it("rejects HTML, empty bodies and non-RESPONSE roots", () => {
+        expect(() => parseLivenessBanner("<html></html>")).toThrow(TallyProtocolError);
+        expect(() => parseLivenessBanner("")).toThrow(TallyProtocolError);
+        expect(() => parseLivenessBanner("<ENVELOPE></ENVELOPE>")).toThrow(/unexpected root/);
     });
 });

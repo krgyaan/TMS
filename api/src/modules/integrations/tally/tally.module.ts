@@ -3,11 +3,11 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TallyDisabledError } from "./errors/tally.errors";
 import { TALLY_CONFIG, TALLY_RATE_LIMITER, TALLY_REQUESTER } from "./tally.constants";
 import { RateLimiter } from "./transport/rate-limiter";
-import { nodeTallyRequester, type TallyRequester } from "./transport/tally-http.transport";
+import { createNodeTallyRequester, type TallyRequester } from "./transport/tally-http.transport";
 import { TallyClient } from "./client/tally.client";
 import { TallyMastersService } from "./masters/tally-masters.service";
 import { TallyStatusService } from "./tally-status.service";
-import { TallyConfig } from "@/config/tally.config";
+import type { TallyConfig } from "@/config/tally.config";
 
 /**
  * TallyPrime integration foundation.
@@ -44,7 +44,9 @@ import { TallyConfig } from "@/config/tally.config";
                     return () => Promise.reject(new TallyDisabledError());
                 }
 
-                return request => limiter.schedule(() => nodeTallyRequester(request));
+                const send = createNodeTallyRequester({ ca: config.caCertificate ?? undefined });
+
+                return request => limiter.schedule(() => send(request));
             },
         },
         TallyClient,

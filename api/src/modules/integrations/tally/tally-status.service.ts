@@ -9,6 +9,7 @@ import {
     TallyProtocolError,
     TallyRateLimited,
     TallyTimeout,
+    TallyTlsError,
     TallyUnreachable,
 } from "./errors/tally.errors";
 import { namesEqual } from "./masters/name.util";
@@ -22,6 +23,7 @@ export type TallyStatusState = "disabled" | "ok" | "degraded" | "down";
 
 export interface TallyStatusConnection {
     enabled: boolean;
+    serverRunning: boolean;
     reachable: boolean;
     authOk: boolean;
     latencyMs: number | null;
@@ -136,6 +138,16 @@ const mapError = (error: unknown): MappedFailure => {
         };
     }
 
+    if (error instanceof TallyTlsError) {
+        return {
+            status: "down",
+            code: "TLS",
+            message: "Secure connection to TallyPrime could not be verified.",
+            reachable: false,
+            authOk: false,
+        };
+    }
+
     if (error instanceof TallyProtocolError || isTallyError(error)) {
         return {
             status: "degraded",
@@ -215,6 +227,20 @@ export class TallyStatusService {
         const configured = this.config.company;
 
         try {
+            const liveness = await this.client.checkLiveness({ readTimeoutMs: TALLY_STATUS_CHECK_TIMEOUT_MS });
+
+            if (!liveness.running) {
+                const company = this.lastCompany ?? {
+                    configured,
+                    open: false,
+                    loaded: false,
+                    loadedCompanies: [],
+                };
+                const base = this.baseSnapshot(checkedAt, Date.now() - startedAt, company, false);
+
+                return this.degraded(base, "SERVER_NOT_RUNNING", "TallyPrime did not report that the server is running.");
+            }
+
             const companies = await this.client.listCompanies({ readTimeoutMs: TALLY_STATUS_CHECK_TIMEOUT_MS });
             const latencyMs = Date.now() - startedAt;
             const companyOpen = companies.length > 0;
@@ -262,7 +288,7 @@ export class TallyStatusService {
         }
     }
 
-    private baseSnapshot(checkedAt: string, latencyMs: number, company: TallyStatusCompany): TallyStatusSnapshot {
+    private baseSnapshot(checkedAt: string, latencyMs: number, company: TallyStatusCompany, serverRunning = true): TallyStatusSnapshot {
         return {
             status: "ok",
             message: "",
@@ -271,6 +297,7 @@ export class TallyStatusService {
             cache: { ttlSeconds: TALLY_STATUS_CACHE_TTL_MS / 1000, ageSeconds: 0 },
             connection: {
                 enabled: true,
+                serverRunning,
                 reachable: true,
                 authOk: true,
                 latencyMs,
@@ -307,6 +334,7 @@ export class TallyStatusService {
             cache: { ttlSeconds: TALLY_STATUS_CACHE_TTL_MS / 1000, ageSeconds: 0 },
             connection: {
                 enabled: true,
+                serverRunning: false,
                 reachable: mapped.reachable,
                 authOk: mapped.authOk,
                 latencyMs,
@@ -333,6 +361,7 @@ export class TallyStatusService {
             cache: { ttlSeconds: TALLY_STATUS_CACHE_TTL_MS / 1000, ageSeconds: 0 },
             connection: {
                 enabled: false,
+                serverRunning: false,
                 reachable: false,
                 authOk: false,
                 latencyMs: null,

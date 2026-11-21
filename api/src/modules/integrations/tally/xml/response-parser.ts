@@ -42,6 +42,11 @@ export interface TallyImportResult {
     alreadyExists: boolean;
 }
 
+export interface TallyLiveness {
+    running: boolean;
+    message: string;
+}
+
 export interface ParseImportOptions {
     treatAlreadyExistsAsSuccess?: boolean;
 }
@@ -245,6 +250,56 @@ export function assertEnvelopeOk(parsed: ParsedTallyResponse): void {
     }
 }
 
+const LIVENESS_BANNER = /TallyPrime\s+Server\s+is\s+Running/i;
+
+/**
+ * Parses the reverse proxy's liveness reply, e.g.
+ * `<RESPONSE>TallyPrime Server is Running</RESPONSE>`.
+ * This is not an ENVELOPE and carries no company data.
+ */
+export function parseLivenessBanner(xml: string): TallyLiveness {
+    const trimmed = String(xml ?? "").trim();
+
+    if (!trimmed) {
+        throw new TallyProtocolError("Tally liveness probe returned an empty response");
+    }
+
+    if (HTML_START.test(trimmed)) {
+        throw new TallyProtocolError("Tally liveness probe returned an HTML page");
+    }
+
+    assertSafeXml(trimmed);
+
+    const validation = XMLValidator.validate(trimmed);
+
+    if (validation !== true) {
+        throw new TallyProtocolError("Tally liveness probe returned malformed XML");
+    }
+
+    let parsed: unknown;
+
+    try {
+        parsed = xmlParser.parse(trimmed);
+    } catch (error) {
+        throw new TallyProtocolError("Tally liveness probe response could not be parsed", { cause: error });
+    }
+
+    const document = (parsed ?? {}) as Record<string, unknown>;
+    const rootKey = Object.keys(document).find(key => key.toUpperCase() === "RESPONSE");
+
+    if (!rootKey) {
+        throw new TallyProtocolError("Tally liveness probe returned an unexpected root element");
+    }
+
+    const text = extractText(document[rootKey]) ?? "";
+    const running = LIVENESS_BANNER.test(text);
+
+    return {
+        running,
+        message: running ? "TallyPrime Server is Running" : text.slice(0, 120),
+    };
+}
+
 export function parseImportResult(xml: string, options: ParseImportOptions = {}): TallyImportResult {
     const parsed = parseResponse(xml);
     const resultNode = findFirstByTag(parsed.data, "IMPORTRESULT") ?? findFirstByTag(parsed.envelope, "IMPORTRESULT") ?? {};
@@ -299,6 +354,10 @@ export function parseMasterList(xml: string, kind: MasterKind): TallyMasterRecor
 
     assertEnvelopeOk(parsed);
 
+    if (parsed.root !== "ENVELOPE") {
+        throw new TallyProtocolError("Expected an ENVELOPE response but received a RESPONSE banner");
+    }
+
     const nodes = collectByTag(parsed.data ?? parsed.envelope, tag);
     const records: TallyMasterRecord[] = [];
     const seen = new Set<string>();
@@ -337,6 +396,10 @@ export function parseCompanyNames(xml: string): string[] {
     const parsed = parseResponse(xml);
 
     assertEnvelopeOk(parsed);
+
+    if (parsed.root !== "ENVELOPE") {
+        throw new TallyProtocolError("Expected an ENVELOPE response but received a RESPONSE banner");
+    }
 
     const nodes = collectByTag(parsed.data ?? parsed.envelope, "COMPANY");
     const names: string[] = [];

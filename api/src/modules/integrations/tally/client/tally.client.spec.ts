@@ -8,6 +8,7 @@ const baseConfig: TallyConfig = {
     baseUrl: "https://tally.example.com:25989",
     authToken: "secret-token-value",
     company: "VEPL 2025-26",
+    caCertificate: null,
     connectTimeoutMs: 1000,
     httpTimeoutMs: 2000,
     rateLimitRps: 2,
@@ -91,6 +92,7 @@ describe("TallyClient", () => {
         expect(calls).toHaveLength(1);
         expect(calls[0].headers.Authorization).toBe("Bearer secret-token-value");
         expect(calls[0].headers["Content-Type"]).toContain("text/xml");
+        expect(calls[0].headers["Accept-Encoding"]).toBe("identity");
         expect(calls[0].url.hostname).toBe("tally.example.com");
 
         const serialized = JSON.stringify(logs);
@@ -113,6 +115,16 @@ describe("TallyClient", () => {
         await client.listCompanies({ readTimeoutMs: 1234 });
 
         expect(calls[0].readTimeoutMs).toBe(1234);
+    });
+
+    it("parses the liveness banner from an empty POST", async () => {
+        const { client, calls } = buildClient(xmlResponse("<RESPONSE>TallyPrime Server is Running</RESPONSE>"));
+
+        await expect(client.checkLiveness()).resolves.toEqual({
+            running: true,
+            message: "TallyPrime Server is Running",
+        });
+        expect(calls[0].body).toBe("");
     });
 
     it("parses an import result", async () => {

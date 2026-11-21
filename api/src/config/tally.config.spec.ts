@@ -1,4 +1,22 @@
+jest.mock("node:fs", () => {
+    const actual = jest.requireActual<typeof import("node:fs")>("node:fs");
+
+    return { ...actual, statSync: jest.fn(), readFileSync: jest.fn() };
+});
+
+jest.mock("node:tls", () => {
+    const actual = jest.requireActual<typeof import("node:tls")>("node:tls");
+
+    return { ...actual, createSecureContext: jest.fn() };
+});
+
+import * as fs from "node:fs";
+import * as tls from "node:tls";
 import { parseTallyEnv, validateTallyEnv } from "./tally.config";
+
+const statSyncMock = fs.statSync as unknown as jest.Mock;
+const readFileSyncMock = fs.readFileSync as unknown as jest.Mock;
+const createSecureContextMock = tls.createSecureContext as unknown as jest.Mock;
 
 const enabledEnv: Record<string, unknown> = {
     TALLY_ENABLED: "true",
@@ -8,6 +26,12 @@ const enabledEnv: Record<string, unknown> = {
 };
 
 describe("parseTallyEnv", () => {
+    beforeEach(() => {
+        statSyncMock.mockReset();
+        readFileSyncMock.mockReset();
+        createSecureContextMock.mockReset();
+    });
+
     it("is inert and needs no Tally variables when disabled", () => {
         const config = parseTallyEnv({});
 
@@ -27,6 +51,7 @@ describe("parseTallyEnv", () => {
         expect(config.baseUrl).toBe("https://tally.example.com:25989");
         expect(config.authToken).toBe("super-secret-token");
         expect(config.company).toBe("VEPL 2025-26");
+        expect(config.caCertificate).toBeNull();
     });
 
     it("applies numeric overrides", () => {
@@ -67,6 +92,44 @@ describe("parseTallyEnv", () => {
         } catch (error) {
             expect(String(error)).not.toContain("super-secret-token");
         }
+    });
+
+    it("loads and validates a private CA certificate", () => {
+        const caPem = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n";
+
+        statSyncMock.mockReturnValue({ isFile: () => true, size: caPem.length });
+        readFileSyncMock.mockReturnValue(caPem);
+        createSecureContextMock.mockReturnValue({});
+
+        const config = parseTallyEnv({ ...enabledEnv, TALLY_CA_CERT_PATH: "/etc/tms/certs/caddy-root.crt" });
+
+        expect(config.caCertificate).toBe(caPem);
+        expect(createSecureContextMock).toHaveBeenCalledWith({ ca: caPem });
+    });
+
+    it("requires an absolute CA path", () => {
+        expect(() => parseTallyEnv({ ...enabledEnv, TALLY_CA_CERT_PATH: "certs/ca.crt" })).toThrow(/absolute/);
+    });
+
+    it("rejects an unreadable CA file", () => {
+        statSyncMock.mockImplementation(() => {
+            throw new Error("ENOENT");
+        });
+
+        expect(() => parseTallyEnv({ ...enabledEnv, TALLY_CA_CERT_PATH: "/missing/ca.crt" })).toThrow(/could not be read/);
+    });
+
+    it("rejects a non-PEM CA file", () => {
+        statSyncMock.mockReturnValue({ isFile: () => true, size: 8 });
+        readFileSyncMock.mockReturnValue("not a cert");
+
+        expect(() => parseTallyEnv({ ...enabledEnv, TALLY_CA_CERT_PATH: "/etc/ca.crt" })).toThrow(/PEM certificate/);
+    });
+
+    it("rejects an oversize CA file", () => {
+        statSyncMock.mockReturnValue({ isFile: () => true, size: 100_000 });
+
+        expect(() => parseTallyEnv({ ...enabledEnv, TALLY_CA_CERT_PATH: "/etc/ca.crt" })).toThrow(/65536/);
     });
 
     it("validateTallyEnv returns an empty object when disabled", () => {

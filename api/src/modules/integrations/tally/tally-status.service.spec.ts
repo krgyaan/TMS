@@ -1,14 +1,15 @@
+import type { TallyConfig } from "@/config/tally.config";
 import type { TallyClient, TallyLogger } from "./client/tally.client";
-import { TallyAuthError, TallyLineError, TallyProtocolError, TallyTimeout, TallyUnreachable } from "./errors/tally.errors";
-import type { TallyMasterRecord } from "./xml/response-parser";
+import { TallyAuthError, TallyLineError, TallyProtocolError, TallyTimeout, TallyTlsError, TallyUnreachable } from "./errors/tally.errors";
+import type { TallyLiveness, TallyMasterRecord } from "./xml/response-parser";
 import { TALLY_STATUS_CACHE_TTL_MS, TALLY_STATUS_CHECK_TIMEOUT_MS, TallyStatusService } from "./tally-status.service";
-import { TallyConfig } from "@/config/tally.config";
 
 const baseConfig: TallyConfig = {
     enabled: true,
     baseUrl: "https://tally.example.com:25989",
     authToken: "secret-token-value",
     company: "VEPL 2025-26",
+    caCertificate: null,
     connectTimeoutMs: 5000,
     httpTimeoutMs: 30000,
     rateLimitRps: 2,
@@ -21,14 +22,19 @@ interface CallOptions {
     readTimeoutMs?: number;
 }
 
+const runningBanner: TallyLiveness = { running: true, message: "TallyPrime Server is Running" };
+
 function buildService(config: TallyConfig = baseConfig) {
+    const checkLiveness = jest.fn<Promise<TallyLiveness>, [CallOptions?]>();
     const listCompanies = jest.fn<Promise<string[]>, [CallOptions?]>();
     const exportMasters = jest.fn<Promise<TallyMasterRecord[]>, [string, CallOptions?]>();
     const logger: TallyLogger = { info: jest.fn(), warn: jest.fn(), error: jest.fn() };
-    const client = { listCompanies, exportMasters } as unknown as TallyClient;
+    const client = { checkLiveness, listCompanies, exportMasters } as unknown as TallyClient;
     const service = new TallyStatusService(config, client, logger);
 
-    return { service, listCompanies, exportMasters, logger };
+    checkLiveness.mockResolvedValue(runningBanner);
+
+    return { service, checkLiveness, listCompanies, exportMasters, logger };
 }
 
 describe("TallyStatusService", () => {
@@ -44,7 +50,7 @@ describe("TallyStatusService", () => {
     });
 
     it("reports disabled without calling Tally or leaking the token", async () => {
-        const { service, listCompanies } = buildService({
+        const { service, checkLiveness, listCompanies } = buildService({
             ...baseConfig,
             enabled: false,
             baseUrl: null,
@@ -55,14 +61,15 @@ describe("TallyStatusService", () => {
         const status = await service.getStatus();
 
         expect(status.status).toBe("disabled");
-        expect(status.connection.enabled).toBe(false);
+        expect(status.connection).toMatchObject({ enabled: false, serverRunning: false });
         expect(status.company.loadedCompanies).toEqual([]);
+        expect(checkLiveness).not.toHaveBeenCalled();
         expect(listCompanies).not.toHaveBeenCalled();
         expect(JSON.stringify(status)).not.toContain("secret-token-value");
     });
 
-    it("reports ok when the configured company is loaded and returns masters", async () => {
-        const { service, listCompanies, exportMasters } = buildService();
+    it("reports ok when the server is running and the configured company is loaded", async () => {
+        const { service, checkLiveness, listCompanies, exportMasters } = buildService();
 
         listCompanies.mockResolvedValue(["VEPL 2025-26", "Other Co"]);
         exportMasters.mockResolvedValue([{ name: "Capital Account", parent: null }]);
@@ -72,6 +79,7 @@ describe("TallyStatusService", () => {
         expect(status.status).toBe("ok");
         expect(status.connection).toMatchObject({
             enabled: true,
+            serverRunning: true,
             reachable: true,
             authOk: true,
             host: "tally.example.com",
@@ -84,8 +92,22 @@ describe("TallyStatusService", () => {
         });
         expect(status.lastSuccessAt).toBe(new Date(now).toISOString());
         expect(status.lastFailure).toBeNull();
+        expect(checkLiveness).toHaveBeenCalledWith({ readTimeoutMs: TALLY_STATUS_CHECK_TIMEOUT_MS });
         expect(listCompanies).toHaveBeenCalledWith({ readTimeoutMs: TALLY_STATUS_CHECK_TIMEOUT_MS });
         expect(exportMasters).toHaveBeenCalledWith("group", { readTimeoutMs: TALLY_STATUS_CHECK_TIMEOUT_MS });
+    });
+
+    it("reports when the liveness banner is not recognised", async () => {
+        const { service, checkLiveness, listCompanies } = buildService();
+
+        checkLiveness.mockResolvedValue({ running: false, message: "Something else" });
+
+        const status = await service.getStatus();
+
+        expect(status.status).toBe("degraded");
+        expect(status.connection.serverRunning).toBe(false);
+        expect(status.lastFailure?.code).toBe("SERVER_NOT_RUNNING");
+        expect(listCompanies).not.toHaveBeenCalled();
     });
 
     it("reports a company that is not loaded", async () => {
@@ -96,6 +118,7 @@ describe("TallyStatusService", () => {
         const status = await service.getStatus();
 
         expect(status.status).toBe("degraded");
+        expect(status.connection.serverRunning).toBe(true);
         expect(status.company.loaded).toBe(false);
         expect(status.lastFailure?.code).toBe("COMPANY_NOT_LOADED");
         expect(exportMasters).not.toHaveBeenCalled();
@@ -138,20 +161,33 @@ describe("TallyStatusService", () => {
     });
 
     it("maps auth failures to down with auth rejected", async () => {
-        const { service, listCompanies } = buildService();
+        const { service, checkLiveness } = buildService();
 
-        listCompanies.mockRejectedValue(new TallyAuthError("Tally rejected the request (HTTP 401). Check TALLY_AUTH_TOKEN."));
+        checkLiveness.mockRejectedValue(new TallyAuthError("Tally rejected the request (HTTP 401). Check TALLY_AUTH_TOKEN."));
 
         const status = await service.getStatus();
 
         expect(status.status).toBe("down");
-        expect(status.connection).toMatchObject({ reachable: true, authOk: false });
+        expect(status.connection).toMatchObject({ reachable: true, authOk: false, serverRunning: false });
         expect(status.lastFailure?.code).toBe("AUTH");
+    });
+
+    it("maps certificate trust failures to the TLS code", async () => {
+        const { service, checkLiveness } = buildService();
+
+        checkLiveness.mockRejectedValue(new TallyTlsError("Tally certificate chain is not trusted"));
+
+        const status = await service.getStatus();
+
+        expect(status.status).toBe("down");
+        expect(status.connection).toMatchObject({ reachable: false, serverRunning: false });
+        expect(status.lastFailure?.code).toBe("TLS");
+        expect(status.message).toMatch(/Secure connection/);
     });
 
     it("maps unreachable and timeout failures to down", async () => {
         const unreachable = buildService();
-        unreachable.listCompanies.mockRejectedValue(new TallyUnreachable("down"));
+        unreachable.checkLiveness.mockRejectedValue(new TallyUnreachable("down"));
         await expect(unreachable.service.getStatus()).resolves.toMatchObject({
             status: "down",
             connection: { reachable: false },
@@ -159,7 +195,7 @@ describe("TallyStatusService", () => {
         });
 
         const timeout = buildService();
-        timeout.listCompanies.mockRejectedValue(new TallyTimeout("slow"));
+        timeout.checkLiveness.mockRejectedValue(new TallyTimeout("slow"));
         await expect(timeout.service.getStatus()).resolves.toMatchObject({
             status: "down",
             lastFailure: { code: "TIMEOUT" },
@@ -189,7 +225,7 @@ describe("TallyStatusService", () => {
     });
 
     it("serves one check from cache for the whole TTL", async () => {
-        const { service, listCompanies, exportMasters } = buildService();
+        const { service, checkLiveness, listCompanies, exportMasters } = buildService();
 
         listCompanies.mockResolvedValue(["VEPL 2025-26"]);
         exportMasters.mockResolvedValue([{ name: "Capital Account", parent: null }]);
@@ -203,17 +239,19 @@ describe("TallyStatusService", () => {
         const cached = await service.getStatus();
 
         expect(cached.cache.ageSeconds).toBe(30);
+        expect(checkLiveness).toHaveBeenCalledTimes(1);
         expect(listCompanies).toHaveBeenCalledTimes(1);
 
         now += TALLY_STATUS_CACHE_TTL_MS;
 
         await service.getStatus();
 
+        expect(checkLiveness).toHaveBeenCalledTimes(2);
         expect(listCompanies).toHaveBeenCalledTimes(2);
     });
 
     it("shares one in-flight check between concurrent callers", async () => {
-        const { service, listCompanies, exportMasters } = buildService();
+        const { service, checkLiveness, listCompanies, exportMasters } = buildService();
         let resolveList: (value: string[]) => void = () => undefined;
 
         listCompanies.mockImplementation(
@@ -227,6 +265,9 @@ describe("TallyStatusService", () => {
         const first = service.getStatus();
         const second = service.getStatus();
 
+        await new Promise<void>(resolve => setImmediate(resolve));
+
+        expect(checkLiveness).toHaveBeenCalledTimes(1);
         expect(listCompanies).toHaveBeenCalledTimes(1);
 
         resolveList(["VEPL 2025-26"]);
@@ -239,7 +280,7 @@ describe("TallyStatusService", () => {
     });
 
     it("keeps the last known company data when a refresh fails", async () => {
-        const { service, listCompanies, exportMasters } = buildService();
+        const { service, checkLiveness, listCompanies, exportMasters } = buildService();
 
         listCompanies.mockResolvedValue(["VEPL 2025-26", "Other Co"]);
         exportMasters.mockResolvedValue([{ name: "Capital Account", parent: null }]);
@@ -247,12 +288,13 @@ describe("TallyStatusService", () => {
         const ok = await service.getStatus();
 
         now += TALLY_STATUS_CACHE_TTL_MS + 1;
-        listCompanies.mockRejectedValue(new TallyUnreachable("down"));
+        checkLiveness.mockRejectedValue(new TallyUnreachable("down"));
 
         const failed = await service.getStatus();
 
         expect(failed.status).toBe("down");
         expect(failed.stale).toBe(true);
+        expect(failed.connection.serverRunning).toBe(false);
         expect(failed.company.loadedCompanies).toEqual(["VEPL 2025-26", "Other Co"]);
         expect(failed.lastSuccessAt).toBe(ok.lastSuccessAt);
         expect(failed.lastFailure?.code).toBe("UNREACHABLE");

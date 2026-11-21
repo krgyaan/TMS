@@ -1,4 +1,7 @@
 import { registerAs } from "@nestjs/config";
+import { readFileSync, statSync, type Stats } from "node:fs";
+import { isAbsolute } from "node:path";
+import { createSecureContext } from "node:tls";
 import { z } from "zod";
 
 const boolFromEnv = z
@@ -17,11 +20,14 @@ const intFromEnv = (fallback: number, min = 1) =>
 
 const rpsFromEnv = z.preprocess(value => (value === undefined || value === null || value === "" ? 2 : Number(value)), z.number().positive()).default(2);
 
+const MAX_CA_CERTIFICATE_BYTES = 64 * 1024;
+
 const tallyEnvSchema = z.object({
     TALLY_ENABLED: boolFromEnv,
     TALLY_BASE_URL: z.string().trim().optional(),
     TALLY_AUTH_TOKEN: z.string().optional(),
     TALLY_COMPANY: z.string().trim().optional(),
+    TALLY_CA_CERT_PATH: z.string().trim().optional(),
     TALLY_CONNECT_TIMEOUT_MS: intFromEnv(5000),
     TALLY_HTTP_TIMEOUT_MS: intFromEnv(30000),
     TALLY_RATE_LIMIT_RPS: rpsFromEnv,
@@ -37,6 +43,8 @@ export interface TallyConfig {
     baseUrl: string | null;
     authToken: string | null;
     company: string | null;
+    /** PEM contents of the private CA that signs the Tally proxy certificate. */
+    caCertificate: string | null;
     connectTimeoutMs: number;
     httpTimeoutMs: number;
     rateLimitRps: number;
@@ -57,6 +65,50 @@ const isPresent = (value: unknown): boolean => {
 
 const formatIssues = (error: z.ZodError): string => error.issues.map(issue => `${issue.path.length ? issue.path.join(".") : "env"}: ${issue.message}`).join("; ");
 
+const loadCaCertificate = (rawPath: string): string => {
+    const path = rawPath.trim();
+
+    if (!isAbsolute(path)) {
+        throw new Error("TALLY_CA_CERT_PATH must be an absolute path");
+    }
+
+    let stats: Stats;
+
+    try {
+        stats = statSync(path);
+    } catch {
+        throw new Error("TALLY_CA_CERT_PATH could not be read");
+    }
+
+    if (!stats.isFile()) {
+        throw new Error("TALLY_CA_CERT_PATH must point to a file");
+    }
+
+    if (stats.size > MAX_CA_CERTIFICATE_BYTES) {
+        throw new Error(`TALLY_CA_CERT_PATH must be at most ${MAX_CA_CERTIFICATE_BYTES} bytes`);
+    }
+
+    let pem: string;
+
+    try {
+        pem = readFileSync(path, "utf8");
+    } catch {
+        throw new Error("TALLY_CA_CERT_PATH could not be read");
+    }
+
+    if (!pem.includes("-----BEGIN CERTIFICATE-----")) {
+        throw new Error("TALLY_CA_CERT_PATH must contain a PEM certificate");
+    }
+
+    try {
+        createSecureContext({ ca: pem });
+    } catch {
+        throw new Error("TALLY_CA_CERT_PATH does not contain a valid certificate");
+    }
+
+    return pem;
+};
+
 /**
  * Parses and validates the Tally environment. Values are only required when
  * TALLY_ENABLED=true, so local/CI environments can leave the integration inert.
@@ -76,6 +128,7 @@ export function parseTallyEnv(env: Record<string, unknown>): TallyConfig {
         baseUrl: null,
         authToken: null,
         company: null,
+        caCertificate: null,
         connectTimeoutMs: data.TALLY_CONNECT_TIMEOUT_MS,
         httpTimeoutMs: data.TALLY_HTTP_TIMEOUT_MS,
         rateLimitRps: data.TALLY_RATE_LIMIT_RPS,
@@ -115,11 +168,14 @@ export function parseTallyEnv(env: Record<string, unknown>): TallyConfig {
         throw new Error("TALLY_BASE_URL must not contain a query string or fragment");
     }
 
+    const caPath = data.TALLY_CA_CERT_PATH?.trim();
+
     return {
         ...base,
         baseUrl: rawUrl.replace(/\/+$/, ""),
         authToken: data.TALLY_AUTH_TOKEN!,
         company: data.TALLY_COMPANY!.trim(),
+        caCertificate: caPath ? loadCaCertificate(caPath) : null,
     };
 }
 

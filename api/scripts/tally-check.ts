@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { parseTallyEnv } from "../src/config/tally.config";
 import { TallyClient, type TallyLogger } from "../src/modules/integrations/tally/client/tally.client";
-import { nodeTallyRequester, type TallyRequester } from "../src/modules/integrations/tally/transport/tally-http.transport";
+import { createNodeTallyRequester, type TallyRequester } from "../src/modules/integrations/tally/transport/tally-http.transport";
 import { RateLimiter } from "../src/modules/integrations/tally/transport/rate-limiter";
 
 const consoleLogger: TallyLogger = {
@@ -21,15 +21,18 @@ async function main(): Promise<void> {
     }
 
     const limiter = new RateLimiter({ rps: config.rateLimitRps, maxConcurrency: config.maxConcurrency });
-    const requester: TallyRequester = request => limiter.schedule(() => nodeTallyRequester(request));
+    const send = createNodeTallyRequester({ ca: config.caCertificate ?? undefined });
+    const requester: TallyRequester = request => limiter.schedule(() => send(request));
     const client = new TallyClient(config, requester, consoleLogger);
 
+    const liveness = await client.checkLiveness();
     const health = await client.health();
 
     console.log(
         JSON.stringify(
             {
                 enabled: health.enabled,
+                serverRunning: liveness.running,
                 reachable: health.reachable,
                 companyOpen: health.companyOpen,
                 companyMatches: health.companyMatches,
