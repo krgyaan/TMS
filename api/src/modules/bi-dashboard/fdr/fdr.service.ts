@@ -940,6 +940,10 @@ export class FdrService {
         return { ...result, linkedCheque, linkedBg };
     }
 
+    async getRequestLetterPreview(): Promise<{ path: string; url: string }> {
+        return this.notificationService.getFdrRequestLetterPreview();
+    }
+
     async getActionFormData(id: number) {
         const [result] = await this.db
             .select({

@@ -174,6 +174,49 @@ export class PaymentRequestsNotificationService {
         }
     };
 
+    private formatDateDDMMYYYYSlash = (dateStr: string | Date | null | undefined): string => {
+        return this.formatDateDDMMYYYY(dateStr).replace(/-/g, '/');
+    };
+
+    /**
+     * Duration between two dates expressed as calendar months + remaining days,
+     * e.g. "17 months 9 Days" for the Request Letter lien period.
+     */
+    private resolveLienPeriod = (
+        start: Date | string | null | undefined,
+        end: Date | string | null | undefined,
+    ): { text: string; months: number; days: number } => {
+        const fromDate = start ? new Date(start) : null;
+        const toDate = end ? new Date(end) : null;
+        if (!fromDate || !toDate || Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+            return { text: '', months: 0, days: 0 };
+        }
+
+        const from = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
+        const to = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate());
+        if (to.getTime() <= from.getTime()) {
+            return { text: '0 Days', months: 0, days: 0 };
+        }
+
+        let months = (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth());
+        const anchor = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+        anchor.setMonth(anchor.getMonth() + months);
+        if (anchor.getTime() > to.getTime()) {
+            months -= 1;
+            anchor.setTime(from.getTime());
+            anchor.setMonth(anchor.getMonth() + months);
+        }
+
+        const days = Math.max(0, Math.round((to.getTime() - anchor.getTime()) / 86400000));
+        const parts: string[] = [];
+        if (months > 0) {
+            parts.push(`${months} ${months === 1 ? 'month' : 'months'}`);
+        }
+        parts.push(`${days} ${days === 1 ? 'Day' : 'Days'}`);
+
+        return { text: parts.join(' '), months, days };
+    };
+
     
     private resolveBgDueDate(
         paymentReq: { type?: string | null; dueDate?: Date | string | null; createdAt?: Date | string | null },
@@ -741,6 +784,38 @@ export class PaymentRequestsNotificationService {
 
         return { courierProvider, courierDocketNo, courierDocketSlip };
     };
+
+    async getFdrRequestLetterPreview(): Promise<{ path: string; url: string }> {
+        const letterDate = new Date();
+        const expiry = new Date(letterDate.getFullYear(), letterDate.getMonth(), letterDate.getDate());
+        expiry.setMonth(expiry.getMonth() + 17);
+        expiry.setDate(expiry.getDate() + 9);
+
+        const lienPeriod = this.resolveLienPeriod(letterDate, expiry);
+
+        const [path] = await this.pdfGenerator.generatePdfs(
+            'fdrRequestLetter',
+            {
+                date: this.formatDateDDMMYYYY(letterDate),
+                beneficiary: 'Executive Engineer (E), PHEWD, CPWD, New Delhi',
+                purposeText: 'Tender Bidbond EMD',
+                referenceNo: '55/2026-27/EE (E)/PHEWD/III/Recall-2',
+                referenceLabel: 'Tender No.',
+                amount: '4,827.00/-',
+                lienPeriodText: lienPeriod.text,
+                lienFrom: this.formatDateDDMMYYYYSlash(letterDate),
+                lienTo: this.formatDateDDMMYYYYSlash(expiry),
+            },
+            0,
+            'FDR'
+        );
+
+        if (!path) {
+            throw new Error('Failed to generate the FDR request letter preview');
+        }
+
+        return { path, url: this.buildPublicFileUrl(path) };
+    }
 
     async getBgMailPreview(
         instrumentId: number,
@@ -1861,6 +1936,65 @@ export class PaymentRequestsNotificationService {
             } catch (error) {
                 this.logger.warn(
                     `FDR authorization letter generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
+
+            // Request letter — lien-marking letter addressed to the AU Bank
+            // branch, with the FDR details and lien period. Persisted on
+            // request_letter_path for later re-use.
+            try {
+                const letterDate = new Date();
+                const lienPeriod = this.resolveLienPeriod(letterDate, fdrExpiryDate);
+                const requestLetterPurpose = isBgPurpose
+                    ? purposeLabel
+                    : rawPurpose.toUpperCase() === 'EMD'
+                        ? 'Tender Bidbond EMD'
+                        : `Tender Bidbond ${purposeLabel}`;
+                const requestLetterBeneficiary = isBgPurpose
+                    ? 'AU Small Finance Bank Ltd'
+                    : (instrument.favouring || '');
+                const requestLetterAmount = instrument.amount
+                    ? `${Number(instrument.amount).toLocaleString('en-IN', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                    })}/-`
+                    : '';
+
+                const requestLetterData = {
+                    date: this.formatDateDDMMYYYY(letterDate),
+                    beneficiary: requestLetterBeneficiary,
+                    purposeText: requestLetterPurpose,
+                    referenceNo: fdrReference?.value || '',
+                    referenceLabel: fdrReference?.label || '',
+                    amount: requestLetterAmount,
+                    lienPeriodText: lienPeriod.text,
+                    lienFrom: this.formatDateDDMMYYYYSlash(letterDate),
+                    lienTo: this.formatDateDDMMYYYYSlash(fdrExpiryDate),
+                };
+
+                const [requestLetterPath] = await this.pdfGenerator.generatePdfs(
+                    'fdrRequestLetter',
+                    { ...requestLetterData },
+                    instrumentId,
+                    'FDR'
+                );
+
+                if (requestLetterPath) {
+                    addAttachmentLink('Request Letter', requestLetterPath);
+                    try {
+                        await this.db
+                            .update(instrumentFdrDetails)
+                            .set({ requestLetterPath })
+                            .where(eq(instrumentFdrDetails.instrumentId, instrumentId));
+                    } catch (persistError) {
+                        this.logger.warn(
+                            `Failed to persist FDR request letter path for instrument ${instrumentId}: ${persistError instanceof Error ? persistError.message : String(persistError)}`
+                        );
+                    }
+                }
+            } catch (error) {
+                this.logger.warn(
+                    `FDR request letter generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
                 );
             }
 

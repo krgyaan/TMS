@@ -16,6 +16,16 @@ const bgFile = (config: FileConfig): FileConfig => ({
     includeStorageDirInPath: true,
 });
 
+/**
+ * Auto-generated FDR letters nest under `bi-dashboard/fdr/<context>/`, matching
+ * the PDF generator's `baseDir` for the FDR letter templates.
+ */
+const fdrFile = (config: FileConfig): FileConfig => ({
+    ...config,
+    storageDir: 'bi-dashboard/fdr',
+    includeStorageDirInPath: true,
+});
+
 export const biDashboardConfigs: Record<string, FileConfig> = {
     "bg-format-files": bgFile({
         maxFiles: 5,
@@ -164,6 +174,25 @@ export const biDashboardConfigs: Record<string, FileConfig> = {
         allowedMimeTypes: [...DOCS],
         allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
     },
+    // Auto-generated FDR letters (stored under bi-dashboard/fdr/<context>/)
+    "fdrcovletter": fdrFile({
+        maxFiles: 5,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf"],
+    }),
+    "fdrauthletter": fdrFile({
+        maxFiles: 5,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf"],
+    }),
+    "fdrreqletter": fdrFile({
+        maxFiles: 5,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf"],
+    }),
     // Demand Draft file contexts
     "dd-format-imran": {
         maxFiles: 2,

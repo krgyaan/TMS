@@ -15,6 +15,7 @@ const BG_BG_PREFIXED_TYPES = new Set([
 const FDR_PREFIXED_TYPES = new Set([
     'fdrCoveringLetter',
     'fdrAuthorizationLetter',
+    'fdrRequestLetter',
 ]);
 
 /**
@@ -178,6 +179,18 @@ export const PDF_CONFIG = {
             templates: ['fdr-authorization-letter'],
             storagePath: 'fdrauthletter',
             baseDir: 'bi-dashboard/fdr/fdrauthletter',
+            margin: {
+                top: '0mm',
+                right: '0mm',
+                bottom: '0mm',
+                left: '0mm',
+            },
+        },
+        fdrRequestLetter: {
+            directory: 'letters',
+            templates: ['fdr-request-letter'],
+            storagePath: 'fdrreqletter',
+            baseDir: 'bi-dashboard/fdr/fdrreqletter',
             margin: {
                 top: '0mm',
                 right: '0mm',

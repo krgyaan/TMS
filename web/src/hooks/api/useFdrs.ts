@@ -99,6 +99,19 @@ export const useFDRFollowupData = (id: number) => {
     });
 };
 
+export const useFdrRequestLetterPreview = (enabled = true) => {
+    return useQuery<{ path: string; url: string }>({
+        queryKey: [...fdrsKey.all, 'request-letter-preview'],
+        queryFn: async () => {
+            const result = await fdrsService.getRequestLetterPreview();
+            return result;
+        },
+        enabled,
+        staleTime: 0,
+        gcTime: 0,
+    });
+};
+
 export const useUpdateFdrAction = () => {
     const queryClient = useQueryClient();
 

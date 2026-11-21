@@ -40,6 +40,11 @@ export class FdrController {
         return this.fdrService.getDashboardCounts();
     }
 
+    @Get('request-letter/preview')
+    async getRequestLetterPreview() {
+        return this.fdrService.getRequestLetterPreview();
+    }
+
     @Get('requests/:id')
     async getById(@Param('id', ParseIntPipe) id: number) {
         return this.fdrService.getById(id);
