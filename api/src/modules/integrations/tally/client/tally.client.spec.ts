@@ -107,6 +107,14 @@ describe("TallyClient", () => {
         await expect(client.listCompanies()).resolves.toEqual(["VEPL 2025-26", "Other Co"]);
     });
 
+    it("passes a per-call read timeout override", async () => {
+        const { client, calls } = buildClient(companiesResponse(["VEPL 2025-26"]));
+
+        await client.listCompanies({ readTimeoutMs: 1234 });
+
+        expect(calls[0].readTimeoutMs).toBe(1234);
+    });
+
     it("parses an import result", async () => {
         const { client } = buildClient(
             xmlResponse(

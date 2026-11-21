@@ -39,6 +39,11 @@ export interface TallyHealth {
     error?: string;
 }
 
+export interface TallyCallOptions {
+    /** Overrides TALLY_HTTP_TIMEOUT_MS for a single call (used by status checks). */
+    readTimeoutMs?: number;
+}
+
 interface ResolvedConfig {
     baseUrl: string;
     authToken: string;
@@ -110,11 +115,11 @@ export class TallyClient {
     }
 
     /** Lightweight reachability probe. Throws on failure. */
-    async ping(): Promise<void> {
-        await this.listCompanies();
+    async ping(options: TallyCallOptions = {}): Promise<void> {
+        await this.listCompanies(options);
     }
 
-    async listCompanies(): Promise<string[]> {
+    async listCompanies(options: TallyCallOptions = {}): Promise<string[]> {
         this.requireConfig();
 
         const xml = buildCollectionExportRequest({
@@ -122,7 +127,7 @@ export class TallyClient {
             objectType: "Company",
             nativeMethods: ["Name"],
         });
-        const response = await this.post("listCompanies", xml);
+        const response = await this.post("listCompanies", xml, options);
 
         return parseCompanyNames(response.xml);
     }
@@ -155,10 +160,10 @@ export class TallyClient {
         }
     }
 
-    async exportMasters(kind: MasterKind): Promise<TallyMasterRecord[]> {
+    async exportMasters(kind: MasterKind, options: TallyCallOptions = {}): Promise<TallyMasterRecord[]> {
         const { company } = this.requireConfig();
         const xml = buildMasterCollectionRequest(kind, { company });
-        const response = await this.post(`list:${kind}`, xml);
+        const response = await this.post(`list:${kind}`, xml, options);
 
         return parseMasterList(response.xml, kind);
     }
@@ -183,7 +188,7 @@ export class TallyClient {
         };
     }
 
-    private async post(operation: string, xml: string): Promise<{ xml: string; statusCode: number }> {
+    private async post(operation: string, xml: string, options: TallyCallOptions = {}): Promise<{ xml: string; statusCode: number }> {
         const { baseUrl, authToken } = this.requireConfig();
         const requestId = randomUUID();
         const startedAt = Date.now();
@@ -199,7 +204,7 @@ export class TallyClient {
                     Authorization: `Bearer ${authToken}`,
                 },
                 connectTimeoutMs: this.config.connectTimeoutMs,
-                readTimeoutMs: this.config.httpTimeoutMs,
+                readTimeoutMs: options.readTimeoutMs ?? this.config.httpTimeoutMs,
                 maxResponseBytes: MAX_TALLY_RESPONSE_BYTES,
             });
 

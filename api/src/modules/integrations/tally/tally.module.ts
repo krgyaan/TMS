@@ -6,6 +6,7 @@ import { RateLimiter } from "./transport/rate-limiter";
 import { nodeTallyRequester, type TallyRequester } from "./transport/tally-http.transport";
 import { TallyClient } from "./client/tally.client";
 import { TallyMastersService } from "./masters/tally-masters.service";
+import { TallyStatusService } from "./tally-status.service";
 import { TallyConfig } from "@/config/tally.config";
 
 /**
@@ -48,7 +49,8 @@ import { TallyConfig } from "@/config/tally.config";
         },
         TallyClient,
         TallyMastersService,
+        TallyStatusService,
     ],
-    exports: [TallyClient, TallyMastersService],
+    exports: [TallyClient, TallyMastersService, TallyStatusService],
 })
 export class TallyModule {}

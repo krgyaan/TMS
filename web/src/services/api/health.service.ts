@@ -156,6 +156,43 @@ export interface SystemHealth {
     }
 }
 
+export type TallyStatusState = 'disabled' | 'ok' | 'degraded' | 'down'
+
+export interface TallyStatusFailure {
+    code: string
+    message: string
+    at: string
+}
+
+export interface TallyStatus {
+    status: TallyStatusState
+    message: string
+    checkedAt: string
+    stale: boolean
+    cache: { ttlSeconds: number; ageSeconds: number }
+    connection: {
+        enabled: boolean
+        reachable: boolean
+        authOk: boolean
+        latencyMs: number | null
+        host: string | null
+    }
+    company: {
+        configured: string | null
+        open: boolean
+        loaded: boolean
+        loadedCompanies: string[]
+    }
+    limits: {
+        rateLimitRps: number
+        maxConcurrency: number
+        connectTimeoutMs: number
+        httpTimeoutMs: number
+    }
+    lastSuccessAt: string | null
+    lastFailure: TallyStatusFailure | null
+}
+
 class HealthService extends BaseApiService {
     constructor() {
         super('/health')
@@ -163,6 +200,10 @@ class HealthService extends BaseApiService {
 
     async getSystemHealth(): Promise<SystemHealth> {
         return this.get<SystemHealth>('')
+    }
+
+    async getTallyStatus(): Promise<TallyStatus> {
+        return this.get<TallyStatus>('/tally')
     }
 
     async getClaudeTelemetry(): Promise<ClaudeTelemetryResponse> {
