@@ -209,7 +209,7 @@ export function filterMenu(user: AuthUser | null, menu: NavGroup[]): NavGroup[] 
 export function buildFieldMenu(user: AuthUser | null): NavGroup[] {
     return [
         ...navMain.filter(group => group.title === "Dashboard"),
-        ...FIELD_DASHBOARD_TILES.filter(tile => canRead(user, tile.permission)).map(tile => ({
+        ...FIELD_DASHBOARD_TILES.filter(tile => !tile.permission || canRead(user, tile.permission)).map(tile => ({
             title: tile.title,
             url: tile.url,
             icon: tile.icon,

@@ -62,6 +62,11 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
     const poActions: ActionItem<PurchaseOrderRow>[] = useMemo(() => {
         const actions: ActionItem<PurchaseOrderRow>[] = [
             {
+                label: "Review PDF & Approve (TL)",
+                icon: <CheckCircle className="h-4 w-4" />,
+                onClick: (row) => navigate(`/operations/po/${row.id}/approval`),
+            },
+            {
                 label: "Upload Invoice",
                 icon: <FileUp className="h-4 w-4" />,
                 visible: (row) => Number(row.totalPiAmount || 0) < Number(row.grandTotal || 0),
@@ -111,9 +116,15 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <span>{getShortId(p.value)}</span>
+                            <button
+                                type="button"
+                                className="font-medium text-primary hover:underline cursor-pointer text-left"
+                                onClick={() => p.data?.id && navigate(`/operations/po/${p.data.id}/approval`)}
+                            >
+                                {getShortId(p.value)}
+                            </button>
                         </TooltipTrigger>
-                        <TooltipContent>{p.value}</TooltipContent>
+                        <TooltipContent>{p.value} — Click to open PDF Approval</TooltipContent>
                     </Tooltip>
                 </TooltipProvider>
             ),
