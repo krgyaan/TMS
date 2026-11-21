@@ -1,7 +1,7 @@
 /// <reference types="jest" />
 import { BadRequestException, ForbiddenException, NotFoundException } from "@nestjs/common";
 import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
-import { PurchaseOrderService } from "./purchase-order.service";
+import { PoApprovalService } from "./po-approval.service";
 
 function createMockSelectChain(rows: any[]) {
     const chain: any = {
@@ -58,7 +58,7 @@ function makeUser(overrides: Partial<ValidatedUser> = {}): ValidatedUser {
     } as ValidatedUser;
 }
 
-describe("PurchaseOrderService.submitTlApproval", () => {
+describe("PoApprovalService.submitTlApproval", () => {
     const basePo = {
         id: 42,
         poNumber: "VE/SOLAR/2627/PO0042",
@@ -81,14 +81,10 @@ describe("PurchaseOrderService.submitTlApproval", () => {
         const notifications = {
             notifyPoTlDecision: jest.fn().mockResolvedValue(undefined),
         };
-        const service = new PurchaseOrderService(
+        const service = new PoApprovalService(
             db,
             logger as any,
-            {} as any,
-            {} as any,
-            {} as any,
-            notifications as any,
-            {} as any
+            notifications as any
         );
         return { service, db, updateCalls, notifications };
     }
