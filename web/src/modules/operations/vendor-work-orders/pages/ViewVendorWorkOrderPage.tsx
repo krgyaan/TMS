@@ -55,6 +55,7 @@ function toOrderViewData(vwo: VendorWorkOrderView): OrderViewData {
         approvalRemark: vwo.woApprovalRemark,
         tlStatus: vwo.tlStatus ?? 0,
         tlComment: vwo.tlComment ?? null,
+        tlFeedback: vwo.tlFeedback ?? null,
         creatorTeamId: vwo.creatorTeamId ?? null,
         attachments: [
             { title: "Scope of Work", paths: parseAttachments(vwo.scopeOfWork) },

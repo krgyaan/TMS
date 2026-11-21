@@ -95,7 +95,17 @@ export class VendorWorkOrderController {
 
     @Patch(":id/tl-approval")
     @HttpCode(HttpStatus.OK)
-    submitTlApproval(@Param("id", ParseIntPipe) id: number, @Body() body: { tlStatus: number; tlComment?: string }, @CurrentUser() user: ValidatedUser) {
+    submitTlApproval(
+        @Param("id", ParseIntPipe) id: number,
+        @Body()
+        body: {
+            tlStatus: number;
+            tlComment?: string;
+            rejectionFields?: Array<{ field: string; label?: string; remark: string }>;
+            editFields?: Array<{ field: string; label?: string; oldValue: string; newValue: string; remark?: string }>;
+        },
+        @CurrentUser() user: ValidatedUser
+    ) {
         return this.service.submitTlApproval(id, body, user);
     }
 

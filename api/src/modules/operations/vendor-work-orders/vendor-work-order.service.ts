@@ -264,6 +264,7 @@ export class VendorWorkOrderService {
                     ...(isUnapproved && {
                         tlStatus: 0,
                         tlComment: null,
+                        tlFeedback: null,
                     }),
                     ...(wasRejected && {
                         woApproved: null,
@@ -510,6 +511,7 @@ export class VendorWorkOrderService {
                 amountAfterTds: vendorWorkOrders.amountAfterTds,
                 tlStatus: vendorWorkOrders.tlStatus,
                 tlComment: vendorWorkOrders.tlComment,
+                tlFeedback: vendorWorkOrders.tlFeedback,
                 woApproved: vendorWorkOrders.woApproved,
                 woApprovalRemark: vendorWorkOrders.woApprovalRemark,
                 closedAt: vendorWorkOrders.closedAt,
@@ -710,7 +712,12 @@ export class VendorWorkOrderService {
 
     async submitTlApproval(
         id: number,
-        body: { tlStatus: number; tlComment?: string },
+        body: {
+            tlStatus: number;
+            tlComment?: string;
+            rejectionFields?: Array<{ field: string; label?: string; remark: string }>;
+            editFields?: Array<{ field: string; label?: string; oldValue: string; newValue: string; remark?: string }>;
+        },
         user?: ValidatedUser
     ) {
         if (!user) {
@@ -718,14 +725,53 @@ export class VendorWorkOrderService {
         }
 
         const tlStatus = Number(body?.tlStatus);
-        if (tlStatus !== 1 && tlStatus !== 2) {
-            throw new BadRequestException("tlStatus must be 1 (Approve) or 2 (Reject)");
+        if (tlStatus !== 1 && tlStatus !== 2 && tlStatus !== 3) {
+            throw new BadRequestException("tlStatus must be 1 (Approve), 2 (Reject), or 3 (Edit Requested)");
         }
 
-        const comment = typeof body?.tlComment === "string" ? body.tlComment.trim() || null : null;
-        if (tlStatus === 2 && !comment) {
-            throw new BadRequestException("Rejection reason (tlComment) is required when rejecting a Work Order");
+        const rawComment = typeof body?.tlComment === "string" ? body.tlComment.trim() || null : null;
+        const rejectionFields = Array.isArray(body?.rejectionFields)
+            ? body.rejectionFields
+                  .map(f => ({
+                      field: String(f?.field ?? "").trim(),
+                      label: String(f?.label ?? f?.field ?? "").trim(),
+                      remark: String(f?.remark ?? "").trim(),
+                  }))
+                  .filter(f => f.field && f.remark)
+            : [];
+        const editFields = Array.isArray(body?.editFields)
+            ? body.editFields
+                  .map(f => ({
+                      field: String(f?.field ?? "").trim(),
+                      label: String(f?.label ?? f?.field ?? "").trim(),
+                      oldValue: String(f?.oldValue ?? "").trim(),
+                      newValue: String(f?.newValue ?? "").trim(),
+                      ...(typeof f?.remark === "string" && f.remark.trim() ? { remark: f.remark.trim() } : {}),
+                  }))
+                  .filter(f => f.field && f.newValue)
+            : [];
+
+        if (tlStatus === 2 && !rawComment && rejectionFields.length === 0) {
+            throw new BadRequestException("Rejection reason (tlComment or per-field rejection remarks) is required when rejecting a Work Order");
         }
+        if (tlStatus === 3 && !rawComment && editFields.length === 0) {
+            throw new BadRequestException("At least one requested field change (editFields) or edit remark is required when requesting an edit on a Work Order");
+        }
+
+        const comment =
+            tlStatus === 2 && rejectionFields.length > 0
+                ? [
+                      ...rejectionFields.map(f => `${f.label || f.field}: ${f.remark}`),
+                      ...(rawComment ? [`Note: ${rawComment}`] : []),
+                  ].join(" | ")
+                : tlStatus === 3 && editFields.length > 0
+                  ? [
+                        ...editFields.map(
+                            f => `${f.label || f.field}: "${f.oldValue || "—"}" → "${f.newValue}"${f.remark ? ` (${f.remark})` : ""}`
+                        ),
+                        ...(rawComment ? [`Note: ${rawComment}`] : []),
+                    ].join(" | ")
+                  : rawComment;
 
         const wo = await this.db
             .select()
@@ -790,12 +836,21 @@ export class VendorWorkOrderService {
         const now = new Date();
 
         if (tlStatus === 1) {
+            const tlFeedback = rawComment
+                ? {
+                      action: "approve" as const,
+                      generalRemark: rawComment,
+                      actedBy: user.id,
+                      actedAt: now.toISOString(),
+                  }
+                : null;
             const [updated] = await this.db
                 .update(vendorWorkOrders)
                 .set({
                     tlStatus: 1,
                     tlComment: comment,
-                    ...(wo.woApproved === false && wo.tlStatus === 2
+                    tlFeedback,
+                    ...(wo.woApproved === false && (wo.tlStatus === 2 || wo.tlStatus === 3)
                         ? { woApproved: null, woApprovalRemark: null }
                         : {}),
                     updatedAt: now,
@@ -820,12 +875,60 @@ export class VendorWorkOrderService {
 
             this.logger.info(`VWO #${id} approved by TL/Admin user #${user.id}`);
             return updated;
+        } else if (tlStatus === 3) {
+            const tlFeedback = {
+                action: "edit" as const,
+                generalRemark: rawComment,
+                editFields,
+                actedBy: user.id,
+                actedAt: now.toISOString(),
+            };
+            const [updated] = await this.db
+                .update(vendorWorkOrders)
+                .set({
+                    tlStatus: 3,
+                    tlComment: comment,
+                    tlFeedback,
+                    ...(wo.woApproved === false && wo.tlStatus === 2
+                        ? { woApproved: null, woApprovalRemark: null }
+                        : {}),
+                    updatedAt: now,
+                })
+                .where(eq(vendorWorkOrders.id, id))
+                .returning();
+
+            this.notifications
+                .notifyVwoTlDecision({
+                    vendorWorkOrderId: id,
+                    woNumber: wo.woNumber ?? `#${id}`,
+                    sellerName: wo.sellerName,
+                    grandTotal: round2(grandTotal).toFixed(2),
+                    projectName: wo.projectName,
+                    tlStatus: 3,
+                    tlComment: comment,
+                    editFields,
+                    actedBy: user.id,
+                    createdBy: wo.woRaisedBy ?? null,
+                    teamId: creatorTeamId,
+                })
+                .catch(err => this.logger.warn(`WhatsApp VWO TL edit-request notification failed: ${err}`));
+
+            this.logger.info(`VWO #${id} edit requested by TL/Admin user #${user.id}: ${comment}`);
+            return updated;
         } else {
+            const tlFeedback = {
+                action: "reject" as const,
+                generalRemark: rawComment,
+                rejectionFields,
+                actedBy: user.id,
+                actedAt: now.toISOString(),
+            };
             const [updated] = await this.db
                 .update(vendorWorkOrders)
                 .set({
                     tlStatus: 2,
                     tlComment: comment,
+                    tlFeedback,
                     woApproved: false,
                     woApprovalRemark: comment,
                     updatedAt: now,
@@ -856,6 +959,7 @@ export class VendorWorkOrderService {
                     projectName: wo.projectName,
                     tlStatus: 2,
                     tlComment: comment,
+                    ...(rejectionFields.length > 0 ? { rejectionFields } : {}),
                     actedBy: user.id,
                     createdBy: wo.woRaisedBy ?? null,
                     teamId: creatorTeamId,
@@ -893,6 +997,7 @@ export class VendorWorkOrderService {
                 amountAfterTds: vendorWorkOrders.amountAfterTds,
                 tlStatus: vendorWorkOrders.tlStatus,
                 tlComment: vendorWorkOrders.tlComment,
+                tlFeedback: vendorWorkOrders.tlFeedback,
                 woApproved: vendorWorkOrders.woApproved,
                 woApprovalRemark: vendorWorkOrders.woApprovalRemark,
                 closedAt: vendorWorkOrders.closedAt,

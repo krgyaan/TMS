@@ -40,6 +40,7 @@ export interface PurchaseOrderView {
     poApprovalRemark?: string;
     tlStatus?: number | null;
     tlComment?: string | null;
+    tlFeedback?: any | null;
     creatorTeamId?: number | null;
     category?: string;
     poType?: string;

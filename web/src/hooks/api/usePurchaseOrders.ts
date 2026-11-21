@@ -159,8 +159,18 @@ export const useSetTdsPercentage = () => {
 export const useSubmitPoTlApproval = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: { tlStatus: 1 | 2; tlComment?: string } }) =>
-            purchaseOrderApi.submitTlApproval(id, data),
+        mutationFn: ({
+            id,
+            data,
+        }: {
+            id: number;
+            data: {
+                tlStatus: 1 | 2 | 3;
+                tlComment?: string;
+                rejectionFields?: Array<{ field: string; label?: string; remark: string }>;
+                editFields?: Array<{ field: string; label?: string; oldValue: string; newValue: string; remark?: string }>;
+            };
+        }) => purchaseOrderApi.submitTlApproval(id, data),
         onSuccess: (_data, { id }) => {
             queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.purchaseOrder(id) });
             queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.all });

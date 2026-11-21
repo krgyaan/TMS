@@ -36,8 +36,18 @@ export function useSetVwoApproval() {
 export function useSubmitVwoTlApproval() {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: { tlStatus: 1 | 2; tlComment?: string } }) =>
-            vendorWorkOrderApi.submitTlApproval(id, data),
+        mutationFn: ({
+            id,
+            data,
+        }: {
+            id: number;
+            data: {
+                tlStatus: 1 | 2 | 3;
+                tlComment?: string;
+                rejectionFields?: Array<{ field: string; label?: string; remark: string }>;
+                editFields?: Array<{ field: string; label?: string; oldValue: string; newValue: string; remark?: string }>;
+            };
+        }) => vendorWorkOrderApi.submitTlApproval(id, data),
         onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: vwoKeys.all });
             queryClient.invalidateQueries({ queryKey: ["vendor-work-orders", variables.id] });

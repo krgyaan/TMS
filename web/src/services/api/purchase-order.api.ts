@@ -155,7 +155,15 @@ class PurchaseOrderApiService extends BaseApiService {
         return this.put(`/${id}/tds`, data);
     }
 
-    async submitTlApproval(id: number, data: { tlStatus: 1 | 2; tlComment?: string }): Promise<any> {
+    async submitTlApproval(
+        id: number,
+        data: {
+            tlStatus: 1 | 2 | 3;
+            tlComment?: string;
+            rejectionFields?: Array<{ field: string; label?: string; remark: string }>;
+            editFields?: Array<{ field: string; label?: string; oldValue: string; newValue: string; remark?: string }>;
+        }
+    ): Promise<any> {
         return this.patch(`/${id}/tl-approval`, data);
     }
 

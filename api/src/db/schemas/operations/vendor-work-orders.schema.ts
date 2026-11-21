@@ -48,9 +48,10 @@ export const vendorWorkOrders = pgTable(
         tdsPercentage: numeric("tds_percentage", { precision: 5, scale: 2 }),
         tdsAmount: numeric("tds_amount", { precision: 14, scale: 2 }),
         amountAfterTds: numeric("amount_after_tds", { precision: 14, scale: 2 }),
-        // TL Approval: 0 = Pending, 1 = Approved, 2 = Rejected
+        // TL Approval: 0 = Pending, 1 = Approved, 2 = Rejected, 3 = Edit Requested
         tlStatus: smallint("tl_status").notNull().default(0),
         tlComment: text("tl_comment"),
+        tlFeedback: jsonb("tl_feedback"),
         woApproved: boolean("wo_approved"),
         woApprovalRemark: text("wo_approval_remark"),
         closedAt: timestamp("closed_at", { withTimezone: true }),

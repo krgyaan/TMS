@@ -38,6 +38,7 @@ export interface VendorWorkOrderView {
     woApprovalRemark?: string;
     tlStatus?: number | null;
     tlComment?: string | null;
+    tlFeedback?: any | null;
     creatorTeamId?: number | null;
     category?: string;
     accessoriesPackagingListAttachments?: string;
