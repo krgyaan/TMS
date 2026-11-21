@@ -272,4 +272,65 @@ describe("VendorWorkOrderService.submitTlApproval", () => {
             )
         ).rejects.toThrow(NotFoundException);
     });
+
+    it("supports Edit Requested (tlStatus = 3) with Old vs New field values and notifies GROUPS.POVWO", async () => {
+        const editVwo = {
+            ...baseVwo,
+            tlStatus: 3,
+            tlComment: 'Unit Rates / Pricing: "₹80,000" → "₹75,000" (As per negotiated quote)',
+        };
+        const { service, updateCalls, notifications } = buildService(
+            [[baseVwo], [{ primaryTeamId: 1, team: 1 }], items, []],
+            editVwo
+        );
+
+        const result = await service.submitTlApproval(
+            77,
+            {
+                tlStatus: 3,
+                editFields: [
+                    {
+                        field: "pricing",
+                        label: "Unit Rates / Pricing",
+                        oldValue: "₹80,000",
+                        newValue: "₹75,000",
+                        remark: "As per negotiated quote",
+                    },
+                ],
+            },
+            makeUser({ id: 10, role: "Team Leader", roleId: 3, teamId: 1 })
+        );
+
+        expect(result).toEqual(editVwo);
+        expect(updateCalls).toHaveLength(1);
+        expect(updateCalls[0].payload).toMatchObject({
+            tlStatus: 3,
+            tlComment: 'Unit Rates / Pricing: "₹80,000" → "₹75,000" (As per negotiated quote)',
+            tlFeedback: expect.objectContaining({
+                action: "edit",
+                editFields: [
+                    {
+                        field: "pricing",
+                        label: "Unit Rates / Pricing",
+                        oldValue: "₹80,000",
+                        newValue: "₹75,000",
+                        remark: "As per negotiated quote",
+                    },
+                ],
+            }),
+        });
+        expect(notifications.notifyVwoTlDecision).toHaveBeenCalledWith(
+            expect.objectContaining({
+                vendorWorkOrderId: 77,
+                tlStatus: 3,
+                editFields: [
+                    expect.objectContaining({
+                        field: "pricing",
+                        oldValue: "₹80,000",
+                        newValue: "₹75,000",
+                    }),
+                ],
+            })
+        );
+    });
 });

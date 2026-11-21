@@ -47,8 +47,39 @@ export interface OrderPurchaseInvoiceRow {
     uploadedByName: string;
 }
 
+export interface TlRejectFieldFeedback {
+    field: string;
+    label?: string;
+    remark: string;
+}
+
+export interface TlEditFieldFeedback {
+    field: string;
+    label?: string;
+    oldValue: string;
+    newValue: string;
+    remark?: string;
+}
+
+export interface TlFeedbackPayload {
+    action: "approve" | "reject" | "edit";
+    generalRemark?: string | null;
+    rejectionFields?: TlRejectFieldFeedback[];
+    editFields?: TlEditFieldFeedback[];
+    actedBy?: number;
+    actedAt?: string;
+}
+
+export interface SubmitTlApprovalPayload {
+    tlStatus: 1 | 2 | 3;
+    tlComment?: string;
+    rejectionFields?: TlRejectFieldFeedback[];
+    editFields?: TlEditFieldFeedback[];
+}
+
 export interface OrderViewData {
     id: number;
+    projectId?: number;
     number: string;
     category?: string;
     date: string;
@@ -82,7 +113,10 @@ export interface OrderViewData {
     approvalRemark?: string;
     tlStatus?: number | null;
     tlComment?: string | null;
+    tlFeedback?: TlFeedbackPayload | null;
     creatorTeamId?: number | null;
+    remarks?: string;
+    termsAndConditions?: Array<{ field?: string; value?: string }>;
     attachments: OrderAttachmentGroup[];
     generatedPdfVersions: Record<string, { path: string; hash: string }> | null;
 }

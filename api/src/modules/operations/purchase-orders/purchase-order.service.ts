@@ -72,6 +72,7 @@ export class PurchaseOrderService {
                 amountAfterTds: purchaseOrders.amountAfterTds,
                 tlStatus: purchaseOrders.tlStatus,
                 tlComment: purchaseOrders.tlComment,
+                tlFeedback: purchaseOrders.tlFeedback,
                 totalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0) + COALESCE((SELECT SUM(taxable_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                 totalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0) + COALESCE((SELECT SUM(gst_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                 grandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0) + COALESCE((SELECT SUM(total_amount::numeric) FROM order_extra_charges WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
@@ -200,6 +201,7 @@ export class PurchaseOrderService {
                 amountAfterTds: purchaseOrders.amountAfterTds,
                 tlStatus: purchaseOrders.tlStatus,
                 tlComment: purchaseOrders.tlComment,
+                tlFeedback: purchaseOrders.tlFeedback,
                 poApproved: purchaseOrders.poApproved,
                 poApprovalRemark: purchaseOrders.poApprovalRemark,
                 closedAt: purchaseOrders.closedAt,
@@ -772,9 +774,18 @@ export class PurchaseOrderService {
 
     async submitTlApproval(
         id: number,
-        body: { tlStatus: number; tlComment?: string },
-        user: ValidatedUser
+        body: {
+            tlStatus: number;
+            tlComment?: string;
+            rejectionFields?: Array<{ field: string; label?: string; remark: string }>;
+            editFields?: Array<{ field: string; label?: string; oldValue: string; newValue: string; remark?: string }>;
+        },
+        user?: ValidatedUser
     ) {
+        if (!user) {
+            throw new ForbiddenException("Authentication is required to approve or reject a Purchase Order.");
+        }
+
         const po = await this.db
             .select()
             .from(purchaseOrders)
@@ -833,14 +844,53 @@ export class PurchaseOrderService {
         }
 
         const tlStatus = Number(body?.tlStatus);
-        if (tlStatus !== 1 && tlStatus !== 2) {
-            throw new BadRequestException("tlStatus must be 1 (Approved) or 2 (Rejected)");
+        if (tlStatus !== 1 && tlStatus !== 2 && tlStatus !== 3) {
+            throw new BadRequestException("tlStatus must be 1 (Approved), 2 (Rejected), or 3 (Edit Requested)");
         }
 
-        const comment = body?.tlComment?.trim() || null;
-        if (tlStatus === 2 && !comment) {
-            throw new BadRequestException("A rejection reason (tlComment) is required when rejecting a Purchase Order.");
+        const rawComment = typeof body?.tlComment === "string" ? body.tlComment.trim() || null : null;
+        const rejectionFields = Array.isArray(body?.rejectionFields)
+            ? body.rejectionFields
+                  .map(f => ({
+                      field: String(f?.field ?? "").trim(),
+                      label: String(f?.label ?? f?.field ?? "").trim(),
+                      remark: String(f?.remark ?? "").trim(),
+                  }))
+                  .filter(f => f.field && f.remark)
+            : [];
+        const editFields = Array.isArray(body?.editFields)
+            ? body.editFields
+                  .map(f => ({
+                      field: String(f?.field ?? "").trim(),
+                      label: String(f?.label ?? f?.field ?? "").trim(),
+                      oldValue: String(f?.oldValue ?? "").trim(),
+                      newValue: String(f?.newValue ?? "").trim(),
+                      ...(typeof f?.remark === "string" && f.remark.trim() ? { remark: f.remark.trim() } : {}),
+                  }))
+                  .filter(f => f.field && f.newValue)
+            : [];
+
+        if (tlStatus === 2 && !rawComment && rejectionFields.length === 0) {
+            throw new BadRequestException("A rejection reason (tlComment or per-field rejection remarks) is required when rejecting a Purchase Order.");
         }
+        if (tlStatus === 3 && !rawComment && editFields.length === 0) {
+            throw new BadRequestException("At least one requested field change (editFields) or edit remark is required when requesting an edit.");
+        }
+
+        const comment =
+            tlStatus === 2 && rejectionFields.length > 0
+                ? [
+                      ...rejectionFields.map(f => `${f.label || f.field}: ${f.remark}`),
+                      ...(rawComment ? [`Note: ${rawComment}`] : []),
+                  ].join(" | ")
+                : tlStatus === 3 && editFields.length > 0
+                  ? [
+                        ...editFields.map(
+                            f => `${f.label || f.field}: "${f.oldValue || "—"}" → "${f.newValue}"${f.remark ? ` (${f.remark})` : ""}`
+                        ),
+                        ...(rawComment ? [`Note: ${rawComment}`] : []),
+                    ].join(" | ")
+                  : rawComment;
 
         // Compute grandTotal for notifications
         const products = await this.db
@@ -858,13 +908,22 @@ export class PurchaseOrderService {
         const now = new Date();
 
         if (tlStatus === 1) {
+            const tlFeedback = rawComment
+                ? {
+                      action: "approve" as const,
+                      generalRemark: rawComment,
+                      actedBy: user.id,
+                      actedAt: now.toISOString(),
+                  }
+                : null;
             const [updated] = await this.db
                 .update(purchaseOrders)
                 .set({
                     tlStatus: 1,
                     tlComment: comment,
+                    tlFeedback,
                     // If previously rejected by TL, clear poApproved=false so it moves to pending Accounts
-                    ...(po.poApproved === false && po.tlStatus === 2
+                    ...(po.poApproved === false && (po.tlStatus === 2 || po.tlStatus === 3)
                         ? { poApproved: null, poApprovalRemark: null }
                         : {}),
                     updatedAt: now,
@@ -889,12 +948,60 @@ export class PurchaseOrderService {
 
             this.logger.info(`PO #${id} approved by TL/Admin user #${user.id}`);
             return updated;
+        } else if (tlStatus === 3) {
+            const tlFeedback = {
+                action: "edit" as const,
+                generalRemark: rawComment,
+                editFields,
+                actedBy: user.id,
+                actedAt: now.toISOString(),
+            };
+            const [updated] = await this.db
+                .update(purchaseOrders)
+                .set({
+                    tlStatus: 3,
+                    tlComment: comment,
+                    tlFeedback,
+                    ...(po.poApproved === false && po.tlStatus === 2
+                        ? { poApproved: null, poApprovalRemark: null }
+                        : {}),
+                    updatedAt: now,
+                })
+                .where(eq(purchaseOrders.id, id))
+                .returning();
+
+            this.notifications
+                .notifyPoTlDecision({
+                    purchaseOrderId: id,
+                    poNumber: po.poNumber ?? `#${id}`,
+                    sellerName: po.sellerName,
+                    grandTotal: round2(grandTotal).toFixed(2),
+                    projectName: po.projectName,
+                    tlStatus: 3,
+                    tlComment: comment,
+                    editFields,
+                    actedBy: user.id,
+                    createdBy: po.poRaisedBy ?? null,
+                    teamId: creatorTeamId,
+                })
+                .catch(err => this.logger.warn(`WhatsApp TL edit-request notification failed: ${err}`));
+
+            this.logger.info(`PO #${id} edit requested by TL/Admin user #${user.id}: ${comment}`);
+            return updated;
         } else {
+            const tlFeedback = {
+                action: "reject" as const,
+                generalRemark: rawComment,
+                rejectionFields,
+                actedBy: user.id,
+                actedAt: now.toISOString(),
+            };
             const [updated] = await this.db
                 .update(purchaseOrders)
                 .set({
                     tlStatus: 2,
                     tlComment: comment,
+                    tlFeedback,
                     poApproved: false,
                     poApprovalRemark: comment,
                     updatedAt: now,
@@ -926,6 +1033,7 @@ export class PurchaseOrderService {
                     projectName: po.projectName,
                     tlStatus: 2,
                     tlComment: comment,
+                    ...(rejectionFields.length > 0 ? { rejectionFields } : {}),
                     actedBy: user.id,
                     createdBy: po.poRaisedBy ?? null,
                     teamId: creatorTeamId,
@@ -1357,6 +1465,7 @@ export class PurchaseOrderService {
                     ...(existingPO.poApproved !== true && {
                         tlStatus: 0,
                         tlComment: null,
+                        tlFeedback: null,
                     }),
 
                     ...(wasRejected && {

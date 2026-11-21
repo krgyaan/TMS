@@ -40,6 +40,7 @@ export interface VendorWorkOrderRow {
     woApprovalRemark?: string;
     tlStatus?: number | null;
     tlComment?: string | null;
+    tlFeedback?: any | null;
     creatorTeamId?: number | null;
     totalVwiAmount?: number;
     totalVwiCount?: number;

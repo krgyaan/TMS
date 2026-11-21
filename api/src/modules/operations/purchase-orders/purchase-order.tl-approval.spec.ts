@@ -273,4 +273,112 @@ describe("PurchaseOrderService.submitTlApproval", () => {
             )
         ).rejects.toThrow(NotFoundException);
     });
+
+    it("persists structured multi-field rejection feedback (tlFeedback) and formatted tlComment", async () => {
+        const rejectedPo = {
+            ...basePo,
+            tlStatus: 2,
+            tlComment: "Unit Rates / Pricing: 10% above quotation | GST / Taxes: Use 18% GST",
+            poApproved: false,
+        };
+        const { service, updateCalls, notifications } = buildService(
+            [[basePo], [{ primaryTeamId: 1, team: 1 }], products, []],
+            rejectedPo
+        );
+
+        await service.submitTlApproval(
+            42,
+            {
+                tlStatus: 2,
+                rejectionFields: [
+                    { field: "pricing", label: "Unit Rates / Pricing", remark: "10% above quotation" },
+                    { field: "gst_taxes", label: "GST / Taxes", remark: "Use 18% GST" },
+                ],
+            },
+            makeUser({ id: 10, role: "Team Leader", roleId: 3, teamId: 1 })
+        );
+
+        expect(updateCalls[0].payload).toMatchObject({
+            tlStatus: 2,
+            tlComment: "Unit Rates / Pricing: 10% above quotation | GST / Taxes: Use 18% GST",
+            poApproved: false,
+            tlFeedback: expect.objectContaining({
+                action: "reject",
+                rejectionFields: [
+                    { field: "pricing", label: "Unit Rates / Pricing", remark: "10% above quotation" },
+                    { field: "gst_taxes", label: "GST / Taxes", remark: "Use 18% GST" },
+                ],
+            }),
+        });
+        expect(notifications.notifyPoTlDecision).toHaveBeenCalledWith(
+            expect.objectContaining({
+                tlStatus: 2,
+                rejectionFields: [
+                    { field: "pricing", label: "Unit Rates / Pricing", remark: "10% above quotation" },
+                    { field: "gst_taxes", label: "GST / Taxes", remark: "Use 18% GST" },
+                ],
+            })
+        );
+    });
+
+    it("supports Edit Requested (tlStatus = 3) with Old vs New field values and notifies GROUPS.POVWO", async () => {
+        const editPo = {
+            ...basePo,
+            tlStatus: 3,
+            tlComment: 'Delivery / Ship-To Address: "Warehouse A" → "Site Gate 3" (Confirmed with PM)',
+        };
+        const { service, updateCalls, notifications } = buildService(
+            [[basePo], [{ primaryTeamId: 1, team: 1 }], products, []],
+            editPo
+        );
+
+        const result = await service.submitTlApproval(
+            42,
+            {
+                tlStatus: 3,
+                editFields: [
+                    {
+                        field: "shippingAddress",
+                        label: "Delivery / Ship-To Address",
+                        oldValue: "Warehouse A",
+                        newValue: "Site Gate 3",
+                        remark: "Confirmed with PM",
+                    },
+                ],
+            },
+            makeUser({ id: 10, role: "Team Leader", roleId: 3, teamId: 1 })
+        );
+
+        expect(result).toEqual(editPo);
+        expect(updateCalls).toHaveLength(1);
+        expect(updateCalls[0].payload).toMatchObject({
+            tlStatus: 3,
+            tlComment: 'Delivery / Ship-To Address: "Warehouse A" → "Site Gate 3" (Confirmed with PM)',
+            tlFeedback: expect.objectContaining({
+                action: "edit",
+                editFields: [
+                    {
+                        field: "shippingAddress",
+                        label: "Delivery / Ship-To Address",
+                        oldValue: "Warehouse A",
+                        newValue: "Site Gate 3",
+                        remark: "Confirmed with PM",
+                    },
+                ],
+            }),
+        });
+        expect(notifications.notifyPoTlDecision).toHaveBeenCalledWith(
+            expect.objectContaining({
+                purchaseOrderId: 42,
+                tlStatus: 3,
+                editFields: [
+                    expect.objectContaining({
+                        field: "shippingAddress",
+                        oldValue: "Warehouse A",
+                        newValue: "Site Gate 3",
+                    }),
+                ],
+            })
+        );
+    });
 });

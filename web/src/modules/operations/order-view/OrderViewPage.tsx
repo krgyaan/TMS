@@ -78,6 +78,16 @@ function TlApprovalBadge({
             </div>
         );
     }
+    if (tlStatus === 3) {
+        return (
+            <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="secondary" className="bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
+                    Edit Requested by TL
+                </Badge>
+                {tlComment && <span className="text-xs text-muted-foreground">{tlComment}</span>}
+            </div>
+        );
+    }
     return <Badge variant="outline">Pending TL Approval</Badge>;
 }
 
@@ -284,14 +294,25 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
     return (
         <Card>
             <CardHeader>
-                <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-                        <ArrowLeft className="h-5 w-5" />
-                    </Button>
-                    <div>
-                        <h1 className="text-xl font-semibold">{data.number}</h1>
-                        {data.category && <p className="text-sm text-muted-foreground">{data.category}</p>}
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+                            <ArrowLeft className="h-5 w-5" />
+                        </Button>
+                        <div>
+                            <h1 className="text-xl font-semibold">{data.number}</h1>
+                            {data.category && <p className="text-sm text-muted-foreground">{data.category}</p>}
+                        </div>
                     </div>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={() => navigate(`/operations/${type === "vwo" ? "wo" : "po"}/${data.id}/approval`)}
+                    >
+                        <ShieldCheck className="h-4 w-4 text-primary" />
+                        PDF Approval View
+                    </Button>
                 </div>
             </CardHeader>
 

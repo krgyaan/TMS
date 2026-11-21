@@ -55,6 +55,7 @@ function toOrderViewData(po: PurchaseOrderView): OrderViewData {
         approvalRemark: po.poApprovalRemark,
         tlStatus: po.tlStatus ?? 0,
         tlComment: po.tlComment ?? null,
+        tlFeedback: po.tlFeedback ?? null,
         creatorTeamId: po.creatorTeamId ?? null,
         attachments: [
             ...(po.poType === "pi" ? [{ title: "Invoice Copy", paths: parseAttachments(po.piAttachments) }] : []),

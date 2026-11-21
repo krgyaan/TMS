@@ -48,6 +48,36 @@ export interface MakerDoneNotificationData {
   category: string;
 }
 
+export interface TlRejectFieldFeedback {
+  field: string;
+  label?: string;
+  remark: string;
+}
+
+export interface TlEditFieldFeedback {
+  field: string;
+  label?: string;
+  oldValue: string;
+  newValue: string;
+  remark?: string;
+}
+
+export interface TlFeedbackPayload {
+  action: 'approve' | 'reject' | 'edit';
+  generalRemark?: string | null;
+  rejectionFields?: TlRejectFieldFeedback[];
+  editFields?: TlEditFieldFeedback[];
+  actedBy?: number;
+  actedAt?: string;
+}
+
+export interface SubmitTlApprovalDto {
+  tlStatus: number; // 1 = Approve, 2 = Reject, 3 = Edit Requested
+  tlComment?: string;
+  rejectionFields?: TlRejectFieldFeedback[];
+  editFields?: TlEditFieldFeedback[];
+}
+
 export interface PoCreatedNotificationData {
   purchaseOrderId?: number;
   poNumber: string;
@@ -66,8 +96,10 @@ export interface PoTlDecisionNotificationData {
   sellerName: string | null;
   grandTotal: string | number;
   projectName: string | null;
-  tlStatus: 1 | 2;
+  tlStatus: 1 | 2 | 3;
   tlComment: string | null;
+  rejectionFields?: TlRejectFieldFeedback[];
+  editFields?: TlEditFieldFeedback[];
   actedBy: number;
   createdBy: number | null;
   teamId: number | null;
@@ -118,8 +150,10 @@ export interface VwoTlDecisionNotificationData {
   sellerName: string | null;
   grandTotal: string | number;
   projectName: string | null;
-  tlStatus: 1 | 2;
+  tlStatus: 1 | 2 | 3;
   tlComment: string | null;
+  rejectionFields?: TlRejectFieldFeedback[];
+  editFields?: TlEditFieldFeedback[];
   actedBy: number;
   createdBy: number | null;
   teamId: number | null;
@@ -546,24 +580,46 @@ export class OperationNotificationService {
     }
   }
 
-  private buildDirectPoAppUrl(purchaseOrderId?: number | null): string | null {
+  private async buildDirectPoAppUrl(purchaseOrderId?: number | null): Promise<string | null> {
     if (!purchaseOrderId) return null;
+    const relativePath = `/operations/po/${purchaseOrderId}/approval`;
     const baseUrl = (
       process.env.PUBLIC_APP_URL ||
       process.env.FRONTEND_URL ||
       'http://localhost:5173'
     ).replace(/\/+$/, '');
-    return `${baseUrl}/operations/purchase-orders/${purchaseOrderId}`;
+    const fallbackUrl = `${baseUrl}${relativePath}`;
+
+    if (typeof (this.publicLink as any)?.buildAppShortUrl === 'function') {
+      try {
+        const shortUrl = await this.publicLink.buildAppShortUrl(relativePath, 'po-tl-approval');
+        if (shortUrl) return shortUrl;
+      } catch (err) {
+        this.logger.warn(`Failed to build short PO approval URL: ${err}`);
+      }
+    }
+    return fallbackUrl;
   }
 
-  private buildDirectVwoAppUrl(vendorWorkOrderId?: number | null): string | null {
+  private async buildDirectVwoAppUrl(vendorWorkOrderId?: number | null): Promise<string | null> {
     if (!vendorWorkOrderId) return null;
+    const relativePath = `/operations/wo/${vendorWorkOrderId}/approval`;
     const baseUrl = (
       process.env.PUBLIC_APP_URL ||
       process.env.FRONTEND_URL ||
       'http://localhost:5173'
     ).replace(/\/+$/, '');
-    return `${baseUrl}/operations/vendor-work-orders/${vendorWorkOrderId}`;
+    const fallbackUrl = `${baseUrl}${relativePath}`;
+
+    if (typeof (this.publicLink as any)?.buildAppShortUrl === 'function') {
+      try {
+        const shortUrl = await this.publicLink.buildAppShortUrl(relativePath, 'wo-tl-approval');
+        if (shortUrl) return shortUrl;
+      } catch (err) {
+        this.logger.warn(`Failed to build short VWO approval URL: ${err}`);
+      }
+    }
+    return fallbackUrl;
   }
 
   async notifyPoCreated(data: PoCreatedNotificationData): Promise<void> {
@@ -579,7 +635,7 @@ export class OperationNotificationService {
         .limit(1);
 
       const userName = user?.name ?? 'Unknown';
-      const poUrl = this.buildDirectPoAppUrl(data.purchaseOrderId);
+      const poUrl = await this.buildDirectPoAppUrl(data.purchaseOrderId);
       const tenderOrProject =
         [data.tenderNo, data.tenderName].filter(Boolean).join(' - ') ||
         data.projectName ||
@@ -595,7 +651,7 @@ export class OperationNotificationService {
       ];
 
       if (poUrl) {
-        lines.push(`Review & Approve in TMS: ${poUrl}`);
+        lines.push(`Review PDF & Approve: ${poUrl}`);
       } else {
         lines.push(`Kindly review and approve in TMS.`);
       }
@@ -616,7 +672,7 @@ export class OperationNotificationService {
         .limit(1);
 
       const actorName = actor?.name ?? 'Team Leader';
-      const poUrl = this.buildDirectPoAppUrl(data.purchaseOrderId);
+      const poUrl = await this.buildDirectPoAppUrl(data.purchaseOrderId);
 
       if (data.tlStatus === 1) {
         const lines: string[] = [
@@ -636,6 +692,31 @@ export class OperationNotificationService {
 
         const text = lines.join('\n');
         await this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO });
+      } else if (data.tlStatus === 3) {
+        const lines: string[] = [
+          `*PO Edit Requested by Team Leader*`,
+          `PO No: ${data.poNumber}`,
+          `Project: ${data.projectName || 'N/A'}`,
+          `Vendor: ${data.sellerName || 'N/A'}`,
+          `Grand Total: ₹${data.grandTotal}`,
+          `Requested By: ${actorName}`,
+        ];
+        if (data.editFields && data.editFields.length > 0) {
+          lines.push(`Requested Changes:`);
+          for (const ef of data.editFields) {
+            lines.push(
+              `- ${ef.label || ef.field}: "${ef.oldValue || '—'}" → "${ef.newValue}"${ef.remark ? ` (${ef.remark})` : ''}`
+            );
+          }
+        } else if (data.tlComment) {
+          lines.push(`Details: ${data.tlComment}`);
+        }
+        if (poUrl) {
+          lines.push(`View in TMS: ${poUrl}`);
+        }
+
+        const text = lines.join('\n');
+        await this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO });
       } else {
         const lines: string[] = [
           `*PO Rejected by Team Leader*`,
@@ -646,6 +727,11 @@ export class OperationNotificationService {
           `Rejected By: ${actorName}`,
           `Reason: ${data.tlComment || 'N/A'}`,
         ];
+        if (data.rejectionFields && data.rejectionFields.length > 0) {
+          for (const rf of data.rejectionFields) {
+            lines.push(`- ${rf.label || rf.field}: ${rf.remark}`);
+          }
+        }
         if (poUrl) {
           lines.push(`View in TMS: ${poUrl}`);
         }
@@ -691,7 +777,7 @@ export class OperationNotificationService {
         .limit(1);
 
       const userName = user?.name ?? 'Unknown';
-      const poUrl = this.buildDirectPoAppUrl(data.purchaseOrderId);
+      const poUrl = await this.buildDirectPoAppUrl(data.purchaseOrderId);
 
       const lines: string[] = [
         `*PO Updated — TL Approval Required* @${userName}`,
@@ -705,7 +791,7 @@ export class OperationNotificationService {
         lines.push(`Grand Total: ₹${data.grandTotal}`);
       }
       if (poUrl) {
-        lines.push(`Review & Approve in TMS: ${poUrl}`);
+        lines.push(`Review PDF & Approve: ${poUrl}`);
       }
 
       const text = lines.join('\n');
@@ -724,7 +810,7 @@ export class OperationNotificationService {
         .limit(1);
 
       const userName = user?.name ?? 'Unknown';
-      const vwoUrl = this.buildDirectVwoAppUrl(data.vendorWorkOrderId);
+      const vwoUrl = await this.buildDirectVwoAppUrl(data.vendorWorkOrderId);
       const tenderOrProject =
         [data.tenderNo, data.tenderName].filter(Boolean).join(' - ') ||
         data.projectName ||
@@ -740,7 +826,7 @@ export class OperationNotificationService {
       ];
 
       if (vwoUrl) {
-        lines.push(`Review & Approve in TMS: ${vwoUrl}`);
+        lines.push(`Review PDF & Approve: ${vwoUrl}`);
       } else {
         lines.push(`Kindly review and approve in TMS.`);
       }
@@ -761,7 +847,7 @@ export class OperationNotificationService {
         .limit(1);
 
       const actorName = actor?.name ?? 'Team Leader';
-      const vwoUrl = this.buildDirectVwoAppUrl(data.vendorWorkOrderId);
+      const vwoUrl = await this.buildDirectVwoAppUrl(data.vendorWorkOrderId);
 
       if (data.tlStatus === 1) {
         const lines: string[] = [
@@ -781,6 +867,31 @@ export class OperationNotificationService {
 
         const text = lines.join('\n');
         await this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO });
+      } else if (data.tlStatus === 3) {
+        const lines: string[] = [
+          `*WO Edit Requested by Team Leader*`,
+          `WO No: ${data.woNumber}`,
+          `Project: ${data.projectName || 'N/A'}`,
+          `Vendor: ${data.sellerName || 'N/A'}`,
+          `Grand Total: ₹${data.grandTotal}`,
+          `Requested By: ${actorName}`,
+        ];
+        if (data.editFields && data.editFields.length > 0) {
+          lines.push(`Requested Changes:`);
+          for (const ef of data.editFields) {
+            lines.push(
+              `- ${ef.label || ef.field}: "${ef.oldValue || '—'}" → "${ef.newValue}"${ef.remark ? ` (${ef.remark})` : ''}`
+            );
+          }
+        } else if (data.tlComment) {
+          lines.push(`Details: ${data.tlComment}`);
+        }
+        if (vwoUrl) {
+          lines.push(`View in TMS: ${vwoUrl}`);
+        }
+
+        const text = lines.join('\n');
+        await this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO });
       } else {
         const lines: string[] = [
           `*WO Rejected by Team Leader*`,
@@ -791,6 +902,11 @@ export class OperationNotificationService {
           `Rejected By: ${actorName}`,
           `Reason: ${data.tlComment || 'N/A'}`,
         ];
+        if (data.rejectionFields && data.rejectionFields.length > 0) {
+          for (const rf of data.rejectionFields) {
+            lines.push(`- ${rf.label || rf.field}: ${rf.remark}`);
+          }
+        }
         if (vwoUrl) {
           lines.push(`View in TMS: ${vwoUrl}`);
         }
@@ -836,7 +952,7 @@ export class OperationNotificationService {
         .limit(1);
 
       const userName = user?.name ?? 'Unknown';
-      const vwoUrl = this.buildDirectVwoAppUrl(data.vendorWorkOrderId);
+      const vwoUrl = await this.buildDirectVwoAppUrl(data.vendorWorkOrderId);
 
       const lines: string[] = [
         `*WO Updated — TL Approval Required* @${userName}`,
@@ -850,7 +966,7 @@ export class OperationNotificationService {
         lines.push(`Grand Total: ₹${data.grandTotal}`);
       }
       if (vwoUrl) {
-        lines.push(`Review & Approve in TMS: ${vwoUrl}`);
+        lines.push(`Review PDF & Approve: ${vwoUrl}`);
       }
 
       const text = lines.join('\n');

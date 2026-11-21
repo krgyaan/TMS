@@ -225,6 +225,9 @@ export const VendorWorkOrdersSection: React.FC<VendorWorkOrdersSectionProps> = (
                 } else if (isRejected) {
                     label = tlStatus === 2 ? "Rejected (TL)" : "Rejected";
                     variant = "destructive";
+                } else if (tlStatus === 3) {
+                    label = "Edit Requested (TL)";
+                    variant = "secondary";
                 } else if (tlStatus === 1) {
                     label = "Pending Accounts";
                     variant = "secondary";
@@ -234,7 +237,13 @@ export const VendorWorkOrdersSection: React.FC<VendorWorkOrdersSectionProps> = (
                 }
 
                 const tlStatusLabel =
-                    tlStatus === 1 ? "Approved" : tlStatus === 2 ? "Rejected" : "Pending";
+                    tlStatus === 1
+                        ? "Approved"
+                        : tlStatus === 2
+                          ? "Rejected"
+                          : tlStatus === 3
+                            ? "Edit Requested"
+                            : "Pending";
                 const accountsStatusLabel =
                     isApproved ? "Approved" : isRejected && tlStatus !== 2 ? "Rejected" : "Pending";
 

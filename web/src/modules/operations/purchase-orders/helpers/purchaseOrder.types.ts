@@ -134,6 +134,7 @@ export interface PurchaseOrderRow {
     poApprovalRemark?: string;
     tlStatus?: number | null;
     tlComment?: string | null;
+    tlFeedback?: any | null;
     creatorTeamId?: number | null;
     totalPaymentRequested?: number;
     totalMakerDone?: number;
@@ -145,8 +146,10 @@ export interface PurchaseOrderRow {
 }
 
 export interface SubmitTlApprovalDTO {
-    tlStatus: 1 | 2;
+    tlStatus: 1 | 2 | 3;
     tlComment?: string;
+    rejectionFields?: Array<{ field: string; label?: string; remark: string }>;
+    editFields?: Array<{ field: string; label?: string; oldValue: string; newValue: string; remark?: string }>;
 }
 
 export interface SetTdsDTO {
