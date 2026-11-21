@@ -19,18 +19,24 @@
             padding: 0 40px 24mm 40px;
             position: relative;
             box-sizing: border-box;
-            min-height: 250mm;
+            min-height: 262mm;
         }
 
         .page-bottom {
             position: absolute;
             left: 46px;
             right: 46px;
-            bottom: 22mm;
+            bottom: 16mm;
         }
 
         .page-break {
             page-break-before: always;
+        }
+
+        .top-bars {
+            margin: 0 -40px;
+            border-top: 10px solid #333;
+            border-bottom: 5px solid #f04e23;
         }
 
         .footer {
@@ -63,47 +69,58 @@
         }
 
         .letter-body {
-            font-size: 11px;
-            line-height: 1.35;
+            font-size: 10pt;
+            line-height: 1.28;
             padding: 0 6px;
         }
 
         .letter-body p {
-            margin: 4px 0;
+            margin: 5px 0;
         }
 
-        .index-table {
-            border-collapse: collapse;
+        /* Main paragraphs run at 12pt, matching the AU docx. */
+        .main-para {
+            font-size: 12pt;
+            line-height: 1.22;
+        }
+
+        .clause-para {
+            font-size: 10pt;
+            line-height: 1.28;
+        }
+
+        .index-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 4px 0;
             margin-bottom: 8px;
         }
 
-        .index-table td {
-            border: 1px solid #333;
-            padding: 3px 16px;
-            text-align: center;
-            font-family: 'Century Gothic', sans-serif;
-            font-size: 11px;
-            font-weight: bold;
+        .au-logo {
+            height: 46px;
         }
 
-        .index-logo {
-            height: 46px;
-            margin: 6px 0 10px 0;
+        .index-text {
+            font-family: 'Century Gothic', sans-serif;
+            font-size: 11pt;
+            font-weight: bold;
+            border: 1px solid #333;
+            padding: 3px 16px;
         }
 
         .annexure-line {
-            margin-left: 36px;
-            text-indent: 36px;
-            font-size: 12px;
+            text-align: center;
+            font-size: 12pt;
             font-weight: bold;
-            margin-bottom: 10px;
+            margin: 12px 0 14px 0;
         }
 
         .fd-table {
             width: 100%;
             border-collapse: collapse;
             margin: 8px 0;
-            font-size: 9.5px;
+            font-size: 10pt;
         }
 
         .fd-table th,
@@ -116,11 +133,11 @@
 
         .fd-table th {
             font-weight: bold;
-            line-height: 1.25;
+            line-height: 1.2;
         }
 
         .fd-table td {
-            height: 16px;
+            height: 17px;
         }
 
         .fd-amount {
@@ -129,41 +146,36 @@
 
         .page-label {
             font-weight: bold;
-            font-size: 10px;
+            font-size: 10pt;
             margin-top: 6px;
         }
 
         .doc-footer-label {
             text-align: right;
             font-weight: bold;
-            font-size: 10px;
+            font-size: 10pt;
             margin-top: 4px;
         }
 
         .disclaimer {
-            font-size: 6.5px;
+            font-size: 6.5pt;
             line-height: 1.25;
             text-align: justify;
             margin-top: 4px;
         }
 
         .signature-gap {
-            height: 16px;
-        }
-
-        .signature-block p {
-            margin: 0;
+            height: 14px;
         }
     </style>
 </head>
 
 <body>
     <img class="wm" alt="" src="data:image/png;base64,{{ img_watermark_base64 }}">
-    <!-- Full-bleed letterhead bar -->
-    <div style="border-top: 10px solid #333; border-bottom: 5px solid #f04e23;"></div>
 
     <!-- ============================ PAGE 1 ============================ -->
     <div class="page">
+        <div class="top-bars"></div>
         <!-- Letterhead -->
         <div style="padding: 10px 0; font-family: sans-serif;">
             <table width="100%" cellpadding="0" cellspacing="0" style="width: 100%;">
@@ -203,12 +215,11 @@
         </div>
 
         <div class="letter-body">
-            <table class="index-table">
-                <tr>
-                    <td>INDEX</td>
-                </tr>
-            </table>
-            <img class="index-logo" src="data:image/png;base64,{{ img_logo_base64 }}" alt="Volks Energie Logo">
+            <div class="index-row">
+                <img class="au-logo" src="data:image/png;base64,{{ img_au_logo_base64 }}"
+                    alt="AU Small Finance Bank">
+                <span class="index-text">INDEX</span>
+            </div>
 
             <p class="annexure-line">Annexure I: Letter to be addressed by the client to the bank.</p>
 
@@ -219,7 +230,7 @@
             </p>
             <p style="margin-top: 8px;">Dear Sir,</p>
 
-            <p style="text-align: justify;">
+            <p class="main-para" style="text-align: justify;">
                 I/We instruct you to mark a lien in favor of <strong>{{ beneficiary }}</strong> on the following
                 fixed deposit(s) for the purpose of {{ purposeText }}{{#if referenceNo}} with reference number (if any)
                 <strong>{{ referenceNo }}</strong>{{/if}}.
@@ -284,19 +295,19 @@
                 </tbody>
             </table>
 
-            <p style="text-align: justify;">I/We hereby in relation to above detailed Fixed Deposits irrevocably
-                instruct you as follows:</p>
+            <p class="main-para" style="text-align: justify;">I/We hereby in relation to above detailed Fixed Deposits
+                irrevocably instruct you as follows:</p>
 
-            <p style="text-align: justify;">
+            <p class="clause-para" style="text-align: justify;">
                 i. The amount under the said Fixed Deposit to be paid to <strong>{{ beneficiary }}</strong> on demand,
                 at any point of time without any reference to us or without conducting any enquiry as to genuineness or
                 reason for such demand by <strong>{{ beneficiary }}</strong>.
             </p>
-            <p style="text-align: justify;">
+            <p class="clause-para" style="text-align: justify;">
                 ii. No clearance from any authority/person other than <strong>{{ beneficiary }}</strong> shall be
                 required for encashment of the fixed deposit, whether premature or otherwise.
             </p>
-            <p style="text-align: justify;">
+            <p class="clause-para" style="text-align: justify;">
                 iii. On receipt of lien revocation instruction by the <strong>{{ beneficiary }}</strong> interest
                 accrued thereon be released to <strong>Volks Energie Private Limited</strong> after deduction of the
                 TDS (if any) (this point to be filled only if the interest payout mode of TD is cumulative).
@@ -318,56 +329,94 @@
 
     <!-- ============================ PAGE 2 ============================ -->
     <div class="page page-break">
-        <div class="letter-body">
-            <table class="index-table" style="margin-top: 10px;">
+        <div class="top-bars"></div>
+        <!-- Letterhead (repeated) -->
+        <div style="padding: 10px 0; font-family: sans-serif;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="width: 100%;">
                 <tr>
-                    <td>INDEX</td>
+                    <td style="width: 50%; padding-left: 20px;">
+                        <img src="data:image/png;base64,{{ img_logo_base64 }}"
+                            alt="Volks Energie Logo" style="height: 60px;">
+                    </td>
+                    <td style="width: 50%; text-align: right; font-size: 10px; color: #333; padding-right: 20px;">
+                        <div>
+                            B-1/D8, 2nd floor,<br>
+                            Mohan Cooperative Industrial Estate,<br>
+                            New Delhi 110044
+                        </div>
+                        <div>
+                            <img src="data:image/png;base64,{{ img_phone_base64 }}"
+                                alt="Phone" style="height: 12px; vertical-align: middle;">
+                            +91 9650393636, +91 9654551781<br>
+                            <img src="data:image/png;base64,{{ img_phone_base64 }}"
+                                alt="Phone" style="height: 12px; vertical-align: middle;">
+                            Accounts: +91 8882591733
+                        </div>
+                        <div>
+                            <img src="data:image/png;base64,{{ img_email_base64 }}"
+                                alt="Email" style="height: 12px; vertical-align: middle;">
+                            contact@volksenergie.in
+                        </div>
+                        <div>
+                            <img src="data:image/png;base64,{{ img_web_base64 }}"
+                                alt="Website" style="height: 12px; vertical-align: middle;">
+                            www.volksenergie.in
+                        </div>
+                    </td>
                 </tr>
             </table>
-            <img class="index-logo" src="data:image/png;base64,{{ img_logo_base64 }}" alt="Volks Energie Logo">
+            <hr />
+        </div>
 
-            <p style="text-align: justify;">
+        <div class="letter-body">
+            <div class="index-row">
+                <img class="au-logo" src="data:image/png;base64,{{ img_au_logo_base64 }}"
+                    alt="AU Small Finance Bank">
+                <span class="index-text">INDEX</span>
+            </div>
+
+            <p class="clause-para" style="text-align: justify;">
                 iv. The said fixed deposit be auto renewed for the original period of deposit booked with the Bank,
                 till the lien is active.
             </p>
-            <p style="text-align: justify;">
+            <p class="clause-para" style="text-align: justify;">
                 v. The line is being placed on the fixed deposit for a period of {{ lienPeriodText }}
                 (<strong>from {{ lienFrom }} to {{ lienTo }}</strong>).
             </p>
-            <p style="text-align: justify;">
+            <p class="main-para" style="text-align: justify;">
                 I/We confirm that the line is being marked and these instructions are being given pursuant to genuine
                 and lawful transaction entered into by and between me/us and <strong>{{ beneficiary }}</strong>.
             </p>
-            <p style="text-align: justify;">
+            <p class="main-para" style="text-align: justify;">
                 I/We hereby agree and confirm that the above-mentioned Fixed Deposit shall be released to me only upon
                 written confirmation of <strong>{{ beneficiary }}</strong>.
             </p>
-            <p style="text-align: justify;">
+            <p class="main-para" style="text-align: justify;">
                 I/We hereby further agree and confirm that any statutory/ regulatory attachment shall have priority
                 over lien created in favor of <strong>{{ beneficiary }}</strong> and that you shall be entitled to act
                 in accordance with instructions of any statutory/ regulatory authority notwithstanding any
                 instructions to the contrary contained herein or any other document executed between the Bank and us.
             </p>
-            <p style="text-align: justify;">
+            <p class="main-para" style="text-align: justify;">
                 I/We hereby agree that I/we shall be liable for payment of Tax deducted at source and undertake to keep
                 you indemnified and hold the bank harmless against any claim by any union, state or local government
                 authority against the bank, and of its subsidiaries or affiliates, regarding taxes assessed against us.
             </p>
-            <p style="text-align: justify;">
+            <p class="main-para" style="text-align: justify;">
                 I/We confirm that these instructions are irrevocable and cannot be revoked except with the written
                 consent of <strong>{{ beneficiary }}</strong>.
             </p>
-            <p style="text-align: justify;">
+            <p class="main-para" style="text-align: justify;">
                 I/We undertake to hold the bank and its director, officers and agents harmless against any loss or
                 damage caused due to acting on these instructions.
             </p>
-            <p style="text-align: justify;">
+            <p class="main-para" style="text-align: justify;">
                 I/We agree and acknowledge that acting upon the aforesaid instructions shall be at the sole and
                 absolute discretion of the Bank and the terms and conditions of the fixed deposit as stated on the
                 website of the Bank www.aubank.in shall apply appropriately.
             </p>
 
-            <p style="margin-top: 10px;">Yours faithfully,</p>
+            <p style="margin-top: 12px;">Yours faithfully,</p>
             <p>For <strong>Volks Energie Private Limited</strong></p>
             <div class="signature-gap"></div>
             <div class="signature-gap"></div>
