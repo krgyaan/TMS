@@ -39,7 +39,8 @@ class VendorWorkOrderApiService extends BaseApiService {
             editFields?: Array<{ field: string; label?: string; oldValue: string; newValue: string; remark?: string }>;
         }
     ): Promise<any> {
-        return this.patch(`/${id}/tl-approval`, data);
+        const res = await axiosInstance.patch(`/purchase-orders/wo/${id}/tl-approval`, data);
+        return res.data;
     }
 
     async getById(id: number) {

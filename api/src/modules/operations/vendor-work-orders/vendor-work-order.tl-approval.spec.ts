@@ -1,7 +1,7 @@
 /// <reference types="jest" />
 import { BadRequestException, ForbiddenException, NotFoundException } from "@nestjs/common";
 import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
-import { VendorWorkOrderService } from "./vendor-work-order.service";
+import { WoApprovalService } from "../purchase-orders/wo-approval.service";
 
 function createMockSelectChain(rows: any[]) {
     const chain: any = {
@@ -58,7 +58,7 @@ function makeUser(overrides: Partial<ValidatedUser> = {}): ValidatedUser {
     } as ValidatedUser;
 }
 
-describe("VendorWorkOrderService.submitTlApproval", () => {
+describe("WoApprovalService.submitTlApproval", () => {
     const baseVwo = {
         id: 77,
         woNumber: "VE/SOLAR/2627/WO0077",
@@ -81,13 +81,10 @@ describe("VendorWorkOrderService.submitTlApproval", () => {
         const notifications = {
             notifyVwoTlDecision: jest.fn().mockResolvedValue(undefined),
         };
-        const service = new VendorWorkOrderService(
+        const service = new WoApprovalService(
             db,
             logger as any,
-            {} as any,
-            {} as any,
-            notifications as any,
-            {} as any
+            notifications as any
         );
         return { service, db, updateCalls, notifications };
     }

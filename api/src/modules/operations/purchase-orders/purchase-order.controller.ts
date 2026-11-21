@@ -10,7 +10,10 @@ import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
 import { PermissionGuard } from "@/modules/auth/guards/permission.guard";
 import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
 import { PdfRetryGuard } from "@/modules/pdf/pdf-retry.guard";
+import type { SubmitTlApprovalDto } from "@/modules/operations/operation-notification.service";
 import { PurchaseOrderService } from "./purchase-order.service";
+import { PoApprovalService } from "./po-approval.service";
+import { WoApprovalService } from "./wo-approval.service";
 
 // This controller serves both the /accounts and the /operations section (the
 // `section` query param picks which rows come back), so a permission has to
@@ -51,7 +54,11 @@ const parseLimit = (raw?: string): number | undefined => {
 @Controller("purchase-orders")
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class PurchaseOrderController {
-    constructor(private readonly service: PurchaseOrderService) {}
+    constructor(
+        private readonly service: PurchaseOrderService,
+        private readonly poApprovalService: PoApprovalService,
+        private readonly woApprovalService: WoApprovalService
+    ) {}
 
     @Get("project/:projectId")
     getProjectPurchaseOrders(@Param("projectId", ParseIntPipe) projectId: number) {
@@ -245,16 +252,30 @@ export class PurchaseOrderController {
     @HttpCode(HttpStatus.OK)
     submitTlApproval(
         @Param("id", ParseIntPipe) id: number,
-        @Body()
-        body: {
-            tlStatus: number;
-            tlComment?: string;
-            rejectionFields?: Array<{ field: string; label?: string; remark: string }>;
-            editFields?: Array<{ field: string; label?: string; oldValue: string; newValue: string; remark?: string }>;
-        },
+        @Body() body: SubmitTlApprovalDto,
         @CurrentUser() user: ValidatedUser
     ) {
-        return this.service.submitTlApproval(id, body, user);
+        return this.poApprovalService.submitTlApproval(id, body, user);
+    }
+
+    @Patch("wo/:id/tl-approval")
+    @HttpCode(HttpStatus.OK)
+    submitWoTlApproval(
+        @Param("id", ParseIntPipe) id: number,
+        @Body() body: SubmitTlApprovalDto,
+        @CurrentUser() user: ValidatedUser
+    ) {
+        return this.woApprovalService.submitTlApproval(id, body, user);
+    }
+
+    @Patch("vwo/:id/tl-approval")
+    @HttpCode(HttpStatus.OK)
+    submitVwoTlApproval(
+        @Param("id", ParseIntPipe) id: number,
+        @Body() body: SubmitTlApprovalDto,
+        @CurrentUser() user: ValidatedUser
+    ) {
+        return this.woApprovalService.submitTlApproval(id, body, user);
     }
 
     @Post(":id/close")
