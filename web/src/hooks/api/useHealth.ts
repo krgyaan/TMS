@@ -3,6 +3,7 @@ import { healthService } from "@/services/api/health.service";
 
 export const healthKey = {
     all: ["system-health"] as const,
+    tally: ["system-health", "tally"] as const,
     claude: ["system-health", "claude"] as const,
     claudeTenders: (sortBy: string) => ["system-health", "claude-tenders", sortBy] as const,
 };
@@ -14,6 +15,16 @@ export const useSystemHealth = () => {
         refetchInterval: 30_000,
         refetchOnWindowFocus: true,
         staleTime: 10_000,
+    });
+};
+
+export const useTallyStatus = () => {
+    return useQuery({
+        queryKey: healthKey.tally,
+        queryFn: () => healthService.getTallyStatus(),
+        refetchInterval: 60_000,
+        refetchOnWindowFocus: true,
+        staleTime: 30_000,
     });
 };
 
