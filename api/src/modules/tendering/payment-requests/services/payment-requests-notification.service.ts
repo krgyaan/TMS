@@ -1147,6 +1147,7 @@ export class PaymentRequestsNotificationService {
                 favouring: paymentInstruments.favouring,
                 payableAt: paymentInstruments.payableAt,
                 amount: paymentInstruments.amount,
+                rejectionReason: paymentInstruments.rejectionReason,
             })
             .from(paymentInstruments)
             .where(eq(paymentInstruments.id, instrumentId))
@@ -1164,6 +1165,7 @@ export class PaymentRequestsNotificationService {
                 purpose: paymentRequests.purpose,
                 tenderNo: paymentRequests.tenderNo,
                 projectId: paymentRequests.projectId,
+                projectName: paymentRequests.projectName,
             })
             .from(paymentRequests)
             .where(eq(paymentRequests.id, instrument.requestId))
@@ -1202,6 +1204,32 @@ export class PaymentRequestsNotificationService {
 
         const tenderTeamId = await this.getTenderTeamId(paymentReq.tenderId || 0, paymentReq.requestedBy || 0);
 
+        // Purpose + Tender/WO name for the rejection mail.
+        const [fdrDetails] = await this.db
+            .select({ fdrPurpose: instrumentFdrDetails.fdrPurpose })
+            .from(instrumentFdrDetails)
+            .where(eq(instrumentFdrDetails.instrumentId, instrumentId))
+            .limit(1);
+
+        let tenderName: string | null = null;
+        if (paymentReq.tenderId && paymentReq.tenderId > 0) {
+            const [tender] = await this.db
+                .select({ tenderName: tenderInfos.tenderName })
+                .from(tenderInfos)
+                .where(eq(tenderInfos.id, paymentReq.tenderId))
+                .limit(1);
+            tenderName = tender?.tenderName ?? null;
+        }
+
+        const rawPurpose = (fdrDetails?.fdrPurpose || paymentReq.purpose || '').trim();
+        const purposeLabel = formatFdrPurpose(rawPurpose, paymentReq.purpose || '');
+        const isBgPurpose = rawPurpose.toUpperCase() === 'BANK_GUARANTEE';
+        const rawName = (tenderName || paymentReq.projectName || '').trim();
+        const hasName = !!rawName && rawName.toUpperCase() !== 'NA';
+        const subjectName = isBgPurpose || !hasName ? 'NA' : rawName;
+
+        const rejectionReason = (body.reason_req || instrument.rejectionReason || '').toString().trim();
+
         try {
             // From: FDR responsible user — To: Requestor
             const result = await this.emailService.sendPaymentEmail({
@@ -1209,26 +1237,36 @@ export class PaymentRequestsNotificationService {
                 tenderId: paymentReq.tenderId || undefined,
                 eventType: isAccepted ? 'FDR_CREATED' : 'FDR_REJECTED',
                 fromUserId: await this.getResponsibleUserIdByMode('FDR') ?? 33,
-                subject: `Request for FDR ${isAccepted ? 'Accepted' : 'Rejected'} - ${paymentReq.purpose || ''}`,
-                template: 'fdr-create',
-                data: {
+                subject: isAccepted
+                    ? `Request for FDR Accepted - ${purposeLabel}`
+                    : `FDR Request Rejected - ${purposeLabel} - ${subjectName}`,
+                template: isAccepted ? 'fdr-create' : 'fdr-rejected',
+                data: isAccepted ? {
                     requestedBy: reqUser.name,
-                    status: isAccepted ? 'Accepted' : 'Rejected',
-                    issueDate: isAccepted ? (this.formatDateDDMMYYYY(body.fdr_date) || '') : '',
-                    fdrNo: isAccepted ? (body.fdr_no || '') : '',
+                    status: 'Accepted',
+                    issueDate: this.formatDateDDMMYYYY(body.fdr_date) || '',
+                    fdrNo: body.fdr_no || '',
                     beneficiaryName: instrument.favouring || '',
                     payableAt: instrument.payableAt || '',
                     amountFormatted: instrument.amount ? this.formatCurrency(Number(instrument.amount)) : '',
                     fdrImage: imageUrl,
-                    courierRequestNo: isAccepted ? (body.req_no || '') : '',
+                    courierRequestNo: body.req_no || '',
                     courierLink: '',
-                    remarks: isAccepted ? (body.remarks || '') : (body.reason_req || ''),
+                    remarks: body.remarks || '',
+                } : {
+                    tenderExecutive: reqUser.name,
+                    rejectionReason,
                 },
                 to: [{ type: 'emails', emails: [reqUser.email] }],
-                cc: [
+                cc: isAccepted ? [
                     { type: 'role', role: 'Admin', teamId: tenderTeamId },
                     { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
                     { type: 'emails', emails: ['accounts@volksenergie.in'] },
+                ] : [
+                    { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
+                    { type: 'emails', emails: ['goyal@volksenergie.in'] },
+                    { type: 'emails', emails: ['accounts@volksenergie.in'] },
+                    { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
                 ],
             });
 
