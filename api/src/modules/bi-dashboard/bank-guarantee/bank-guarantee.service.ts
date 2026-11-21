@@ -309,7 +309,10 @@ export class BankGuaranteeService {
             const bgNeedsHours = Number.parseInt(String(row.bgNeeds ?? '').replace(/[^0-9]/g, ''), 10);
             const timerHours = row.action === 0
                 ? 12
-                : row.action === 1 && Number.isFinite(bgNeedsHours) && bgNeedsHours > 0
+                : row.action === 1
+                    && row.bgStatus === BG_STATUSES.ACCOUNTS_FORM_ACCEPTED
+                    && Number.isFinite(bgNeedsHours)
+                    && bgNeedsHours > 0
                     ? bgNeedsHours
                     : null;
             const elapsedSeconds = Number(row.elapsedSeconds ?? 0);
