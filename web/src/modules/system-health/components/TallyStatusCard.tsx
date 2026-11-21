@@ -45,19 +45,19 @@ function Section({ icon, title, children }: { icon: ReactNode; title: string; ch
     return (
         <div className="rounded-lg border p-3">
             <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {icon}
-                {title}
+                {icon} {title}
             </div>
-            <dl className="space-y-1.5 text-sm">{children}</dl>
+            <dl className="flex justify-between flex-wrap gap-2 text-sm">{children}</dl>
         </div>
     );
 }
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
     return (
+
         <div className="flex items-start justify-between gap-3">
             <dt className="text-muted-foreground">{label}</dt>
-            <dd className="text-right">{children}</dd>
+            <dd>{children}</dd>
         </div>
     );
 }
@@ -122,53 +122,58 @@ export function TallyStatusCard({ status, isLoading, isFetching, error }: TallyS
             </CardHeader>
             <CardContent className="grid gap-3 md:grid-cols-2">
                 <Section icon={<Globe className="h-3.5 w-3.5" />} title="Connection">
-                    <Row label="Enabled">
-                        <BoolValue value={connection.enabled} />
-                    </Row>
-                    <Row label="Server running">
-                        <BoolValue value={connection.serverRunning} />
-                    </Row>
-                    <Row label="Reachable">
-                        <BoolValue value={connection.reachable} />
-                    </Row>
-                    <Row label="Auth token">
-                        <BoolValue value={connection.authOk} trueLabel="Accepted" falseLabel="Rejected" />
-                    </Row>
-                    <Row label="Latency">{connection.latencyMs != null ? `${connection.latencyMs} ms` : "—"}</Row>
-                    <Row label="Checked">{relativeTime(status.checkedAt)}</Row>
-                    <Row label="Last OK">{relativeTime(status.lastSuccessAt)}</Row>
-                    <Row label="Last failure">
-                        {status.lastFailure ? (
-                            <span className="inline-flex items-center gap-2">
-                                <Badge variant="outline" className="text-[10px]" title={status.lastFailure.message}>
-                                    {status.lastFailure.code}
-                                </Badge>
-                                <span className="text-xs text-muted-foreground">{relativeTime(status.lastFailure.at)}</span>
-                            </span>
-                        ) : (
-                            <span className="text-muted-foreground">None</span>
-                        )}
-                    </Row>
+                    <div>
+                        <Row label="ENV Enabled:">
+                            <BoolValue value={connection.enabled} />
+                        </Row>
+                        <Row label="Server running:">
+                            <BoolValue value={connection.serverRunning} />
+                        </Row>
+                        <Row label="Reachable:">
+                            <BoolValue value={connection.reachable} />
+                        </Row>
+                        <Row label="Auth token:">
+                            <BoolValue value={connection.authOk} trueLabel="Accepted" falseLabel="Rejected" />
+                        </Row>
+                    </div>
+                    <div>
+                        <Row label="Latency:">{connection.latencyMs != null ? `${connection.latencyMs} ms` : "—"}</Row>
+                        <Row label="Checked:">{relativeTime(status.checkedAt)}</Row>
+                        <Row label="Last OK:">{relativeTime(status.lastSuccessAt)}</Row>
+                        <Row label="Last failure:">
+                            {status.lastFailure ? (
+                                <span className="inline-flex items-center gap-2">
+                                    <Badge variant="outline" className="text-[10px]" title={status.lastFailure.message}>
+                                        {status.lastFailure.code}
+                                    </Badge>
+                                    <span className="text-xs text-muted-foreground">{relativeTime(status.lastFailure.at)}</span>
+                                </span>
+                            ) : (
+                                <span className="text-muted-foreground">None</span>
+                            )}
+                        </Row>
+                    </div>
+                    <div>
+                        <Row label="Configured:">
+                            <span className="font-medium">{company.configured ?? "—"}</span>
+                        </Row>
+                        <Row label="Open:">
+                            <BoolValue value={company.open} />
+                        </Row>
+                        <Row label="Loaded:">
+                            <BoolValue value={company.loaded} />
+                        </Row>
+                    </div>
                 </Section>
-
-                <Section icon={<Building2 className="h-3.5 w-3.5" />} title="Company">
-                    <Row label="Configured">
-                        <span className="font-medium">{company.configured ?? "—"}</span>
-                    </Row>
-                    <Row label="Open">
-                        <BoolValue value={company.open} />
-                    </Row>
-                    <Row label="Loaded">
-                        <BoolValue value={company.loaded} />
-                    </Row>
-                    <Row label="Loaded companies">
+                <Section icon={<Building2 className="h-3.5 w-3.5" />} title="Loaded companies">
+                    <Row label="">
                         {company.loadedCompanies.length > 0 ? (
                             <div className="flex flex-wrap justify-end gap-1">
                                 {company.loadedCompanies.map(name => (
                                     <Badge
                                         key={name}
                                         variant={name === company.configured ? "default" : "outline"}
-                                        className="text-[10px]"
+                                        className="text-[10px] whitespace-normal [overflow-wrap:anywhere]"
                                     >
                                         {name}
                                     </Badge>
