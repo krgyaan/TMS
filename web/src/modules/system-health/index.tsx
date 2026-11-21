@@ -3,22 +3,12 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-    AlertCircle,
-    Database,
-    Mail,
-    RefreshCw,
-    Server,
-    Activity,
-    Layers,
-    Wifi,
-    Cpu,
-    Bot,
-} from "lucide-react";
+import { AlertCircle, Database, Mail, RefreshCw, Server, Activity, Layers, Wifi, Cpu, Bot } from "lucide-react";
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { useSystemHealth } from "@/hooks/api/useHealth";
+import { useSystemHealth, useTallyStatus } from "@/hooks/api/useHealth";
 import { ClaudeTelemetrySection } from "./components/ClaudeTelemetrySection";
+import { TallyStatusCard } from "./components/TallyStatusCard";
 import type { WorkerStatusDetail, QueueCounts } from "@/services/api/health.service";
 
 type StatusKind = "ok" | "degraded" | "down";
@@ -289,6 +279,7 @@ function SkeletonDashboard() {
 
 const SystemHealthPage = () => {
     const { data, isLoading, error, refetch, isFetching } = useSystemHealth();
+    const tallyStatus = useTallyStatus();
 
     if (isLoading) return <SkeletonDashboard />;
 
@@ -399,6 +390,13 @@ const SystemHealthPage = () => {
                     status={toStatusKind(overview.claude?.status ?? "ok")}
                 />
             </div>
+
+            <TallyStatusCard
+                status={tallyStatus.data}
+                isLoading={tallyStatus.isLoading}
+                isFetching={tallyStatus.isFetching}
+                error={tallyStatus.error}
+            />
 
             {/* Claude AI Token Telemetry, Sliding TPM & Leaderboard */}
             <ClaudeTelemetrySection />
