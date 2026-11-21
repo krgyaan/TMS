@@ -2,7 +2,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, Building2, Clock, Gauge, Globe, Landmark } from "lucide-react";
+import { AlertCircle, Building2, Globe, Landmark } from "lucide-react";
 import type { ReactNode } from "react";
 import type { TallyStatus, TallyStatusState } from "@/services/api/health.service";
 
@@ -120,7 +120,7 @@ export function TallyStatusCard({ status, isLoading, isFetching, error }: TallyS
                     </div>
                 </div>
             </CardHeader>
-            <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <CardContent className="grid gap-3 md:grid-cols-2">
                 <Section icon={<Globe className="h-3.5 w-3.5" />} title="Connection">
                     <Row label="Enabled">
                         <BoolValue value={connection.enabled} />
@@ -136,6 +136,19 @@ export function TallyStatusCard({ status, isLoading, isFetching, error }: TallyS
                     </Row>
                     <Row label="Latency">{connection.latencyMs != null ? `${connection.latencyMs} ms` : "—"}</Row>
                     <Row label="Checked">{relativeTime(status.checkedAt)}</Row>
+                    <Row label="Last OK">{relativeTime(status.lastSuccessAt)}</Row>
+                    <Row label="Last failure">
+                        {status.lastFailure ? (
+                            <span className="inline-flex items-center gap-2">
+                                <Badge variant="outline" className="text-[10px]" title={status.lastFailure.message}>
+                                    {status.lastFailure.code}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">{relativeTime(status.lastFailure.at)}</span>
+                            </span>
+                        ) : (
+                            <span className="text-muted-foreground">None</span>
+                        )}
+                    </Row>
                 </Section>
 
                 <Section icon={<Building2 className="h-3.5 w-3.5" />} title="Company">
@@ -165,30 +178,6 @@ export function TallyStatusCard({ status, isLoading, isFetching, error }: TallyS
                             <span className="text-muted-foreground">None</span>
                         )}
                     </Row>
-                </Section>
-
-                <Section icon={<Gauge className="h-3.5 w-3.5" />} title="Limits">
-                    <Row label="Rate limit">{status.limits.rateLimitRps} req/s</Row>
-                    <Row label="Concurrency">{status.limits.maxConcurrency}</Row>
-                    <Row label="Connect timeout">{status.limits.connectTimeoutMs} ms</Row>
-                    <Row label="Read timeout">{status.limits.httpTimeoutMs} ms</Row>
-                </Section>
-
-                <Section icon={<Clock className="h-3.5 w-3.5" />} title="Cache & history">
-                    <Row label="Cache age">
-                        {status.cache.ageSeconds}s / {status.cache.ttlSeconds}s
-                    </Row>
-                    <Row label="Last OK">{relativeTime(status.lastSuccessAt)}</Row>
-                    <Row label="Last failure">
-                        {status.lastFailure ? (
-                            <Badge variant="outline" className="text-[10px]">
-                                {status.lastFailure.code}
-                            </Badge>
-                        ) : (
-                            <span className="text-muted-foreground">None</span>
-                        )}
-                    </Row>
-                    {status.lastFailure && <Row label="Failed at">{relativeTime(status.lastFailure.at)}</Row>}
                 </Section>
             </CardContent>
         </Card>

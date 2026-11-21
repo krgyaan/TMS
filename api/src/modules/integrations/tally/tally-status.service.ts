@@ -37,13 +37,6 @@ export interface TallyStatusCompany {
     loadedCompanies: string[];
 }
 
-export interface TallyStatusLimits {
-    rateLimitRps: number;
-    maxConcurrency: number;
-    connectTimeoutMs: number;
-    httpTimeoutMs: number;
-}
-
 export interface TallyStatusFailure {
     code: string;
     message: string;
@@ -55,17 +48,14 @@ export interface TallyStatusSnapshot {
     message: string;
     checkedAt: string;
     stale: boolean;
-    cache: { ttlSeconds: number; ageSeconds: number };
     connection: TallyStatusConnection;
     company: TallyStatusCompany;
-    limits: TallyStatusLimits;
     lastSuccessAt: string | null;
     lastFailure: TallyStatusFailure | null;
 }
 
 interface CachedStatus {
     snapshot: TallyStatusSnapshot;
-    cachedAt: number;
     expiresAt: number;
 }
 
@@ -196,7 +186,7 @@ export class TallyStatusService {
         const now = Date.now();
 
         if (this.cache && this.cache.expiresAt > now) {
-            return this.withAge(this.cache, now);
+            return this.cache.snapshot;
         }
 
         if (!this.inFlight) {
@@ -207,7 +197,7 @@ export class TallyStatusService {
 
         await this.inFlight;
 
-        return this.cache ? this.withAge(this.cache, Date.now()) : this.disabledSnapshot();
+        return this.cache ? this.cache.snapshot : this.disabledSnapshot();
     }
 
     private async runCheck(): Promise<void> {
@@ -216,7 +206,6 @@ export class TallyStatusService {
 
         this.cache = {
             snapshot,
-            cachedAt: startedAt,
             expiresAt: startedAt + TALLY_STATUS_CACHE_TTL_MS,
         };
     }
@@ -294,7 +283,6 @@ export class TallyStatusService {
             message: "",
             checkedAt,
             stale: false,
-            cache: { ttlSeconds: TALLY_STATUS_CACHE_TTL_MS / 1000, ageSeconds: 0 },
             connection: {
                 enabled: true,
                 serverRunning,
@@ -304,7 +292,6 @@ export class TallyStatusService {
                 host: this.host(),
             },
             company,
-            limits: this.limits(),
             lastSuccessAt: this.lastSuccessAt,
             lastFailure: this.lastFailure,
         };
@@ -331,7 +318,6 @@ export class TallyStatusService {
             message: mapped.message,
             checkedAt,
             stale: this.lastCompany !== null,
-            cache: { ttlSeconds: TALLY_STATUS_CACHE_TTL_MS / 1000, ageSeconds: 0 },
             connection: {
                 enabled: true,
                 serverRunning: false,
@@ -346,7 +332,6 @@ export class TallyStatusService {
                 loaded: false,
                 loadedCompanies: [],
             },
-            limits: this.limits(),
             lastSuccessAt: this.lastSuccessAt,
             lastFailure: failure,
         };
@@ -358,7 +343,6 @@ export class TallyStatusService {
             message: "Tally integration is disabled (TALLY_ENABLED=false).",
             checkedAt: new Date(Date.now()).toISOString(),
             stale: false,
-            cache: { ttlSeconds: TALLY_STATUS_CACHE_TTL_MS / 1000, ageSeconds: 0 },
             connection: {
                 enabled: false,
                 serverRunning: false,
@@ -373,28 +357,8 @@ export class TallyStatusService {
                 loaded: false,
                 loadedCompanies: [],
             },
-            limits: this.limits(),
             lastSuccessAt: this.lastSuccessAt,
             lastFailure: this.lastFailure,
-        };
-    }
-
-    private withAge(cache: CachedStatus, now: number): TallyStatusSnapshot {
-        return {
-            ...cache.snapshot,
-            cache: {
-                ttlSeconds: TALLY_STATUS_CACHE_TTL_MS / 1000,
-                ageSeconds: Math.max(0, Math.floor((now - cache.cachedAt) / 1000)),
-            },
-        };
-    }
-
-    private limits(): TallyStatusLimits {
-        return {
-            rateLimitRps: this.config.rateLimitRps,
-            maxConcurrency: this.config.maxConcurrency,
-            connectTimeoutMs: this.config.connectTimeoutMs,
-            httpTimeoutMs: this.config.httpTimeoutMs,
         };
     }
 

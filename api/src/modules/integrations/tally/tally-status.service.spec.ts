@@ -224,21 +224,31 @@ describe("TallyStatusService", () => {
         expect(status.lastFailure?.message).toBe("TallyPrime returned an unexpected response.");
     });
 
+    it("returns only the documented response fields", async () => {
+        const { service, listCompanies, exportMasters } = buildService();
+
+        listCompanies.mockResolvedValue(["VEPL 2025-26"]);
+        exportMasters.mockResolvedValue([{ name: "Capital Account", parent: null }]);
+
+        const status = await service.getStatus();
+
+        expect(Object.keys(status).sort()).toEqual(["checkedAt", "company", "connection", "lastFailure", "lastSuccessAt", "message", "stale", "status"].sort());
+        expect(status).not.toHaveProperty("limits");
+        expect(status).not.toHaveProperty("cache");
+    });
+
     it("serves one check from cache for the whole TTL", async () => {
         const { service, checkLiveness, listCompanies, exportMasters } = buildService();
 
         listCompanies.mockResolvedValue(["VEPL 2025-26"]);
         exportMasters.mockResolvedValue([{ name: "Capital Account", parent: null }]);
 
-        const first = await service.getStatus();
-
-        expect(first.cache.ageSeconds).toBe(0);
+        await service.getStatus();
 
         now += 30_000;
 
-        const cached = await service.getStatus();
+        await service.getStatus();
 
-        expect(cached.cache.ageSeconds).toBe(30);
         expect(checkLiveness).toHaveBeenCalledTimes(1);
         expect(listCompanies).toHaveBeenCalledTimes(1);
 

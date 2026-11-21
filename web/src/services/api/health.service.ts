@@ -169,7 +169,6 @@ export interface TallyStatus {
     message: string
     checkedAt: string
     stale: boolean
-    cache: { ttlSeconds: number; ageSeconds: number }
     connection: {
         enabled: boolean
         serverRunning: boolean
@@ -183,12 +182,6 @@ export interface TallyStatus {
         open: boolean
         loaded: boolean
         loadedCompanies: string[]
-    }
-    limits: {
-        rateLimitRps: number
-        maxConcurrency: number
-        connectTimeoutMs: number
-        httpTimeoutMs: number
     }
     lastSuccessAt: string | null
     lastFailure: TallyStatusFailure | null
