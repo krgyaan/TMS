@@ -125,6 +125,9 @@ export function TallyStatusCard({ status, isLoading, isFetching, error }: TallyS
                     <Row label="Enabled">
                         <BoolValue value={connection.enabled} />
                     </Row>
+                    <Row label="Server running">
+                        <BoolValue value={connection.serverRunning} />
+                    </Row>
                     <Row label="Reachable">
                         <BoolValue value={connection.reachable} />
                     </Row>

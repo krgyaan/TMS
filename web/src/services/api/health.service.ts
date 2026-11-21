@@ -172,6 +172,7 @@ export interface TallyStatus {
     cache: { ttlSeconds: number; ageSeconds: number }
     connection: {
         enabled: boolean
+        serverRunning: boolean
         reachable: boolean
         authOk: boolean
         latencyMs: number | null
