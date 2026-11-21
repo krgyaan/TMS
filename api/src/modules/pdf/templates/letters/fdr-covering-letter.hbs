@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <style>
+        * {
+            font-family: 'Calibri Light', sans-serif;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            color: #000;
+        }
+
+        /* Body clears the fixed footer (margins for this template are 0mm). */
+        .page {
+            padding: 0 40px 24mm 40px;
+        }
+
+        .footer {
+            position: fixed;
+            bottom: 6mm;
+            left: 0;
+            width: 100%;
+            background: #fff;
+        }
+
+        .footer-line {
+            width: 100%;
+            height: 2px;
+            background: #000;
+        }
+
+        .footer-content {
+            padding: 8px 10px;
+        }
+
+        .wm {
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            width: 150mm;
+            transform: translate(-50%, -50%);
+            z-index: -1;
+            opacity: 0.1;
+            pointer-events: none;
+        }
+
+        .letter-body {
+            font-size: 12.5px;
+            line-height: 1.42;
+            padding: 0 10px;
+        }
+
+        .letter-body p {
+            margin: 6px 0;
+        }
+
+        .spaced-block {
+            margin-top: 32px;
+        }
+
+        .party-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .party-table td {
+            vertical-align: top;
+        }
+
+        .fdr-details {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8px 0;
+            font-size: 12.5px;
+        }
+
+        .fdr-details td {
+            border: 1px solid #333;
+            padding: 3px 8px;
+            vertical-align: top;
+        }
+
+        .fdr-details .label {
+            width: 230px;
+            font-weight: bold;
+        }
+
+        .signature-block {
+            margin-top: 12px;
+        }
+
+        .signature-block p {
+            margin: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <img class="wm" alt="" src="data:image/png;base64,{{ img_watermark_base64 }}">
+    <!-- Full-bleed letterhead bar -->
+    <div style="border-top: 10px solid #333; border-bottom: 5px solid #f04e23;"></div>
+    <div class="page">
+        <!-- Letterhead -->
+        <div style="padding: 10px 0; font-family: sans-serif;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="width: 100%;">
+                <tr>
+                    <!-- Left: Logo -->
+                    <td style="width: 50%; padding-left: 20px;">
+                        <img src="data:image/png;base64,{{ img_logo_base64 }}"
+                            alt="Volks Energie Logo" style="height: 60px;">
+                    </td>
+
+                    <!-- Right: Contact Info -->
+                    <td style="width: 50%; text-align: right; font-size: 10px; color: #333; padding-right: 20px;">
+                        <div>
+                            B-1/D8, 2nd floor,<br>
+                            Mohan Cooperative Industrial Estate,<br>
+                            New Delhi 110044
+                        </div>
+                        <div>
+                            <img src="data:image/png;base64,{{ img_phone_base64 }}"
+                                alt="Phone" style="height: 12px; vertical-align: middle;">
+                            +91 9650393636, +91 9654551781<br>
+                            <img src="data:image/png;base64,{{ img_phone_base64 }}"
+                                alt="Phone" style="height: 12px; vertical-align: middle;">
+                            Accounts: +91 8882591733
+                        </div>
+                        <div>
+                            <img src="data:image/png;base64,{{ img_email_base64 }}"
+                                alt="Email" style="height: 12px; vertical-align: middle;">
+                            contact@volksenergie.in
+                        </div>
+                        <div>
+                            <img src="data:image/png;base64,{{ img_web_base64 }}"
+                                alt="Website" style="height: 12px; vertical-align: middle;">
+                            www.volksenergie.in
+                        </div>
+                    </td>
+                </tr>
+            </table>
+            <hr />
+        </div>
+
+        <div class="letter-body">
+            <table class="party-table">
+                <tr>
+                    <td style="text-align: left;">
+                        To,<br>
+                        {{#if courierOrg}}{{ courierOrg }},<br>{{/if}}
+                        {{#if courierName}}{{ courierName }},<br>{{/if}}
+                        {{#if courierAddress}}<span style="white-space: pre-line;">{{ courierAddress }}</span>{{/if}}
+                    </td>
+                    <td style="text-align: right; white-space: nowrap;">
+                        <strong>Date:</strong> {{ date }}
+                    </td>
+                </tr>
+            </table>
+
+            {{#if referenceNo}}
+            <p class="spaced-block"><strong>{{ referenceLabel }}:</strong> {{ referenceNo }}</p>
+            {{/if}}
+
+            <p class="spaced-block">
+                <strong>Subject:</strong> Submission of Fixed Deposit Receipt{{#if referenceNo}} for
+                {{ referenceLabel }} {{ referenceNo }}{{/if}}
+            </p>
+            <br>
+
+            <p><strong>Dear Sir,</strong></p>
+
+            <p>
+                We are pleased to confirm the submission of the Fixed Deposit Receipt{{#if referenceNo}} against
+                {{ referenceLabel }} <strong>{{ referenceNo }}</strong>{{/if}}, for the purpose of {{ purpose }}.
+            </p>
+
+            <table class="fdr-details">
+                <tr>
+                    <td class="label">FDR No.</td>
+                    <td>{{ fdrNo }}</td>
+                </tr>
+                <tr>
+                    <td class="label">FDR Date</td>
+                    <td><strong>{{ fdrDate }}</strong></td>
+                </tr>
+                <tr>
+                    <td class="label">FDR Expiry</td>
+                    <td><strong>{{ fdrExpiryDate }}</strong></td>
+                </tr>
+                <tr>
+                    <td class="label">FDR Amount</td>
+                    <td><strong>Rs. {{ amount }}</strong></td>
+                </tr>
+            </table>
+
+            <p>Please contact the undersigned for any further clarification.</p>
+
+            <p>Best Regards,</p>
+
+            <div class="signature-block">
+                <p><strong>{{ teamLeaderName }}</strong></p>
+                <p>Team Leader</p>
+                <p>{{ teamLeaderPhone }}</p>
+                <p>{{ teamLeaderEmail }}</p>
+            </div>
+
+            <div class="signature-block">
+                <p><strong>{{ accountsLeaderName }}</strong></p>
+                <p>Accounts Leader</p>
+                <p>{{ accountsLeaderPhone }}</p>
+                <p>{{ accountsLeaderEmail }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <div class="footer-content">
+            <table width="100%" style="font-size: 12px; color: #555;">
+                <tr>
+                    <td style="text-align: left;"><b>CIN: </b>U40100DL2011PTC228907</td>
+                    <td style="text-align: center;"><b>PAN: </b>AADCV9386C</td>
+                    <td style="text-align: right;"><b>MSME: </b>UDYAM-DL-0900000465</td>
+                </tr>
+            </table>
+        </div>
+        <div class="footer-line"></div>
+    </div>
+</body>
+
+</html>

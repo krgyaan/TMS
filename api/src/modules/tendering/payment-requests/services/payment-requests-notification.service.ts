@@ -1658,7 +1658,9 @@ export class PaymentRequestsNotificationService {
                 .select({
                     requestedBy: paymentRequests.requestedBy,
                     tenderId: paymentRequests.tenderId,
+                    projectId: paymentRequests.projectId,
                     projectName: paymentRequests.projectName,
+                    tenderNo: paymentRequests.tenderNo,
                     dueDate: paymentRequests.dueDate,
                 })
                 .from(paymentRequests)
@@ -1729,6 +1731,139 @@ export class PaymentRequestsNotificationService {
                 ? `${this.formatDateDDMMYYYY(dueDate)} 18:00`
                 : 'the due date';
 
+            // Letters attached to the create-request mail (BG style): a covering
+            // letter and an authorization letter for collecting the FDR from the
+            // AU Bank branch. Both are persisted on instrument_fdr_details so the
+            // dashboard can re-use them later.
+            const attachmentLinks: Array<{ label: string; url: string }> = [];
+            const addAttachmentLink = (label: string, filePath: string) => {
+                const url = this.buildPublicFileUrl(filePath);
+                if (!url || attachmentLinks.some((link) => link.url === url)) {
+                    return;
+                }
+                attachmentLinks.push({ label, url });
+            };
+
+            const [tlContact] = await this.db
+                .select({ name: users.name, mobile: users.mobile, email: users.email })
+                .from(users)
+                .where(
+                    and(
+                        eq(users.team, tenderTeamId),
+                        eq(users.roleId, 3)
+                    )
+                )
+                .limit(1);
+
+            // Accounts Leader shown in the cover letter signature block.
+            const [accountsLeader] = await this.db
+                .select({ name: users.name, mobile: users.mobile, email: users.email })
+                .from(users)
+                .where(eq(users.email, 'imran@volksenergie.in'))
+                .limit(1);
+
+            const fdrReference = await this.resolveBgReference({
+                tenderNo: paymentReq?.tenderNo,
+                projectId: paymentReq?.projectId,
+                tenderId,
+            });
+
+            const fdrAmount = instrument.amount ? Number(instrument.amount).toLocaleString('en-IN') : '';
+
+            // Covering letter addressee = the FDR courier recipient.
+            const courierOrg = typeof courierAddr?.org === 'string' ? courierAddr.org.trim() : '';
+            const courierName = typeof courierAddr?.name === 'string' ? courierAddr.name.trim() : '';
+            const courierAddressLines = courierAddr
+                ? [
+                    courierAddr.line1,
+                    courierAddr.line2,
+                    courierAddr.city,
+                    [courierAddr.state, courierAddr.pincode].filter(Boolean).join(' - '),
+                ]
+                    .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
+                    .join('\n')
+                : (instrument.courierAddress ?? '').trim();
+
+            try {
+                const coveringLetterData = {
+                    date: this.formatDateDDMMYYYY(new Date()),
+                    courierOrg,
+                    courierName,
+                    courierAddress: courierAddressLines,
+                    referenceNo: fdrReference?.value || '',
+                    referenceLabel: fdrReference?.label || '',
+                    purpose: purposeLabel,
+                    fdrNo: fdrDetails?.fdrNo || '',
+                    fdrDate: fdrDetails?.fdrDate ? this.formatDateDDMMYYYY(fdrDetails.fdrDate) : 'NA',
+                    fdrExpiryDate: this.formatDateDDMMYYYY(fdrExpiryDate) || 'NA',
+                    amount: fdrAmount,
+                    teamLeaderName: tlContact?.name || tlUser?.name || 'Team Leader',
+                    teamLeaderPhone: this.formatPhoneWithCountryCode(tlContact?.mobile),
+                    teamLeaderEmail: tlContact?.email || '',
+                    accountsLeaderName: accountsLeader?.name || 'Accounts Leader',
+                    accountsLeaderPhone: this.formatPhoneWithCountryCode(accountsLeader?.mobile),
+                    accountsLeaderEmail: accountsLeader?.email || 'imran@volksenergie.in',
+                };
+
+                const [coverLetterPath] = await this.pdfGenerator.generatePdfs(
+                    'fdrCoveringLetter',
+                    { ...coveringLetterData },
+                    instrumentId,
+                    'FDR'
+                );
+
+                if (coverLetterPath) {
+                    addAttachmentLink('Covering Letter', coverLetterPath);
+                    try {
+                        await this.db
+                            .update(instrumentFdrDetails)
+                            .set({ coverLetterPath })
+                            .where(eq(instrumentFdrDetails.instrumentId, instrumentId));
+                    } catch (persistError) {
+                        this.logger.warn(
+                            `Failed to persist FDR cover letter path for instrument ${instrumentId}: ${persistError instanceof Error ? persistError.message : String(persistError)}`
+                        );
+                    }
+                }
+            } catch (error) {
+                this.logger.warn(
+                    `FDR covering letter generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
+
+            try {
+                const authorizationLetterData = {
+                    date: this.formatDateDDMMYYYY(new Date()),
+                    partyName: isBgPurpose ? 'AU Small Finance Bank Ltd' : (instrument.favouring || ''),
+                    fdrAmount: fdrAmount ? `${fdrAmount}/-` : '',
+                };
+
+                const [authorizationLetterPath] = await this.pdfGenerator.generatePdfs(
+                    'fdrAuthorizationLetter',
+                    { ...authorizationLetterData },
+                    instrumentId,
+                    'FDR'
+                );
+
+                if (authorizationLetterPath) {
+                    addAttachmentLink('Authorization Letter', authorizationLetterPath);
+                    try {
+                        await this.db
+                            .update(instrumentFdrDetails)
+                            .set({ authorizationLetterPath })
+                            .where(eq(instrumentFdrDetails.instrumentId, instrumentId));
+                    } catch (persistError) {
+                        this.logger.warn(
+                            `Failed to persist FDR authorization letter path for instrument ${instrumentId}: ${persistError instanceof Error ? persistError.message : String(persistError)}`
+                        );
+                    }
+                }
+            } catch (error) {
+                this.logger.warn(
+                    `FDR authorization letter generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
+
             try {
                 const result = await this.emailService.sendPaymentEmail({
                     requestId: instrument.requestId,
@@ -1753,6 +1888,7 @@ export class PaymentRequestsNotificationService {
                         courierAddress,
                         senderName: requesterName,
                         tlName: tlUser?.name || 'Team Leader',
+                        attachmentLinks,
                     },
                     to: [{ type: 'emails', emails: [toEmails] }],
                     cc: [

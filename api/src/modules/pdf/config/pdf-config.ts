@@ -12,6 +12,11 @@ const BG_BG_PREFIXED_TYPES = new Set([
     'bgAuthorizationLetter',
 ]);
 
+const FDR_PREFIXED_TYPES = new Set([
+    'fdrCoveringLetter',
+    'fdrAuthorizationLetter',
+]);
+
 /**
  * PDF Generation Configuration
  */
@@ -149,6 +154,30 @@ export const PDF_CONFIG = {
             templates: ['bg-authorization-letter'],
             storagePath: 'bgauthletter',
             baseDir: 'bi-dashboard/bank-guarantee/bgauthletter',
+            margin: {
+                top: '0mm',
+                right: '0mm',
+                bottom: '0mm',
+                left: '0mm',
+            },
+        },
+        fdrCoveringLetter: {
+            directory: 'letters',
+            templates: ['fdr-covering-letter'],
+            storagePath: 'fdrcovletter',
+            baseDir: 'bi-dashboard/fdr/fdrcovletter',
+            margin: {
+                top: '0mm',
+                right: '0mm',
+                bottom: '0mm',
+                left: '0mm',
+            },
+        },
+        fdrAuthorizationLetter: {
+            directory: 'letters',
+            templates: ['fdr-authorization-letter'],
+            storagePath: 'fdrauthletter',
+            baseDir: 'bi-dashboard/fdr/fdrauthletter',
             margin: {
                 top: '0mm',
                 right: '0mm',
@@ -307,6 +336,8 @@ export function getOutputPath(
     let fileName: string;
     if (BG_BG_PREFIXED_TYPES.has(templateType) && instrumentId) {
         fileName = `bg_${instrumentId}_${templateName}_${s}.pdf`;
+    } else if (FDR_PREFIXED_TYPES.has(templateType) && instrumentId) {
+        fileName = `fdr_${instrumentId}_${templateName}_${s}.pdf`;
     } else {
         const prefix = storagePath;
         fileName = `${prefix}_${templateName}_${s}.pdf`;
@@ -330,6 +361,8 @@ export function getRelativePath(
     let fileName: string;
     if (BG_BG_PREFIXED_TYPES.has(templateType) && instrumentId) {
         fileName = `bg_${instrumentId}_${templateName}_${s}.pdf`;
+    } else if (FDR_PREFIXED_TYPES.has(templateType) && instrumentId) {
+        fileName = `fdr_${instrumentId}_${templateName}_${s}.pdf`;
     } else {
         const prefix = storagePath;
         fileName = `${prefix}_${templateName}_${s}.pdf`;

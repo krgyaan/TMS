@@ -6,7 +6,7 @@
         The purpose of the FDR is {{data.purpose}}.{{#if data.isBgPurpose}} (BG in case of FDR for BG){{/if}}
     </p>
 
-    <p>Please prepare the BG using the details below:</p>
+    <p>Please prepare the FDR using the details below:</p>
     <p>
         <strong>FDR in favor of:</strong> {{data.fdrInFavourOf}}<br>
         <strong>FDR Amount:</strong> Rs. {{data.amount}}<br>
@@ -16,7 +16,7 @@
     <p>This FDR is required within {{data.timeLimit}} Hrs.{{#if data.isBgPurpose}} (12 hours in case of FDR for BG){{/if}}</p>
 
     <p>
-        Please review the BG format, if accepted, send a request to the bank using the
+        Please review the pre-filled bank format, if accepted, send a request to the bank using the
         <a href="{{data.stage1Link}}">Stage 1: Request to Bank</a>. If Corrections are required, reject the request
         and mention the corrections needed.
     </p>
@@ -42,4 +42,13 @@
         {{data.senderName}},<br>
         Approved by {{data.tlName}}
     </p>
+
+    {{#if data.attachmentLinks.length}}
+    <p><strong>Documents</strong></p>
+    <ul>
+        {{#each data.attachmentLinks}}
+        <li><a href="{{this.url}}">{{this.label}}</a></li>
+        {{/each}}
+    </ul>
+    {{/if}}
 </div>
