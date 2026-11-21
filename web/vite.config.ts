@@ -53,6 +53,8 @@ export default defineConfig(({ command }) => ({
                 // precache.
                 globPatterns: command === "build" ? ["index.html", "manifest.webmanifest"] : [],
                 cleanupOutdatedCaches: true,
+                skipWaiting: true,
+                clientsClaim: true,
                 navigateFallback: "/index.html",
                 navigateFallbackDenylist: [/^\/api\//, /^\/uploads\//],
                 runtimeCaching: [

@@ -19,7 +19,7 @@ const Dashboard = () => {
         return (
             <div className="space-y-6 p-8">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                    {FIELD_DASHBOARD_TILES.filter(tile => canRead(tile.permission)).map(tile => (
+                    {FIELD_DASHBOARD_TILES.filter(tile => !tile.permission || canRead(tile.permission)).map(tile => (
                         <QuickActionCard
                             key={tile.title}
                             title={tile.title}
