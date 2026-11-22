@@ -11,14 +11,7 @@ export function escapeXml(value: string): string {
     return String(value ?? "").replace(/[&<>"']/g, char => XML_ESCAPES[char] ?? char);
 }
 
-/** Tally voucher/master dates use YYYYMMDD. */
-export function formatTallyDate(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-
-    return `${year}${month}${day}`;
-}
+export { toTallyDate as formatTallyDate } from "../dates/ist-date";
 
 export interface TallyStaticVariables {
     company?: string;

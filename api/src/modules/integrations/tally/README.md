@@ -4,9 +4,10 @@ Shared foundation for pushing TMS data into TallyPrime over its XML-over-HTTP
 gateway, and for reading masters back. Other modules should depend on this
 module instead of building their own Tally calls.
 
-Phase 0 (this delivery) contains connection/company checks and idempotent
-master operations. Vouchers, the persistent queue, the sync ledger and the
-scheduler are planned below.
+Phase 0 contains connection/company checks and idempotent master operations.
+Phase 1 adds the sync schema, money/date helpers, imprest mappings and a
+read-only voucher snapshot source. Voucher posting, the queue worker and the
+scheduler are still planned below.
 
 ## Configuration
 
@@ -43,7 +44,31 @@ src/modules/integrations/tally/
   xml/master-xml.builder.ts       GROUP/LEDGER/COSTCENTRE create fragments
   xml/response-parser.ts          hardened parser + normalised results
   errors/tally.errors.ts          typed errors callers can branch on
+  money/paise.ts                  integer-paise parsing, summing, formatting
+  dates/ist-date.ts               IST calendar-day formatting
+  mappings/imprest-tally.config.ts category->ledger, blocked categories, employee ledgers
+  sources/imprest-voucher.source.ts      read-only accounts-signed voucher source
+  sources/voucher-snapshot.builder.ts    posting lines, problems, sha256 fingerprint
 ```
+
+## Phase 1 configuration
+
+`mappings/imprest-tally.config.ts` is the single source for imprest mappings:
+
+- `categoryLedgers`: imprest category id -> expense ledger and group. Empty by
+  default; every category is blocked until finance populates it.
+- `blockedCategoryIds`: Transfer (22) and Insurance (8). Any voucher containing
+  one is not posted.
+- `employeeLedgers`: optional user id -> payable ledger name. Falls back to the
+  employee name when absent.
+- `employeePayableGroup`: parent group for employee payables.
+
+Cost centres are not mapped: the TMS project code is used verbatim as the
+Tally cost-centre name. A missing project code blocks the line.
+
+`ImprestVoucherSource.listSnapshots` only reads: it lists accounts-signed
+vouchers with posting lines, problem codes and a fingerprint. It never calls
+Tally. A voucher is postable only when `problems` is empty.
 
 ## Public API
 
@@ -78,6 +103,18 @@ pnpm tally:check
 
 Prints reachability, whether the configured company is loaded, and master
 counts. It performs reads only. Exits non-zero on any failure.
+
+### Voucher preview
+
+```bash
+cd api
+pnpm tally:preview --from=2026-04-01 --to=2026-06-30
+```
+
+Prints every accounts-signed imprest voucher in the IST date range with its
+posting lines, totals and blocking problem codes. It reads the database only
+and never calls TallyPrime. Exits non-zero when any voucher is not postable;
+`UNMAPPED_CATEGORY` means the category is missing from `categoryLedgers`.
 
 ## Safety properties
 
@@ -132,12 +169,19 @@ layer.
 - [x] Typed errors and operator CLI (`pnpm tally:check`)
 - [x] Unit tests, type-check, scoped lint
 
-### Phase 1 - data model and mappings
+### Phase 1 - data model and mappings (delivered; finance config pending)
 
-- [ ] `tally_sync_jobs` and `tally_sync_ledger` Drizzle schemas + migration
-- [ ] Category -> ledger and project code -> cost centre mapping (single source)
-- [ ] Expense-report source adapter (`employee_imprest_vouchers` + lines)
-- [ ] Decimal-safe money handling (integer paise)
+- [x] `tally_sync_jobs` and `tally_sync_ledger` Drizzle schemas + migration
+- [x] Category -> ledger mapping and project code -> cost centre (single source)
+- [x] Expense-report source adapter (`employee_imprest_vouchers` + lines)
+- [x] Decimal-safe money handling (integer paise)
+- [x] Read-only voucher preview CLI (`pnpm tally:preview`)
+- [ ] Populate `categoryLedgers` and confirm employee payable ledger names
+- [ ] Apply `0189_create_tally_sync_tables.sql` to the target database
+
+Migrations from 0094 onward are authored as SQL plus a `_journal.json` entry:
+`drizzle/meta` snapshots stop at 0093, and `pnpm drizzle:generate` prompts for
+enum conflicts so it cannot run non-interactively.
 
 ### Phase 2 - vouchers
 

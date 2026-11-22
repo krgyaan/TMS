@@ -7,6 +7,7 @@ import { createNodeTallyRequester, type TallyRequester } from "./transport/tally
 import { TallyClient } from "./client/tally.client";
 import { TallyMastersService } from "./masters/tally-masters.service";
 import { TallyStatusService } from "./tally-status.service";
+import { ImprestVoucherSource } from "./sources/imprest-voucher.source";
 import type { TallyConfig } from "@/config/tally.config";
 
 /**
@@ -52,7 +53,8 @@ import type { TallyConfig } from "@/config/tally.config";
         TallyClient,
         TallyMastersService,
         TallyStatusService,
+        ImprestVoucherSource,
     ],
-    exports: [TallyClient, TallyMastersService, TallyStatusService],
+    exports: [TallyClient, TallyMastersService, TallyStatusService, ImprestVoucherSource],
 })
 export class TallyModule {}

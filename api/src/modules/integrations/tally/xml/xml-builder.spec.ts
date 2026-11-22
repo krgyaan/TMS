@@ -11,9 +11,9 @@ describe("escapeXml", () => {
 });
 
 describe("formatTallyDate", () => {
-    it("formats as YYYYMMDD", () => {
-        expect(formatTallyDate(new Date(2026, 0, 5))).toBe("20260105");
-        expect(formatTallyDate(new Date(2026, 11, 31))).toBe("20261231");
+    it("formats the IST calendar day as YYYYMMDD", () => {
+        expect(formatTallyDate(new Date("2026-01-04T18:30:00.000Z"))).toBe("20260105");
+        expect(formatTallyDate(new Date("2026-12-31T12:00:00.000Z"))).toBe("20261231");
     });
 });
 
