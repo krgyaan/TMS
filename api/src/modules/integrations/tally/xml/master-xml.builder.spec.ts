@@ -56,4 +56,10 @@ describe("buildMasterCollectionRequest", () => {
         expect(xml).toContain("<NATIVEMETHOD>Parent</NATIVEMETHOD>");
         expect(xml).toContain("<SVCURRENTCOMPANY>VEPL</SVCURRENTCOMPANY>");
     });
+
+    it("requests GUIDs for ledgers", () => {
+        const xml = buildMasterCollectionRequest("ledger");
+
+        expect(xml).toContain("<NATIVEMETHOD>GUID</NATIVEMETHOD>");
+    });
 });

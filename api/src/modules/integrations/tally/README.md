@@ -46,22 +46,60 @@ src/modules/integrations/tally/
   errors/tally.errors.ts          typed errors callers can branch on
   money/paise.ts                  integer-paise parsing, summing, formatting
   dates/ist-date.ts               IST calendar-day formatting
-  mappings/imprest-tally.config.ts category->ledger, blocked categories, employee ledgers
+  mappings/imprest-tally.config.ts category->ledger, blocked categories, fallback employee ledgers
+  ledgers/tally-ledgers.service.ts       sync/list all Tally ledgers (GUID-aware)
+  ledgers/tally-user-ledgers.service.ts  the three employee ledger links on `users`
+  ledgers/ledger-sync.plan.ts            pure insert/update/deactivate plan
+  ledgers/ledger-name.ts                 employee ledger name parser + role suffix
+  ledgers/tally-ledgers.controller.ts    admin API under /api/v1/tally
   sources/imprest-voucher.source.ts      read-only accounts-signed voucher source
   sources/voucher-snapshot.builder.ts    posting lines, problems, sha256 fingerprint
 ```
 
 ## Phase 1 configuration
 
-`mappings/imprest-tally.config.ts` is the single source for imprest mappings:
+### Ledger master and employee links
+
+`tally_ledgers` stores every ledger synced from TallyPrime (name, parent,
+GUID, active flag). It is populated by reads only:
+
+```bash
+cd api
+pnpm tally:sync-ledgers                 # manual
+curl -X POST /api/v1/tally/ledgers/sync # authed, permission integrations:update
+```
+
+Sync matches by GUID first and falls back to the normalised name, so a rename
+keeps the same row. Ledgers absent from the export are marked inactive, never
+deleted.
+
+Each user row carries three ledger FKs: `imprest_ledger_id`,
+`salary_ledger_id`, `salary_payable_ledger_id` (`ON DELETE SET NULL`). Ledgers
+can be shared between users.
+
+Link them from a CSV keyed by TMS user id:
+
+```bash
+# scripts/csv/ is git-ignored
+pnpm tally:link-employee-ledgers --file=scripts/csv/tally-employee-ledgers.csv
+pnpm tally:link-employee-ledgers --file=scripts/csv/tally-employee-ledgers.csv --apply
+```
+
+CSV columns: `user_id, ledger_name [, role]`. The role is derived from the
+`Imprest` / `Salary A/c` / `Salary Payable A/c` suffix. Ambiguous rows are
+rejected; nothing is written unless every row validates.
+
+Admin API: `GET /tally/ledgers`, `POST /tally/ledgers/sync`,
+`GET|PUT|DELETE /tally/user-ledgers/:userId` (permission `integrations`).
+
+`mappings/imprest-tally.config.ts` still holds static mappings:
 
 - `categoryLedgers`: imprest category id -> expense ledger and group. Empty by
   default; every category is blocked until finance populates it.
 - `blockedCategoryIds`: Transfer (22) and Insurance (8). Any voucher containing
   one is not posted.
-- `employeeLedgers`: optional user id -> payable ledger name. Falls back to the
-  employee name when absent.
-- `employeePayableGroup`: parent group for employee payables.
+- `employeeLedgers` / `employeePayableGroup`: fallbacks used only when a user
+  has no linked imprest ledger or the linked ledger has no parent.
 
 Cost centres are not mapped: the TMS project code is used verbatim as the
 Tally cost-centre name. A missing project code blocks the line.
@@ -176,8 +214,12 @@ layer.
 - [x] Expense-report source adapter (`employee_imprest_vouchers` + lines)
 - [x] Decimal-safe money handling (integer paise)
 - [x] Read-only voucher preview CLI (`pnpm tally:preview`)
-- [ ] Populate `categoryLedgers` and confirm employee payable ledger names
-- [ ] Apply `0189_create_tally_sync_tables.sql` to the target database
+- [x] All-ledger `tally_ledgers` master with GUID-aware sync
+- [x] Three employee ledger links on `users` + admin API
+- [x] Ledger sync and user-link CLIs
+- [ ] Populate `categoryLedgers`
+- [ ] Run ledger sync and link users on the target environment
+- [ ] Apply `0189_create_tally_sync_tables.sql` + `0190_create_tally_ledgers.sql`
 
 Migrations from 0094 onward are authored as SQL plus a `_journal.json` entry:
 `drizzle/meta` snapshots stop at 0093, and `pnpm drizzle:generate` prompts for

@@ -119,6 +119,31 @@ describe("buildVoucherSnapshot", () => {
         expect(snapshot.postable).toBe(false);
     });
 
+    it("prefers the ledger linked from the database", () => {
+        const snapshot = buildVoucherSnapshot(
+            config,
+            voucher({
+                employeeId: 9,
+                employeeName: "Asha Rao",
+                employeeLedger: { ledger: "ASHA RAO (VEP009) Imprest", group: "Current Liabilities", active: true },
+            })
+        );
+
+        expect(snapshot.creditLedger).toBe("ASHA RAO (VEP009) Imprest");
+        expect(snapshot.creditGroup).toBe("Current Liabilities");
+        expect(snapshot.postable).toBe(true);
+    });
+
+    it("blocks an inactive linked ledger", () => {
+        const snapshot = buildVoucherSnapshot(
+            config,
+            voucher({ employeeLedger: { ledger: "RAVI KUMAR (VEP007) Imprest", group: "Current Liabilities", active: false } })
+        );
+
+        expect(codes(snapshot)).toContain("INACTIVE_EMPLOYEE_LEDGER");
+        expect(snapshot.postable).toBe(false);
+    });
+
     it("falls back to the employee name when no override exists", () => {
         const snapshot = buildVoucherSnapshot(config, voucher({ employeeId: 9, employeeName: "Asha Rao" }));
 

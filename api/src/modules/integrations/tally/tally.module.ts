@@ -8,6 +8,9 @@ import { TallyClient } from "./client/tally.client";
 import { TallyMastersService } from "./masters/tally-masters.service";
 import { TallyStatusService } from "./tally-status.service";
 import { ImprestVoucherSource } from "./sources/imprest-voucher.source";
+import { TallyLedgersController } from "./ledgers/tally-ledgers.controller";
+import { TallyLedgersService } from "./ledgers/tally-ledgers.service";
+import { TallyUserLedgersService } from "./ledgers/tally-user-ledgers.service";
 import type { TallyConfig } from "@/config/tally.config";
 
 /**
@@ -18,6 +21,7 @@ import type { TallyConfig } from "@/config/tally.config";
  */
 @Module({
     imports: [ConfigModule],
+    controllers: [TallyLedgersController],
     providers: [
         {
             provide: TALLY_CONFIG,
@@ -54,7 +58,9 @@ import type { TallyConfig } from "@/config/tally.config";
         TallyMastersService,
         TallyStatusService,
         ImprestVoucherSource,
+        TallyLedgersService,
+        TallyUserLedgersService,
     ],
-    exports: [TallyClient, TallyMastersService, TallyStatusService, ImprestVoucherSource],
+    exports: [TallyClient, TallyMastersService, TallyStatusService, ImprestVoucherSource, TallyLedgersService, TallyUserLedgersService],
 })
 export class TallyModule {}

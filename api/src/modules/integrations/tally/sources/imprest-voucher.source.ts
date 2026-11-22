@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { DRIZZLE } from "@/db/database.module";
-import { employeeImprestVoucherItems, employeeImprestVouchers, employeeImprests, projects, users } from "@/db/schemas";
+import { employeeImprestVoucherItems, employeeImprestVouchers, employeeImprests, projects, tallyLedgers, users } from "@/db/schemas";
 import type { DbInstance } from "@db";
 import { and, asc, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import { TallyValidationError } from "../errors/tally.errors";
@@ -11,6 +11,12 @@ export interface ListSnapshotsParams {
     from: Date;
     to: Date;
     config?: ImprestTallyConfig;
+}
+
+interface EmployeeRow {
+    id: number;
+    name: string;
+    imprestLedgerId: number | null;
 }
 
 const BENEFICIARY_ID = sql<number | null>`CASE WHEN ${employeeImprestVouchers.beneficiaryName} ~ '^[0-9]+$' THEN ${employeeImprestVouchers.beneficiaryName}::int ELSE NULL END`;
@@ -43,8 +49,13 @@ export class ImprestVoucherSource {
         const voucherIds = vouchers.map(voucher => voucher.voucherId);
         const employeeIds = [...new Set(vouchers.map(voucher => voucher.employeeId).filter((id): id is number => id !== null))];
 
-        const employeeRowsPromise: Promise<{ id: number; name: string }[]> =
-            employeeIds.length > 0 ? this.db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, employeeIds)) : Promise.resolve([]);
+        const employeeRowsPromise: Promise<EmployeeRow[]> =
+            employeeIds.length > 0
+                ? this.db
+                      .select({ id: users.id, name: users.name, imprestLedgerId: users.imprestLedgerId })
+                      .from(users)
+                      .where(inArray(users.id, employeeIds))
+                : Promise.resolve([]);
 
         const [employeeRows, lineRows] = await Promise.all([
             employeeRowsPromise,
@@ -65,7 +76,17 @@ export class ImprestVoucherSource {
                 .orderBy(asc(employeeImprestVoucherItems.voucherId), asc(employeeImprests.id)),
         ]);
 
-        const employeeNames = new Map(employeeRows.map(row => [row.id, row.name] as const));
+        const ledgerIds = [...new Set(employeeRows.map(row => row.imprestLedgerId).filter((id): id is number => id !== null))];
+        const ledgerRows =
+            ledgerIds.length > 0
+                ? await this.db
+                      .select({ id: tallyLedgers.id, name: tallyLedgers.name, parent: tallyLedgers.parent, isActive: tallyLedgers.isActive })
+                      .from(tallyLedgers)
+                      .where(inArray(tallyLedgers.id, ledgerIds))
+                : [];
+
+        const employeesById = new Map(employeeRows.map(row => [row.id, row] as const));
+        const ledgersById = new Map(ledgerRows.map(row => [row.id, row] as const));
         const linesByVoucher = new Map<number, VoucherLineInput[]>();
 
         for (const row of lineRows) {
@@ -85,19 +106,23 @@ export class ImprestVoucherSource {
 
         const config = params.config ?? IMPREST_TALLY_CONFIG;
 
-        return vouchers.map(voucher =>
-            buildVoucherSnapshot(config, {
+        return vouchers.map(voucher => {
+            const employee = voucher.employeeId === null ? undefined : employeesById.get(voucher.employeeId);
+            const linkedLedger = employee?.imprestLedgerId != null ? ledgersById.get(employee.imprestLedgerId) : undefined;
+
+            return buildVoucherSnapshot(config, {
                 voucherId: voucher.voucherId,
                 voucherCode: voucher.voucherCode,
                 employeeId: voucher.employeeId,
-                employeeName: voucher.employeeId === null ? null : (employeeNames.get(voucher.employeeId) ?? null),
+                employeeName: employee?.name ?? null,
+                employeeLedger: linkedLedger ? { ledger: linkedLedger.name, group: linkedLedger.parent ?? "", active: linkedLedger.isActive } : null,
                 amount: voucher.amount,
                 validFrom: voucher.validFrom,
                 validTo: voucher.validTo,
                 accountsSignedAt: voucher.accountsSignedAt,
                 lines: linesByVoucher.get(voucher.voucherId) ?? [],
-            })
-        );
+            });
+        });
     }
 
     private assertRange(params: ListSnapshotsParams): void {

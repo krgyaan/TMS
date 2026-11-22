@@ -13,8 +13,10 @@ export interface ImprestTallyConfig {
 }
 
 export const IMPREST_TALLY_CONFIG: ImprestTallyConfig = {
-    employeePayableGroup: "Employee Payables",
-    categoryLedgers: {},
+    employeePayableGroup: "Sundry Creditors",
+    categoryLedgers: {
+        
+    },
     blockedCategoryIds: [22, 8],
     employeeLedgers: {},
 };

@@ -8,12 +8,14 @@ import {
     resolveEmployeePayableGroup,
     type ImprestTallyConfig,
 } from "../mappings/imprest-tally.config";
+import { normalizeMasterName } from "../masters/name.util";
 import { sumPaise, toPaise } from "../money/paise";
 
 export type VoucherProblemCode =
     | "NOT_ACCOUNTS_SIGNED"
     | "MISSING_EMPLOYEE"
     | "MISSING_EMPLOYEE_LEDGER"
+    | "INACTIVE_EMPLOYEE_LEDGER"
     | "MISSING_VOUCHER_AMOUNT"
     | "INVALID_VOUCHER_AMOUNT"
     | "INVALID_DATE"
@@ -44,11 +46,18 @@ export interface VoucherLineInput {
     approvalStatus: number;
 }
 
+export interface EmployeeLedgerLink {
+    ledger: string;
+    group: string;
+    active: boolean;
+}
+
 export interface VoucherInput {
     voucherId: number;
     voucherCode: string;
     employeeId: number | null;
     employeeName: string | null;
+    employeeLedger?: EmployeeLedgerLink | null;
     amount: string | number | null;
     validFrom: Date;
     validTo: Date;
@@ -116,8 +125,16 @@ export function buildVoucherSnapshot(config: ImprestTallyConfig, voucher: Vouche
         problems.push({ code: "MISSING_EMPLOYEE", message: `Voucher ${voucher.voucherCode} has no employee` });
     }
 
-    const creditLedger = resolveEmployeeLedger(config, voucher.employeeId, voucher.employeeName);
-    const creditGroup = resolveEmployeePayableGroup(config);
+    const linkedLedger = voucher.employeeLedger ? normalizeMasterName(voucher.employeeLedger.ledger) : "";
+    const creditLedger = linkedLedger.length > 0 ? linkedLedger : resolveEmployeeLedger(config, voucher.employeeId, voucher.employeeName);
+    const creditGroup = (voucher.employeeLedger ? normalizeMasterName(voucher.employeeLedger.group) : "") || resolveEmployeePayableGroup(config);
+
+    if (voucher.employeeLedger && !voucher.employeeLedger.active) {
+        problems.push({
+            code: "INACTIVE_EMPLOYEE_LEDGER",
+            message: `Voucher ${voucher.voucherCode} is linked to an inactive ledger`,
+        });
+    }
 
     if (creditLedger === null) {
         problems.push({

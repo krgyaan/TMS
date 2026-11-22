@@ -105,7 +105,15 @@ describe("parseMasterList", () => {
     it("reads a single master object", () => {
         const xml = envelope('<DATA><TALLYMESSAGE><LEDGER NAME="Site Expenses"><NAME>Site Expenses</NAME><PARENT>Indirect Expenses</PARENT></LEDGER></TALLYMESSAGE></DATA>');
 
-        expect(parseMasterList(xml, "ledger")).toEqual([{ name: "Site Expenses", parent: "Indirect Expenses" }]);
+        expect(parseMasterList(xml, "ledger")).toEqual([{ name: "Site Expenses", parent: "Indirect Expenses", guid: null }]);
+    });
+
+    it("reads the ledger GUID when present", () => {
+        const xml = envelope(
+            '<DATA><TALLYMESSAGE><LEDGER NAME="Site Expenses"><NAME>Site Expenses</NAME><PARENT>Indirect Expenses</PARENT><GUID>abc-123</GUID></LEDGER></TALLYMESSAGE></DATA>'
+        );
+
+        expect(parseMasterList(xml, "ledger")).toEqual([{ name: "Site Expenses", parent: "Indirect Expenses", guid: "abc-123" }]);
     });
 
     it("reads an array of masters and de-duplicates by name", () => {
