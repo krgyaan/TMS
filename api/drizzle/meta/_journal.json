@@ -834,6 +834,13 @@
       "when": 1806000000000,
       "tag": "0189_create_tally_sync_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 143,
+      "version": "7",
+      "when": 1807000000000,
+      "tag": "0190_create_tally_ledgers",
+      "breakpoints": true
     }
   ]
 }
