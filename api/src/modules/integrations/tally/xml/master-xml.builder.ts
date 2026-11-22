@@ -49,7 +49,7 @@ export function buildMasterCollectionRequest(kind: MasterKind, variables?: Tally
     return buildCollectionExportRequest({
         collectionName: `TMS ${tag} list`,
         objectType: tag,
-        nativeMethods: ["Name", "Parent"],
+        nativeMethods: kind === "ledger" ? ["Name", "Parent", "GUID"] : ["Name", "Parent"],
         variables,
     });
 }

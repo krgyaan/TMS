@@ -30,6 +30,7 @@ export interface ParsedTallyResponse {
 export interface TallyMasterRecord {
     name: string;
     parent: string | null;
+    guid: string | null;
 }
 
 export interface TallyImportResult {
@@ -386,6 +387,7 @@ export function parseMasterList(xml: string, kind: MasterKind): TallyMasterRecor
         records.push({
             name,
             parent: extractText(record.PARENT) ?? extractText(record["@_PARENT"]),
+            guid: extractText(record.GUID) ?? extractText(record["@_GUID"]),
         });
     }
 

@@ -33,7 +33,10 @@
         "postinstall": "npx puppeteer browsers install chrome",
         "type-check": "tsc --noEmit",
         "type-check:watch": "tsc --noEmit --watch",
-        "tally:check": "tsx scripts/tally-check.ts"
+        "tally:check": "tsx scripts/tally-check.ts",
+        "tally:preview": "tsx -r tsconfig-paths/register scripts/tally-preview.ts",
+        "tally:sync-ledgers": "tsx -r tsconfig-paths/register scripts/tally-sync-ledgers.ts",
+        "tally:link-employee-ledgers": "tsx -r tsconfig-paths/register scripts/tally-link-employee-ledgers.ts"
     },
     "dependencies": {
         "@asteasolutions/zod-to-openapi": "^7.3.4",

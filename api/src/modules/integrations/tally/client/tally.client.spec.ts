@@ -144,7 +144,7 @@ describe("TallyClient", () => {
             xmlResponse(envelope('<DATA><TALLYMESSAGE><LEDGER NAME="Site Expenses"><NAME>Site Expenses</NAME><PARENT>Indirect Expenses</PARENT></LEDGER></TALLYMESSAGE></DATA>'))
         );
 
-        await expect(client.exportMasters("ledger")).resolves.toEqual([{ name: "Site Expenses", parent: "Indirect Expenses" }]);
+        await expect(client.exportMasters("ledger")).resolves.toEqual([{ name: "Site Expenses", parent: "Indirect Expenses", guid: null }]);
     });
 
     it("maps 401 and 403 to TallyAuthError with a token hint", async () => {
