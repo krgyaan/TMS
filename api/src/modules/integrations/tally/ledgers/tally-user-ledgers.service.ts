@@ -113,8 +113,8 @@ export class TallyUserLedgersService {
         return this.setForUser(userId, { imprestLedgerId: null, salaryLedgerId: null, salaryPayableLedgerId: null }, company);
     }
 
-    private toLink(link: { id: number | null; name: string | null; parent: string | null; isActive: boolean | null }): UserLedgerLink | null {
-        if (link.id === null) {
+    private toLink(link: { id: number | null; name: string | null; parent: string | null; isActive: boolean | null } | null): UserLedgerLink | null {
+        if (!link || link.id === null) {
             return null;
         }
 
