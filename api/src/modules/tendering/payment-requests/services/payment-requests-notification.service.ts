@@ -1559,6 +1559,125 @@ export class PaymentRequestsNotificationService {
         }
     }
 
+    /**
+     * Notifies the tendering team (first Stage 2 save) that the FDR has been
+     * created, with the soft copy uploaded in Stage 2 attached.
+     * Not sent for FDRs raised against a Bank Guarantee.
+     */
+    async sendFdrCreatedTeamEmail(instrumentId: number, body: any = {}): Promise<void> {
+        try {
+            const [result] = await this.db
+                .select({
+                    instrument: paymentInstruments,
+                    request: paymentRequests,
+                    fdrDetails: instrumentFdrDetails,
+                })
+                .from(paymentInstruments)
+                .innerJoin(paymentRequests, eq(paymentInstruments.requestId, paymentRequests.id))
+                .leftJoin(instrumentFdrDetails, eq(instrumentFdrDetails.instrumentId, paymentInstruments.id))
+                .where(eq(paymentInstruments.id, instrumentId))
+                .limit(1);
+
+            if (!result || !result.instrument) {
+                this.logger.warn(`FDR created (team) email skipped: instrument ${instrumentId} not found`);
+                return;
+            }
+
+            const { instrument, request, fdrDetails } = result;
+
+            const rawPurpose = (fdrDetails?.fdrPurpose || request.purpose || '').trim();
+            if (rawPurpose.toUpperCase() === 'BANK_GUARANTEE') {
+                this.logger.log(
+                    `FDR created (team) email skipped for instrument ${instrumentId}: purpose is Bank Guarantee`,
+                );
+                return;
+            }
+
+            const [reqUser] = request.requestedBy
+                ? await this.db
+                    .select({ name: users.name, email: users.email })
+                    .from(users)
+                    .where(eq(users.id, request.requestedBy))
+                    .limit(1)
+                : [];
+
+            if (!reqUser?.email) {
+                this.logger.warn(
+                    `FDR created (team) email skipped: requester email not found for instrument ${instrumentId}`,
+                );
+                return;
+            }
+
+            let tenderName: string | null = null;
+            if (request.tenderId && request.tenderId > 0) {
+                const [tender] = await this.db
+                    .select({ tenderName: tenderInfos.tenderName })
+                    .from(tenderInfos)
+                    .where(eq(tenderInfos.id, request.tenderId))
+                    .limit(1);
+                tenderName = tender?.tenderName ?? null;
+            }
+
+            const rawName = (tenderName || request.projectName || '').trim();
+            const hasName = !!rawName && rawName.toUpperCase() !== 'NA';
+            const purposeLabel = formatFdrPurpose(rawPurpose, request.purpose || 'Other Payment');
+            const subject = hasName
+                ? `FDR Created - ${purposeLabel} - ${rawName}`
+                : `FDR Created - ${purposeLabel}`;
+
+            const attachmentItems = this.toAttachmentPaths(fdrDetails?.fdrCopy).map((path) => ({
+                path,
+                name: 'Soft Copy of FDR',
+            }));
+            const stagedAttachments = this.stageFdrMailAttachments(instrumentId, attachmentItems);
+
+            const [kailashUser] = await this.db
+                .select({ id: users.id })
+                .from(users)
+                .where(eq(users.email, 'kailash@volksenergie.in'))
+                .limit(1);
+
+            const fromUserId =
+                kailashUser?.id ?? (await this.getResponsibleUserIdByMode('FDR')) ?? 33;
+
+            const tenderTeamId = await this.getTenderTeamId(request.tenderId || 0, request.requestedBy || 0);
+            const remarks = (body.remarks || '').toString().trim();
+
+            await this.emailService.sendPaymentEmail({
+                requestId: instrument.requestId,
+                tenderId: request.tenderId || undefined,
+                eventType: 'FDR_STAGE2_SAVED',
+                template: 'fdr-created-team',
+                subject,
+                fromUserId,
+                to: [{ type: 'emails', emails: [reqUser.email] }],
+                cc: [
+                    { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
+                    { type: 'emails', emails: ['goyal@volksenergie.in'] },
+                    { type: 'emails', emails: ['accounts@volksenergie.in'] },
+                    { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                ],
+                data: {
+                    tenderExecutiveName: reqUser.name || 'Tender Executive',
+                    fdrDate: this.formatDateDDMMYYYY(body.fdr_date || fdrDetails?.fdrDate) || 'NA',
+                    fdrNo: body.fdr_no || fdrDetails?.fdrNo || '',
+                    beneficiaryName: instrument.favouring || '',
+                    amount: (Number(instrument.amount) || 0).toLocaleString('en-IN'),
+                    courierRequestNo: instrument.reqNo || '',
+                    remarks,
+                },
+                attachments: { files: stagedAttachments.map((attachment) => attachment.path) },
+            });
+
+            this.logger.log(
+                `FDR created (team) email sent for instrument ${instrumentId} to ${reqUser.email}`,
+            );
+        } catch (error) {
+            this.logger.error(`Failed to send FDR created (team) email for instrument ${instrumentId}:`, error);
+            throw error;
+        }
+    }
+
     async sendChequeCreatedMail(
         instrumentId: number,
         status: 'Accepted' | 'Rejected',

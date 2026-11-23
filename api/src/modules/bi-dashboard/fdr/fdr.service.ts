@@ -665,11 +665,17 @@ export class FdrService {
             }
         }
 
+        let wasFdrCreated = false;
+
         if (Object.keys(fdrDetailsUpdate).length > 0) {
             fdrDetailsUpdate.updatedAt = new Date();
 
             // Check if fdrDetails record exists
             const [existingFdrDetails] = await this.db.select().from(instrumentFdrDetails).where(eq(instrumentFdrDetails.instrumentId, instrumentId)).limit(1);
+
+            wasFdrCreated = Boolean(
+                existingFdrDetails?.fdrNo && String(existingFdrDetails.fdrNo).trim().length > 0,
+            );
 
             if (existingFdrDetails) {
                 await this.db.update(instrumentFdrDetails).set(fdrDetailsUpdate).where(eq(instrumentFdrDetails.instrumentId, instrumentId));
@@ -701,6 +707,18 @@ export class FdrService {
                         ),
                     );
             }
+        }
+
+        // Notify the tendering team the first time Stage 2 (FDR created) is saved.
+        if (body.action === "accounts-form-2" && !wasFdrCreated) {
+            this.notificationService
+                .sendFdrCreatedTeamEmail(instrumentId, body)
+                .catch((error) =>
+                    this.logger.error(
+                        `FDR created (team) email failed for instrument ${instrumentId}:`,
+                        error,
+                    ),
+                );
         }
 
         // Create follow-up if action is initiate-followup
