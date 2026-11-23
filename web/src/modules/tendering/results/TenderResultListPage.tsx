@@ -7,7 +7,7 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Clock, Upload, Gavel, Trophy, XCircle, Eye, FileX2, Search } from 'lucide-react';
+import { AlertCircle, Clock, Upload, Gavel, Trophy, XCircle, Eye, FileX2, Plus, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -130,6 +130,13 @@ const TenderResultListPage = () => {
                 icon: <FileX2 className="h-4 w-4" />,
                 onClick: (row: ResultDashboardRow) => row?.woBasicDetailId ? navigate(paths.operations.woBasicDetailShowPage(row.woBasicDetailId)) : navigate(`${paths.operations.woBasicDetailCreatePage}?tenderId=${row.tenderId}`),
                 visible: (row: ResultDashboardRow) => row.resultStatus === 'Won' || row.resultStatus === 'won',
+            },
+            {
+                label: 'Add Another Order',
+                icon: <Plus className="h-4 w-4" />,
+                onClick: (row: ResultDashboardRow) => navigate(`${paths.operations.woBasicDetailCreatePage}?tenderId=${row.tenderId}`),
+                visible: (row: ResultDashboardRow) =>
+                    (row.resultStatus === 'Won' || row.resultStatus === 'won') && !!row.woBasicDetailId,
             },
             {
                 label: 'View RA Details',

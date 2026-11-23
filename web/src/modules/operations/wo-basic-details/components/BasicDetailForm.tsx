@@ -11,7 +11,7 @@ import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { useCreateWoBasicDetail, useUpdateWoBasicDetail, useWoBasicDetailPrefill } from "@/hooks/api/useWoBasicDetails";
+import { useCreateWoBasicDetail, useUpdateWoBasicDetail, useWoBasicDetailPrefill, useWoBasicDetailsByTender } from "@/hooks/api/useWoBasicDetails";
 import { useCreateBulkWoContacts, useDeleteAllContactsByBasicDetail, useWoContactsByBasicDetail } from "@/hooks/api/useWoContacts";
 import { useItemOptions, useLocationOptions, useOrganizationOptions, useTeamOptions } from "@/hooks/useSelectOptions";
 import { formatINR } from "@/hooks/useINRFormatter";
@@ -85,6 +85,18 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
     const watchProjectName = form.watch("projectName");
     const [projectNameSuffix, setProjectNameSuffix] = useState<string | null>(null);
     const watchPricesChanged = form.watch("pricesChanged");
+
+    const { data: existingOrders = [] } = useWoBasicDetailsByTender(
+        mode === "create" && !isNonTender ? effectiveTenderId ?? 0 : 0,
+    );
+    const hasExistingOrders =
+        mode === "create" && !isNonTender && existingOrders.length > 0;
+
+    useEffect(() => {
+        if (hasExistingOrders && form.getValues("orderType") !== "multiple") {
+            form.setValue("orderType", "multiple", { shouldValidate: true });
+        }
+    }, [hasExistingOrders, form]);
 
     useEffect(() => {
         if (projectNameSuffix && mode === "create") {
@@ -433,16 +445,31 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                         <div className="grid gap-4 grid-cols-1 md:grid-cols-3 lg:grid-cols-4 items-start">
                             {/* Order Type: only eligible when linked to a tender */}
                             {!isNonTender && (
-                                <SelectField
-                                    control={form.control}
-                                    name="orderType"
-                                    label="Order Type"
-                                    options={[
-                                        { value: "single", label: "Single" },
-                                        { value: "multiple", label: "Multiple (part of a batch)" },
-                                    ]}
-                                    placeholder="Single"
-                                />
+                                <div className="space-y-1">
+                                    <SelectField
+                                        control={form.control}
+                                        name="orderType"
+                                        label="Order Type"
+                                        options={
+                                            hasExistingOrders
+                                                ? [{
+                                                    value: "multiple",
+                                                    label: `Multiple (order #${existingOrders.length + 1})`,
+                                                }]
+                                                : [
+                                                    { value: "single", label: "Single" },
+                                                    { value: "multiple", label: "Multiple (part of a batch)" },
+                                                ]
+                                        }
+                                        placeholder={hasExistingOrders ? "Multiple" : "Single"}
+                                        disabled={hasExistingOrders}
+                                    />
+                                    {hasExistingOrders && (
+                                        <p className="px-1 text-xs text-muted-foreground">
+                                            This tender already has {existingOrders.length} order(s). The new order will be #{existingOrders.length + 1}.
+                                        </p>
+                                    )}
+                                </div>
                             )}
 
                             <FieldWrapper control={form.control} name="woNumber" label="WO Number">
