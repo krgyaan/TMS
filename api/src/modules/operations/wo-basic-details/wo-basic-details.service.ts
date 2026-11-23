@@ -1,4 +1,4 @@
-import { items, locations, organizations, projects, teams, tenderClients, tenderCostingDetails, tenderCostingSheets, tenderInfos, tenderInformation } from '@/db/schemas';
+import { items, locations, organizations, projects, teams, tenderClients, tenderCostingDetails, tenderCostingSheets, tenderInfos, tenderInformation, tenderResults } from '@/db/schemas';
 import { AppLogger } from '@/logger/app-logger.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { CashFlowService } from '@/modules/operations/cash-flows/cash-flow.service';
@@ -528,7 +528,36 @@ export class WoBasicDetailsService {
         // cannot reuse the same order number. max+1 (rather than count+1) also
         // avoids repeating a sequence after an earlier order was deleted.
         const [row] = await this.db.transaction(async (tx) => {
-            if (orderType === 'multiple' && data.tenderId) {
+            let effectiveOrderType = orderType;
+
+            if (data.tenderId) {
+                const [{ existingOrders }] = await tx
+                    .select({ existingOrders: sql<number>`count(*)::int` })
+                    .from(woBasicDetails)
+                    .where(eq(woBasicDetails.tenderId, data.tenderId));
+
+                if ((existingOrders ?? 0) > 0) {
+                    // Additional orders are only allowed once the tender is won.
+                    const [latestResult] = await tx
+                        .select({ status: tenderResults.status })
+                        .from(tenderResults)
+                        .where(eq(tenderResults.tenderId, data.tenderId))
+                        .orderBy(desc(tenderResults.createdAt))
+                        .limit(1);
+
+                    if ((latestResult?.status ?? '').trim().toLowerCase() !== 'won') {
+                        throw new BadRequestException(
+                            'A new order can only be added to a won tender.',
+                        );
+                    }
+
+                    // A tender with existing orders is always a multi-order batch,
+                    // regardless of what the client submitted.
+                    effectiveOrderType = 'multiple';
+                }
+            }
+
+            if (effectiveOrderType === 'multiple' && data.tenderId) {
                 const [{ maxSequence }] = await tx
                     .select({ maxSequence: sql<number | null>`max(${woBasicDetails.orderSequence})::int` })
                     .from(woBasicDetails)
@@ -536,7 +565,7 @@ export class WoBasicDetailsService {
                 insertValues.orderType = 'multiple';
                 insertValues.orderSequence = (maxSequence ?? 0) + 1;
             } else {
-                insertValues.orderType = insertValues.orderType ?? orderType;
+                insertValues.orderType = insertValues.orderType ?? effectiveOrderType;
                 insertValues.orderSequence = insertValues.orderSequence ?? 1;
             }
 
@@ -547,7 +576,7 @@ export class WoBasicDetailsService {
 
             // Adding another order turns the whole tender into a multi-order batch,
             // so mark existing siblings as 'multiple' as well.
-            if (orderType === 'multiple' && data.tenderId) {
+            if (effectiveOrderType === 'multiple' && data.tenderId) {
                 await tx
                     .update(woBasicDetails)
                     .set({ orderType: 'multiple', updatedAt: new Date() })

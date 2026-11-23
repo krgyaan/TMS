@@ -44,7 +44,7 @@ describe('WoBasicDetailsService multi-order support', () => {
         );
     });
 
-    it('allocates max+1 and marks existing orders as multiple atomically', async () => {
+    it('forces multiple, allocates max+1 and marks existing orders atomically', async () => {
         const createdRow = {
             id: 99,
             tenderId: 10,
@@ -63,14 +63,29 @@ describe('WoBasicDetailsService multi-order support', () => {
             }),
         }));
 
-        const txSelectWhere = jest.fn().mockResolvedValue([{ maxSequence: 2 }]);
+        const txSelect = jest.fn()
+            .mockImplementationOnce(() => ({
+                from: () => ({ where: () => Promise.resolve([{ existingOrders: 1 }]) }),
+            }))
+            .mockImplementationOnce(() => ({
+                from: () => ({
+                    where: () => ({
+                        orderBy: () => ({
+                            limit: () => Promise.resolve([{ status: 'Won' }]),
+                        }),
+                    }),
+                }),
+            }))
+            .mockImplementationOnce(() => ({
+                from: () => ({ where: () => Promise.resolve([{ maxSequence: 2 }]) }),
+            }));
         const txUpdateWhere = jest.fn().mockResolvedValue(undefined);
         const tx = {
-            select: jest.fn(() => ({
-                from: () => ({ where: txSelectWhere }),
-            })),
+            select: txSelect,
             insert: jest.fn(() => ({
                 values: (values: any) => {
+                    // Client sent nothing forcing multiple; the existing-order
+                    // check must promote it.
                     expect(values.orderType).toBe('multiple');
                     expect(values.orderSequence).toBe(3);
                     return { returning: () => Promise.resolve([createdRow]) };
@@ -102,7 +117,7 @@ describe('WoBasicDetailsService multi-order support', () => {
 
         const result = await service.create({
             tenderId: 10,
-            orderType: 'multiple',
+            orderType: 'single',
             projectCode: 'P-1',
             projectName: 'Project',
             woNumber: 'WO-1',
@@ -112,7 +127,8 @@ describe('WoBasicDetailsService multi-order support', () => {
         }, 7);
 
         expect(result?.id).toBe(99);
-        expect(tx.select).toHaveBeenCalledWith(
+        expect(txSelect).toHaveBeenCalledTimes(3);
+        expect(txSelect).toHaveBeenCalledWith(
             expect.objectContaining({
                 maxSequence: expect.anything(),
             }),
@@ -127,6 +143,58 @@ describe('WoBasicDetailsService multi-order support', () => {
             25,
             'WO Basic Details created',
         );
+    });
+
+    it('rejects adding another order when the tender is not won', async () => {
+        mockDb.select.mockImplementationOnce(() => ({
+            from: () => ({
+                where: () => ({
+                    limit: () => Promise.resolve([{ teamId: 1, status: 25, organizationId: 2 }]),
+                }),
+            }),
+        }));
+
+        const txSelect = jest.fn()
+            .mockImplementationOnce(() => ({
+                from: () => ({ where: () => Promise.resolve([{ existingOrders: 1 }]) }),
+            }))
+            .mockImplementationOnce(() => ({
+                from: () => ({
+                    where: () => ({
+                        orderBy: () => ({
+                            limit: () => Promise.resolve([{ status: 'Lost' }]),
+                        }),
+                    }),
+                }),
+            }));
+        const tx = {
+            select: txSelect,
+            insert: jest.fn(),
+            update: jest.fn(),
+        };
+        mockDb.transaction.mockImplementation(async (callback: (tx: any) => unknown) => callback(tx));
+
+        jest.spyOn(service, 'checkProjectCodeExists').mockResolvedValue({ exists: false, projectCode: 'P-1' } as any);
+        jest.spyOn(service, 'checkProjectNameExists').mockResolvedValue({
+            exists: false,
+            count: 0,
+            projectName: 'Project',
+            existingProjectNames: [],
+            suggestion: null,
+        } as any);
+
+        await expect(service.create({
+            tenderId: 10,
+            orderType: 'single',
+            projectCode: 'P-1',
+            projectName: 'Project',
+            woNumber: 'WO-1',
+            woDate: '2026-01-01',
+            woValuePreGst: '100',
+            woValueGstAmt: '18',
+        }, 7)).rejects.toThrow('A new order can only be added to a won tender.');
+
+        expect(tx.insert).not.toHaveBeenCalled();
     });
 
     it('returns orders ordered by sequence then id', async () => {
