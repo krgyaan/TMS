@@ -558,10 +558,7 @@ export class OperationNotificationService {
       }
 
       const text = lines.join('\n');
-      await Promise.allSettled([
-        this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO }),
-        this.sendToTargets(text, { type: 'group', group: GROUPS.PAYMENTS }),
-      ]);
+      await this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO });
     } catch (err) {
       this.logger.warn(`Failed to send PO approval notification: ${err}`);
     }
@@ -589,10 +586,7 @@ export class OperationNotificationService {
       }
 
       const text = lines.join('\n');
-      await Promise.allSettled([
-        this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO }),
-        this.sendToTargets(text, { type: 'group', group: GROUPS.PAYMENTS }),
-      ]);
+      await this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO });
     } catch (err) {
       this.logger.warn(`Failed to send VWO approval notification: ${err}`);
     }
@@ -784,10 +778,7 @@ export class OperationNotificationService {
       }
 
       const text = lines.join('\n');
-      await Promise.allSettled([
-        this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO }),
-        this.sendToTargets(text, { type: 'group', group: GROUPS.PAYMENTS }),
-      ]);
+      await this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO });
     } catch (err) {
       this.logger.warn(`Failed to send PO rejected notification: ${err}`);
     }
@@ -966,10 +957,7 @@ export class OperationNotificationService {
       }
 
       const text = lines.join('\n');
-      await Promise.allSettled([
-        this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO }),
-        this.sendToTargets(text, { type: 'group', group: GROUPS.PAYMENTS }),
-      ]);
+      await this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO });
     } catch (err) {
       this.logger.warn(`Failed to send VWO rejected notification: ${err}`);
     }

@@ -591,7 +591,7 @@ describe("OperationNotificationService PO POVWO Group & TL Decision notification
         expect(text3).toContain('GST / Tax Rates: "12%" → "18%"');
     });
 
-    it("notifyPoApproved and notifyPoRejected send to both GROUPS.POVWO and GROUPS.PAYMENTS with short link", async () => {
+    it("notifyPoApproved and notifyPoRejected send only to GROUPS.POVWO with short link", async () => {
         await service.notifyPoApproved({
             purchaseOrderId: 42,
             poNumber: "PO/2026/0042",
@@ -602,9 +602,8 @@ describe("OperationNotificationService PO POVWO Group & TL Decision notification
             approvedBy: 33,
         });
 
-        expect(sendText).toHaveBeenCalledTimes(2);
-        const approveGroups = sendText.mock.calls.map(([g]) => g);
-        expect(approveGroups).toEqual([GROUPS.POVWO, GROUPS.PAYMENTS]);
+        expect(sendText).toHaveBeenCalledTimes(1);
+        expect(sendText.mock.calls[0][0]).toBe(GROUPS.POVWO);
         expect(sendText.mock.calls[0][1]).toContain("*PO Approved*");
         expect(sendText.mock.calls[0][1]).toContain("https://tms.example.com/n/short");
 
@@ -619,14 +618,13 @@ describe("OperationNotificationService PO POVWO Group & TL Decision notification
             rejectedBy: 42,
         });
 
-        expect(sendText).toHaveBeenCalledTimes(2);
-        const rejectGroups = sendText.mock.calls.map(([g]) => g);
-        expect(rejectGroups).toEqual([GROUPS.POVWO, GROUPS.PAYMENTS]);
+        expect(sendText).toHaveBeenCalledTimes(1);
+        expect(sendText.mock.calls[0][0]).toBe(GROUPS.POVWO);
         expect(sendText.mock.calls[0][1]).toContain("*PO Rejected*");
         expect(sendText.mock.calls[0][1]).toContain("Incorrect TDS category");
     });
 
-    it("notifyVwoApproved and notifyVwoRejected send to both GROUPS.POVWO and GROUPS.PAYMENTS with short link", async () => {
+    it("notifyVwoApproved and notifyVwoRejected send only to GROUPS.POVWO with short link", async () => {
         await service.notifyVwoApproved({
             vendorWorkOrderId: 99,
             woNumber: "VE/Solar_Plant/2627/WO0099",
@@ -637,9 +635,8 @@ describe("OperationNotificationService PO POVWO Group & TL Decision notification
             approvedBy: 62,
         });
 
-        expect(sendText).toHaveBeenCalledTimes(2);
-        const approveGroups = sendText.mock.calls.map(([g]) => g);
-        expect(approveGroups).toEqual([GROUPS.POVWO, GROUPS.PAYMENTS]);
+        expect(sendText).toHaveBeenCalledTimes(1);
+        expect(sendText.mock.calls[0][0]).toBe(GROUPS.POVWO);
         expect(sendText.mock.calls[0][1]).toContain("*WO Approved*");
         expect(sendText.mock.calls[0][1]).toContain("https://tms.example.com/n/short");
 
@@ -654,9 +651,8 @@ describe("OperationNotificationService PO POVWO Group & TL Decision notification
             rejectedBy: 62,
         });
 
-        expect(sendText).toHaveBeenCalledTimes(2);
-        const rejectGroups = sendText.mock.calls.map(([g]) => g);
-        expect(rejectGroups).toEqual([GROUPS.POVWO, GROUPS.PAYMENTS]);
+        expect(sendText).toHaveBeenCalledTimes(1);
+        expect(sendText.mock.calls[0][0]).toBe(GROUPS.POVWO);
         expect(sendText.mock.calls[0][1]).toContain("*WO Rejected*");
         expect(sendText.mock.calls[0][1]).toContain("Missing GSTIN");
     });
