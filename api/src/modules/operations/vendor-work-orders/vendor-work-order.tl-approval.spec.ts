@@ -330,4 +330,12 @@ describe("WoApprovalService.submitTlApproval", () => {
             })
         );
     });
+
+    it("blocks Stage 2 Accounts approval (setVwoApproval) when Stage 1 TL approval is not completed", async () => {
+        const { service } = buildService([[{ ...baseVwo, tlStatus: 0 }]]);
+
+        await expect(
+            service.setVwoApproval(77, { approve: true, tdsPercentage: 1 }, 62)
+        ).rejects.toThrow("Stage 1 TL approval is required before Accounts can approve");
+    });
 });

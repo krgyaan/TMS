@@ -377,4 +377,12 @@ describe("PoApprovalService.submitTlApproval", () => {
             })
         );
     });
+
+    it("blocks Stage 2 Accounts approval (setTdsPercentage) when Stage 1 TL approval is not completed", async () => {
+        const { service } = buildService([[{ ...basePo, tlStatus: 0 }]]);
+
+        await expect(
+            service.setTdsPercentage(42, { approve: true, tdsPercentage: 2 }, 33)
+        ).rejects.toThrow("Stage 1 TL approval is required before Accounts can approve");
+    });
 });

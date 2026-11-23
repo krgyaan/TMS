@@ -66,6 +66,9 @@ export class PoApprovalService {
         if (!po) throw new NotFoundException("Purchase Order not found");
 
         if (approve) {
+            if (po.tlStatus !== 1) {
+                throw new BadRequestException("Stage 1 TL approval is required before Accounts can approve");
+            }
             if (tdsPercentage == null || tdsPercentage < 0) {
                 throw new BadRequestException("TDS percentage is required when approving");
             }
@@ -93,12 +96,6 @@ export class PoApprovalService {
                     amountAfterTds: round2(amountAfterTds).toFixed(2),
                     poApproved: true,
                     poApprovalRemark: remark || null,
-                    ...(po.tlStatus !== 1
-                        ? {
-                              tlStatus: 1,
-                              tlComment: po.tlComment || "Auto-approved with Stage 2 Accounts approval",
-                          }
-                        : {}),
                     updatedAt: new Date(),
                 })
                 .where(eq(purchaseOrders.id, id))

@@ -46,6 +46,9 @@ export class WoApprovalService {
         if (!wo) throw new NotFoundException("Vendor Work Order not found");
 
         if (approve) {
+            if (wo.tlStatus !== 1) {
+                throw new BadRequestException("Stage 1 TL approval is required before Accounts can approve");
+            }
             if (tdsPercentage == null || tdsPercentage < 0) {
                 throw new BadRequestException("TDS percentage is required when approving");
             }
@@ -73,12 +76,6 @@ export class WoApprovalService {
                     amountAfterTds: round2(amountAfterTds).toFixed(2),
                     woApproved: true,
                     woApprovalRemark: remark || null,
-                    ...(wo.tlStatus !== 1
-                        ? {
-                              tlStatus: 1,
-                              tlComment: wo.tlComment || "Auto-approved with Stage 2 Accounts approval",
-                          }
-                        : {}),
                     updatedAt: sql`now()`,
                 })
                 .where(eq(vendorWorkOrders.id, id))
