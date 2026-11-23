@@ -1,5 +1,5 @@
 import { paths } from "@/app/routes/paths";
-import { FileText, Landmark, Receipt, Send, ShieldCheck, Truck, Wallet, type LucideIcon } from "lucide-react";
+import { FileText, Landmark, Receipt, Send, Truck, Wallet, type LucideIcon } from "lucide-react";
 
 export const getCircularFileUrl = (path?: string | null) => {
     if (!path) return "";
@@ -90,14 +90,6 @@ export const mockUsers = [
 ];
 
 export const quickActions: QuickAction[] = [
-    {
-        title: "PO / WO PDF Approvals",
-        subtitle: "Preview PDF, Approve, Reject & Edit",
-        icon: ShieldCheck,
-        color: "text-emerald-600",
-        bgColor: "bg-emerald-50 dark:bg-emerald-950/30",
-        path: "/operations/approvals"
-    },
     {
         title: "Add Imprest",
         subtitle: "Create New Imprest Entry",
