@@ -6,6 +6,7 @@ import { RoleName } from "@/common/constants/roles.constant";
 import { HealthService } from "@/modules/master/health/health.service";
 import { ClaudeUsageService } from "@/modules/master/claude-usage/claude-usage.service";
 import { AdminUsageService } from "@/modules/master/health/admin-usage.service";
+import { TallyStatusService } from "@/modules/integrations/tally/tally-status.service";
 
 @Controller("health")
 export class HealthController {
@@ -13,12 +14,23 @@ export class HealthController {
         private readonly healthService: HealthService,
         private readonly claudeUsageService: ClaudeUsageService,
         private readonly adminUsageService: AdminUsageService,
+        private readonly tallyStatusService: TallyStatusService,
     ) {}
 
     @Get()
     @Public()
     async getHealth() {
         return this.healthService.getHealth();
+    }
+
+    /**
+     * TallyPrime connectivity and loaded-company status.
+     * Available to every signed-in user (the global JwtAuthGuard applies).
+     * Cached server-side; contains mapped messages only, never the token.
+     */
+    @Get("tally")
+    async getTallyStatus() {
+        return this.tallyStatusService.getStatus();
     }
 
     /**

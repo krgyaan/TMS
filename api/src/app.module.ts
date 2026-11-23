@@ -7,6 +7,7 @@ import dbConfig, { validateDbEnv } from "@/config/db.config";
 import googleConfig, { validateGoogleEnv } from "@/config/google.config";
 import openwaConfig, { validateOpenwaEnv } from "@/config/openwa.config";
 import redisConfig, { validateRedisEnv } from "@/config/redis.config";
+import tallyConfig, { validateTallyEnv } from "@/config/tally.config";
 import volksAiConfig, { validateVolksAiEnv } from "@/config/volks-ai.config";
 import { DatabaseModule } from "@/db/database.module";
 import { LoggerModule } from "@/logger/logger.module";
@@ -34,6 +35,7 @@ import { EmployeeProfilesModule } from "@/modules/hrms/employee-profiles/employe
 import { ImprestAdminModule } from "@/modules/imprest-admin/imprest-admin.module";
 import { GoogleIntegrationModule } from "@/modules/integrations/google/google.module";
 import { IntegrationsModule } from "@/modules/integrations/integrations.module";
+import { TallyModule } from "@/modules/integrations/tally/tally.module";
 import { AmcModule } from "@/modules/services/amc/amc.module";
 import { AmcBillingModule } from "@/modules/services/amc-billing/amc-billing.module";
 import { AmcServicesModule } from "@/modules/services/amc-services/amc-services.module";
@@ -161,7 +163,7 @@ import { QueueMonitoringModule } from "./modules/queue-monitoring/queue-monitori
         ConfigModule.forRoot({
             isGlobal: true,
             expandVariables: true,
-            load: [appConfig, dbConfig, googleConfig, authConfig, redisConfig, openwaConfig, volksAiConfig, currencyConfig],
+            load: [appConfig, dbConfig, googleConfig, authConfig, redisConfig, openwaConfig, volksAiConfig, currencyConfig, tallyConfig],
             validate: env => ({
                 ...validateAppEnv(env),
                 ...validateDbEnv(env),
@@ -171,6 +173,7 @@ import { QueueMonitoringModule } from "./modules/queue-monitoring/queue-monitori
                 ...validateOpenwaEnv(env),
                 ...validateVolksAiEnv(env),
                 ...validateCurrencyEnv(env),
+                ...validateTallyEnv(env),
             }),
         }),
         ScheduleModule.forRoot(),
@@ -199,6 +202,7 @@ import { QueueMonitoringModule } from "./modules/queue-monitoring/queue-monitori
         VendorMasterModule,
         GoogleIntegrationModule,
         IntegrationsModule,
+        TallyModule,
         CashFlowModule,
         AuthModule,
         WebsitesModule,
