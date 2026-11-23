@@ -53,6 +53,20 @@ export class TenderResultService {
         this.logger = this.appLogger.withContext(TenderResultService.name);
     }
 
+    /**
+     * Latest Basic Detail (order) linked to a tender. Kept as a scalar
+     * subquery so it cannot multiply tender result rows when one won tender
+     * has multiple work orders.
+     */
+    private latestWoBasicDetailIdSql() {
+        return sql<number | null>`(
+            select ${woBasicDetails.id}
+            from ${woBasicDetails}
+            where ${woBasicDetails.tenderId} = ${tenderInfos.id}
+            order by ${woBasicDetails.orderSequence} desc nulls last, ${woBasicDetails.id} desc
+            limit 1
+        )`;
+    }
 
     private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number): any[] {
         const roleFilterConditions: any[] = [];
@@ -252,7 +266,7 @@ export class TenderResultService {
             costingFinalPrice: latestCostingSheetSq.finalPrice,
             resultId: latestTenderResultSq.id,
             resultStatus: latestTenderResultSq.status,
-            woBasicDetailId: woBasicDetails.id,
+            woBasicDetailId: this.latestWoBasicDetailIdSql(),
         })
         .from(tenderInfos)
         .leftJoin(users, eq(users.id, tenderInfos.teamMember))
@@ -270,7 +284,6 @@ export class TenderResultService {
         )
         .leftJoin(items, eq(items.id, tenderInfos.item))
         .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-        .leftJoin(woBasicDetails, eq(woBasicDetails.tenderId, tenderInfos.id))
         .where(whereClause)
         .orderBy(orderByClause)
         .limit(limit)
@@ -556,7 +569,7 @@ export class TenderResultService {
                 tenderStatus: statuses.name,
                 reverseAuctionApplicable: tenderInformation.reverseAuctionApplicable,
                 bidSubmissionDate: latestBidSubmissionSq.submissionDatetime,
-                woBasicDetailId: woBasicDetails.id,
+                woBasicDetailId: this.latestWoBasicDetailIdSql(),
             })
             .from(tenderResults)
             .innerJoin(tenderInfos, eq(tenderResults.tenderId, tenderInfos.id))
@@ -564,8 +577,7 @@ export class TenderResultService {
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
-            .leftJoin(woBasicDetails, eq(woBasicDetails.tenderId, tenderInfos.id))
-            .leftJoin(latestBidSubmissionSq, eq(latestBidSubmissionSq.tenderId, tenderInfos.id))
+                .leftJoin(latestBidSubmissionSq, eq(latestBidSubmissionSq.tenderId, tenderInfos.id))
             .where(eq(tenderResults.id, id))
             .limit(1);
 
@@ -633,7 +645,7 @@ export class TenderResultService {
                 tenderStatus: statuses.name,
                 reverseAuctionApplicable: tenderInformation.reverseAuctionApplicable,
                 bidSubmissionDate: latestBidSubmissionSq.submissionDatetime,
-                woBasicDetailId: woBasicDetails.id,
+                woBasicDetailId: this.latestWoBasicDetailIdSql(),
             })
             .from(tenderResults)
             .innerJoin(tenderInfos, eq(tenderResults.tenderId, tenderInfos.id))
@@ -641,8 +653,7 @@ export class TenderResultService {
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
-            .leftJoin(woBasicDetails, eq(woBasicDetails.tenderId, tenderInfos.id))
-            .leftJoin(latestBidSubmissionSq, eq(latestBidSubmissionSq.tenderId, tenderInfos.id))
+                .leftJoin(latestBidSubmissionSq, eq(latestBidSubmissionSq.tenderId, tenderInfos.id))
             .where(eq(tenderResults.tenderId, tenderId))
             .limit(1);
 
