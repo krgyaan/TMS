@@ -1282,6 +1282,18 @@ export class FdrService {
         };
     }
 
+    async getMailPreview(
+        instrumentId: number,
+        body: { stage?: number | string; files?: Record<string, string[]> } = {},
+    ) {
+        const stage = Number(body.stage);
+        if (![1, 2].includes(stage)) {
+            throw new BadRequestException('mail-preview stage must be 1 or 2');
+        }
+
+        return this.notificationService.getFdrMailPreview(instrumentId, stage, body.files ?? {});
+    }
+
     async getFollowupData(instrumentId: number) {
         const [result] = await this.db
             .select({

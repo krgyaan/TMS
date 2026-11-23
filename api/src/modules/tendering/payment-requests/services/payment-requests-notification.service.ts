@@ -1025,6 +1025,91 @@ export class PaymentRequestsNotificationService {
         };
     }
 
+    /**
+     * Preview the documents attached to the FDR mail for a given stage.
+     * Stage 1 = bank request mail (CEO-signed bank form + request letter).
+     * Stage 2 = FDR created mail to the tendering team (soft copy of the FDR).
+     */
+    async getFdrMailPreview(
+        instrumentId: number,
+        stage: number,
+        files: Record<string, string[] | undefined> = {},
+    ): Promise<{ stage: number; attachments: Array<{ label: string; path: string }>; missing: string[] }> {
+        const [result] = await this.db
+            .select({
+                instrument: paymentInstruments,
+                fdrDetails: instrumentFdrDetails,
+            })
+            .from(paymentInstruments)
+            .leftJoin(instrumentFdrDetails, eq(instrumentFdrDetails.instrumentId, paymentInstruments.id))
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!result || !result.instrument) {
+            throw new Error(`Instrument ${instrumentId} not found`);
+        }
+
+        const overrides: Record<string, string> = {};
+        const overrideFields: Record<string, string> = {
+            prefilledSignedFdr: 'prefilledSignedFdr',
+            uploadDocuments: 'uploadDocuments',
+            fdrCopy: 'fdrCopy',
+        };
+
+        Object.entries(overrideFields).forEach(([fileKey, dbKey]) => {
+            const value = files[fileKey];
+            if (Array.isArray(value)) {
+                overrides[dbKey] = value.length > 0 ? JSON.stringify(value) : '';
+            }
+        });
+
+        const fdrDetails = {
+            ...(result.fdrDetails ?? {}),
+            ...overrides,
+        } as Record<string, any>;
+
+        const expected: Array<{ key: string; label: string }> = stage === 2
+            ? [{ key: 'fdrCopy', label: 'Soft Copy of FDR' }]
+            : [
+                { key: 'prefilledSignedFdr', label: 'Bank Form - Signed by CEO' },
+                { key: 'uploadDocuments', label: 'Request Letter - Signed by CEO' },
+            ];
+
+        let items: Array<{ path: string; name: string; key: string }> = [];
+
+        if (stage === 2) {
+            items = this.toAttachmentPaths(fdrDetails.fdrCopy).map((path) => ({
+                path,
+                name: 'Soft Copy of FDR',
+                key: 'fdrCopy',
+            }));
+        } else {
+            items = [
+                ...this.toAttachmentPaths(fdrDetails.prefilledSignedFdr).map((path) => ({
+                    path,
+                    name: 'Bank Form - Signed by CEO',
+                    key: 'prefilledSignedFdr',
+                })),
+                ...this.toAttachmentPaths(fdrDetails.uploadDocuments).map((path) => ({
+                    path,
+                    name: 'Request Letter - Signed by CEO',
+                    key: 'uploadDocuments',
+                })),
+            ];
+        }
+
+        const existing = items.filter((item) => this.resolveUploadAbsolutePath(item.path));
+        const attachedKeys = new Set(existing.map((item) => item.key));
+
+        return {
+            stage,
+            attachments: existing.map((item) => ({ label: item.name, path: item.path })),
+            missing: expected
+                .filter((item) => !attachedKeys.has(item.key))
+                .map((item) => item.label),
+        };
+    }
+
     async sendDdMailAfterChequeAction(
         chequeInstrument: any,
         chequeDetails: any,

@@ -23,6 +23,7 @@ import { FileText, Users, Package, Banknote, CheckCircle2, XCircle, CheckSquare,
 import { Badge } from '@/components/ui/badge';
 import { ALL_FDR_ACTION_OPTIONS, type FDRActionFormProps } from '../helpers/fdr.types';
 import { FileUploader } from '@/components/file-upload';
+import { FdrMailAttachmentPreview } from './FdrMailAttachmentPreview';
 
 interface MailIdRows {
     fields: Array<{ id: string }>;
@@ -174,6 +175,9 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
     const selectedAction = useWatch({ control: form.control, name: 'action' });
     const fdrReq = useWatch({ control: form.control, name: 'fdr_req' });
     const emailBody = useWatch({ control: form.control, name: 'emailBody' });
+    const prefilledSignedFdr = useWatch({ control: form.control, name: 'prefilled_signed_fdr' });
+    const uploadDocuments = useWatch({ control: form.control, name: 'upload_documents' });
+    const fdrCopy = useWatch({ control: form.control, name: 'fdr_copy' });
 
     useEffect(() => {
         if (formHistory?.accountsForm?.fdrReq) {
@@ -541,6 +545,17 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
                                     placeholder="e.g., branch@bank.com"
                                     removeLabel="Remove CC mail id"
                                 />
+
+                                <FdrMailAttachmentPreview
+                                    instrumentId={instrumentId}
+                                    stage={1}
+                                    files={{
+                                        prefilledSignedFdr: (prefilledSignedFdr ?? []).filter(
+                                            (path): path is string => typeof path === 'string',
+                                        ),
+                                        uploadDocuments: uploadDocuments ? [uploadDocuments] : [],
+                                    }}
+                                />
                             </div>
                         )}
                     </div>
@@ -590,6 +605,12 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
                                 />
                             )}
                         </FieldWrapper>
+
+                        <FdrMailAttachmentPreview
+                            instrumentId={instrumentId}
+                            stage={2}
+                            files={{ fdrCopy: fdrCopy ?? [] }}
+                        />
                     </div>
                     </fieldset>
                 </ConditionalSection>
