@@ -39,6 +39,32 @@ const BG_PURPOSE_LABELS: Record<string, string> = {
     OTHER_SECURITY: 'Other Security',
 };
 
+const FDR_PURPOSE_LABELS: Record<string, string> = {
+    EMD: 'EMD',
+    SECURITY_DEPOSIT: 'Security Deposit',
+    BANK_GUARANTEE: 'Bank Guarantee',
+    OTHER_SECURITY: 'Other Security',
+};
+
+const formatFdrPurpose = (value: string | null | undefined, fallback = ''): string => {
+    const raw = value?.trim();
+    if (!raw) {
+        return fallback;
+    }
+
+    const mapped = FDR_PURPOSE_LABELS[raw.toUpperCase()];
+    if (mapped) {
+        return mapped;
+    }
+
+    return raw
+        .toLowerCase()
+        .split(/[_\s]+/)
+        .filter((word) => word.length > 0)
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+};
+
 const formatBgPurpose = (value: string | null | undefined, fallback: string): string => {
     const raw = value?.trim();
     if (!raw) {
@@ -146,6 +172,141 @@ export class PaymentRequestsNotificationService {
         } catch {
             return String(dateStr);
         }
+    };
+
+    private formatDateDDMMYYYYSlash = (dateStr: string | Date | null | undefined): string => {
+        return this.formatDateDDMMYYYY(dateStr).replace(/-/g, '/');
+    };
+
+    /**
+     * Duration between two dates expressed as calendar months + remaining days,
+     * e.g. "17 months 9 Days" for the Request Letter lien period.
+     */
+    private resolveLienPeriod = (
+        start: Date | string | null | undefined,
+        end: Date | string | null | undefined,
+    ): { text: string; months: number; days: number } => {
+        const fromDate = start ? new Date(start) : null;
+        const toDate = end ? new Date(end) : null;
+        if (!fromDate || !toDate || Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+            return { text: '', months: 0, days: 0 };
+        }
+
+        const from = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
+        const to = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate());
+        if (to.getTime() <= from.getTime()) {
+            return { text: '0 Days', months: 0, days: 0 };
+        }
+
+        let months = (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth());
+        const anchor = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+        anchor.setMonth(anchor.getMonth() + months);
+        if (anchor.getTime() > to.getTime()) {
+            months -= 1;
+            anchor.setTime(from.getTime());
+            anchor.setMonth(anchor.getMonth() + months);
+        }
+
+        const days = Math.max(0, Math.round((to.getTime() - anchor.getTime()) / 86400000));
+        const parts: string[] = [];
+        if (months > 0) {
+            parts.push(`${months} ${months === 1 ? 'month' : 'months'}`);
+        }
+        parts.push(`${days} ${days === 1 ? 'Day' : 'Days'}`);
+
+        return { text: parts.join(' '), months, days };
+    };
+
+    /**
+     * Split a value into fixed-width digit boxes. Digits are right-aligned and
+     * the remaining leading boxes are left blank (e.g. amount field).
+     */
+    private rightAlignedDigits = (value: string | number, count: number): string[] => {
+        const digits = String(value ?? '').replace(/\D/g, '');
+        return digits
+            .padStart(count, ' ')
+            .slice(-count)
+            .split('')
+            .map((ch) => (ch === ' ' ? '' : ch));
+    };
+
+    /**
+     * Split a value into fixed-width digit boxes, left-padded with zeros
+     * (e.g. paise, months and days fields).
+     */
+    private zeroPaddedDigits = (value: string | number, count: number): string[] => {
+        const digits = String(value ?? '').replace(/\D/g, '');
+        return digits.padStart(count, '0').slice(-count).split('');
+    };
+
+    /**
+     * Amount in Indian numbering words, e.g. "Four Thousand Eight Hundred
+     * Twenty Seven Rupees Only".
+     */
+    private amountInIndianWords = (amount: number | string | null | undefined): string => {
+        const value = Math.abs(Number(amount) || 0);
+        const rupees = Math.floor(value);
+        const paise = Math.round((value - rupees) * 100);
+
+        const ones = [
+            '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+            'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen',
+            'Seventeen', 'Eighteen', 'Nineteen',
+        ];
+        const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+        const underHundred = (n: number): string =>
+            n < 20 ? ones[n] : `${tens[Math.floor(n / 10)]}${n % 10 ? ` ${ones[n % 10]}` : ''}`;
+        const underThousand = (n: number): string =>
+            n >= 100
+                ? `${ones[Math.floor(n / 100)]} Hundred${n % 100 ? ` ${underHundred(n % 100)}` : ''}`
+                : underHundred(n);
+
+        const grouped = (n: number): string => {
+            if (!n) return '';
+            const crore = Math.floor(n / 10000000);
+            const lakh = Math.floor((n % 10000000) / 100000);
+            const thousand = Math.floor((n % 100000) / 1000);
+            const rest = n % 1000;
+            return [
+                crore ? `${grouped(crore)} Crore` : '',
+                lakh ? `${underHundred(lakh)} Lakh` : '',
+                thousand ? `${underHundred(thousand)} Thousand` : '',
+                rest ? underThousand(rest) : '',
+            ]
+                .filter(Boolean)
+                .join(' ');
+        };
+
+        const rupeeWords = rupees ? `${grouped(rupees)} Rupees` : 'Zero Rupees';
+        const paiseWords = paise ? `${underHundred(paise)} Paise` : '';
+        return paiseWords ? `${rupeeWords} and ${paiseWords} Only` : `${rupeeWords} Only`;
+    };
+
+    /**
+     * Pre-fill values for the AU Small Finance Bank term-deposit form.
+     */
+    private buildFdrFormData = (
+        amount: number | string | null | undefined,
+        formDate: Date,
+        expiry: Date | string | null | undefined,
+    ): Record<string, unknown> => {
+        const period = this.resolveLienPeriod(formDate, expiry);
+        const amountValue = Number(amount) || 0;
+        const rupees = Math.floor(Math.abs(amountValue));
+        const paise = Math.round((Math.abs(amountValue) - rupees) * 100);
+
+        return {
+            branchName: 'Lajpat Nagar',
+            dateDigits: this.rightAlignedDigits(this.formatDateDDMMYYYY(formDate), 8),
+            datedDigits: this.rightAlignedDigits(this.formatDateDDMMYYYY(formDate), 8),
+            amountRupeeDigits: this.rightAlignedDigits(rupees, 9),
+            amountPaiseDigits: this.zeroPaddedDigits(paise, 2),
+            amountWords: this.amountInIndianWords(amountValue),
+            debitDigits: this.rightAlignedDigits('2502245699295242', 16),
+            durationMonthDigits: this.zeroPaddedDigits(period.months, 2),
+            durationDayDigits: this.zeroPaddedDigits(period.days, 2),
+        };
     };
 
     
@@ -547,14 +708,15 @@ export class PaymentRequestsNotificationService {
         return candidates.find((candidate) => existsSync(candidate)) ?? null;
     };
 
-    private stageBgMailAttachments = (
+    private stageMailAttachments = (
+        modulePath: string,
         instrumentId: number,
         items: Array<{ path: string; name: string }>,
     ): Array<{ path: string; name: string }> => {
         const staged: Array<{ path: string; name: string }> = [];
         const seenSources = new Set<string>();
         const nameCounts = new Map<string, number>();
-        const relativeDir = `bi-dashboard/bank-guarantee/mail-attachments/${instrumentId}`;
+        const relativeDir = `${modulePath}/mail-attachments/${instrumentId}`;
         const targetDir = join(process.cwd(), 'uploads', relativeDir);
 
         items.forEach((item) => {
@@ -582,6 +744,18 @@ export class PaymentRequestsNotificationService {
 
         return staged;
     };
+
+    private stageBgMailAttachments = (
+        instrumentId: number,
+        items: Array<{ path: string; name: string }>,
+    ): Array<{ path: string; name: string }> =>
+        this.stageMailAttachments('bi-dashboard/bank-guarantee', instrumentId, items);
+
+    private stageFdrMailAttachments = (
+        instrumentId: number,
+        items: Array<{ path: string; name: string }>,
+    ): Array<{ path: string; name: string }> =>
+        this.stageMailAttachments('bi-dashboard/fdr', instrumentId, items);
 
     private normalizeMailIds = (value: unknown): string[] => {
         const list = Array.isArray(value)
@@ -788,6 +962,91 @@ export class PaymentRequestsNotificationService {
         } else {
             const courier = await this.resolveBgSubmittedCourier(result.instrument);
             items = this.buildBgSubmittedAttachmentItems(bgDetails, courier.courierDocketSlip);
+        }
+
+        const existing = items.filter((item) => this.resolveUploadAbsolutePath(item.path));
+        const attachedKeys = new Set(existing.map((item) => item.key));
+
+        return {
+            stage,
+            attachments: existing.map((item) => ({ label: item.name, path: item.path })),
+            missing: expected
+                .filter((item) => !attachedKeys.has(item.key))
+                .map((item) => item.label),
+        };
+    }
+
+    /**
+     * Preview the documents attached to the FDR mail for a given stage.
+     * Stage 1 = bank request mail (CEO-signed bank form + request letter).
+     * Stage 2 = FDR created mail to the tendering team (soft copy of the FDR).
+     */
+    async getFdrMailPreview(
+        instrumentId: number,
+        stage: number,
+        files: Record<string, string[] | undefined> = {},
+    ): Promise<{ stage: number; attachments: Array<{ label: string; path: string }>; missing: string[] }> {
+        const [result] = await this.db
+            .select({
+                instrument: paymentInstruments,
+                fdrDetails: instrumentFdrDetails,
+            })
+            .from(paymentInstruments)
+            .leftJoin(instrumentFdrDetails, eq(instrumentFdrDetails.instrumentId, paymentInstruments.id))
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!result || !result.instrument) {
+            throw new Error(`Instrument ${instrumentId} not found`);
+        }
+
+        const overrides: Record<string, string> = {};
+        const overrideFields: Record<string, string> = {
+            prefilledSignedFdr: 'prefilledSignedFdr',
+            uploadDocuments: 'uploadDocuments',
+            fdrCopy: 'fdrCopy',
+        };
+
+        Object.entries(overrideFields).forEach(([fileKey, dbKey]) => {
+            const value = files[fileKey];
+            if (Array.isArray(value)) {
+                overrides[dbKey] = value.length > 0 ? JSON.stringify(value) : '';
+            }
+        });
+
+        const fdrDetails = {
+            ...(result.fdrDetails ?? {}),
+            ...overrides,
+        } as Record<string, any>;
+
+        const expected: Array<{ key: string; label: string }> = stage === 2
+            ? [{ key: 'fdrCopy', label: 'Soft Copy of FDR' }]
+            : [
+                { key: 'prefilledSignedFdr', label: 'Bank Form - Signed by CEO' },
+                { key: 'uploadDocuments', label: 'Request Letter - Signed by CEO' },
+            ];
+
+        let items: Array<{ path: string; name: string; key: string }> = [];
+
+        if (stage === 2) {
+            items = this.toAttachmentPaths(fdrDetails.fdrCopy).map((path) => ({
+                path,
+                name: 'Soft Copy of FDR',
+                key: 'fdrCopy',
+            }));
+        } else {
+            items = [
+                ...this.toAttachmentPaths(fdrDetails.prefilledSignedFdr).map((path) => ({
+                    path,
+                    name: 'Bank Form - Signed by CEO',
+                    key: 'prefilledSignedFdr',
+                })),
+                ...this.toAttachmentPaths(fdrDetails.uploadDocuments).map((path) => ({
+                    path,
+                    name: 'Request Letter - Signed by CEO',
+                    key: 'uploadDocuments',
+                })),
+            ];
         }
 
         const existing = items.filter((item) => this.resolveUploadAbsolutePath(item.path));
@@ -1121,6 +1380,7 @@ export class PaymentRequestsNotificationService {
                 favouring: paymentInstruments.favouring,
                 payableAt: paymentInstruments.payableAt,
                 amount: paymentInstruments.amount,
+                rejectionReason: paymentInstruments.rejectionReason,
             })
             .from(paymentInstruments)
             .where(eq(paymentInstruments.id, instrumentId))
@@ -1138,6 +1398,7 @@ export class PaymentRequestsNotificationService {
                 purpose: paymentRequests.purpose,
                 tenderNo: paymentRequests.tenderNo,
                 projectId: paymentRequests.projectId,
+                projectName: paymentRequests.projectName,
             })
             .from(paymentRequests)
             .where(eq(paymentRequests.id, instrument.requestId))
@@ -1176,6 +1437,32 @@ export class PaymentRequestsNotificationService {
 
         const tenderTeamId = await this.getTenderTeamId(paymentReq.tenderId || 0, paymentReq.requestedBy || 0);
 
+        // Purpose + Tender/WO name for the rejection mail.
+        const [fdrDetails] = await this.db
+            .select({ fdrPurpose: instrumentFdrDetails.fdrPurpose })
+            .from(instrumentFdrDetails)
+            .where(eq(instrumentFdrDetails.instrumentId, instrumentId))
+            .limit(1);
+
+        let tenderName: string | null = null;
+        if (paymentReq.tenderId && paymentReq.tenderId > 0) {
+            const [tender] = await this.db
+                .select({ tenderName: tenderInfos.tenderName })
+                .from(tenderInfos)
+                .where(eq(tenderInfos.id, paymentReq.tenderId))
+                .limit(1);
+            tenderName = tender?.tenderName ?? null;
+        }
+
+        const rawPurpose = (fdrDetails?.fdrPurpose || paymentReq.purpose || '').trim();
+        const purposeLabel = formatFdrPurpose(rawPurpose, paymentReq.purpose || '');
+        const isBgPurpose = rawPurpose.toUpperCase() === 'BANK_GUARANTEE';
+        const rawName = (tenderName || paymentReq.projectName || '').trim();
+        const hasName = !!rawName && rawName.toUpperCase() !== 'NA';
+        const subjectName = isBgPurpose || !hasName ? 'NA' : rawName;
+
+        const rejectionReason = (body.reason_req || instrument.rejectionReason || '').toString().trim();
+
         try {
             // From: FDR responsible user — To: Requestor
             const result = await this.emailService.sendPaymentEmail({
@@ -1183,26 +1470,36 @@ export class PaymentRequestsNotificationService {
                 tenderId: paymentReq.tenderId || undefined,
                 eventType: isAccepted ? 'FDR_CREATED' : 'FDR_REJECTED',
                 fromUserId: await this.getResponsibleUserIdByMode('FDR') ?? 33,
-                subject: `Request for FDR ${isAccepted ? 'Accepted' : 'Rejected'} - ${paymentReq.purpose || ''}`,
-                template: 'fdr-create',
-                data: {
+                subject: isAccepted
+                    ? `Request for FDR Accepted - ${purposeLabel}`
+                    : `FDR Request Rejected - ${purposeLabel} - ${subjectName}`,
+                template: isAccepted ? 'fdr-create' : 'fdr-rejected',
+                data: isAccepted ? {
                     requestedBy: reqUser.name,
-                    status: isAccepted ? 'Accepted' : 'Rejected',
-                    issueDate: isAccepted ? (this.formatDateDDMMYYYY(body.fdr_date) || '') : '',
-                    fdrNo: isAccepted ? (body.fdr_no || '') : '',
+                    status: 'Accepted',
+                    issueDate: this.formatDateDDMMYYYY(body.fdr_date) || '',
+                    fdrNo: body.fdr_no || '',
                     beneficiaryName: instrument.favouring || '',
                     payableAt: instrument.payableAt || '',
                     amountFormatted: instrument.amount ? this.formatCurrency(Number(instrument.amount)) : '',
                     fdrImage: imageUrl,
-                    courierRequestNo: isAccepted ? (body.req_no || '') : '',
+                    courierRequestNo: body.req_no || '',
                     courierLink: '',
-                    remarks: isAccepted ? (body.remarks || '') : (body.reason_req || ''),
+                    remarks: body.remarks || '',
+                } : {
+                    tenderExecutive: reqUser.name,
+                    rejectionReason,
                 },
                 to: [{ type: 'emails', emails: [reqUser.email] }],
-                cc: [
+                cc: isAccepted ? [
                     { type: 'role', role: 'Admin', teamId: tenderTeamId },
                     { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
                     { type: 'emails', emails: ['accounts@volksenergie.in'] },
+                ] : [
+                    { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
+                    { type: 'emails', emails: ['goyal@volksenergie.in'] },
+                    { type: 'emails', emails: ['accounts@volksenergie.in'] },
+                    { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
                 ],
             });
 
@@ -1213,6 +1510,256 @@ export class PaymentRequestsNotificationService {
             }
         } catch (error) {
             this.logger.error(`Failed to send FDR created email for instrument ${instrumentId}:`, error);
+        }
+    }
+
+    /**
+     * Sends the request to the bank once Stage 1 (Accounts Form) is accepted.
+     * Carries the CEO-signed bank form and request letter uploaded in Stage 1.
+     * Not sent for FDRs raised against a Bank Guarantee.
+     */
+    async sendFdrBankRequestEmail(instrumentId: number): Promise<void> {
+        try {
+            const [result] = await this.db
+                .select({
+                    instrument: paymentInstruments,
+                    request: paymentRequests,
+                    fdrDetails: instrumentFdrDetails,
+                })
+                .from(paymentInstruments)
+                .innerJoin(paymentRequests, eq(paymentInstruments.requestId, paymentRequests.id))
+                .leftJoin(instrumentFdrDetails, eq(instrumentFdrDetails.instrumentId, paymentInstruments.id))
+                .where(eq(paymentInstruments.id, instrumentId))
+                .limit(1);
+
+            if (!result || !result.instrument) {
+                this.logger.warn(`FDR bank request email skipped: instrument ${instrumentId} not found`);
+                return;
+            }
+
+            const { instrument, request, fdrDetails } = result;
+
+            const rawPurpose = (fdrDetails?.fdrPurpose || request.purpose || '').trim();
+            if (rawPurpose.toUpperCase() === 'BANK_GUARANTEE') {
+                this.logger.log(
+                    `FDR bank request email skipped for instrument ${instrumentId}: purpose is Bank Guarantee`,
+                );
+                return;
+            }
+
+            const bankMailIds = this.normalizeMailIds(fdrDetails?.bankMailIds);
+            if (bankMailIds.length === 0) {
+                this.logger.warn(
+                    `FDR bank request email skipped: no bank mail ids saved for instrument ${instrumentId}`,
+                );
+                return;
+            }
+
+            const bankMailIdsCc = this.normalizeMailIds(fdrDetails?.bankMailIdsCc);
+            const tenderTeamId = await this.getTenderTeamId(request.tenderId || 0, request.requestedBy || 0);
+
+            const ccSources: RecipientSource[] = [
+                { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
+                { type: 'emails', emails: ['accounts@volksenergie.in'] },
+                { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+            ];
+
+            if (bankMailIdsCc.length > 0) {
+                ccSources.push({ type: 'emails', emails: bankMailIdsCc });
+            }
+
+            let tenderName: string | null = null;
+            if (request.tenderId && request.tenderId > 0) {
+                const [tender] = await this.db
+                    .select({ tenderName: tenderInfos.tenderName })
+                    .from(tenderInfos)
+                    .where(eq(tenderInfos.id, request.tenderId))
+                    .limit(1);
+                tenderName = tender?.tenderName ?? null;
+            }
+
+            const rawName = (tenderName || request.projectName || '').trim();
+            const hasName = !!rawName && rawName.toUpperCase() !== 'NA';
+            const purposeLabel = formatFdrPurpose(rawPurpose, request.purpose || 'Other Payment');
+            const subject = hasName
+                ? `Request for FDR - ${purposeLabel} - ${rawName}`
+                : `Request for FDR - ${purposeLabel}`;
+
+            const attachmentItems = [
+                ...this.toAttachmentPaths(fdrDetails?.prefilledSignedFdr).map((path) => ({
+                    path,
+                    name: 'Bank Form - Signed by CEO',
+                })),
+                ...this.toAttachmentPaths(fdrDetails?.uploadDocuments).map((path) => ({
+                    path,
+                    name: 'Request Letter - Signed by CEO',
+                })),
+            ];
+
+            const stagedAttachments = this.stageFdrMailAttachments(instrumentId, attachmentItems);
+            const attachmentFiles = stagedAttachments.map((attachment) => attachment.path);
+
+            const [ceoUser] = await this.db
+                .select({ id: users.id })
+                .from(users)
+                .where(eq(users.email, 'goyal@volksenergie.in'))
+                .limit(1);
+
+            let fromUserId = ceoUser?.id;
+            if (!fromUserId) {
+                this.logger.warn('CEO user not found for FDR bank request email, falling back to Imran');
+                const [imranUser] = await this.db
+                    .select({ id: users.id })
+                    .from(users)
+                    .where(eq(users.email, 'imran@volksenergie.in'))
+                    .limit(1);
+                fromUserId = imranUser?.id ?? 33;
+            }
+
+            await this.emailService.sendPaymentEmail({
+                requestId: instrument.requestId,
+                tenderId: request.tenderId || undefined,
+                eventType: 'FDR_BANK_REQUEST',
+                template: 'fdr-bank-request',
+                subject,
+                fromUserId,
+                to: [{ type: 'emails', emails: bankMailIds }],
+                cc: ccSources,
+                data: {
+                    purpose: purposeLabel,
+                    beneficiaryName: instrument.favouring || '',
+                    fdrExpiryDate: this.formatDateDDMMYYYY(fdrDetails?.fdrExpiryDate) || 'NA',
+                    amount: (Number(instrument.amount) || 0).toLocaleString('en-IN'),
+                    debitAccountNo: '2502245699295242',
+                },
+                attachments: { files: attachmentFiles },
+            });
+
+            this.logger.log(
+                `FDR bank request email sent for instrument ${instrumentId} to ${bankMailIds.join(', ')}`,
+            );
+        } catch (error) {
+            this.logger.error(`Failed to send FDR bank request email for instrument ${instrumentId}:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Notifies the tendering team (first Stage 2 save) that the FDR has been
+     * created, with the soft copy uploaded in Stage 2 attached.
+     * Not sent for FDRs raised against a Bank Guarantee.
+     */
+    async sendFdrCreatedTeamEmail(instrumentId: number, body: any = {}): Promise<void> {
+        try {
+            const [result] = await this.db
+                .select({
+                    instrument: paymentInstruments,
+                    request: paymentRequests,
+                    fdrDetails: instrumentFdrDetails,
+                })
+                .from(paymentInstruments)
+                .innerJoin(paymentRequests, eq(paymentInstruments.requestId, paymentRequests.id))
+                .leftJoin(instrumentFdrDetails, eq(instrumentFdrDetails.instrumentId, paymentInstruments.id))
+                .where(eq(paymentInstruments.id, instrumentId))
+                .limit(1);
+
+            if (!result || !result.instrument) {
+                this.logger.warn(`FDR created (team) email skipped: instrument ${instrumentId} not found`);
+                return;
+            }
+
+            const { instrument, request, fdrDetails } = result;
+
+            const rawPurpose = (fdrDetails?.fdrPurpose || request.purpose || '').trim();
+            if (rawPurpose.toUpperCase() === 'BANK_GUARANTEE') {
+                this.logger.log(
+                    `FDR created (team) email skipped for instrument ${instrumentId}: purpose is Bank Guarantee`,
+                );
+                return;
+            }
+
+            const [reqUser] = request.requestedBy
+                ? await this.db
+                    .select({ name: users.name, email: users.email })
+                    .from(users)
+                    .where(eq(users.id, request.requestedBy))
+                    .limit(1)
+                : [];
+
+            if (!reqUser?.email) {
+                this.logger.warn(
+                    `FDR created (team) email skipped: requester email not found for instrument ${instrumentId}`,
+                );
+                return;
+            }
+
+            let tenderName: string | null = null;
+            if (request.tenderId && request.tenderId > 0) {
+                const [tender] = await this.db
+                    .select({ tenderName: tenderInfos.tenderName })
+                    .from(tenderInfos)
+                    .where(eq(tenderInfos.id, request.tenderId))
+                    .limit(1);
+                tenderName = tender?.tenderName ?? null;
+            }
+
+            const rawName = (tenderName || request.projectName || '').trim();
+            const hasName = !!rawName && rawName.toUpperCase() !== 'NA';
+            const purposeLabel = formatFdrPurpose(rawPurpose, request.purpose || 'Other Payment');
+            const subject = hasName
+                ? `FDR Created - ${purposeLabel} - ${rawName}`
+                : `FDR Created - ${purposeLabel}`;
+
+            const attachmentItems = this.toAttachmentPaths(fdrDetails?.fdrCopy).map((path) => ({
+                path,
+                name: 'Soft Copy of FDR',
+            }));
+            const stagedAttachments = this.stageFdrMailAttachments(instrumentId, attachmentItems);
+
+            const [kailashUser] = await this.db
+                .select({ id: users.id })
+                .from(users)
+                .where(eq(users.email, 'kailash@volksenergie.in'))
+                .limit(1);
+
+            const fromUserId =
+                kailashUser?.id ?? (await this.getResponsibleUserIdByMode('FDR')) ?? 33;
+
+            const tenderTeamId = await this.getTenderTeamId(request.tenderId || 0, request.requestedBy || 0);
+            const remarks = (body.remarks || '').toString().trim();
+
+            await this.emailService.sendPaymentEmail({
+                requestId: instrument.requestId,
+                tenderId: request.tenderId || undefined,
+                eventType: 'FDR_STAGE2_SAVED',
+                template: 'fdr-created-team',
+                subject,
+                fromUserId,
+                to: [{ type: 'emails', emails: [reqUser.email] }],
+                cc: [
+                    { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
+                    { type: 'emails', emails: ['goyal@volksenergie.in'] },
+                    { type: 'emails', emails: ['accounts@volksenergie.in'] },
+                    { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                ],
+                data: {
+                    tenderExecutiveName: reqUser.name || 'Tender Executive',
+                    fdrDate: this.formatDateDDMMYYYY(body.fdr_date || fdrDetails?.fdrDate) || 'NA',
+                    fdrNo: body.fdr_no || fdrDetails?.fdrNo || '',
+                    beneficiaryName: instrument.favouring || '',
+                    amount: (Number(instrument.amount) || 0).toLocaleString('en-IN'),
+                    courierRequestNo: instrument.reqNo || '',
+                    remarks,
+                },
+                attachments: { files: stagedAttachments.map((attachment) => attachment.path) },
+            });
+
+            this.logger.log(
+                `FDR created (team) email sent for instrument ${instrumentId} to ${reqUser.email}`,
+            );
+        } catch (error) {
+            this.logger.error(`Failed to send FDR created (team) email for instrument ${instrumentId}:`, error);
+            throw error;
         }
     }
 
@@ -1583,16 +2130,40 @@ export class PaymentRequestsNotificationService {
             }
         } else if (mode === 'FDR') {
             // FDR request created directly (no auto-created Cheque).
-            // Notify the FDR responsible user so they can process the Accounts Form (FDR).
+            // Notify the Accounts team (FDR responsible user) so they can prepare the FDR.
             const [fdrDetails] = await this.db
                 .select()
                 .from(instrumentFdrDetails)
                 .where(eq(instrumentFdrDetails.instrumentId, instrumentId))
                 .limit(1);
 
+            const [paymentReq] = await this.db
+                .select({
+                    requestedBy: paymentRequests.requestedBy,
+                    tenderId: paymentRequests.tenderId,
+                    projectId: paymentRequests.projectId,
+                    projectName: paymentRequests.projectName,
+                    tenderNo: paymentRequests.tenderNo,
+                    dueDate: paymentRequests.dueDate,
+                })
+                .from(paymentRequests)
+                .where(eq(paymentRequests.id, instrument.requestId))
+                .limit(1);
+
+            let requesterName = 'Tender Executive';
+            if (paymentReq?.requestedBy) {
+                const [requester] = await this.db
+                    .select({ name: users.name })
+                    .from(users)
+                    .where(eq(users.id, paymentReq.requestedBy))
+                    .limit(1);
+                requesterName = requester?.name || requesterName;
+            }
+
             const courierAddr = instrument.courierAddressJson as Record<string, any> | null;
             const courierAddress = courierAddr
                 ? [
+                    courierAddr.org,
                     courierAddr.name,
                     courierAddr.phone,
                     [courierAddr.line1, courierAddr.line2].filter(Boolean).join(', '),
@@ -1601,34 +2172,305 @@ export class PaymentRequestsNotificationService {
                 ].filter(Boolean).join('\n')
                 : (instrument.courierAddress ?? 'Not specified');
 
+            // Tender / WO name: tender first, then the project name, else NA.
+            const rawName = (tender?.tenderName || paymentReq?.projectName || '').trim();
+            const hasName = !!rawName && rawName.toUpperCase() !== 'NA';
+
+            const rawPurpose = (fdrDetails?.fdrPurpose || purpose || '').trim();
+            const isBgPurpose = rawPurpose.toUpperCase() === 'BANK_GUARANTEE';
+            const purposeLabel = formatFdrPurpose(rawPurpose, purpose || 'Other Payment');
+
+            // "Request for FDR - <Purpose> - <Name>" — the name is NA for
+            // accounts/admin FDRs and for FDRs raised against a BG.
+            const subjectName = isBgPurpose || !hasName ? 'NA' : rawName;
+
+            // FDR expiry: for BG-linked FDRs, the BG claim period expiry wins.
+            let fdrExpiryDate: Date | string | null = fdrDetails?.fdrExpiryDate ?? null;
+            if (isBgPurpose) {
+                const [bgDetails] = await this.db
+                    .select({
+                        claimExpiryDate: instrumentBgDetails.claimExpiryDate,
+                        bgClaim: instrumentBgDetails.bgClaim,
+                    })
+                    .from(instrumentBgDetails)
+                    .innerJoin(paymentInstruments, eq(paymentInstruments.id, instrumentBgDetails.instrumentId))
+                    .where(and(
+                        eq(paymentInstruments.requestId, instrument.requestId),
+                        eq(paymentInstruments.instrumentType, 'BG'),
+                        eq(paymentInstruments.isActive, true),
+                    ))
+                    .limit(1);
+                fdrExpiryDate = bgDetails?.claimExpiryDate || bgDetails?.bgClaim || fdrExpiryDate;
+            }
+
+            const requestedHours = Number(fdrDetails?.fdrNeeds) || Number(instrument.courierDeadline) || 24;
+            const timeLimit = isBgPurpose ? 12 : requestedHours;
+
+            const dueDate =
+                tender?.dueDate ||
+                paymentReq?.dueDate ||
+                (courierAddr?.delDate ? new Date(courierAddr.delDate) : null);
+            const dueDateTime = dueDate
+                ? `${this.formatDateDDMMYYYY(dueDate)} 18:00`
+                : 'the due date';
+
+            // Letters attached to the create-request mail (BG style): a covering
+            // letter and an authorization letter for collecting the FDR from the
+            // AU Bank branch. Both are persisted on instrument_fdr_details so the
+            // dashboard can re-use them later.
+            const attachmentLinks: Array<{ label: string; url: string }> = [];
+            const addAttachmentLink = (label: string, filePath: string) => {
+                const url = this.buildPublicFileUrl(filePath);
+                if (!url || attachmentLinks.some((link) => link.url === url)) {
+                    return;
+                }
+                attachmentLinks.push({ label, url });
+            };
+
+            const [tlContact] = await this.db
+                .select({ name: users.name, mobile: users.mobile, email: users.email })
+                .from(users)
+                .where(
+                    and(
+                        eq(users.team, tenderTeamId),
+                        eq(users.roleId, 3)
+                    )
+                )
+                .limit(1);
+
+            // Accounts Leader shown in the cover letter signature block.
+            const [accountsLeader] = await this.db
+                .select({ name: users.name, mobile: users.mobile, email: users.email })
+                .from(users)
+                .where(eq(users.email, 'imran@volksenergie.in'))
+                .limit(1);
+
+            const fdrReference = await this.resolveBgReference({
+                tenderNo: paymentReq?.tenderNo,
+                projectId: paymentReq?.projectId,
+                tenderId,
+            });
+
+            const fdrAmount = instrument.amount ? Number(instrument.amount).toLocaleString('en-IN') : '';
+
+            // Covering letter addressee = the FDR courier recipient.
+            const courierOrg = typeof courierAddr?.org === 'string' ? courierAddr.org.trim() : '';
+            const courierName = typeof courierAddr?.name === 'string' ? courierAddr.name.trim() : '';
+            const courierAddressLines = courierAddr
+                ? [
+                    courierAddr.line1,
+                    courierAddr.line2,
+                    courierAddr.city,
+                    [courierAddr.state, courierAddr.pincode].filter(Boolean).join(' - '),
+                ]
+                    .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
+                    .join('\n')
+                : (instrument.courierAddress ?? '').trim();
+
+            try {
+                const coveringLetterData = {
+                    date: this.formatDateDDMMYYYY(new Date()),
+                    courierOrg,
+                    courierName,
+                    courierAddress: courierAddressLines,
+                    referenceNo: fdrReference?.value || '',
+                    referenceLabel: fdrReference?.label || '',
+                    purpose: purposeLabel,
+                    fdrNo: fdrDetails?.fdrNo || '',
+                    fdrDate: fdrDetails?.fdrDate ? this.formatDateDDMMYYYY(fdrDetails.fdrDate) : '',
+                    fdrExpiryDate: this.formatDateDDMMYYYY(fdrExpiryDate) || 'NA',
+                    amount: fdrAmount,
+                    teamLeaderName: tlContact?.name || tlUser?.name || 'Team Leader',
+                    teamLeaderPhone: this.formatPhoneWithCountryCode(tlContact?.mobile),
+                    teamLeaderEmail: tlContact?.email || '',
+                    accountsLeaderName: accountsLeader?.name || 'Accounts Leader',
+                    accountsLeaderPhone: this.formatPhoneWithCountryCode(accountsLeader?.mobile),
+                    accountsLeaderEmail: accountsLeader?.email || 'imran@volksenergie.in',
+                };
+
+                const [coverLetterPath] = await this.pdfGenerator.generatePdfs(
+                    'fdrCoveringLetter',
+                    { ...coveringLetterData },
+                    instrumentId,
+                    'FDR'
+                );
+
+                if (coverLetterPath) {
+                    addAttachmentLink('Covering Letter', coverLetterPath);
+                    try {
+                        await this.db
+                            .update(instrumentFdrDetails)
+                            .set({ coverLetterPath })
+                            .where(eq(instrumentFdrDetails.instrumentId, instrumentId));
+                    } catch (persistError) {
+                        this.logger.warn(
+                            `Failed to persist FDR cover letter path for instrument ${instrumentId}: ${persistError instanceof Error ? persistError.message : String(persistError)}`
+                        );
+                    }
+                }
+            } catch (error) {
+                this.logger.warn(
+                    `FDR covering letter generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
+
+            try {
+                const authorizationLetterData = {
+                    date: this.formatDateDDMMYYYY(new Date()),
+                    partyName: isBgPurpose ? 'AU Small Finance Bank Ltd' : (instrument.favouring || ''),
+                    fdrAmount: fdrAmount ? `${fdrAmount}/-` : '',
+                };
+
+                const [authorizationLetterPath] = await this.pdfGenerator.generatePdfs(
+                    'fdrAuthorizationLetter',
+                    { ...authorizationLetterData },
+                    instrumentId,
+                    'FDR'
+                );
+
+                if (authorizationLetterPath) {
+                    addAttachmentLink('Authorization Letter', authorizationLetterPath);
+                    try {
+                        await this.db
+                            .update(instrumentFdrDetails)
+                            .set({ authorizationLetterPath })
+                            .where(eq(instrumentFdrDetails.instrumentId, instrumentId));
+                    } catch (persistError) {
+                        this.logger.warn(
+                            `Failed to persist FDR authorization letter path for instrument ${instrumentId}: ${persistError instanceof Error ? persistError.message : String(persistError)}`
+                        );
+                    }
+                }
+            } catch (error) {
+                this.logger.warn(
+                    `FDR authorization letter generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
+
+            // Request letter — lien-marking letter addressed to the AU Bank
+            // branch, with the FDR details and lien period. Persisted on
+            // request_letter_path for later re-use.
+            try {
+                const letterDate = new Date();
+                const lienPeriod = this.resolveLienPeriod(letterDate, fdrExpiryDate);
+                const requestLetterPurpose = isBgPurpose
+                    ? purposeLabel
+                    : rawPurpose.toUpperCase() === 'EMD'
+                        ? 'Tender Bidbond EMD'
+                        : `Tender Bidbond ${purposeLabel}`;
+                const requestLetterBeneficiary = isBgPurpose
+                    ? 'AU Small Finance Bank Ltd'
+                    : (instrument.favouring || '');
+                const requestLetterAmount = instrument.amount
+                    ? `${Number(instrument.amount).toLocaleString('en-IN', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                    })}/-`
+                    : '';
+
+                const requestLetterData = {
+                    date: this.formatDateDDMMYYYY(letterDate),
+                    beneficiary: requestLetterBeneficiary,
+                    purposeText: requestLetterPurpose,
+                    referenceNo: fdrReference?.value || '',
+                    referenceLabel: fdrReference?.label || '',
+                    amount: requestLetterAmount,
+                    lienPeriodText: lienPeriod.text,
+                    lienFrom: this.formatDateDDMMYYYYSlash(letterDate),
+                    lienTo: this.formatDateDDMMYYYYSlash(fdrExpiryDate),
+                };
+
+                const [requestLetterPath] = await this.pdfGenerator.generatePdfs(
+                    'fdrRequestLetter',
+                    { ...requestLetterData },
+                    instrumentId,
+                    'FDR'
+                );
+
+                if (requestLetterPath) {
+                    addAttachmentLink('Request Letter', requestLetterPath);
+                    try {
+                        await this.db
+                            .update(instrumentFdrDetails)
+                            .set({ requestLetterPath })
+                            .where(eq(instrumentFdrDetails.instrumentId, instrumentId));
+                    } catch (persistError) {
+                        this.logger.warn(
+                            `Failed to persist FDR request letter path for instrument ${instrumentId}: ${persistError instanceof Error ? persistError.message : String(persistError)}`
+                        );
+                    }
+                }
+            } catch (error) {
+                this.logger.warn(
+                    `FDR request letter generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
+
+            // FDR form — AU Small Finance Bank term-deposit form with branch,
+            // amount, dates, debit account and duration pre-filled.
+            try {
+                const formDate = new Date();
+                const fdrFormData = this.buildFdrFormData(instrument.amount, formDate, fdrExpiryDate);
+
+                const [fdrFormPath] = await this.pdfGenerator.generatePdfs(
+                    'fdrForm',
+                    { ...fdrFormData },
+                    instrumentId,
+                    'FDR'
+                );
+
+                if (fdrFormPath) {
+                    addAttachmentLink('FDR Form', fdrFormPath);
+                    try {
+                        await this.db
+                            .update(instrumentFdrDetails)
+                            .set({ fdrFormPath })
+                            .where(eq(instrumentFdrDetails.instrumentId, instrumentId));
+                    } catch (persistError) {
+                        this.logger.warn(
+                            `Failed to persist FDR form path for instrument ${instrumentId}: ${persistError instanceof Error ? persistError.message : String(persistError)}`
+                        );
+                    }
+                }
+            } catch (error) {
+                this.logger.warn(
+                    `FDR form generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
+
             try {
                 const result = await this.emailService.sendPaymentEmail({
                     requestId: instrument.requestId,
                     tenderId: tenderId || undefined,
                     eventType: 'FDR_REQUEST',
                     fromUserId: requestedBy,
-                    subject: `Please create a new FDR - ${purpose}`,
+                    subject: `Request for FDR - ${purposeLabel} - ${subjectName}`,
                     template: 'fdr-request',
                     data: {
-                        fdrPurpose: fdrDetails?.fdrPurpose || 'Not specified',
-                        tenderNo: tender?.tenderNo || 'NA',
-                        tenderName: tender?.tenderName || 'Not specified',
-                        dueDateTime: this.formatDateDDMMYYYY(tender?.dueDate),
-                        beneficiaryName: instrument.favouring || 'Not specified',
-                        payableAt: instrument.payableAt || 'Not specified',
+                        recipientName: 'Kailash',
+                        purpose: purposeLabel,
+                        isBgPurpose,
+                        fdrInFavourOf: isBgPurpose
+                            ? 'AU Small Finance Bank Ltd'
+                            : (instrument.favouring || 'Not specified'),
                         amount: this.formatCurrency(Number(instrument.amount) || 0),
-                        fdrExpiryDate: this.formatDateDDMMYYYY(fdrDetails?.fdrExpiryDate),
-                        timeLimit: instrument.courierDeadline || 24,
+                        fdrExpiryDate: this.formatDateDDMMYYYY(fdrExpiryDate),
+                        timeLimit,
+                        dueDateTime,
+                        stage1Link: `${this.getFrontendUrl()}/bi-dashboard/fdr/action/${instrumentId}?section=accounts-form`,
+                        stage2Link: `${this.getFrontendUrl()}/bi-dashboard/fdr/action/${instrumentId}?section=accounts-form-2`,
                         courierAddress,
-                        link: `${this.getFrontendUrl()}/bi-dashboard/fdr/action/${instrumentId}`,
+                        senderName: requesterName,
                         tlName: tlUser?.name || 'Team Leader',
+                        attachmentLinks,
                     },
                     to: [{ type: 'emails', emails: [toEmails] }],
                     cc: [
-                        { type: 'role', role: 'Admin', teamId: tenderTeamId },
+                        { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
+                        { type: 'emails', emails: ['goyal@volksenergie.in'] },
+                        { type: 'emails', emails: ['accounts@volksenergie.in'] },
                         { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
-                        { type: 'emails', emails: ['accounts@volksenergie.in']},
-                    ]
+                    ],
                 });
                 if (result.success) {
                     this.logger.log(`FDR request email sent for instrument ${instrumentId} (logId: ${result.emailLogId})`);

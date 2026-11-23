@@ -76,6 +76,7 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
 
         // Load common images (logo, phone, email, web icons)
         imageData.img_logo_base64 = await this.loadImageAsBase64('logo.png');
+        imageData.img_au_logo_base64 = await this.loadImageAsBase64('au.png');
         imageData.img_watermark_base64 = await this.loadImageAsBase64('watermark.png');
         imageData.img_phone_base64 = await this.loadImageAsBase64('phone.png');
         imageData.img_email_base64 = await this.loadImageAsBase64('email.png');

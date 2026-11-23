@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Query, Put, Param, ParseIntPipe, Body, Req } from '@nestjs/common';
+import { Controller, Get, Patch, Post, Query, Put, Param, ParseIntPipe, Body, Req } from '@nestjs/common';
 import { FdrService } from './fdr.service';
 
 @Controller('fdrs')
@@ -53,6 +53,11 @@ export class FdrController {
     @Get('instruments/:id/followup')
     async getFollowupData(@Param('id', ParseIntPipe) id: number) {
         return this.fdrService.getFollowupData(id);
+    }
+
+    @Post('instruments/:id/mail-preview')
+    async getMailPreview(@Param('id', ParseIntPipe) id: number, @Body() body: any) {
+        return this.fdrService.getMailPreview(id, body);
     }
 
     @Patch('instruments/:id/action')
