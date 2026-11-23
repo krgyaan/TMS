@@ -1,5 +1,5 @@
 import { useParams } from "react-router-dom";
-import { useVendorWorkOrderDetails } from "@/hooks/api/useVendorWorkOrders";
+import { useVendorWorkOrderDetails, useSubmitVwoTlApproval } from "@/hooks/api/useVendorWorkOrders";
 import { OrderViewPage } from "@/modules/operations/order-view/OrderViewPage";
 import { parseAttachments, type OrderViewData } from "@/modules/operations/order-view/orderView.types";
 import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
@@ -53,6 +53,10 @@ function toOrderViewData(vwo: VendorWorkOrderView): OrderViewData {
         amountAfterTds: vwo.amountAfterTds,
         approved: vwo.woApproved,
         approvalRemark: vwo.woApprovalRemark,
+        tlStatus: vwo.tlStatus ?? 0,
+        tlComment: vwo.tlComment ?? null,
+        tlFeedback: vwo.tlFeedback ?? null,
+        creatorTeamId: vwo.creatorTeamId ?? null,
         attachments: [
             { title: "Scope of Work", paths: parseAttachments(vwo.scopeOfWork) },
             { title: "Accessories / Packaging List", paths: parseAttachments(vwo.accessoriesPackagingListAttachments) },
@@ -66,6 +70,7 @@ const ViewVendorWorkOrderPage = () => {
     const woId = Number(woIdParam);
 
     const { data, isLoading, isError, error } = useVendorWorkOrderDetails(woId);
+    const { mutateAsync: submitTlApproval, isPending: isSubmittingTlApproval } = useSubmitVwoTlApproval();
 
     return (
         <OrderViewPage
@@ -79,6 +84,10 @@ const ViewVendorWorkOrderPage = () => {
             notFoundMessage="Vendor Work Order not found."
             loadErrorMessage="Failed to load Vendor Work Order"
             pdfUrl={(id, label) => vendorWorkOrderApi.getPdfDownloadUrl(id, label)}
+            onSubmitTlApproval={async (payload) => {
+                await submitTlApproval({ id: woId, data: payload });
+            }}
+            isSubmittingTlApproval={isSubmittingTlApproval}
         />
     );
 };

@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <style>
+        * {
+            font-family: 'Calibri Light', sans-serif;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            color: #000;
+        }
+
+        .page {
+            padding: 0 40px 24mm 40px;
+        }
+
+        .footer {
+            position: fixed;
+            bottom: 6mm;
+            left: 0;
+            width: 100%;
+            background: #fff;
+        }
+
+        .footer-line {
+            width: 100%;
+            height: 2px;
+            background: #000;
+        }
+
+        .footer-content {
+            padding: 8px 10px;
+        }
+
+        .wm {
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            width: 150mm;
+            transform: translate(-50%, -50%);
+            z-index: -1;
+            opacity: 0.1;
+            pointer-events: none;
+        }
+
+        .letter-body {
+            font-size: 12.5px;
+            line-height: 1.42;
+            padding: 0 10px;
+        }
+
+        .letter-body p {
+            margin: 6px 0;
+        }
+
+        .party-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .party-table td {
+            vertical-align: top;
+        }
+
+        .addr p {
+            margin: 0;
+        }
+
+        .auth-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            font-size: 12.5px;
+        }
+
+        .auth-table th,
+        .auth-table td {
+            border: 1px solid #333;
+            padding: 4px 8px;
+            vertical-align: top;
+        }
+
+        .auth-table th {
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .center {
+            text-align: center;
+        }
+
+        .signature-block {
+            margin-top: 18px;
+        }
+
+        .signature-block p {
+            margin: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <img class="wm" alt="" src="data:image/png;base64,{{ img_watermark_base64 }}">
+    <div style="border-top: 10px solid #333; border-bottom: 5px solid #f04e23;"></div>
+    <div class="page">
+        <div style="padding: 10px 0; font-family: sans-serif;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="width: 100%;">
+                <tr>
+                    <td style="width: 50%; padding-left: 20px;">
+                        <img src="data:image/png;base64,{{ img_logo_base64 }}"
+                            alt="Volks Energie Logo" style="height: 60px;">
+                    </td>
+                    <td style="width: 50%; text-align: right; font-size: 10px; color: #333; padding-right: 20px;">
+                        <div>
+                            B-1/D8, 2nd floor,<br>
+                            Mohan Cooperative Industrial Estate,<br>
+                            New Delhi 110044
+                        </div>
+                        <div>
+                            <img src="data:image/png;base64,{{ img_phone_base64 }}"
+                                alt="Phone" style="height: 12px; vertical-align: middle;">
+                            +91 9650393636, +91 9654551781<br>
+                            <img src="data:image/png;base64,{{ img_phone_base64 }}"
+                                alt="Phone" style="height: 12px; vertical-align: middle;">
+                            Accounts: +91 8882591733
+                        </div>
+                        <div>
+                            <img src="data:image/png;base64,{{ img_email_base64 }}"
+                                alt="Email" style="height: 12px; vertical-align: middle;">
+                            contact@volksenergie.in
+                        </div>
+                        <div>
+                            <img src="data:image/png;base64,{{ img_web_base64 }}"
+                                alt="Website" style="height: 12px; vertical-align: middle;">
+                            www.volksenergie.in
+                        </div>
+                    </td>
+                </tr>
+            </table>
+            <hr />
+        </div>
+
+        <div class="letter-body">
+            <table class="party-table">
+                <tr>
+                    <td style="text-align: left;"><strong>To,</strong></td>
+                    <td style="text-align: right; white-space: nowrap;">Date: {{ date }}</td>
+                </tr>
+            </table>
+
+            <div class="addr" style="margin-top: 6px;">
+                <p>The Branch Manager,</p>
+                <p>AU Small Finance Bank,</p>
+                <p>Plot No.- 24, Floor, Ring Road,</p>
+                <p>Lajpat Nagar 4, Lajpat Nagar, New Delhi &ndash; 110024.</p>
+            </div>
+
+            <p style="margin-top: 18px;">
+                <strong>Subject</strong>
+                &ndash; Authorization Letter for receiving of Fixed Deposit Receipt from Au Small Finance Bank Limited.
+            </p>
+
+            <p><strong>Dear Sir,</strong></p>
+
+            <p>
+                We are maintaining Current/CC account no. <strong>2502245699295242</strong> in the name of
+                M/s Volks Energie Private Limited. We hereby authorize the following persons to receive the
+                following Fixed Deposit Receipt, from you on our behalf.
+            </p>
+
+            <table class="auth-table">
+                <thead>
+                    <tr>
+                        <th style="width: 15%;">SI No.</th>
+                        <th style="width: 60%;">Party&rsquo;s Name</th>
+                        <th style="width: 25%;">FDR Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="center">1.</td>
+                        <td>{{ partyName }}</td>
+                        <td class="center">{{ fdrAmount }}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p style="margin-top: 16px;">
+                Name Of Authorized Person:
+                <strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&mdash;&mdash;</strong>
+                &nbsp;&nbsp;&nbsp;&nbsp;(Aadhaar No.: &mdash;&mdash; &mdash;&mdash; &mdash;&mdash;).
+            </p>
+
+            <p style="margin-top: 16px;">
+                Kindly handover the above-mentioned documents pertaining to our company to the above-mentioned
+                employees/representatives at our risk and responsibility.
+            </p>
+
+            <p style="margin-top: 16px;"><strong>Thanking You.</strong></p>
+
+            <div class="signature-block">
+                <p><strong>For</strong> Volks Energie Private Limited</p>
+                <p style="margin-top: 48px;">Authorized Signatory</p>
+            </div>
+
+            <p style="margin-top: 18px;">
+                <strong>Encl:</strong> Self attested copy of Valid ID cards with photo as mentioned above:
+            </p>
+        </div>
+    </div>
+
+    <div class="footer">
+        <div class="footer-content">
+            <table width="100%" style="font-size: 12px; color: #555;">
+                <tr>
+                    <td style="text-align: left;"><b>CIN: </b>U40100DL2011PTC228907</td>
+                    <td style="text-align: center;"><b>PAN: </b>AADCV9386C</td>
+                    <td style="text-align: right;"><b>MSME: </b>UDYAM-DL-0900000465</td>
+                </tr>
+            </table>
+        </div>
+        <div class="footer-line"></div>
+    </div>
+</body>
+
+</html>

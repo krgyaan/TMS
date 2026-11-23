@@ -16,6 +16,8 @@ export const fdrsKey = {
     counts: () => [...fdrsKey.all, 'counts'] as const,
     actionForm: (id: number) => [...fdrsKey.all, 'action-form', id] as const,
     followup: (id: number) => [...fdrsKey.all, 'followup', id] as const,
+    mailPreview: (id: number, stage: number, files: Record<string, string[]>) =>
+        [...fdrsKey.all, 'mail-preview', id, stage, files] as const,
 };
 
 export const useFdrDashboard = (
@@ -96,6 +98,25 @@ export const useFDRFollowupData = (id: number) => {
             return result;
         },
         enabled: !!id,
+    });
+};
+
+export const useFdrMailPreview = (
+    id: number,
+    stage: number,
+    files: Record<string, string[]>,
+) => {
+    return useQuery({
+        queryKey: fdrsKey.mailPreview(id, stage, files),
+        queryFn: async () => {
+            const result = await fdrsService.getMailPreview(id, { stage, files });
+            return result as {
+                stage: number;
+                attachments: Array<{ label: string; path: string }>;
+                missing: string[];
+            };
+        },
+        enabled: !!id && [1, 2].includes(stage),
     });
 };
 

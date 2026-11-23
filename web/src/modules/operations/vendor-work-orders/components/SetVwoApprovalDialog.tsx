@@ -78,7 +78,8 @@ export const SetVwoApprovalDialog: React.FC<SetVwoApprovalDialogProps> = ({ vwo,
         }
     };
 
-    const canSave = isReject || (selectedRate && tdsPercentage >= 0);
+    const isTlApproved = vwo.tlStatus === 1;
+    const canSave = isReject || (isTlApproved && Boolean(selectedRate) && tdsPercentage >= 0);
     const selectedLabel = TDS_RATES.find(r => r.value === selectedRate)?.label ?? "";
 
     const selectOptions = useMemo(() => TDS_RATES.map(r => ({ value: r.value, label: r.label })), []);
@@ -102,6 +103,12 @@ export const SetVwoApprovalDialog: React.FC<SetVwoApprovalDialogProps> = ({ vwo,
                                 <Label htmlFor="reject">Reject</Label>
                             </div>
                         </RadioGroup>
+
+                        {!isReject && !isTlApproved && (
+                            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+                                Stage 1 TL approval is required before Accounts can approve this Work Order.
+                            </div>
+                        )}
 
                         {!isReject && (
                             <>

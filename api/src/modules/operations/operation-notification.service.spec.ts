@@ -367,11 +367,15 @@ describe("OperationNotificationService PO POVWO Group & TL Decision notification
     let service: OperationNotificationService;
     let sendText: jest.Mock;
     let toJid: jest.Mock;
+    let buildAppShortUrl: jest.Mock;
     let dryRun: boolean;
 
     beforeEach(async () => {
         sendText = jest.fn().mockResolvedValue({ messageId: "m1" });
         toJid = jest.fn().mockReturnValue("919999999999@c.us");
+        buildAppShortUrl = jest.fn().mockImplementation(async (relativePath: string) => {
+            return `https://tms.example.com/n/short?to=${encodeURIComponent(relativePath)}`;
+        });
         dryRun = false;
 
         const db = {
@@ -390,7 +394,7 @@ describe("OperationNotificationService PO POVWO Group & TL Decision notification
                 { provide: OpenwaService, useValue: { sendText } },
                 { provide: DRIZZLE, useValue: db },
                 { provide: WhatsappJidResolver, useValue: { toJid } },
-                { provide: PublicLinkService, useValue: { buildUrl: jest.fn() } },
+                { provide: PublicLinkService, useValue: { buildUrl: jest.fn(), buildAppShortUrl } },
                 {
                     provide: openwaConfig.KEY,
                     useFactory: () => ({
@@ -405,7 +409,7 @@ describe("OperationNotificationService PO POVWO Group & TL Decision notification
         service = module.get(OperationNotificationService);
     });
 
-    it("notifyPoCreated routes only to GROUPS.POVWO with direct TMS PO URL", async () => {
+    it("notifyPoCreated routes only to GROUPS.POVWO with shortened PDF approval URL", async () => {
         await service.notifyPoCreated({
             purchaseOrderId: 42,
             poNumber: "PO/2026/0042",
@@ -416,13 +420,14 @@ describe("OperationNotificationService PO POVWO Group & TL Decision notification
             teamId: 1,
         });
 
+        expect(buildAppShortUrl).toHaveBeenCalledWith("/operations/po/42/approval", "po-tl-approval");
         expect(sendText).toHaveBeenCalledTimes(1);
         const [group, text] = sendText.mock.calls[0];
         expect(group).toBe(GROUPS.POVWO);
         expect(text).toContain("PO/2026/0042");
         expect(text).toContain("Solar Plant");
         expect(text).toContain("Acme Traders");
-        expect(text).toContain("/operations/purchase-orders/42");
+        expect(text).toContain("https://tms.example.com/n/short");
     });
 
     it("notifyPoTlDecision (Approve) notifies only GROUPS.POVWO", async () => {
@@ -444,10 +449,10 @@ describe("OperationNotificationService PO POVWO Group & TL Decision notification
         expect(group).toBe(GROUPS.POVWO);
         expect(text).toContain("PO Approved by TL");
         expect(text).toContain("Verified rates");
-        expect(text).toContain("/operations/purchase-orders/42");
+        expect(text).toContain("https://tms.example.com/n/short");
     });
 
-    it("notifyPoTlDecision (Reject) notifies only GROUPS.POVWO", async () => {
+    it("notifyPoTlDecision (Reject & Edit Requested) notifies only GROUPS.POVWO with field feedback", async () => {
         await service.notifyPoTlDecision({
             purchaseOrderId: 42,
             poNumber: "PO/2026/0042",
@@ -459,6 +464,7 @@ describe("OperationNotificationService PO POVWO Group & TL Decision notification
             teamId: 2,
             tlStatus: 2,
             tlComment: "Price mismatch with quotation",
+            rejectionFields: [{ field: "pricing", label: "Unit Rates / Pricing", remark: "Rate is 10% higher than quote" }],
         });
 
         expect(sendText).toHaveBeenCalledTimes(1);
@@ -466,5 +472,188 @@ describe("OperationNotificationService PO POVWO Group & TL Decision notification
         expect(group).toBe(GROUPS.POVWO);
         expect(text).toContain("PO Rejected by Team Leader");
         expect(text).toContain("Price mismatch with quotation");
+        expect(text).toContain("Unit Rates / Pricing: Rate is 10% higher than quote");
+
+        sendText.mockClear();
+
+        await service.notifyPoTlDecision({
+            purchaseOrderId: 42,
+            poNumber: "PO/2026/0042",
+            projectName: "Solar Plant",
+            sellerName: "Acme Traders",
+            grandTotal: 125000,
+            actedBy: 2,
+            createdBy: 1,
+            teamId: 2,
+            tlStatus: 3,
+            tlComment: "Update delivery address",
+            editFields: [
+                {
+                    field: "shippingAddress",
+                    label: "Delivery Address",
+                    oldValue: "Old Warehouse",
+                    newValue: "Site Gate 2",
+                    remark: "Per client email",
+                },
+            ],
+        });
+
+        expect(sendText).toHaveBeenCalledTimes(1);
+        const [groupEdit, textEdit] = sendText.mock.calls[0];
+        expect(groupEdit).toBe(GROUPS.POVWO);
+        expect(textEdit).toContain("PO Edit Requested by Team Leader");
+        expect(textEdit).toContain('Delivery Address: "Old Warehouse" → "Site Gate 2" (Per client email)');
+    });
+
+    it("notifyVwoCreated routes only to GROUPS.POVWO with shortened PDF approval URL", async () => {
+        await service.notifyVwoCreated({
+            vendorWorkOrderId: 99,
+            woNumber: "VE/Solar_Plant/2627/WO0099",
+            projectName: "Solar Plant",
+            sellerName: "Acme Contractors",
+            grandTotal: 250000,
+            createdBy: 1,
+            teamId: 1,
+        });
+
+        expect(buildAppShortUrl).toHaveBeenCalledWith("/operations/wo/99/approval", "wo-tl-approval");
+        expect(sendText).toHaveBeenCalledTimes(1);
+        const [group, text] = sendText.mock.calls[0];
+        expect(group).toBe(GROUPS.POVWO);
+        expect(text).toContain("VE/Solar_Plant/2627/WO0099");
+        expect(text).toContain("Solar Plant");
+        expect(text).toContain("Acme Contractors");
+        expect(text).toContain("https://tms.example.com/n/short");
+    });
+
+    it("notifyVwoTlDecision (Approve, Reject & Edit Requested) notifies only GROUPS.POVWO", async () => {
+        await service.notifyVwoTlDecision({
+            vendorWorkOrderId: 99,
+            woNumber: "VE/Solar_Plant/2627/WO0099",
+            projectName: "Solar Plant",
+            sellerName: "Acme Contractors",
+            grandTotal: 250000,
+            actedBy: 2,
+            createdBy: 1,
+            teamId: 1,
+            tlStatus: 1,
+            tlComment: "Scope verified",
+        });
+
+        expect(sendText).toHaveBeenCalledTimes(1);
+        const [group1, text1] = sendText.mock.calls[0];
+        expect(group1).toBe(GROUPS.POVWO);
+        expect(text1).toContain("WO Approved by TL");
+        expect(text1).toContain("Scope verified");
+        expect(text1).toContain("https://tms.example.com/n/short");
+
+        sendText.mockClear();
+
+        await service.notifyVwoTlDecision({
+            vendorWorkOrderId: 99,
+            woNumber: "VE/Solar_Plant/2627/WO0099",
+            projectName: "Solar Plant",
+            sellerName: "Acme Contractors",
+            grandTotal: 250000,
+            actedBy: 2,
+            createdBy: 1,
+            teamId: 1,
+            tlStatus: 2,
+            tlComment: "Incorrect BOQ items",
+        });
+
+        expect(sendText).toHaveBeenCalledTimes(1);
+        const [group2, text2] = sendText.mock.calls[0];
+        expect(group2).toBe(GROUPS.POVWO);
+        expect(text2).toContain("WO Rejected by Team Leader");
+        expect(text2).toContain("Incorrect BOQ items");
+
+        sendText.mockClear();
+
+        await service.notifyVwoTlDecision({
+            vendorWorkOrderId: 99,
+            woNumber: "VE/Solar_Plant/2627/WO0099",
+            projectName: "Solar Plant",
+            sellerName: "Acme Contractors",
+            grandTotal: 250000,
+            actedBy: 2,
+            createdBy: 1,
+            teamId: 1,
+            tlStatus: 3,
+            tlComment: "Revise GST rate",
+            editFields: [{ field: "gst_taxes", label: "GST / Tax Rates", oldValue: "12%", newValue: "18%" }],
+        });
+
+        expect(sendText).toHaveBeenCalledTimes(1);
+        const [group3, text3] = sendText.mock.calls[0];
+        expect(group3).toBe(GROUPS.POVWO);
+        expect(text3).toContain("WO Edit Requested by Team Leader");
+        expect(text3).toContain('GST / Tax Rates: "12%" → "18%"');
+    });
+
+    it("notifyPoApproved and notifyPoRejected send only to GROUPS.POVWO with short link", async () => {
+        await service.notifyPoApproved({
+            purchaseOrderId: 42,
+            poNumber: "PO/2026/0042",
+            sellerName: "Acme Traders",
+            grandTotal: "125000.00",
+            tdsPercentage: "2",
+            amountAfterTds: "122500.00",
+            approvedBy: 33,
+        });
+
+        expect(sendText).toHaveBeenCalledTimes(1);
+        expect(sendText.mock.calls[0][0]).toBe(GROUPS.POVWO);
+        expect(sendText.mock.calls[0][1]).toContain("*PO Approved*");
+        expect(sendText.mock.calls[0][1]).toContain("https://tms.example.com/n/short");
+
+        sendText.mockClear();
+
+        await service.notifyPoRejected({
+            purchaseOrderId: 42,
+            poNumber: "PO/2026/0042",
+            sellerName: "Acme Traders",
+            grandTotal: "125000.00",
+            remark: "Incorrect TDS category",
+            rejectedBy: 42,
+        });
+
+        expect(sendText).toHaveBeenCalledTimes(1);
+        expect(sendText.mock.calls[0][0]).toBe(GROUPS.POVWO);
+        expect(sendText.mock.calls[0][1]).toContain("*PO Rejected*");
+        expect(sendText.mock.calls[0][1]).toContain("Incorrect TDS category");
+    });
+
+    it("notifyVwoApproved and notifyVwoRejected send only to GROUPS.POVWO with short link", async () => {
+        await service.notifyVwoApproved({
+            vendorWorkOrderId: 99,
+            woNumber: "VE/Solar_Plant/2627/WO0099",
+            sellerName: "Acme Contractors",
+            grandTotal: "250000.00",
+            tdsPercentage: "1",
+            amountAfterTds: "247500.00",
+            approvedBy: 62,
+        });
+
+        expect(sendText).toHaveBeenCalledTimes(1);
+        expect(sendText.mock.calls[0][0]).toBe(GROUPS.POVWO);
+        expect(sendText.mock.calls[0][1]).toContain("*WO Approved*");
+        expect(sendText.mock.calls[0][1]).toContain("https://tms.example.com/n/short");
+
+        sendText.mockClear();
+
+        await service.notifyVwoRejected({
+            vendorWorkOrderId: 99,
+            woNumber: "VE/Solar_Plant/2627/WO0099",
+            sellerName: "Acme Contractors",
+            grandTotal: "250000.00",
+            remark: "Missing GSTIN",
+            rejectedBy: 62,
+        });
+
+        expect(sendText).toHaveBeenCalledTimes(1);
+        expect(sendText.mock.calls[0][0]).toBe(GROUPS.POVWO);
+        expect(sendText.mock.calls[0][1]).toContain("*WO Rejected*");
+        expect(sendText.mock.calls[0][1]).toContain("Missing GSTIN");
     });
 });

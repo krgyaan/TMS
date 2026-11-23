@@ -62,6 +62,11 @@ const VendorWorkOrderListPage: React.FC<VendorWorkOrderListPageProps> = ({
     const woActions: ActionItem<VendorWorkOrderRow>[] = useMemo(() => {
         const actions: ActionItem<VendorWorkOrderRow>[] = [
             {
+                label: "Review PDF & Approve (TL)",
+                icon: <CheckCircle className="h-4 w-4" />,
+                onClick: (row) => navigate(`/operations/wo/${row.id}/approval`),
+            },
+            {
                 label: "Upload Invoice",
                 icon: <FileUp className="h-4 w-4" />,
                 visible: (row) => Number(row.totalVwiAmount || 0) < Number(row.grandTotal || 0),
@@ -111,9 +116,15 @@ const VendorWorkOrderListPage: React.FC<VendorWorkOrderListPageProps> = ({
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <span>{getShortId(p.value)}</span>
+                            <button
+                                type="button"
+                                className="font-medium text-primary hover:underline cursor-pointer text-left"
+                                onClick={() => p.data?.id && navigate(`/operations/wo/${p.data.id}/approval`)}
+                            >
+                                {getShortId(p.value)}
+                            </button>
                         </TooltipTrigger>
-                        <TooltipContent>{p.value}</TooltipContent>
+                        <TooltipContent>{p.value} — Click to open PDF Approval</TooltipContent>
                     </Tooltip>
                 </TooltipProvider>
             ),
@@ -281,11 +292,12 @@ const VendorWorkOrderListPage: React.FC<VendorWorkOrderListPageProps> = ({
             headerName: "Status",
             sortable: true,
             filter: true,
-            width: 110,
+            width: 140,
             cellRenderer: (p: CustomCellRendererProps<VendorWorkOrderRow>) => {
                 const d = p.data;
                 const isApproved = d?.woApproved === true;
                 const isRejected = d?.woApproved === false;
+                const tlStatus = d?.tlStatus ?? 0;
                 const tdsPct = d?.tdsPercentage ? Number(d.tdsPercentage) : null;
 
                 let label: string;
@@ -295,12 +307,29 @@ const VendorWorkOrderListPage: React.FC<VendorWorkOrderListPageProps> = ({
                     label = "Approved";
                     variant = "default";
                 } else if (isRejected) {
-                    label = "Rejected";
+                    label = tlStatus === 2 ? "Rejected (TL)" : "Rejected";
                     variant = "destructive";
+                } else if (tlStatus === 3) {
+                    label = "Edit Requested (TL)";
+                    variant = "secondary";
+                } else if (tlStatus === 1) {
+                    label = "Pending Accounts";
+                    variant = "secondary";
                 } else {
-                    label = "Pending";
+                    label = "Pending TL";
                     variant = "outline";
                 }
+
+                const tlStatusLabel =
+                    tlStatus === 1
+                        ? "Approved"
+                        : tlStatus === 2
+                          ? "Rejected"
+                          : tlStatus === 3
+                            ? "Edit Requested"
+                            : "Pending";
+                const accountsStatusLabel =
+                    isApproved ? "Approved" : isRejected && tlStatus !== 2 ? "Rejected" : "Pending";
 
                 return (
                     <TooltipProvider>
@@ -312,17 +341,19 @@ const VendorWorkOrderListPage: React.FC<VendorWorkOrderListPageProps> = ({
                             </TooltipTrigger>
                             <TooltipContent side="top" align="start" className="max-w-xs dark:bg-accent">
                                 <div className="space-y-1 text-xs">
+                                    <p><strong>TL Approval:</strong> {tlStatusLabel}</p>
+                                    {d?.tlComment && (
+                                        <p><strong>TL Comment:</strong> {d.tlComment}</p>
+                                    )}
+                                    <p><strong>Accounts Approval:</strong> {accountsStatusLabel}</p>
                                     {tdsPct !== null && isApproved && (
                                         <>
                                             <p><strong>TDS:</strong> {tdsPct}% (-{formatINR(d?.tdsAmount || 0)})</p>
                                             <p><strong>After TDS:</strong> {formatINR(d?.amountAfterTds || 0)}</p>
                                         </>
                                     )}
-                                    {d?.woApprovalRemark && (
+                                    {d?.woApprovalRemark && d?.woApprovalRemark !== d?.tlComment && (
                                         <p><strong>Remark:</strong> {d.woApprovalRemark}</p>
-                                    )}
-                                    {!d?.woApprovalRemark && !tdsPct && (
-                                        <p className="text-muted-foreground">Awaiting approval</p>
                                     )}
                                 </div>
                             </TooltipContent>

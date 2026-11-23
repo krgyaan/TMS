@@ -1,4 +1,5 @@
-import { BadRequestException, ConflictException, Inject, Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
+import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
 import { and, eq, like, desc, asc, sql, inArray, isNull, isNotNull, ne, or, type SQL } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
@@ -175,10 +176,12 @@ export class VendorWorkOrderService {
 
         this.notifications
             .notifyVwoCreated({
+                vendorWorkOrderId: wo.id,
                 woNumber,
                 sellerName: normalizeVendorName(body.sellerName),
                 grandTotal: grandTotal.toFixed(2),
                 projectName: body.projectName,
+                teamId: wo.team ?? null,
                 createdBy: userId,
             })
             .catch(err => this.logger.warn(`WhatsApp notification failed: ${err}`));
@@ -219,6 +222,7 @@ export class VendorWorkOrderService {
         // }
 
         const wasRejected = existing.woApproved === false;
+        const isUnapproved = existing.woApproved !== true;
 
         const updated = (
             await this.db
@@ -257,6 +261,11 @@ export class VendorWorkOrderService {
                     remarks: body.remarks,
                     certRecipient: body.certRecipient,
                     certRecipients: body.certRecipients ?? [],
+                    ...(isUnapproved && {
+                        tlStatus: 0,
+                        tlComment: null,
+                        tlFeedback: null,
+                    }),
                     ...(wasRejected && {
                         woApproved: null,
                         tdsPercentage: null,
@@ -298,10 +307,23 @@ export class VendorWorkOrderService {
 
         this.logger.info(`Vendor Work Order updated: ${existing.woNumber}`);
 
+        const updatedGrandTotal = (body.products || []).reduce((sum: number, p: any) => {
+            const qty = Number(p.qty);
+            const rate = Number(p.rate);
+            const gstRate = Number(p.gstRate);
+            const taxable = qty * rate;
+            const gst = (taxable * gstRate) / 100;
+            return sum + taxable + gst;
+        }, 0);
+
         this.notifications
             .notifyVwoUpdated({
+                vendorWorkOrderId: id,
                 woNumber: existing.woNumber ?? `#${id}`,
                 sellerName: normalizeVendorName(body.sellerName),
+                projectName: existing.projectName,
+                grandTotal: updatedGrandTotal.toFixed(2),
+                teamId: existing.team ?? null,
                 updatedBy: userId,
             })
             .catch(err => this.logger.warn(`WhatsApp notification failed: ${err}`));
@@ -369,9 +391,23 @@ export class VendorWorkOrderService {
         });
 
         let raisedByName: string | null = null;
+        let creatorTeamId: number | null = wo.team != null ? Number(wo.team) : null;
         if (wo.woRaisedBy) {
-            const [raisedByUser] = await this.db.select({ name: users.name }).from(users).where(eq(users.id, wo.woRaisedBy));
+            const [raisedByUser] = await this.db
+                .select({
+                    name: users.name,
+                    primaryTeamId: users.primaryTeamId,
+                    team: users.team,
+                })
+                .from(users)
+                .where(eq(users.id, wo.woRaisedBy));
             raisedByName = raisedByUser?.name ?? null;
+            creatorTeamId =
+                raisedByUser?.primaryTeamId != null
+                    ? Number(raisedByUser.primaryTeamId)
+                    : raisedByUser?.team != null
+                      ? Number(raisedByUser.team)
+                      : creatorTeamId;
         }
 
         const paymentRequestsData = await this.db
@@ -407,6 +443,7 @@ export class VendorWorkOrderService {
 
         return {
             ...wo,
+            creatorTeamId,
             products: enrichedProducts,
             total,
             itemTotals,
@@ -467,10 +504,14 @@ export class VendorWorkOrderService {
                 shipToPan: vendorWorkOrders.shipToPan,
                 woDate: vendorWorkOrders.woDate,
                 woRaisedBy: users.name,
+                creatorTeamId: sql<number | null>`COALESCE(${users.primaryTeamId}, ${users.team}, ${vendorWorkOrders.team})`,
                 createdAt: vendorWorkOrders.createdAt,
                 tdsPercentage: vendorWorkOrders.tdsPercentage,
                 tdsAmount: vendorWorkOrders.tdsAmount,
                 amountAfterTds: vendorWorkOrders.amountAfterTds,
+                tlStatus: vendorWorkOrders.tlStatus,
+                tlComment: vendorWorkOrders.tlComment,
+                tlFeedback: vendorWorkOrders.tlFeedback,
                 woApproved: vendorWorkOrders.woApproved,
                 woApprovalRemark: vendorWorkOrders.woApprovalRemark,
                 closedAt: vendorWorkOrders.closedAt,
@@ -523,152 +564,6 @@ export class VendorWorkOrderService {
         return { pending, approved, rejected, new: newCount, closed: closedCount, invoicePending: invoicePendingCount };
     }
 
-    async setVwoApproval(id: number, { approve, tdsPercentage, remark }: { approve: boolean; tdsPercentage?: number; remark?: string }, userId?: number) {
-        const wo = await this.db
-            .select()
-            .from(vendorWorkOrders)
-            .where(eq(vendorWorkOrders.id, id))
-            .then(rows => rows[0]);
-        if (!wo) throw new NotFoundException("Vendor Work Order not found");
-
-        if (approve) {
-            if (tdsPercentage == null || tdsPercentage < 0) {
-                throw new BadRequestException("TDS percentage is required when approving");
-            }
-
-            const items = await this.db.select().from(vendorWorkOrderItems).where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
-
-            const subtotal = items.reduce((acc, item) => acc + Number(item.taxableAmount), 0);
-            const charges = await this.db.select().from(orderExtraCharges).where(eq(orderExtraCharges.vendorWorkOrderId, id));
-            const chargesTotal = charges.reduce((sum, c) => sum + Number(c.totalAmount ?? 0), 0);
-            // Extra charges roll into the grand total but stay out of the TDS base.
-            const grandTotal = items.reduce((acc, item) => acc + Number(item.totalAmount), 0) + chargesTotal;
-            const tdsAmt = (subtotal * tdsPercentage) / 100;
-            const amountAfterTds = grandTotal - tdsAmt;
-
-            const [updated] = await this.db
-                .update(vendorWorkOrders)
-                .set({
-                    tdsPercentage: tdsPercentage.toString(),
-                    tdsAmount: round2(tdsAmt).toFixed(2),
-                    amountAfterTds: round2(amountAfterTds).toFixed(2),
-                    woApproved: true,
-                    woApprovalRemark: remark || null,
-                    updatedAt: sql`now()`,
-                })
-                .where(eq(vendorWorkOrders.id, id))
-                .returning();
-
-            this.logger.info(`VWO approved #${id}: ${tdsPercentage}%, TDS Amount: ${tdsAmt}, After TDS: ${amountAfterTds}`);
-
-            // Bulk update po_approval_pending → pending and send WA notifications
-            const pendingPrs = await this.db
-                .select({
-                    id: paymentRequests.id,
-                    requestNo: paymentRequests.requestNo,
-                    amount: paymentRequests.amount,
-                    partyName: paymentRequests.partyName,
-                    portalLink: paymentRequests.portalLink,
-                    paymentAgainst: paymentRequests.paymentAgainst,
-                    requestedBy: paymentRequests.requestedBy,
-                })
-                .from(paymentRequests)
-                .where(and(eq(paymentRequests.vendorWorkOrderId, id), eq(paymentRequests.status, "po_approval_pending")));
-
-            if (pendingPrs.length > 0) {
-                await this.db
-                    .update(paymentRequests)
-                    .set({ status: "pending", tdsPercentage: tdsPercentage.toString(), updatedAt: new Date() })
-                    .where(and(eq(paymentRequests.vendorWorkOrderId, id), eq(paymentRequests.status, "po_approval_pending")));
-
-                for (const pr of pendingPrs) {
-                    this.notifications
-                        .notifyNewPaymentRequest({
-                            requestNo: pr.requestNo ?? "",
-                            amount: pr.amount ?? 0,
-                            partyName: pr.partyName ?? null,
-                            portalLink: pr.portalLink ?? null,
-                            requestedBy: pr.requestedBy ?? 0,
-                            category: pr.paymentAgainst ?? "",
-                        })
-                        .catch(err => this.logger.warn(`WhatsApp notification failed for PR #${pr.id}: ${err}`));
-                }
-
-                this.logger.info(`Bulk updated ${pendingPrs.length} payment requests from po_approval_pending to pending for VWO #${id}`);
-            }
-
-            // Send VWO approved notification
-            this.notifications
-                .notifyVwoApproved({
-                    woNumber: wo.woNumber ?? `#${id}`,
-                    sellerName: wo.sellerName,
-                    grandTotal: round2(grandTotal).toFixed(2),
-                    tdsPercentage: tdsPercentage.toString(),
-                    amountAfterTds: round2(amountAfterTds).toFixed(2),
-                    approvedBy: userId ?? 0,
-                })
-                .catch(err => this.logger.warn(`WhatsApp VWO approval notification failed: ${err}`));
-
-            if (wo.projectId) {
-                await this.cashFlowService
-                    .create({
-                        projectId: wo.projectId,
-                        eventType: "vwo_approved",
-                        amount: round2(amountAfterTds).toFixed(2),
-                        direction: "outflow",
-                        referenceType: "vendor_work_order",
-                        referenceId: wo.id,
-                        referenceNo: wo.woNumber ?? `VWO #${wo.id}`,
-                        tdsPercentage: tdsPercentage.toString(),
-                        tdsAmount: round2(tdsAmt).toFixed(2),
-                        remark: `VWO approved with TDS @ ${tdsPercentage}%`,
-                        createdBy: userId ?? 0,
-                    })
-                    .catch(err => this.logger.warn(`Cash flow creation failed for VWO approval #${wo.id}: ${err}`));
-            }
-
-            return updated;
-        } else {
-            const [updated] = await this.db
-                .update(vendorWorkOrders)
-                .set({
-                    woApproved: false,
-                    woApprovalRemark: remark || null,
-                    updatedAt: sql`now()`,
-                })
-                .where(eq(vendorWorkOrders.id, id))
-                .returning();
-
-            // Bulk update po_approval_pending → rejected
-            const rejectedCount = await this.db
-                .update(paymentRequests)
-                .set({ status: "rejected", rejectionReason: remark || "VWO Rejected", updatedAt: new Date() })
-                .where(and(eq(paymentRequests.vendorWorkOrderId, id), eq(paymentRequests.status, "po_approval_pending")))
-                .returning({ id: paymentRequests.id });
-
-            if (rejectedCount.length > 0) {
-                this.logger.info(`Bulk rejected ${rejectedCount.length} payment requests for rejected VWO #${id}`);
-            }
-
-            // Compute grandTotal for notification
-            const rejectItems = await this.db.select().from(vendorWorkOrderItems).where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
-            const rejectGrandTotal = rejectItems.reduce((acc, item) => acc + Number(item.totalAmount), 0);
-
-            this.notifications
-                .notifyVwoRejected({
-                    woNumber: wo.woNumber ?? `#${id}`,
-                    sellerName: wo.sellerName,
-                    grandTotal: rejectGrandTotal.toString(),
-                    remark: remark || null,
-                    rejectedBy: userId ?? 0,
-                })
-                .catch(err => this.logger.warn(`WhatsApp VWO rejection notification failed: ${err}`));
-
-            this.logger.info(`VWO rejected #${id}: ${remark || "no remark"}`);
-            return updated;
-        }
-    }
-
     async getByProject(projectId: number) {
         const rows = await this.db
             .select({
@@ -689,9 +584,13 @@ export class VendorWorkOrderService {
                 shipToGst: vendorWorkOrders.shipToGst,
                 shipToPan: vendorWorkOrders.shipToPan,
                 woRaisedBy: vendorWorkOrders.woRaisedBy,
+                team: vendorWorkOrders.team,
                 tdsPercentage: vendorWorkOrders.tdsPercentage,
                 tdsAmount: vendorWorkOrders.tdsAmount,
                 amountAfterTds: vendorWorkOrders.amountAfterTds,
+                tlStatus: vendorWorkOrders.tlStatus,
+                tlComment: vendorWorkOrders.tlComment,
+                tlFeedback: vendorWorkOrders.tlFeedback,
                 woApproved: vendorWorkOrders.woApproved,
                 woApprovalRemark: vendorWorkOrders.woApprovalRemark,
                 closedAt: vendorWorkOrders.closedAt,
@@ -743,10 +642,29 @@ export class VendorWorkOrderService {
                     .from(paymentRequests)
                     .where(and(eq(paymentRequests.vendorWorkOrderId, wo.id), ne(paymentRequests.status, "rejected")));
 
-                const [raisedByUser] = wo.woRaisedBy ? await this.db.select({ name: users.name }).from(users).where(eq(users.id, wo.woRaisedBy)) : [];
+                const [raisedByUser] = wo.woRaisedBy
+                    ? await this.db
+                          .select({
+                              name: users.name,
+                              primaryTeamId: users.primaryTeamId,
+                              team: users.team,
+                          })
+                          .from(users)
+                          .where(eq(users.id, wo.woRaisedBy))
+                    : [];
+
+                const creatorTeamId =
+                    raisedByUser?.primaryTeamId != null
+                        ? Number(raisedByUser.primaryTeamId)
+                        : raisedByUser?.team != null
+                          ? Number(raisedByUser.team)
+                          : wo.team != null
+                            ? Number(wo.team)
+                            : null;
 
                 return {
                     ...wo,
+                    creatorTeamId,
                     products: items,
                     ...totals,
                     totalVwiAmount: invoiceTotals?.totalVwiAmount || 0,

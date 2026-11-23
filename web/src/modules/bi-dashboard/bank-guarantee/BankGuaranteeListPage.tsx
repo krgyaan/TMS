@@ -83,6 +83,13 @@ const compareDates = (dateA: Date | string | null, dateB: Date | string | null):
     return new Date(dateA).getTime() - new Date(dateB).getTime();
 };
 
+const NEW_REQUEST_HIDDEN_COLUMNS = new Set([
+    'bgDate',
+    'bgClaimExpiryDate',
+    'bgChargesPaid',
+    'bgChargesCalculated',
+]);
+
 const getStatusVariant = (status: string | null): string => {
     if (!status) return 'secondary';
     const statusLower = status.toLowerCase();
@@ -147,14 +154,10 @@ const BankGuaranteeListPage = () => {
         mapPendingRow: (r: any) => ({
             'Project Name': r.projectLabel || r.projectName || '',
             'Tender No': r.projectNo || '',
-            'BG Creation Date': r.bgDate ? new Date(r.bgDate).toLocaleDateString('en-GB') : '',
             'BG No': r.bgNo || '',
             'Beneficiary Name': r.beneficiaryName || r.favouring || '',
             'Amount': r.amount || '',
             'BG Expiry Date': r.bgExpiryDateCoalesced ? new Date(r.bgExpiryDateCoalesced).toLocaleDateString('en-GB') : '',
-            'BG Claim Period Expiry Date': r.bgClaimExpiryDate ? new Date(r.bgClaimExpiryDate).toLocaleDateString('en-GB') : '',
-            'BG Charges paid': r.bgChargesPaid || '',
-            'BG Charges Calculated': r.bgChargesCalculated || '',
             'FDR No': r.fdrNo || '',
             'FDR Value': r.fdrValue || '',
             'Tender Status': r.tenderStatus || '',
@@ -227,7 +230,8 @@ const BankGuaranteeListPage = () => {
     );
 
     const colDefs = useMemo<ColDef<BankGuaranteeDashboardRow>[]>(
-        () => [
+        () => {
+            const columns: ColDef<BankGuaranteeDashboardRow>[] = [
             {
                 field: 'bgDate',
                 headerName: 'BG Creation Date',
@@ -400,8 +404,15 @@ const BankGuaranteeListPage = () => {
                 pinned: 'right',
                 width: 57,
             },
-        ],
-        [bgActions]
+            ];
+
+            if (activeTab === 'new-requests') {
+                return columns.filter((column) => !NEW_REQUEST_HIDDEN_COLUMNS.has(String(column.colId)));
+            }
+
+            return columns;
+        },
+        [bgActions, activeTab]
     );
 
     const tabsWithData = useMemo(() => {

@@ -30,6 +30,19 @@ class VendorWorkOrderApiService extends BaseApiService {
         return this.put(`/${id}/approval`, data);
     }
 
+    async submitTlApproval(
+        id: number,
+        data: {
+            tlStatus: 1 | 2 | 3;
+            tlComment?: string;
+            rejectionFields?: Array<{ field: string; label?: string; remark: string }>;
+            editFields?: Array<{ field: string; label?: string; oldValue: string; newValue: string; remark?: string }>;
+        }
+    ): Promise<any> {
+        const res = await axiosInstance.patch(`/purchase-orders/wo/${id}/tl-approval`, data);
+        return res.data;
+    }
+
     async getById(id: number) {
         return this.get<any>(`/${id}`);
     }

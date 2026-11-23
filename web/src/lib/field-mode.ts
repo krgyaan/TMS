@@ -19,6 +19,11 @@ export const FIELD_PATH_PREFIXES = [
     "/crm/followup", // leads follow-up page lives at /crm/followup/:leadId
     "/crm/enquiries",
     "/shared/imprests",
+    "/operations/po", // PO PDF TL approval page (/operations/po/:id/approval)
+    "/operations/wo", // WO PDF TL approval page (/operations/wo/:id/approval)
+    "/operations/vwo", // VWO PDF TL approval alias (/operations/vwo/:id/approval)
+    "/operations/purchase-orders", // PO full detail view linked from approval page
+    "/operations/vendor-work-orders", // WO full detail view linked from approval page
 ] as const;
 
 /** Always-allowed standalone routes: the main dashboard and the profile page. */
@@ -80,4 +85,14 @@ export const FIELD_DASHBOARD_TILES: FieldDashboardTile[] = [
         url: paths.shared.imprest,
         permission: "shared.imprests",
     },
+    {
+        title: "Purchase Orders",
+        subtitle: "Manage purchase orders",
+        icon: Wallet,   
+        color: "text-green-600",
+        bgColor: "bg-green-50 dark:bg-green-950/30",
+        url: paths.operations.purchaseOrders,
+        permission: "operations.purchase_orders",
+    }
+    
 ];

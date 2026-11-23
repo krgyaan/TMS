@@ -78,6 +78,16 @@ function TlApprovalBadge({
             </div>
         );
     }
+    if (tlStatus === 3) {
+        return (
+            <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="secondary" className="bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
+                    Edit Requested by TL
+                </Badge>
+                {tlComment && <span className="text-xs text-muted-foreground">{tlComment}</span>}
+            </div>
+        );
+    }
     return <Badge variant="outline">Pending TL Approval</Badge>;
 }
 
@@ -177,7 +187,7 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
     }, [data?.id, data?.tlComment, data?.tlStatus]);
 
     const canTlApprove = useMemo(() => {
-        if (type !== "po" || !onSubmitTlApproval || !data) return false;
+        if (!onSubmitTlApproval || !data) return false;
         const isSuperOrAdmin = isSuperUser || isAdmin || roleId === 1 || roleId === 2;
         if (isSuperOrAdmin) return true;
         const isSameTeamTl =
@@ -186,13 +196,15 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
             data.creatorTeamId != null &&
             Number(teamId) === Number(data.creatorTeamId);
         return isSameTeamTl;
-    }, [type, onSubmitTlApproval, data, isSuperUser, isAdmin, isTeamLeader, roleId, teamId]);
+    }, [onSubmitTlApproval, data, isSuperUser, isAdmin, isTeamLeader, roleId, teamId]);
 
     const handleTlDecision = async (tlStatus: 1 | 2) => {
         if (!onSubmitTlApproval) return;
         const trimmedComment = tlCommentInput.trim();
         if (tlStatus === 2 && !trimmedComment) {
-            setTlActionError("Please enter a rejection reason before rejecting this Purchase Order.");
+            setTlActionError(
+                `Please enter a rejection reason before rejecting this ${type === "vwo" ? "Work Order" : "Purchase Order"}.`
+            );
             return;
         }
         setTlActionError(null);
@@ -282,19 +294,30 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
     return (
         <Card>
             <CardHeader>
-                <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-                        <ArrowLeft className="h-5 w-5" />
-                    </Button>
-                    <div>
-                        <h1 className="text-xl font-semibold">{data.number}</h1>
-                        {data.category && <p className="text-sm text-muted-foreground">{data.category}</p>}
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+                            <ArrowLeft className="h-5 w-5" />
+                        </Button>
+                        <div>
+                            <h1 className="text-xl font-semibold">{data.number}</h1>
+                            {data.category && <p className="text-sm text-muted-foreground">{data.category}</p>}
+                        </div>
                     </div>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={() => navigate(`/operations/${type === "vwo" ? "wo" : "po"}/${data.id}/approval`)}
+                    >
+                        <ShieldCheck className="h-4 w-4 text-primary" />
+                        PDF Approval View
+                    </Button>
                 </div>
             </CardHeader>
 
             <CardContent className="space-y-2">
-                {type === "po" && canTlApprove && data.approved !== true && (
+                {canTlApprove && data.approved !== true && (
                     <Card className="border-primary/30 bg-muted/20">
                         <CardHeader className="pb-2">
                             <CardTitle className="flex items-center justify-between text-base">
@@ -338,7 +361,7 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
                                     className="gap-1.5"
                                 >
                                     {isSubmittingTlApproval ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                                    {data.tlStatus === 1 ? "Update Approval" : "Approve PO"}
+                                    {data.tlStatus === 1 ? "Update Approval" : `Approve ${type === "vwo" ? "WO" : "PO"}`}
                                 </Button>
                                 <Button
                                     type="button"
@@ -349,7 +372,7 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
                                     className="gap-1.5"
                                 >
                                     {isSubmittingTlApproval ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
-                                    {data.tlStatus === 2 ? "Update Rejection" : "Reject PO"}
+                                    {data.tlStatus === 2 ? "Update Rejection" : `Reject ${type === "vwo" ? "WO" : "PO"}`}
                                 </Button>
                             </div>
                         </CardContent>
@@ -374,17 +397,15 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
                                     <TableCell className="text-sm font-medium text-muted-foreground w-1/4">Raised By</TableCell>
                                     <TableCell className="text-sm w-1/4">{data.raisedByName || "—"}</TableCell>
                                 </TableRow>
-                                {type === "po" && (
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">TL Approval (Stage 1)</TableCell>
-                                        <TableCell className="text-sm" colSpan={3}>
-                                            <TlApprovalBadge tlStatus={data.tlStatus} tlComment={data.tlComment} />
-                                        </TableCell>
-                                    </TableRow>
-                                )}
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">TL Approval (Stage 1)</TableCell>
+                                    <TableCell className="text-sm" colSpan={3}>
+                                        <TlApprovalBadge tlStatus={data.tlStatus} tlComment={data.tlComment} />
+                                    </TableCell>
+                                </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">
-                                        {type === "po" ? "Accounts Approval (Stage 2)" : "Approval Status"}
+                                        Accounts Approval (Stage 2)
                                     </TableCell>
                                     <TableCell className="text-sm" colSpan={3}>
                                         <ApprovalBadge

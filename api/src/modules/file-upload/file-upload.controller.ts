@@ -138,6 +138,31 @@ export class FileUploadController {
     }
 
     /**
+     * Serve/Download an auto-generated FDR letter (stored as
+     * bi-dashboard/fdr/<context>/<fileName>).
+     * GET /files/serve/bi-dashboard/fdr/:context/:fileName
+     */
+    @Public()
+    @Get('serve/bi-dashboard/fdr/:context/:fileName')
+    async serveFdr(
+        @Param('context') context: string,
+        @Param('fileName') fileName: string,
+        @Res({ passthrough: true }) res: Response,
+    ): Promise<StreamableFile> {
+        const parsedContext = ContextSchema.parse(context);
+        const filePath = `bi-dashboard/fdr/${parsedContext}/${fileName}`;
+
+        const exists = await this.service.exists(filePath);
+        if (!exists) {
+            throw new NotFoundException('File not found');
+        }
+
+        const absolutePath = this.service.getAbsolutePath(filePath);
+        const ext = path.extname(fileName).toLowerCase();
+        return this.streamFile(res, fileName, absolutePath, ext);
+    }
+
+    /**
      * Delete file
      * DELETE /files/:context/:fileName
      */

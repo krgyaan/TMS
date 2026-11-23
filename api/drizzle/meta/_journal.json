@@ -827,6 +827,20 @@
       "when": 1805000000000,
       "tag": "0188_add_tl_status_and_comment_to_purchase_orders",
       "breakpoints": true
+    },
+    {
+      "idx": 142,
+      "version": "7",
+      "when": 1806000000000,
+      "tag": "0189_create_tally_sync_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 143,
+      "version": "7",
+      "when": 1807000000000,
+      "tag": "0190_create_tally_ledgers",
+      "breakpoints": true
     }
   ]
 }

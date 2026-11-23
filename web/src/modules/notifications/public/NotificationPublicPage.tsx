@@ -1,4 +1,4 @@
-import { useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router-dom";
 import { isAxiosError } from "axios";
 import { Loader2, AlertTriangle } from "lucide-react";
 import type { ReactNode } from "react";
@@ -66,6 +66,12 @@ export default function NotificationPublicPage() {
             <ProblemCard title="Something went wrong" message="We could not load this notification right now. Please try again later." />
         );
     } else if (data) {
+        if (data.type === "po" && data.entity?.id) {
+            return <Navigate to={`/operations/po/${data.entity.id}/approval`} replace />;
+        }
+        if (data.type === "vwo" && data.entity?.id) {
+            return <Navigate to={`/operations/wo/${data.entity.id}/approval`} replace />;
+        }
         body = <NotificationCard data={data} />;
     }
 

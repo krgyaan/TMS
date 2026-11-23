@@ -201,6 +201,13 @@ export const instrumentFdrDetails = pgTable('instrument_fdr_details', {
     prefilledSignedFdr: text('prefilled_signed_fdr'), // JSON string of uploaded file paths
     uploadDocuments: text('upload_documents'), // Upload Documents path
     fdrCopy: text('fdr_copy'), // Accounts Form (FDR) 2 - FDR copy (JSON array of paths)
+    // Letters generated automatically when the FDR create-request mail is sent.
+    // request_letter_path and fdr_form_path are reserved for the upcoming
+    // request letter and FDR form attachments.
+    coverLetterPath: varchar('cover_letter_path', { length: 500 }),
+    authorizationLetterPath: varchar('authorization_letter_path', { length: 500 }),
+    requestLetterPath: varchar('request_letter_path', { length: 500 }),
+    fdrFormPath: varchar('fdr_form_path', { length: 500 }),
     bankMailIds: jsonb('bank_mail_ids').$type<string[]>(),
     bankMailIdsCc: jsonb('bank_mail_ids_cc').$type<string[]>(),
 

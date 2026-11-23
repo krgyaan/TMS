@@ -36,6 +36,10 @@ export interface VendorWorkOrderView {
     amountAfterTds?: number | string;
     woApproved?: boolean;
     woApprovalRemark?: string;
+    tlStatus?: number | null;
+    tlComment?: string | null;
+    tlFeedback?: any | null;
+    creatorTeamId?: number | null;
     category?: string;
     accessoriesPackagingListAttachments?: string;
     purchaseInvoices: VwoPurchaseInvoice[];

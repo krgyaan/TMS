@@ -7,9 +7,17 @@ export default function ProtectedRoute() {
     const { data: user, isLoading, isError } = useCurrentUser();
 
     const storedUser = getStoredUser();
+    const currentPath = location.pathname + location.search;
+
+    const persistRedirectTarget = () => {
+        if (currentPath && currentPath !== "/" && !location.pathname.startsWith("/login")) {
+            sessionStorage.setItem("auth_redirect", currentPath);
+        }
+    };
 
     if (isLoading) {
         if (!storedUser) {
+            persistRedirectTarget();
             return <Navigate to="/login" replace state={{ from: location }} />;
         }
 
@@ -25,6 +33,7 @@ export default function ProtectedRoute() {
 
     if (isError || !user) {
         clearAuthSession();
+        persistRedirectTarget();
         return <Navigate to="/login" replace state={{ from: location }} />;
     }
 

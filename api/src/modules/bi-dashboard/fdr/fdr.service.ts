@@ -471,6 +471,93 @@ export class FdrService {
 
 
 
+    /**
+     * Creates the courier dispatch record for an FDR from the courier address
+     * captured on the request form. Runs on the first Stage 2 save, mirroring
+     * the BG flow (createBgCourierDispatch). No-op when a courier is already
+     * linked or when the FDR is raised against a Bank Guarantee.
+     */
+    private async createFdrCourierDispatch(
+        instrument: {
+            id: number;
+            reqNo?: string | null;
+            courierAddressJson?: unknown;
+            courierAddress?: string | null;
+            purpose?: string | null;
+        },
+        userId: number,
+    ): Promise<void> {
+        // Already linked to a courier (e.g. created at request time before this change).
+        if (instrument.reqNo?.trim()) {
+            return;
+        }
+
+        const [fdrDetails] = await this.db
+            .select({ fdrPurpose: instrumentFdrDetails.fdrPurpose })
+            .from(instrumentFdrDetails)
+            .where(eq(instrumentFdrDetails.instrumentId, instrument.id))
+            .limit(1);
+
+        // FDRs raised against a Bank Guarantee do not need a courier dispatch.
+        const rawPurpose = (fdrDetails?.fdrPurpose || instrument.purpose || '').trim();
+        if (rawPurpose.toUpperCase() === 'BANK_GUARANTEE') {
+            return;
+        }
+
+        let rawJson: any = instrument.courierAddressJson;
+        if (typeof rawJson === 'string') {
+            try {
+                rawJson = JSON.parse(rawJson);
+            } catch {
+                rawJson = null;
+            }
+        }
+
+        const json = rawJson !== null && typeof rawJson === 'object' && !Array.isArray(rawJson)
+            ? (rawJson as Record<string, any>)
+            : {};
+
+        const org = String(json.org ?? '').trim();
+        if (!org) {
+            return;
+        }
+
+        const toAddr = [
+            json.line1,
+            json.line2,
+            json.city,
+            json.state,
+        ].filter(Boolean).join(', ') || (instrument.courierAddress ?? '');
+
+        await this.db.transaction(async (tx) => {
+            const [row] = await tx
+                .insert(couriers)
+                .values({
+                    userId: userId || 0,
+                    toOrg: org,
+                    toName: String(json.name ?? '').trim(),
+                    toAddr,
+                    toPin: String(json.pincode ?? '').trim(),
+                    toMobile: String(json.phone ?? '').trim(),
+                    empFrom: Number(json.empFrom) || userId || 0,
+                    delDate: json.delDate ? new Date(json.delDate) : new Date(),
+                    urgency: Number(json.urgency) || 1,
+                    courierDocs: Array.isArray(json.docs) ? json.docs : [],
+                    status: 0,
+                })
+                .returning();
+
+            if (!row) {
+                return;
+            }
+
+            await tx
+                .update(paymentInstruments)
+                .set({ reqNo: String(row.id), updatedAt: new Date() })
+                .where(eq(paymentInstruments.id, instrument.id));
+        });
+    }
+
     async updateAction(instrumentId: number, body: Record<string, any>, user: any) {
         const [instrument] = await this.db.select().from(paymentInstruments).where(eq(paymentInstruments.id, instrumentId)).limit(1);
 
@@ -665,11 +752,17 @@ export class FdrService {
             }
         }
 
+        let wasFdrCreated = false;
+
         if (Object.keys(fdrDetailsUpdate).length > 0) {
             fdrDetailsUpdate.updatedAt = new Date();
 
             // Check if fdrDetails record exists
             const [existingFdrDetails] = await this.db.select().from(instrumentFdrDetails).where(eq(instrumentFdrDetails.instrumentId, instrumentId)).limit(1);
+
+            wasFdrCreated = Boolean(
+                existingFdrDetails?.fdrNo && String(existingFdrDetails.fdrNo).trim().length > 0,
+            );
 
             if (existingFdrDetails) {
                 await this.db.update(instrumentFdrDetails).set(fdrDetailsUpdate).where(eq(instrumentFdrDetails.instrumentId, instrumentId));
@@ -690,6 +783,42 @@ export class FdrService {
             } catch (error) {
                 this.logger.error(`Failed to send FDR created email for instrument ${instrumentId}:`, error);
             }
+
+            if (body.fdr_req === "Accepted") {
+                this.notificationService
+                    .sendFdrBankRequestEmail(instrumentId)
+                    .catch((error) =>
+                        this.logger.error(
+                            `FDR bank request email failed for instrument ${instrumentId}:`,
+                            error,
+                        ),
+                    );
+            }
+        }
+
+        // Create the courier dispatch from the address captured at request time
+        // on the first Stage 2 save (skipped for FDRs raised against a BG).
+        if (body.action === "accounts-form-2") {
+            try {
+                await this.createFdrCourierDispatch(instrument, user?.id ?? user?.sub ?? 0);
+            } catch (error) {
+                this.logger.error(
+                    `Failed to create FDR courier dispatch for instrument ${instrumentId}:`,
+                    error,
+                );
+            }
+        }
+
+        // Notify the tendering team the first time Stage 2 (FDR created) is saved.
+        if (body.action === "accounts-form-2" && !wasFdrCreated) {
+            this.notificationService
+                .sendFdrCreatedTeamEmail(instrumentId, body)
+                .catch((error) =>
+                    this.logger.error(
+                        `FDR created (team) email failed for instrument ${instrumentId}:`,
+                        error,
+                    ),
+                );
         }
 
         // Create follow-up if action is initiate-followup
@@ -799,6 +928,7 @@ export class FdrService {
                 courierDeadline: paymentInstruments.courierDeadline,
                 action: paymentInstruments.action,
                 status: paymentInstruments.status,
+                rejectionReason: paymentInstruments.rejectionReason,
                 isActive: paymentInstruments.isActive,
                 generatedPdf: paymentInstruments.generatedPdf,
                 cancelPdf: paymentInstruments.cancelPdf,
@@ -835,6 +965,11 @@ export class FdrService {
                 fdrExpiryDate: instrumentFdrDetails.fdrExpiryDate,
                 fdrNeeds: instrumentFdrDetails.fdrNeeds,
                 fdrRemark: instrumentFdrDetails.fdrRemark,
+                prefilledSignedFdr: instrumentFdrDetails.prefilledSignedFdr,
+                uploadDocuments: instrumentFdrDetails.uploadDocuments,
+                fdrCopy: instrumentFdrDetails.fdrCopy,
+                bankMailIds: instrumentFdrDetails.bankMailIds,
+                bankMailIdsCc: instrumentFdrDetails.bankMailIdsCc,
                 fdrDetailsCreatedAt: instrumentFdrDetails.createdAt,
                 fdrDetailsUpdatedAt: instrumentFdrDetails.updatedAt,
 
@@ -937,7 +1072,85 @@ export class FdrService {
             }
         }
 
-        return { ...result, linkedCheque, linkedBg };
+        let courierDetails: any = null;
+        if (result.reqNo) {
+            const courierId = Number(result.reqNo);
+            if (!isNaN(courierId)) {
+                const [courier] = await this.db
+                    .select()
+                    .from(couriers)
+                    .where(eq(couriers.id, courierId))
+                    .limit(1);
+                if (courier) {
+                    const courierStatusLabels = ['Pending', 'In Transit', 'Dispatched', 'Not Delivered', 'Delivered', 'Rejected'];
+                    courierDetails = {
+                        id: courier.id,
+                        toOrg: courier.toOrg,
+                        toName: courier.toName,
+                        toAddr: courier.toAddr,
+                        toPin: courier.toPin,
+                        toMobile: courier.toMobile,
+                        empFrom: courier.empFrom,
+                        delDate: courier.delDate,
+                        urgency: courier.urgency,
+                        trackingNumber: courier.trackingNumber,
+                        courierProvider: courier.courierProvider,
+                        docketNo: courier.docketNo,
+                        docketSlip: courier.docketSlip,
+                        courierDocs: courier.courierDocs,
+                        deliveryPod: courier.deliveryPod,
+                        deliveryDate: courier.deliveryDate,
+                        pickupDate: courier.pickupDate,
+                        status: courier.status,
+                        courierStatusName: courier.status != null ? (courierStatusLabels[courier.status] || 'Unknown') : 'Unknown',
+                    };
+                }
+            }
+        }
+
+        const parseDocPaths = (value: unknown): string[] => {
+            if (!value) return [];
+            if (Array.isArray(value)) {
+                return value.filter((entry): entry is string => typeof entry === 'string');
+            }
+            if (typeof value === 'string') {
+                try {
+                    const parsed = JSON.parse(value);
+                    if (Array.isArray(parsed)) {
+                        return parsed.filter((entry): entry is string => typeof entry === 'string');
+                    }
+                } catch {
+                    // Not JSON — treat as a single path.
+                }
+                return [value];
+            }
+            return [];
+        };
+
+        return {
+            ...result,
+            linkedCheque,
+            linkedBg,
+            fdrStatus: this.deriveFdrStatus(result.status, result.fdrNo),
+            rejectionReason: result.rejectionReason,
+            roi: result.roi != null ? Number(result.roi) : null,
+            marginPercent: result.marginPercent != null ? Number(result.marginPercent) : null,
+            prefilledSignedFdr: parseDocPaths(result.prefilledSignedFdr),
+            uploadDocuments: result.uploadDocuments ?? null,
+            fdrCopy: parseDocPaths(result.fdrCopy),
+            bankMailIds: (result.bankMailIds as string[] | null) ?? [],
+            bankMailIdsCc: (result.bankMailIdsCc as string[] | null) ?? [],
+            courierDetails,
+            deliverBy: result.courierDeadline != null
+                ? (result.courierDeadline === -1 ? 'Tender Due Date'
+                    : result.courierDeadline === 24 ? '24 Hours'
+                    : result.courierDeadline === 48 ? '48 Hours'
+                    : `${result.courierDeadline} Hours`)
+                : null,
+            hasAccountsFormData: result.action != null && result.action >= 1,
+            hasReturnedData: result.action != null && result.action >= 3,
+            hasSettledData: result.action === 4 || result.action === 7,
+        };
     }
 
     async getActionFormData(id: number) {
@@ -974,6 +1187,7 @@ export class FdrService {
                 prefilledSignedFdr: instrumentFdrDetails.prefilledSignedFdr,
                 uploadDocuments: instrumentFdrDetails.uploadDocuments,
                 fdrRoi: instrumentFdrDetails.roi,
+                marginPercent: instrumentFdrDetails.marginPercent,
                 fdrCopy: instrumentFdrDetails.fdrCopy,
                 bankMailIds: instrumentFdrDetails.bankMailIds,
                 bankMailIdsCc: instrumentFdrDetails.bankMailIdsCc,
@@ -1116,6 +1330,7 @@ export class FdrService {
             fdrNeeds: result.fdrNeeds,
             fdrRemark: result.fdrRemark,
             fdrRoi: result.fdrRoi != null ? Number(result.fdrRoi) : null,
+            marginPercent: result.marginPercent != null ? Number(result.marginPercent) : null,
             fdrCopy: (() => {
                 if (!result.fdrCopy) return [];
                 try {
@@ -1151,6 +1366,18 @@ export class FdrService {
             linkedCheque: linkedChequeData,
             linkedBg: linkedBgData,
         };
+    }
+
+    async getMailPreview(
+        instrumentId: number,
+        body: { stage?: number | string; files?: Record<string, string[]> } = {},
+    ) {
+        const stage = Number(body.stage);
+        if (![1, 2].includes(stage)) {
+            throw new BadRequestException('mail-preview stage must be 1 or 2');
+        }
+
+        return this.notificationService.getFdrMailPreview(instrumentId, stage, body.files ?? {});
     }
 
     async getFollowupData(instrumentId: number) {

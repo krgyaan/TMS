@@ -8,7 +8,6 @@ import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { instrumentBgDetails, instrumentChequeDetails, instrumentDdDetails, instrumentFdrDetails, instrumentStatusHistory, instrumentTransferDetails, paymentInstruments, paymentRequestMom, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
 import { paymentRequests as opsPaymentRequests } from '@db/schemas/operations/payment-requests.schema';
-import { couriers } from '@db/schemas/shared/couriers.schema';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
 import { PaymentRequestService } from '@/modules/operations/payment-requests/payment-request.service';
 import { and, desc, eq, like } from 'drizzle-orm';
@@ -604,43 +603,9 @@ export class PaymentRequestsCommandService {
             docs: details[`${shorthand}CourierDocs`] ?? details.bgCourierDocs ?? [],
         } : null;
 
-        // BG and FDR requests create their courier dispatch row up-front; the
-        // instrument references it through req_no (same convention as step 2).
-        let courierId: number | null = null;
-        const courierOrg = mode === 'BG' ? details.bgCourierOrg : mode === 'FDR' ? details.fdrCourierOrg : null;
-        if ((mode === 'BG' || mode === 'FDR') && courierOrg) {
-            const org = courierOrg;
-            const toName = mode === 'BG' ? details.bgCourierName : details.fdrCourierName;
-            const addr1 = mode === 'BG' ? details.bgCourierAddrLine1 : details.fdrCourierAddrLine1;
-            const addr2 = mode === 'BG' ? details.bgCourierAddrLine2 : details.fdrCourierAddrLine2;
-            const city = mode === 'BG' ? details.bgCourierCity : details.fdrCourierCity;
-            const state = mode === 'BG' ? details.bgCourierState : details.fdrCourierState;
-            const pincode = mode === 'BG' ? details.bgCourierPincode : details.fdrCourierPincode;
-            const phone = mode === 'BG' ? details.bgCourierPhone : details.fdrCourierPhone;
-            const empFrom = mode === 'BG' ? details.bgCourierEmpFrom : details.fdrCourierEmpFrom;
-            const delDate = mode === 'BG' ? details.bgCourierDelDate : details.fdrCourierDelDate;
-            const urgency = mode === 'BG' ? details.bgCourierUrgency : details.fdrCourierUrgency;
-            const docs = mode === 'BG' ? details.bgCourierDocs : details.fdrCourierDocs;
-
-            const [courierRow] = await tx
-                .insert(couriers)
-                .values({
-                    userId: userId ?? 0,
-                    toOrg: org,
-                    toName: toName || '',
-                    toAddr: [addr1, addr2, city, state].filter(Boolean).join(', '),
-                    toPin: pincode || '',
-                    toMobile: phone || '',
-                    empFrom: Number(empFrom) || userId || 0,
-                    delDate: delDate ? new Date(delDate) : new Date(),
-                    urgency: Number(urgency) || 1,
-                    courierDocs: docs ?? [],
-                    status: 0, // Courier status: Pending
-                })
-                .returning()
-                .execute();
-            courierId = courierRow?.id ?? null;
-        }
+        // FDR courier dispatch is created later, on the first Stage 2
+        // (Accounts Form 2) save in the BI dashboard. The address captured here
+        // is stored on the instrument and reused at that point.
 
         const structuredCourierAddress = [
             details[`${shorthand}CourierAddressLine1`] || details[`${shorthand}CourierAddrLine1`] || details.bgCourierAddrLine1,
@@ -664,7 +629,6 @@ export class PaymentRequestsCommandService {
                 courierAddress: (details[`${shorthand}CourierAddress`] || details.bgCourierAddress || structuredCourierAddress || details.ddCourierAddress || details.fdrCourierAddress) || null,
                 courierAddressJson,
                 courierDeadline: (details[`${shorthand}CourierHours`] || details.bgCourierDays || details.ddCourierHours || details.fdrCourierHours) || null,
-                reqNo: courierId ? String(courierId) : null,
                 status: 'PENDING',
                 isActive: true,
                 createdBy: userId,

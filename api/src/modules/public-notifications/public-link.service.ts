@@ -90,6 +90,23 @@ export class PublicLinkService {
         }
     }
 
+    /**
+     * Shortens an authenticated in-app route (e.g. `/operations/po/42/approval`)
+     * to `<PUBLIC_APP_URL>/n/<short-token>` via UrlShortenerService, falling back
+     * to the full URL if shortening fails.
+     */
+    async buildAppShortUrl(relativePath: string, purpose: string = PUBLIC_NOTIFY_PURPOSE): Promise<string> {
+        const normalizedPath = relativePath.startsWith("/") ? relativePath : `/${relativePath}`;
+        const fullUrl = `${this.publicAppUrl}${normalizedPath}`;
+
+        try {
+            return await this.urlShortener.shorten(fullUrl, { purpose });
+        } catch (err) {
+            this.logger.warn(`Failed to shorten app link "${fullUrl}" — sending the full URL instead: ${err}`);
+            return fullUrl;
+        }
+    }
+
     async verify(token: string): Promise<PublicNotifyClaims> {
         try {
             const claims = await this.jwtService.verifyAsync<PublicNotifyClaims>(token, {

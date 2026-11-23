@@ -5,9 +5,10 @@ import { AdminUsageService } from "@/modules/master/health/admin-usage.service";
 import { ClaudeUsageModule } from "@/modules/master/claude-usage/claude-usage.module";
 import { DatabaseModule } from "@/db/database.module";
 import { QueueModule } from "@/infra/queue/queue.module";
+import { TallyModule } from "@/modules/integrations/tally/tally.module";
 
 @Module({
-    imports: [DatabaseModule, QueueModule, ClaudeUsageModule],
+    imports: [DatabaseModule, QueueModule, ClaudeUsageModule, TallyModule],
     controllers: [HealthController],
     providers: [HealthService, AdminUsageService],
     exports: [HealthService, AdminUsageService, ClaudeUsageModule],

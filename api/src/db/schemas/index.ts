@@ -13,3 +13,4 @@ export * from './email';
 export * from './workflow/timer.schema';
 export * from './hrms';
 export * from './services';
+export * from './integrations';
