@@ -72,7 +72,7 @@ describe("TallyStatusService", () => {
         const { service, checkLiveness, listCompanies, exportMasters } = buildService();
 
         listCompanies.mockResolvedValue(["VEPL 2025-26", "Other Co"]);
-        exportMasters.mockResolvedValue([{ name: "Capital Account", parent: null }]);
+        exportMasters.mockResolvedValue([{ name: "Capital Account", parent: null, guid: null }]);
 
         const status = await service.getStatus();
 
@@ -228,7 +228,7 @@ describe("TallyStatusService", () => {
         const { service, listCompanies, exportMasters } = buildService();
 
         listCompanies.mockResolvedValue(["VEPL 2025-26"]);
-        exportMasters.mockResolvedValue([{ name: "Capital Account", parent: null }]);
+        exportMasters.mockResolvedValue([{ name: "Capital Account", parent: null, guid: null }]);
 
         const status = await service.getStatus();
 
@@ -241,7 +241,7 @@ describe("TallyStatusService", () => {
         const { service, checkLiveness, listCompanies, exportMasters } = buildService();
 
         listCompanies.mockResolvedValue(["VEPL 2025-26"]);
-        exportMasters.mockResolvedValue([{ name: "Capital Account", parent: null }]);
+        exportMasters.mockResolvedValue([{ name: "Capital Account", parent: null, guid: null }]);
 
         await service.getStatus();
 
@@ -270,7 +270,7 @@ describe("TallyStatusService", () => {
                     resolveList = resolve;
                 })
         );
-        exportMasters.mockResolvedValue([{ name: "Capital Account", parent: null }]);
+        exportMasters.mockResolvedValue([{ name: "Capital Account", parent: null, guid: null }]);
 
         const first = service.getStatus();
         const second = service.getStatus();
@@ -293,7 +293,7 @@ describe("TallyStatusService", () => {
         const { service, checkLiveness, listCompanies, exportMasters } = buildService();
 
         listCompanies.mockResolvedValue(["VEPL 2025-26", "Other Co"]);
-        exportMasters.mockResolvedValue([{ name: "Capital Account", parent: null }]);
+        exportMasters.mockResolvedValue([{ name: "Capital Account", parent: null, guid: null }]);
 
         const ok = await service.getStatus();
 

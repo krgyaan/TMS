@@ -135,10 +135,7 @@ describe("buildVoucherSnapshot", () => {
     });
 
     it("blocks an inactive linked ledger", () => {
-        const snapshot = buildVoucherSnapshot(
-            config,
-            voucher({ employeeLedger: { ledger: "RAVI KUMAR (VEP007) Imprest", group: "Current Liabilities", active: false } })
-        );
+        const snapshot = buildVoucherSnapshot(config, voucher({ employeeLedger: { ledger: "RAVI KUMAR (VEP007) Imprest", group: "Current Liabilities", active: false } }));
 
         expect(codes(snapshot)).toContain("INACTIVE_EMPLOYEE_LEDGER");
         expect(snapshot.postable).toBe(false);
@@ -179,6 +176,37 @@ describe("buildVoucherSnapshot", () => {
         expect(codes(buildVoucherSnapshot(config, voucher({ lines: [line({ amount: null })] })))).toContain("MISSING_AMOUNT");
         expect(codes(buildVoucherSnapshot(config, voucher({ lines: [line({ amount: "0" })] })))).toContain("NON_POSITIVE_AMOUNT");
         expect(codes(buildVoucherSnapshot(config, voucher({ lines: [line({ amount: "1.234" })] })))).toContain("INVALID_AMOUNT");
+    });
+
+    it("prefers the category ledger mapped in the database", () => {
+        const snapshot = buildVoucherSnapshot(
+            config,
+            voucher({ amount: "1000.00", lines: [line({ categoryLedger: { ledger: "Travelling Expenses", group: "PROJECT EXPENSES", active: true } })] })
+        );
+
+        expect(snapshot.postable).toBe(true);
+        expect(snapshot.lines[0]).toMatchObject({ ledger: "Travelling Expenses", ledgerGroup: "PROJECT EXPENSES" });
+    });
+
+    it("blocks a category mapped to an inactive ledger", () => {
+        const snapshot = buildVoucherSnapshot(config, voucher({ lines: [line({ categoryLedger: { ledger: "Travelling Expenses", group: "PROJECT EXPENSES", active: false } })] }));
+
+        expect(codes(snapshot)).toContain("INACTIVE_CATEGORY_LEDGER");
+        expect(snapshot.postable).toBe(false);
+        expect(snapshot.lines).toEqual([]);
+    });
+
+    it("blocks a category flagged in the database even when a ledger is mapped", () => {
+        const snapshot = buildVoucherSnapshot(
+            config,
+            voucher({
+                lines: [line({ categoryBlocked: true, categoryLedger: { ledger: "Travelling Expenses", group: "PROJECT EXPENSES", active: true } })],
+            })
+        );
+
+        expect(codes(snapshot)).toContain("BLOCKED_CATEGORY");
+        expect(snapshot.postable).toBe(false);
+        expect(snapshot.lines).toEqual([]);
     });
 
     it("flags a voucher with no linked imprests", () => {
