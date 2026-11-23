@@ -928,6 +928,7 @@ export class FdrService {
                 courierDeadline: paymentInstruments.courierDeadline,
                 action: paymentInstruments.action,
                 status: paymentInstruments.status,
+                rejectionReason: paymentInstruments.rejectionReason,
                 isActive: paymentInstruments.isActive,
                 generatedPdf: paymentInstruments.generatedPdf,
                 cancelPdf: paymentInstruments.cancelPdf,
@@ -964,6 +965,11 @@ export class FdrService {
                 fdrExpiryDate: instrumentFdrDetails.fdrExpiryDate,
                 fdrNeeds: instrumentFdrDetails.fdrNeeds,
                 fdrRemark: instrumentFdrDetails.fdrRemark,
+                prefilledSignedFdr: instrumentFdrDetails.prefilledSignedFdr,
+                uploadDocuments: instrumentFdrDetails.uploadDocuments,
+                fdrCopy: instrumentFdrDetails.fdrCopy,
+                bankMailIds: instrumentFdrDetails.bankMailIds,
+                bankMailIdsCc: instrumentFdrDetails.bankMailIdsCc,
                 fdrDetailsCreatedAt: instrumentFdrDetails.createdAt,
                 fdrDetailsUpdatedAt: instrumentFdrDetails.updatedAt,
 
@@ -1066,7 +1072,85 @@ export class FdrService {
             }
         }
 
-        return { ...result, linkedCheque, linkedBg };
+        let courierDetails: any = null;
+        if (result.reqNo) {
+            const courierId = Number(result.reqNo);
+            if (!isNaN(courierId)) {
+                const [courier] = await this.db
+                    .select()
+                    .from(couriers)
+                    .where(eq(couriers.id, courierId))
+                    .limit(1);
+                if (courier) {
+                    const courierStatusLabels = ['Pending', 'In Transit', 'Dispatched', 'Not Delivered', 'Delivered', 'Rejected'];
+                    courierDetails = {
+                        id: courier.id,
+                        toOrg: courier.toOrg,
+                        toName: courier.toName,
+                        toAddr: courier.toAddr,
+                        toPin: courier.toPin,
+                        toMobile: courier.toMobile,
+                        empFrom: courier.empFrom,
+                        delDate: courier.delDate,
+                        urgency: courier.urgency,
+                        trackingNumber: courier.trackingNumber,
+                        courierProvider: courier.courierProvider,
+                        docketNo: courier.docketNo,
+                        docketSlip: courier.docketSlip,
+                        courierDocs: courier.courierDocs,
+                        deliveryPod: courier.deliveryPod,
+                        deliveryDate: courier.deliveryDate,
+                        pickupDate: courier.pickupDate,
+                        status: courier.status,
+                        courierStatusName: courier.status != null ? (courierStatusLabels[courier.status] || 'Unknown') : 'Unknown',
+                    };
+                }
+            }
+        }
+
+        const parseDocPaths = (value: unknown): string[] => {
+            if (!value) return [];
+            if (Array.isArray(value)) {
+                return value.filter((entry): entry is string => typeof entry === 'string');
+            }
+            if (typeof value === 'string') {
+                try {
+                    const parsed = JSON.parse(value);
+                    if (Array.isArray(parsed)) {
+                        return parsed.filter((entry): entry is string => typeof entry === 'string');
+                    }
+                } catch {
+                    // Not JSON — treat as a single path.
+                }
+                return [value];
+            }
+            return [];
+        };
+
+        return {
+            ...result,
+            linkedCheque,
+            linkedBg,
+            fdrStatus: this.deriveFdrStatus(result.status, result.fdrNo),
+            rejectionReason: result.rejectionReason,
+            roi: result.roi != null ? Number(result.roi) : null,
+            marginPercent: result.marginPercent != null ? Number(result.marginPercent) : null,
+            prefilledSignedFdr: parseDocPaths(result.prefilledSignedFdr),
+            uploadDocuments: result.uploadDocuments ?? null,
+            fdrCopy: parseDocPaths(result.fdrCopy),
+            bankMailIds: (result.bankMailIds as string[] | null) ?? [],
+            bankMailIdsCc: (result.bankMailIdsCc as string[] | null) ?? [],
+            courierDetails,
+            deliverBy: result.courierDeadline != null
+                ? (result.courierDeadline === -1 ? 'Tender Due Date'
+                    : result.courierDeadline === 24 ? '24 Hours'
+                    : result.courierDeadline === 48 ? '48 Hours'
+                    : `${result.courierDeadline} Hours`)
+                : null,
+            hasAccountsFormData: result.action != null && result.action >= 1,
+            hasReturnedData: result.action != null && result.action >= 3,
+            hasSettledData: result.action === 4 || result.action === 7,
+        };
     }
 
     async getActionFormData(id: number) {
@@ -1103,6 +1187,7 @@ export class FdrService {
                 prefilledSignedFdr: instrumentFdrDetails.prefilledSignedFdr,
                 uploadDocuments: instrumentFdrDetails.uploadDocuments,
                 fdrRoi: instrumentFdrDetails.roi,
+                marginPercent: instrumentFdrDetails.marginPercent,
                 fdrCopy: instrumentFdrDetails.fdrCopy,
                 bankMailIds: instrumentFdrDetails.bankMailIds,
                 bankMailIdsCc: instrumentFdrDetails.bankMailIdsCc,
@@ -1245,6 +1330,7 @@ export class FdrService {
             fdrNeeds: result.fdrNeeds,
             fdrRemark: result.fdrRemark,
             fdrRoi: result.fdrRoi != null ? Number(result.fdrRoi) : null,
+            marginPercent: result.marginPercent != null ? Number(result.marginPercent) : null,
             fdrCopy: (() => {
                 if (!result.fdrCopy) return [];
                 try {
