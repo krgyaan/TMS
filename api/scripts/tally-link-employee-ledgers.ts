@@ -250,21 +250,26 @@ async function main(): Promise<void> {
                 continue;
             }
 
-            const parsed = parseEmployeeLedgerName(row.ledgerName);
-
-            if (!parsed) {
-                errors.push(`${label}: "${row.ledgerName}" is not an employee ledger name`);
-                continue;
-            }
-
             if (row.roleProvided && row.role === null) {
                 errors.push(`${label}: role "${row.roleRaw}" is not recognised (use imprest, salary or salary_payable)`);
                 continue;
             }
 
-            const role = row.role ?? parsed.role;
+            const parsed = parseEmployeeLedgerName(row.ledgerName);
 
-            if (row.roleProvided && row.role !== null && row.role !== parsed.role) {
+            if (!parsed && row.role === null) {
+                errors.push(`${label}: "${row.ledgerName}" has no (VEP###) code; add an explicit role column`);
+                continue;
+            }
+
+            const role = row.role ?? parsed?.role;
+
+            if (!role) {
+                errors.push(`${label}: could not determine the ledger role`);
+                continue;
+            }
+
+            if (parsed && row.role !== null && row.role !== parsed.role) {
                 errors.push(`${label}: role "${row.role}" does not match the ledger suffix ("${parsed.role}")`);
                 continue;
             }
