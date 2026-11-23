@@ -2277,7 +2277,7 @@ export class PaymentRequestsNotificationService {
                     referenceLabel: fdrReference?.label || '',
                     purpose: purposeLabel,
                     fdrNo: fdrDetails?.fdrNo || '',
-                    fdrDate: fdrDetails?.fdrDate ? this.formatDateDDMMYYYY(fdrDetails.fdrDate) : 'NA',
+                    fdrDate: fdrDetails?.fdrDate ? this.formatDateDDMMYYYY(fdrDetails.fdrDate) : '',
                     fdrExpiryDate: this.formatDateDDMMYYYY(fdrExpiryDate) || 'NA',
                     amount: fdrAmount,
                     teamLeaderName: tlContact?.name || tlUser?.name || 'Team Leader',
