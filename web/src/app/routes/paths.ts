@@ -183,6 +183,8 @@ export const paths = {
             `/operations/project-dashboard/${projectId}/bi-request/bank-guarantee/create`,
         biRequestFdrCreate: (projectId: number) =>
             `/operations/project-dashboard/${projectId}/bi-request/fdr/create`,
+        biRequestDdCreate: (projectId: number) =>
+            `/operations/project-dashboard/${projectId}/bi-request/demand-draft/create`,
         biRequestView: (projectId: number, requestId: number) =>
             `/operations/project-dashboard/${projectId}/bi-request/${requestId}`,
         paymentRequests: "/operations/payment-requests",

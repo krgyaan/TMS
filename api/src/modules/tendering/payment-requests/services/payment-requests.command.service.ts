@@ -83,8 +83,8 @@ export class PaymentRequestsCommandService {
                 const emdAmount = isNonTmsRequest
                     ? extractAmountFromDetails(payload.EMD.mode, payload.EMD.details)
                     : Number(tender?.emd) || 0;
-                const emdRemarks = isNonTmsRequest
-                    ? `${payload.EMD.mode} Details`
+                const emdRemarks = payload.EMD.mode === 'DD' && payload.projectId && payload.EMD.details?.ddRemarks
+                    ? String(payload.EMD.details.ddRemarks)
                     : `${payload.EMD.mode} Details`;
 
                 const isBlankNonTmsCheque = isNonTmsRequest && payload.EMD.mode === 'CHEQUE';
@@ -587,6 +587,10 @@ export class PaymentRequestsCommandService {
             city: details[`${shorthand}CourierCity`] || null,
             state: details[`${shorthand}CourierState`] || null,
             pincode: details[`${shorthand}CourierPincode`] || null,
+            org: details[`${shorthand}CourierOrg`] || null,
+            empFrom: details[`${shorthand}CourierEmpFrom`] ?? null,
+            delDate: details[`${shorthand}CourierDelDate`] || null,
+            urgency: details[`${shorthand}CourierUrgency`] ?? null,
         } : (mode === 'FDR' || mode === 'BG') ? {
             // BG-style Courier Dispatch block (BG and FDR request forms).
             org: details[`${shorthand}CourierOrg`] || details.bgCourierOrg || null,
@@ -656,6 +660,7 @@ export class PaymentRequestsCommandService {
                     ddPurpose: details.ddPurpose || null,
                     ddNeeds: details.ddDeliverBy || null,
                     ddRemarks: details.ddRemarks || null,
+                    ddPurposeReason: details.ddPurposeReason || null,
                     reqNo: details.reqNo || null,
                 }).execute();
                 break;
@@ -997,6 +1002,7 @@ export class PaymentRequestsCommandService {
                     ddPurpose: details.ddPurpose || null,
                     ddNeeds: details.ddDeliverBy || null,
                     ddRemarks: details.ddRemarks || null,
+                    ddPurposeReason: details.ddPurposeReason || null,
                     reqNo: details.reqNo || null,
                 }).where(eq(instrumentDdDetails.instrumentId, instrumentId));
                 break;

@@ -54,6 +54,7 @@ export interface DDActionFormData {
     reqNo: string | null;
     ddNeeds: string | null;
     ddPurpose: string | null;
+    ddPurposeReason: string | null;
     ddRemarks: string | null;
     courierAddress: string | null;
     courierAddressJson: Record<string, any> | null;

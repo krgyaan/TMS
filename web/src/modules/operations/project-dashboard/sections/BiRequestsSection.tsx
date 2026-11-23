@@ -65,6 +65,18 @@ const FDR_STATUS_LABELS: Record<string, string> = {
     CANCELLED: "FDR Cancelled at Branch",
 };
 
+const DD_STATUS_LABELS: Record<string, string> = {
+    PENDING: "Pending",
+    ACCOUNTS_FORM_ACCEPTED: "DD Created",
+    ACCOUNTS_FORM_REJECTED: "DD Rejected",
+    FOLLOWUP_INITIATED: "Followup Initiated",
+    RETURN_VIA_COURIER: "Returned via courier",
+    RETURN_VIA_BANK_TRANSFER: "Returned via Bank Transfer",
+    SETTLED_WITH_PROJECT: "Settled with Project Account",
+    CANCELLATION_REQUESTED: "DD Cancellation request sent to branch",
+    CANCELLED: "DD Cancelled at Branch",
+};
+
 const titleCaseStatus = (status: string) =>
     status
         .toLowerCase()
@@ -90,11 +102,14 @@ const formatInstrumentStatus = (instrument?: BiInstrumentRow | null) => {
     if (instrument.instrumentType === "FDR") {
         return formatFdrStatus(instrument.status, instrument.fdrNo);
     }
+    if (instrument.instrumentType === "DD") {
+        return DD_STATUS_LABELS[instrument.status] ?? titleCaseStatus(instrument.status);
+    }
     return formatStatusLabel(instrument.status, instrument.instrumentType);
 };
 
 const pickInstrument = (row?: BiRequestRow | null): BiInstrumentRow | null =>
-    row?.instruments?.find((instrument) => instrument.instrumentType === "FDR")
+    row?.instruments?.find((instrument) => instrument.instrumentType !== "Cheque")
     ?? row?.instruments?.[0]
     ?? null;
 
@@ -231,6 +246,12 @@ export const BiRequestsSection: React.FC<BiRequestsSectionProps> = ({ projectId 
                                         onClick={() => navigate(paths.operations.biRequestFdrCreate(projectId))}
                                     >
                                         FDR
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        className="cursor-pointer"
+                                        onClick={() => navigate(paths.operations.biRequestDdCreate(projectId))}
+                                    >
+                                        Demand Draft
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>

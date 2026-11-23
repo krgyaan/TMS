@@ -55,6 +55,21 @@ export const PROJECT_FDR_PURPOSE_OPTIONS = [
     { value: 'OTHER_SECURITY', label: 'Other Security' },
 ];
 
+// Project-dashboard Demand Draft requests only allow these purposes.
+export const PROJECT_DD_PURPOSE_OPTIONS = [
+    { value: 'SECURITY_DEPOSIT', label: 'Security Deposit' },
+    { value: 'OTHER_PAYMENT', label: 'Other Payment' },
+    { value: 'OTHER_SECURITY', label: 'Other Security' },
+];
+
+// Project-dashboard Demand Draft "DD Needed In" options (includes 36 hours).
+export const PROJECT_DD_DELIVERY_OPTIONS = [
+    { value: 'TENDER_DUE', label: 'Tender Due Date' },
+    { value: '24', label: '24 Hours' },
+    { value: '36', label: '36 Hours' },
+    { value: '48', label: '48 Hours' },
+];
+
 export const BG_PURPOSE_OPTIONS = [
     { value: 'EMD', label: 'EMD' },
     { value: 'ADVANCE_PAYMENT', label: 'Advance Payment' },

@@ -66,6 +66,11 @@ const ddDetails = z.object({
     ddCourierHours: optionalNumber(z.coerce.number().min(0)),
     ddDate: optionalString,
     ddRemarks: optionalString,
+    ddPurposeReason: optionalString,
+    ddCourierOrg: optionalString,
+    ddCourierEmpFrom: optionalNumber(z.coerce.number()),
+    ddCourierDelDate: optionalString,
+    ddCourierUrgency: optionalNumber(z.coerce.number()),
 }).superRefine((data, ctx) => {
     if (data.ddPurpose && !(VALID_PURPOSE_VALUES as readonly string[]).includes(data.ddPurpose)) {
         ctx.addIssue({

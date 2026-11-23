@@ -53,6 +53,11 @@ export const PaymentDetailsSchema = z.object({
     ddCourierHours: z.coerce.number().optional(),
     ddDate: z.string().optional(),
     ddRemarks: z.string().optional(),
+    ddPurposeReason: z.string().optional(),
+    ddCourierOrg: z.string().optional(),
+    ddCourierEmpFrom: z.coerce.number().optional(),
+    ddCourierDelDate: z.string().optional(),
+    ddCourierUrgency: z.coerce.number().optional(),
 
     // FDR fields
     fdrFavouring: z.string().optional(),
@@ -762,11 +767,115 @@ export const ProjectFdrRequestSchema = BiOtherThanTenderRequestSchema.superRefin
     }
 });
 
+const PROJECT_DD_PURPOSE_VALUES = ['SECURITY_DEPOSIT', 'OTHER_PAYMENT', 'OTHER_SECURITY'] as const;
+const PROJECT_DD_DELIVERY_VALUES = ['TENDER_DUE', '24', '36', '48'] as const;
+
+const ProjectDdDetailsSchema = PaymentDetailsSchema.extend({
+    ddDeliverBy: deliveryEnumField(PROJECT_DD_DELIVERY_VALUES),
+});
+
+const PROJECT_DD_COURIER_REQUIRED_FIELDS = [
+    ['ddCourierOrg', 'Organization Name'],
+    ['ddCourierName', 'Recipient Name'],
+    ['ddCourierPhone', 'Phone'],
+    ['ddCourierAddressLine1', 'Address Line 1'],
+    ['ddCourierCity', 'City'],
+    ['ddCourierState', 'State'],
+    ['ddCourierPincode', 'Pin Code'],
+    ['ddCourierEmpFrom', 'Courier From'],
+    ['ddCourierDelDate', 'Expected Delivery Date'],
+    ['ddCourierUrgency', 'Dispatch Urgency'],
+] as const;
+
+/**
+ * Project-dashboard Demand Draft requests are raised before the DD exists, so
+ * the strict EMD DD rules (DD date / deliver-by) do not apply.
+ */
+export const ProjectDdRequestSchema = z.object({
+    tenderName: z.string().optional(),
+    tenderNo: z.string().optional(),
+    tenderDueDate: z.string().optional(),
+    EMD: z.object({
+        mode: z.preprocess(normalizeMode, z.enum(['DD'])),
+        details: ProjectDdDetailsSchema,
+    }),
+}).superRefine((data, ctx) => {
+    const details: Record<string, any> = data.EMD?.details ?? {};
+
+    const requiredFields: Array<[string, string]> = [
+        ['ddFavouring', 'DD in Favour of'],
+        ['ddPayableAt', 'DD Payable At'],
+        ['ddPurpose', 'Purpose of the DD'],
+        ['ddDeliverBy', 'DD Needed In'],
+    ];
+    for (const [key, label] of requiredFields) {
+        const value = details[key];
+        if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) {
+            ctx.addIssue({
+                code: 'custom',
+                message: `${label} is required`,
+                path: ['EMD', 'details', key],
+            });
+        }
+    }
+
+    if (details.ddAmount === undefined || details.ddAmount === null || Number(details.ddAmount) <= 0) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Amount is required',
+            path: ['EMD', 'details', 'ddAmount'],
+        });
+    }
+
+    if (details.ddPurpose && !(PROJECT_DD_PURPOSE_VALUES as readonly string[]).includes(String(details.ddPurpose))) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Select a valid purpose',
+            path: ['EMD', 'details', 'ddPurpose'],
+        });
+    }
+
+    const requiresReason = details.ddPurpose === 'OTHER_PAYMENT' || details.ddPurpose === 'OTHER_SECURITY';
+    if (requiresReason && (!details.ddPurposeReason || String(details.ddPurposeReason).trim() === '')) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Reason is required for this purpose',
+            path: ['EMD', 'details', 'ddPurposeReason'],
+        });
+    }
+
+    for (const [key, label] of PROJECT_DD_COURIER_REQUIRED_FIELDS) {
+        const value = details[key];
+        const missing =
+            value === undefined ||
+            value === null ||
+            (typeof value === 'string' && value.trim() === '') ||
+            (typeof value === 'number' && isNaN(value));
+        if (missing) {
+            ctx.addIssue({
+                code: 'custom',
+                message: `${label} is required`,
+                path: ['EMD', 'details', key],
+            });
+        }
+    }
+
+    const pincode = details.ddCourierPincode;
+    if (typeof pincode === 'string' && pincode.trim() !== '' && !/^\d{6}$/.test(pincode.trim())) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Pin Code must be 6 digits',
+            path: ['EMD', 'details', 'ddCourierPincode'],
+        });
+    }
+});
+
 export type PaymentRequestFormValues = z.infer<typeof PaymentRequestSchema>;
 export type OldEntryPaymentRequestFormValues = z.infer<typeof OldEntryPaymentRequestSchema>;
 export type BiOtherThanTenderRequestFormValues = z.infer<typeof BiOtherThanTenderRequestSchema>;
 export type ProjectBgRequestFormValues = z.infer<typeof ProjectBgRequestSchema>;
 export type ProjectFdrRequestFormValues = z.infer<typeof ProjectFdrRequestSchema>;
+export type ProjectDdRequestFormValues = z.infer<typeof ProjectDdRequestSchema>;
 export type PaymentDetailsFormValues = z.infer<typeof PaymentDetailsSchema>;
 export type BankTransferFormValues = z.infer<typeof BankTransferSchema>;
 export type PayOnPortalFormValues = z.infer<typeof PayOnPortalSchema>;

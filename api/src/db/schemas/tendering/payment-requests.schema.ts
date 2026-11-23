@@ -174,6 +174,7 @@ export const instrumentDdDetails = pgTable('instrument_dd_details', {
     reqNo: varchar('req_no', { length: 100 }), // emd_demand_drafts.req_no
     ddNeeds: varchar('dd_needs', { length: 255 }), // emd_demand_drafts.dd_needs
     ddPurpose: varchar('dd_purpose', { length: 255 }), // emd_demand_drafts.dd_purpose
+    ddPurposeReason: text('dd_purpose_reason'), // Reason captured for Other Payment / Other Security
     ddRemarks: text('dd_remarks'), // emd_demand_drafts.remarks
 
     createdAt: timestamp('created_at').defaultNow(),

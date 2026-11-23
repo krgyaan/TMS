@@ -156,7 +156,7 @@ export default function DemandDraftActionPage() {
                             ddDate: actionFormData.ddDate ? new Date(actionFormData.ddDate).toISOString() : undefined,
                             reqNo: actionFormData.reqNo ?? undefined,
                             remarks: actionFormData.ddRemarks ?? undefined,
-                            courierOrg: actionFormData.courierDetails?.toOrg ?? undefined,
+                            courierOrg: actionFormData.courierDetails?.toOrg ?? actionFormData.courierAddressJson?.org ?? undefined,
                             courierName: actionFormData.courierAddressJson?.name ?? undefined,
                             courierPhone: actionFormData.courierAddressJson?.phone ?? undefined,
                             courierAddrLine1: actionFormData.courierAddressJson?.line1 ?? undefined,
