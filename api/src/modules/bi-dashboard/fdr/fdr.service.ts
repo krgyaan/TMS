@@ -471,6 +471,93 @@ export class FdrService {
 
 
 
+    /**
+     * Creates the courier dispatch record for an FDR from the courier address
+     * captured on the request form. Runs on the first Stage 2 save, mirroring
+     * the BG flow (createBgCourierDispatch). No-op when a courier is already
+     * linked or when the FDR is raised against a Bank Guarantee.
+     */
+    private async createFdrCourierDispatch(
+        instrument: {
+            id: number;
+            reqNo?: string | null;
+            courierAddressJson?: unknown;
+            courierAddress?: string | null;
+            purpose?: string | null;
+        },
+        userId: number,
+    ): Promise<void> {
+        // Already linked to a courier (e.g. created at request time before this change).
+        if (instrument.reqNo?.trim()) {
+            return;
+        }
+
+        const [fdrDetails] = await this.db
+            .select({ fdrPurpose: instrumentFdrDetails.fdrPurpose })
+            .from(instrumentFdrDetails)
+            .where(eq(instrumentFdrDetails.instrumentId, instrument.id))
+            .limit(1);
+
+        // FDRs raised against a Bank Guarantee do not need a courier dispatch.
+        const rawPurpose = (fdrDetails?.fdrPurpose || instrument.purpose || '').trim();
+        if (rawPurpose.toUpperCase() === 'BANK_GUARANTEE') {
+            return;
+        }
+
+        let rawJson: any = instrument.courierAddressJson;
+        if (typeof rawJson === 'string') {
+            try {
+                rawJson = JSON.parse(rawJson);
+            } catch {
+                rawJson = null;
+            }
+        }
+
+        const json = rawJson !== null && typeof rawJson === 'object' && !Array.isArray(rawJson)
+            ? (rawJson as Record<string, any>)
+            : {};
+
+        const org = String(json.org ?? '').trim();
+        if (!org) {
+            return;
+        }
+
+        const toAddr = [
+            json.line1,
+            json.line2,
+            json.city,
+            json.state,
+        ].filter(Boolean).join(', ') || (instrument.courierAddress ?? '');
+
+        await this.db.transaction(async (tx) => {
+            const [row] = await tx
+                .insert(couriers)
+                .values({
+                    userId: userId || 0,
+                    toOrg: org,
+                    toName: String(json.name ?? '').trim(),
+                    toAddr,
+                    toPin: String(json.pincode ?? '').trim(),
+                    toMobile: String(json.phone ?? '').trim(),
+                    empFrom: Number(json.empFrom) || userId || 0,
+                    delDate: json.delDate ? new Date(json.delDate) : new Date(),
+                    urgency: Number(json.urgency) || 1,
+                    courierDocs: Array.isArray(json.docs) ? json.docs : [],
+                    status: 0,
+                })
+                .returning();
+
+            if (!row) {
+                return;
+            }
+
+            await tx
+                .update(paymentInstruments)
+                .set({ reqNo: String(row.id), updatedAt: new Date() })
+                .where(eq(paymentInstruments.id, instrument.id));
+        });
+    }
+
     async updateAction(instrumentId: number, body: Record<string, any>, user: any) {
         const [instrument] = await this.db.select().from(paymentInstruments).where(eq(paymentInstruments.id, instrumentId)).limit(1);
 
@@ -706,6 +793,19 @@ export class FdrService {
                             error,
                         ),
                     );
+            }
+        }
+
+        // Create the courier dispatch from the address captured at request time
+        // on the first Stage 2 save (skipped for FDRs raised against a BG).
+        if (body.action === "accounts-form-2") {
+            try {
+                await this.createFdrCourierDispatch(instrument, user?.id ?? user?.sub ?? 0);
+            } catch (error) {
+                this.logger.error(
+                    `Failed to create FDR courier dispatch for instrument ${instrumentId}:`,
+                    error,
+                );
             }
         }
 
