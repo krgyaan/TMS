@@ -5,7 +5,7 @@ import {
     Injectable,
     NotFoundException,
 } from "@nestjs/common";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
@@ -17,6 +17,7 @@ import { orderExtraCharges } from "@/db/schemas/operations/order-extra-charges.s
 import { vendorWorkOrderItems } from "@/db/schemas/operations/vendor-work-order-items.schema";
 import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.schema";
 import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
+import { CashFlowService } from "@/modules/operations/cash-flows/cash-flow.service";
 import {
     OperationNotificationService,
     type SubmitTlApprovalDto,
@@ -28,8 +29,168 @@ export class WoApprovalService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
-        private readonly notifications: OperationNotificationService
+        private readonly notifications: OperationNotificationService,
+        private readonly cashFlowService?: CashFlowService
     ) {}
+
+    async setVwoApproval(
+        id: number,
+        { approve, tdsPercentage, remark }: { approve: boolean; tdsPercentage?: number; remark?: string },
+        userId?: number
+    ) {
+        const wo = await this.db
+            .select()
+            .from(vendorWorkOrders)
+            .where(eq(vendorWorkOrders.id, id))
+            .then(rows => rows[0]);
+        if (!wo) throw new NotFoundException("Vendor Work Order not found");
+
+        if (approve) {
+            if (wo.tlStatus !== 1) {
+                throw new BadRequestException("Stage 1 TL approval is required before Accounts can approve");
+            }
+            if (tdsPercentage == null || tdsPercentage < 0) {
+                throw new BadRequestException("TDS percentage is required when approving");
+            }
+
+            const items = await this.db
+                .select()
+                .from(vendorWorkOrderItems)
+                .where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
+
+            const subtotal = items.reduce((acc, item) => acc + Number(item.taxableAmount), 0);
+            const charges = await this.db
+                .select()
+                .from(orderExtraCharges)
+                .where(eq(orderExtraCharges.vendorWorkOrderId, id));
+            const chargesTotal = charges.reduce((sum, c) => sum + Number(c.totalAmount ?? 0), 0);
+            const grandTotal = items.reduce((acc, item) => acc + Number(item.totalAmount), 0) + chargesTotal;
+            const tdsAmt = (subtotal * tdsPercentage) / 100;
+            const amountAfterTds = grandTotal - tdsAmt;
+
+            const [updated] = await this.db
+                .update(vendorWorkOrders)
+                .set({
+                    tdsPercentage: tdsPercentage.toString(),
+                    tdsAmount: round2(tdsAmt).toFixed(2),
+                    amountAfterTds: round2(amountAfterTds).toFixed(2),
+                    woApproved: true,
+                    woApprovalRemark: remark || null,
+                    updatedAt: sql`now()`,
+                })
+                .where(eq(vendorWorkOrders.id, id))
+                .returning();
+
+            this.logger.info(`VWO approved #${id}: ${tdsPercentage}%, TDS Amount: ${tdsAmt}, After TDS: ${amountAfterTds}`);
+
+            const pendingPrs = await this.db
+                .select({
+                    id: paymentRequests.id,
+                    requestNo: paymentRequests.requestNo,
+                    amount: paymentRequests.amount,
+                    partyName: paymentRequests.partyName,
+                    portalLink: paymentRequests.portalLink,
+                    paymentAgainst: paymentRequests.paymentAgainst,
+                    requestedBy: paymentRequests.requestedBy,
+                })
+                .from(paymentRequests)
+                .where(and(eq(paymentRequests.vendorWorkOrderId, id), eq(paymentRequests.status, "po_approval_pending")));
+
+            if (pendingPrs.length > 0) {
+                await this.db
+                    .update(paymentRequests)
+                    .set({ status: "pending", tdsPercentage: tdsPercentage.toString(), updatedAt: new Date() })
+                    .where(and(eq(paymentRequests.vendorWorkOrderId, id), eq(paymentRequests.status, "po_approval_pending")));
+
+                for (const pr of pendingPrs) {
+                    this.notifications
+                        .notifyNewPaymentRequest({
+                            requestNo: pr.requestNo ?? "",
+                            amount: pr.amount ?? 0,
+                            partyName: pr.partyName ?? null,
+                            portalLink: pr.portalLink ?? null,
+                            requestedBy: pr.requestedBy ?? 0,
+                            category: pr.paymentAgainst ?? "",
+                        })
+                        .catch(err => this.logger.warn(`WhatsApp notification failed for PR #${pr.id}: ${err}`));
+                }
+
+                this.logger.info(`Bulk updated ${pendingPrs.length} payment requests from po_approval_pending to pending for VWO #${id}`);
+            }
+
+            this.notifications
+                .notifyVwoApproved({
+                    vendorWorkOrderId: id,
+                    woNumber: wo.woNumber ?? `#${id}`,
+                    sellerName: wo.sellerName,
+                    grandTotal: round2(grandTotal).toFixed(2),
+                    tdsPercentage: tdsPercentage.toString(),
+                    amountAfterTds: round2(amountAfterTds).toFixed(2),
+                    approvedBy: userId ?? 0,
+                })
+                .catch(err => this.logger.warn(`WhatsApp VWO approval notification failed: ${err}`));
+
+            if (wo.projectId && this.cashFlowService) {
+                await this.cashFlowService
+                    .create({
+                        projectId: wo.projectId,
+                        eventType: "vwo_approved",
+                        amount: round2(amountAfterTds).toFixed(2),
+                        direction: "outflow",
+                        referenceType: "vendor_work_order",
+                        referenceId: wo.id,
+                        referenceNo: wo.woNumber ?? `VWO #${wo.id}`,
+                        tdsPercentage: tdsPercentage.toString(),
+                        tdsAmount: round2(tdsAmt).toFixed(2),
+                        remark: `VWO approved with TDS @ ${tdsPercentage}%`,
+                        createdBy: userId ?? 0,
+                    })
+                    .catch(err => this.logger.warn(`Cash flow creation failed for VWO approval #${wo.id}: ${err}`));
+            }
+
+            return updated;
+        } else {
+            const [updated] = await this.db
+                .update(vendorWorkOrders)
+                .set({
+                    woApproved: false,
+                    woApprovalRemark: remark || null,
+                    updatedAt: sql`now()`,
+                })
+                .where(eq(vendorWorkOrders.id, id))
+                .returning();
+
+            const rejectedCount = await this.db
+                .update(paymentRequests)
+                .set({ status: "rejected", rejectionReason: remark || "VWO Rejected", updatedAt: new Date() })
+                .where(and(eq(paymentRequests.vendorWorkOrderId, id), eq(paymentRequests.status, "po_approval_pending")))
+                .returning({ id: paymentRequests.id });
+
+            if (rejectedCount.length > 0) {
+                this.logger.info(`Bulk rejected ${rejectedCount.length} payment requests for rejected VWO #${id}`);
+            }
+
+            const rejectItems = await this.db
+                .select()
+                .from(vendorWorkOrderItems)
+                .where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
+            const rejectGrandTotal = rejectItems.reduce((acc, item) => acc + Number(item.totalAmount), 0);
+
+            this.notifications
+                .notifyVwoRejected({
+                    vendorWorkOrderId: id,
+                    woNumber: wo.woNumber ?? `#${id}`,
+                    sellerName: wo.sellerName,
+                    grandTotal: rejectGrandTotal.toString(),
+                    remark: remark || null,
+                    rejectedBy: userId ?? 0,
+                })
+                .catch(err => this.logger.warn(`WhatsApp VWO rejection notification failed: ${err}`));
+
+            this.logger.info(`VWO rejected #${id}: ${remark || "no remark"}`);
+            return updated;
+        }
+    }
 
     async submitTlApproval(
         id: number,

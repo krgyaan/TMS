@@ -4,6 +4,7 @@ import { join } from "path";
 import type { Response } from "express";
 
 import { VendorWorkOrderService } from "./vendor-work-order.service";
+import { WoApprovalService } from "@/modules/operations/purchase-orders/wo-approval.service";
 import { CurrentUser } from "@/modules/auth/decorators/current-user.decorator";
 import { RequireAnyPermission } from "@/modules/auth/decorators";
 import type { PermissionRequirement } from "@/modules/auth/guards/permission.guard";
@@ -28,7 +29,10 @@ const WORK_ORDER_MODULES = ["accounts.vendor-work-orders", "ops.vendor-work-orde
 @Controller("vendor-work-orders")
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class VendorWorkOrderController {
-    constructor(private readonly service: VendorWorkOrderService) {}
+    constructor(
+        private readonly service: VendorWorkOrderService,
+        private readonly woApprovalService: WoApprovalService
+    ) {}
 
     @Post()
     @HttpCode(HttpStatus.CREATED)
@@ -90,7 +94,7 @@ export class VendorWorkOrderController {
     @HttpCode(HttpStatus.OK)
     @RequireAnyPermission(...eitherModule(...WORK_ORDER_MODULES, "approve"))
     setApproval(@Param("id", ParseIntPipe) id: number, @Body() body: { approve: boolean; tdsPercentage?: number; remark?: string }, @CurrentUser() user: ValidatedUser) {
-        return this.service.setVwoApproval(id, body, user?.id);
+        return this.woApprovalService.setVwoApproval(id, body, user?.id);
     }
 
     @Get(":id")
