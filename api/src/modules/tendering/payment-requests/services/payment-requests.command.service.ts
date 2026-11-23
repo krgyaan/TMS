@@ -8,7 +8,6 @@ import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { instrumentBgDetails, instrumentChequeDetails, instrumentDdDetails, instrumentFdrDetails, instrumentStatusHistory, instrumentTransferDetails, paymentInstruments, paymentRequestMom, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
 import { paymentRequests as opsPaymentRequests } from '@db/schemas/operations/payment-requests.schema';
-import { couriers } from '@db/schemas/shared/couriers.schema';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
 import { PaymentRequestService } from '@/modules/operations/payment-requests/payment-request.service';
 import { and, desc, eq, like } from 'drizzle-orm';
@@ -604,33 +603,9 @@ export class PaymentRequestsCommandService {
             docs: details[`${shorthand}CourierDocs`] ?? details.bgCourierDocs ?? [],
         } : null;
 
-        let courierId: number | null = null;
-        const courierOrg = mode === 'FDR' ? details.fdrCourierOrg : null;
-        if (mode === 'FDR' && courierOrg) {
-            const [courierRow] = await tx
-                .insert(couriers)
-                .values({
-                    userId: userId ?? 0,
-                    toOrg: courierOrg,
-                    toName: details.fdrCourierName || '',
-                    toAddr: [
-                        details.fdrCourierAddrLine1,
-                        details.fdrCourierAddrLine2,
-                        details.fdrCourierCity,
-                        details.fdrCourierState,
-                    ].filter(Boolean).join(', '),
-                    toPin: details.fdrCourierPincode || '',
-                    toMobile: details.fdrCourierPhone || '',
-                    empFrom: Number(details.fdrCourierEmpFrom) || userId || 0,
-                    delDate: details.fdrCourierDelDate ? new Date(details.fdrCourierDelDate) : new Date(),
-                    urgency: Number(details.fdrCourierUrgency) || 1,
-                    courierDocs: details.fdrCourierDocs ?? [],
-                    status: 0,
-                })
-                .returning()
-                .execute();
-            courierId = courierRow?.id ?? null;
-        }
+        // FDR courier dispatch is created later, on the first Stage 2
+        // (Accounts Form 2) save in the BI dashboard. The address captured here
+        // is stored on the instrument and reused at that point.
 
         const structuredCourierAddress = [
             details[`${shorthand}CourierAddressLine1`] || details[`${shorthand}CourierAddrLine1`] || details.bgCourierAddrLine1,
@@ -654,7 +629,6 @@ export class PaymentRequestsCommandService {
                 courierAddress: (details[`${shorthand}CourierAddress`] || details.bgCourierAddress || structuredCourierAddress || details.ddCourierAddress || details.fdrCourierAddress) || null,
                 courierAddressJson,
                 courierDeadline: (details[`${shorthand}CourierHours`] || details.bgCourierDays || details.ddCourierHours || details.fdrCourierHours) || null,
-                reqNo: courierId ? String(courierId) : null,
                 status: 'PENDING',
                 isActive: true,
                 createdBy: userId,

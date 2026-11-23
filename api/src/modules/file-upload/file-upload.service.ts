@@ -28,6 +28,7 @@ export interface UploadResult {
 
 /** Module storage directories (bi-dashboard, accounts, …) used to resolve nested paths. */
 const BG_PATH_PREFIX = 'bi-dashboard/bank-guarantee/';
+const FDR_PATH_PREFIX = 'bi-dashboard/fdr/';
 
 @Injectable()
 export class FileUploadService implements OnModuleInit {
@@ -101,7 +102,7 @@ export class FileUploadService implements OnModuleInit {
         }
 
         let resolved: string;
-        if (normalized.startsWith(BG_PATH_PREFIX)) {
+        if (normalized.startsWith(BG_PATH_PREFIX) || normalized.startsWith(FDR_PATH_PREFIX)) {
             resolved = path.join(this.uploadsRoot, normalized);
         } else {
             // Legacy flat `<context>/<file>`: resolve against the module-level

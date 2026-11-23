@@ -1,0 +1,26 @@
+<div style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.6; color: #222; max-width: 640px;">
+    <p>Dear {{data.tenderExecutiveName}},</p>
+
+    <p>
+        The request for Third Party Fixed Deposit Receipt (FDR) creation has been accepted and the FDR has been
+        created, details mentioned below:
+    </p>
+
+    <p>
+        FDR Date: {{data.fdrDate}}<br>
+        FDR No.: {{data.fdrNo}}<br>
+        Beneficiary Name: {{data.beneficiaryName}}<br>
+        Amount: Rs. {{data.amount}}<br>
+        Soft copy of the FDR: attached below<br>
+        Courier Request No.: {{data.courierRequestNo}}{{#if data.remarks}}<br>
+        Remarks: {{data.remarks}}{{/if}}
+    </p>
+
+    <p>Best of luck for your work.</p>
+
+    <p>
+        Regards,<br>
+        Kailash,<br>
+        Accounts team.
+    </p>
+</div>

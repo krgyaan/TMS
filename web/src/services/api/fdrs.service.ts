@@ -87,6 +87,16 @@ class FdrsService extends BaseApiService {
         return this.get<any>(`/instruments/${id}/followup`);
     }
 
+    async getMailPreview(
+        id: number,
+        payload: { stage: number; files: Record<string, string[]> },
+    ): Promise<any> {
+        return this.post<any, { stage: number; files: Record<string, string[]> }>(
+            `/instruments/${id}/mail-preview`,
+            payload,
+        );
+    }
+
     async updateAction(id: number, data: any): Promise<any> {
         return this.patch<any>(`/instruments/${id}/action`, data);
     }

@@ -1,32 +1,54 @@
-<div>
-    <p>Dear Accounts team,</p>
-
-    <p>A new Fixed Deposit Receipt (FDR) request has been created. Please process it via the Accounts Form (FDR).</p>
-
-    <ul>
-        <li>Tender No.: {{data.tenderNo}}</li>
-        <li>Tender Name: {{data.tenderName}}</li>
-        {{#if data.dueDateTime}}<li>Tender Due Date: {{data.dueDateTime}}</li>{{/if}}
-        <li>FDR Purpose: {{data.fdrPurpose}}</li>
-        <li>Beneficiary Name: {{data.beneficiaryName}}</li>
-        <li>Payable at: {{data.payableAt}}</li>
-        <li>Amount: Rs. {{data.amount}}</li>
-        {{#if data.fdrExpiryDate}}<li>FDR Expiry Date: {{data.fdrExpiryDate}}</li>{{/if}}
-    </ul>
-
-    <p>The FDR is required in {{data.timeLimit}} hours.</p>
-
-    <p>Once the FDR is created, please share the SOFT COPY of the FDR and the Docket slip with us on time using the <a href="{{data.link}}">Accounts Form (FDR)</a>.</p>
-
-    <p>Courier Address:</p>
-    <pre>{{data.courierAddress}}</pre>
-
-    <p>Please attach the covering letter with the FDR and courier it.</p>
-
-    <p>"Ensuring timely operations is the only source of growth"</p>
+<div style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.6; color: #222; max-width: 640px;">
+    <p>Dear {{data.recipientName}} (Accounts team),</p>
 
     <p>
-        Regards,<br />
-        {{data.tlName}},
+        Please use the pre-filled forms attached below to prepare the following FDR.<br>
+        The purpose of the FDR is {{data.purpose}}.{{#if data.isBgPurpose}} (BG in case of FDR for BG){{/if}}
     </p>
+
+    <p>Please prepare the FDR using the details below:</p>
+    <p>
+        <strong>FDR in favor of:</strong> {{data.fdrInFavourOf}}<br>
+        <strong>FDR Amount:</strong> Rs. {{data.amount}}<br>
+        <strong>FDR Expiry Date:</strong> {{data.fdrExpiryDate}}
+    </p>
+
+    <p>This FDR is required within {{data.timeLimit}} Hrs.{{#if data.isBgPurpose}} (12 hours in case of FDR for BG){{/if}}</p>
+
+    <p>
+        Please review the pre-filled bank format, if accepted, send a request to the bank using the
+        <a href="{{data.stage1Link}}">Stage 1: Request to Bank</a>. If Corrections are required, reject the request
+        and mention the corrections needed.
+    </p>
+
+    <p>
+        Please courier the FDR to the address below keeping sufficient margin for the courier delivery time to
+        ensure the FDR reaches before the <strong>{{data.dueDateTime}}</strong> and share the SOFT COPY of the FDR
+        and the Docket slip with us on time using the form
+        <a href="{{data.stage2Link}}">Stage 2: After FDR Creation</a> or your dashboard:
+    </p>
+
+    <p>
+        <strong>Courier Address:</strong><br>
+        {{data.courierAddress}}
+    </p>
+
+    <p>Please attach the cover letter with the FDR when you courier the FDR. (Attached below)</p>
+
+    <p style="font-style: italic;">"Ensuring timely operations is the only source of growth."</p>
+
+    <p>
+        Regards,<br>
+        {{data.senderName}},<br>
+        Approved by {{data.tlName}}
+    </p>
+
+    {{#if data.attachmentLinks.length}}
+    <p><strong>Documents</strong></p>
+    <ul>
+        {{#each data.attachmentLinks}}
+        <li><a href="{{this.url}}">{{this.label}}</a></li>
+        {{/each}}
+    </ul>
+    {{/if}}
 </div>

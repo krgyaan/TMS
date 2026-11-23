@@ -10,6 +10,53 @@ import type { FDRFollowupData } from '../helpers/fdr.types';
 const docUrl = (doc: string): string =>
     doc.includes("/") ? fileUploadService.getFileUrl(doc) : `/uploads/courier/${doc}`;
 
+const toDocList = (value: unknown): string[] => {
+    if (!value) return [];
+    if (Array.isArray(value)) {
+        return value.filter((entry): entry is string => typeof entry === 'string');
+    }
+    if (typeof value === 'string') {
+        try {
+            const parsed = JSON.parse(value);
+            if (Array.isArray(parsed)) {
+                return parsed.filter((entry): entry is string => typeof entry === 'string');
+            }
+        } catch {
+            // Not JSON — treat as a single path.
+        }
+        return [value];
+    }
+    return [];
+};
+
+const fileNameFromPath = (path: string): string => {
+    const name = path.split('/').pop() || path;
+    try {
+        return decodeURIComponent(name);
+    } catch {
+        return name;
+    }
+};
+
+function DocumentLinks({ paths }: { paths: string[] }) {
+    if (paths.length === 0) return <>—</>;
+    return (
+        <div className="space-y-1">
+            {paths.map((path, index) => (
+                <a
+                    key={`${path}-${index}`}
+                    href={fileUploadService.getFileUrl(path)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-blue-600 hover:underline inline-flex items-center gap-1"
+                >
+                    <Eye className="h-3 w-3" /> {fileNameFromPath(path)}
+                </a>
+            ))}
+        </div>
+    );
+}
+
 function SectionHeader({ title, icon: Icon }: { title: string; icon?: React.ComponentType<{ className?: string }> }) {
     return (
         <TableRow className="bg-muted/50">
@@ -65,7 +112,6 @@ function CourierAddressBlock({ addressJson, address }: { addressJson: Record<str
 
 function CourierDetailsBlock({ details }: { details: any }) {
     if (!details) return <span className="text-muted-foreground italic">Not available</span>;
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
     return (
         <div className="space-y-0.5">
             <div><span className="font-medium">Organisation:</span> {details.toOrg || '—'}</div>
@@ -141,6 +187,12 @@ export function FdrView({
     const hasAccountsFormData = data.hasAccountsFormData === true;
     const isAccountsFormRejected = (data.fdrStatus === 'ACCOUNTS_FORM_REJECTED' || data.status === 'ACCOUNTS_FORM_REJECTED');
     const expiryStatus = data.fdrExpiryDate ? deriveFdrExpiryStatus(data.fdrExpiryDate) : data.expiryDate ? deriveFdrExpiryStatus(data.expiryDate) : null;
+    const roi = data.roi ?? data.fdrRoi;
+    const bankMailIds = toDocList(data.bankMailIds);
+    const bankMailIdsCc = toDocList(data.bankMailIdsCc);
+    const prefilledSignedDocs = toDocList(data.prefilledSignedFdr);
+    const uploadDocumentDocs = toDocList(data.uploadDocuments);
+    const fdrCopyDocs = toDocList(data.fdrCopy);
 
     return (
         <Card className={className}>
@@ -208,7 +260,7 @@ export function FdrView({
                                 ROI
                             </TableCell>
                             <TableCell className="text-sm">
-                                {data.roi ? `${Number(data.roi)}%` : '—'}
+                                {roi != null ? `${Number(roi)}%` : '—'}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -335,11 +387,43 @@ export function FdrView({
                                         </TableRow>
                                         <FieldRow label="Courier Req No" value={data.reqNo} />
                                         <FieldRow label="UTR" value={data.utr} />
+                                        <FieldRow
+                                            label="Bank Mail Ids"
+                                            value={bankMailIds.length > 0 ? bankMailIds.join(', ') : '—'}
+                                            fullWidth
+                                        />
+                                        <FieldRow
+                                            label="Bank Mail Ids CC"
+                                            value={bankMailIdsCc.length > 0 ? bankMailIdsCc.join(', ') : '—'}
+                                            fullWidth
+                                        />
                                         <FieldRow label="Remarks" value={data.fdrRemark} fullWidth />
                                     </>
                                 )}
                             </>
                         ) : null}
+
+                        {/* Documents */}
+                        {(prefilledSignedDocs.length > 0 || uploadDocumentDocs.length > 0 || fdrCopyDocs.length > 0) && (
+                            <>
+                                <SectionHeader title="Documents" icon={FileText} />
+                                <FieldRow
+                                    label="Bank Form, Signed by CEO"
+                                    value={<DocumentLinks paths={prefilledSignedDocs} />}
+                                    fullWidth
+                                />
+                                <FieldRow
+                                    label="Request Letter, Signed by CEO"
+                                    value={<DocumentLinks paths={uploadDocumentDocs} />}
+                                    fullWidth
+                                />
+                                <FieldRow
+                                    label="FDR Copy"
+                                    value={<DocumentLinks paths={fdrCopyDocs} />}
+                                    fullWidth
+                                />
+                            </>
+                        )}
 
                         {/* Initiate Followup */}
                         {followupData ? (
