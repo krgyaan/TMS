@@ -32,7 +32,7 @@ describe("TallyMastersService", () => {
     it("exists() matches names case-insensitively and normalises whitespace", async () => {
         const { service, exportMasters } = buildService();
 
-        exportMasters.mockResolvedValue(records({ name: "Site Expenses", parent: "Indirect Expenses" }));
+        exportMasters.mockResolvedValue(records({ name: "Site Expenses", parent: "Indirect Expenses", guid: null }));
 
         await expect(service.exists("ledger", "  site   expenses ")).resolves.toBe(true);
         await expect(service.exists("ledger", "Local Conveyance")).resolves.toBe(false);
@@ -41,18 +41,19 @@ describe("TallyMastersService", () => {
     it("get() returns the canonical record", async () => {
         const { service, exportMasters } = buildService();
 
-        exportMasters.mockResolvedValue(records({ name: "Site Expenses", parent: "Indirect Expenses" }));
+        exportMasters.mockResolvedValue(records({ name: "Site Expenses", parent: "Indirect Expenses", guid: null }));
 
         await expect(service.get("ledger", "site expenses")).resolves.toEqual({
             name: "Site Expenses",
             parent: "Indirect Expenses",
+            guid: null,
         });
     });
 
     it('ensure() returns "exists" without writing when the master is already present', async () => {
         const { service, exportMasters, importMasters } = buildService();
 
-        exportMasters.mockResolvedValue(records({ name: "Site Expenses", parent: "Indirect Expenses" }));
+        exportMasters.mockResolvedValue(records({ name: "Site Expenses", parent: "Indirect Expenses", guid: null }));
 
         await expect(service.ensure("ledger", { name: "Site Expenses", parent: "Indirect Expenses" })).resolves.toBe("exists");
         expect(importMasters).not.toHaveBeenCalled();
@@ -61,7 +62,7 @@ describe("TallyMastersService", () => {
     it("ensure() rejects a conflicting parent", async () => {
         const { service, exportMasters, importMasters } = buildService();
 
-        exportMasters.mockResolvedValue(records({ name: "Site Expenses", parent: "Direct Expenses" }));
+        exportMasters.mockResolvedValue(records({ name: "Site Expenses", parent: "Direct Expenses", guid: null }));
 
         await expect(service.ensure("ledger", { name: "Site Expenses", parent: "Indirect Expenses" })).rejects.toBeInstanceOf(TallyMasterConflict);
         expect(importMasters).not.toHaveBeenCalled();
@@ -70,7 +71,7 @@ describe("TallyMastersService", () => {
     it("ensure() creates the master and verifies it by reading back", async () => {
         const { service, exportMasters, importMasters } = buildService();
 
-        exportMasters.mockResolvedValueOnce([]).mockResolvedValueOnce(records({ name: "Site Expenses", parent: "Indirect Expenses" }));
+        exportMasters.mockResolvedValueOnce([]).mockResolvedValueOnce(records({ name: "Site Expenses", parent: "Indirect Expenses", guid: null }));
         importMasters.mockResolvedValue(created);
 
         await expect(service.ensure("ledger", { name: "Site Expenses", parent: "Indirect Expenses" })).resolves.toBe("created");
@@ -86,7 +87,7 @@ describe("TallyMastersService", () => {
     it("ensure() verifies an unknown write outcome instead of resending", async () => {
         const { service, exportMasters, importMasters } = buildService();
 
-        exportMasters.mockResolvedValueOnce([]).mockResolvedValueOnce(records({ name: "Primary", parent: null }));
+        exportMasters.mockResolvedValueOnce([]).mockResolvedValueOnce(records({ name: "Primary", parent: null, guid: null }));
         importMasters.mockRejectedValue(new TallyUnknownOutcome("connection dropped mid-write"));
 
         await expect(service.ensure("group", { name: "Primary", parent: "Root" })).resolves.toBe("created");

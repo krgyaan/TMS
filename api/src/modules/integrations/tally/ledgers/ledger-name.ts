@@ -22,7 +22,10 @@ export function normalizeLedgerName(name: string): string {
 }
 
 export function normalizeEmployeeCode(code: string): string {
-    return code.trim().toUpperCase().replace(/^VEP(?=\d)/, "VE");
+    return code
+        .trim()
+        .toUpperCase()
+        .replace(/^VEP(?=\d)/, "VE");
 }
 
 export function roleFromSuffix(suffix: string): TallyLedgerRole | null {

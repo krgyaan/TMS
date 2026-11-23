@@ -92,12 +92,33 @@ rejected; nothing is written unless every row validates.
 Admin API: `GET /tally/ledgers`, `POST /tally/ledgers/sync`,
 `GET|PUT|DELETE /tally/user-ledgers/:userId` (permission `integrations`).
 
-`mappings/imprest-tally.config.ts` still holds static mappings:
+### Imprest category links
 
-- `categoryLedgers`: imprest category id -> expense ledger and group. Empty by
-  default; every category is blocked until finance populates it.
-- `blockedCategoryIds`: Transfer (22) and Insurance (8). Any voucher containing
-  one is not posted.
+`imprest_categories` carries `tally_ledger_id` (→ `tally_ledgers.id`) and
+`tally_blocked`. Map each category through the existing master API:
+
+```bash
+curl -X PATCH /api/v1/imprest-categories/12 \
+  -H 'content-type: application/json' \
+  -d '{"tallyLedgerId": 231, "tallyBlocked": false}'
+```
+
+A blocked category is never posted, even if a ledger is mapped. Mapping edits
+validate that the ledger exists, belongs to `TALLY_COMPANY` and is active.
+`GET /api/v1/imprest-categories` returns the joined ledger name/parent/active
+for the UI.
+
+```bash
+cd api
+pnpm tally:check-categories   # read-only; exits non-zero on unmapped/inactive categories
+```
+
+`mappings/imprest-tally.config.ts` holds fallbacks:
+
+- `categoryLedgers`: imprest category id -> ledger/group, used only when the
+  category row has no `tally_ledger_id`.
+- `blockedCategoryIds`: Transfer (22) and Insurance (8), in addition to the
+  per-row `tally_blocked` flag.
 - `employeeLedgers` / `employeePayableGroup`: fallbacks used only when a user
   has no linked imprest ledger or the linked ledger has no parent.
 
@@ -217,9 +238,10 @@ layer.
 - [x] All-ledger `tally_ledgers` master with GUID-aware sync
 - [x] Three employee ledger links on `users` + admin API
 - [x] Ledger sync and user-link CLIs
-- [ ] Populate `categoryLedgers`
+- [x] Category-to-ledger mapping on `imprest_categories` + block flag + check CLI
+- [ ] Map categories via the API on the target environment
 - [ ] Run ledger sync and link users on the target environment
-- [ ] Apply `0189_create_tally_sync_tables.sql` + `0190_create_tally_ledgers.sql`
+- [ ] Apply `0189`, `0190` and `0191` migrations
 
 Migrations from 0094 onward are authored as SQL plus a `_journal.json` entry:
 `drizzle/meta` snapshots stop at 0093, and `pnpm drizzle:generate` prompts for
