@@ -28,6 +28,7 @@ const eitherModule = (accounts: string, ops: string, action: string): Permission
 const PAYMENT_REQUESTS = ["accounts.payment-requests", "ops.payment-requests"] as const;
 const PURCHASE_INVOICES = ["accounts.purchase-invoices", "ops.purchase-invoices"] as const;
 const PURCHASE_ORDER_MODULES = ["accounts.purchase-orders", "ops.purchase-orders"] as const;
+const WORK_ORDER_MODULES = ["accounts.vendor-work-orders", "ops.vendor-work-orders"] as const;
 
 // `?ids=1,2,3` -> [1, 2, 3]. A picker's query string should never 400 the
 // dropdown, so junk entries are dropped instead of rejected.
@@ -245,7 +246,21 @@ export class PurchaseOrderController {
     @HttpCode(HttpStatus.OK)
     @RequireAnyPermission(...eitherModule(...PURCHASE_ORDER_MODULES, "approve"))
     setTdsPercentage(@Param("id", ParseIntPipe) id: number, @Body() body: { approve: boolean; tdsPercentage?: number; remark?: string }, @CurrentUser() user: ValidatedUser) {
-        return this.service.setTdsPercentage(id, body, user?.id);
+        return this.poApprovalService.setTdsPercentage(id, body, user?.id);
+    }
+
+    @Put("wo/:id/approval")
+    @HttpCode(HttpStatus.OK)
+    @RequireAnyPermission(...eitherModule(...WORK_ORDER_MODULES, "approve"))
+    setWoApproval(@Param("id", ParseIntPipe) id: number, @Body() body: { approve: boolean; tdsPercentage?: number; remark?: string }, @CurrentUser() user: ValidatedUser) {
+        return this.woApprovalService.setVwoApproval(id, body, user?.id);
+    }
+
+    @Put("vwo/:id/approval")
+    @HttpCode(HttpStatus.OK)
+    @RequireAnyPermission(...eitherModule(...WORK_ORDER_MODULES, "approve"))
+    setVwoApproval(@Param("id", ParseIntPipe) id: number, @Body() body: { approve: boolean; tdsPercentage?: number; remark?: string }, @CurrentUser() user: ValidatedUser) {
+        return this.woApprovalService.setVwoApproval(id, body, user?.id);
     }
 
     @Patch(":id/tl-approval")

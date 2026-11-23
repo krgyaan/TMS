@@ -106,6 +106,7 @@ export interface PoTlDecisionNotificationData {
 }
 
 export interface PoApprovalNotificationData {
+  purchaseOrderId?: number;
   poNumber: string;
   sellerName: string | null;
   grandTotal: string | number;
@@ -115,6 +116,7 @@ export interface PoApprovalNotificationData {
 }
 
 export interface PoRejectedNotificationData {
+  purchaseOrderId?: number;
   poNumber: string;
   sellerName: string | null;
   grandTotal: string | number;
@@ -160,6 +162,7 @@ export interface VwoTlDecisionNotificationData {
 }
 
 export interface VwoApprovalNotificationData {
+  vendorWorkOrderId?: number;
   woNumber: string;
   sellerName: string | null;
   grandTotal: string | number;
@@ -169,6 +172,7 @@ export interface VwoApprovalNotificationData {
 }
 
 export interface VwoRejectedNotificationData {
+  vendorWorkOrderId?: number;
   woNumber: string;
   sellerName: string | null;
   grandTotal: string | number;
@@ -541,6 +545,7 @@ export class OperationNotificationService {
         .limit(1);
 
       const userName = user?.name ?? 'Unknown';
+      const poUrl = await this.buildDirectPoAppUrl(data.purchaseOrderId);
       const lines: string[] = [
         `*PO Approved* @${userName}`,
         `PO No: ${data.poNumber}`,
@@ -548,9 +553,15 @@ export class OperationNotificationService {
         `After TDS (${data.tdsPercentage || '0'}%): ₹${data.amountAfterTds || 'N/A'}`,
         `Party: ${data.sellerName || 'N/A'}`,
       ];
+      if (poUrl) {
+        lines.push(`View in TMS: ${poUrl}`);
+      }
 
       const text = lines.join('\n');
-      await this.sendToTargets(text, { type: 'group', group: GROUPS.PAYMENTS });
+      await Promise.allSettled([
+        this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO }),
+        this.sendToTargets(text, { type: 'group', group: GROUPS.PAYMENTS }),
+      ]);
     } catch (err) {
       this.logger.warn(`Failed to send PO approval notification: ${err}`);
     }
@@ -565,6 +576,7 @@ export class OperationNotificationService {
         .limit(1);
 
       const userName = user?.name ?? 'Unknown';
+      const vwoUrl = await this.buildDirectVwoAppUrl(data.vendorWorkOrderId);
       const lines: string[] = [
         `*WO Approved* @${userName}`,
         `WO No: ${data.woNumber}`,
@@ -572,9 +584,15 @@ export class OperationNotificationService {
         `After TDS (${data.tdsPercentage || '0'}%): ₹${data.amountAfterTds || 'N/A'}`,
         `Party: ${data.sellerName || 'N/A'}`,
       ];
+      if (vwoUrl) {
+        lines.push(`View in TMS: ${vwoUrl}`);
+      }
 
       const text = lines.join('\n');
-      await this.sendToTargets(text, { type: 'group', group: GROUPS.PAYMENTS });
+      await Promise.allSettled([
+        this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO }),
+        this.sendToTargets(text, { type: 'group', group: GROUPS.PAYMENTS }),
+      ]);
     } catch (err) {
       this.logger.warn(`Failed to send VWO approval notification: ${err}`);
     }
@@ -753,6 +771,7 @@ export class OperationNotificationService {
         .limit(1);
 
       const userName = user?.name ?? 'Unknown';
+      const poUrl = await this.buildDirectPoAppUrl(data.purchaseOrderId);
       const lines: string[] = [
         `*PO Rejected* @${userName}`,
         `PO No: ${data.poNumber}`,
@@ -760,9 +779,15 @@ export class OperationNotificationService {
         `Party: ${data.sellerName || 'N/A'}`,
         `Reason: ${data.remark || 'N/A'}`,
       ];
+      if (poUrl) {
+        lines.push(`View in TMS: ${poUrl}`);
+      }
 
       const text = lines.join('\n');
-      await this.sendToTargets(text, { type: 'group', group: GROUPS.PAYMENTS });
+      await Promise.allSettled([
+        this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO }),
+        this.sendToTargets(text, { type: 'group', group: GROUPS.PAYMENTS }),
+      ]);
     } catch (err) {
       this.logger.warn(`Failed to send PO rejected notification: ${err}`);
     }
@@ -928,6 +953,7 @@ export class OperationNotificationService {
         .limit(1);
 
       const userName = user?.name ?? 'Unknown';
+      const vwoUrl = await this.buildDirectVwoAppUrl(data.vendorWorkOrderId);
       const lines: string[] = [
         `*WO Rejected* @${userName}`,
         `WO No: ${data.woNumber}`,
@@ -935,9 +961,15 @@ export class OperationNotificationService {
         `Party: ${data.sellerName || 'N/A'}`,
         `Reason: ${data.remark || 'N/A'}`,
       ];
+      if (vwoUrl) {
+        lines.push(`View in TMS: ${vwoUrl}`);
+      }
 
       const text = lines.join('\n');
-      await this.sendToTargets(text, { type: 'group', group: GROUPS.PAYMENTS });
+      await Promise.allSettled([
+        this.sendToTargets(text, { type: 'group', group: GROUPS.POVWO }),
+        this.sendToTargets(text, { type: 'group', group: GROUPS.PAYMENTS }),
+      ]);
     } catch (err) {
       this.logger.warn(`Failed to send VWO rejected notification: ${err}`);
     }
