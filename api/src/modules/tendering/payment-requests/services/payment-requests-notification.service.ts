@@ -877,58 +877,6 @@ export class PaymentRequestsNotificationService {
         return { courierProvider, courierDocketNo, courierDocketSlip };
     };
 
-    async getFdrRequestLetterPreview(): Promise<{ path: string; url: string }> {
-        const letterDate = new Date();
-        const expiry = new Date(letterDate.getFullYear(), letterDate.getMonth(), letterDate.getDate());
-        expiry.setMonth(expiry.getMonth() + 17);
-        expiry.setDate(expiry.getDate() + 9);
-
-        const lienPeriod = this.resolveLienPeriod(letterDate, expiry);
-
-        const [path] = await this.pdfGenerator.generatePdfs(
-            'fdrRequestLetter',
-            {
-                date: this.formatDateDDMMYYYY(letterDate),
-                beneficiary: 'Executive Engineer (E), PHEWD, CPWD, New Delhi',
-                purposeText: 'Tender Bidbond EMD',
-                referenceNo: '55/2026-27/EE (E)/PHEWD/III/Recall-2',
-                referenceLabel: 'Tender No.',
-                amount: '4,827.00/-',
-                lienPeriodText: lienPeriod.text,
-                lienFrom: this.formatDateDDMMYYYYSlash(letterDate),
-                lienTo: this.formatDateDDMMYYYYSlash(expiry),
-            },
-            0,
-            'FDR'
-        );
-
-        if (!path) {
-            throw new Error('Failed to generate the FDR request letter preview');
-        }
-
-        return { path, url: this.buildPublicFileUrl(path) };
-    }
-
-    async getFdrFormPreview(): Promise<{ path: string; url: string }> {
-        const formDate = new Date();
-        const expiry = new Date(formDate.getFullYear(), formDate.getMonth(), formDate.getDate());
-        expiry.setMonth(expiry.getMonth() + 17);
-        expiry.setDate(expiry.getDate() + 9);
-
-        const [path] = await this.pdfGenerator.generatePdfs(
-            'fdrForm',
-            this.buildFdrFormData(4827, formDate, expiry),
-            0,
-            'FDR'
-        );
-
-        if (!path) {
-            throw new Error('Failed to generate the FDR form preview');
-        }
-
-        return { path, url: this.buildPublicFileUrl(path) };
-    }
-
     async getBgMailPreview(
         instrumentId: number,
         stage: number,

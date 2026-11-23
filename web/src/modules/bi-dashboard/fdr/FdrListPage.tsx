@@ -18,7 +18,7 @@ import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { fdrsService } from '@/services/api/fdrs.service';
 import type { ColDef } from 'ag-grid-community';
-import { AlertCircle, Banknote, Clock, Edit, Eye, FileText, FileX2, Link, MessageSquare, Plus, RotateCcw, Search, Shield, ShieldCheck, XCircle } from 'lucide-react';
+import { AlertCircle, Banknote, Clock, Edit, Eye, FileX2, Link, MessageSquare, Plus, RotateCcw, Search, Shield, ShieldCheck, XCircle } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { DashboardTab, FdrDashboardRow } from './helpers/fdr.types';
@@ -391,14 +391,6 @@ const FdrListPage = () => {
                                 <Button variant="outline" onClick={() => navigate(paths.tendering.oldEmdsForFDR())}>
                                     <Plus className="w-4 h-4" />
                                     Add Old Entry
-                                </Button>
-                                <Button variant="outline" onClick={() => navigate(paths.bi.fdrRequestLetterPreview())}>
-                                    <FileText className="w-4 h-4" />
-                                    Request Letter Format
-                                </Button>
-                                <Button variant="outline" onClick={() => navigate(paths.bi.fdrFormPreview())}>
-                                    <FileText className="w-4 h-4" />
-                                    FDR Form Format
                                 </Button>
                                 <Button onClick={() => navigate(paths.bi.fdrCreate())}>
                                     <Plus className="w-4 h-4" />
