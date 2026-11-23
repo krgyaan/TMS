@@ -690,6 +690,17 @@ export class FdrService {
             } catch (error) {
                 this.logger.error(`Failed to send FDR created email for instrument ${instrumentId}:`, error);
             }
+
+            if (body.fdr_req === "Accepted") {
+                this.notificationService
+                    .sendFdrBankRequestEmail(instrumentId)
+                    .catch((error) =>
+                        this.logger.error(
+                            `FDR bank request email failed for instrument ${instrumentId}:`,
+                            error,
+                        ),
+                    );
+            }
         }
 
         // Create follow-up if action is initiate-followup

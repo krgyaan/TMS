@@ -503,7 +503,7 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
                         {fdrReq === 'Accepted' && (
                             <div className="space-y-4 pt-3 border-t">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FieldWrapper control={form.control} name="prefilled_signed_fdr" label="Prefilled Bank Formats, Signed by CEO">
+                                    <FieldWrapper control={form.control} name="prefilled_signed_fdr" label="Bank Form, Signed by CEO">
                                         {(field) => (
                                             <FileUploader
                                                 context="fdr-prefilled-signed"
@@ -513,7 +513,7 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
                                         )}
                                     </FieldWrapper>
 
-                                    <FieldWrapper control={form.control} name="upload_documents" label="Upload Documents">
+                                    <FieldWrapper control={form.control} name="upload_documents" label="Request Letter, Signed by CEO">
                                         {(field) => (
                                             <FileUploader
                                                 context="fdr-format-imran"
