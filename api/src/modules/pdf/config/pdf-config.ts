@@ -16,6 +16,7 @@ const FDR_PREFIXED_TYPES = new Set([
     'fdrCoveringLetter',
     'fdrAuthorizationLetter',
     'fdrRequestLetter',
+    'fdrForm',
 ]);
 
 /**
@@ -191,6 +192,18 @@ export const PDF_CONFIG = {
             templates: ['fdr-request-letter'],
             storagePath: 'fdrreqletter',
             baseDir: 'bi-dashboard/fdr/fdrreqletter',
+            margin: {
+                top: '0mm',
+                right: '0mm',
+                bottom: '0mm',
+                left: '0mm',
+            },
+        },
+        fdrForm: {
+            directory: 'forms',
+            templates: ['fdr-form'],
+            storagePath: 'fdrform',
+            baseDir: 'bi-dashboard/fdr/fdrform',
             margin: {
                 top: '0mm',
                 right: '0mm',

@@ -944,6 +944,10 @@ export class FdrService {
         return this.notificationService.getFdrRequestLetterPreview();
     }
 
+    async getFdrFormPreview(): Promise<{ path: string; url: string }> {
+        return this.notificationService.getFdrFormPreview();
+    }
+
     async getActionFormData(id: number) {
         const [result] = await this.db
             .select({

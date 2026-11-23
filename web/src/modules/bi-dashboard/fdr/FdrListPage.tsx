@@ -396,6 +396,10 @@ const FdrListPage = () => {
                                     <FileText className="w-4 h-4" />
                                     Request Letter Format
                                 </Button>
+                                <Button variant="outline" onClick={() => navigate(paths.bi.fdrFormPreview())}>
+                                    <FileText className="w-4 h-4" />
+                                    FDR Form Format
+                                </Button>
                                 <Button onClick={() => navigate(paths.bi.fdrCreate())}>
                                     <Plus className="w-4 h-4" />
                                     Add FDR

@@ -217,6 +217,98 @@ export class PaymentRequestsNotificationService {
         return { text: parts.join(' '), months, days };
     };
 
+    /**
+     * Split a value into fixed-width digit boxes. Digits are right-aligned and
+     * the remaining leading boxes are left blank (e.g. amount field).
+     */
+    private rightAlignedDigits = (value: string | number, count: number): string[] => {
+        const digits = String(value ?? '').replace(/\D/g, '');
+        return digits
+            .padStart(count, ' ')
+            .slice(-count)
+            .split('')
+            .map((ch) => (ch === ' ' ? '' : ch));
+    };
+
+    /**
+     * Split a value into fixed-width digit boxes, left-padded with zeros
+     * (e.g. paise, months and days fields).
+     */
+    private zeroPaddedDigits = (value: string | number, count: number): string[] => {
+        const digits = String(value ?? '').replace(/\D/g, '');
+        return digits.padStart(count, '0').slice(-count).split('');
+    };
+
+    /**
+     * Amount in Indian numbering words, e.g. "Four Thousand Eight Hundred
+     * Twenty Seven Rupees Only".
+     */
+    private amountInIndianWords = (amount: number | string | null | undefined): string => {
+        const value = Math.abs(Number(amount) || 0);
+        const rupees = Math.floor(value);
+        const paise = Math.round((value - rupees) * 100);
+
+        const ones = [
+            '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+            'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen',
+            'Seventeen', 'Eighteen', 'Nineteen',
+        ];
+        const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+        const underHundred = (n: number): string =>
+            n < 20 ? ones[n] : `${tens[Math.floor(n / 10)]}${n % 10 ? ` ${ones[n % 10]}` : ''}`;
+        const underThousand = (n: number): string =>
+            n >= 100
+                ? `${ones[Math.floor(n / 100)]} Hundred${n % 100 ? ` ${underHundred(n % 100)}` : ''}`
+                : underHundred(n);
+
+        const grouped = (n: number): string => {
+            if (!n) return '';
+            const crore = Math.floor(n / 10000000);
+            const lakh = Math.floor((n % 10000000) / 100000);
+            const thousand = Math.floor((n % 100000) / 1000);
+            const rest = n % 1000;
+            return [
+                crore ? `${grouped(crore)} Crore` : '',
+                lakh ? `${underHundred(lakh)} Lakh` : '',
+                thousand ? `${underHundred(thousand)} Thousand` : '',
+                rest ? underThousand(rest) : '',
+            ]
+                .filter(Boolean)
+                .join(' ');
+        };
+
+        const rupeeWords = rupees ? `${grouped(rupees)} Rupees` : 'Zero Rupees';
+        const paiseWords = paise ? `${underHundred(paise)} Paise` : '';
+        return paiseWords ? `${rupeeWords} and ${paiseWords} Only` : `${rupeeWords} Only`;
+    };
+
+    /**
+     * Pre-fill values for the AU Small Finance Bank term-deposit form.
+     */
+    private buildFdrFormData = (
+        amount: number | string | null | undefined,
+        formDate: Date,
+        expiry: Date | string | null | undefined,
+    ): Record<string, unknown> => {
+        const period = this.resolveLienPeriod(formDate, expiry);
+        const amountValue = Number(amount) || 0;
+        const rupees = Math.floor(Math.abs(amountValue));
+        const paise = Math.round((Math.abs(amountValue) - rupees) * 100);
+
+        return {
+            branchName: 'Lajpat Nagar',
+            dateDigits: this.rightAlignedDigits(this.formatDateDDMMYYYY(formDate), 8),
+            datedDigits: this.rightAlignedDigits(this.formatDateDDMMYYYY(formDate), 8),
+            amountRupeeDigits: this.rightAlignedDigits(rupees, 9),
+            amountPaiseDigits: this.zeroPaddedDigits(paise, 2),
+            amountWords: this.amountInIndianWords(amountValue),
+            debitDigits: this.rightAlignedDigits('2502245699295242', 16),
+            durationMonthDigits: this.zeroPaddedDigits(period.months, 2),
+            durationDayDigits: this.zeroPaddedDigits(period.days, 2),
+        };
+    };
+
     
     private resolveBgDueDate(
         paymentReq: { type?: string | null; dueDate?: Date | string | null; createdAt?: Date | string | null },
@@ -812,6 +904,26 @@ export class PaymentRequestsNotificationService {
 
         if (!path) {
             throw new Error('Failed to generate the FDR request letter preview');
+        }
+
+        return { path, url: this.buildPublicFileUrl(path) };
+    }
+
+    async getFdrFormPreview(): Promise<{ path: string; url: string }> {
+        const formDate = new Date();
+        const expiry = new Date(formDate.getFullYear(), formDate.getMonth(), formDate.getDate());
+        expiry.setMonth(expiry.getMonth() + 17);
+        expiry.setDate(expiry.getDate() + 9);
+
+        const [path] = await this.pdfGenerator.generatePdfs(
+            'fdrForm',
+            this.buildFdrFormData(4827, formDate, expiry),
+            0,
+            'FDR'
+        );
+
+        if (!path) {
+            throw new Error('Failed to generate the FDR form preview');
         }
 
         return { path, url: this.buildPublicFileUrl(path) };
@@ -1995,6 +2107,38 @@ export class PaymentRequestsNotificationService {
             } catch (error) {
                 this.logger.warn(
                     `FDR request letter generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
+
+            // FDR form — AU Small Finance Bank term-deposit form with branch,
+            // amount, dates, debit account and duration pre-filled.
+            try {
+                const formDate = new Date();
+                const fdrFormData = this.buildFdrFormData(instrument.amount, formDate, fdrExpiryDate);
+
+                const [fdrFormPath] = await this.pdfGenerator.generatePdfs(
+                    'fdrForm',
+                    { ...fdrFormData },
+                    instrumentId,
+                    'FDR'
+                );
+
+                if (fdrFormPath) {
+                    addAttachmentLink('FDR Form', fdrFormPath);
+                    try {
+                        await this.db
+                            .update(instrumentFdrDetails)
+                            .set({ fdrFormPath })
+                            .where(eq(instrumentFdrDetails.instrumentId, instrumentId));
+                    } catch (persistError) {
+                        this.logger.warn(
+                            `Failed to persist FDR form path for instrument ${instrumentId}: ${persistError instanceof Error ? persistError.message : String(persistError)}`
+                        );
+                    }
+                }
+            } catch (error) {
+                this.logger.warn(
+                    `FDR form generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
                 );
             }
 

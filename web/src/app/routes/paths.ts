@@ -232,6 +232,7 @@ export const paths = {
         fdrView: (requestId: number) => `/bi-dashboard/fdr/details/${requestId}`,
         fdrAction: (id: number) => `/bi-dashboard/fdr/action/${id}`,
         fdrRequestLetterPreview: () => `/bi-dashboard/fdr/request-letter-preview`,
+        fdrFormPreview: () => `/bi-dashboard/fdr/fdr-form-preview`,
         FdrMeetingRemarksPage: (id: number) => `/bi-dashboard/fdr/meeting-remarks/${id}`,
         cheque: "/bi-dashboard/cheque",
         chequeView: (requestId: number) => `/bi-dashboard/cheque/details/${requestId}`,

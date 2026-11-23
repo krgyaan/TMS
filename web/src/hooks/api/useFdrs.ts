@@ -112,6 +112,19 @@ export const useFdrRequestLetterPreview = (enabled = true) => {
     });
 };
 
+export const useFdrFormPreview = (enabled = true) => {
+    return useQuery<{ path: string; url: string }>({
+        queryKey: [...fdrsKey.all, 'fdr-form-preview'],
+        queryFn: async () => {
+            const result = await fdrsService.getFdrFormPreview();
+            return result;
+        },
+        enabled,
+        staleTime: 0,
+        gcTime: 0,
+    });
+};
+
 export const useUpdateFdrAction = () => {
     const queryClient = useQueryClient();
 
