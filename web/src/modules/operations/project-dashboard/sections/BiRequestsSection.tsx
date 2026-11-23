@@ -19,6 +19,7 @@ interface BiInstrumentRow {
     purpose: string | null;
     amount: string;
     status: string;
+    fdrNo?: string | null;
 }
 
 interface BiRequestRow {
@@ -53,20 +54,49 @@ const BG_STATUS_LABELS: Record<string, string> = {
     FDR_CANCELLED: "FDR released",
 };
 
+const FDR_STATUS_LABELS: Record<string, string> = {
+    PENDING: "Pending",
+    ACCOUNTS_FORM_REJECTED: "FDR Rejected",
+    FOLLOWUP_INITIATED: "Followup Initiated",
+    RETURN_VIA_COURIER: "Returned via courier",
+    RETURN_VIA_BANK_TRANSFER: "Returned via Bank Transfer",
+    SETTLED_WITH_PROJECT: "Settled with Project Account",
+    CANCELLATION_REQUESTED: "FDR Cancellation request sent to branch",
+    CANCELLED: "FDR Cancelled at Branch",
+};
+
+const titleCaseStatus = (status: string) =>
+    status
+        .toLowerCase()
+        .replaceAll("_", " ")
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+
 const formatStatusLabel = (status?: string | null, instrumentType?: string | null) => {
     if (!status) return "-";
     const label = instrumentType === "BG" ? BG_STATUS_LABELS[status] : undefined;
-    return (
-        label ??
-        status
-            .toLowerCase()
-            .replaceAll("_", " ")
-            .replace(/\b\w/g, (char) => char.toUpperCase())
-    );
+    return label ?? titleCaseStatus(status);
 };
 
-const formatInstrumentStatus = (instrument?: BiInstrumentRow | null) =>
-    formatStatusLabel(instrument?.status, instrument?.instrumentType);
+const formatFdrStatus = (status?: string | null, fdrNo?: string | null) => {
+    if (!status) return "-";
+    if (status === "ACCOUNTS_FORM_ACCEPTED") {
+        return fdrNo ? "FDR Created" : "FDR Accepted";
+    }
+    return FDR_STATUS_LABELS[status] ?? titleCaseStatus(status);
+};
+
+const formatInstrumentStatus = (instrument?: BiInstrumentRow | null) => {
+    if (!instrument) return "-";
+    if (instrument.instrumentType === "FDR") {
+        return formatFdrStatus(instrument.status, instrument.fdrNo);
+    }
+    return formatStatusLabel(instrument.status, instrument.instrumentType);
+};
+
+const pickInstrument = (row?: BiRequestRow | null): BiInstrumentRow | null =>
+    row?.instruments?.find((instrument) => instrument.instrumentType === "FDR")
+    ?? row?.instruments?.[0]
+    ?? null;
 
 export const BiRequestsSection: React.FC<BiRequestsSectionProps> = ({ projectId }) => {
     const navigate = useNavigate();
@@ -109,7 +139,7 @@ export const BiRequestsSection: React.FC<BiRequestsSectionProps> = ({ projectId 
             sortable: false,
             filter: false,
             width: 130,
-            valueGetter: (p) => p.data?.instruments?.[0]?.instrumentType || "-",
+            valueGetter: (p) => pickInstrument(p.data)?.instrumentType || "-",
         },
         {
             field: "purpose",
@@ -132,7 +162,7 @@ export const BiRequestsSection: React.FC<BiRequestsSectionProps> = ({ projectId 
             filter: true,
             width: 150,
             valueGetter: (p) => {
-                const instrument = p.data?.instruments?.[0];
+                const instrument = pickInstrument(p.data);
                 return instrument
                     ? formatInstrumentStatus(instrument)
                     : formatStatusLabel(p.data?.status);
