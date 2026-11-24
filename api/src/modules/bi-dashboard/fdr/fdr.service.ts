@@ -195,6 +195,7 @@ export class FdrService {
                 teamMember: users.name,
                 source: instrumentFdrDetails.fdrSource,
                 expiry: instrumentFdrDetails.fdrExpiryDate,
+                fdrValidity: instrumentFdrDetails.fdrValidity,
                 fdrStatus: paymentInstruments.status,
             })
             .from(paymentInstruments)
@@ -255,7 +256,9 @@ export class FdrService {
             tenderNo: row.tenderNo || row.projectNo,
             tenderStatus: row.requestTenderId ? (row.tenderStatus ?? 'Other than Tender') : 'Other than Tender',
             member: row.teamMember?.toString() ?? null,
-            expiry: this.deriveFdrExpiryStatus(row.expiry ? new Date(row.expiry) : null),
+            expiry: this.deriveFdrExpiryStatus(
+                (row.fdrValidity ?? row.expiry) ? new Date((row.fdrValidity ?? row.expiry) as any) : null,
+            ),
             fdrStatus: stoppedFollowupIds.has(row.id) && row.fdrStatus === FDR_STATUSES.FOLLOWUP_INITIATED
                 ? 'Followup Stopped'
                 : this.deriveFdrStatus(row.fdrStatus, row.fdrNo),
@@ -293,6 +296,7 @@ export class FdrService {
                 teamMember: users.name,
                 source: instrumentFdrDetails.fdrSource,
                 expiry: instrumentFdrDetails.fdrExpiryDate,
+                fdrValidity: instrumentFdrDetails.fdrValidity,
                 fdrStatus: paymentInstruments.status,
                 reqNo: paymentInstruments.reqNo,
                 fdrNeeds: instrumentFdrDetails.fdrNeeds,
@@ -344,7 +348,9 @@ export class FdrService {
             projectLabel: this.resolveFdrProjectLabel(row.projectName, row.tenderName),
             tenderStatus: row.requestTenderId ? (row.tenderStatus ?? 'Other than Tender') : 'Other than Tender',
             member: row.teamMember?.toString() ?? null,
-            expiry: this.deriveFdrExpiryStatus(row.expiry ? new Date(row.expiry) : null),
+            expiry: this.deriveFdrExpiryStatus(
+                (row.fdrValidity ?? row.expiry) ? new Date((row.fdrValidity ?? row.expiry) as any) : null,
+            ),
             fdrStatus: stoppedFollowupIds.has(row.id) && row.fdrStatus === FDR_STATUSES.FOLLOWUP_INITIATED
                 ? 'Followup Stopped'
                 : this.deriveFdrStatus(row.fdrStatus, row.fdrNo),
@@ -354,6 +360,7 @@ export class FdrService {
             fdrRemark: row.fdrRemark,
             fdrSource: row.fdrSource,
             fdrExpiryDate: row.fdrExpiryDate ? new Date(row.fdrExpiryDate) : null,
+            fdrValidity: row.fdrValidity ? new Date(row.fdrValidity) : null,
             utr: row.utr,
             issueDate: row.issueDate ? new Date(row.issueDate) : null,
             expiryDate: row.expiryDate ? new Date(row.expiryDate) : null,
@@ -771,7 +778,7 @@ export class FdrService {
         if (body.action === "accounts-form" || body.action === "accounts-form-2") {
             if (body.fdr_no) fdrDetailsUpdate.fdrNo = body.fdr_no;
             if (body.fdr_date) fdrDetailsUpdate.fdrDate = body.fdr_date;
-            if (body.fdr_validity) fdrDetailsUpdate.fdrExpiryDate = body.fdr_validity;
+            if (body.fdr_validity) fdrDetailsUpdate.fdrValidity = body.fdr_validity;
             if (body.fdr_roi !== undefined && body.fdr_roi !== '') fdrDetailsUpdate.roi = body.fdr_roi;
             if (body.fdr_copy !== undefined) {
                 try {
@@ -1053,6 +1060,7 @@ export class FdrService {
                 marginPercent: instrumentFdrDetails.marginPercent,
                 fdrPurpose: instrumentFdrDetails.fdrPurpose,
                 fdrExpiryDate: instrumentFdrDetails.fdrExpiryDate,
+                fdrValidity: instrumentFdrDetails.fdrValidity,
                 fdrNeeds: instrumentFdrDetails.fdrNeeds,
                 fdrRemark: instrumentFdrDetails.fdrRemark,
                 prefilledSignedFdr: instrumentFdrDetails.prefilledSignedFdr,
@@ -1273,6 +1281,7 @@ export class FdrService {
                 fdrSource: instrumentFdrDetails.fdrSource,
                 fdrPurpose: instrumentFdrDetails.fdrPurpose,
                 fdrExpiryDate: instrumentFdrDetails.fdrExpiryDate,
+                fdrValidity: instrumentFdrDetails.fdrValidity,
                 fdrNeeds: instrumentFdrDetails.fdrNeeds,
                 fdrRemark: instrumentFdrDetails.fdrRemark,
                 prefilledSignedFdr: instrumentFdrDetails.prefilledSignedFdr,

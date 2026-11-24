@@ -186,7 +186,7 @@ export function FdrView({
         : deriveFdrStatus(data.fdrStatus || data.status, data.fdrNo);
     const hasAccountsFormData = data.hasAccountsFormData === true;
     const isAccountsFormRejected = (data.fdrStatus === 'ACCOUNTS_FORM_REJECTED' || data.status === 'ACCOUNTS_FORM_REJECTED');
-    const expiryStatus = data.fdrExpiryDate ? deriveFdrExpiryStatus(data.fdrExpiryDate) : data.expiryDate ? deriveFdrExpiryStatus(data.expiryDate) : null;
+    const expiryStatus = data.fdrValidity ? deriveFdrExpiryStatus(data.fdrValidity) : data.fdrExpiryDate ? deriveFdrExpiryStatus(data.fdrExpiryDate) : data.expiryDate ? deriveFdrExpiryStatus(data.expiryDate) : null;
     const roi = data.roi ?? data.fdrRoi;
     const bankMailIds = toDocList(data.bankMailIds);
     const bankMailIdsCc = toDocList(data.bankMailIdsCc);
@@ -384,6 +384,20 @@ export function FdrView({
                                             </TableCell>
                                             <TableCell className="text-sm">
                                                 {data.fdrDate ? formatDate(data.fdrDate) : '—'}
+                                            </TableCell>
+                                        </TableRow>
+                                        <TableRow className="hover:bg-muted/30 transition-colors">
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                FDR Expiry Date
+                                            </TableCell>
+                                            <TableCell className="text-sm">
+                                                {data.fdrExpiryDate ? formatDate(data.fdrExpiryDate) : '—'}
+                                            </TableCell>
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                FDR Validity
+                                            </TableCell>
+                                            <TableCell className="text-sm">
+                                                {data.fdrValidity ? formatDate(data.fdrValidity) : '—'}
                                             </TableCell>
                                         </TableRow>
                                         <FieldRow label="Courier Req No" value={data.reqNo} />

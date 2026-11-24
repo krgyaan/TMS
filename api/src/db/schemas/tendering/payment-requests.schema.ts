@@ -197,6 +197,7 @@ export const instrumentFdrDetails = pgTable('instrument_fdr_details', {
     marginPercent: decimal('margin_percent', { precision: 15, scale: 2 }), // New field, not in MySQL but needed
     fdrPurpose: varchar('fdr_purpose', { length: 500 }), // New field, similar to emd_fdrs.fdr_needs
     fdrExpiryDate: date('fdr_expiry_date'), // emd_fdrs.fdr_expiry
+    fdrValidity: date('fdr_validity'), // Accounts Form (FDR) 2 - actual FDR validity
     fdrNeeds: varchar('fdr_needs', { length: 255 }), // emd_fdrs.fdr_needs
     fdrRemark: text('fdr_remark'), // emd_fdrs.fdr_remark
     prefilledSignedFdr: text('prefilled_signed_fdr'), // JSON string of uploaded file paths
