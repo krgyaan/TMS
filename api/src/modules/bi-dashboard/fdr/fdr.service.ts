@@ -6,6 +6,7 @@ import { FollowUpService } from "@/modules/follow-up/follow-up.service";
 import type { CreateFollowUpDto } from "@/modules/follow-up/dto";
 import { CHEQUE_STATUSES, FDR_STATUSES } from "@/modules/tendering/payment-requests/constants/payment-request-statuses";
 import { PaymentRequestsNotificationService } from "@/modules/tendering/payment-requests/services/payment-requests-notification.service";
+import { MakerRequestService } from "@/modules/operations/maker-requests/maker-request.service";
 import type { PaginatedResult } from "@/modules/tendering/types/shared.types";
 import { wrapPaginatedResponse } from "@/utils/responseWrapper";
 import type { DbInstance } from "@db";
@@ -15,6 +16,7 @@ import { statuses } from "@db/schemas/master/statuses.schema";
 import { teams } from "@db/schemas/master/teams.schema";
 import { instrumentBgDetails, instrumentChequeDetails, instrumentFdrDetails, paymentInstruments, paymentRequests } from "@db/schemas/tendering/payment-requests.schema";
 import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
+import { beneficiaries } from "@db/schemas/operations/beneficiaries.schema";
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
@@ -27,6 +29,7 @@ export class FdrService {
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly followUpService: FollowUpService,
         private readonly notificationService: PaymentRequestsNotificationService,
+        private readonly makerRequestService: MakerRequestService,
     ) {
         this.logger = this.appLogger.withContext(FdrService.name);
     }
@@ -558,6 +561,92 @@ export class FdrService {
         });
     }
 
+    /**
+     * Creates the own-bank maker request when Stage 1 is accepted, mirroring
+     * the BG flow (createOwnBankMakerRequest). Idempotent — skipped when the
+     * instrument already has a maker request linked.
+     *
+     * Category is chosen by where the FDR was raised:
+     *   - Project dashboard / tender fees -> AU_8316
+     *   - Everything else (FDR dashboard)  -> AU_5190
+     * The beneficiary is always the AU debit account 2502245699295242.
+     */
+    private async createFdrMakerRequest(instrumentId: number, requestedBy?: number): Promise<void> {
+        try {
+            const [instrument] = await this.db
+                .select({
+                    id: paymentInstruments.id,
+                    makerRequestId: paymentInstruments.makerRequestId,
+                    amount: paymentInstruments.amount,
+                    projectId: paymentRequests.projectId,
+                    requestPurpose: paymentRequests.purpose,
+                })
+                .from(paymentInstruments)
+                .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+                .where(eq(paymentInstruments.id, instrumentId))
+                .limit(1);
+
+            if (!instrument || instrument.makerRequestId) {
+                return;
+            }
+
+            if (!requestedBy) {
+                this.logger.warn(
+                    `FDR maker request skipped for instrument ${instrumentId}: requestedBy missing`,
+                );
+                return;
+            }
+
+            const isProjectOrTenderFee =
+                instrument.projectId != null ||
+                instrument.requestPurpose === "Tender Fee" ||
+                instrument.requestPurpose === "Processing Fee";
+            const category = isProjectOrTenderFee ? "AU_8316" : "AU_5190";
+
+            const [beneficiary] = await this.db
+                .select()
+                .from(beneficiaries)
+                .where(eq(beneficiaries.accountNumber, "2502245699295242"))
+                .limit(1);
+
+            if (!beneficiary) {
+                this.logger.warn(
+                    `FDR maker request skipped for instrument ${instrumentId}: beneficiary account not found`,
+                );
+                return;
+            }
+
+            const created = await this.makerRequestService.create(
+                {
+                    paymentMode: "BANK_TRANSFER",
+                    amount: Number(instrument.amount) || 0,
+                    category,
+                    beneficiaryId: beneficiary.id,
+                    partyName: beneficiary.name,
+                    accountNumber: beneficiary.accountNumber,
+                    bankName: beneficiary.bankName,
+                    ifsc: beneficiary.ifsc,
+                    billFiles: [],
+                    remark: "Auto-created from FDR request",
+                },
+                requestedBy,
+            );
+
+            await this.db
+                .update(paymentInstruments)
+                .set({ makerRequestId: created.id })
+                .where(eq(paymentInstruments.id, instrumentId));
+
+            this.logger.log(
+                `FDR maker request ${created.requestNo ?? created.id} (${category}) created for instrument ${instrumentId}`,
+            );
+        } catch (error) {
+            this.logger.warn(
+                `FDR maker request creation failed for instrument ${instrumentId}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
+    }
+
     async updateAction(instrumentId: number, body: Record<string, any>, user: any) {
         const [instrument] = await this.db.select().from(paymentInstruments).where(eq(paymentInstruments.id, instrumentId)).limit(1);
 
@@ -793,6 +882,7 @@ export class FdrService {
                             error,
                         ),
                     );
+                await this.createFdrMakerRequest(instrumentId, user?.id ?? user?.sub);
             }
         }
 
