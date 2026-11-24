@@ -13,7 +13,7 @@ import { useCreateInventoryItem, useInventoryItem, useItemCodePreview, useItemCo
 import { handleQueryError } from "@/lib/react-query";
 import { paths } from "@/app/routes/paths";
 import type { InventoryItemPayload } from "@/types/inventory-item.types";
-import { ITEM_CATALOG, fieldIsVisible, findCatalogItem, getAllowedConversionPairs, getAllowedUnits, getDefaultUnit, getItemMainCategory } from "./item-catalog";
+import { ITEM_CATALOG, fieldIsVisible, findCatalogItem, getAllowedConversionPairs, getAllowedUnits, getConfiguredHsnCodes, getDefaultHsn, getDefaultUnit, getItemMainCategory } from "./item-catalog";
 import { type Unit } from "./item-config";
 import { inventoryItemFormSchema, type InventoryItemFormValues } from "./item-form-schema";
 
@@ -75,7 +75,7 @@ export default function InventoryItemFormPage() {
             const editCategory = getItemMainCategory(item.itemName, item.category);
             form.reset({
                 category: editCategory, legacyCodeEdit: false, itemName: item.itemName, itemType: item.itemType || "",
-                specifications: editSpecifications, makeBrand: item.makeBrand || "", modelNumber: item.modelNumber || "", description: item.description || "",
+                specifications: storedSpecifications, makeBrand: item.makeBrand || "", modelNumber: item.modelNumber || "", description: item.description || "",
                 unit: item.unit as Unit, storedUnit: item.unit, conversionEnabled: Boolean(item.conversionUnit), conversionUnit: item.conversionUnit || "",
                 conversionFactor: item.conversionFactor || "", hsnCode: item.hsnCode || "", isActive: item.isActive,
             });
@@ -122,6 +122,19 @@ export default function InventoryItemFormPage() {
             form.setValue("conversionFactor", "", { shouldDirty: true });
         }
     }, [catalogItem, categoryName, itemName, specifications, unit, form]);
+
+    useEffect(() => {
+        if (!catalogItem?.defaultHsnByField) return;
+        const nextHsn = getDefaultHsn(categoryName, itemName, specifications);
+        if (!nextHsn) return;
+        const currentHsn = form.getValues("hsnCode")?.trim() || "";
+        const knownHsnCodes = getConfiguredHsnCodes(categoryName, itemName);
+        if (!currentHsn || knownHsnCodes.includes(currentHsn)) {
+            if (currentHsn !== nextHsn) {
+                form.setValue("hsnCode", nextHsn, { shouldDirty: true, shouldValidate: true });
+            }
+        }
+    }, [catalogItem, categoryName, itemName, specifications, form]);
 
     useEffect(() => {
         if (!conversionEnabled || width !== (form.getValues("specifications.width") || "") || width === lastWidth.current) return;
@@ -211,7 +224,7 @@ export default function InventoryItemFormPage() {
             const payload: InventoryItemPayload = {
                 category: values.category, modelNumber: values.modelNumber?.trim() || null, itemName: values.itemName,
                 itemType: typeField ? values.specifications[typeField.key] || null : values.itemType.trim() || null,
-                makeBrand: values.makeBrand.trim() || null,
+                makeBrand: isEdit ? (values.makeBrand?.trim() || null) : null,
                 specifications: visibleSpecifications, description: values.description.trim() || null,
                 unit: values.unit, conversionUnit: values.conversionEnabled ? values.conversionUnit || null : null,
                 conversionFactor: values.conversionEnabled && values.conversionUnit ? values.conversionFactor : null,
@@ -270,6 +283,7 @@ export default function InventoryItemFormPage() {
                             form.setValue("itemName", "", { shouldDirty: true, shouldValidate: true });
                             form.setValue("itemType", "", { shouldDirty: true });
                             form.setValue("specifications", {}, { shouldDirty: true });
+                            form.setValue("hsnCode", "", { shouldDirty: true });
                         } })}>
                             <option value="">Select category</option>
                             {ITEM_CATALOG.map(option => <option key={option.name} value={option.name}>{option.name}</option>)}
@@ -281,6 +295,8 @@ export default function InventoryItemFormPage() {
                             form.setValue("specifications", {}, { shouldDirty: true });
                             const selected = category?.items.find(candidate => candidate.name === event.target.value);
                             if (selected) form.setValue("unit", getDefaultUnit(categoryName, selected.name) as Unit, { shouldDirty: true });
+                            const nextHsn = selected ? (getDefaultHsn(categoryName, selected.name) || "") : "";
+                            form.setValue("hsnCode", nextHsn, { shouldDirty: true, shouldValidate: Boolean(nextHsn) });
                         } })}>
                             <option value="">Select item name</option>
                             {isEdit && item && itemName === item.itemName && category?.name === categoryName && !category.items.some(option => option.name === item.itemName) && <option value={item.itemName}>{item.itemName} (legacy name)</option>}
@@ -300,7 +316,7 @@ export default function InventoryItemFormPage() {
 
             <section className={sectionClass}>
                 <div className="grid gap-4 md:grid-cols-2">
-                    <FormField label="HSN Code" required helper="Enter 4 to 8 digits." error={errors.hsnCode?.message}>
+                    <FormField label="HSN Code" required helper={getDefaultHsn(categoryName, itemName, specifications) ? "Prefilled from the selected item. Edit if needed (4 to 8 digits)." : "Enter 4 to 8 digits."} error={errors.hsnCode?.message}>
                         <Input inputMode="numeric" maxLength={8} className={formControlClass} aria-invalid={Boolean(errors.hsnCode)} {...form.register("hsnCode")} />
                     </FormField>
                 </div>
@@ -370,10 +386,12 @@ export default function InventoryItemFormPage() {
             </section>
 
             <section className={sectionClass}>
-                <div><h2 className="font-semibold">Make/Brand</h2><p className="text-sm text-muted-foreground">Optional manufacturer or brand.</p></div>
-                <FormField label="Make/Brand" helper="Optional. Up to 120 characters." error={errors.makeBrand?.message}>
-                    <Input maxLength={120} className={formControlClass} aria-invalid={Boolean(errors.makeBrand)} {...form.register("makeBrand")} />
-                </FormField>
+                <div><h2 className="font-semibold">Model Number</h2><p className="text-sm text-muted-foreground">Optional model identifier.</p></div>
+                {isEdit && Boolean(item?.makeBrand) && (
+                    <FormField label="Make/Brand" helper="Existing value from legacy record. Optional, up to 120 characters." error={errors.makeBrand?.message}>
+                        <Input maxLength={120} className={formControlClass} aria-invalid={Boolean(errors.makeBrand)} {...form.register("makeBrand")} />
+                    </FormField>
+                )}
                 <FormField label="Model Number" helper="Optional. Up to 120 characters." error={errors.modelNumber?.message}>
                     <Input maxLength={120} className={formControlClass} aria-invalid={Boolean(errors.modelNumber)} {...form.register("modelNumber")} />
                 </FormField>

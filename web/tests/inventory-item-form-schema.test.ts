@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ITEM_CATALOG, UNIT_OPTIONS, fieldIsVisible, findCatalogItem, getAllowedUnits } from "../src/modules/accounts/inventory-items/item-catalog.ts";
+import { ITEM_CATALOG, UNIT_OPTIONS, fieldIsVisible, findCatalogItem, getAllowedUnits, getDefaultHsn } from "../src/modules/accounts/inventory-items/item-catalog.ts";
 import { buildInventoryItemFormSchema } from "../src/modules/accounts/inventory-items/item-form-schema.ts";
 import { formatKeySpecification, itemMasterColumnsForViewport } from "../src/modules/accounts/inventory-items/item-master-display.ts";
 import { ITEM_CATALOG as API_ITEM_CATALOG } from "../../api/src/modules/accounts/inventory-items/item-catalog.ts";
@@ -57,7 +57,13 @@ test("form validation follows catalog required, optional, conditional and range 
     assert.equal(schema.safeParse(base({ specifications: { discharge: "L", capacity: "100" } })).success, false);
     assert.equal(schema.safeParse(base({ specifications: { type: "KP", discharge: "L", capacity: "0" } })).success, false);
     assert.equal(schema.safeParse(base({ specifications: { type: "KP", discharge: "L", capacity: "100", unknown: "x" } })).success, false);
-    assert.equal(schema.safeParse(base({ itemName: "Eye Wash Bottle", category: "Battery Accessories", specifications: {}, hsnCode: "" })).success, true);
+    assert.equal(schema.safeParse(base({ itemName: "Eye Wash Bottle", category: "Battery Accessories", specifications: {}, hsnCode: "39269099" })).success, true);
+    assert.equal(getDefaultHsn("Battery Accessories", "Eye Wash Bottle"), "39269099");
+    assert.equal(getDefaultHsn("Battery Accessories", "Helmet"), "65061010");
+    assert.equal(getDefaultHsn("AC Accessories", "Copper", { type: "Pipe" }), "74111000");
+    assert.equal(getDefaultHsn("AC Accessories", "Copper", { type: "Tee" }), "74121000");
+    assert.equal(getDefaultHsn("AC Accessories", "GI Sheet / MS Sheet", { material: "GI" }), "72104900");
+    assert.equal(getDefaultHsn("AC Accessories", "GI Sheet / MS Sheet", { material: "MS" }), "72085290");
 
     const charger = findCatalogItem("Battery Chargers", "Battery Charger");
     const pulse = charger?.fields.find(field => field.key === "pulse");
