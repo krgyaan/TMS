@@ -14,6 +14,7 @@ import { ContactPersonFields } from '@/components/form/ContactPersonFields';
 import { FollowUpFrequencySelect } from '@/components/form/FollowUpFrequencySelect';
 import { FollowupEmailEditor } from '@/components/form/FollowupEmailEditor';
 import { ConditionalSection } from '@/components/form/ConditionalSection';
+import { SelectField } from '@/components/form/SelectField';
 import { NumberInput } from '@/components/form/NumberInput';
 import DateInput from '@/components/form/DateInput';
 import { ChequeActionFormSchema, type ChequeActionFormValues } from '../helpers/chequeActionForm.schema';
@@ -24,6 +25,7 @@ import { FileText, Users, Ban, Banknote, Landmark, XCircle, Info, CheckCircle2 }
 import { Badge } from '@/components/ui/badge';
 import { ALL_CHEQUE_ACTION_OPTIONS, type ChequeActionFormProps } from '../helpers/cheque.types';
 import { infoSheetsService } from '@/services/api/info-sheet.service';
+import { BANKS } from '@/modules/tendering/emds-tenderfees/constants';
 
 export function ChequeActionForm({ instrumentId, action: propAction, tenderId, formHistory, instrumentData, linkedDdId }: ChequeActionFormProps) {
     const navigate = useNavigate();
@@ -102,6 +104,12 @@ export function ChequeActionForm({ instrumentId, action: propAction, tenderId, f
     const selectedAction = useWatch({ control: form.control, name: 'action' });
     const chequeReq = useWatch({ control: form.control, name: 'cheque_req' });
     const emailBody = useWatch({ control: form.control, name: 'emailBody' });
+    const currentAccount = useWatch({ control: form.control, name: 'cheque_given_from_account' });
+
+    // Keep legacy free-text values selectable instead of showing an empty placeholder.
+    const accountOptions = currentAccount && !BANKS.some(bank => bank.value === currentAccount)
+        ? [{ value: currentAccount, label: currentAccount }, ...BANKS]
+        : BANKS;
 
     useEffect(() => {
         if (formHistory?.accountsForm?.chequeReq) {
@@ -326,9 +334,14 @@ export function ChequeActionForm({ instrumentId, action: propAction, tenderId, f
                                         {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                                     </FieldWrapper>
 
-                                    <FieldWrapper control={form.control} name="cheque_given_from_account" label="Cheque given from Account">
-                                        {(field) => <Input {...field} placeholder="Enter account name" />}
-                                    </FieldWrapper>
+                                    <SelectField
+                                        control={form.control}
+                                        name="cheque_given_from_account"
+                                        label="Cheque given from Account"
+                                        options={accountOptions}
+                                        placeholder="Select Account"
+                                        valueType="string"
+                                    />
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
