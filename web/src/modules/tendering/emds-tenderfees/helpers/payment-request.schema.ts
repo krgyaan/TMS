@@ -8,7 +8,7 @@ const emdModeMapping: Record<string, string> = {
 const normalizeMode = (val: unknown) =>
     typeof val === 'string' ? (emdModeMapping[val] ?? val) : val;
 
-const DELIVERY_OPTION_VALUES = DELIVERY_OPTIONS.map(option => option.value) as ['TENDER_DUE', '24', '48'];
+const DELIVERY_OPTION_VALUES = DELIVERY_OPTIONS.map(option => option.value) as ['TENDER_DUE', '24', '36', '48'];
 const CHEQUE_DELIVERY_OPTION_VALUES = CHEQUE_DELIVERY_OPTIONS.map(option => option.value) as ['3', '6', '12', '24'];
 
 const deliveryEnumField = (values: readonly [string, ...string[]]) =>
@@ -254,6 +254,19 @@ const validateCourierFields = (data: any, ctx: z.RefinementCtx, prefix: string) 
     }
 };
 
+const DD_COURIER_REQUIRED_FIELDS = [
+    ['ddCourierOrg', 'Organization Name'],
+    ['ddCourierName', 'Recipient Name'],
+    ['ddCourierPhone', 'Phone'],
+    ['ddCourierAddressLine1', 'Address Line 1'],
+    ['ddCourierCity', 'City'],
+    ['ddCourierState', 'State'],
+    ['ddCourierPincode', 'Pin Code'],
+    ['ddCourierEmpFrom', 'Courier From'],
+    ['ddCourierDelDate', 'Expected Delivery Date'],
+    ['ddCourierUrgency', 'Dispatch Urgency'],
+] as const;
+
 export const DemandDraftSchema = z.object({
     ddPurpose: z.string().optional(),
     ddAmount: z.coerce.number().optional(),
@@ -268,6 +281,10 @@ export const DemandDraftSchema = z.object({
     ddCourierCity: z.string().optional(),
     ddCourierState: z.string().optional(),
     ddCourierPincode: z.string().optional(),
+    ddCourierOrg: z.string().optional(),
+    ddCourierEmpFrom: z.coerce.number().optional(),
+    ddCourierDelDate: z.string().optional(),
+    ddCourierUrgency: z.coerce.number().optional(),
     ddCourierHours: z.coerce.number().optional(),
     ddDate: z.string().optional(),
     ddRemarks: z.string().optional(),
@@ -289,7 +306,7 @@ export const DemandDraftSchema = z.object({
     if (!data.ddDeliverBy) {
         ctx.addIssue({
             code: 'custom',
-            message: 'Deliver By is required',
+            message: 'DD Needed In is required',
             path: ['ddDeliverBy'],
         });
     }
@@ -300,12 +317,26 @@ export const DemandDraftSchema = z.object({
             path: ['ddPurpose'],
         });
     }
-    validateCourierFields(data, ctx, 'dd');
-    if (!data.ddCourierHours) {
+    for (const [key, label] of DD_COURIER_REQUIRED_FIELDS) {
+        const value = (data as Record<string, any>)[key];
+        const missing =
+            value === undefined ||
+            value === null ||
+            (typeof value === 'string' && value.trim() === '') ||
+            (typeof value === 'number' && isNaN(value));
+        if (missing) {
+            ctx.addIssue({
+                code: 'custom',
+                message: `${label} is required`,
+                path: [key],
+            });
+        }
+    }
+    if (typeof data.ddCourierPincode === 'string' && data.ddCourierPincode.trim() !== '' && !/^\d{6}$/.test(data.ddCourierPincode.trim())) {
         ctx.addIssue({
             code: 'custom',
-            message: 'Courier Hours is required',
-            path: ['ddCourierHours'],
+            message: 'Pin Code must be 6 digits',
+            path: ['ddCourierPincode'],
         });
     }
     if (!data.ddDate || (typeof data.ddDate === 'string' && data.ddDate.trim() === '')) {

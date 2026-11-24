@@ -82,6 +82,7 @@ export const BG_PURPOSE_OPTIONS = [
 export const DELIVERY_OPTIONS = [
     { value: 'TENDER_DUE', label: 'Tender Due Date' },
     { value: '24', label: '24 Hours' },
+    { value: '36', label: '36 Hours' },
     { value: '48', label: '48 Hours' },
 ];
 

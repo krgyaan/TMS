@@ -164,6 +164,9 @@ export default function DemandDraftActionPage() {
                             courierCity: actionFormData.courierAddressJson?.city ?? undefined,
                             courierState: actionFormData.courierAddressJson?.state ?? undefined,
                             courierPincode: actionFormData.courierAddressJson?.pincode ?? undefined,
+                            empFrom: actionFormData.courierAddressJson?.empFrom != null ? String(actionFormData.courierAddressJson.empFrom) : undefined,
+                            delDate: actionFormData.courierAddressJson?.delDate ?? undefined,
+                            urgency: actionFormData.courierAddressJson?.urgency != null ? String(actionFormData.courierAddressJson.urgency) : undefined,
                         } : undefined,
                         initiateFollowup: followupData ? {
                             organisationName: followupData.organisationName ?? undefined,

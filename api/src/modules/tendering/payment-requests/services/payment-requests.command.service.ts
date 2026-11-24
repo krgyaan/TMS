@@ -935,8 +935,8 @@ export class PaymentRequestsCommandService {
                 details[`${shorthand}CourierAddress`] ||
                 details.bgCourierAddress ||
                 [
-                    details[`${shorthand}CourierAddrLine1`] || details.bgCourierAddrLine1,
-                    details[`${shorthand}CourierAddrLine2`] || details.bgCourierAddrLine2,
+                    details[`${shorthand}CourierAddressLine1`] || details[`${shorthand}CourierAddrLine1`] || details.bgCourierAddrLine1,
+                    details[`${shorthand}CourierAddressLine2`] || details[`${shorthand}CourierAddrLine2`] || details.bgCourierAddrLine2,
                     details[`${shorthand}CourierCity`] || details.bgCourierCity,
                     details[`${shorthand}CourierState`] || details.bgCourierState,
                     details[`${shorthand}CourierPincode`] || details.bgCourierPincode,
@@ -952,6 +952,10 @@ export class PaymentRequestsCommandService {
                 city: details[`${shorthand}CourierCity`] || null,
                 state: details[`${shorthand}CourierState`] || null,
                 pincode: details[`${shorthand}CourierPincode`] || null,
+                org: details[`${shorthand}CourierOrg`] || null,
+                empFrom: details[`${shorthand}CourierEmpFrom`] ?? null,
+                delDate: details[`${shorthand}CourierDelDate`] || null,
+                urgency: details[`${shorthand}CourierUrgency`] ?? null,
             } : (normalizedMode === 'FDR' || normalizedMode === 'BG') ? {
                 org: details[`${shorthand}CourierOrg`] || details.bgCourierOrg || null,
                 name: details[`${shorthand}CourierName`] || details.bgCourierName || null,
@@ -974,6 +978,12 @@ export class PaymentRequestsCommandService {
         if (normalizedMode === 'FDR') {
             if (!details.fdrDate) delete instrumentUpdate.issueDate;
             if (!details.fdrCourierHours) delete instrumentUpdate.courierDeadline;
+        }
+
+        // The tender DD form no longer captures courier hours; keep the previously
+        // stored deadline instead of nulling it when editing an existing request.
+        if (normalizedMode === 'DD' && details.ddCourierHours === undefined) {
+            delete instrumentUpdate.courierDeadline;
         }
 
         await tx
