@@ -97,10 +97,8 @@ export function ChequeView({
 
     const expiryStatus = getExpiryStatus(data.dueDate || data.chequeDate, data.chequeReason, data.linkedDdStatus);
 
-    const getChequeStatus = (status: string | null, chequeReason: string | null, linkedDdStatus?: string | null): string => {
+    const getChequeStatus = (status: string | null): string => {
         if (status === 'ACCOUNTS_FORM_ACCEPTED') {
-            if (chequeReason === 'DD') return isDdCreated(linkedDdStatus) ? 'DD Created' : 'DD Requested';
-            if (chequeReason === 'FDR') return 'FDR Created';
             return 'Cheque Created';
         }
         const map: Record<string, string> = {
@@ -179,7 +177,7 @@ export function ChequeView({
                                     Status
                                 </TableCell>
                                 <TableCell className="text-sm">
-                                    <Badge variant="outline">{getChequeStatus(data.status || data.chequeStatus, data.chequeReason, data.linkedDdStatus)}</Badge>
+                                    <Badge variant="outline">{getChequeStatus(data.status || data.chequeStatus)}</Badge>
                                 </TableCell>
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Purpose

@@ -44,10 +44,8 @@ export class ChequeService {
             linkedDdStatus !== DD_STATUSES.ACCOUNTS_FORM_REJECTED;
     }
 
-    private deriveChequeStatus(status: string | null, chequeReason: string | null, linkedDdStatus?: string | null): string {
+    private deriveChequeStatus(status: string | null): string {
         if (status === CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED) {
-            if (chequeReason === 'DD') return this.isDdCreated(linkedDdStatus) ? 'DD Created' : 'DD Requested';
-            if (chequeReason === 'FDR') return 'FDR Created';
             return 'Cheque Created';
         }
         const map: Record<string, string> = {
@@ -278,7 +276,7 @@ export class ChequeService {
             cheque: row.cheque,
             dueDate: row.dueDate ? new Date(row.dueDate) : null,
             expiry: this.deriveExpiryStatus(row.dueDate ? new Date(row.dueDate) : null, row.type, row.chequeStatus, row.linkedDdStatus),
-            chequeStatus: this.deriveChequeStatus(row.chequeStatus, row.type, row.linkedDdStatus),
+            chequeStatus: this.deriveChequeStatus(row.chequeStatus),
         }));
 
         return wrapPaginatedResponse(data, total, page, limit);
@@ -351,7 +349,7 @@ export class ChequeService {
             cheque: row.cheque,
             dueDate: row.dueDate ? new Date(row.dueDate) : null,
             expiry: this.deriveExpiryStatus(row.dueDate ? new Date(row.dueDate) : null, row.type, row.chequeStatus, row.linkedDdStatus),
-            chequeStatus: this.deriveChequeStatus(row.chequeStatus, row.type, row.linkedDdStatus),
+            chequeStatus: this.deriveChequeStatus(row.chequeStatus),
             utr: row.utr,
             rejectionReason: row.rejectionReason,
             issueDate: row.issueDate ? new Date(row.issueDate) : null,
@@ -1056,7 +1054,7 @@ export class ChequeService {
             action: result.action,
             status: result.status,
             rejectionReason: result.rejectionReason,
-            chequeStatus: this.deriveChequeStatus(result.status, result.chequeReason, result.linkedDdStatus),
+            chequeStatus: this.deriveChequeStatus(result.status),
             linkedDdStatus: result.linkedDdStatus,
             tenderNo: result.tenderNo,
             tenderName: result.tenderName,
