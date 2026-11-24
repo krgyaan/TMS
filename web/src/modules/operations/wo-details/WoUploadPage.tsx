@@ -8,6 +8,7 @@ import { useCompleteWoUpload, useWoDetailWithRelations } from '@/hooks/api/useWo
 import { useDeleteWoDocument, useUploadWoDocument, useWoDocumentsByType } from '@/hooks/api/useWoDocuments';
 import { formatDate } from '@/hooks/useFormatedDate';
 import { parseFileArray } from '@/lib/utils';
+import { resolveFileUrl } from '../helpers/resolveFileUrl';
 import type { DocumentType } from '@/modules/operations/types/wo.types';
 import { ArrowLeft, Calendar, Hash } from 'lucide-react';
 import { useMemo } from 'react';
@@ -58,12 +59,6 @@ const WoDocumentUploader = ({ woDetailId, type, context, label }: WoDocumentUplo
             onChange={handleChange}
         />
     );
-};
-
-const getFileUrl = (filePath: string): string => {
-    const fileName = filePath.split('/').pop() || filePath;
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
-    return `${baseUrl}/files/serve/wo-draft/${encodeURIComponent(fileName)}`;
 };
 
 const WoUploadPage = () => {
@@ -167,7 +162,7 @@ const WoUploadPage = () => {
                                         {basicDraftFiles.map((file, idx) => (
                                             <a
                                                 key={idx}
-                                                href={getFileUrl(file)}
+                                                href={resolveFileUrl(file, 'wo-draft')}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="text-primary underline text-sm"

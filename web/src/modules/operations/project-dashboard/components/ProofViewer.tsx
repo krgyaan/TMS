@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/modules/performance/tender-executive/components/emd-helpers";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { resolveFileUrl } from "../../helpers/resolveFileUrl";
 
 export interface ProofViewerProps {
     isOpen: boolean;
@@ -88,14 +89,8 @@ export const ProofViewer: React.FC<ProofViewerProps> = ({
     const getFullUrl = (url: string): string => {
         if (!url) return '';
         if (isValidUrl(url)) return url;
-        
-        // If it's a relative path, prepend the API base URL
-        // Adjust this based on your backend URL structure
-        const baseUrl = "https://tmsv2.volksenergie.in/uploads/employee-imprest";
-        
-        // Remove leading slash if present to avoid double slashes
-        const cleanPath = url.startsWith('/') ? url : `/${url}`;
-        return `${baseUrl}${cleanPath}`;
+
+        return resolveFileUrl(url, 'employee-imprest');
     };
 
     // Determine file type from URL

@@ -1,4 +1,4 @@
-import { items, locations, organizations, projects, teams, tenderClients, tenderCostingDetails, tenderCostingSheets, tenderInfos, tenderInformation } from '@/db/schemas';
+import { items, locations, organizations, projects, teams, tenderClients, tenderCostingDetails, tenderCostingSheets, tenderInfos, tenderInformation, tenderResults } from '@/db/schemas';
 import { AppLogger } from '@/logger/app-logger.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { CashFlowService } from '@/modules/operations/cash-flows/cash-flow.service';
@@ -11,7 +11,7 @@ import { DRIZZLE } from '@db/database.module';
 import { users } from '@db/schemas/auth/users.schema';
 import { woBasicDetails, woContacts, woDetails, woOrderRevisions } from '@db/schemas/operations';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { AssignOeDto, BulkAssignOeDto, CreateWoBasicDetailDto, RemoveOeAssignmentDto, ReviseOrderDto, UpdateWoBasicDetailDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
 import { computeGemChargesBreakdown, gemBreakdownToDbColumns } from './helpers/gem-charges.helper';
@@ -508,20 +508,6 @@ export class WoBasicDetailsService {
 
         const insertValues = this.mapCreateToDb(data);
 
-        // For multiple orders, derive the sequence number (count of existing orders for the tender + 1)
-        const orderType = data.orderType ?? 'single';
-        if (orderType === 'multiple' && data.tenderId) {
-            const [{ count }] = await this.db
-                .select({ count: sql<number>`count(*)::int` })
-                .from(woBasicDetails)
-                .where(eq(woBasicDetails.tenderId, data.tenderId));
-            insertValues.orderType = 'multiple';
-            insertValues.orderSequence = (count ?? 0) + 1;
-        } else {
-            insertValues.orderType = insertValues.orderType ?? orderType;
-            insertValues.orderSequence = insertValues.orderSequence ?? 1;
-        }
-
         if (userId) {
             insertValues.createdBy = userId;
             insertValues.updatedBy = userId;
@@ -536,11 +522,72 @@ export class WoBasicDetailsService {
             }
         }
 
-        // Create WO Basic Detail
-        const [row] = await this.db
-            .insert(woBasicDetails)
-            .values(insertValues)
-            .returning();
+        const orderType = data.orderType ?? 'single';
+
+        // Allocate the next sequence and insert atomically so concurrent creates
+        // cannot reuse the same order number. max+1 (rather than count+1) also
+        // avoids repeating a sequence after an earlier order was deleted.
+        const [row] = await this.db.transaction(async (tx) => {
+            let effectiveOrderType = orderType;
+
+            if (data.tenderId) {
+                const [{ existingOrders }] = await tx
+                    .select({ existingOrders: sql<number>`count(*)::int` })
+                    .from(woBasicDetails)
+                    .where(eq(woBasicDetails.tenderId, data.tenderId));
+
+                if ((existingOrders ?? 0) > 0) {
+                    // Additional orders are only allowed once the tender is won.
+                    const [latestResult] = await tx
+                        .select({ status: tenderResults.status })
+                        .from(tenderResults)
+                        .where(eq(tenderResults.tenderId, data.tenderId))
+                        .orderBy(desc(tenderResults.createdAt))
+                        .limit(1);
+
+                    if ((latestResult?.status ?? '').trim().toLowerCase() !== 'won') {
+                        throw new BadRequestException(
+                            'A new order can only be added to a won tender.',
+                        );
+                    }
+
+                    // A tender with existing orders is always a multi-order batch,
+                    // regardless of what the client submitted.
+                    effectiveOrderType = 'multiple';
+                }
+            }
+
+            if (effectiveOrderType === 'multiple' && data.tenderId) {
+                const [{ maxSequence }] = await tx
+                    .select({ maxSequence: sql<number | null>`max(${woBasicDetails.orderSequence})::int` })
+                    .from(woBasicDetails)
+                    .where(eq(woBasicDetails.tenderId, data.tenderId));
+                insertValues.orderType = 'multiple';
+                insertValues.orderSequence = (maxSequence ?? 0) + 1;
+            } else {
+                insertValues.orderType = insertValues.orderType ?? effectiveOrderType;
+                insertValues.orderSequence = insertValues.orderSequence ?? 1;
+            }
+
+            const [inserted] = await tx
+                .insert(woBasicDetails)
+                .values(insertValues)
+                .returning();
+
+            // Adding another order turns the whole tender into a multi-order batch,
+            // so mark existing siblings as 'multiple' as well.
+            if (effectiveOrderType === 'multiple' && data.tenderId) {
+                await tx
+                    .update(woBasicDetails)
+                    .set({ orderType: 'multiple', updatedAt: new Date() })
+                    .where(and(
+                        eq(woBasicDetails.tenderId, data.tenderId),
+                        ne(woBasicDetails.id, inserted.id),
+                    ));
+            }
+
+            return [inserted] as const;
+        });
 
         // Update tender status to 26 (Wo Basic detail filled) after successful creation
         if (data.tenderId && userId) {
@@ -1322,7 +1369,8 @@ export class WoBasicDetailsService {
         const rows = await this.db
             .select()
             .from(woBasicDetails)
-            .where(eq(woBasicDetails.tenderId, tenderId));
+            .where(eq(woBasicDetails.tenderId, tenderId))
+            .orderBy(asc(woBasicDetails.orderSequence), asc(woBasicDetails.id));
 
         return rows.map((r) => this.mapRowToResponse(r));
     }
@@ -1331,7 +1379,8 @@ export class WoBasicDetailsService {
         const rows = await this.db
             .select()
             .from(woBasicDetails)
-            .where(eq(woBasicDetails.enquiryId, enquiryId));
+            .where(eq(woBasicDetails.enquiryId, enquiryId))
+            .orderBy(asc(woBasicDetails.orderSequence), asc(woBasicDetails.id));
 
         return rows.map((r) => this.mapRowToResponse(r));
     }
