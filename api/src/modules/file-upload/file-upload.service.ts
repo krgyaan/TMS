@@ -8,7 +8,7 @@ import * as path from 'path';
 import sharp from 'sharp';
 import { PDFDocument } from 'pdf-lib';
 import { AppLogger } from '@/logger/app-logger.service';
-import { getFileConfig, getStorageDir, formatBytes, isImage, type FileContext, type FileConfig, type ResolvedFileConfig, FILE_CONFIGS } from './config';
+import { getFileConfig, getStorageDir, formatBytes, isImage, type FileContext, type FileConfig, type ResolvedFileConfig, FILE_CONFIGS, LEGACY_CONTEXT_ALIASES, DEFAULT_STORAGE_DIR } from './config';
 
 export interface UploadedFile {
     originalName: string;
@@ -108,15 +108,17 @@ export class FileUploadService implements OnModuleInit {
             // Legacy flat `<context>/<file>`: resolve against the module-level
             // directory the file was written to at the time (a context may have
             // been moved into a nested storageDir since).
-            const context = segments[0];
+            const rawContext = segments[0];
+            const context = (LEGACY_CONTEXT_ALIASES[rawContext] ?? rawContext) as FileContext;
             if (!(context in FILE_CONFIGS)) {
-                throw new BadRequestException(`Unknown file context: ${context}`);
+                throw new BadRequestException(`Unknown file context: ${rawContext}`);
             }
             const config = getFileConfig(context);
+            const canonicalPath = [context, ...segments.slice(1)].join('/');
             resolved = path.join(
                 this.uploadsRoot,
                 config.moduleStorageDir ?? getStorageDir(context),
-                normalized,
+                canonicalPath,
             );
         }
 
@@ -417,6 +419,53 @@ export class FileUploadService implements OnModuleInit {
             return true;
         } catch {
             return false;
+        }
+    }
+
+    async resolveExistingAbsolutePath(filePath: string, legacyContext?: string): Promise<string | null> {
+        const normalized = filePath.replace(/\\/g, '/').replace(/^\/+/, '');
+        const segments = normalized.split('/');
+        if (!normalized || segments.includes('..')) {
+            throw new BadRequestException('Invalid file path');
+        }
+
+        const fileName = segments[segments.length - 1];
+        const candidates: string[] = [];
+        const canonicalCandidate = this.tryResolveAbsolutePath(filePath);
+        if (canonicalCandidate) candidates.push(canonicalCandidate);
+
+        const legacyFolders = new Set<string>();
+        if (legacyContext) legacyFolders.add(legacyContext);
+        if (segments.length > 1) legacyFolders.add(segments[0]);
+
+        const storageDirs = new Set<string>(['', DEFAULT_STORAGE_DIR]);
+        for (const config of Object.values(FILE_CONFIGS)) {
+            if (config.storageDir) storageDirs.add(config.storageDir);
+        }
+
+        for (const folder of legacyFolders) {
+            if (!folder || folder === '.' || folder === '..' || folder.includes('/')) continue;
+            for (const dir of storageDirs) {
+                candidates.push(path.join(this.uploadsRoot, dir, folder, fileName));
+            }
+        }
+
+        const root = path.resolve(this.uploadsRoot);
+        for (const candidate of candidates) {
+            const resolved = path.resolve(candidate);
+            if (resolved !== root && !resolved.startsWith(root + path.sep)) continue;
+            const accessible = await fs.access(resolved).then(() => true).catch(() => false);
+            if (accessible) return resolved;
+        }
+        return null;
+    }
+
+    private tryResolveAbsolutePath(filePath: string): string | null {
+        try {
+            return this.resolveAbsolutePath(filePath);
+        } catch (error) {
+            if (error instanceof BadRequestException) return null;
+            throw error;
         }
     }
 

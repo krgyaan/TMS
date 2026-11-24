@@ -51,6 +51,17 @@ export const FILE_CONFIGS: Record<string, ResolvedFileConfig> = {
 
 export type FileContext = keyof typeof FILE_CONFIGS;
 
+export const LEGACY_CONTEXT_ALIASES: Record<string, FileContext> = {
+    draftWo: 'wo-draft',
+};
+
+export function resolveFileContext(value: string): FileContext | undefined {
+    if (Object.prototype.hasOwnProperty.call(FILE_CONFIGS, value)) {
+        return value as FileContext;
+    }
+    return LEGACY_CONTEXT_ALIASES[value];
+}
+
 export function getFileConfig(context: FileContext): ResolvedFileConfig {
     const config = FILE_CONFIGS[context];
     if (!config) {
