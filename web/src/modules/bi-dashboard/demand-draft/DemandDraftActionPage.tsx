@@ -148,10 +148,9 @@ export default function DemandDraftActionPage() {
                     linkedCheque={actionFormData?.linkedCheque ?? null}
                     formHistory={{
                         accountsForm: actionFormData ? {
-                            ddReq: actionFormData.ddStatus === 'Rejected' ? 'Rejected' :
-                                   actionFormData.ddStatus === 'Accepted' ? 'Accepted' :
-                                   actionFormData.ddRemarks ? 'Accepted' : undefined,
-                            reasonReq: actionFormData.ddStatus === 'Rejected' ? (actionFormData as any).rejectionReason ?? undefined : undefined,
+                            ddReq: actionFormData.status === 'ACCOUNTS_FORM_REJECTED' ? 'Rejected' :
+                                   (actionFormData.action ?? 0) >= 1 ? 'Accepted' : undefined,
+                            reasonReq: actionFormData.status === 'ACCOUNTS_FORM_REJECTED' ? actionFormData.rejectionReason ?? undefined : undefined,
                             ddNo: actionFormData.ddNo ?? undefined,
                             ddDate: actionFormData.ddDate ? new Date(actionFormData.ddDate).toISOString() : undefined,
                             reqNo: actionFormData.reqNo ?? undefined,

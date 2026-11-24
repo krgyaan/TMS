@@ -176,7 +176,7 @@ export class DemandDraftService {
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentDdDetails, eq(instrumentDdDetails.instrumentId, paymentInstruments.id))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
@@ -264,7 +264,7 @@ export class DemandDraftService {
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentDdDetails, eq(instrumentDdDetails.instrumentId, paymentInstruments.id))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
@@ -679,6 +679,7 @@ export class DemandDraftService {
                 id: paymentInstruments.id,
                 action: paymentInstruments.action,
                 status: paymentInstruments.status,
+                rejectionReason: paymentInstruments.rejectionReason,
                 amount: paymentInstruments.amount,
                 favouring: paymentInstruments.favouring,
                 payableAt: paymentInstruments.payableAt,
@@ -783,6 +784,8 @@ export class DemandDraftService {
         return {
             id: result.id,
             action: result.action,
+            status: result.status,
+            rejectionReason: result.rejectionReason,
             ddStatus: this.deriveDdStatus(result.status),
             tenderNo: result.tenderNo,
             tenderName: result.tenderName,
