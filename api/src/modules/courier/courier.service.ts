@@ -605,7 +605,7 @@ export class CourierService {
                             fromName: requester?.name ?? "",
                             delDate: this.formatMailDateOnly(courier.delDate),
                             urgency: URGENCY_LABELS[courier.urgency] ?? String(courier.urgency),
-                            dispatchLink: `${this.configService.get<string>('app.publicAppUrl')}/shared/couriers/dispatch/${courier.id}`,
+                            dispatchLink: `${this.configService.get<string>('app.publicAppUrl')}/shared/couriers/action/${courier.id}`,
                             hasAttachments: courierDocs.length > 0,
                         },
                         {
