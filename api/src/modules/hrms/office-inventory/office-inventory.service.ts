@@ -5,7 +5,7 @@ import {
     Injectable,
     NotFoundException,
 } from "@nestjs/common";
-import { asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import {
@@ -70,39 +70,52 @@ export class OfficeInventoryService {
     }
 
     async listItems() {
-        const [items, purchaseSums, consumptionSums] = await Promise.all([
-            this.db
-                .select()
-                .from(officeInventoryItems)
-                .orderBy(asc(officeInventoryItems.itemCode)),
-            this.db
-                .select({
-                    itemId: officeInventoryPurchases.itemId,
-                    totalQty: sql<string>`COALESCE(SUM(${officeInventoryPurchases.qtyPurchased}), 0)`,
-                })
-                .from(officeInventoryPurchases)
-                .groupBy(officeInventoryPurchases.itemId),
-            this.db
-                .select({
-                    itemId: officeInventoryConsumptions.itemId,
-                    totalQty: sql<string>`COALESCE(SUM(${officeInventoryConsumptions.qtyIssued}), 0)`,
-                })
-                .from(officeInventoryConsumptions)
-                .groupBy(officeInventoryConsumptions.itemId),
-        ]);
+        const purchaseAgg = this.db
+            .select({
+                itemId: officeInventoryPurchases.itemId,
+                totalQty: sql<string>`COALESCE(SUM(${officeInventoryPurchases.qtyPurchased}), 0)`.as(
+                    "purchased_qty"
+                ),
+            })
+            .from(officeInventoryPurchases)
+            .groupBy(officeInventoryPurchases.itemId)
+            .as("purchase_agg");
 
-        const purchasedMap = new Map<number, number>(
-            purchaseSums.map(r => [r.itemId, toNum(r.totalQty)])
-        );
-        const consumedMap = new Map<number, number>(
-            consumptionSums.map(r => [r.itemId, toNum(r.totalQty)])
-        );
+        const consumptionAgg = this.db
+            .select({
+                itemId: officeInventoryConsumptions.itemId,
+                totalQty: sql<string>`COALESCE(SUM(${officeInventoryConsumptions.qtyIssued}), 0)`.as(
+                    "consumed_qty"
+                ),
+            })
+            .from(officeInventoryConsumptions)
+            .groupBy(officeInventoryConsumptions.itemId)
+            .as("consumption_agg");
 
-        return items.map(item => {
+        const rows = await this.db
+            .select({
+                id: officeInventoryItems.id,
+                category: officeInventoryItems.category,
+                itemCode: officeInventoryItems.itemCode,
+                itemName: officeInventoryItems.itemName,
+                unit: officeInventoryItems.unit,
+                minStockLevel: officeInventoryItems.minStockLevel,
+                openingStock: officeInventoryItems.openingStock,
+                createdAt: officeInventoryItems.createdAt,
+                updatedAt: officeInventoryItems.updatedAt,
+                totalPurchased: sql<string>`COALESCE(${purchaseAgg.totalQty}, 0)`,
+                totalConsumed: sql<string>`COALESCE(${consumptionAgg.totalQty}, 0)`,
+            })
+            .from(officeInventoryItems)
+            .leftJoin(purchaseAgg, eq(officeInventoryItems.id, purchaseAgg.itemId))
+            .leftJoin(consumptionAgg, eq(officeInventoryItems.id, consumptionAgg.itemId))
+            .orderBy(asc(officeInventoryItems.itemCode));
+
+        return rows.map(item => {
             const openingStock = toNum(item.openingStock);
             const minStockLevel = toNum(item.minStockLevel);
-            const totalPurchased = purchasedMap.get(item.id) ?? 0;
-            const totalConsumed = consumedMap.get(item.id) ?? 0;
+            const totalPurchased = toNum(item.totalPurchased);
+            const totalConsumed = toNum(item.totalConsumed);
             const { currentStock, status } = computeItemStock(
                 openingStock,
                 totalPurchased,
@@ -199,25 +212,18 @@ export class OfficeInventoryService {
     }
 
     async deleteItem(id: number) {
-        const [existing] = await this.db
-            .select({ id: officeInventoryItems.id })
+        const [row] = await this.db
+            .select({
+                id: officeInventoryItems.id,
+                purchaseCount: sql<number>`(SELECT COUNT(*)::int FROM ${officeInventoryPurchases} WHERE ${officeInventoryPurchases.itemId} = ${officeInventoryItems.id})`,
+                consumptionCount: sql<number>`(SELECT COUNT(*)::int FROM ${officeInventoryConsumptions} WHERE ${officeInventoryConsumptions.itemId} = ${officeInventoryItems.id})`,
+            })
             .from(officeInventoryItems)
             .where(eq(officeInventoryItems.id, id))
             .limit(1);
-        if (!existing) throw new NotFoundException(`Item #${id} not found`);
 
-        const [pCount, cCount] = await Promise.all([
-            this.db
-                .select({ cnt: sql<number>`COUNT(*)::int` })
-                .from(officeInventoryPurchases)
-                .where(eq(officeInventoryPurchases.itemId, id)),
-            this.db
-                .select({ cnt: sql<number>`COUNT(*)::int` })
-                .from(officeInventoryConsumptions)
-                .where(eq(officeInventoryConsumptions.itemId, id)),
-        ]);
-
-        if ((pCount[0]?.cnt ?? 0) > 0 || (cCount[0]?.cnt ?? 0) > 0) {
+        if (!row) throw new NotFoundException(`Item #${id} not found`);
+        if (row.purchaseCount > 0 || row.consumptionCount > 0) {
             throw new BadRequestException(
                 "Cannot delete an item that has Purchase or Consumption logs. Delete those log entries first."
             );
@@ -227,36 +233,32 @@ export class OfficeInventoryService {
         return { deleted: true, id };
     }
 
-    private async getItemAvailableStock(itemId: number, excludeConsumptionId?: number): Promise<number> {
-        const [item] = await this.db
-            .select()
+    private async getItemAvailableStock(
+        itemId: number,
+        excludeConsumptionId?: number
+    ): Promise<number> {
+        const consumptionSumSql = excludeConsumptionId
+            ? sql<string>`(SELECT COALESCE(SUM(${officeInventoryConsumptions.qtyIssued}), 0) FROM ${officeInventoryConsumptions} WHERE ${officeInventoryConsumptions.itemId} = ${officeInventoryItems.id} AND ${officeInventoryConsumptions.id} <> ${excludeConsumptionId})`
+            : sql<string>`(SELECT COALESCE(SUM(${officeInventoryConsumptions.qtyIssued}), 0) FROM ${officeInventoryConsumptions} WHERE ${officeInventoryConsumptions.itemId} = ${officeInventoryItems.id})`;
+
+        const [row] = await this.db
+            .select({
+                openingStock: officeInventoryItems.openingStock,
+                minStockLevel: officeInventoryItems.minStockLevel,
+                totalPurchased: sql<string>`(SELECT COALESCE(SUM(${officeInventoryPurchases.qtyPurchased}), 0) FROM ${officeInventoryPurchases} WHERE ${officeInventoryPurchases.itemId} = ${officeInventoryItems.id})`,
+                totalConsumed: consumptionSumSql,
+            })
             .from(officeInventoryItems)
             .where(eq(officeInventoryItems.id, itemId))
             .limit(1);
-        if (!item) throw new NotFoundException(`Item #${itemId} not found`);
 
-        const [pRow, cRow] = await Promise.all([
-            this.db
-                .select({
-                    total: sql<string>`COALESCE(SUM(${officeInventoryPurchases.qtyPurchased}), 0)`,
-                })
-                .from(officeInventoryPurchases)
-                .where(eq(officeInventoryPurchases.itemId, itemId)),
-            this.db
-                .select({
-                    total: excludeConsumptionId
-                        ? sql<string>`COALESCE(SUM(CASE WHEN ${officeInventoryConsumptions.id} <> ${excludeConsumptionId} THEN ${officeInventoryConsumptions.qtyIssued} ELSE 0 END), 0)`
-                        : sql<string>`COALESCE(SUM(${officeInventoryConsumptions.qtyIssued}), 0)`,
-                })
-                .from(officeInventoryConsumptions)
-                .where(eq(officeInventoryConsumptions.itemId, itemId)),
-        ]);
+        if (!row) throw new NotFoundException(`Item #${itemId} not found`);
 
         return computeItemStock(
-            toNum(item.openingStock),
-            toNum(pRow[0]?.total),
-            toNum(cRow[0]?.total),
-            toNum(item.minStockLevel)
+            toNum(row.openingStock),
+            toNum(row.totalPurchased),
+            toNum(row.totalConsumed),
+            toNum(row.minStockLevel)
         ).currentStock;
     }
 
@@ -282,7 +284,10 @@ export class OfficeInventoryService {
                 createdAt: officeInventoryPurchases.createdAt,
             })
             .from(officeInventoryPurchases)
-            .innerJoin(officeInventoryItems, eq(officeInventoryPurchases.itemId, officeInventoryItems.id))
+            .innerJoin(
+                officeInventoryItems,
+                eq(officeInventoryPurchases.itemId, officeInventoryItems.id)
+            )
             .orderBy(desc(officeInventoryPurchases.purchaseDate), desc(officeInventoryPurchases.id));
 
         return rows.map(r => ({
@@ -327,7 +332,8 @@ export class OfficeInventoryService {
             .limit(1);
         if (!existing) throw new NotFoundException(`Purchase #${id} not found`);
 
-        const nextQty = dto.qtyPurchased !== undefined ? dto.qtyPurchased : toNum(existing.qtyPurchased);
+        const nextQty =
+            dto.qtyPurchased !== undefined ? dto.qtyPurchased : toNum(existing.qtyPurchased);
         const nextRate = dto.rate !== undefined ? dto.rate : toNum(existing.rate);
         const nextAmount = round2(nextQty * nextRate);
 
@@ -350,14 +356,11 @@ export class OfficeInventoryService {
     }
 
     async deletePurchase(id: number) {
-        const [existing] = await this.db
-            .select({ id: officeInventoryPurchases.id })
-            .from(officeInventoryPurchases)
+        const [deleted] = await this.db
+            .delete(officeInventoryPurchases)
             .where(eq(officeInventoryPurchases.id, id))
-            .limit(1);
-        if (!existing) throw new NotFoundException(`Purchase #${id} not found`);
-
-        await this.db.delete(officeInventoryPurchases).where(eq(officeInventoryPurchases.id, id));
+            .returning({ id: officeInventoryPurchases.id });
+        if (!deleted) throw new NotFoundException(`Purchase #${id} not found`);
         return { deleted: true, id };
     }
 
@@ -455,16 +458,11 @@ export class OfficeInventoryService {
     }
 
     async deleteConsumption(id: number) {
-        const [existing] = await this.db
-            .select({ id: officeInventoryConsumptions.id })
-            .from(officeInventoryConsumptions)
-            .where(eq(officeInventoryConsumptions.id, id))
-            .limit(1);
-        if (!existing) throw new NotFoundException(`Consumption #${id} not found`);
-
-        await this.db
+        const [deleted] = await this.db
             .delete(officeInventoryConsumptions)
-            .where(eq(officeInventoryConsumptions.id, id));
+            .where(eq(officeInventoryConsumptions.id, id))
+            .returning({ id: officeInventoryConsumptions.id });
+        if (!deleted) throw new NotFoundException(`Consumption #${id} not found`);
         return { deleted: true, id };
     }
 
@@ -484,29 +482,48 @@ export class OfficeInventoryService {
     }
 
     async listEquipment() {
-        const [equipmentRows, logSums] = await Promise.all([
-            this.db.select().from(officeEquipment).orderBy(asc(officeEquipment.equipmentCode)),
-            this.db
-                .select({
-                    equipmentId: officeEquipmentLogs.equipmentId,
-                    addedQty: sql<string>`COALESCE(SUM(CASE WHEN ${officeEquipmentLogs.movementType} = 'New Purchase' THEN ${officeEquipmentLogs.qty} ELSE 0 END), 0)`,
-                    discardedQty: sql<string>`COALESCE(SUM(CASE WHEN ${officeEquipmentLogs.movementType} IN ('Discard - End of Life', 'Discard - Damaged/Lost') THEN ${officeEquipmentLogs.qty} ELSE 0 END), 0)`,
-                })
-                .from(officeEquipmentLogs)
-                .groupBy(officeEquipmentLogs.equipmentId),
-        ]);
+        const logAgg = this.db
+            .select({
+                equipmentId: officeEquipmentLogs.equipmentId,
+                addedQty:
+                    sql<string>`COALESCE(SUM(CASE WHEN ${officeEquipmentLogs.movementType} = 'New Purchase' THEN ${officeEquipmentLogs.qty} ELSE 0 END), 0)`.as(
+                        "added_qty"
+                    ),
+                discardedQty:
+                    sql<string>`COALESCE(SUM(CASE WHEN ${officeEquipmentLogs.movementType} IN ('Discard - End of Life', 'Discard - Damaged/Lost') THEN ${officeEquipmentLogs.qty} ELSE 0 END), 0)`.as(
+                        "discarded_qty"
+                    ),
+            })
+            .from(officeEquipmentLogs)
+            .groupBy(officeEquipmentLogs.equipmentId)
+            .as("log_agg");
 
-        const sumsMap = new Map(
-            logSums.map(r => [
-                r.equipmentId,
-                { added: toNum(r.addedQty), discarded: toNum(r.discardedQty) },
-            ])
-        );
+        const rows = await this.db
+            .select({
+                id: officeEquipment.id,
+                category: officeEquipment.category,
+                equipmentCode: officeEquipment.equipmentCode,
+                itemName: officeEquipment.itemName,
+                unit: officeEquipment.unit,
+                location: officeEquipment.location,
+                openingQty: officeEquipment.openingQty,
+                unitCost: officeEquipment.unitCost,
+                condition: officeEquipment.condition,
+                remarks: officeEquipment.remarks,
+                createdAt: officeEquipment.createdAt,
+                updatedAt: officeEquipment.updatedAt,
+                addedQty: sql<string>`COALESCE(${logAgg.addedQty}, 0)`,
+                discardedQty: sql<string>`COALESCE(${logAgg.discardedQty}, 0)`,
+            })
+            .from(officeEquipment)
+            .leftJoin(logAgg, eq(officeEquipment.id, logAgg.equipmentId))
+            .orderBy(asc(officeEquipment.equipmentCode));
 
-        return equipmentRows.map(eqRow => {
+        return rows.map(eqRow => {
             const openingQty = toNum(eqRow.openingQty);
-            const sums = sumsMap.get(eqRow.id) ?? { added: 0, discarded: 0 };
-            const currentQty = computeEquipmentQty(openingQty, sums.added, sums.discarded);
+            const added = toNum(eqRow.addedQty);
+            const discarded = toNum(eqRow.discardedQty);
+            const currentQty = computeEquipmentQty(openingQty, added, discarded);
             return {
                 id: eqRow.id,
                 category: eqRow.category,
@@ -515,8 +532,8 @@ export class OfficeInventoryService {
                 unit: eqRow.unit,
                 location: eqRow.location,
                 openingQty,
-                qtyAdded: round2(sums.added),
-                qtyDiscarded: round2(sums.discarded),
+                qtyAdded: round2(added),
+                qtyDiscarded: round2(discarded),
                 currentQty,
                 unitCost: toNum(eqRow.unitCost),
                 condition: eqRow.condition,
@@ -601,18 +618,17 @@ export class OfficeInventoryService {
     }
 
     async deleteEquipment(id: number) {
-        const [existing] = await this.db
-            .select({ id: officeEquipment.id })
+        const [row] = await this.db
+            .select({
+                id: officeEquipment.id,
+                logCount: sql<number>`(SELECT COUNT(*)::int FROM ${officeEquipmentLogs} WHERE ${officeEquipmentLogs.equipmentId} = ${officeEquipment.id})`,
+            })
             .from(officeEquipment)
             .where(eq(officeEquipment.id, id))
             .limit(1);
-        if (!existing) throw new NotFoundException(`Equipment #${id} not found`);
 
-        const [logCount] = await this.db
-            .select({ cnt: sql<number>`COUNT(*)::int` })
-            .from(officeEquipmentLogs)
-            .where(eq(officeEquipmentLogs.equipmentId, id));
-        if ((logCount?.cnt ?? 0) > 0) {
+        if (!row) throw new NotFoundException(`Equipment #${id} not found`);
+        if (row.logCount > 0) {
             throw new BadRequestException(
                 "Cannot delete equipment with movement logs. Delete those movement entries first."
             );
@@ -651,7 +667,7 @@ export class OfficeInventoryService {
 
     async createEquipmentLog(userId: number, dto: CreateEquipmentLogDto) {
         const [eqRow] = await this.db
-            .select()
+            .select({ id: officeEquipment.id })
             .from(officeEquipment)
             .where(eq(officeEquipment.id, dto.equipmentId))
             .limit(1);
@@ -703,14 +719,11 @@ export class OfficeInventoryService {
     }
 
     async deleteEquipmentLog(id: number) {
-        const [existing] = await this.db
-            .select({ id: officeEquipmentLogs.id })
-            .from(officeEquipmentLogs)
+        const [deleted] = await this.db
+            .delete(officeEquipmentLogs)
             .where(eq(officeEquipmentLogs.id, id))
-            .limit(1);
-        if (!existing) throw new NotFoundException(`Equipment log #${id} not found`);
-
-        await this.db.delete(officeEquipmentLogs).where(eq(officeEquipmentLogs.id, id));
+            .returning({ id: officeEquipmentLogs.id });
+        if (!deleted) throw new NotFoundException(`Equipment log #${id} not found`);
         return { deleted: true, id };
     }
 
@@ -726,37 +739,72 @@ export class OfficeInventoryService {
     }
 
     async listAppliances() {
-        const [appliances, serviceAgg, cleaningAgg] = await Promise.all([
-            this.db.select().from(officeAppliances).orderBy(asc(officeAppliances.applianceCode)),
-            this.db
-                .select({
-                    applianceId: officeApplianceServices.applianceId,
-                    visitCount: sql<number>`COUNT(*)::int`,
-                    totalExpense: sql<string>`COALESCE(SUM(${officeApplianceServices.expense}), 0)`,
-                    lastServiceDate: sql<string | null>`MAX(${officeApplianceServices.serviceDate})`,
-                    nextServiceDue: sql<string | null>`MAX(${officeApplianceServices.nextServiceDue})`,
-                })
-                .from(officeApplianceServices)
-                .groupBy(officeApplianceServices.applianceId),
-            this.db
-                .select({
-                    applianceId: officeApplianceCleanings.applianceId,
-                    cleaningCount: sql<number>`COUNT(*)::int`,
-                    lastCleanedDate: sql<string | null>`MAX(${officeApplianceCleanings.cleaningDate})`,
-                })
-                .from(officeApplianceCleanings)
-                .groupBy(officeApplianceCleanings.applianceId),
-        ]);
+        const serviceAgg = this.db
+            .select({
+                applianceId: officeApplianceServices.applianceId,
+                visitCount: sql<number>`COUNT(*)::int`.as("visit_count"),
+                totalExpense: sql<string>`COALESCE(SUM(${officeApplianceServices.expense}), 0)`.as(
+                    "total_expense"
+                ),
+                lastServiceDate: sql<string | null>`MAX(${officeApplianceServices.serviceDate})`.as(
+                    "last_service_date"
+                ),
+                nextServiceDue:
+                    sql<string | null>`MAX(${officeApplianceServices.nextServiceDue})`.as(
+                        "next_service_due"
+                    ),
+            })
+            .from(officeApplianceServices)
+            .groupBy(officeApplianceServices.applianceId)
+            .as("service_agg");
 
-        const serviceMap = new Map(serviceAgg.map(r => [r.applianceId, r]));
-        const cleaningMap = new Map(cleaningAgg.map(r => [r.applianceId, r]));
+        const cleaningAgg = this.db
+            .select({
+                applianceId: officeApplianceCleanings.applianceId,
+                cleaningCount: sql<number>`COUNT(*)::int`.as("cleaning_count"),
+                lastCleanedDate:
+                    sql<string | null>`MAX(${officeApplianceCleanings.cleaningDate})`.as(
+                        "last_cleaned_date"
+                    ),
+            })
+            .from(officeApplianceCleanings)
+            .groupBy(officeApplianceCleanings.applianceId)
+            .as("cleaning_agg");
+
+        const rows = await this.db
+            .select({
+                id: officeAppliances.id,
+                applianceCode: officeAppliances.applianceCode,
+                applianceName: officeAppliances.applianceName,
+                brandModel: officeAppliances.brandModel,
+                location: officeAppliances.location,
+                purchaseDate: officeAppliances.purchaseDate,
+                purchaseCost: officeAppliances.purchaseCost,
+                warrantyExpiry: officeAppliances.warrantyExpiry,
+                serviceFrequency: officeAppliances.serviceFrequency,
+                cleaningFrequency: officeAppliances.cleaningFrequency,
+                status: officeAppliances.status,
+                discardDate: officeAppliances.discardDate,
+                notes: officeAppliances.notes,
+                createdAt: officeAppliances.createdAt,
+                updatedAt: officeAppliances.updatedAt,
+                visitCount: sql<number>`COALESCE(${serviceAgg.visitCount}, 0)`,
+                totalExpense: sql<string>`COALESCE(${serviceAgg.totalExpense}, 0)`,
+                lastServiceDate: serviceAgg.lastServiceDate,
+                nextServiceDue: serviceAgg.nextServiceDue,
+                cleaningCount: sql<number>`COALESCE(${cleaningAgg.cleaningCount}, 0)`,
+                lastCleanedDate: cleaningAgg.lastCleanedDate,
+            })
+            .from(officeAppliances)
+            .leftJoin(serviceAgg, eq(officeAppliances.id, serviceAgg.applianceId))
+            .leftJoin(cleaningAgg, eq(officeAppliances.id, cleaningAgg.applianceId))
+            .orderBy(asc(officeAppliances.applianceCode));
+
         const { today } = getCurrentWeekBounds();
 
-        return appliances.map(app => {
-            const svc = serviceMap.get(app.id);
-            const cln = cleaningMap.get(app.id);
-            const cleaningsCount = cln?.cleaningCount ?? 0;
-            const lastCleanedDate = cln?.lastCleanedDate ?? null;
+        return rows.map(app => {
+            const cleaningsCount = Number(app.cleaningCount) || 0;
+            const lastCleanedDate = app.lastCleanedDate ?? null;
             const nextCleaningDue = computeNextCleaningDue({
                 status: app.status,
                 cleaningFrequency: app.cleaningFrequency,
@@ -782,10 +830,10 @@ export class OfficeInventoryService {
                 status: app.status,
                 discardDate: app.discardDate,
                 notes: app.notes,
-                serviceVisitsCount: svc?.visitCount ?? 0,
-                totalMaintenanceExpense: round2(toNum(svc?.totalExpense)),
-                lastServiceDate: svc?.lastServiceDate ?? null,
-                nextServiceDue: svc?.nextServiceDue ?? null,
+                serviceVisitsCount: Number(app.visitCount) || 0,
+                totalMaintenanceExpense: round2(toNum(app.totalExpense)),
+                lastServiceDate: app.lastServiceDate ?? null,
+                nextServiceDue: app.nextServiceDue ?? null,
                 cleaningsCount,
                 lastCleanedDate,
                 nextCleaningDue,
@@ -884,25 +932,18 @@ export class OfficeInventoryService {
     }
 
     async deleteAppliance(id: number) {
-        const [existing] = await this.db
-            .select({ id: officeAppliances.id })
+        const [row] = await this.db
+            .select({
+                id: officeAppliances.id,
+                serviceCount: sql<number>`(SELECT COUNT(*)::int FROM ${officeApplianceServices} WHERE ${officeApplianceServices.applianceId} = ${officeAppliances.id})`,
+                cleaningCount: sql<number>`(SELECT COUNT(*)::int FROM ${officeApplianceCleanings} WHERE ${officeApplianceCleanings.applianceId} = ${officeAppliances.id})`,
+            })
             .from(officeAppliances)
             .where(eq(officeAppliances.id, id))
             .limit(1);
-        if (!existing) throw new NotFoundException(`Appliance #${id} not found`);
 
-        const [svcCount, clnCount] = await Promise.all([
-            this.db
-                .select({ cnt: sql<number>`COUNT(*)::int` })
-                .from(officeApplianceServices)
-                .where(eq(officeApplianceServices.applianceId, id)),
-            this.db
-                .select({ cnt: sql<number>`COUNT(*)::int` })
-                .from(officeApplianceCleanings)
-                .where(eq(officeApplianceCleanings.applianceId, id)),
-        ]);
-
-        if ((svcCount[0]?.cnt ?? 0) > 0 || (clnCount[0]?.cnt ?? 0) > 0) {
+        if (!row) throw new NotFoundException(`Appliance #${id} not found`);
+        if (row.serviceCount > 0 || row.cleaningCount > 0) {
             throw new BadRequestException(
                 "Cannot delete an appliance that has Service or Cleaning logs. Delete those logs first."
             );
@@ -993,16 +1034,11 @@ export class OfficeInventoryService {
     }
 
     async deleteApplianceService(id: number) {
-        const [existing] = await this.db
-            .select({ id: officeApplianceServices.id })
-            .from(officeApplianceServices)
-            .where(eq(officeApplianceServices.id, id))
-            .limit(1);
-        if (!existing) throw new NotFoundException(`Service visit #${id} not found`);
-
-        await this.db
+        const [deleted] = await this.db
             .delete(officeApplianceServices)
-            .where(eq(officeApplianceServices.id, id));
+            .where(eq(officeApplianceServices.id, id))
+            .returning({ id: officeApplianceServices.id });
+        if (!deleted) throw new NotFoundException(`Service visit #${id} not found`);
         return { deleted: true, id };
     }
 
@@ -1083,80 +1119,99 @@ export class OfficeInventoryService {
     }
 
     async deleteApplianceCleaning(id: number) {
-        const [existing] = await this.db
-            .select({ id: officeApplianceCleanings.id })
-            .from(officeApplianceCleanings)
-            .where(eq(officeApplianceCleanings.id, id))
-            .limit(1);
-        if (!existing) throw new NotFoundException(`Cleaning log #${id} not found`);
-
-        await this.db
+        const [deleted] = await this.db
             .delete(officeApplianceCleanings)
-            .where(eq(officeApplianceCleanings.id, id));
+            .where(eq(officeApplianceCleanings.id, id))
+            .returning({ id: officeApplianceCleanings.id });
+        if (!deleted) throw new NotFoundException(`Cleaning log #${id} not found`);
         return { deleted: true, id };
     }
 
     // =========================================================================
-    // 6. REPORTS & WEEKLY TASKS DASHBOARD
+    // 6. REPORTS & WEEKLY TASKS DASHBOARD (Single-query SQL aggregations)
     // =========================================================================
 
     private async buildPeriodReport(startDate: string, endDate: string, category?: string) {
-        const [items, purchases, consumptions] = await Promise.all([
-            this.listItems(),
-            this.db
-                .select({
-                    itemId: officeInventoryPurchases.itemId,
-                    qtyPurchased: officeInventoryPurchases.qtyPurchased,
-                    amount: officeInventoryPurchases.amount,
-                    purchaseDate: officeInventoryPurchases.purchaseDate,
-                })
-                .from(officeInventoryPurchases),
-            this.db
-                .select({
-                    itemId: officeInventoryConsumptions.itemId,
-                    qtyIssued: officeInventoryConsumptions.qtyIssued,
-                    consumptionDate: officeInventoryConsumptions.consumptionDate,
-                })
-                .from(officeInventoryConsumptions),
-        ]);
+        const purchaseAgg = this.db
+            .select({
+                itemId: officeInventoryPurchases.itemId,
+                allTimeQty: sql<string>`COALESCE(SUM(${officeInventoryPurchases.qtyPurchased}), 0)`.as(
+                    "all_purchased_qty"
+                ),
+                periodQty:
+                    sql<string>`COALESCE(SUM(${officeInventoryPurchases.qtyPurchased}) FILTER (WHERE ${officeInventoryPurchases.purchaseDate} >= ${startDate} AND ${officeInventoryPurchases.purchaseDate} <= ${endDate}), 0)`.as(
+                        "period_purchased_qty"
+                    ),
+                periodAmount:
+                    sql<string>`COALESCE(SUM(${officeInventoryPurchases.amount}) FILTER (WHERE ${officeInventoryPurchases.purchaseDate} >= ${startDate} AND ${officeInventoryPurchases.purchaseDate} <= ${endDate}), 0)`.as(
+                        "period_purchased_amount"
+                    ),
+            })
+            .from(officeInventoryPurchases)
+            .groupBy(officeInventoryPurchases.itemId)
+            .as("purchase_agg");
 
-        const filteredItems =
+        const consumptionAgg = this.db
+            .select({
+                itemId: officeInventoryConsumptions.itemId,
+                allTimeQty: sql<string>`COALESCE(SUM(${officeInventoryConsumptions.qtyIssued}), 0)`.as(
+                    "all_consumed_qty"
+                ),
+                periodQty:
+                    sql<string>`COALESCE(SUM(${officeInventoryConsumptions.qtyIssued}) FILTER (WHERE ${officeInventoryConsumptions.consumptionDate} >= ${startDate} AND ${officeInventoryConsumptions.consumptionDate} <= ${endDate}), 0)`.as(
+                        "period_consumed_qty"
+                    ),
+            })
+            .from(officeInventoryConsumptions)
+            .groupBy(officeInventoryConsumptions.itemId)
+            .as("consumption_agg");
+
+        const baseQuery = this.db
+            .select({
+                id: officeInventoryItems.id,
+                itemCode: officeInventoryItems.itemCode,
+                itemName: officeInventoryItems.itemName,
+                category: officeInventoryItems.category,
+                unit: officeInventoryItems.unit,
+                openingStock: officeInventoryItems.openingStock,
+                minStockLevel: officeInventoryItems.minStockLevel,
+                allPurchased: sql<string>`COALESCE(${purchaseAgg.allTimeQty}, 0)`,
+                allConsumed: sql<string>`COALESCE(${consumptionAgg.allTimeQty}, 0)`,
+                periodPurchased: sql<string>`COALESCE(${purchaseAgg.periodQty}, 0)`,
+                periodAmount: sql<string>`COALESCE(${purchaseAgg.periodAmount}, 0)`,
+                periodConsumed: sql<string>`COALESCE(${consumptionAgg.periodQty}, 0)`,
+            })
+            .from(officeInventoryItems)
+            .leftJoin(purchaseAgg, eq(officeInventoryItems.id, purchaseAgg.itemId))
+            .leftJoin(consumptionAgg, eq(officeInventoryItems.id, consumptionAgg.itemId));
+
+        const rawRows =
             category && category !== "All"
-                ? items.filter(i => i.category === category)
-                : items;
+                ? await baseQuery
+                      .where(eq(officeInventoryItems.category, category))
+                      .orderBy(asc(officeInventoryItems.itemCode))
+                : await baseQuery.orderBy(asc(officeInventoryItems.itemCode));
 
-        const purchaseByItem = new Map<number, { qty: number; amount: number }>();
-        for (const p of purchases) {
-            if (p.purchaseDate >= startDate && p.purchaseDate <= endDate) {
-                const cur = purchaseByItem.get(p.itemId) ?? { qty: 0, amount: 0 };
-                cur.qty += toNum(p.qtyPurchased);
-                cur.amount += toNum(p.amount);
-                purchaseByItem.set(p.itemId, cur);
-            }
-        }
-
-        const consumedByItem = new Map<number, number>();
-        for (const c of consumptions) {
-            if (c.consumptionDate >= startDate && c.consumptionDate <= endDate) {
-                consumedByItem.set(c.itemId, (consumedByItem.get(c.itemId) ?? 0) + toNum(c.qtyIssued));
-            }
-        }
-
-        const rows = filteredItems.map(item => {
-            const p = purchaseByItem.get(item.id) ?? { qty: 0, amount: 0 };
-            const qtyConsumed = round2(consumedByItem.get(item.id) ?? 0);
+        const rows = rawRows.map(r => {
+            const minStockLevel = toNum(r.minStockLevel);
+            const { currentStock, status } = computeItemStock(
+                toNum(r.openingStock),
+                toNum(r.allPurchased),
+                toNum(r.allConsumed),
+                minStockLevel
+            );
             return {
-                id: item.id,
-                itemCode: item.itemCode,
-                itemName: item.itemName,
-                category: item.category,
-                unit: item.unit,
-                qtyPurchased: round2(p.qty),
-                purchaseAmount: round2(p.amount),
-                qtyConsumed,
-                currentStock: item.currentStock,
-                minStockLevel: item.minStockLevel,
-                status: item.status,
+                id: r.id,
+                itemCode: r.itemCode,
+                itemName: r.itemName,
+                category: r.category,
+                unit: r.unit,
+                qtyPurchased: round2(toNum(r.periodPurchased)),
+                purchaseAmount: round2(toNum(r.periodAmount)),
+                qtyConsumed: round2(toNum(r.periodConsumed)),
+                currentStock,
+                minStockLevel,
+                status,
             };
         });
 
@@ -1195,16 +1250,73 @@ export class OfficeInventoryService {
 
     async getWeeklyTasksDashboard() {
         const { weekStart, weekEnd, today } = getCurrentWeekBounds();
-        const [items, appliances, purchases, consumptions, cleanings, services, eqLogs] =
-            await Promise.all([
-                this.listItems(),
-                this.listAppliances(),
-                this.db.select().from(officeInventoryPurchases),
-                this.db.select().from(officeInventoryConsumptions),
-                this.db.select().from(officeApplianceCleanings),
-                this.db.select().from(officeApplianceServices),
-                this.db.select().from(officeEquipmentLogs),
-            ]);
+
+        const [
+            items,
+            appliances,
+            [purchaseWeek],
+            [consumptionWeek],
+            [cleaningWeek],
+            [serviceWeek],
+            [eqWeek],
+        ] = await Promise.all([
+            this.listItems(),
+            this.listAppliances(),
+            this.db
+                .select({
+                    count: sql<number>`COUNT(*)::int`,
+                    value: sql<string>`COALESCE(SUM(${officeInventoryPurchases.amount}), 0)`,
+                })
+                .from(officeInventoryPurchases)
+                .where(
+                    and(
+                        gte(officeInventoryPurchases.purchaseDate, weekStart),
+                        lte(officeInventoryPurchases.purchaseDate, weekEnd)
+                    )
+                ),
+            this.db
+                .select({ count: sql<number>`COUNT(*)::int` })
+                .from(officeInventoryConsumptions)
+                .where(
+                    and(
+                        gte(officeInventoryConsumptions.consumptionDate, weekStart),
+                        lte(officeInventoryConsumptions.consumptionDate, weekEnd)
+                    )
+                ),
+            this.db
+                .select({ count: sql<number>`COUNT(*)::int` })
+                .from(officeApplianceCleanings)
+                .where(
+                    and(
+                        gte(officeApplianceCleanings.cleaningDate, weekStart),
+                        lte(officeApplianceCleanings.cleaningDate, weekEnd)
+                    )
+                ),
+            this.db
+                .select({
+                    count: sql<number>`COUNT(*)::int`,
+                    expense: sql<string>`COALESCE(SUM(${officeApplianceServices.expense}), 0)`,
+                })
+                .from(officeApplianceServices)
+                .where(
+                    and(
+                        gte(officeApplianceServices.serviceDate, weekStart),
+                        lte(officeApplianceServices.serviceDate, weekEnd)
+                    )
+                ),
+            this.db
+                .select({
+                    purchasesCount: sql<number>`COUNT(*) FILTER (WHERE ${officeEquipmentLogs.movementType} = 'New Purchase')::int`,
+                    discardsCount: sql<number>`COUNT(*) FILTER (WHERE ${officeEquipmentLogs.movementType} IN ('Discard - End of Life', 'Discard - Damaged/Lost'))::int`,
+                })
+                .from(officeEquipmentLogs)
+                .where(
+                    and(
+                        gte(officeEquipmentLogs.logDate, weekStart),
+                        lte(officeEquipmentLogs.logDate, weekEnd)
+                    )
+                ),
+        ]);
 
         const lowStockItems = items
             .filter(i => i.status === "LOW STOCK")
@@ -1251,22 +1363,6 @@ export class OfficeInventoryService {
                 isOverdue: a.nextServiceDue! < today,
             }));
 
-        const weekPurchases = purchases.filter(
-            p => p.purchaseDate >= weekStart && p.purchaseDate <= weekEnd
-        );
-        const weekConsumptions = consumptions.filter(
-            c => c.consumptionDate >= weekStart && c.consumptionDate <= weekEnd
-        );
-        const weekCleanings = cleanings.filter(
-            c => c.cleaningDate >= weekStart && c.cleaningDate <= weekEnd
-        );
-        const weekServices = services.filter(
-            s => s.serviceDate >= weekStart && s.serviceDate <= weekEnd
-        );
-        const weekEqLogs = eqLogs.filter(
-            l => l.logDate >= weekStart && l.logDate <= weekEnd
-        );
-
         return {
             weekStart,
             weekEnd,
@@ -1280,24 +1376,14 @@ export class OfficeInventoryService {
                 servicesDue,
             },
             completedThisWeek: {
-                purchasesCount: weekPurchases.length,
-                purchasesValue: round2(
-                    weekPurchases.reduce((sum, p) => sum + toNum(p.amount), 0)
-                ),
-                consumptionsCount: weekConsumptions.length,
-                cleaningsCount: weekCleanings.length,
-                servicesCount: weekServices.length,
-                servicesExpense: round2(
-                    weekServices.reduce((sum, s) => sum + toNum(s.expense), 0)
-                ),
-                equipmentPurchasesCount: weekEqLogs.filter(
-                    l => l.movementType === "New Purchase"
-                ).length,
-                equipmentDiscardsCount: weekEqLogs.filter(
-                    l =>
-                        l.movementType === "Discard - End of Life" ||
-                        l.movementType === "Discard - Damaged/Lost"
-                ).length,
+                purchasesCount: purchaseWeek?.count ?? 0,
+                purchasesValue: round2(toNum(purchaseWeek?.value)),
+                consumptionsCount: consumptionWeek?.count ?? 0,
+                cleaningsCount: cleaningWeek?.count ?? 0,
+                servicesCount: serviceWeek?.count ?? 0,
+                servicesExpense: round2(toNum(serviceWeek?.expense)),
+                equipmentPurchasesCount: eqWeek?.purchasesCount ?? 0,
+                equipmentDiscardsCount: eqWeek?.discardsCount ?? 0,
             },
         };
     }

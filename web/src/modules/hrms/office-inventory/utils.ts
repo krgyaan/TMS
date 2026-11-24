@@ -1,22 +1,6 @@
-export function formatCurrency(value: number | null | undefined): string {
-    if (value === null || value === undefined || Number.isNaN(value)) return "—";
-    return `₹${Number(value).toLocaleString("en-IN", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    })}`;
-}
-
 export function formatQty(value: number | null | undefined): string {
     if (value === null || value === undefined || Number.isNaN(value)) return "0";
     return Number.isInteger(value) ? String(value) : Number(value).toFixed(2);
-}
-
-export function formatDateDisplay(iso: string | null | undefined): string {
-    if (!iso) return "—";
-    const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
-    if (!y || !m || !d) return iso;
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    return `${String(d).padStart(2, "0")}-${months[m - 1]}-${y}`;
 }
 
 export function todayIso(): string {
@@ -45,13 +29,20 @@ export function currentMonthStartIso(): string {
     return `${y}-${m}-01`;
 }
 
-export function downloadCsv(filename: string, headers: string[], rows: Array<Array<string | number | null | undefined>>) {
+export function downloadCsv(
+    filename: string,
+    headers: string[],
+    rows: Array<Array<string | number | null | undefined>>
+) {
     const escapeCell = (v: string | number | null | undefined) => {
         const s = v === null || v === undefined ? "" : String(v);
         if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
         return s;
     };
-    const lines = [headers.map(escapeCell).join(","), ...rows.map(r => r.map(escapeCell).join(","))];
+    const lines = [
+        headers.map(escapeCell).join(","),
+        ...rows.map(r => r.map(escapeCell).join(",")),
+    ];
     const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

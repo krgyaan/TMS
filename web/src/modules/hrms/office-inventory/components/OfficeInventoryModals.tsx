@@ -47,8 +47,9 @@ import {
     type OfficeInventoryItem,
     type OfficeInventoryPurchase,
 } from "../types";
+import { formatINR } from "@/hooks/useINRFormatter";
 import { officeInventoryApi } from "../officeInventory.service";
-import { formatCurrency, formatQty, todayIso } from "../utils";
+import { formatQty, todayIso } from "../utils";
 
 export type ModalState =
     | { type: "closed" }
@@ -611,7 +612,7 @@ export function OfficeInventoryModals({
                             <div className="space-y-1">
                                 <Label>Amount (Auto)</Label>
                                 <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm font-semibold tabular-nums">
-                                    {formatCurrency(purchaseAmountPreview)}
+                                    {formatINR(purchaseAmountPreview)}
                                 </div>
                             </div>
                         </div>
