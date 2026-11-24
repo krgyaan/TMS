@@ -14,7 +14,7 @@ import { CourierForm } from "./components/CourierForm";
 
 const CourierEditPage = () => {
     const navigate = useNavigate();
-    const { user, role, teamId } = useAuth();
+    const { role, teamId } = useAuth();
     const { id } = useParams<{ id: string }>();
     const courierId = id ? parseInt(id, 10) : 0;
 
@@ -58,7 +58,7 @@ const CourierEditPage = () => {
         );
     }
 
-    const canEdit = isCourierPrivileged(role, teamId) || courier.userId === user?.id;
+    const canEdit = isCourierPrivileged(role, teamId);
 
     if (!canEdit) {
         return (

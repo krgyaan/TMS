@@ -72,7 +72,17 @@ export type CreateCourierInput = {
     urgency: number;
 };
 
-export type UpdateCourierInput = Partial<CreateCourierInput>;
+export type UpdateCourierInput = Partial<CreateCourierInput> & {
+    status?: number;
+    trackingNumber?: string | null;
+    courierProvider?: string | null;
+    pickupDate?: string | null;
+    docketNo?: string | null;
+    docketSlip?: string | null;
+    deliveryDate?: string | null;
+    deliveryPod?: string | null;
+    withinTime?: boolean | null;
+};
 
 export type UpdateStatusInput = {
     status: number;

@@ -13,14 +13,14 @@ import { CourierView } from "./components/CourierView";
 
 const CourierDetailsPage = () => {
     const navigate = useNavigate();
-    const { user, role, teamId } = useAuth();
+    const { role, teamId } = useAuth();
     const { id } = useParams<{ id: string }>();
     const courierId = id ? parseInt(id, 10) : 0;
 
     const { data: courier, isLoading, error } = useCourierDetails(courierId);
 
     const isPrivileged = isCourierPrivileged(role, teamId);
-    const canEdit = isPrivileged || courier?.userId === user?.id;
+    const canEdit = isPrivileged;
 
     if (isLoading) {
         return (

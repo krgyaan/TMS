@@ -27,7 +27,7 @@ import type { CourierDashboardRow, CourierTab } from "./helpers/courier.types";
 
 const CourierListPage = () => {
     const navigate = useNavigate();
-    const { user, role, teamId } = useAuth();
+    const { role, teamId } = useAuth();
     const isPrivileged = isCourierPrivileged(role, teamId);
     const deleteMutation = useDeleteCourier();
 
@@ -81,7 +81,7 @@ const CourierListPage = () => {
             {
                 label: "Edit",
                 icon: <Pencil className="h-4 w-4" />,
-                visible: row => isPrivileged || row.userId === user?.id,
+                visible: () => isPrivileged,
                 onClick: row => navigate(paths.shared.courierEdit(row.id)),
             },
             {
@@ -99,7 +99,7 @@ const CourierListPage = () => {
                 onClick: handleDelete,
             },
         ];
-    }, [deleteMutation, isPrivileged, navigate, user?.id]);
+    }, [deleteMutation, isPrivileged, navigate]);
 
     const columnDefs = useMemo(
         () => createCourierColumns({ activeTab, actions: courierActions }),

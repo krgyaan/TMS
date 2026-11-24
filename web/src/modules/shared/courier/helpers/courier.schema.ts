@@ -16,6 +16,17 @@ export const CourierFormSchema = z.object({
     empFrom: z.coerce.number({ message: "Please select an employee" }).int().positive(),
     delDate: z.string().min(1, "Expected delivery date is required"),
     urgency: z.coerce.number({ message: "Please select dispatch urgency" }).int().min(1).max(2),
+
+    // Editable-only fields (available in edit mode for privileged users)
+    status: z.coerce.number().int().min(0).max(5).optional(),
+    trackingNumber: z.string().max(255).optional(),
+    courierProvider: z.string().max(255).optional(),
+    pickupDate: z.string().optional(),
+    docketNo: z.string().max(255).optional(),
+    docketSlip: z.array(z.string()).optional(),
+    deliveryDate: z.string().optional(),
+    deliveryPod: z.array(z.string()).optional(),
+    withinTime: z.enum(["1", "0"]).optional(),
 });
 
 export type CourierFormValues = z.infer<typeof CourierFormSchema>;
