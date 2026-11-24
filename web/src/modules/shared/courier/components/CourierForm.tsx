@@ -3,12 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { useForm, type Resolver, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Save } from "lucide-react";
+import { ArrowLeft, FileText, Loader2, MapPin, Save, Truck } from "lucide-react";
 
 import { paths } from "@/app/routes/paths";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
@@ -38,9 +38,12 @@ interface CourierFormProps {
     mode: "create" | "edit";
     courierId?: number;
     existingData?: Courier | null;
+    title?: string;
+    description?: React.ReactNode;
+    onBack?: () => void;
 }
 
-export function CourierForm({ mode, courierId, existingData }: CourierFormProps) {
+export function CourierForm({ mode, courierId, existingData, title, description, onBack }: CourierFormProps) {
     const navigate = useNavigate();
     const { role, teamId } = useAuth();
     const isPrivileged = isCourierPrivileged(role, teamId);
@@ -110,26 +113,36 @@ export function CourierForm({ mode, courierId, existingData }: CourierFormProps)
 
     return (
         <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                    <CardTitle>{mode === "create" ? "New Courier Request" : "Edit Courier"}</CardTitle>
-                    <CardDescription className="mt-2">
-                        {mode === "create"
-                            ? "Fill in the details below to create a new courier dispatch request"
-                            : "Update the courier request details"}
-                    </CardDescription>
+            <CardHeader>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <CardTitle>
+                            {title ?? (mode === "create" ? "New Courier Request" : "Edit Courier")}
+                        </CardTitle>
+                        <CardDescription className="mt-2">
+                            {description ??
+                                (mode === "create"
+                                    ? "Fill in the details below to create a new courier dispatch request"
+                                    : "Update the courier request details")}
+                        </CardDescription>
+                    </div>
+                    <CardAction>
+                        <Button variant="outline" onClick={onBack ?? (() => navigate(-1))}>
+                            <ArrowLeft className="mr-2 h-4 w-4" />
+                            Back
+                        </Button>
+                    </CardAction>
                 </div>
-                <Button variant="outline" onClick={() => navigate(-1)}>
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Back
-                </Button>
             </CardHeader>
 
             <CardContent>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
                         <div className="space-y-4">
-                            <h4 className="border-b pb-2 text-base font-semibold text-primary">Courier to</h4>
+                            <h4 className="flex items-center gap-2 border-b pb-2 text-base font-semibold text-primary">
+                                <MapPin className="h-4 w-4" />
+                                Courier to
+                            </h4>
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                                 <FieldWrapper control={form.control} name="toOrg" label="Organization Name">
                                     {field => <Input {...field} placeholder="Enter organization name" disabled={isSubmitting} />}
@@ -150,7 +163,10 @@ export function CourierForm({ mode, courierId, existingData }: CourierFormProps)
                         </div>
 
                         <div className="space-y-4">
-                            <h4 className="border-b pb-2 text-base font-semibold text-primary">Courier Details</h4>
+                            <h4 className="flex items-center gap-2 border-b pb-2 text-base font-semibold text-primary">
+                                <Truck className="h-4 w-4" />
+                                Courier Details
+                            </h4>
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                                 <SelectField
                                     control={form.control}
@@ -194,7 +210,10 @@ export function CourierForm({ mode, courierId, existingData }: CourierFormProps)
 
                         {canUploadDocs && (
                             <div className="space-y-2">
-                                <p className="text-sm font-medium">Soft Copy of the documents</p>
+                                <p className="flex items-center gap-2 text-sm font-medium">
+                                    <FileText className="h-4 w-4 text-muted-foreground" />
+                                    Soft Copy of the documents
+                                </p>
                                 <FileUploader
                                     context="courier"
                                     value={files}

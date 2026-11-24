@@ -73,9 +73,14 @@ const CourierEditPage = () => {
     }
 
     return (
-        <div>
-            <CourierForm mode="edit" courierId={courierId} existingData={courier} />
-        </div>
+        <CourierForm
+            mode="edit"
+            courierId={courierId}
+            existingData={courier}
+            title="Edit Courier"
+            description={`Courier #${courier.id} - ${courier.toName}${courier.toOrg ? ` (${courier.toOrg})` : ""}`}
+            onBack={() => navigate(paths.shared.courierView(courier.id))}
+        />
     );
 };
 
