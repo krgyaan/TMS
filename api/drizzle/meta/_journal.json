@@ -862,13 +862,6 @@
       "when": 1810000000000,
       "tag": "0193_seed_hrms_office_inventory_data",
       "breakpoints": true
-    },
-    {
-      "idx": 147,
-      "version": "7",
-      "when": 1811000000000,
-      "tag": "0194_hrms_office_inventory_permissions",
-      "breakpoints": true
     }
   ]
 }
