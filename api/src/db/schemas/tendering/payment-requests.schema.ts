@@ -209,6 +209,7 @@ export const instrumentFdrDetails = pgTable('instrument_fdr_details', {
     authorizationLetterPath: varchar('authorization_letter_path', { length: 500 }),
     requestLetterPath: varchar('request_letter_path', { length: 500 }),
     fdrFormPath: varchar('fdr_form_path', { length: 500 }),
+    envelopeSlip: varchar('envelope_slip', { length: 500 }), // envelope slip printed and pasted on the dispatch envelope
     bankMailIds: jsonb('bank_mail_ids').$type<string[]>(),
     bankMailIdsCc: jsonb('bank_mail_ids_cc').$type<string[]>(),
 

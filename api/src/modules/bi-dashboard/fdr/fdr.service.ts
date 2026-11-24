@@ -968,6 +968,7 @@ export class FdrService {
                 prefilledSignedFdr: instrumentFdrDetails.prefilledSignedFdr,
                 uploadDocuments: instrumentFdrDetails.uploadDocuments,
                 fdrCopy: instrumentFdrDetails.fdrCopy,
+                envelopeSlip: instrumentFdrDetails.envelopeSlip,
                 bankMailIds: instrumentFdrDetails.bankMailIds,
                 bankMailIdsCc: instrumentFdrDetails.bankMailIdsCc,
                 fdrDetailsCreatedAt: instrumentFdrDetails.createdAt,

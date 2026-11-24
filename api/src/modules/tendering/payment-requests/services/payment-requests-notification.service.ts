@@ -621,6 +621,55 @@ export class PaymentRequestsNotificationService {
         return `₹${amount.toLocaleString('en-IN')}`;
     };
 
+    /**
+     * FDR-only test redirect. When FDR_MAIL_TEST_TO is set, every FDR mail is
+     * sent from (and to) the configured test inbox instead of the real
+     * recipients. Mirrors the removed BG_MAIL_TEST_TO behaviour.
+     */
+    private resolveFdrMailOverride = async (
+        fromUserId: number,
+        to: RecipientSource[],
+        cc?: RecipientSource[],
+    ): Promise<{ fromUserId: number; to: RecipientSource[]; cc: RecipientSource[] }> => {
+        const raw = this.configService.get<string>('FDR_MAIL_TEST_TO') || process.env.FDR_MAIL_TEST_TO || '';
+        const emails = raw
+            .split(',')
+            .map((email) => email.trim())
+            .filter((email) => email.length > 0);
+
+        if (emails.length === 0) {
+            return { fromUserId, to, cc: cc ?? [] };
+        }
+
+        let testFromUserId = fromUserId;
+        const configuredSenderId = Number(
+            this.configService.get<string>('FDR_MAIL_TEST_SENDER_ID') || process.env.FDR_MAIL_TEST_SENDER_ID || '',
+        );
+
+        if (Number.isInteger(configuredSenderId) && configuredSenderId > 0) {
+            testFromUserId = configuredSenderId;
+        } else {
+            const [testUser] = await this.db
+                .select({ id: users.id })
+                .from(users)
+                .where(eq(users.email, emails[0]))
+                .limit(1);
+            if (testUser) {
+                testFromUserId = testUser.id;
+            }
+        }
+
+        this.logger.warn(
+            `[FDR TEST MAIL] Redirecting to ${emails.join(', ')} from user ${testFromUserId} (original sender ${fromUserId})`,
+        );
+
+        return {
+            fromUserId: testFromUserId,
+            to: [{ type: 'emails', emails }],
+            cc: [],
+        };
+    };
+
     
     private buildPublicFileUrl = (filePath: string): string => {
         const apiUrl = (this.configService.get<string>('app.apiUrl') || '').replace(/\/+$/, '');
@@ -1226,11 +1275,22 @@ export class PaymentRequestsNotificationService {
 
         try {
             // From: Cheque responsible user — To: FDR responsible user
+            const fdrFromUserId = await this.getResponsibleUserIdByMode('CHEQUE') ?? 33;
+            const fdrCc: RecipientSource[] = [
+                { type: 'role', role: 'Admin', teamId: tenderTeamId },
+                { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                { type: 'emails', emails: ['accounts@volksenergie.in'] },
+            ];
+            const mailTarget = await this.resolveFdrMailOverride(
+                fdrFromUserId,
+                [{ type: 'emails', emails: [toEmails] }],
+                fdrCc,
+            );
             const result = await this.emailService.sendPaymentEmail({
                 requestId,
                 tenderId: tenderId > 0 ? tenderId : undefined,
                 eventType: 'FDR_REQUEST',
-                fromUserId: await this.getResponsibleUserIdByMode('CHEQUE') ?? 33,
+                fromUserId: mailTarget.fromUserId,
                 subject: `Cheque created for FDR`,
                 template: 'fixed-deposit-receipt-request',
                 data: {
@@ -1245,12 +1305,8 @@ export class PaymentRequestsNotificationService {
                     link: `${this.getFrontendUrl()}/bi-dashboard/fdrs/${fdrInstrumentId}`,
                     courierAddress: chequeInstrument.courierAddress || 'Not specified',
                 },
-                to: [{ type: 'emails', emails: [toEmails] }],
-                cc: [
-                    { type: 'role', role: 'Admin', teamId: tenderTeamId },
-                    { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
-                    { type: 'emails', emails: ['accounts@volksenergie.in'] },
-                ],
+                to: mailTarget.to,
+                cc: mailTarget.cc,
             });
 
             if (result.success) {
@@ -1465,11 +1521,27 @@ export class PaymentRequestsNotificationService {
 
         try {
             // From: FDR responsible user — To: Requestor
+            const fdrFromUserId = await this.getResponsibleUserIdByMode('FDR') ?? 33;
+            const fdrCc: RecipientSource[] = isAccepted ? [
+                { type: 'role', role: 'Admin', teamId: tenderTeamId },
+                { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                { type: 'emails', emails: ['accounts@volksenergie.in'] },
+            ] : [
+                { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
+                { type: 'emails', emails: ['goyal@volksenergie.in'] },
+                { type: 'emails', emails: ['accounts@volksenergie.in'] },
+                { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+            ];
+            const mailTarget = await this.resolveFdrMailOverride(
+                fdrFromUserId,
+                [{ type: 'emails', emails: [reqUser.email] }],
+                fdrCc,
+            );
             const result = await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
                 tenderId: paymentReq.tenderId || undefined,
                 eventType: isAccepted ? 'FDR_CREATED' : 'FDR_REJECTED',
-                fromUserId: await this.getResponsibleUserIdByMode('FDR') ?? 33,
+                fromUserId: mailTarget.fromUserId,
                 subject: isAccepted
                     ? `Request for FDR Accepted - ${purposeLabel}`
                     : `FDR Request Rejected - ${purposeLabel} - ${subjectName}`,
@@ -1490,17 +1562,8 @@ export class PaymentRequestsNotificationService {
                     tenderExecutive: reqUser.name,
                     rejectionReason,
                 },
-                to: [{ type: 'emails', emails: [reqUser.email] }],
-                cc: isAccepted ? [
-                    { type: 'role', role: 'Admin', teamId: tenderTeamId },
-                    { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
-                    { type: 'emails', emails: ['accounts@volksenergie.in'] },
-                ] : [
-                    { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
-                    { type: 'emails', emails: ['goyal@volksenergie.in'] },
-                    { type: 'emails', emails: ['accounts@volksenergie.in'] },
-                    { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
-                ],
+                to: mailTarget.to,
+                cc: mailTarget.cc,
             });
 
             if (result.success) {
@@ -1616,15 +1679,21 @@ export class PaymentRequestsNotificationService {
                 fromUserId = imranUser?.id ?? 33;
             }
 
+            const mailTarget = await this.resolveFdrMailOverride(
+                fromUserId,
+                [{ type: 'emails', emails: bankMailIds }],
+                ccSources,
+            );
+
             await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
                 tenderId: request.tenderId || undefined,
                 eventType: 'FDR_BANK_REQUEST',
                 template: 'fdr-bank-request',
                 subject,
-                fromUserId,
-                to: [{ type: 'emails', emails: bankMailIds }],
-                cc: ccSources,
+                fromUserId: mailTarget.fromUserId,
+                to: mailTarget.to,
+                cc: mailTarget.cc,
                 data: {
                     purpose: purposeLabel,
                     beneficiaryName: instrument.favouring || '',
@@ -1728,20 +1797,26 @@ export class PaymentRequestsNotificationService {
             const tenderTeamId = await this.getTenderTeamId(request.tenderId || 0, request.requestedBy || 0);
             const remarks = (body.remarks || '').toString().trim();
 
+            const mailTarget = await this.resolveFdrMailOverride(
+                fromUserId,
+                [{ type: 'emails', emails: [reqUser.email] }],
+                [
+                    { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
+                    { type: 'emails', emails: ['goyal@volksenergie.in'] },
+                    { type: 'emails', emails: ['accounts@volksenergie.in'] },
+                    { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                ],
+            );
+
             await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
                 tenderId: request.tenderId || undefined,
                 eventType: 'FDR_STAGE2_SAVED',
                 template: 'fdr-created-team',
                 subject,
-                fromUserId,
-                to: [{ type: 'emails', emails: [reqUser.email] }],
-                cc: [
-                    { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
-                    { type: 'emails', emails: ['goyal@volksenergie.in'] },
-                    { type: 'emails', emails: ['accounts@volksenergie.in'] },
-                    { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
-                ],
+                fromUserId: mailTarget.fromUserId,
+                to: mailTarget.to,
+                cc: mailTarget.cc,
                 data: {
                     tenderExecutiveName: reqUser.name || 'Tender Executive',
                     fdrDate: this.formatDateDDMMYYYY(body.fdr_date || fdrDetails?.fdrDate) || 'NA',
@@ -2438,12 +2513,73 @@ export class PaymentRequestsNotificationService {
                 );
             }
 
+            // Attachment — envelope slip (PDF) printed and pasted on the
+            // dispatch envelope. No letterhead / footer / watermark.
             try {
+                const courierJson = (instrument?.courierAddressJson ?? null) as Record<string, any> | null;
+                const addressLines: string[] = courierJson
+                    ? [
+                        courierJson.line1,
+                        courierJson.line2,
+                        courierJson.city,
+                        [courierJson.state, courierJson.pincode].filter(Boolean).join(' - '),
+                    ].filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
+                    : (instrument?.courierAddress || '')
+                        .split(/\r?\n/)
+                        .map((line) => line.trim())
+                        .filter((line) => line.length > 0);
+
+                const [envelopeSlipPath] = await this.pdfGenerator.generatePdfs(
+                    'fdrEnvelopeSlip',
+                    {
+                        data: {
+                            to_name: courierJson?.name || '',
+                            to_address_lines: addressLines,
+                            contact_number: courierJson?.phone || '',
+                            submission_label: fdrReference?.label || '',
+                            submission_ref: fdrReference?.value || '',
+                        },
+                    },
+                    instrumentId,
+                    'FDR'
+                );
+
+                if (envelopeSlipPath) {
+                    addAttachmentLink('Envelope Slip', envelopeSlipPath);
+                    try {
+                        await this.db
+                            .update(instrumentFdrDetails)
+                            .set({ envelopeSlip: envelopeSlipPath })
+                            .where(eq(instrumentFdrDetails.instrumentId, instrumentId));
+                    } catch (persistError) {
+                        this.logger.warn(
+                            `Failed to persist FDR envelope slip path for instrument ${instrumentId}: ${persistError instanceof Error ? persistError.message : String(persistError)}`
+                        );
+                    }
+                }
+            } catch (error) {
+                this.logger.warn(
+                    `FDR envelope slip generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
+
+            try {
+                const fdrCc: RecipientSource[] = [
+                    { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
+                    { type: 'emails', emails: ['goyal@volksenergie.in'] },
+                    { type: 'emails', emails: ['accounts@volksenergie.in'] },
+                    { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                ];
+                const mailTarget = await this.resolveFdrMailOverride(
+                    requestedBy,
+                    [{ type: 'emails', emails: [toEmails] }],
+                    fdrCc,
+                );
                 const result = await this.emailService.sendPaymentEmail({
                     requestId: instrument.requestId,
                     tenderId: tenderId || undefined,
                     eventType: 'FDR_REQUEST',
-                    fromUserId: requestedBy,
+                    fromUserId: mailTarget.fromUserId,
                     subject: `Request for FDR - ${purposeLabel} - ${subjectName}`,
                     template: 'fdr-request',
                     data: {
@@ -2464,13 +2600,8 @@ export class PaymentRequestsNotificationService {
                         tlName: tlUser?.name || 'Team Leader',
                         attachmentLinks,
                     },
-                    to: [{ type: 'emails', emails: [toEmails] }],
-                    cc: [
-                        { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
-                        { type: 'emails', emails: ['goyal@volksenergie.in'] },
-                        { type: 'emails', emails: ['accounts@volksenergie.in'] },
-                        { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
-                    ],
+                    to: mailTarget.to,
+                    cc: mailTarget.cc,
                 });
                 if (result.success) {
                     this.logger.log(`FDR request email sent for instrument ${instrumentId} (logId: ${result.emailLogId})`);

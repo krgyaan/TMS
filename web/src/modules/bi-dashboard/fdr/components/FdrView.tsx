@@ -193,6 +193,7 @@ export function FdrView({
     const prefilledSignedDocs = toDocList(data.prefilledSignedFdr);
     const uploadDocumentDocs = toDocList(data.uploadDocuments);
     const fdrCopyDocs = toDocList(data.fdrCopy);
+    const envelopeSlipDocs = toDocList(data.envelopeSlip);
 
     return (
         <Card className={className}>
@@ -404,7 +405,7 @@ export function FdrView({
                         ) : null}
 
                         {/* Documents */}
-                        {(prefilledSignedDocs.length > 0 || uploadDocumentDocs.length > 0 || fdrCopyDocs.length > 0) && (
+                        {(prefilledSignedDocs.length > 0 || uploadDocumentDocs.length > 0 || fdrCopyDocs.length > 0 || envelopeSlipDocs.length > 0) && (
                             <>
                                 <SectionHeader title="Documents" icon={FileText} />
                                 <FieldRow
@@ -420,6 +421,11 @@ export function FdrView({
                                 <FieldRow
                                     label="FDR Copy"
                                     value={<DocumentLinks paths={fdrCopyDocs} />}
+                                    fullWidth
+                                />
+                                <FieldRow
+                                    label="Envelope Slip (Generated)"
+                                    value={<DocumentLinks paths={envelopeSlipDocs} />}
                                     fullWidth
                                 />
                             </>
