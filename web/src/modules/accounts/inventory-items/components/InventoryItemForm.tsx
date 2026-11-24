@@ -1,37 +1,38 @@
 import { cloneElement, isValidElement, useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useCreateInventoryItem, useInventoryItem, useItemCodePreview, useItemConversionOptions, useUpdateInventoryItem } from "@/hooks/api/useInventoryItems";
+import { useCreateInventoryItem, useItemCodePreview, useItemConversionOptions, useUpdateInventoryItem } from "@/hooks/api/useInventoryItems";
 import { handleQueryError } from "@/lib/react-query";
 import { paths } from "@/app/routes/paths";
-import type { InventoryItemPayload } from "@/types/inventory-item.types";
-import { ITEM_CATALOG, fieldIsVisible, findCatalogItem, getAllowedConversionPairs, getAllowedUnits, getConfiguredHsnCodes, getDefaultHsn, getDefaultUnit, getItemMainCategory } from "./item-catalog";
-import { type Unit } from "./item-config";
-import { inventoryItemFormSchema, type InventoryItemFormValues } from "./item-form-schema";
+import type { InventoryItem, InventoryItemPayload } from "@/types/inventory-item.types";
+import { ITEM_CATALOG, fieldIsVisible, findCatalogItem, getAllowedConversionPairs, getAllowedUnits, getConfiguredHsnCodes, getDefaultHsn, getDefaultUnit, getItemMainCategory } from "../helpers/inventoryItem.catalog";
+import { type Unit } from "../helpers/inventoryItem.config";
+import { inventoryItemFormSchema, type InventoryItemFormValues } from "../helpers/inventoryItem.schema";
 
 const formControlClass = "h-11 w-full rounded-md border border-slate-400 bg-background px-3 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:border-slate-600 md:h-10";
 const sectionClass = "space-y-4 rounded-lg border bg-card p-4 sm:p-5";
 const formatPreview = (value: number) => value.toLocaleString("en-IN", { maximumFractionDigits: 6 });
 const normalizeFactorText = (value: string) => value.includes(".") ? value.replace(/0+$/, "").replace(/\.$/, "") : value;
 
-export default function InventoryItemFormPage() {
-    const { id: rawId } = useParams<{ id: string }>();
-    const itemId = rawId ? Number(rawId) : 0;
-    const isEdit = Boolean(rawId);
+export type InventoryItemFormProps =
+    | { mode: "create"; existingData?: undefined }
+    | { mode: "edit"; existingData: InventoryItem };
+
+export default function InventoryItemForm({ mode, existingData }: InventoryItemFormProps) {
+    const isEdit = mode === "edit";
+    const item = existingData;
+    const itemId = item?.id ?? 0;
     const navigate = useNavigate();
     const form = useForm<InventoryItemFormValues>({
         resolver: zodResolver(inventoryItemFormSchema) as never,
-        defaultValues: { category: "", legacyCodeEdit: false, itemName: "", itemType: "", specifications: {}, makeBrand: "", modelNumber: "", description: "", unit: "Nos.", storedUnit: "", conversionEnabled: false, conversionUnit: "", conversionFactor: "", hsnCode: "", isActive: true },
+        defaultValues: { category: "", legacyCodeEdit: false, itemName: "", itemType: "", specifications: {}, modelNumber: "", description: "", unit: "Nos.", storedUnit: "", conversionEnabled: false, conversionUnit: "", conversionFactor: "", hsnCode: "", isActive: true },
     });
-    const { data: item, isLoading: itemLoading, error: itemError, refetch } = useInventoryItem("master", itemId);
     const createItem = useCreateInventoryItem();
     const updateItem = useUpdateInventoryItem();
     const submissionLock = useRef(false);
@@ -70,12 +71,12 @@ export default function InventoryItemFormPage() {
         : allowedConversionPairs.some(pair => pair.from === unit);
 
     useEffect(() => {
-        if (isEdit) {
-            if (!item || initializedForm.current === `edit-${itemId}`) return;
+        if (isEdit && item) {
+            if (initializedForm.current === `edit-${itemId}`) return;
             const editCategory = getItemMainCategory(item.itemName, item.category);
             form.reset({
                 category: editCategory, legacyCodeEdit: false, itemName: item.itemName, itemType: item.itemType || "",
-                specifications: storedSpecifications, makeBrand: item.makeBrand || "", modelNumber: item.modelNumber || "", description: item.description || "",
+                specifications: storedSpecifications, modelNumber: item.modelNumber || "", description: item.description || "",
                 unit: item.unit as Unit, storedUnit: item.unit, conversionEnabled: Boolean(item.conversionUnit), conversionUnit: item.conversionUnit || "",
                 conversionFactor: item.conversionFactor || "", hsnCode: item.hsnCode || "", isActive: item.isActive,
             });
@@ -83,9 +84,9 @@ export default function InventoryItemFormPage() {
             initializedForm.current = `edit-${itemId}`;
             formUrl.current = window.location.href;
             setUnitChangedNotice(false);
-        } else if (initializedForm.current !== "new") {
+        } else if (!isEdit && initializedForm.current !== "new") {
             form.reset({
-                category: "", legacyCodeEdit: false, itemName: "", itemType: "", specifications: {}, makeBrand: "", modelNumber: "", description: "", unit: "Nos.", storedUnit: "", conversionEnabled: false,
+                category: "", legacyCodeEdit: false, itemName: "", itemType: "", specifications: {}, modelNumber: "", description: "", unit: "Nos.", storedUnit: "", conversionEnabled: false,
                 conversionUnit: "", conversionFactor: "", hsnCode: "", isActive: true,
             });
             lastWidth.current = "";
@@ -194,7 +195,7 @@ export default function InventoryItemFormPage() {
             lastWidth.current = width;
             setUnitChangedNotice(true);
             form.clearErrors(["conversionUnit", "conversionFactor"]);
-        } 
+        }
     };
 
     const handleConversionChange = (nextUnit: string) => {
@@ -223,12 +224,12 @@ export default function InventoryItemFormPage() {
             }));
             const payload: InventoryItemPayload = {
                 category: values.category, modelNumber: values.modelNumber?.trim() || null, itemName: values.itemName,
-                itemType: typeField ? values.specifications[typeField.key] || null : values.itemType.trim() || null,
-                makeBrand: isEdit ? (values.makeBrand?.trim() || null) : null,
-                specifications: visibleSpecifications, description: values.description.trim() || null,
+                itemType: typeField ? values.specifications[typeField.key] || null : values.itemType?.trim() || null,
+                specifications: visibleSpecifications, description: values.description?.trim() || null,
                 unit: values.unit, conversionUnit: values.conversionEnabled ? values.conversionUnit || null : null,
                 conversionFactor: values.conversionEnabled && values.conversionUnit ? values.conversionFactor : null,
-                hsnCode: values.hsnCode.trim(), isActive: values.isActive, 
+                hsnCode: values.hsnCode.trim(), isActive: values.isActive,
+                ...(!isEdit ? { makeBrand: null } : {}),
             };
             if (isEdit) await updateItem.mutateAsync({ id: itemId, data: payload });
             else await createItem.mutateAsync(payload);
@@ -249,10 +250,6 @@ export default function InventoryItemFormPage() {
         });
     };
 
-    if (isEdit && (!Number.isInteger(itemId) || itemId <= 0)) return <Card><CardHeader><CardTitle>Item not found</CardTitle><CardDescription>Invalid item identifier.</CardDescription></CardHeader></Card>;
-    if (isEdit && itemLoading) return <Card><CardHeader><Skeleton className="h-8 w-56" /><Skeleton className="h-4 w-72" /></CardHeader><CardContent><Skeleton className="h-96 w-full" /></CardContent></Card>;
-    if (isEdit && (itemError || !item)) return <Card><CardHeader><CardTitle>Edit Item</CardTitle><CardDescription>Unable to load this item.</CardDescription></CardHeader><CardContent><Alert variant="destructive" className="mb-4"><AlertDescription>{itemError instanceof Error ? itemError.message : "Item not found."}</AlertDescription></Alert><Button variant="outline" onClick={() => void refetch()}>Retry</Button></CardContent></Card>;
-
     const errors = form.formState.errors;
     const errorMessage = errors.root?.server?.message;
     const storedWidthMismatch = Boolean(item && item.conversionUnit === conversionUnit && unit === item.unit && item.specifications?.width === width && selectedConversion?.factorMode === "width" && Number(item.conversionFactor) !== Number(selectedConversion.factor));
@@ -266,7 +263,7 @@ export default function InventoryItemFormPage() {
             <div><p className="text-sm text-muted-foreground">Settings / Item Master</p><h1 className="text-2xl font-semibold">{isEdit ? "Edit Item" : "Add Item"}</h1><p className="text-sm text-muted-foreground">{isEdit && item ? item.itemCode : "Create a shared item."}</p></div>
             <Button type="button" variant="outline" className="min-h-11" onClick={leavePage}><ArrowLeft className="mr-2 h-4 w-4" />Back</Button>
         </div>
-        {(errorMessage || (isEdit && itemError)) && <Alert variant="destructive"><AlertDescription>{errorMessage || (itemError instanceof Error ? itemError.message : "Unable to save item.")}</AlertDescription></Alert>}
+        {errorMessage && <Alert variant="destructive"><AlertDescription>{errorMessage}</AlertDescription></Alert>}
         <form
             onSubmit={event => event.preventDefault()}
             onKeyDown={event => {
@@ -279,7 +276,7 @@ export default function InventoryItemFormPage() {
                 <div><h2 className="font-semibold">Item details</h2><p className="text-sm text-muted-foreground">Choose a category, then an item name from that category.</p></div>
                 <div className="grid gap-4 md:grid-cols-2">
                     <FormField label="Category" required helper="Select the item category." error={errors.category?.message}>
-                        <select className={formControlClass} aria-invalid={Boolean(errors.category)} {...form.register("category", { onChange: event => {
+                        <select className={formControlClass} aria-invalid={Boolean(errors.category)} {...form.register("category", { onChange: () => {
                             form.setValue("itemName", "", { shouldDirty: true, shouldValidate: true });
                             form.setValue("itemType", "", { shouldDirty: true });
                             form.setValue("specifications", {}, { shouldDirty: true });
@@ -387,11 +384,6 @@ export default function InventoryItemFormPage() {
 
             <section className={sectionClass}>
                 <div><h2 className="font-semibold">Model Number</h2><p className="text-sm text-muted-foreground">Optional model identifier.</p></div>
-                {isEdit && Boolean(item?.makeBrand) && (
-                    <FormField label="Make/Brand" helper="Existing value from legacy record. Optional, up to 120 characters." error={errors.makeBrand?.message}>
-                        <Input maxLength={120} className={formControlClass} aria-invalid={Boolean(errors.makeBrand)} {...form.register("makeBrand")} />
-                    </FormField>
-                )}
                 <FormField label="Model Number" helper="Optional. Up to 120 characters." error={errors.modelNumber?.message}>
                     <Input maxLength={120} className={formControlClass} aria-invalid={Boolean(errors.modelNumber)} {...form.register("modelNumber")} />
                 </FormField>
@@ -411,7 +403,7 @@ export default function InventoryItemFormPage() {
 
             <div className="sticky bottom-0 z-10 -mx-4 flex items-center justify-end gap-3 border-t bg-background/95 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-lg backdrop-blur sm:-mx-6 sm:px-6">
                 <Button type="button" variant="outline" className="min-h-11" disabled={saving} onClick={leavePage}>Cancel</Button>
-                <Button type="button" className="min-h-11 min-w-28" onClick={() => void form.handleSubmit(onValid, onInvalid)()} disabled={saving || submissionLock.current || (isEdit && itemLoading) || (isEdit && !item)}>
+                <Button type="button" className="min-h-11 min-w-28" onClick={() => void form.handleSubmit(onValid, onInvalid)()} disabled={saving || submissionLock.current}>
                     {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{isEdit ? "Save changes" : "Save item"}
                 </Button>
             </div>

@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ITEM_CATALOG, UNIT_OPTIONS, fieldIsVisible, findCatalogItem, getAllowedUnits, getDefaultHsn } from "../src/modules/accounts/inventory-items/item-catalog.ts";
-import { buildInventoryItemFormSchema } from "../src/modules/accounts/inventory-items/item-form-schema.ts";
-import { formatKeySpecification, itemMasterColumnsForViewport } from "../src/modules/accounts/inventory-items/item-master-display.ts";
+import { ITEM_CATALOG, UNIT_OPTIONS, fieldIsVisible, findCatalogItem, getAllowedUnits, getDefaultHsn } from "../src/modules/accounts/inventory-items/helpers/inventoryItem.catalog.ts";
+import { buildInventoryItemFormSchema } from "../src/modules/accounts/inventory-items/helpers/inventoryItem.schema.ts";
+import { formatKeySpecification, itemMasterColumnsForViewport } from "../src/modules/accounts/inventory-items/helpers/inventoryItem.display.ts";
 import { ITEM_CATALOG as API_ITEM_CATALOG } from "../../api/src/modules/accounts/inventory-items/item-catalog.ts";
 
 const base = (overrides: Record<string, unknown> = {}) => ({
