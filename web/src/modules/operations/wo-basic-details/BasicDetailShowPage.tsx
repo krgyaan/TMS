@@ -1,11 +1,14 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useState, useCallback } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useWoStepStatuses } from "@/hooks/api/useWoStepStatuses";
-import { useWoBasicDetailById } from "@/hooks/api/useWoBasicDetails";
+import { useWoBasicDetailById, useWoBasicDetailsByTender } from "@/hooks/api/useWoBasicDetails";
+import { useTenderResultByTenderId } from "@/hooks/api/useTenderResults";
 import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Plus } from "lucide-react";
 import { TenderViewPage } from "@/modules/tendering/tenders/TenderViewPage";
-import { BasicDetailsSection } from "@/modules/operations/wo-basic-details/components/BasicDetailsSection";
+import { OrdersBasicDetailsAccordion } from "@/modules/operations/wo-basic-details/components/OrdersBasicDetailsAccordion";
 import { WoDetailsSection } from "@/modules/operations/wo-details/components/WoDetailsSection";
 import { KickOffSection } from "@/modules/operations/kick-off/components/KickOffSection";
 import { ContractAgreementSection } from "@/modules/operations/contract-agreement/components/ContractAgreementSection";
@@ -21,6 +24,22 @@ export default function BasicDetailShowPage() {
 
     const { data: woBasicDetail } = useWoBasicDetailById(woId);
     const tenderId = woBasicDetail?.tenderId ?? null;
+    const { data: tenderOrders = [] } = useWoBasicDetailsByTender(tenderId ?? 0);
+    const orders = useMemo(() => {
+        if (tenderOrders.length === 0) {
+            return woBasicDetail ? [woBasicDetail] : [];
+        }
+
+        // Keep the opened order visible even if the by-tender cache is briefly stale.
+        if (woBasicDetail && !tenderOrders.some((order) => order.id === woBasicDetail.id)) {
+            return [...tenderOrders, woBasicDetail];
+        }
+
+        return tenderOrders;
+    }, [tenderOrders, woBasicDetail]);
+    const { data: tenderResult } = useTenderResultByTenderId(tenderId);
+    const canAddAnotherOrder =
+        !!tenderId && (tenderResult?.resultStatus ?? "").trim().toLowerCase() === "won";
 
     const [activeTab, setActiveTab] = useState<"operation" | "tendering">("operation");
 
@@ -40,7 +59,13 @@ export default function BasicDetailShowPage() {
     const renderSectionContent = useCallback((stepId: string) => {
         switch (stepId) {
             case "basic-details":
-                return <BasicDetailsSection woBasicDetailId={woId} />;
+                return (
+                    <OrdersBasicDetailsAccordion
+                        orders={orders}
+                        activeOrderId={woId}
+                        onOpenOrder={(orderId) => navigate(paths.operations.woBasicDetailShowPage(orderId))}
+                    />
+                );
             case "wo-details":
                 return woDetailId ? <WoDetailsSection woDetailId={woDetailId} /> : null;
             case "kick-off":
@@ -52,7 +77,7 @@ export default function BasicDetailShowPage() {
             default:
                 return null;
         }
-    }, [woId, woDetailId]);
+    }, [woId, woDetailId, orders, navigate]);
 
     if (!woId) {
         return (
@@ -64,10 +89,21 @@ export default function BasicDetailShowPage() {
 
     return (
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "operation" | "tendering")}>
-            <TabsList className="mb-4">
-                <TabsTrigger value="operation">Operation Details</TabsTrigger>
-                <TabsTrigger value="tendering">Tendering Details</TabsTrigger>
-            </TabsList>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <TabsList>
+                    <TabsTrigger value="operation">Operation Details</TabsTrigger>
+                    <TabsTrigger value="tendering">Tendering Details</TabsTrigger>
+                </TabsList>
+                {canAddAnotherOrder && (
+                    <Button
+                        size="sm"
+                        onClick={() => navigate(`${paths.operations.woBasicDetailCreatePage}?tenderId=${tenderId}`)}
+                    >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Another Order
+                    </Button>
+                )}
+            </div>
             <TabsContent value="operation">
                 <ShowPageLayout
                     steps={steps}

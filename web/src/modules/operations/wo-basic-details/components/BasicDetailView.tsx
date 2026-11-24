@@ -13,6 +13,7 @@ import type { WoContact } from '../../types/wo.types';
 import { GEM_GST_RATE, GEM_TDS_RATE } from '../helpers/gemCharges';
 import { paths } from '@/app/routes/paths';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { resolveFileUrl } from '../../helpers/resolveFileUrl';
 
 interface BasicDetailViewProps {
     data: WoBasicDetail;
@@ -20,16 +21,6 @@ interface BasicDetailViewProps {
     isLoading?: boolean;
     className?: string;
 }
-
-// Helper function to get file URL from stored path
-const getFileUrl = (filePath: string): string => {
-    // Extract the filename (last part of the path)
-    const fileName = filePath.split('/').pop() || filePath;
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
-    
-    // Always serve under 'wo-draft' context as requested
-    return `${baseUrl}/files/serve/wo-draft/${encodeURIComponent(fileName)}`;
-};
 
 
 
@@ -781,7 +772,7 @@ export function BasicDetailView({
                                             variant="outline"
                                             size="sm"
                                             className="flex-1 h-9 text-sm gap-2"
-                                            onClick={() => window.open(getFileUrl(filePath), '_blank')}
+                                            onClick={() => window.open(resolveFileUrl(filePath, 'wo-draft'), '_blank')}
                                         >
                                             <ExternalLink className="h-4 w-4" />
                                             View
@@ -792,7 +783,7 @@ export function BasicDetailView({
                                             className="flex-1 h-9 text-sm gap-2"
                                             onClick={() => {
                                                 const a = document.createElement('a');
-                                                a.href = getFileUrl(filePath);
+                                                a.href = resolveFileUrl(filePath, 'wo-draft');
                                                 a.download = filePath.split('/').pop() || filePath;
                                                 a.click();
                                             }}

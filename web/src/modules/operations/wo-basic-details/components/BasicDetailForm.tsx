@@ -11,7 +11,7 @@ import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { useCreateWoBasicDetail, useUpdateWoBasicDetail, useWoBasicDetailPrefill } from "@/hooks/api/useWoBasicDetails";
+import { useCreateWoBasicDetail, useUpdateWoBasicDetail, useWoBasicDetailPrefill, useWoBasicDetailsByTender } from "@/hooks/api/useWoBasicDetails";
 import { useCreateBulkWoContacts, useDeleteAllContactsByBasicDetail, useWoContactsByBasicDetail } from "@/hooks/api/useWoContacts";
 import { useItemOptions, useLocationOptions, useOrganizationOptions, useTeamOptions } from "@/hooks/useSelectOptions";
 import { formatINR } from "@/hooks/useINRFormatter";
@@ -44,7 +44,14 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
     const location = useLocation();
     const [searchParams] = useSearchParams();
     const urlTenderId = searchParams.get("tenderId");
-    const isNonTender = !urlTenderId;
+    // Edit routes do not carry ?tenderId, so the tender reference must come
+    // from the loaded record. Without this, every edit was treated as a
+    // non-tender WO and exposed Team/Org/Item/Location fields.
+    const existingTenderId = mode === "edit" ? existingData?.tenderId ?? null : null;
+    const isNonTender = mode === "edit" ? !existingTenderId : !urlTenderId;
+    const effectiveTenderId = mode === "edit"
+        ? existingTenderId
+        : urlTenderId ? Number(urlTenderId) : null;
     const returnTo = (location.state as { from?: string } | null)?.from;
     const createMutation = useCreateWoBasicDetail();
     const updateMutation = useUpdateWoBasicDetail();
@@ -59,11 +66,11 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
             return mapResponseToForm(existingData);
         }
         const defaults = buildDefaultValues();
-        if (mode === "create" && !isNonTender && urlTenderId) {
-            defaults.tenderId = Number(urlTenderId);
+        if (mode === "create" && !isNonTender && effectiveTenderId) {
+            defaults.tenderId = effectiveTenderId;
         }
         return defaults;
-    }, [mode, existingData, urlTenderId, isNonTender]);
+    }, [mode, existingData, isNonTender, effectiveTenderId]);
 
     const form = useForm<WoBasicDetailFormValues>({
         resolver: zodResolver(WoBasicDetailFormSchema) as Resolver<WoBasicDetailFormValues>,
@@ -78,6 +85,18 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
     const watchProjectName = form.watch("projectName");
     const [projectNameSuffix, setProjectNameSuffix] = useState<string | null>(null);
     const watchPricesChanged = form.watch("pricesChanged");
+
+    const { data: existingOrders = [] } = useWoBasicDetailsByTender(
+        mode === "create" && !isNonTender ? effectiveTenderId ?? 0 : 0,
+    );
+    const hasExistingOrders =
+        mode === "create" && !isNonTender && existingOrders.length > 0;
+
+    useEffect(() => {
+        if (hasExistingOrders && form.getValues("orderType") !== "multiple") {
+            form.setValue("orderType", "multiple", { shouldValidate: true });
+        }
+    }, [hasExistingOrders, form]);
 
     useEffect(() => {
         if (projectNameSuffix && mode === "create") {
@@ -195,9 +214,12 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
     }, [isNonTender, prefillData, watchWoNumber, watchWoDate, watchTeamId, watchOrganizationId, watchItemId, watchLocationId, teamOptions, organizationOptions, itemOptions, locationOptions]);
 
     useEffect(() => {
+        // Only auto-derive project identifiers for new records; edits keep the
+        // stored code/name so historical values are not silently rewritten.
+        if (mode !== "create") return;
         if (derivedCode) form.setValue("projectCode", derivedCode);
         if (derivedName && !projectNameSuffix) form.setValue("projectName", derivedName);
-    }, [derivedCode, derivedName, form, projectNameSuffix]);
+    }, [mode, derivedCode, derivedName, form, projectNameSuffix]);
 
     // Auto-calculate Margin if manually edited
     useEffect(() => {
@@ -423,16 +445,31 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                         <div className="grid gap-4 grid-cols-1 md:grid-cols-3 lg:grid-cols-4 items-start">
                             {/* Order Type: only eligible when linked to a tender */}
                             {!isNonTender && (
-                                <SelectField
-                                    control={form.control}
-                                    name="orderType"
-                                    label="Order Type"
-                                    options={[
-                                        { value: "single", label: "Single" },
-                                        { value: "multiple", label: "Multiple (part of a batch)" },
-                                    ]}
-                                    placeholder="Single"
-                                />
+                                <div className="space-y-1">
+                                    <SelectField
+                                        control={form.control}
+                                        name="orderType"
+                                        label="Order Type"
+                                        options={
+                                            hasExistingOrders
+                                                ? [{
+                                                    value: "multiple",
+                                                    label: `Multiple (order #${existingOrders.length + 1})`,
+                                                }]
+                                                : [
+                                                    { value: "single", label: "Single" },
+                                                    { value: "multiple", label: "Multiple (part of a batch)" },
+                                                ]
+                                        }
+                                        placeholder={hasExistingOrders ? "Multiple" : "Single"}
+                                        disabled={hasExistingOrders}
+                                    />
+                                    {hasExistingOrders && (
+                                        <p className="px-1 text-xs text-muted-foreground">
+                                            This tender already has {existingOrders.length} order(s). The new order will be #{existingOrders.length + 1}.
+                                        </p>
+                                    )}
+                                </div>
                             )}
 
                             <FieldWrapper control={form.control} name="woNumber" label="WO Number">
@@ -530,7 +567,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                 <TrendingUp className="h-5 w-5 text-orange-500" />
                                 Pricing Details
                             </h3>
-                            {!isNonTender && (
+                            {!isNonTender && mode === "create" && (
                                 <div className="max-w-xs mb-4">
                                     <SelectField
                                         control={form.control}
@@ -541,7 +578,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                     />
                                 </div>
                             )}
-                            {isNonTender ? (
+                            {isNonTender || mode === "edit" ? (
                                 <div className="grid gap-4 grid-cols-1 md:grid-cols-3 lg:grid-cols-4 items-start">
                                     <FieldWrapper control={form.control} name="budgetPreGst" label="Budget Price">
                                         {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}

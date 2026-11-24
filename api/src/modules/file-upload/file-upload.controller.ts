@@ -7,10 +7,12 @@ import { z } from 'zod';
 import { Public } from '@/modules/auth/decorators/public.decorator';
 import { CurrentUser, type CurrentUserType } from '@/decorators/current-user.decorator';
 import { FileUploadService } from './file-upload.service';
-import { FILE_CONFIGS, type FileContext } from './config';
+import { FILE_CONFIGS, resolveFileContext, type FileContext } from './config';
 
-// Validation schema
-const ContextSchema = z.enum(Object.keys(FILE_CONFIGS) as [FileContext, ...FileContext[]]);
+const ContextSchema = z.preprocess(
+    (value) => (typeof value === 'string' ? resolveFileContext(value) ?? value : value),
+    z.enum(Object.keys(FILE_CONFIGS) as [FileContext, ...FileContext[]]),
+);
 
 const UploadBodySchema = z.object({
     context: ContextSchema,
@@ -102,12 +104,11 @@ export class FileUploadController {
         const parsedContext = ContextSchema.parse(context);
         const filePath = path.join(parsedContext, fileName);
 
-        const exists = await this.service.exists(filePath);
-        if (!exists) {
+        const absolutePath = await this.service.resolveExistingAbsolutePath(filePath, context);
+        if (!absolutePath) {
             throw new NotFoundException('File not found');
         }
 
-        const absolutePath = this.service.getAbsolutePath(filePath);
         const ext = path.extname(fileName).toLowerCase();
         return this.streamFile(res, fileName, absolutePath, ext);
     }
