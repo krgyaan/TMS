@@ -241,7 +241,7 @@ const planRows = (
             warnings.push(`Unparsed delivery date: ${normalizeText(deliveryRaw)}`);
         }
 
-        let status = COURIER_STATUS.PENDING;
+        let status: number = COURIER_STATUS.PENDING;
         if (deliveryDate) {
             status = COURIER_STATUS.DELIVERED;
         } else if (isReturn) {
