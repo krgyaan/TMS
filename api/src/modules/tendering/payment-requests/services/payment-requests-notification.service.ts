@@ -3090,6 +3090,8 @@ export class PaymentRequestsNotificationService {
                 requestedBy: paymentRequests.requestedBy,
                 legacyData: paymentInstruments.legacyData,
                 generatedPdf: paymentInstruments.generatedPdf,
+                instrumentPurpose: paymentInstruments.purpose,
+                requestPurpose: paymentRequests.purpose,
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
@@ -3133,6 +3135,8 @@ export class PaymentRequestsNotificationService {
 
         const status = popReq === 'Accepted' ? 'accepted' : 'rejected';
 
+        const displayPurpose = purpose || instrument.instrumentPurpose || instrument.requestPurpose || 'Payment';
+
         // Get payment proof path (from legacyData or generatedPdf)
         const legacyData = instrument.legacyData as Record<string, any> | null;
         const paymentProofPath = legacyData?.payment_proof || instrument.generatedPdf || undefined;
@@ -3148,7 +3152,7 @@ export class PaymentRequestsNotificationService {
                 tenderId: instrument.tenderId || undefined,
                 eventType: 'POP_ACTION',
                 fromUserId: await this.getResponsibleUserIdByMode('PORTAL_PAYMENT') ?? 33,
-                subject: `Payment on Portal - ${purpose}`,
+                subject: `Payment on Portal - ${displayPurpose}`,
                 template: 'pop-action',
                 data: {
                     tenderExecutive: requestedUser.name,
