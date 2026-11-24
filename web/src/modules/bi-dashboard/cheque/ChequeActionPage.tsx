@@ -145,6 +145,7 @@ export default function ChequeActionPage() {
                     action={currentAction}
                     instrumentData={instrumentData}
                     tenderId={actionFormData?.tenderId ?? null}
+                    linkedDdId={actionFormData?.linkedDdId ?? null}
                     formHistory={{
                         accountsForm: actionFormData ? {
                             chequeReq: actionFormData.chequeStatus === 'Rejected' ? 'Rejected' :

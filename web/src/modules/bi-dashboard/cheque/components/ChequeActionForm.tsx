@@ -25,7 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { ALL_CHEQUE_ACTION_OPTIONS, type ChequeActionFormProps } from '../helpers/cheque.types';
 import { infoSheetsService } from '@/services/api/info-sheet.service';
 
-export function ChequeActionForm({ instrumentId, action: propAction, tenderId, formHistory, instrumentData }: ChequeActionFormProps) {
+export function ChequeActionForm({ instrumentId, action: propAction, tenderId, formHistory, instrumentData, linkedDdId }: ChequeActionFormProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdateChequeAction();
 
@@ -35,6 +35,7 @@ export function ChequeActionForm({ instrumentId, action: propAction, tenderId, f
     const hasPaidViaBankTransferData = !!(formHistory?.paidViaBankTransfer?.utr);
     const hasDepositedInBankData = !!(formHistory?.depositedInBank?.reference);
     const hasCancelledTornData = !!(formHistory?.cancelledTorn?.cancelledImagePath);
+    const isDdLinkedCheque = Boolean(linkedDdId);
 
     const getSubmittedBadge = (hasData: boolean) => {
         if (!hasData) return (
@@ -351,15 +352,25 @@ export function ChequeActionForm({ instrumentId, action: propAction, tenderId, f
                                         )}
                                     </FieldWrapper>
 
-                                    <FieldWrapper control={form.control} name="positive_pay_confirmation" label="Upload Positive pay confirmation copy">
-                                        {(field) => (
-                                            <CompactFileUploader
-                                                context="cheque-positive-pay-confirmation"
-                                                value={field.value}
-                                                onChange={field.onChange}
-                                            />
-                                        )}
-                                    </FieldWrapper>
+                                    <div className={isDdLinkedCheque ? 'opacity-60' : undefined}>
+                                        <FieldWrapper control={form.control} name="positive_pay_confirmation" label="Upload Positive pay confirmation copy">
+                                            {(field) => (
+                                                <div className="space-y-1">
+                                                    <CompactFileUploader
+                                                        context="cheque-positive-pay-confirmation"
+                                                        value={field.value}
+                                                        onChange={field.onChange}
+                                                        disabled={isDdLinkedCheque}
+                                                    />
+                                                    {isDdLinkedCheque && (
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Not applicable for Demand Draft cheques.
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </FieldWrapper>
+                                    </div>
                                 </div>
 
                                 <FieldWrapper control={form.control} name="remarks" label="Remarks">
