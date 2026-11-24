@@ -1,5 +1,10 @@
-import { useMemo } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { useMemo, type CSSProperties } from "react";
+import type { ColDef } from "ag-grid-community";
+import DataTable from "@/components/ui/data-table";
+import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
+import type { ActionItem } from "@/components/ui/ActionMenu";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import type { OfficeInventoryConsumption, OfficeInventoryPurchase } from "../types";
 import { formatCurrency, formatDateDisplay, formatQty } from "../utils";
 
@@ -8,6 +13,7 @@ interface TransactionsTabProps {
     onSubTabChange: (sub: "purchases" | "consumptions") => void;
     purchases: OfficeInventoryPurchase[];
     consumptions: OfficeInventoryConsumption[];
+    loading?: boolean;
     search: string;
     onEditPurchase: (row: OfficeInventoryPurchase) => void;
     onDeletePurchase: (row: OfficeInventoryPurchase) => void;
@@ -20,6 +26,7 @@ export function TransactionsTab({
     onSubTabChange,
     purchases,
     consumptions,
+    loading = false,
     search,
     onEditPurchase,
     onDeletePurchase,
@@ -63,180 +70,212 @@ export function TransactionsTab({
         [filteredPurchases]
     );
 
+    const purchaseActions = useMemo<ActionItem<OfficeInventoryPurchase>[]>(
+        () => [
+            { label: "Edit", onClick: onEditPurchase },
+            { label: "Delete", className: "text-destructive", onClick: onDeletePurchase },
+        ],
+        [onEditPurchase, onDeletePurchase]
+    );
+
+    const consumptionActions = useMemo<ActionItem<OfficeInventoryConsumption>[]>(
+        () => [
+            { label: "Edit", onClick: onEditConsumption },
+            { label: "Delete", className: "text-destructive", onClick: onDeleteConsumption },
+        ],
+        [onEditConsumption, onDeleteConsumption]
+    );
+
+    const purchaseColumns = useMemo<ColDef<OfficeInventoryPurchase>[]>(
+        () => [
+            {
+                field: "purchaseDate",
+                headerName: "Date",
+                width: 125,
+                valueFormatter: p => formatDateDisplay(p.value),
+            },
+            { field: "itemCode", headerName: "Item Code", width: 115, cellClass: "font-mono text-xs" },
+            { field: "itemName", headerName: "Item Name", flex: 1.3, minWidth: 160 },
+            {
+                field: "category",
+                headerName: "Category",
+                width: 130,
+                cellRenderer: (p: { value?: string }) =>
+                    p.value ? <Badge variant="outline">{p.value}</Badge> : "—",
+            },
+            {
+                field: "qtyPurchased",
+                headerName: "Qty",
+                width: 110,
+                valueGetter: p => (p.data ? `${formatQty(p.data.qtyPurchased)} ${p.data.unit}` : ""),
+            },
+            {
+                field: "rate",
+                headerName: "Rate (₹)",
+                width: 115,
+                valueFormatter: p => formatCurrency(p.value),
+            },
+            {
+                field: "amount",
+                headerName: "Amount (₹)",
+                width: 130,
+                cellStyle: { fontWeight: 600 } as ColDef<OfficeInventoryPurchase>["cellStyle"],
+                valueFormatter: p => formatCurrency(p.value),
+            },
+            {
+                field: "supplier",
+                headerName: "Supplier",
+                flex: 1,
+                minWidth: 140,
+                valueFormatter: p => p.value || "—",
+            },
+            {
+                field: "notes",
+                headerName: "Notes",
+                flex: 1,
+                minWidth: 140,
+                valueFormatter: p => p.value || "—",
+            },
+            {
+                headerName: "Actions",
+                filter: false,
+                sortable: false,
+                width: 85,
+                headerComponent: () => <div className="w-full text-center">Actions</div>,
+                cellRenderer: createActionColumnRenderer(purchaseActions),
+                cellStyle: {
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                } as ColDef<OfficeInventoryPurchase>["cellStyle"],
+            },
+        ],
+        [purchaseActions]
+    );
+
+    const consumptionColumns = useMemo<ColDef<OfficeInventoryConsumption>[]>(
+        () => [
+            {
+                field: "consumptionDate",
+                headerName: "Date",
+                width: 125,
+                valueFormatter: p => formatDateDisplay(p.value),
+            },
+            { field: "itemCode", headerName: "Item Code", width: 115, cellClass: "font-mono text-xs" },
+            { field: "itemName", headerName: "Item Name", flex: 1.3, minWidth: 160 },
+            {
+                field: "category",
+                headerName: "Category",
+                width: 130,
+                cellRenderer: (p: { value?: string }) =>
+                    p.value ? <Badge variant="outline">{p.value}</Badge> : "—",
+            },
+            {
+                field: "qtyIssued",
+                headerName: "Qty Issued",
+                width: 130,
+                cellStyle: { fontWeight: 600 } as ColDef<OfficeInventoryConsumption>["cellStyle"],
+                valueGetter: p => (p.data ? `${formatQty(p.data.qtyIssued)} ${p.data.unit}` : ""),
+            },
+            {
+                field: "issuedTo",
+                headerName: "Issued To / Dept.",
+                flex: 1,
+                minWidth: 150,
+                valueFormatter: p => p.value || "—",
+            },
+            {
+                field: "notes",
+                headerName: "Notes",
+                flex: 1.2,
+                minWidth: 160,
+                valueFormatter: p => p.value || "—",
+            },
+            {
+                headerName: "Actions",
+                filter: false,
+                sortable: false,
+                width: 85,
+                headerComponent: () => <div className="w-full text-center">Actions</div>,
+                cellRenderer: createActionColumnRenderer(consumptionActions),
+                cellStyle: {
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                } as ColDef<OfficeInventoryConsumption>["cellStyle"],
+            },
+        ],
+        [consumptionActions]
+    );
+
     return (
-        <div>
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                    <button
+                    <Button
                         type="button"
+                        size="sm"
+                        variant={subTab === "purchases" ? "default" : "outline"}
                         onClick={() => onSubTabChange("purchases")}
-                        className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition ${
-                            subTab === "purchases"
-                                ? "bg-[#111827] text-white"
-                                : "bg-[#F3F4F6] text-[#374151] hover:bg-[#E5E7EB]"
-                        }`}
                     >
                         Purchase Log ({purchases.length})
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         type="button"
+                        size="sm"
+                        variant={subTab === "consumptions" ? "default" : "outline"}
                         onClick={() => onSubTabChange("consumptions")}
-                        className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition ${
-                            subTab === "consumptions"
-                                ? "bg-[#111827] text-white"
-                                : "bg-[#F3F4F6] text-[#374151] hover:bg-[#E5E7EB]"
-                        }`}
                     >
                         Consumption / Issue Log ({consumptions.length})
-                    </button>
+                    </Button>
                 </div>
                 {subTab === "purchases" && (
-                    <div className="text-[13px] text-[#6B7280]">
+                    <span className="text-sm text-muted-foreground">
                         Total Value:{" "}
-                        <span className="font-semibold text-[#111827]">
+                        <strong className="text-foreground">
                             {formatCurrency(totalPurchaseValue)}
-                        </span>
-                    </div>
+                        </strong>
+                    </span>
                 )}
             </div>
 
-            {subTab === "purchases" ? (
-                <div className="overflow-x-auto rounded-[10px] border border-[#E5E7EB] bg-white">
-                    <table className="w-full min-w-[860px] border-collapse text-left">
-                        <thead>
-                            <tr className="border-b border-[#E5E7EB] bg-[#FAFAFA] text-[13px] font-semibold text-[#111827]">
-                                <th className="px-4 py-3">Date</th>
-                                <th className="px-4 py-3">Item Code</th>
-                                <th className="px-4 py-3">Item Name</th>
-                                <th className="px-4 py-3">Category</th>
-                                <th className="px-4 py-3 text-right">Qty</th>
-                                <th className="px-4 py-3 text-right">Rate (₹)</th>
-                                <th className="px-4 py-3 text-right">Amount (₹)</th>
-                                <th className="px-4 py-3">Supplier</th>
-                                <th className="px-4 py-3">Notes</th>
-                                <th className="px-4 py-3 text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#E5E7EB] text-[13.5px]">
-                            {filteredPurchases.length === 0 ? (
-                                <tr>
-                                    <td colSpan={10} className="px-4 py-12 text-center text-[#6B7280]">
-                                        No purchase entries recorded yet.
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredPurchases.map(p => (
-                                    <tr key={p.id} className="hover:bg-[#FAFAFA]">
-                                        <td className="whitespace-nowrap px-4 py-3">
-                                            {formatDateDisplay(p.purchaseDate)}
-                                        </td>
-                                        <td className="px-4 py-3 font-mono text-[13px] font-medium">
-                                            {p.itemCode}
-                                        </td>
-                                        <td className="px-4 py-3 font-medium">{p.itemName}</td>
-                                        <td className="px-4 py-3 text-[#6B7280]">{p.category}</td>
-                                        <td className="px-4 py-3 text-right font-medium">
-                                            {formatQty(p.qtyPurchased)} {p.unit}
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
-                                            {formatCurrency(p.rate)}
-                                        </td>
-                                        <td className="px-4 py-3 text-right font-semibold">
-                                            {formatCurrency(p.amount)}
-                                        </td>
-                                        <td className="px-4 py-3">{p.supplier || "—"}</td>
-                                        <td className="max-w-[200px] truncate px-4 py-3 text-[#6B7280]">
-                                            {p.notes || "—"}
-                                        </td>
-                                        <td className="whitespace-nowrap px-4 py-3 text-right">
-                                            <button
-                                                type="button"
-                                                onClick={() => onEditPurchase(p)}
-                                                className="mr-1 inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#E5E7EB] hover:bg-[#F3F4F6]"
-                                                title="Edit purchase"
-                                            >
-                                                <Pencil className="h-3.5 w-3.5" />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => onDeletePurchase(p)}
-                                                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#E5E7EB] text-red-600 hover:bg-red-50"
-                                                title="Delete purchase"
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            ) : (
-                <div className="overflow-x-auto rounded-[10px] border border-[#E5E7EB] bg-white">
-                    <table className="w-full min-w-[780px] border-collapse text-left">
-                        <thead>
-                            <tr className="border-b border-[#E5E7EB] bg-[#FAFAFA] text-[13px] font-semibold text-[#111827]">
-                                <th className="px-4 py-3">Date</th>
-                                <th className="px-4 py-3">Item Code</th>
-                                <th className="px-4 py-3">Item Name</th>
-                                <th className="px-4 py-3">Category</th>
-                                <th className="px-4 py-3 text-right">Qty Issued</th>
-                                <th className="px-4 py-3">Issued To / Dept.</th>
-                                <th className="px-4 py-3">Notes</th>
-                                <th className="px-4 py-3 text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#E5E7EB] text-[13.5px]">
-                            {filteredConsumptions.length === 0 ? (
-                                <tr>
-                                    <td colSpan={8} className="px-4 py-12 text-center text-[#6B7280]">
-                                        No consumption entries recorded yet.
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredConsumptions.map(c => (
-                                    <tr key={c.id} className="hover:bg-[#FAFAFA]">
-                                        <td className="whitespace-nowrap px-4 py-3">
-                                            {formatDateDisplay(c.consumptionDate)}
-                                        </td>
-                                        <td className="px-4 py-3 font-mono text-[13px] font-medium">
-                                            {c.itemCode}
-                                        </td>
-                                        <td className="px-4 py-3 font-medium">{c.itemName}</td>
-                                        <td className="px-4 py-3 text-[#6B7280]">{c.category}</td>
-                                        <td className="px-4 py-3 text-right font-semibold">
-                                            {formatQty(c.qtyIssued)} {c.unit}
-                                        </td>
-                                        <td className="px-4 py-3">{c.issuedTo || "—"}</td>
-                                        <td className="max-w-[220px] truncate px-4 py-3 text-[#6B7280]">
-                                            {c.notes || "—"}
-                                        </td>
-                                        <td className="whitespace-nowrap px-4 py-3 text-right">
-                                            <button
-                                                type="button"
-                                                onClick={() => onEditConsumption(c)}
-                                                className="mr-1 inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#E5E7EB] hover:bg-[#F3F4F6]"
-                                                title="Edit consumption"
-                                            >
-                                                <Pencil className="h-3.5 w-3.5" />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => onDeleteConsumption(c)}
-                                                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#E5E7EB] text-red-600 hover:bg-red-50"
-                                                title="Delete consumption"
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            )}
+            <div style={{ "--ag-cell-horizontal-padding": "10px" } as CSSProperties}>
+                {subTab === "purchases" ? (
+                    <DataTable
+                        data={filteredPurchases}
+                        columnDefs={purchaseColumns}
+                        loading={loading}
+                        pageSize={25}
+                        gridOptions={{
+                            rowHeight: 48,
+                            headerHeight: 44,
+                            defaultColDef: {
+                                filter: false,
+                                sortable: true,
+                                resizable: true,
+                                cellStyle: { display: "flex", alignItems: "center" },
+                            },
+                        }}
+                    />
+                ) : (
+                    <DataTable
+                        data={filteredConsumptions}
+                        columnDefs={consumptionColumns}
+                        loading={loading}
+                        pageSize={25}
+                        gridOptions={{
+                            rowHeight: 48,
+                            headerHeight: 44,
+                            defaultColDef: {
+                                filter: false,
+                                sortable: true,
+                                resizable: true,
+                                cellStyle: { display: "flex", alignItems: "center" },
+                            },
+                        }}
+                    />
+                )}
+            </div>
         </div>
     );
 }

@@ -25,80 +25,102 @@ function getErrorMessage(err: unknown, fallback: string): string {
     return fallback;
 }
 
-export function useOfficeItems() {
+export function useOfficeItems(enabled = true) {
     return useQuery({
         queryKey: [...OI_KEY, "items"],
         queryFn: () => officeInventoryApi.listItems(),
+        enabled,
+        staleTime: 30_000,
     });
 }
 
-export function useOfficePurchases() {
+export function useOfficePurchases(enabled = true) {
     return useQuery({
         queryKey: [...OI_KEY, "purchases"],
         queryFn: () => officeInventoryApi.listPurchases(),
+        enabled,
+        staleTime: 30_000,
     });
 }
 
-export function useOfficeConsumptions() {
+export function useOfficeConsumptions(enabled = true) {
     return useQuery({
         queryKey: [...OI_KEY, "consumptions"],
         queryFn: () => officeInventoryApi.listConsumptions(),
+        enabled,
+        staleTime: 30_000,
     });
 }
 
-export function useOfficeEquipment() {
+export function useOfficeEquipment(enabled = true) {
     return useQuery({
         queryKey: [...OI_KEY, "equipment"],
         queryFn: () => officeInventoryApi.listEquipment(),
+        enabled,
+        staleTime: 30_000,
     });
 }
 
-export function useOfficeEquipmentLogs() {
+export function useOfficeEquipmentLogs(enabled = true) {
     return useQuery({
         queryKey: [...OI_KEY, "equipment-logs"],
         queryFn: () => officeInventoryApi.listEquipmentLogs(),
+        enabled,
+        staleTime: 30_000,
     });
 }
 
-export function useOfficeAppliances() {
+export function useOfficeAppliances(enabled = true) {
     return useQuery({
         queryKey: [...OI_KEY, "appliances"],
         queryFn: () => officeInventoryApi.listAppliances(),
+        enabled,
+        staleTime: 30_000,
     });
 }
 
-export function useOfficeApplianceServices() {
+export function useOfficeApplianceServices(enabled = true) {
     return useQuery({
         queryKey: [...OI_KEY, "appliance-services"],
         queryFn: () => officeInventoryApi.listApplianceServices(),
+        enabled,
+        staleTime: 30_000,
     });
 }
 
-export function useOfficeApplianceCleanings() {
+export function useOfficeApplianceCleanings(enabled = true) {
     return useQuery({
         queryKey: [...OI_KEY, "appliance-cleanings"],
         queryFn: () => officeInventoryApi.listApplianceCleanings(),
+        enabled,
+        staleTime: 30_000,
     });
 }
 
-export function useWeeklyReport(startDate: string, category: string) {
+export function useWeeklyReport(startDate: string, category: string, enabled = true) {
     return useQuery({
         queryKey: [...OI_KEY, "weekly-report", startDate, category],
         queryFn: () => officeInventoryApi.getWeeklyReport(startDate, category),
+        enabled,
+        staleTime: 30_000,
     });
 }
 
-export function useMonthlyReport(startDate: string, category: string) {
+export function useMonthlyReport(startDate: string, category: string, enabled = true) {
     return useQuery({
         queryKey: [...OI_KEY, "monthly-report", startDate, category],
         queryFn: () => officeInventoryApi.getMonthlyReport(startDate, category),
+        enabled,
+        staleTime: 30_000,
     });
 }
 
-export function useWeeklyTasks() {
+export function useWeeklyTasks(enabled = true) {
     return useQuery({
         queryKey: [...OI_KEY, "weekly-tasks"],
         queryFn: () => officeInventoryApi.getWeeklyTasks(),
+        enabled,
+        staleTime: 30_000,
     });
 }
 

@@ -1,6 +1,18 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Download, Plus, Search } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+    Card,
+    CardAction,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     useOfficeApplianceCleanings,
     useOfficeAppliances,
@@ -21,37 +33,95 @@ import { OfficeInventoryModals, type ModalState } from "./components/OfficeInven
 import { downloadCsv } from "./utils";
 
 type MainTab = "item-master" | "transactions" | "equipment" | "appliances" | "reports";
-
-const TABS: Array<{ id: MainTab; label: string }> = [
-    { id: "item-master", label: "Item Master" },
-    { id: "transactions", label: "Purchases & Consumption" },
-    { id: "equipment", label: "Equipment Register" },
-    { id: "appliances", label: "Pantry Appliances" },
-    { id: "reports", label: "Weekly Tasks & Reports" },
-];
+const VALID_TABS: MainTab[] = ["item-master", "transactions", "equipment", "appliances", "reports"];
 
 export default function OfficeInventoryPage() {
-    const [activeTab, setActiveTab] = useState<MainTab>("item-master");
-    const [txSubTab, setTxSubTab] = useState<"purchases" | "consumptions">("purchases");
-    const [eqSubTab, setEqSubTab] = useState<"register" | "logs">("register");
-    const [apSubTab, setApSubTab] = useState<"register" | "services" | "cleanings">("register");
+    const [searchParams, setSearchParams] = useSearchParams();
+    const rawTab = searchParams.get("tab") as MainTab | null;
+    const activeTab: MainTab = rawTab && VALID_TABS.includes(rawTab) ? rawTab : "item-master";
+    const rawSub = searchParams.get("sub");
+
+    const txSubTab: "purchases" | "consumptions" =
+        rawSub === "consumptions" ? "consumptions" : "purchases";
+    const eqSubTab: "register" | "logs" = rawSub === "logs" ? "logs" : "register";
+    const apSubTab: "register" | "services" | "cleanings" =
+        rawSub === "services" || rawSub === "cleanings" ? rawSub : "register";
+    const reportSubTab: "tasks" | "weekly" | "monthly" =
+        rawSub === "weekly" || rawSub === "monthly" ? rawSub : "tasks";
+
+    const setActiveTab = (next: MainTab) => {
+        setSearchParams(
+            prev => {
+                const copy = new URLSearchParams(prev);
+                copy.set("tab", next);
+                copy.delete("sub");
+                return copy;
+            },
+            { replace: true }
+        );
+    };
+
+    const setSubTab = (nextSub: string) => {
+        setSearchParams(
+            prev => {
+                const copy = new URLSearchParams(prev);
+                copy.set("tab", activeTab);
+                copy.set("sub", nextSub);
+                return copy;
+            },
+            { replace: true }
+        );
+    };
+
     const [search, setSearch] = useState("");
     const [modal, setModal] = useState<ModalState>({ type: "closed" });
 
-    const { data: items = [], isLoading: itemsLoading } = useOfficeItems();
-    const { data: purchases = [] } = useOfficePurchases();
-    const { data: consumptions = [] } = useOfficeConsumptions();
-    const { data: equipment = [] } = useOfficeEquipment();
-    const { data: equipmentLogs = [] } = useOfficeEquipmentLogs();
-    const { data: appliances = [] } = useOfficeAppliances();
-    const { data: applianceServices = [] } = useOfficeApplianceServices();
-    const { data: applianceCleanings = [] } = useOfficeApplianceCleanings();
+    // Only fetch data needed for the active tab (or open modal) to eliminate initial load buffering
+    const needItems =
+        activeTab === "item-master" ||
+        activeTab === "transactions" ||
+        modal.type === "purchase" ||
+        modal.type === "consumption";
+    const needPurchases = activeTab === "transactions" && txSubTab === "purchases";
+    const needConsumptions = activeTab === "transactions" && txSubTab === "consumptions";
+    const needEquipment = activeTab === "equipment" || modal.type === "equipment-log";
+    const needEqLogs = activeTab === "equipment" && eqSubTab === "logs";
+    const needAppliances =
+        activeTab === "appliances" ||
+        modal.type === "appliance-service" ||
+        modal.type === "appliance-cleaning";
+    const needServices = activeTab === "appliances" && apSubTab === "services";
+    const needCleanings = activeTab === "appliances" && apSubTab === "cleanings";
+
+    const { data: items = [], isLoading: itemsLoading, error: itemsError } =
+        useOfficeItems(needItems);
+    const { data: purchases = [], isLoading: purchasesLoading, error: purchasesError } =
+        useOfficePurchases(needPurchases);
+    const { data: consumptions = [], isLoading: consumptionsLoading, error: consumptionsError } =
+        useOfficeConsumptions(needConsumptions);
+    const { data: equipment = [], isLoading: equipmentLoading, error: equipmentError } =
+        useOfficeEquipment(needEquipment);
+    const { data: equipmentLogs = [], isLoading: eqLogsLoading, error: eqLogsError } =
+        useOfficeEquipmentLogs(needEqLogs);
+    const { data: appliances = [], isLoading: appliancesLoading, error: appliancesError } =
+        useOfficeAppliances(needAppliances);
+    const { data: applianceServices = [], isLoading: servicesLoading, error: servicesError } =
+        useOfficeApplianceServices(needServices);
+    const { data: applianceCleanings = [], isLoading: cleaningsLoading, error: cleaningsError } =
+        useOfficeApplianceCleanings(needCleanings);
+
+    const activeError =
+        (activeTab === "item-master" && itemsError) ||
+        (activeTab === "transactions" && (purchasesError || consumptionsError)) ||
+        (activeTab === "equipment" && (equipmentError || eqLogsError)) ||
+        (activeTab === "appliances" && (appliancesError || servicesError || cleaningsError)) ||
+        null;
 
     const mutations = useOfficeInventoryMutations();
 
     const primaryAction = useMemo(() => {
         if (activeTab === "item-master") {
-            return { label: "Add Item", onClick: () => setModal({ type: "item" }) };
+            return { label: "Add New Item", onClick: () => setModal({ type: "item" }) };
         }
         if (activeTab === "transactions") {
             return txSubTab === "purchases"
@@ -142,7 +212,15 @@ export default function OfficeInventoryPage() {
             } else {
                 downloadCsv(
                     "office-inventory-consumption.csv",
-                    ["Date", "Item Code", "Item Name", "Category", "Qty Issued", "Issued To", "Notes"],
+                    [
+                        "Date",
+                        "Item Code",
+                        "Item Name",
+                        "Category",
+                        "Qty Issued",
+                        "Issued To",
+                        "Notes",
+                    ],
                     consumptions.map(c => [
                         c.consumptionDate,
                         c.itemCode,
@@ -192,7 +270,16 @@ export default function OfficeInventoryPage() {
             } else {
                 downloadCsv(
                     "office-equipment-log.csv",
-                    ["Date", "Equipment Code", "Item Name", "Movement Type", "Qty", "Cost (INR)", "Reason", "Approved By"],
+                    [
+                        "Date",
+                        "Equipment Code",
+                        "Item Name",
+                        "Movement Type",
+                        "Qty",
+                        "Cost (INR)",
+                        "Reason",
+                        "Approved By",
+                    ],
                     equipmentLogs.map(l => [
                         l.logDate,
                         l.equipmentCode,
@@ -251,7 +338,16 @@ export default function OfficeInventoryPage() {
             } else if (apSubTab === "services") {
                 downloadCsv(
                     "office-appliance-services.csv",
-                    ["Date", "Appliance Code", "Appliance Name", "Visit Type", "Vendor", "Expense (INR)", "Next Service Due", "Notes"],
+                    [
+                        "Date",
+                        "Appliance Code",
+                        "Appliance Name",
+                        "Visit Type",
+                        "Vendor",
+                        "Expense (INR)",
+                        "Next Service Due",
+                        "Notes",
+                    ],
                     applianceServices.map(s => [
                         s.serviceDate,
                         s.applianceCode,
@@ -266,7 +362,15 @@ export default function OfficeInventoryPage() {
             } else {
                 downloadCsv(
                     "office-appliance-cleanings.csv",
-                    ["Date", "Appliance Code", "Appliance Name", "Cleaning Type", "Done By", "Cost (INR)", "Notes"],
+                    [
+                        "Date",
+                        "Appliance Code",
+                        "Appliance Name",
+                        "Cleaning Type",
+                        "Done By",
+                        "Cost (INR)",
+                        "Notes",
+                    ],
                     applianceCleanings.map(c => [
                         c.cleaningDate,
                         c.applianceCode,
@@ -282,206 +386,209 @@ export default function OfficeInventoryPage() {
     };
 
     return (
-        <div className="mx-auto max-w-[1380px] px-4 pb-16 pt-4 sm:px-6">
-            {/* Header */}
-            <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                    <h1 className="text-[22px] font-bold leading-tight tracking-[-0.015em] text-[#111827] sm:text-[24px]">
-                        Office Inventory Management
-                    </h1>
-                    <p className="mt-1 text-[14px] text-[#6B7280]">
-                        View and manage Housekeeping, Pantry, and Stationery stock, equipment
-                        registers, appliance maintenance, and weekly tasks.
-                    </p>
-                </div>
-
-                <div className="flex shrink-0 items-center gap-2.5">
-                    {activeTab !== "reports" && (
-                        <button
-                            type="button"
-                            onClick={handleExportCsv}
-                            className="inline-flex items-center gap-1.5 rounded-[8px] border border-[#E5E7EB] bg-white px-3.5 py-2 text-[13px] font-medium text-[#374151] transition hover:bg-[#F9FAFB]"
-                        >
-                            <Download className="h-4 w-4 text-[#6B7280]" />
-                            Export CSV
-                        </button>
-                    )}
-                    {primaryAction && (
-                        <button
-                            type="button"
-                            onClick={primaryAction.onClick}
-                            className="inline-flex items-center gap-1.5 rounded-[8px] bg-[#111827] px-4 py-2 text-[13px] font-medium text-white shadow-xs transition hover:bg-[#1F2937]"
-                        >
-                            <Plus className="h-4 w-4" />
-                            {primaryAction.label}
-                        </button>
-                    )}
-                </div>
-            </div>
-
-            {/* Navigation Tabs */}
-            <div className="mb-5 overflow-x-auto border-b border-[#E5E7EB]">
-                <nav className="flex min-w-max items-center gap-6" aria-label="Inventory Sections">
-                    {TABS.map(tab => {
-                        const isActive = activeTab === tab.id;
-                        return (
-                            <button
-                                key={tab.id}
-                                type="button"
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`whitespace-nowrap border-b-2 px-1 py-2.5 text-[14px] transition ${
-                                    isActive
-                                        ? "border-[#111827] font-semibold text-[#111827]"
-                                        : "border-transparent font-medium text-[#6B7280] hover:text-[#111827]"
-                                }`}
-                            >
-                                {tab.label}
-                            </button>
-                        );
-                    })}
-                </nav>
-            </div>
-
-            {/* Global Search Bar (for tabular tabs) */}
-            {activeTab !== "reports" && (
-                <div className="mb-5">
-                    <div className="flex items-center rounded-[10px] border border-[#E5E7EB] bg-white px-4 py-2.5 shadow-2xs transition focus-within:border-[#9CA3AF]">
-                        <Search className="mr-3 h-[18px] w-[18px] shrink-0 text-[#6B7280]" />
-                        <input
-                            type="text"
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                            placeholder="Search code, name, category, unit, supplier, or status..."
-                            className="w-full bg-transparent text-[14px] text-[#111827] placeholder-[#6B7280] focus:outline-none"
-                        />
-                        {search && (
-                            <button
-                                type="button"
-                                onClick={() => setSearch("")}
-                                className="ml-2 rounded bg-[#F3F4F6] px-2 py-0.5 text-[12px] text-[#6B7280] hover:text-[#111827]"
-                            >
-                                Clear
-                            </button>
+        <Card>
+            <CardHeader>
+                <CardTitle>Office Inventory Management</CardTitle>
+                <CardDescription>
+                    View and manage Housekeeping, Pantry, and Stationery stock, equipment
+                    registers, appliance maintenance, and weekly tasks.
+                </CardDescription>
+                <CardAction>
+                    <div className="flex items-center gap-2">
+                        {activeTab !== "reports" && (
+                            <Button variant="outline" onClick={handleExportCsv}>
+                                <Download className="mr-2 h-4 w-4" />
+                                Export CSV
+                            </Button>
+                        )}
+                        {primaryAction && (
+                            <Button onClick={primaryAction.onClick}>
+                                <Plus className="mr-2 h-4 w-4" />
+                                {primaryAction.label}
+                            </Button>
                         )}
                     </div>
-                </div>
-            )}
+                </CardAction>
+            </CardHeader>
 
-            {/* Tab Content */}
-            {itemsLoading && activeTab === "item-master" ? (
-                <Skeleton className="h-96 w-full rounded-[10px]" />
-            ) : activeTab === "item-master" ? (
-                <ItemMasterTab
+            <CardContent className="space-y-4">
+                {activeError && (
+                    <Alert variant="destructive">
+                        <AlertDescription>
+                            Unable to load office inventory data:{" "}
+                            {activeError instanceof Error ? activeError.message : "Request failed"}
+                        </AlertDescription>
+                    </Alert>
+                )}
+                <Tabs
+                    value={activeTab}
+                    onValueChange={v => setActiveTab(v as MainTab)}
+                    className="w-full"
+                >
+                    <TabsList className="w-full justify-start overflow-x-auto">
+                        <TabsTrigger value="item-master">Item Master</TabsTrigger>
+                        <TabsTrigger value="transactions">Purchases &amp; Consumption</TabsTrigger>
+                        <TabsTrigger value="equipment">Equipment Register</TabsTrigger>
+                        <TabsTrigger value="appliances">Pantry Appliances</TabsTrigger>
+                        <TabsTrigger value="reports">Weekly Tasks &amp; Reports</TabsTrigger>
+                    </TabsList>
+
+                    {activeTab !== "reports" && (
+                        <div className="mt-3 w-full">
+                            <div className="relative w-full">
+                                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    className="h-11 w-full pl-9 md:h-10"
+                                    placeholder="Search code, name, category, unit, supplier, or status..."
+                                    value={search}
+                                    onChange={e => setSearch(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    <TabsContent value="item-master" className="mt-3">
+                        <ItemMasterTab
+                            items={items}
+                            loading={itemsLoading}
+                            search={search}
+                            onEdit={item => setModal({ type: "item", editing: item })}
+                            onDelete={item => {
+                                if (
+                                    window.confirm(
+                                        `Delete item "${item.itemName}" (${item.itemCode})?`
+                                    )
+                                ) {
+                                    mutations.deleteItem.mutate(item.id);
+                                }
+                            }}
+                        />
+                    </TabsContent>
+
+                    <TabsContent value="transactions" className="mt-3">
+                        <TransactionsTab
+                            subTab={txSubTab}
+                            onSubTabChange={setSubTab}
+                            purchases={purchases}
+                            consumptions={consumptions}
+                            loading={purchasesLoading || consumptionsLoading}
+                            search={search}
+                            onEditPurchase={row => setModal({ type: "purchase", editing: row })}
+                            onDeletePurchase={row => {
+                                if (
+                                    window.confirm(
+                                        `Delete purchase entry for ${row.itemCode} (${row.qtyPurchased} ${row.unit})?`
+                                    )
+                                ) {
+                                    mutations.deletePurchase.mutate(row.id);
+                                }
+                            }}
+                            onEditConsumption={row =>
+                                setModal({ type: "consumption", editing: row })
+                            }
+                            onDeleteConsumption={row => {
+                                if (
+                                    window.confirm(
+                                        `Delete consumption entry for ${row.itemCode} (${row.qtyIssued} ${row.unit})?`
+                                    )
+                                ) {
+                                    mutations.deleteConsumption.mutate(row.id);
+                                }
+                            }}
+                        />
+                    </TabsContent>
+
+                    <TabsContent value="equipment" className="mt-3">
+                        <EquipmentTab
+                            subTab={eqSubTab}
+                            onSubTabChange={setSubTab}
+                            equipment={equipment}
+                            logs={equipmentLogs}
+                            loading={equipmentLoading || eqLogsLoading}
+                            search={search}
+                            onEditEquipment={row => setModal({ type: "equipment", editing: row })}
+                            onDeleteEquipment={row => {
+                                if (
+                                    window.confirm(
+                                        `Delete equipment "${row.itemName}" (${row.equipmentCode})?`
+                                    )
+                                ) {
+                                    mutations.deleteEquipment.mutate(row.id);
+                                }
+                            }}
+                            onEditLog={row => setModal({ type: "equipment-log", editing: row })}
+                            onDeleteLog={row => {
+                                if (
+                                    window.confirm(
+                                        `Delete equipment movement for ${row.equipmentCode}?`
+                                    )
+                                ) {
+                                    mutations.deleteEquipmentLog.mutate(row.id);
+                                }
+                            }}
+                        />
+                    </TabsContent>
+
+                    <TabsContent value="appliances" className="mt-3">
+                        <AppliancesTab
+                            subTab={apSubTab}
+                            onSubTabChange={setSubTab}
+                            appliances={appliances}
+                            services={applianceServices}
+                            cleanings={applianceCleanings}
+                            loading={appliancesLoading || servicesLoading || cleaningsLoading}
+                            search={search}
+                            onEditAppliance={row => setModal({ type: "appliance", editing: row })}
+                            onDeleteAppliance={row => {
+                                if (
+                                    window.confirm(
+                                        `Delete appliance "${row.applianceName}" (${row.applianceCode})?`
+                                    )
+                                ) {
+                                    mutations.deleteAppliance.mutate(row.id);
+                                }
+                            }}
+                            onEditService={row =>
+                                setModal({ type: "appliance-service", editing: row })
+                            }
+                            onDeleteService={row => {
+                                if (
+                                    window.confirm(
+                                        `Delete service visit for ${row.applianceCode}?`
+                                    )
+                                ) {
+                                    mutations.deleteApplianceService.mutate(row.id);
+                                }
+                            }}
+                            onEditCleaning={row =>
+                                setModal({ type: "appliance-cleaning", editing: row })
+                            }
+                            onDeleteCleaning={row => {
+                                if (
+                                    window.confirm(
+                                        `Delete cleaning log for ${row.applianceCode}?`
+                                    )
+                                ) {
+                                    mutations.deleteApplianceCleaning.mutate(row.id);
+                                }
+                            }}
+                        />
+                    </TabsContent>
+
+                    <TabsContent value="reports" className="mt-3">
+                        <ReportsTab subTab={reportSubTab} onSubTabChange={setSubTab} />
+                    </TabsContent>
+                </Tabs>
+
+                <OfficeInventoryModals
+                    modal={modal}
+                    onClose={() => setModal({ type: "closed" })}
                     items={items}
-                    search={search}
-                    onView={item => setModal({ type: "item-detail", item })}
-                    onEdit={item => setModal({ type: "item", editing: item })}
-                    onQuickPurchase={item => setModal({ type: "purchase", presetItemId: item.id })}
-                    onQuickConsume={item =>
-                        setModal({ type: "consumption", presetItemId: item.id })
-                    }
-                    onDelete={item => {
-                        if (window.confirm(`Delete item "${item.itemName}" (${item.itemCode})?`)) {
-                            mutations.deleteItem.mutate(item.id);
-                        }
-                    }}
-                />
-            ) : activeTab === "transactions" ? (
-                <TransactionsTab
-                    subTab={txSubTab}
-                    onSubTabChange={setTxSubTab}
-                    purchases={purchases}
-                    consumptions={consumptions}
-                    search={search}
-                    onEditPurchase={row => setModal({ type: "purchase", editing: row })}
-                    onDeletePurchase={row => {
-                        if (
-                            window.confirm(
-                                `Delete purchase entry for ${row.itemCode} (${row.qtyPurchased} ${row.unit})?`
-                            )
-                        ) {
-                            mutations.deletePurchase.mutate(row.id);
-                        }
-                    }}
-                    onEditConsumption={row => setModal({ type: "consumption", editing: row })}
-                    onDeleteConsumption={row => {
-                        if (
-                            window.confirm(
-                                `Delete consumption entry for ${row.itemCode} (${row.qtyIssued} ${row.unit})?`
-                            )
-                        ) {
-                            mutations.deleteConsumption.mutate(row.id);
-                        }
-                    }}
-                />
-            ) : activeTab === "equipment" ? (
-                <EquipmentTab
-                    subTab={eqSubTab}
-                    onSubTabChange={setEqSubTab}
                     equipment={equipment}
-                    logs={equipmentLogs}
-                    search={search}
-                    onEditEquipment={row => setModal({ type: "equipment", editing: row })}
-                    onDeleteEquipment={row => {
-                        if (
-                            window.confirm(
-                                `Delete equipment "${row.itemName}" (${row.equipmentCode})?`
-                            )
-                        ) {
-                            mutations.deleteEquipment.mutate(row.id);
-                        }
-                    }}
-                    onEditLog={row => setModal({ type: "equipment-log", editing: row })}
-                    onDeleteLog={row => {
-                        if (window.confirm(`Delete equipment movement for ${row.equipmentCode}?`)) {
-                            mutations.deleteEquipmentLog.mutate(row.id);
-                        }
-                    }}
-                />
-            ) : activeTab === "appliances" ? (
-                <AppliancesTab
-                    subTab={apSubTab}
-                    onSubTabChange={setApSubTab}
                     appliances={appliances}
-                    services={applianceServices}
-                    cleanings={applianceCleanings}
-                    search={search}
-                    onEditAppliance={row => setModal({ type: "appliance", editing: row })}
-                    onDeleteAppliance={row => {
-                        if (
-                            window.confirm(
-                                `Delete appliance "${row.applianceName}" (${row.applianceCode})?`
-                            )
-                        ) {
-                            mutations.deleteAppliance.mutate(row.id);
-                        }
-                    }}
-                    onEditService={row => setModal({ type: "appliance-service", editing: row })}
-                    onDeleteService={row => {
-                        if (window.confirm(`Delete service visit for ${row.applianceCode}?`)) {
-                            mutations.deleteApplianceService.mutate(row.id);
-                        }
-                    }}
-                    onEditCleaning={row => setModal({ type: "appliance-cleaning", editing: row })}
-                    onDeleteCleaning={row => {
-                        if (window.confirm(`Delete cleaning log for ${row.applianceCode}?`)) {
-                            mutations.deleteApplianceCleaning.mutate(row.id);
-                        }
-                    }}
+                    mutations={mutations}
                 />
-            ) : (
-                <ReportsTab />
-            )}
-
-            {/* Modals */}
-            <OfficeInventoryModals
-                modal={modal}
-                onClose={() => setModal({ type: "closed" })}
-                items={items}
-                equipment={equipment}
-                appliances={appliances}
-                mutations={mutations}
-            />
-        </div>
+            </CardContent>
+        </Card>
     );
 }

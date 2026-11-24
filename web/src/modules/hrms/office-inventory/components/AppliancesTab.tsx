@@ -1,5 +1,10 @@
-import { useMemo } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { useMemo, type CSSProperties } from "react";
+import type { ColDef } from "ag-grid-community";
+import DataTable from "@/components/ui/data-table";
+import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
+import type { ActionItem } from "@/components/ui/ActionMenu";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import type {
     OfficeAppliance,
     OfficeApplianceCleaning,
@@ -13,6 +18,7 @@ interface AppliancesTabProps {
     appliances: OfficeAppliance[];
     services: OfficeApplianceService[];
     cleanings: OfficeApplianceCleaning[];
+    loading?: boolean;
     search: string;
     onEditAppliance: (row: OfficeAppliance) => void;
     onDeleteAppliance: (row: OfficeAppliance) => void;
@@ -28,6 +34,7 @@ export function AppliancesTab({
     appliances,
     services,
     cleanings,
+    loading = false,
     search,
     onEditAppliance,
     onDeleteAppliance,
@@ -83,302 +90,358 @@ export function AppliancesTab({
         [cleanings, q]
     );
 
-    const statusBadge = (status: string) => {
-        if (status === "In Service") return "bg-emerald-50 text-emerald-700";
-        if (status === "Under Repair") return "bg-amber-50 text-amber-700";
-        return "bg-gray-100 text-gray-600";
-    };
+    const applianceActions = useMemo<ActionItem<OfficeAppliance>[]>(
+        () => [
+            { label: "Edit", onClick: onEditAppliance },
+            { label: "Delete", className: "text-destructive", onClick: onDeleteAppliance },
+        ],
+        [onEditAppliance, onDeleteAppliance]
+    );
+
+    const serviceActions = useMemo<ActionItem<OfficeApplianceService>[]>(
+        () => [
+            { label: "Edit", onClick: onEditService },
+            { label: "Delete", className: "text-destructive", onClick: onDeleteService },
+        ],
+        [onEditService, onDeleteService]
+    );
+
+    const cleaningActions = useMemo<ActionItem<OfficeApplianceCleaning>[]>(
+        () => [
+            { label: "Edit", onClick: onEditCleaning },
+            { label: "Delete", className: "text-destructive", onClick: onDeleteCleaning },
+        ],
+        [onEditCleaning, onDeleteCleaning]
+    );
+
+    const applianceColumns = useMemo<ColDef<OfficeAppliance>[]>(
+        () => [
+            {
+                field: "applianceCode",
+                headerName: "Code",
+                width: 110,
+                cellClass: "font-mono text-xs",
+            },
+            {
+                field: "applianceName",
+                headerName: "Appliance",
+                flex: 1.5,
+                minWidth: 200,
+                cellRenderer: (p: { data?: OfficeAppliance }) =>
+                    p.data ? (
+                        <div className="leading-tight">
+                            <div className="font-medium">{p.data.applianceName}</div>
+                            <div className="text-xs text-muted-foreground">
+                                {[p.data.brandModel, p.data.location].filter(Boolean).join(" · ") ||
+                                    "—"}
+                            </div>
+                        </div>
+                    ) : (
+                        "—"
+                    ),
+            },
+            {
+                field: "status",
+                headerName: "Status",
+                width: 125,
+                cellRenderer: (p: { value?: string }) => {
+                    if (!p.value) return "—";
+                    const variant =
+                        p.value === "In Service"
+                            ? "secondary"
+                            : p.value === "Under Repair"
+                              ? "outline"
+                              : "destructive";
+                    return <Badge variant={variant}>{p.value}</Badge>;
+                },
+            },
+            { field: "serviceFrequency", headerName: "Service Freq", width: 120 },
+            { field: "cleaningFrequency", headerName: "Cleaning Freq", width: 125 },
+            {
+                field: "serviceVisitsCount",
+                headerName: "Services / Expense",
+                width: 155,
+                cellRenderer: (p: { data?: OfficeAppliance }) =>
+                    p.data ? (
+                        <div className="leading-tight">
+                            <div className="font-medium">
+                                {p.data.serviceVisitsCount} visit
+                                {p.data.serviceVisitsCount === 1 ? "" : "s"}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                                {formatCurrency(p.data.totalMaintenanceExpense)}
+                            </div>
+                        </div>
+                    ) : (
+                        "—"
+                    ),
+            },
+            {
+                field: "lastServiceDate",
+                headerName: "Last Service",
+                width: 125,
+                valueFormatter: p => formatDateDisplay(p.value),
+            },
+            {
+                field: "cleaningsCount",
+                headerName: "Cleanings / Last",
+                width: 145,
+                cellRenderer: (p: { data?: OfficeAppliance }) =>
+                    p.data ? (
+                        <div className="leading-tight">
+                            <div className="font-medium">{p.data.cleaningsCount} done</div>
+                            <div className="text-xs text-muted-foreground">
+                                {p.data.lastCleanedDate
+                                    ? formatDateDisplay(p.data.lastCleanedDate)
+                                    : "Never"}
+                            </div>
+                        </div>
+                    ) : (
+                        "—"
+                    ),
+            },
+            {
+                field: "nextCleaningDue",
+                headerName: "Next Cleaning Due",
+                width: 175,
+                cellRenderer: (p: { data?: OfficeAppliance }) => {
+                    if (!p.data?.nextCleaningDue) return "—";
+                    return (
+                        <Badge
+                            variant={p.data.isCleaningOverdue ? "destructive" : "outline"}
+                        >
+                            {formatDateDisplay(p.data.nextCleaningDue)}
+                            {p.data.isCleaningOverdue ? " (Overdue)" : ""}
+                        </Badge>
+                    );
+                },
+            },
+            {
+                headerName: "Actions",
+                filter: false,
+                sortable: false,
+                width: 85,
+                headerComponent: () => <div className="w-full text-center">Actions</div>,
+                cellRenderer: createActionColumnRenderer(applianceActions),
+                cellStyle: {
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                } as ColDef<OfficeAppliance>["cellStyle"],
+            },
+        ],
+        [applianceActions]
+    );
+
+    const serviceColumns = useMemo<ColDef<OfficeApplianceService>[]>(
+        () => [
+            {
+                field: "serviceDate",
+                headerName: "Date",
+                width: 125,
+                valueFormatter: p => formatDateDisplay(p.value),
+            },
+            {
+                field: "applianceCode",
+                headerName: "Code",
+                width: 110,
+                cellClass: "font-mono text-xs",
+            },
+            { field: "applianceName", headerName: "Appliance", flex: 1.2, minWidth: 160 },
+            {
+                field: "visitType",
+                headerName: "Visit Type",
+                width: 145,
+                cellRenderer: (p: { value?: string }) =>
+                    p.value ? <Badge variant="outline">{p.value}</Badge> : "—",
+            },
+            {
+                field: "vendorTechnician",
+                headerName: "Vendor / Technician",
+                flex: 1,
+                minWidth: 150,
+                valueFormatter: p => p.value || "—",
+            },
+            {
+                field: "expense",
+                headerName: "Expense (₹)",
+                width: 130,
+                cellStyle: { fontWeight: 600 } as ColDef<OfficeApplianceService>["cellStyle"],
+                valueFormatter: p => formatCurrency(p.value),
+            },
+            {
+                field: "nextServiceDue",
+                headerName: "Next Service Due",
+                width: 145,
+                valueFormatter: p => formatDateDisplay(p.value),
+            },
+            {
+                field: "notes",
+                headerName: "Notes",
+                flex: 1,
+                minWidth: 140,
+                valueFormatter: p => p.value || "—",
+            },
+            {
+                headerName: "Actions",
+                filter: false,
+                sortable: false,
+                width: 85,
+                headerComponent: () => <div className="w-full text-center">Actions</div>,
+                cellRenderer: createActionColumnRenderer(serviceActions),
+                cellStyle: {
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                } as ColDef<OfficeApplianceService>["cellStyle"],
+            },
+        ],
+        [serviceActions]
+    );
+
+    const cleaningColumns = useMemo<ColDef<OfficeApplianceCleaning>[]>(
+        () => [
+            {
+                field: "cleaningDate",
+                headerName: "Date",
+                width: 125,
+                valueFormatter: p => formatDateDisplay(p.value),
+            },
+            {
+                field: "applianceCode",
+                headerName: "Code",
+                width: 110,
+                cellClass: "font-mono text-xs",
+            },
+            { field: "applianceName", headerName: "Appliance", flex: 1.2, minWidth: 160 },
+            {
+                field: "cleaningType",
+                headerName: "Cleaning Type",
+                width: 155,
+                cellRenderer: (p: { value?: string }) =>
+                    p.value ? <Badge variant="outline">{p.value}</Badge> : "—",
+            },
+            {
+                field: "doneBy",
+                headerName: "Done By",
+                width: 150,
+                valueFormatter: p => p.value || "—",
+            },
+            {
+                field: "cost",
+                headerName: "Cost (₹)",
+                width: 120,
+                valueFormatter: p => formatCurrency(p.value),
+            },
+            {
+                field: "notes",
+                headerName: "Notes",
+                flex: 1.2,
+                minWidth: 160,
+                valueFormatter: p => p.value || "—",
+            },
+            {
+                headerName: "Actions",
+                filter: false,
+                sortable: false,
+                width: 85,
+                headerComponent: () => <div className="w-full text-center">Actions</div>,
+                cellRenderer: createActionColumnRenderer(cleaningActions),
+                cellStyle: {
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                } as ColDef<OfficeApplianceCleaning>["cellStyle"],
+            },
+        ],
+        [cleaningActions]
+    );
 
     return (
-        <div>
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={() => onSubTabChange("register")}
-                        className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition ${
-                            subTab === "register"
-                                ? "bg-[#111827] text-white"
-                                : "bg-[#F3F4F6] text-[#374151] hover:bg-[#E5E7EB]"
-                        }`}
-                    >
-                        Appliance Register ({appliances.length})
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => onSubTabChange("services")}
-                        className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition ${
-                            subTab === "services"
-                                ? "bg-[#111827] text-white"
-                                : "bg-[#F3F4F6] text-[#374151] hover:bg-[#E5E7EB]"
-                        }`}
-                    >
-                        Service / Maintenance Visits ({services.length})
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => onSubTabChange("cleanings")}
-                        className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition ${
-                            subTab === "cleanings"
-                                ? "bg-[#111827] text-white"
-                                : "bg-[#F3F4F6] text-[#374151] hover:bg-[#E5E7EB]"
-                        }`}
-                    >
-                        Cleaning Log ({cleanings.length})
-                    </button>
-                </div>
+        <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+                <Button
+                    type="button"
+                    size="sm"
+                    variant={subTab === "register" ? "default" : "outline"}
+                    onClick={() => onSubTabChange("register")}
+                >
+                    Appliance Register ({appliances.length})
+                </Button>
+                <Button
+                    type="button"
+                    size="sm"
+                    variant={subTab === "services" ? "default" : "outline"}
+                    onClick={() => onSubTabChange("services")}
+                >
+                    Service / Maintenance Visits ({services.length})
+                </Button>
+                <Button
+                    type="button"
+                    size="sm"
+                    variant={subTab === "cleanings" ? "default" : "outline"}
+                    onClick={() => onSubTabChange("cleanings")}
+                >
+                    Cleaning Log ({cleanings.length})
+                </Button>
             </div>
 
-            {subTab === "register" && (
-                <div className="overflow-x-auto rounded-[10px] border border-[#E5E7EB] bg-white">
-                    <table className="w-full min-w-[1120px] border-collapse text-left">
-                        <thead>
-                            <tr className="border-b border-[#E5E7EB] bg-[#FAFAFA] text-[13px] font-semibold text-[#111827]">
-                                <th className="px-4 py-3">Code</th>
-                                <th className="px-4 py-3">Appliance</th>
-                                <th className="px-4 py-3">Status</th>
-                                <th className="px-4 py-3">Service Freq</th>
-                                <th className="px-4 py-3">Cleaning Freq</th>
-                                <th className="px-4 py-3 text-right">Services / Expense</th>
-                                <th className="px-4 py-3">Last Service</th>
-                                <th className="px-4 py-3">Cleanings / Last</th>
-                                <th className="px-4 py-3">Next Cleaning Due</th>
-                                <th className="px-4 py-3 text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#E5E7EB] text-[13.5px]">
-                            {filteredAppliances.length === 0 ? (
-                                <tr>
-                                    <td colSpan={10} className="px-4 py-12 text-center text-[#6B7280]">
-                                        No pantry appliances registered yet.
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredAppliances.map(app => (
-                                    <tr key={app.id} className="hover:bg-[#FAFAFA]">
-                                        <td className="px-4 py-3 font-mono text-[13px] font-medium">
-                                            {app.applianceCode}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="font-medium text-[#111827]">
-                                                {app.applianceName}
-                                            </div>
-                                            <div className="text-xs text-[#6B7280]">
-                                                {[app.brandModel, app.location]
-                                                    .filter(Boolean)
-                                                    .join(" · ") || "—"}
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <span
-                                                className={`inline-flex rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold ${statusBadge(
-                                                    app.status
-                                                )}`}
-                                            >
-                                                {app.status}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3">{app.serviceFrequency}</td>
-                                        <td className="px-4 py-3">{app.cleaningFrequency}</td>
-                                        <td className="px-4 py-3 text-right">
-                                            <div className="font-medium">
-                                                {app.serviceVisitsCount} visit
-                                                {app.serviceVisitsCount === 1 ? "" : "s"}
-                                            </div>
-                                            <div className="text-xs text-[#6B7280]">
-                                                {formatCurrency(app.totalMaintenanceExpense)}
-                                            </div>
-                                        </td>
-                                        <td className="whitespace-nowrap px-4 py-3">
-                                            {formatDateDisplay(app.lastServiceDate)}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="font-medium">
-                                                {app.cleaningsCount} done
-                                            </div>
-                                            <div className="text-xs text-[#6B7280]">
-                                                {app.lastCleanedDate
-                                                    ? formatDateDisplay(app.lastCleanedDate)
-                                                    : "Never"}
-                                            </div>
-                                        </td>
-                                        <td className="whitespace-nowrap px-4 py-3">
-                                            {app.nextCleaningDue ? (
-                                                <span
-                                                    className={`inline-flex rounded-full px-2.5 py-0.5 text-[12px] font-semibold ${
-                                                        app.isCleaningOverdue
-                                                            ? "bg-red-100 text-red-700"
-                                                            : "bg-[#F3F4F6] text-[#111827]"
-                                                    }`}
-                                                >
-                                                    {formatDateDisplay(app.nextCleaningDue)}
-                                                    {app.isCleaningOverdue ? " (Overdue)" : ""}
-                                                </span>
-                                            ) : (
-                                                "—"
-                                            )}
-                                        </td>
-                                        <td className="whitespace-nowrap px-4 py-3 text-right">
-                                            <button
-                                                type="button"
-                                                onClick={() => onEditAppliance(app)}
-                                                className="mr-1 inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#E5E7EB] hover:bg-[#F3F4F6]"
-                                                title="Edit appliance"
-                                            >
-                                                <Pencil className="h-3.5 w-3.5" />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => onDeleteAppliance(app)}
-                                                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#E5E7EB] text-red-600 hover:bg-red-50"
-                                                title="Delete appliance"
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            )}
-
-            {subTab === "services" && (
-                <div className="overflow-x-auto rounded-[10px] border border-[#E5E7EB] bg-white">
-                    <table className="w-full min-w-[880px] border-collapse text-left">
-                        <thead>
-                            <tr className="border-b border-[#E5E7EB] bg-[#FAFAFA] text-[13px] font-semibold text-[#111827]">
-                                <th className="px-4 py-3">Date</th>
-                                <th className="px-4 py-3">Code</th>
-                                <th className="px-4 py-3">Appliance</th>
-                                <th className="px-4 py-3">Visit Type</th>
-                                <th className="px-4 py-3">Vendor / Technician</th>
-                                <th className="px-4 py-3 text-right">Expense (₹)</th>
-                                <th className="px-4 py-3">Next Service Due</th>
-                                <th className="px-4 py-3">Notes</th>
-                                <th className="px-4 py-3 text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#E5E7EB] text-[13.5px]">
-                            {filteredServices.length === 0 ? (
-                                <tr>
-                                    <td colSpan={9} className="px-4 py-12 text-center text-[#6B7280]">
-                                        No service visits logged yet.
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredServices.map(s => (
-                                    <tr key={s.id} className="hover:bg-[#FAFAFA]">
-                                        <td className="whitespace-nowrap px-4 py-3">
-                                            {formatDateDisplay(s.serviceDate)}
-                                        </td>
-                                        <td className="px-4 py-3 font-mono text-[13px] font-medium">
-                                            {s.applianceCode}
-                                        </td>
-                                        <td className="px-4 py-3 font-medium">{s.applianceName}</td>
-                                        <td className="px-4 py-3">{s.visitType}</td>
-                                        <td className="px-4 py-3">{s.vendorTechnician || "—"}</td>
-                                        <td className="px-4 py-3 text-right font-semibold">
-                                            {formatCurrency(s.expense)}
-                                        </td>
-                                        <td className="whitespace-nowrap px-4 py-3">
-                                            {formatDateDisplay(s.nextServiceDue)}
-                                        </td>
-                                        <td className="max-w-[200px] truncate px-4 py-3 text-[#6B7280]">
-                                            {s.notes || "—"}
-                                        </td>
-                                        <td className="whitespace-nowrap px-4 py-3 text-right">
-                                            <button
-                                                type="button"
-                                                onClick={() => onEditService(s)}
-                                                className="mr-1 inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#E5E7EB] hover:bg-[#F3F4F6]"
-                                                title="Edit service visit"
-                                            >
-                                                <Pencil className="h-3.5 w-3.5" />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => onDeleteService(s)}
-                                                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#E5E7EB] text-red-600 hover:bg-red-50"
-                                                title="Delete service visit"
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            )}
-
-            {subTab === "cleanings" && (
-                <div className="overflow-x-auto rounded-[10px] border border-[#E5E7EB] bg-white">
-                    <table className="w-full min-w-[780px] border-collapse text-left">
-                        <thead>
-                            <tr className="border-b border-[#E5E7EB] bg-[#FAFAFA] text-[13px] font-semibold text-[#111827]">
-                                <th className="px-4 py-3">Date</th>
-                                <th className="px-4 py-3">Code</th>
-                                <th className="px-4 py-3">Appliance</th>
-                                <th className="px-4 py-3">Cleaning Type</th>
-                                <th className="px-4 py-3">Done By</th>
-                                <th className="px-4 py-3 text-right">Cost (₹)</th>
-                                <th className="px-4 py-3">Notes</th>
-                                <th className="px-4 py-3 text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#E5E7EB] text-[13.5px]">
-                            {filteredCleanings.length === 0 ? (
-                                <tr>
-                                    <td colSpan={8} className="px-4 py-12 text-center text-[#6B7280]">
-                                        No appliance cleanings logged yet.
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredCleanings.map(c => (
-                                    <tr key={c.id} className="hover:bg-[#FAFAFA]">
-                                        <td className="whitespace-nowrap px-4 py-3">
-                                            {formatDateDisplay(c.cleaningDate)}
-                                        </td>
-                                        <td className="px-4 py-3 font-mono text-[13px] font-medium">
-                                            {c.applianceCode}
-                                        </td>
-                                        <td className="px-4 py-3 font-medium">{c.applianceName}</td>
-                                        <td className="px-4 py-3">{c.cleaningType}</td>
-                                        <td className="px-4 py-3">{c.doneBy || "—"}</td>
-                                        <td className="px-4 py-3 text-right">
-                                            {formatCurrency(c.cost)}
-                                        </td>
-                                        <td className="max-w-[220px] truncate px-4 py-3 text-[#6B7280]">
-                                            {c.notes || "—"}
-                                        </td>
-                                        <td className="whitespace-nowrap px-4 py-3 text-right">
-                                            <button
-                                                type="button"
-                                                onClick={() => onEditCleaning(c)}
-                                                className="mr-1 inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#E5E7EB] hover:bg-[#F3F4F6]"
-                                                title="Edit cleaning log"
-                                            >
-                                                <Pencil className="h-3.5 w-3.5" />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => onDeleteCleaning(c)}
-                                                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#E5E7EB] text-red-600 hover:bg-red-50"
-                                                title="Delete cleaning log"
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            )}
+            <div style={{ "--ag-cell-horizontal-padding": "10px" } as CSSProperties}>
+                {subTab === "register" && (
+                    <DataTable
+                        data={filteredAppliances}
+                        columnDefs={applianceColumns}
+                        loading={loading}
+                        pageSize={25}
+                        gridOptions={{
+                            rowHeight: 54,
+                            headerHeight: 44,
+                            defaultColDef: {
+                                filter: false,
+                                sortable: true,
+                                resizable: true,
+                                cellStyle: { display: "flex", alignItems: "center" },
+                            },
+                        }}
+                    />
+                )}
+                {subTab === "services" && (
+                    <DataTable
+                        data={filteredServices}
+                        columnDefs={serviceColumns}
+                        loading={loading}
+                        pageSize={25}
+                        gridOptions={{
+                            rowHeight: 48,
+                            headerHeight: 44,
+                            defaultColDef: {
+                                filter: false,
+                                sortable: true,
+                                resizable: true,
+                                cellStyle: { display: "flex", alignItems: "center" },
+                            },
+                        }}
+                    />
+                )}
+                {subTab === "cleanings" && (
+                    <DataTable
+                        data={filteredCleanings}
+                        columnDefs={cleaningColumns}
+                        loading={loading}
+                        pageSize={25}
+                        gridOptions={{
+                            rowHeight: 48,
+                            headerHeight: 44,
+                            defaultColDef: {
+                                filter: false,
+                                sortable: true,
+                                resizable: true,
+                                cellStyle: { display: "flex", alignItems: "center" },
+                            },
+                        }}
+                    />
+                )}
+            </div>
         </div>
     );
 }

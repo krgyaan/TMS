@@ -1,5 +1,10 @@
-import { useMemo } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { useMemo, type CSSProperties } from "react";
+import type { ColDef } from "ag-grid-community";
+import DataTable from "@/components/ui/data-table";
+import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
+import type { ActionItem } from "@/components/ui/ActionMenu";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import type { OfficeEquipment, OfficeEquipmentLog } from "../types";
 import { formatCurrency, formatDateDisplay, formatQty } from "../utils";
 
@@ -8,6 +13,7 @@ interface EquipmentTabProps {
     onSubTabChange: (sub: "register" | "logs") => void;
     equipment: OfficeEquipment[];
     logs: OfficeEquipmentLog[];
+    loading?: boolean;
     search: string;
     onEditEquipment: (row: OfficeEquipment) => void;
     onDeleteEquipment: (row: OfficeEquipment) => void;
@@ -20,6 +26,7 @@ export function EquipmentTab({
     onSubTabChange,
     equipment,
     logs,
+    loading = false,
     search,
     onEditEquipment,
     onDeleteEquipment,
@@ -58,210 +65,263 @@ export function EquipmentTab({
         [logs, q]
     );
 
-    const conditionBadge = (condition: string) => {
-        if (condition === "Good") return "bg-emerald-50 text-emerald-700";
-        if (condition === "Needs Repair") return "bg-amber-50 text-amber-700";
-        return "bg-red-100 text-red-700";
-    };
+    const equipmentActions = useMemo<ActionItem<OfficeEquipment>[]>(
+        () => [
+            { label: "Edit", onClick: onEditEquipment },
+            { label: "Delete", className: "text-destructive", onClick: onDeleteEquipment },
+        ],
+        [onEditEquipment, onDeleteEquipment]
+    );
 
-    const movementBadge = (type: string) => {
-        if (type === "New Purchase") return "bg-emerald-50 text-emerald-700";
-        return "bg-red-100 text-red-700";
-    };
+    const logActions = useMemo<ActionItem<OfficeEquipmentLog>[]>(
+        () => [
+            { label: "Edit", onClick: onEditLog },
+            { label: "Delete", className: "text-destructive", onClick: onDeleteLog },
+        ],
+        [onEditLog, onDeleteLog]
+    );
+
+    const equipmentColumns = useMemo<ColDef<OfficeEquipment>[]>(
+        () => [
+            {
+                field: "equipmentCode",
+                headerName: "Code",
+                width: 96,
+                minWidth: 88,
+                cellClass: "font-mono text-xs",
+            },
+            {
+                field: "category",
+                headerName: "Category",
+                width: 105,
+                minWidth: 95,
+                cellRenderer: (p: { value?: string }) =>
+                    p.value ? <Badge variant="outline">{p.value}</Badge> : "—",
+            },
+            {
+                field: "itemName",
+                headerName: "Equipment",
+                flex: 1.4,
+                minWidth: 140,
+                cellRenderer: (p: { data?: OfficeEquipment }) =>
+                    p.data ? (
+                        <div className="truncate">
+                            <span className="font-medium">{p.data.itemName}</span>{" "}
+                            <span className="text-xs text-muted-foreground">({p.data.unit})</span>
+                        </div>
+                    ) : (
+                        "—"
+                    ),
+            },
+            {
+                field: "location",
+                headerName: "Location",
+                flex: 0.9,
+                minWidth: 95,
+                valueFormatter: p => p.value || "—",
+            },
+            {
+                field: "openingQty",
+                headerName: "Open",
+                width: 68,
+                minWidth: 62,
+                valueFormatter: p => formatQty(p.value),
+            },
+            {
+                field: "qtyAdded",
+                headerName: "Added",
+                width: 72,
+                minWidth: 64,
+                valueFormatter: p => `+${formatQty(p.value)}`,
+            },
+            {
+                field: "qtyDiscarded",
+                headerName: "Disc.",
+                width: 68,
+                minWidth: 62,
+                valueFormatter: p => `-${formatQty(p.value)}`,
+            },
+            {
+                field: "currentQty",
+                headerName: "Curr. Qty",
+                width: 82,
+                minWidth: 74,
+                cellStyle: { fontWeight: 600 } as ColDef<OfficeEquipment>["cellStyle"],
+                valueFormatter: p => formatQty(p.value),
+            },
+            {
+                field: "unitCost",
+                headerName: "Unit Cost",
+                width: 95,
+                minWidth: 85,
+                valueFormatter: p => formatCurrency(p.value),
+            },
+            {
+                field: "condition",
+                headerName: "Condition",
+                width: 105,
+                minWidth: 92,
+                cellRenderer: (p: { value?: string }) => {
+                    if (!p.value) return "—";
+                    const variant =
+                        p.value === "Good"
+                            ? "secondary"
+                            : p.value === "Needs Repair"
+                              ? "outline"
+                              : "destructive";
+                    return <Badge variant={variant}>{p.value}</Badge>;
+                },
+            },
+            {
+                headerName: "Actions",
+                filter: false,
+                sortable: false,
+                width: 70,
+                minWidth: 66,
+                maxWidth: 74,
+                headerComponent: () => <div className="w-full text-center">Actions</div>,
+                cellRenderer: createActionColumnRenderer(equipmentActions),
+                cellStyle: {
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                } as ColDef<OfficeEquipment>["cellStyle"],
+            },
+        ],
+        [equipmentActions]
+    );
+
+    const logColumns = useMemo<ColDef<OfficeEquipmentLog>[]>(
+        () => [
+            {
+                field: "logDate",
+                headerName: "Date",
+                width: 125,
+                valueFormatter: p => formatDateDisplay(p.value),
+            },
+            {
+                field: "equipmentCode",
+                headerName: "Code",
+                width: 130,
+                cellClass: "font-mono text-xs",
+            },
+            { field: "itemName", headerName: "Equipment Name", flex: 1.3, minWidth: 160 },
+            {
+                field: "movementType",
+                headerName: "Movement Type",
+                width: 185,
+                cellRenderer: (p: { value?: string }) => {
+                    if (!p.value) return "—";
+                    return (
+                        <Badge
+                            variant={p.value === "New Purchase" ? "secondary" : "destructive"}
+                        >
+                            {p.value}
+                        </Badge>
+                    );
+                },
+            },
+            {
+                field: "qty",
+                headerName: "Qty",
+                width: 90,
+                cellStyle: { fontWeight: 600 } as ColDef<OfficeEquipmentLog>["cellStyle"],
+                valueFormatter: p => formatQty(p.value),
+            },
+            {
+                field: "cost",
+                headerName: "Cost (₹)",
+                width: 120,
+                valueFormatter: p => (p.value !== null ? formatCurrency(p.value) : "—"),
+            },
+            {
+                field: "reasonNotes",
+                headerName: "Reason / Notes",
+                flex: 1.2,
+                minWidth: 160,
+                valueFormatter: p => p.value || "—",
+            },
+            {
+                field: "approvedBy",
+                headerName: "Approved By",
+                width: 140,
+                valueFormatter: p => p.value || "—",
+            },
+            {
+                headerName: "Actions",
+                filter: false,
+                sortable: false,
+                width: 85,
+                headerComponent: () => <div className="w-full text-center">Actions</div>,
+                cellRenderer: createActionColumnRenderer(logActions),
+                cellStyle: {
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                } as ColDef<OfficeEquipmentLog>["cellStyle"],
+            },
+        ],
+        [logActions]
+    );
 
     return (
-        <div>
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={() => onSubTabChange("register")}
-                        className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition ${
-                            subTab === "register"
-                                ? "bg-[#111827] text-white"
-                                : "bg-[#F3F4F6] text-[#374151] hover:bg-[#E5E7EB]"
-                        }`}
-                    >
-                        Equipment Register ({equipment.length})
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => onSubTabChange("logs")}
-                        className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition ${
-                            subTab === "logs"
-                                ? "bg-[#111827] text-white"
-                                : "bg-[#F3F4F6] text-[#374151] hover:bg-[#E5E7EB]"
-                        }`}
-                    >
-                        Equipment Movement Log ({logs.length})
-                    </button>
-                </div>
+        <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+                <Button
+                    type="button"
+                    size="sm"
+                    variant={subTab === "register" ? "default" : "outline"}
+                    onClick={() => onSubTabChange("register")}
+                >
+                    Equipment Register ({equipment.length})
+                </Button>
+                <Button
+                    type="button"
+                    size="sm"
+                    variant={subTab === "logs" ? "default" : "outline"}
+                    onClick={() => onSubTabChange("logs")}
+                >
+                    Equipment Movement Log ({logs.length})
+                </Button>
             </div>
 
-            {subTab === "register" ? (
-                <div className="overflow-x-auto rounded-[10px] border border-[#E5E7EB] bg-white">
-                    <table className="w-full min-w-[960px] border-collapse text-left">
-                        <thead>
-                            <tr className="border-b border-[#E5E7EB] bg-[#FAFAFA] text-[13px] font-semibold text-[#111827]">
-                                <th className="px-4 py-3">Code</th>
-                                <th className="px-4 py-3">Category</th>
-                                <th className="px-4 py-3">Equipment Name</th>
-                                <th className="px-4 py-3">Location</th>
-                                <th className="px-4 py-3 text-right">Opening</th>
-                                <th className="px-4 py-3 text-right">Added</th>
-                                <th className="px-4 py-3 text-right">Discarded</th>
-                                <th className="px-4 py-3 text-right">Current Qty</th>
-                                <th className="px-4 py-3 text-right">Unit Cost (₹)</th>
-                                <th className="px-4 py-3">Condition</th>
-                                <th className="px-4 py-3 text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#E5E7EB] text-[13.5px]">
-                            {filteredEquipment.length === 0 ? (
-                                <tr>
-                                    <td colSpan={11} className="px-4 py-12 text-center text-[#6B7280]">
-                                        No equipment registered yet.
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredEquipment.map(eq => (
-                                    <tr key={eq.id} className="hover:bg-[#FAFAFA]">
-                                        <td className="px-4 py-3 font-mono text-[13px] font-medium">
-                                            {eq.equipmentCode}
-                                        </td>
-                                        <td className="px-4 py-3 text-[#6B7280]">{eq.category}</td>
-                                        <td className="px-4 py-3 font-medium">
-                                            {eq.itemName}{" "}
-                                            <span className="text-xs font-normal text-[#6B7280]">
-                                                ({eq.unit})
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3">{eq.location || "—"}</td>
-                                        <td className="px-4 py-3 text-right">
-                                            {formatQty(eq.openingQty)}
-                                        </td>
-                                        <td className="px-4 py-3 text-right text-emerald-700">
-                                            +{formatQty(eq.qtyAdded)}
-                                        </td>
-                                        <td className="px-4 py-3 text-right text-red-600">
-                                            -{formatQty(eq.qtyDiscarded)}
-                                        </td>
-                                        <td className="px-4 py-3 text-right font-semibold">
-                                            {formatQty(eq.currentQty)}
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
-                                            {formatCurrency(eq.unitCost)}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <span
-                                                className={`inline-flex rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold ${conditionBadge(
-                                                    eq.condition
-                                                )}`}
-                                            >
-                                                {eq.condition}
-                                            </span>
-                                        </td>
-                                        <td className="whitespace-nowrap px-4 py-3 text-right">
-                                            <button
-                                                type="button"
-                                                onClick={() => onEditEquipment(eq)}
-                                                className="mr-1 inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#E5E7EB] hover:bg-[#F3F4F6]"
-                                                title="Edit equipment"
-                                            >
-                                                <Pencil className="h-3.5 w-3.5" />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => onDeleteEquipment(eq)}
-                                                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#E5E7EB] text-red-600 hover:bg-red-50"
-                                                title="Delete equipment"
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            ) : (
-                <div className="overflow-x-auto rounded-[10px] border border-[#E5E7EB] bg-white">
-                    <table className="w-full min-w-[840px] border-collapse text-left">
-                        <thead>
-                            <tr className="border-b border-[#E5E7EB] bg-[#FAFAFA] text-[13px] font-semibold text-[#111827]">
-                                <th className="px-4 py-3">Date</th>
-                                <th className="px-4 py-3">Code</th>
-                                <th className="px-4 py-3">Equipment Name</th>
-                                <th className="px-4 py-3">Movement Type</th>
-                                <th className="px-4 py-3 text-right">Qty</th>
-                                <th className="px-4 py-3 text-right">Cost (₹)</th>
-                                <th className="px-4 py-3">Reason / Notes</th>
-                                <th className="px-4 py-3">Approved By</th>
-                                <th className="px-4 py-3 text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#E5E7EB] text-[13.5px]">
-                            {filteredLogs.length === 0 ? (
-                                <tr>
-                                    <td colSpan={9} className="px-4 py-12 text-center text-[#6B7280]">
-                                        No equipment movements recorded yet.
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredLogs.map(log => (
-                                    <tr key={log.id} className="hover:bg-[#FAFAFA]">
-                                        <td className="whitespace-nowrap px-4 py-3">
-                                            {formatDateDisplay(log.logDate)}
-                                        </td>
-                                        <td className="px-4 py-3 font-mono text-[13px] font-medium">
-                                            {log.equipmentCode}
-                                        </td>
-                                        <td className="px-4 py-3 font-medium">{log.itemName}</td>
-                                        <td className="px-4 py-3">
-                                            <span
-                                                className={`inline-flex rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold ${movementBadge(
-                                                    log.movementType
-                                                )}`}
-                                            >
-                                                {log.movementType}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-right font-semibold">
-                                            {formatQty(log.qty)}
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
-                                            {log.cost !== null ? formatCurrency(log.cost) : "—"}
-                                        </td>
-                                        <td className="max-w-[200px] truncate px-4 py-3 text-[#6B7280]">
-                                            {log.reasonNotes || "—"}
-                                        </td>
-                                        <td className="px-4 py-3">{log.approvedBy || "—"}</td>
-                                        <td className="whitespace-nowrap px-4 py-3 text-right">
-                                            <button
-                                                type="button"
-                                                onClick={() => onEditLog(log)}
-                                                className="mr-1 inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#E5E7EB] hover:bg-[#F3F4F6]"
-                                                title="Edit movement"
-                                            >
-                                                <Pencil className="h-3.5 w-3.5" />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => onDeleteLog(log)}
-                                                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#E5E7EB] text-red-600 hover:bg-red-50"
-                                                title="Delete movement"
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            )}
+            <div style={{ "--ag-cell-horizontal-padding": "8px" } as CSSProperties}>
+                {subTab === "register" ? (
+                    <DataTable
+                        data={filteredEquipment}
+                        columnDefs={equipmentColumns}
+                        loading={loading}
+                        pageSize={25}
+                        gridOptions={{
+                            rowHeight: 44,
+                            headerHeight: 40,
+                            defaultColDef: {
+                                filter: false,
+                                sortable: true,
+                                resizable: true,
+                                cellStyle: { display: "flex", alignItems: "center" },
+                            },
+                        }}
+                    />
+                ) : (
+                    <DataTable
+                        data={filteredLogs}
+                        columnDefs={logColumns}
+                        loading={loading}
+                        pageSize={25}
+                        gridOptions={{
+                            rowHeight: 44,
+                            headerHeight: 40,
+                            defaultColDef: {
+                                filter: false,
+                                sortable: true,
+                                resizable: true,
+                                cellStyle: { display: "flex", alignItems: "center" },
+                            },
+                        }}
+                    />
+                )}
+            </div>
         </div>
     );
 }

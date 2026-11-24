@@ -7,9 +7,17 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
     APPLIANCE_CLEANING_FREQUENCIES,
@@ -62,9 +70,6 @@ interface ModalsProps {
     appliances: OfficeAppliance[];
     mutations: ReturnType<typeof import("../useOfficeInventory").useOfficeInventoryMutations>;
 }
-
-const selectCls =
-    "flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
 export function OfficeInventoryModals({
     modal,
@@ -148,7 +153,6 @@ export function OfficeInventoryModals({
     const [clCost, setClCost] = useState("0");
     const [clNotes, setClNotes] = useState("");
 
-    // Hydrate form state when modal opens
     useEffect(() => {
         if (modal.type === "item") {
             const e = modal.editing;
@@ -354,26 +358,28 @@ export function OfficeInventoryModals({
                         }}
                     >
                         <div className="grid grid-cols-2 gap-3">
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Category *</Label>
-                                <select
-                                    className={`mt-1 ${selectCls}`}
+                                <Select
                                     value={itemCategory}
-                                    onChange={e =>
-                                        handleItemCategoryChange(e.target.value as ItemCategory)
-                                    }
+                                    onValueChange={v => handleItemCategoryChange(v as ItemCategory)}
                                 >
-                                    {ITEM_CATEGORIES.map(c => (
-                                        <option key={c} value={c}>
-                                            {c}
-                                        </option>
-                                    ))}
-                                </select>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {ITEM_CATEGORIES.map(c => (
+                                            <SelectItem key={c} value={c}>
+                                                {c}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Item Code *</Label>
                                 <Input
-                                    className="mt-1 font-mono"
+                                    className="font-mono"
                                     value={itemCode}
                                     onChange={e => setItemCode(e.target.value)}
                                     placeholder="HK-001"
@@ -382,20 +388,18 @@ export function OfficeInventoryModals({
                             </div>
                         </div>
                         <div className="grid grid-cols-3 gap-3">
-                            <div className="col-span-2">
+                            <div className="col-span-2 space-y-1">
                                 <Label>Item Name *</Label>
                                 <Input
-                                    className="mt-1"
                                     value={itemName}
                                     onChange={e => setItemName(e.target.value)}
                                     placeholder="e.g. Floor Cleaner (5L)"
                                     required
                                 />
                             </div>
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Unit *</Label>
                                 <Input
-                                    className="mt-1"
                                     value={itemUnit}
                                     onChange={e => setItemUnit(e.target.value)}
                                     placeholder="Bottle / Packet"
@@ -404,10 +408,9 @@ export function OfficeInventoryModals({
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Minimum Stock Level</Label>
                                 <Input
-                                    className="mt-1"
                                     type="number"
                                     min="0"
                                     step="0.01"
@@ -416,10 +419,9 @@ export function OfficeInventoryModals({
                                     required
                                 />
                             </div>
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Opening Stock</Label>
                                 <Input
-                                    className="mt-1"
                                     type="number"
                                     min="0"
                                     step="0.01"
@@ -460,33 +462,33 @@ export function OfficeInventoryModals({
                                 </DialogDescription>
                             </DialogHeader>
                             <div className="grid grid-cols-2 gap-3 text-sm">
-                                <div className="rounded-md border p-3">
+                                <div className="rounded-md border bg-muted/30 p-3">
                                     <div className="text-xs text-muted-foreground">
                                         Current Stock
                                     </div>
-                                    <div className="mt-0.5 text-lg font-bold">
+                                    <div className="mt-0.5 text-lg font-bold tabular-nums">
                                         {formatQty(modal.item.currentStock)} {modal.item.unit}
                                     </div>
                                 </div>
-                                <div className="rounded-md border p-3">
+                                <div className="rounded-md border bg-muted/30 p-3">
                                     <div className="text-xs text-muted-foreground">Status</div>
                                     <div className="mt-1">
-                                        <span
-                                            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                        <Badge
+                                            variant={
                                                 modal.item.status === "LOW STOCK"
-                                                    ? "bg-red-100 text-red-700"
-                                                    : "bg-emerald-50 text-emerald-700"
-                                            }`}
+                                                    ? "destructive"
+                                                    : "secondary"
+                                            }
                                         >
                                             {modal.item.status}
-                                        </span>
+                                        </Badge>
                                     </div>
                                 </div>
                                 <div className="rounded-md border p-2.5">
                                     <div className="text-xs text-muted-foreground">
                                         Opening Stock
                                     </div>
-                                    <div className="font-semibold">
+                                    <div className="font-semibold tabular-nums">
                                         {formatQty(modal.item.openingStock)}
                                     </div>
                                 </div>
@@ -494,7 +496,7 @@ export function OfficeInventoryModals({
                                     <div className="text-xs text-muted-foreground">
                                         Min Stock Level
                                     </div>
-                                    <div className="font-semibold">
+                                    <div className="font-semibold tabular-nums">
                                         {formatQty(modal.item.minStockLevel)}
                                     </div>
                                 </div>
@@ -502,7 +504,7 @@ export function OfficeInventoryModals({
                                     <div className="text-xs text-muted-foreground">
                                         Total Purchased
                                     </div>
-                                    <div className="font-semibold text-emerald-700">
+                                    <div className="font-semibold tabular-nums">
                                         +{formatQty(modal.item.totalPurchased)}
                                     </div>
                                 </div>
@@ -510,7 +512,7 @@ export function OfficeInventoryModals({
                                     <div className="text-xs text-muted-foreground">
                                         Total Consumed
                                     </div>
-                                    <div className="font-semibold text-red-600">
+                                    <div className="font-semibold tabular-nums">
                                         -{formatQty(modal.item.totalConsumed)}
                                     </div>
                                 </div>
@@ -537,6 +539,7 @@ export function OfficeInventoryModals({
                         className="space-y-4"
                         onSubmit={async e => {
                             e.preventDefault();
+                            if (!pItemId) return;
                             const payload = {
                                 purchaseDate: pDate,
                                 itemId: Number(pItemId),
@@ -557,38 +560,35 @@ export function OfficeInventoryModals({
                         }}
                     >
                         <div className="grid grid-cols-2 gap-3">
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Date *</Label>
                                 <Input
-                                    className="mt-1"
                                     type="date"
                                     value={pDate}
                                     onChange={e => setPDate(e.target.value)}
                                     required
                                 />
                             </div>
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Item *</Label>
-                                <select
-                                    className={`mt-1 ${selectCls}`}
-                                    value={pItemId}
-                                    onChange={e => setPItemId(e.target.value)}
-                                    required
-                                >
-                                    <option value="">Select item...</option>
-                                    {items.map(i => (
-                                        <option key={i.id} value={i.id}>
-                                            {i.itemCode} — {i.itemName}
-                                        </option>
-                                    ))}
-                                </select>
+                                <Select value={pItemId} onValueChange={setPItemId}>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Select item..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {items.map(i => (
+                                            <SelectItem key={i.id} value={String(i.id)}>
+                                                {i.itemCode} — {i.itemName}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
                         <div className="grid grid-cols-3 gap-3">
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Qty Purchased *</Label>
                                 <Input
-                                    className="mt-1"
                                     type="number"
                                     min="0.01"
                                     step="0.01"
@@ -597,10 +597,9 @@ export function OfficeInventoryModals({
                                     required
                                 />
                             </div>
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Rate (₹) *</Label>
                                 <Input
-                                    className="mt-1"
                                     type="number"
                                     min="0"
                                     step="0.01"
@@ -609,26 +608,24 @@ export function OfficeInventoryModals({
                                     required
                                 />
                             </div>
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Amount (Auto)</Label>
-                                <div className="mt-1 flex h-9 items-center rounded-md border bg-muted px-3 text-sm font-semibold">
+                                <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm font-semibold tabular-nums">
                                     {formatCurrency(purchaseAmountPreview)}
                                 </div>
                             </div>
                         </div>
-                        <div>
+                        <div className="space-y-1">
                             <Label>Supplier / Vendor</Label>
                             <Input
-                                className="mt-1"
                                 value={pSupplier}
                                 onChange={e => setPSupplier(e.target.value)}
                                 placeholder="e.g. CleanKart Supplies"
                             />
                         </div>
-                        <div>
+                        <div className="space-y-1">
                             <Label>Notes</Label>
                             <Textarea
-                                className="mt-1"
                                 rows={2}
                                 value={pNotes}
                                 onChange={e => setPNotes(e.target.value)}
@@ -642,6 +639,7 @@ export function OfficeInventoryModals({
                             <Button
                                 type="submit"
                                 disabled={
+                                    !pItemId ||
                                     mutations.createPurchase.isPending ||
                                     mutations.updatePurchase.isPending
                                 }
@@ -669,6 +667,7 @@ export function OfficeInventoryModals({
                         className="space-y-4"
                         onSubmit={async e => {
                             e.preventDefault();
+                            if (!cItemId) return;
                             const payload = {
                                 consumptionDate: cDate,
                                 itemId: Number(cItemId),
@@ -688,36 +687,34 @@ export function OfficeInventoryModals({
                         }}
                     >
                         <div className="grid grid-cols-2 gap-3">
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Date *</Label>
                                 <Input
-                                    className="mt-1"
                                     type="date"
                                     value={cDate}
                                     onChange={e => setCDate(e.target.value)}
                                     required
                                 />
                             </div>
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Item *</Label>
-                                <select
-                                    className={`mt-1 ${selectCls}`}
-                                    value={cItemId}
-                                    onChange={e => setCItemId(e.target.value)}
-                                    required
-                                >
-                                    <option value="">Select item...</option>
-                                    {items.map(i => (
-                                        <option key={i.id} value={i.id}>
-                                            {i.itemCode} — {i.itemName} (Stock:{" "}
-                                            {formatQty(i.currentStock)})
-                                        </option>
-                                    ))}
-                                </select>
+                                <Select value={cItemId} onValueChange={setCItemId}>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Select item..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {items.map(i => (
+                                            <SelectItem key={i.id} value={String(i.id)}>
+                                                {i.itemCode} — {i.itemName} (Stock:{" "}
+                                                {formatQty(i.currentStock)})
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
-                            <div>
+                            <div className="space-y-1">
                                 <Label>
                                     Qty Issued *{" "}
                                     {selectedConsumeItem && (
@@ -728,7 +725,6 @@ export function OfficeInventoryModals({
                                     )}
                                 </Label>
                                 <Input
-                                    className="mt-1"
                                     type="number"
                                     min="0.01"
                                     step="0.01"
@@ -737,20 +733,18 @@ export function OfficeInventoryModals({
                                     required
                                 />
                             </div>
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Issued To / Department</Label>
                                 <Input
-                                    className="mt-1"
                                     value={cIssuedTo}
                                     onChange={e => setCIssuedTo(e.target.value)}
                                     placeholder="e.g. Pantry / Admin / Housekeeping"
                                 />
                             </div>
                         </div>
-                        <div>
+                        <div className="space-y-1">
                             <Label>Notes</Label>
                             <Textarea
-                                className="mt-1"
                                 rows={2}
                                 value={cNotes}
                                 onChange={e => setCNotes(e.target.value)}
@@ -763,6 +757,7 @@ export function OfficeInventoryModals({
                             <Button
                                 type="submit"
                                 disabled={
+                                    !cItemId ||
                                     mutations.createConsumption.isPending ||
                                     mutations.updateConsumption.isPending
                                 }
@@ -813,26 +808,30 @@ export function OfficeInventoryModals({
                         }}
                     >
                         <div className="grid grid-cols-2 gap-3">
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Category *</Label>
-                                <select
-                                    className={`mt-1 ${selectCls}`}
+                                <Select
                                     value={eqCategory}
-                                    onChange={e =>
-                                        handleEqCategoryChange(e.target.value as EquipmentCategory)
+                                    onValueChange={v =>
+                                        handleEqCategoryChange(v as EquipmentCategory)
                                     }
                                 >
-                                    {EQUIPMENT_CATEGORIES.map(c => (
-                                        <option key={c} value={c}>
-                                            {c}
-                                        </option>
-                                    ))}
-                                </select>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {EQUIPMENT_CATEGORIES.map(c => (
+                                            <SelectItem key={c} value={c}>
+                                                {c}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Equipment Code *</Label>
                                 <Input
-                                    className="mt-1 font-mono"
+                                    className="font-mono"
                                     value={eqCode}
                                     onChange={e => setEqCode(e.target.value)}
                                     placeholder="EQ-HK-001"
@@ -841,20 +840,18 @@ export function OfficeInventoryModals({
                             </div>
                         </div>
                         <div className="grid grid-cols-3 gap-3">
-                            <div className="col-span-2">
+                            <div className="col-span-2 space-y-1">
                                 <Label>Equipment Name *</Label>
                                 <Input
-                                    className="mt-1"
                                     value={eqName}
                                     onChange={e => setEqName(e.target.value)}
                                     placeholder="e.g. Broom (Soft)"
                                     required
                                 />
                             </div>
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Unit *</Label>
                                 <Input
-                                    className="mt-1"
                                     value={eqUnit}
                                     onChange={e => setEqUnit(e.target.value)}
                                     required
@@ -862,37 +859,37 @@ export function OfficeInventoryModals({
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Location</Label>
                                 <Input
-                                    className="mt-1"
                                     value={eqLocation}
                                     onChange={e => setEqLocation(e.target.value)}
                                     placeholder="e.g. All Floors / Pantry"
                                 />
                             </div>
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Condition</Label>
-                                <select
-                                    className={`mt-1 ${selectCls}`}
+                                <Select
                                     value={eqCondition}
-                                    onChange={e =>
-                                        setEqCondition(e.target.value as EquipmentCondition)
-                                    }
+                                    onValueChange={v => setEqCondition(v as EquipmentCondition)}
                                 >
-                                    {EQUIPMENT_CONDITIONS.map(c => (
-                                        <option key={c} value={c}>
-                                            {c}
-                                        </option>
-                                    ))}
-                                </select>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {EQUIPMENT_CONDITIONS.map(c => (
+                                            <SelectItem key={c} value={c}>
+                                                {c}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Opening Qty</Label>
                                 <Input
-                                    className="mt-1"
                                     type="number"
                                     min="0"
                                     step="0.01"
@@ -900,10 +897,9 @@ export function OfficeInventoryModals({
                                     onChange={e => setEqOpening(e.target.value)}
                                 />
                             </div>
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Unit Cost (₹)</Label>
                                 <Input
-                                    className="mt-1"
                                     type="number"
                                     min="0"
                                     step="0.01"
@@ -912,10 +908,9 @@ export function OfficeInventoryModals({
                                 />
                             </div>
                         </div>
-                        <div>
+                        <div className="space-y-1">
                             <Label>Remarks</Label>
                             <Textarea
-                                className="mt-1"
                                 rows={2}
                                 value={eqRemarks}
                                 onChange={e => setEqRemarks(e.target.value)}
@@ -955,6 +950,7 @@ export function OfficeInventoryModals({
                         className="space-y-4"
                         onSubmit={async e => {
                             e.preventDefault();
+                            if (!elEqId) return;
                             const payload = {
                                 logDate: elDate,
                                 equipmentId: Number(elEqId),
@@ -976,54 +972,53 @@ export function OfficeInventoryModals({
                         }}
                     >
                         <div className="grid grid-cols-2 gap-3">
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Date *</Label>
                                 <Input
-                                    className="mt-1"
                                     type="date"
                                     value={elDate}
                                     onChange={e => setElDate(e.target.value)}
                                     required
                                 />
                             </div>
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Equipment *</Label>
-                                <select
-                                    className={`mt-1 ${selectCls}`}
-                                    value={elEqId}
-                                    onChange={e => setElEqId(e.target.value)}
-                                    required
-                                >
-                                    <option value="">Select equipment...</option>
-                                    {equipment.map(eq => (
-                                        <option key={eq.id} value={eq.id}>
-                                            {eq.equipmentCode} — {eq.itemName}
-                                        </option>
-                                    ))}
-                                </select>
+                                <Select value={elEqId} onValueChange={setElEqId}>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Select equipment..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {equipment.map(eq => (
+                                            <SelectItem key={eq.id} value={String(eq.id)}>
+                                                {eq.equipmentCode} — {eq.itemName}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
                         <div className="grid grid-cols-3 gap-3">
-                            <div className="col-span-2">
+                            <div className="col-span-2 space-y-1">
                                 <Label>Movement Type *</Label>
-                                <select
-                                    className={`mt-1 ${selectCls}`}
+                                <Select
                                     value={elType}
-                                    onChange={e =>
-                                        setElType(e.target.value as EquipmentMovementType)
-                                    }
+                                    onValueChange={v => setElType(v as EquipmentMovementType)}
                                 >
-                                    {EQUIPMENT_MOVEMENT_TYPES.map(t => (
-                                        <option key={t} value={t}>
-                                            {t}
-                                        </option>
-                                    ))}
-                                </select>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {EQUIPMENT_MOVEMENT_TYPES.map(t => (
+                                            <SelectItem key={t} value={t}>
+                                                {t}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Qty *</Label>
                                 <Input
-                                    className="mt-1"
                                     type="number"
                                     min="0.01"
                                     step="0.01"
@@ -1034,10 +1029,9 @@ export function OfficeInventoryModals({
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Cost (₹)</Label>
                                 <Input
-                                    className="mt-1"
                                     type="number"
                                     min="0"
                                     step="0.01"
@@ -1046,20 +1040,18 @@ export function OfficeInventoryModals({
                                     placeholder="Optional"
                                 />
                             </div>
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Approved By</Label>
                                 <Input
-                                    className="mt-1"
                                     value={elApprovedBy}
                                     onChange={e => setElApprovedBy(e.target.value)}
                                     placeholder="e.g. Admin Head"
                                 />
                             </div>
                         </div>
-                        <div>
+                        <div className="space-y-1">
                             <Label>Reason / Notes</Label>
                             <Textarea
-                                className="mt-1"
                                 rows={2}
                                 value={elReason}
                                 onChange={e => setElReason(e.target.value)}
@@ -1072,6 +1064,7 @@ export function OfficeInventoryModals({
                             <Button
                                 type="submit"
                                 disabled={
+                                    !elEqId ||
                                     mutations.createEquipmentLog.isPending ||
                                     mutations.updateEquipmentLog.isPending
                                 }
@@ -1125,20 +1118,19 @@ export function OfficeInventoryModals({
                         }}
                     >
                         <div className="grid grid-cols-3 gap-3">
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Appliance Code *</Label>
                                 <Input
-                                    className="mt-1 font-mono"
+                                    className="font-mono"
                                     value={apCode}
                                     onChange={e => setApCode(e.target.value)}
                                     placeholder="AP-001"
                                     required
                                 />
                             </div>
-                            <div className="col-span-2">
+                            <div className="col-span-2 space-y-1">
                                 <Label>Appliance Name *</Label>
                                 <Input
-                                    className="mt-1"
                                     value={apName}
                                     onChange={e => setApName(e.target.value)}
                                     placeholder="e.g. Refrigerator"
@@ -1147,38 +1139,34 @@ export function OfficeInventoryModals({
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Brand / Model</Label>
                                 <Input
-                                    className="mt-1"
                                     value={apBrand}
                                     onChange={e => setApBrand(e.target.value)}
                                     placeholder="e.g. Samsung 253L Double Door"
                                 />
                             </div>
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Location</Label>
                                 <Input
-                                    className="mt-1"
                                     value={apLocation}
                                     onChange={e => setApLocation(e.target.value)}
                                 />
                             </div>
                         </div>
                         <div className="grid grid-cols-3 gap-3">
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Purchase Date</Label>
                                 <Input
-                                    className="mt-1"
                                     type="date"
                                     value={apPurchaseDate}
                                     onChange={e => setApPurchaseDate(e.target.value)}
                                 />
                             </div>
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Purchase Cost (₹)</Label>
                                 <Input
-                                    className="mt-1"
                                     type="number"
                                     min="0"
                                     step="0.01"
@@ -1186,10 +1174,9 @@ export function OfficeInventoryModals({
                                     onChange={e => setApPurchaseCost(e.target.value)}
                                 />
                             </div>
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Warranty / AMC Expiry</Label>
                                 <Input
-                                    className="mt-1"
                                     type="date"
                                     value={apWarranty}
                                     onChange={e => setApWarranty(e.target.value)}
@@ -1197,72 +1184,78 @@ export function OfficeInventoryModals({
                             </div>
                         </div>
                         <div className="grid grid-cols-3 gap-3">
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Service Frequency</Label>
-                                <select
-                                    className={`mt-1 ${selectCls}`}
+                                <Select
                                     value={apServiceFreq}
-                                    onChange={e =>
-                                        setApServiceFreq(
-                                            e.target.value as ApplianceServiceFrequency
-                                        )
+                                    onValueChange={v =>
+                                        setApServiceFreq(v as ApplianceServiceFrequency)
                                     }
                                 >
-                                    {APPLIANCE_SERVICE_FREQUENCIES.map(f => (
-                                        <option key={f} value={f}>
-                                            {f}
-                                        </option>
-                                    ))}
-                                </select>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {APPLIANCE_SERVICE_FREQUENCIES.map(f => (
+                                            <SelectItem key={f} value={f}>
+                                                {f}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Cleaning Frequency</Label>
-                                <select
-                                    className={`mt-1 ${selectCls}`}
+                                <Select
                                     value={apCleaningFreq}
-                                    onChange={e =>
-                                        setApCleaningFreq(
-                                            e.target.value as ApplianceCleaningFrequency
-                                        )
+                                    onValueChange={v =>
+                                        setApCleaningFreq(v as ApplianceCleaningFrequency)
                                     }
                                 >
-                                    {APPLIANCE_CLEANING_FREQUENCIES.map(f => (
-                                        <option key={f} value={f}>
-                                            {f}
-                                        </option>
-                                    ))}
-                                </select>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {APPLIANCE_CLEANING_FREQUENCIES.map(f => (
+                                            <SelectItem key={f} value={f}>
+                                                {f}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Status</Label>
-                                <select
-                                    className={`mt-1 ${selectCls}`}
+                                <Select
                                     value={apStatus}
-                                    onChange={e => setApStatus(e.target.value as ApplianceStatus)}
+                                    onValueChange={v => setApStatus(v as ApplianceStatus)}
                                 >
-                                    {APPLIANCE_STATUSES.map(s => (
-                                        <option key={s} value={s}>
-                                            {s}
-                                        </option>
-                                    ))}
-                                </select>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {APPLIANCE_STATUSES.map(s => (
+                                            <SelectItem key={s} value={s}>
+                                                {s}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
                         {apStatus === "Discarded" && (
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Discard Date</Label>
                                 <Input
-                                    className="mt-1"
                                     type="date"
                                     value={apDiscardDate}
                                     onChange={e => setApDiscardDate(e.target.value)}
                                 />
                             </div>
                         )}
-                        <div>
+                        <div className="space-y-1">
                             <Label>Notes</Label>
                             <Textarea
-                                className="mt-1"
                                 rows={2}
                                 value={apNotes}
                                 onChange={e => setApNotes(e.target.value)}
@@ -1305,6 +1298,7 @@ export function OfficeInventoryModals({
                         className="space-y-4"
                         onSubmit={async e => {
                             e.preventDefault();
+                            if (!svAppId) return;
                             const payload = {
                                 serviceDate: svDate,
                                 applianceId: Number(svAppId),
@@ -1326,52 +1320,53 @@ export function OfficeInventoryModals({
                         }}
                     >
                         <div className="grid grid-cols-2 gap-3">
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Service Date *</Label>
                                 <Input
-                                    className="mt-1"
                                     type="date"
                                     value={svDate}
                                     onChange={e => setSvDate(e.target.value)}
                                     required
                                 />
                             </div>
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Appliance *</Label>
-                                <select
-                                    className={`mt-1 ${selectCls}`}
-                                    value={svAppId}
-                                    onChange={e => setSvAppId(e.target.value)}
-                                    required
-                                >
-                                    <option value="">Select appliance...</option>
-                                    {appliances.map(a => (
-                                        <option key={a.id} value={a.id}>
-                                            {a.applianceCode} — {a.applianceName}
-                                        </option>
-                                    ))}
-                                </select>
+                                <Select value={svAppId} onValueChange={setSvAppId}>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Select appliance..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {appliances.map(a => (
+                                            <SelectItem key={a.id} value={String(a.id)}>
+                                                {a.applianceCode} — {a.applianceName}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Visit Type *</Label>
-                                <select
-                                    className={`mt-1 ${selectCls}`}
+                                <Select
                                     value={svType}
-                                    onChange={e => setSvType(e.target.value as ApplianceVisitType)}
+                                    onValueChange={v => setSvType(v as ApplianceVisitType)}
                                 >
-                                    {APPLIANCE_VISIT_TYPES.map(t => (
-                                        <option key={t} value={t}>
-                                            {t}
-                                        </option>
-                                    ))}
-                                </select>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {APPLIANCE_VISIT_TYPES.map(t => (
+                                            <SelectItem key={t} value={t}>
+                                                {t}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Vendor / Technician</Label>
                                 <Input
-                                    className="mt-1"
                                     value={svVendor}
                                     onChange={e => setSvVendor(e.target.value)}
                                     placeholder="e.g. Kent Service Centre"
@@ -1379,10 +1374,9 @@ export function OfficeInventoryModals({
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Expense (₹)</Label>
                                 <Input
-                                    className="mt-1"
                                     type="number"
                                     min="0"
                                     step="0.01"
@@ -1390,20 +1384,18 @@ export function OfficeInventoryModals({
                                     onChange={e => setSvExpense(e.target.value)}
                                 />
                             </div>
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Next Service Due</Label>
                                 <Input
-                                    className="mt-1"
                                     type="date"
                                     value={svNextDue}
                                     onChange={e => setSvNextDue(e.target.value)}
                                 />
                             </div>
                         </div>
-                        <div>
+                        <div className="space-y-1">
                             <Label>Notes</Label>
                             <Textarea
-                                className="mt-1"
                                 rows={2}
                                 value={svNotes}
                                 onChange={e => setSvNotes(e.target.value)}
@@ -1416,6 +1408,7 @@ export function OfficeInventoryModals({
                             <Button
                                 type="submit"
                                 disabled={
+                                    !svAppId ||
                                     mutations.createApplianceService.isPending ||
                                     mutations.updateApplianceService.isPending
                                 }
@@ -1446,6 +1439,7 @@ export function OfficeInventoryModals({
                         className="space-y-4"
                         onSubmit={async e => {
                             e.preventDefault();
+                            if (!clAppId) return;
                             const payload = {
                                 cleaningDate: clDate,
                                 applianceId: Number(clAppId),
@@ -1466,64 +1460,62 @@ export function OfficeInventoryModals({
                         }}
                     >
                         <div className="grid grid-cols-2 gap-3">
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Cleaning Date *</Label>
                                 <Input
-                                    className="mt-1"
                                     type="date"
                                     value={clDate}
                                     onChange={e => setClDate(e.target.value)}
                                     required
                                 />
                             </div>
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Appliance *</Label>
-                                <select
-                                    className={`mt-1 ${selectCls}`}
-                                    value={clAppId}
-                                    onChange={e => setClAppId(e.target.value)}
-                                    required
-                                >
-                                    <option value="">Select appliance...</option>
-                                    {appliances.map(a => (
-                                        <option key={a.id} value={a.id}>
-                                            {a.applianceCode} — {a.applianceName}
-                                        </option>
-                                    ))}
-                                </select>
+                                <Select value={clAppId} onValueChange={setClAppId}>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Select appliance..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {appliances.map(a => (
+                                            <SelectItem key={a.id} value={String(a.id)}>
+                                                {a.applianceCode} — {a.applianceName}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Cleaning Type *</Label>
-                                <select
-                                    className={`mt-1 ${selectCls}`}
+                                <Select
                                     value={clType}
-                                    onChange={e =>
-                                        setClType(e.target.value as ApplianceCleaningType)
-                                    }
+                                    onValueChange={v => setClType(v as ApplianceCleaningType)}
                                 >
-                                    {APPLIANCE_CLEANING_TYPES.map(t => (
-                                        <option key={t} value={t}>
-                                            {t}
-                                        </option>
-                                    ))}
-                                </select>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {APPLIANCE_CLEANING_TYPES.map(t => (
+                                            <SelectItem key={t} value={t}>
+                                                {t}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
-                            <div>
+                            <div className="space-y-1">
                                 <Label>Done By</Label>
                                 <Input
-                                    className="mt-1"
                                     value={clDoneBy}
                                     onChange={e => setClDoneBy(e.target.value)}
                                     placeholder="e.g. Pantry Boy / Housekeeping"
                                 />
                             </div>
                         </div>
-                        <div>
+                        <div className="space-y-1">
                             <Label>Cost (₹)</Label>
                             <Input
-                                className="mt-1"
                                 type="number"
                                 min="0"
                                 step="0.01"
@@ -1531,10 +1523,9 @@ export function OfficeInventoryModals({
                                 onChange={e => setClCost(e.target.value)}
                             />
                         </div>
-                        <div>
+                        <div className="space-y-1">
                             <Label>Notes</Label>
                             <Textarea
-                                className="mt-1"
                                 rows={2}
                                 value={clNotes}
                                 onChange={e => setClNotes(e.target.value)}
@@ -1547,6 +1538,7 @@ export function OfficeInventoryModals({
                             <Button
                                 type="submit"
                                 disabled={
+                                    !clAppId ||
                                     mutations.createApplianceCleaning.isPending ||
                                     mutations.updateApplianceCleaning.isPending
                                 }
