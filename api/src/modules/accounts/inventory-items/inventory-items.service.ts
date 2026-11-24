@@ -6,7 +6,7 @@ import { inventoryItems, type InventoryItem } from "@db/schemas/accounts/invento
 import { teams } from "@db/schemas/master/teams.schema";
 import { users } from "@db/schemas/auth/users.schema";
 import { resolveConversion } from "./conversion-rules";
-import { fieldIsVisible, findCatalogItem, getAllowedConversionPairs, getAllowedUnits, getItemMainCategory } from "./item-catalog";
+import { fieldIsVisible, findCatalogItem, getAllowedConversionPairs, getAllowedUnits, getDefaultHsn, getItemMainCategory } from "./item-catalog";
 import { generateTemplatedItemCode } from "./item-code-generator";
 import { validateCatalogItemValues } from "./item-catalog-validation";
 
@@ -100,7 +100,7 @@ export class InventoryItemsService {
         const catalogItem = findCatalogItem(itemData.category, itemData.itemName);
         if (catalogItem?.pending) throw new BadRequestException(`${catalogItem.name} is pending finalization and cannot be created`);
         if (!getAllowedUnits(itemData.category, itemData.itemName, itemData.specifications).some(unit => unit === itemData.unit)) throw new BadRequestException(`Unit ${itemData.unit} is not valid for ${itemData.itemName}`);
-        const hsnCode = itemData.hsnCode?.trim() || null;
+        const hsnCode = itemData.hsnCode?.trim() || getDefaultHsn(itemData.category, itemData.itemName, itemData.specifications) || null;
         if (!catalogItem?.hsnNotApplicable && !hsnCode) throw new BadRequestException("HSN code is required");
         if (hsnCode && !/^\d{4,8}$/.test(hsnCode)) throw new BadRequestException("HSN code must contain 4 to 8 digits");
         const validationError = validateCatalogItemValues(itemData.category, itemData.itemName, itemData.itemType, itemData.specifications);

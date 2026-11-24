@@ -234,11 +234,11 @@ describe("Item Master create, update, and audit behavior", () => {
         expect(updated()).toMatchObject({ itemCode: "NICD/RGP/M/400" });
     });
 
-    it("allows blank HSN only for definitions marked not applicable", async () => {
+    it("prefills the configured default HSN when blank on create", async () => {
         const { service, inserted } = serviceForCrud();
         const body = itemSchema.parse(payload({ category: "Battery Accessories", itemName: "Eye Wash Bottle", specifications: {}, hsnCode: "" }));
         await service.create(body, 7);
-        expect(inserted()).toMatchObject({ itemCode: "EyeWashBottle", hsnCode: null });
+        expect(inserted()).toMatchObject({ itemCode: "EyeWashBottle", hsnCode: "39269099" });
     });
 
     it("keeps UPS unavailable until its code and mandatory fields are finalized", async () => {

@@ -28,7 +28,8 @@ const Master_Item_Edit = lazy(() => import("@/modules/master/item/edit"));
 
 // New shared Item Master
 const Master_InventoryItem_List = lazy(() => import("@/modules/accounts/inventory-items/InventoryItemListPage"));
-const Master_InventoryItem_Form = lazy(() => import("@/modules/accounts/inventory-items/InventoryItemFormPage"));
+const Master_InventoryItem_Create = lazy(() => import("@/modules/accounts/inventory-items/InventoryItemCreatePage"));
+const Master_InventoryItem_Edit = lazy(() => import("@/modules/accounts/inventory-items/InventoryItemEditPage"));
 
 // Websites
 const Master_Website = lazy(() => import("@/modules/master/website"));
@@ -267,7 +268,7 @@ export default function MasterRoutes() {
                     path="new"
                     element={
                         <RouteWrapper permission={{ module: "master.item-master", action: "create" }}>
-                            <Master_InventoryItem_Form />
+                            <Master_InventoryItem_Create />
                         </RouteWrapper>
                     }
                 />
@@ -275,7 +276,7 @@ export default function MasterRoutes() {
                     path=":id/edit"
                     element={
                         <RouteWrapper permission={{ module: "master.item-master", action: "update" }}>
-                            <Master_InventoryItem_Form />
+                            <Master_InventoryItem_Edit />
                         </RouteWrapper>
                     }
                 />
