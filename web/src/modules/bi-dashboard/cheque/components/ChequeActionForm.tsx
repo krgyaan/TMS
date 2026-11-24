@@ -68,6 +68,9 @@ export function ChequeActionForm({ instrumentId, action: propAction, tenderId, f
         defaultValues.due_date = formHistory.accountsForm.dueDate;
         defaultValues.remarks = formHistory.accountsForm.remarks;
         defaultValues.cheque_given_from_account = formHistory.accountsForm.chequeGivenFromAccount;
+        defaultValues.receiving_cheque_handed_over = formHistory.accountsForm.handover;
+        defaultValues.cheque_images = formHistory.accountsForm.chequeImages;
+        defaultValues.positive_pay_confirmation = formHistory.accountsForm.positivePayConfirmation;
     }
 
     if (formHistory?.initiateFollowup) {
@@ -112,65 +115,6 @@ export function ChequeActionForm({ instrumentId, action: propAction, tenderId, f
         : BANKS;
 
     useEffect(() => {
-        if (formHistory?.accountsForm?.chequeReq) {
-            form.setValue('cheque_req', formHistory.accountsForm.chequeReq, { shouldValidate: false });
-        }
-        if (formHistory?.accountsForm?.reasonReq) {
-            form.setValue('reason_req', formHistory.accountsForm.reasonReq, { shouldValidate: false });
-        }
-        if (formHistory?.accountsForm?.chequeNo) {
-            form.setValue('cheque_no', formHistory.accountsForm.chequeNo, { shouldValidate: false });
-        }
-        if (formHistory?.accountsForm?.dueDate) {
-            form.setValue('due_date', formHistory.accountsForm.dueDate, { shouldValidate: false });
-        }
-        if (formHistory?.accountsForm?.remarks) {
-            form.setValue('remarks', formHistory.accountsForm.remarks, { shouldValidate: false });
-        }
-        if (formHistory?.accountsForm?.chequeGivenFromAccount) {
-            form.setValue('cheque_given_from_account', formHistory.accountsForm.chequeGivenFromAccount, { shouldValidate: false });
-        }
-
-        if (formHistory?.initiateFollowup?.organisationName) {
-            form.setValue('organisation_name', formHistory.initiateFollowup.organisationName, { shouldValidate: false });
-        }
-        if (formHistory?.initiateFollowup?.contacts) {
-            form.setValue('contacts', formHistory.initiateFollowup.contacts.map(c => ({
-                name: c.name,
-                phone: c.phone ?? '',
-                email: c.email ?? '',
-            })), { shouldValidate: false });
-        }
-        if (formHistory?.initiateFollowup?.followupStartDate) {
-            form.setValue('followup_start_date', formHistory.initiateFollowup.followupStartDate, { shouldValidate: false });
-        }
-        if (formHistory?.initiateFollowup?.frequency) {
-            form.setValue('frequency', formHistory.initiateFollowup.frequency, { shouldValidate: false });
-        }
-
-        if (formHistory?.stopCheque?.stopReasonText) {
-            form.setValue('stop_reason_text', formHistory.stopCheque.stopReasonText, { shouldValidate: false });
-        }
-
-        if (formHistory?.paidViaBankTransfer?.transferDate) {
-            form.setValue('transfer_date', formHistory.paidViaBankTransfer.transferDate, { shouldValidate: false });
-        }
-        if (formHistory?.paidViaBankTransfer?.utr) {
-            form.setValue('utr', formHistory.paidViaBankTransfer.utr, { shouldValidate: false });
-        }
-        if (formHistory?.paidViaBankTransfer?.amount) {
-            form.setValue('amount', formHistory.paidViaBankTransfer.amount, { shouldValidate: false });
-        }
-
-        if (formHistory?.depositedInBank?.transferDate) {
-            form.setValue('transfer_date', formHistory.depositedInBank.transferDate, { shouldValidate: false });
-        }
-        if (formHistory?.depositedInBank?.reference) {
-            form.setValue('reference', formHistory.depositedInBank.reference, { shouldValidate: false });
-        }
-    }, [formHistory, form]);
-
-    useEffect(() => {
         if (selectedAction === 'initiate-followup' && tenderId && tenderId > 0) {
             (async () => {
                 try {
@@ -210,11 +154,11 @@ export function ChequeActionForm({ instrumentId, action: propAction, tenderId, f
             if (values.reason_req) data.reason_req = values.reason_req;
             if (values.cheque_no) data.cheque_no = values.cheque_no;
             if (values.due_date) data.due_date = values.due_date;
-            if (values.receiving_cheque_handed_over) data.receiving_cheque_handed_over = values.receiving_cheque_handed_over;
-            if (values.cheque_images && values.cheque_images.length > 0) {
-                data.cheque_images = values.cheque_images;
+            if (values.action === 'accounts-form') {
+                data.receiving_cheque_handed_over = values.receiving_cheque_handed_over || null;
+                data.cheque_images = values.cheque_images ?? [];
+                data.positive_pay_confirmation = values.positive_pay_confirmation || null;
             }
-            if (values.positive_pay_confirmation) data.positive_pay_confirmation = values.positive_pay_confirmation;
             if (values.remarks) data.remarks = values.remarks;
             if (values.cheque_given_from_account) data.cheque_given_from_account = values.cheque_given_from_account;
             if (values.organisation_name) data.organisation_name = values.organisation_name;
@@ -260,10 +204,19 @@ export function ChequeActionForm({ instrumentId, action: propAction, tenderId, f
                                 (option.value === 'deposited-in-bank' && hasDepositedInBankData) ||
                                 (option.value === 'cancelled-torn' && hasCancelledTornData);
 
+                            const isSelected = selectedAction === option.value;
                             return (
                                 <div
                                     key={option.value}
-                                    className={`relative flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all hover:bg-muted/50 ${selectedAction === option.value ? 'border-primary' : ''}`}
+                                    className={`relative flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all hover:bg-muted/50 ${
+                                        hasHistory ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30' : ''
+                                    } ${
+                                        isSelected
+                                            ? hasHistory
+                                                ? 'ring-2 ring-primary ring-offset-1'
+                                                : 'border-primary'
+                                            : ''
+                                    }`}
                                     onClick={() => form.setValue('action', option.value, { shouldValidate: true })}
                                 >
                                     <div className="flex items-center gap-2">
@@ -350,7 +303,7 @@ export function ChequeActionForm({ instrumentId, action: propAction, tenderId, f
                                             <CompactFileUploader
                                                 context="cheque-receiving-handed-over"
                                                 value={field.value}
-                                                onChange={field.onChange}
+                                                onChange={(path) => field.onChange(path ?? '')}
                                             />
                                         )}
                                     </FieldWrapper>
@@ -372,7 +325,7 @@ export function ChequeActionForm({ instrumentId, action: propAction, tenderId, f
                                                     <CompactFileUploader
                                                         context="cheque-positive-pay-confirmation"
                                                         value={field.value}
-                                                        onChange={field.onChange}
+                                                        onChange={(path) => field.onChange(path ?? '')}
                                                         disabled={isDdLinkedCheque}
                                                     />
                                                     {isDdLinkedCheque && (
@@ -469,7 +422,7 @@ export function ChequeActionForm({ instrumentId, action: propAction, tenderId, f
                                     <CompactFileUploader
                                         context="cheque-stop-proof-image"
                                         value={field.value}
-                                        onChange={field.onChange}
+                                        onChange={(path) => field.onChange(path ?? '')}
                                     />
                                 )}
                             </FieldWrapper>
@@ -541,7 +494,7 @@ export function ChequeActionForm({ instrumentId, action: propAction, tenderId, f
                                     <CompactFileUploader
                                         context="cheque-cancelled-image"
                                         value={field.value}
-                                        onChange={field.onChange}
+                                        onChange={(path) => field.onChange(path ?? '')}
                                     />
                                 )}
                             </FieldWrapper>

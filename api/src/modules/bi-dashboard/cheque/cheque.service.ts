@@ -536,14 +536,12 @@ export class ChequeService {
             if (body.cheque_no) chequeDetailsUpdate.chequeNo = body.cheque_no;
             if (body.due_date) chequeDetailsUpdate.dueDate = body.due_date;
 
-            const receivingChequePath = getFilePathFromBody('receiving_cheque_handed_over', body);
-            if (receivingChequePath) {
-                chequeDetailsUpdate.handover = receivingChequePath;
+            if (Object.prototype.hasOwnProperty.call(body, 'receiving_cheque_handed_over')) {
+                chequeDetailsUpdate.handover = getFilePathFromBody('receiving_cheque_handed_over', body);
             }
 
-            const positivePayPath = getFilePathFromBody('positive_pay_confirmation', body);
-            if (positivePayPath) {
-                chequeDetailsUpdate.confirmation = positivePayPath;
+            if (Object.prototype.hasOwnProperty.call(body, 'positive_pay_confirmation')) {
+                chequeDetailsUpdate.confirmation = getFilePathFromBody('positive_pay_confirmation', body);
             }
 
             if (body.remarks) {
@@ -981,6 +979,7 @@ export class ChequeService {
                 id: paymentInstruments.id,
                 action: paymentInstruments.action,
                 status: paymentInstruments.status,
+                rejectionReason: paymentInstruments.rejectionReason,
                 amount: paymentInstruments.amount,
                 favouring: paymentInstruments.favouring,
                 payableAt: paymentInstruments.payableAt,
@@ -1040,6 +1039,8 @@ export class ChequeService {
         return {
             id: result.id,
             action: result.action,
+            status: result.status,
+            rejectionReason: result.rejectionReason,
             chequeStatus: this.deriveChequeStatus(result.status, result.chequeReason),
             tenderNo: result.tenderNo,
             tenderName: result.tenderName,
