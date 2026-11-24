@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertCircle, Eye, FileEdit, FileX2, Pencil, Plus, Search, Trash, Truck } from "lucide-react";
+import { AlertCircle, Eye, FileEdit, FileX2, Pencil, Plus, Search, Trash } from "lucide-react";
 
 import { paths } from "@/app/routes/paths";
 import { useAuth } from "@/contexts/AuthContext";
@@ -21,14 +21,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DataTable from "@/components/ui/data-table";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 
-import { CourierStatusDialog } from "./components/CourierStatusDialog";
 import { createCourierColumns } from "./components/courierColumns";
-import { COURIER_STATUS, COURIER_TABS, isCourierPrivileged } from "./helpers/courier.constants";
+import { COURIER_TABS, isCourierPrivileged } from "./helpers/courier.constants";
 import type { CourierDashboardRow, CourierTab } from "./helpers/courier.types";
 
 const CourierListPage = () => {
     const navigate = useNavigate();
-    const { user, role, teamId } = useAuth();
+    const { role, teamId } = useAuth();
     const isPrivileged = isCourierPrivileged(role, teamId);
     const deleteMutation = useDeleteCourier();
 
@@ -63,54 +62,44 @@ const CourierListPage = () => {
     const { data: apiResponse, isLoading, error } = useCourierDashboard(queryParams);
     const { data: counts } = useCourierDashboardCounts();
 
-    const [statusDialogOpen, setStatusDialogOpen] = useState(false);
-    const [selectedCourier, setSelectedCourier] = useState<CourierDashboardRow | null>(null);
-
     const rows = apiResponse?.data ?? [];
     const totalRows = apiResponse?.meta?.total ?? 0;
 
-    const handleDelete = (row: CourierDashboardRow) => {
-        if (window.confirm(`Are you sure you want to delete courier #${row.id}?`)) {
-            deleteMutation.mutate(row.id);
-        }
-    };
+    const courierActions = useMemo<ActionItem<CourierDashboardRow>[]>(() => {
+        const handleDelete = (row: CourierDashboardRow) => {
+            if (window.confirm(`Are you sure you want to delete courier #${row.id}?`)) {
+                deleteMutation.mutate(row.id);
+            }
+        };
 
-    const courierActions: ActionItem<CourierDashboardRow>[] = [
-        {
-            label: "Status",
-            icon: <FileEdit className="h-4 w-4" />,
-            className: "text-blue-600",
-            visible: () => isPrivileged,
-            onClick: row => {
-                setSelectedCourier(row);
-                setStatusDialogOpen(true);
+        return [
+            {
+                label: "View",
+                icon: <Eye className="h-4 w-4" />,
+                onClick: row => navigate(paths.shared.courierView(row.id)),
             },
-        },
-        {
-            label: "Dispatch",
-            icon: <Truck className="h-4 w-4" />,
-            visible: row => isPrivileged && row.status === COURIER_STATUS.PENDING,
-            onClick: row => navigate(paths.shared.courierDispatch(row.id)),
-        },
-        {
-            label: "View",
-            icon: <Eye className="h-4 w-4" />,
-            onClick: row => navigate(paths.shared.courierView(row.id)),
-        },
-        {
-            label: "Edit",
-            icon: <Pencil className="h-4 w-4" />,
-            visible: row => isPrivileged || row.userId === user?.id,
-            onClick: row => navigate(paths.shared.courierEdit(row.id)),
-        },
-        {
-            label: "Delete",
-            icon: <Trash className="h-4 w-4" />,
-            className: "text-red-600",
-            visible: () => isPrivileged,
-            onClick: handleDelete,
-        },
-    ];
+            {
+                label: "Edit",
+                icon: <Pencil className="h-4 w-4" />,
+                visible: () => isPrivileged,
+                onClick: row => navigate(paths.shared.courierEdit(row.id)),
+            },
+            {
+                label: "Change Status",
+                icon: <FileEdit className="h-4 w-4" />,
+                className: "text-blue-600",
+                visible: () => isPrivileged,
+                onClick: row => navigate(paths.shared.courierAction(row.id)),
+            },
+            {
+                label: "Delete",
+                icon: <Trash className="h-4 w-4" />,
+                className: "text-red-600",
+                visible: () => isPrivileged,
+                onClick: handleDelete,
+            },
+        ];
+    }, [deleteMutation, isPrivileged, navigate]);
 
     const columnDefs = useMemo(
         () => createCourierColumns({ activeTab, actions: courierActions }),
@@ -242,12 +231,6 @@ const CourierListPage = () => {
                     ))}
                 </Tabs>
             </CardContent>
-
-            <CourierStatusDialog
-                open={statusDialogOpen}
-                onOpenChange={setStatusDialogOpen}
-                courier={selectedCourier}
-            />
         </Card>
     );
 };

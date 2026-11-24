@@ -605,7 +605,7 @@ export class CourierService {
                             fromName: requester?.name ?? "",
                             delDate: this.formatMailDateOnly(courier.delDate),
                             urgency: URGENCY_LABELS[courier.urgency] ?? String(courier.urgency),
-                            dispatchLink: `${this.configService.get<string>('app.publicAppUrl')}/shared/couriers/dispatch/${courier.id}`,
+                            dispatchLink: `${this.configService.get<string>('app.publicAppUrl')}/shared/couriers/action/${courier.id}`,
                             hasAttachments: courierDocs.length > 0,
                         },
                         {
@@ -651,12 +651,12 @@ export class CourierService {
                 throw new NotFoundException("Courier not found");
             }
 
-            if (existing.userId !== actor.id && !this.isPrivilegedCourierUser(actor)) {
+            if (!this.isPrivilegedCourierUser(actor)) {
                 this.logger.warn("Unauthorized courier update attempt", {
                     courierId: id,
                     userId: actor.id,
                 });
-                throw new ForbiddenException("Not authorized to update this courier");
+                throw new ForbiddenException("Only HR team, Admin or Super User can update this courier");
             }
 
             const updateData: Record<string, any> = {
@@ -671,6 +671,15 @@ export class CourierService {
             if (data.empFrom !== undefined) updateData.empFrom = data.empFrom;
             if (data.urgency !== undefined) updateData.urgency = data.urgency;
             if (data.delDate !== undefined) updateData.delDate = data.delDate; // ✅ already Date
+            if (data.status !== undefined) updateData.status = data.status;
+            if (data.trackingNumber !== undefined) updateData.trackingNumber = data.trackingNumber?.trim() || null;
+            if (data.courierProvider !== undefined) updateData.courierProvider = data.courierProvider?.trim() || null;
+            if (data.pickupDate !== undefined) updateData.pickupDate = data.pickupDate;
+            if (data.docketNo !== undefined) updateData.docketNo = data.docketNo?.trim() || null;
+            if (data.docketSlip !== undefined) updateData.docketSlip = data.docketSlip;
+            if (data.deliveryDate !== undefined) updateData.deliveryDate = data.deliveryDate;
+            if (data.deliveryPod !== undefined) updateData.deliveryPod = data.deliveryPod;
+            if (data.withinTime !== undefined) updateData.withinTime = data.withinTime;
 
             const [updated] = await this.db.update(couriers).set(updateData).where(eq(couriers.id, id)).returning();
 

@@ -24,8 +24,22 @@ export type CreateCourierInput = z.infer<typeof CreateCourierSchema>;
 
 /**
  * Update courier payload
+ *
+ * Extends the create payload with the dispatch/delivery/tracking fields so
+ * privileged users (HR team / Admin / Super User) can edit every detail.
+ * Nullable fields allow clearing existing values.
  */
-export const UpdateCourierSchema = CreateCourierSchema.partial();
+export const UpdateCourierSchema = CreateCourierSchema.partial().extend({
+    status: z.coerce.number().int().min(0).max(5).optional(),
+    trackingNumber: z.string().max(255).nullable().optional(),
+    courierProvider: z.string().max(255).nullable().optional(),
+    pickupDate: z.coerce.date().nullable().optional(),
+    docketNo: z.string().max(255).nullable().optional(),
+    docketSlip: z.string().nullable().optional(),
+    deliveryDate: z.coerce.date().nullable().optional(),
+    deliveryPod: z.string().nullable().optional(),
+    withinTime: z.boolean().nullable().optional(),
+});
 
 export type UpdateCourierInput = z.infer<typeof UpdateCourierSchema>;
 
