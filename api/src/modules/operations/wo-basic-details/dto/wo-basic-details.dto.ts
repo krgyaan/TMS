@@ -360,6 +360,7 @@ export const BatchOrderSchema = z.object({
   budgetFreight: z.string().optional(),
   budgetAdmin: z.string().optional(),
   budgetBuybackSale: z.string().optional(),
+  requestGemCharges: z.boolean().optional(),
   gemChargesAmount: z.number().nonnegative().optional(),
   gemChargesPortalLink: z.string().optional(),
   gemChargesInvoice: z.string().optional(),

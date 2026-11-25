@@ -711,7 +711,12 @@ export class WoBasicDetailsService {
                     budgetFreight: order.budgetFreight,
                     budgetAdmin: order.budgetAdmin,
                     budgetBuybackSale: order.budgetBuybackSale,
-                    gemChargesAmount: order.gemChargesAmount,
+                    budgetGemCharges: order.requestGemCharges !== false && order.gemChargesAmount
+                        ? String(order.gemChargesAmount)
+                        : undefined,
+                    gemChargesAmount: order.requestGemCharges !== false
+                        ? order.gemChargesAmount
+                        : undefined,
                     gemChargesPortalLink: order.gemChargesPortalLink,
                     gemChargesInvoice: order.gemChargesInvoice,
                     tmsDocuments: data.tmsDocuments,
@@ -778,7 +783,7 @@ export class WoBasicDetailsService {
         // Side effects after the atomic DB commit.
         for (const [index, item] of created.entries()) {
             const order = data.orders[index];
-            if (Number(order.gemChargesAmount) > 0) {
+            if (order.requestGemCharges !== false && Number(order.gemChargesAmount) > 0) {
                 await this.createProjectPaymentRequest(
                     item.projectId,
                     {
