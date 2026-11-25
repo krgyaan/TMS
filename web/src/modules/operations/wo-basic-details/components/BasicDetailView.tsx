@@ -129,6 +129,13 @@ export function BasicDetailView({
 
     const grossMarginValue = data?.grossMargin ? parseFloat(String(data?.grossMargin)) : null;
     const woDraftFiles = parseFileArray(data?.woDraft);
+    const orderTypeLabel =
+        data.orderType === "repeat" ? "Repeat" :
+        data.orderType === "multiple" ? "Multiple" : "Single";
+    const orderSequenceLabel =
+        data.orderType !== "single" && data.orderSequence
+            ? `${data.orderType === "repeat" ? "R" : "P"}${data.orderSequence}`
+            : null;
 
     // Calculate TMS documents completion stats
     const tmsDocsComplete = hasTmsDocuments
@@ -238,16 +245,16 @@ export function BasicDetailView({
                                 Order Type
                             </TableCell>
                             <TableCell className="text-sm">
-                                <Badge variant={data.orderType === "multiple" ? "default" : "secondary"}>
-                                    {data.orderType === "multiple" ? "Multiple" : "Single"}
+                                <Badge variant={data.orderType !== "single" ? "default" : "secondary"}>
+                                    {orderTypeLabel}
                                 </Badge>
                             </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Order Sequence
                             </TableCell>
                             <TableCell className="text-sm">
-                                {data.orderType === "multiple" && data.orderSequence
-                                    ? <Badge variant="default">#{data.orderSequence}</Badge>
+                                {orderSequenceLabel
+                                    ? <Badge variant="default">{orderSequenceLabel}</Badge>
                                     : '—'}
                             </TableCell>
                         </TableRow>

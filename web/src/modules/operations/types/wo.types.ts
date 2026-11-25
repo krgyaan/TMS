@@ -179,7 +179,7 @@ export interface WoDetailsHistoryEntry {
 export interface CreateWoBasicDetailDto {
   tenderId?: number;
   enquiryId?: number;
-  orderType?: 'single' | 'multiple';
+  orderType?: 'single' | 'repeat' | 'multiple';
   orderSequence?: number;
   woNumber?: string;
   woDate?: string;
@@ -265,6 +265,8 @@ export interface WoBasicDetailsFilters {
 
 export interface WoBasicDetailPrefillData {
   team: number | null;
+  websiteId: number | null;
+  isGemTender: boolean;
   organizationAcronym: string | null;
   itemName: string | null;
   locationName: string | null;
