@@ -21,8 +21,6 @@ import {
     paymentRequests,
 } from '@db/schemas/tendering/payment-requests.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { beneficiaries } from '@db/schemas/operations/beneficiaries.schema';
-import { MakerRequestService } from '@/modules/operations/maker-requests/maker-request.service';
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, desc, eq, inArray, isNull, like, ne, sql } from 'drizzle-orm';
 
@@ -35,7 +33,6 @@ export class BankGuaranteeService {
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly followUpService: FollowUpService,
         private readonly paymentRequestsNotificationService: PaymentRequestsNotificationService,
-        private readonly makerRequestService: MakerRequestService,
     ) {
         this.logger = this.appLogger.withContext(BankGuaranteeService.name);
     }
@@ -1518,7 +1515,6 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 .catch((error) =>
                     this.logger.error(`BG bank request email failed for instrument ${instrumentId}:`, error),
                 );
-            await this.createOwnBankMakerRequest(instrumentId, user?.id ?? user?.sub);
         }
 
         if (body.action === 'accounts-form-2') {
@@ -1634,99 +1630,6 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             action: body.action,
             actionNumber,
         };
-    }
-
-    private readonly bgOwnBankCategoryMap: Record<string, string> = {
-        AU_5242: 'AU_5242',
-        AU_5180: 'AU_5180',
-        AU_5190: 'AU_5190',
-        AU_8316: 'AU_8316',
-        AU_9589: 'AU_9589',
-        AU_9284: 'AU_9284',
-        amex_cc: 'amex_cc',
-        YESBANK_2011: 'YES_BANK_2011',
-        YESBANK_0771: 'YES_BANK_0771',
-    };
-
-    private async createOwnBankMakerRequest(instrumentId: number, requestedBy?: number) {
-        try {
-            const [instrument] = await this.db
-                .select({
-                    id: paymentInstruments.id,
-                    makerRequestId: paymentInstruments.makerRequestId,
-                    amount: paymentInstruments.amount,
-                })
-                .from(paymentInstruments)
-                .where(eq(paymentInstruments.id, instrumentId))
-                .limit(1);
-
-            if (!instrument || instrument.makerRequestId) {
-                return;
-            }
-
-            const [bgDetails] = await this.db
-                .select({ bankName: instrumentBgDetails.bankName })
-                .from(instrumentBgDetails)
-                .where(eq(instrumentBgDetails.instrumentId, instrumentId))
-                .limit(1);
-
-            const category = bgDetails?.bankName ? this.bgOwnBankCategoryMap[bgDetails.bankName] : undefined;
-            if (!category) {
-                this.logger.warn(
-                    `Own bank maker request skipped for BG instrument ${instrumentId}: no own bank category for ${bgDetails?.bankName ?? 'empty bank'}`,
-                );
-                return;
-            }
-
-            if (!requestedBy) {
-                this.logger.warn(
-                    `Own bank maker request skipped for BG instrument ${instrumentId}: requestedBy missing`,
-                );
-                return;
-            }
-
-            const [beneficiary] = await this.db
-                .select()
-                .from(beneficiaries)
-                .where(eq(beneficiaries.accountNumber, '2502245699295242'))
-                .limit(1);
-
-            if (!beneficiary) {
-                this.logger.warn(
-                    `Own bank maker request skipped for BG instrument ${instrumentId}: beneficiary account not found`,
-                );
-                return;
-            }
-
-            const created = await this.makerRequestService.create(
-                {
-                    paymentMode: 'BANK_TRANSFER',
-                    amount: Number(instrument.amount) || 0,
-                    category,
-                    beneficiaryId: beneficiary.id,
-                    partyName: beneficiary.name,
-                    accountNumber: beneficiary.accountNumber,
-                    bankName: beneficiary.bankName,
-                    ifsc: beneficiary.ifsc,
-                    billFiles: [],
-                    remark: 'Auto-created from BG request',
-                },
-                requestedBy,
-            );
-
-            await this.db
-                .update(paymentInstruments)
-                .set({ makerRequestId: created.id })
-                .where(eq(paymentInstruments.id, instrumentId));
-
-            this.logger.log(
-                `Own bank maker request ${created.requestNo ?? created.id} created for BG instrument ${instrumentId}`,
-            );
-        } catch (error) {
-            this.logger.warn(
-                `Own bank maker request creation failed for BG instrument ${instrumentId}: ${error instanceof Error ? error.message : String(error)}`,
-            );
-        }
     }
 
     async createOldBg(payload: Record<string, any>, user?: any) {
