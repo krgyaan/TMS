@@ -15,10 +15,15 @@ export const woBasicDetails = pgTable("wo_basic_details", {
     projectCode: varchar("project_code", { length: 100 }).unique(),
     projectName: varchar("project_name", { length: 255 }),
 
-    // Order type: 'single' (one order per tender) | 'multiple' (several orders per tender)
+    // Order type: 'single' (one order per tender) | 'repeat' | 'multiple'
     // orderSequence numbers each order within the same tender (1, 2, 3...)
     orderType: varchar("order_type", { length: 20 }).default('single'),
     orderSequence: integer("order_sequence").default(1),
+
+    // Project classification / PO receipt
+    orderNature: varchar("order_nature", { length: 20 }), // 'supply' | 'service' | 'sitc'
+    poReceivedStatus: varchar("po_received_status", { length: 20 }), // 'received' | 'not_received' | 'not_applicable'
+    sapPoUpload: jsonb("sap_po_upload").$type<string[]>(),
 
     // Workflow state: 'basic_details' | 'wo_details' | 'wo_acceptance' | 'wo_upload' | 'completed'
     currentStage: varchar("current_stage", { length: 50 }),
