@@ -56,7 +56,7 @@ export function TenderViewPage({ tenderId, onBack, backLabel }: TenderViewPagePr
                                 {basicDetails.length > 1 && (
                                     <h4 className="text-sm font-semibold text-muted-foreground">
                                         Order {idx + 1}
-                                        {wo.orderType === "multiple" && wo.orderSequence ? ` · #${wo.orderSequence}` : ""}
+                                        {wo.orderType !== "single" && wo.orderSequence ? ` · ${wo.orderType === "repeat" ? "R" : "P"}${wo.orderSequence}` : ""}
                                     </h4>
                                 )}
                                 <BasicDetailsSection woBasicDetailId={wo.id} />
