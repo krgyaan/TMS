@@ -1,4 +1,4 @@
-import { items, locations, organizations, projects, teams, tenderClients, tenderCostingDetails, tenderCostingSheets, tenderInfos, tenderInformation, tenderResults } from '@/db/schemas';
+import { items, locations, organizations, projects, teams, tenderClients, tenderCostingDetails, tenderCostingSheets, tenderInformation, tenderInfos, tenderResults } from '@/db/schemas';
 import { AppLogger } from '@/logger/app-logger.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { CashFlowService } from '@/modules/operations/cash-flows/cash-flow.service';
@@ -13,7 +13,7 @@ import { woBasicDetails, woContacts, woDetails, woOrderRevisions } from '@db/sch
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
-import type { AssignOeDto, BulkAssignOeDto, CreateWoBasicDetailDto, RemoveOeAssignmentDto, ReviseOrderDto, UpdateWoBasicDetailDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
+import type { AssignOeDto, BatchCreateWoBasicDetailDto, BulkAssignOeDto, CreateWoBasicDetailDto, RemoveOeAssignmentDto, ReviseOrderDto, UpdateWoBasicDetailDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
 import { computeGemChargesBreakdown, gemBreakdownToDbColumns } from './helpers/gem-charges.helper';
 const GEM_WEBSITE_ID = 5;
 
@@ -609,6 +609,194 @@ export class WoBasicDetailsService {
         this.safeCreateProject(data, row?.id, userId, insertValues.projectName ?? null);
 
         return this.mapRowToResponse(row!);
+    }
+
+    async createBatch(data: BatchCreateWoBasicDetailDto, userId?: number) {
+        if (data.orderType === 'single' && data.orders.length !== 1) {
+            throw new BadRequestException('A single order must contain exactly one row.');
+        }
+
+        let teamId: number | null = data.teamId ?? null;
+        let itemId: number | null = data.itemId ?? null;
+        let locationId: number | null = data.locationId ?? null;
+        let organizationId: number | null = data.organizationId ?? null;
+        let prevStatus: number | null = null;
+
+        if (data.tenderId) {
+            const [tender] = await this.db
+                .select({
+                    teamId: tenderInfos.team,
+                    itemId: tenderInfos.item,
+                    locationId: tenderInfos.location,
+                    organizationId: tenderInfos.organization,
+                    status: tenderInfos.status,
+                })
+                .from(tenderInfos)
+                .where(eq(tenderInfos.id, data.tenderId))
+                .limit(1);
+
+            if (!tender) throw new NotFoundException(`Tender with ID ${data.tenderId} not found`);
+
+            teamId = tender.teamId;
+            itemId = tender.itemId;
+            locationId = tender.locationId;
+            organizationId = tender.organizationId ?? organizationId;
+            prevStatus = tender.status;
+
+            if (!itemId) {
+                throw new BadRequestException('Cannot create projects: tender item is missing.');
+            }
+
+            const [{ existingOrders }] = await this.db
+                .select({ existingOrders: sql<number>`count(*)::int` })
+                .from(woBasicDetails)
+                .where(eq(woBasicDetails.tenderId, data.tenderId));
+
+            if ((existingOrders ?? 0) > 0) {
+                const [latestResult] = await this.db
+                    .select({ status: tenderResults.status })
+                    .from(tenderResults)
+                    .where(eq(tenderResults.tenderId, data.tenderId))
+                    .orderBy(desc(tenderResults.createdAt))
+                    .limit(1);
+
+                if ((latestResult?.status ?? '').trim().toLowerCase() !== 'won') {
+                    throw new BadRequestException('A new order can only be added to a won tender.');
+                }
+
+                if (data.orderType === 'single') {
+                    throw new BadRequestException(
+                        'This tender already has orders. Add the next order as Repeat or Multiple.',
+                    );
+                }
+            }
+        }
+
+        const teamName = await this.getTeamName(teamId);
+
+        const created = await this.db.transaction(async (tx) => {
+            const [{ maxSequence }] = await tx
+                .select({ maxSequence: sql<number | null>`max(${woBasicDetails.orderSequence})::int` })
+                .from(woBasicDetails)
+                .where(data.tenderId
+                    ? eq(woBasicDetails.tenderId, data.tenderId)
+                    : sql`1 = 0`);
+
+            const startSequence = (maxSequence ?? 0) + 1;
+            const results: Array<{ basic: WoBasicDetailRow; projectId: number }> = [];
+
+            for (const [index, order] of data.orders.entries()) {
+                const sequence = startSequence + index;
+                const insertValues = this.mapCreateToDb({
+                    tenderId: data.tenderId,
+                    teamId: teamId ?? undefined,
+                    organizationId: organizationId ?? undefined,
+                    itemId: itemId ?? undefined,
+                    locationId: locationId ?? undefined,
+                    orderType: data.orderType,
+                    orderSequence: sequence,
+                    woNumber: order.woNumber,
+                    woDate: order.woDate,
+                    projectCode: order.projectCode,
+                    projectName: order.projectName,
+                    woValuePreGst: order.woValuePreGst,
+                    woValueGstAmt: order.woValueGstAmt,
+                    woDraft: order.woDraft,
+                    budgetPreGst: order.budgetPreGst,
+                    receiptPreGst: order.receiptPreGst,
+                    grossMargin: order.grossMargin,
+                    finalPrice: order.finalPrice,
+                    budgetSupply: order.budgetSupply,
+                    budgetService: order.budgetService,
+                    budgetFreight: order.budgetFreight,
+                    budgetAdmin: order.budgetAdmin,
+                    budgetBuybackSale: order.budgetBuybackSale,
+                    gemChargesAmount: order.gemChargesAmount,
+                    gemChargesPortalLink: order.gemChargesPortalLink,
+                    gemChargesInvoice: order.gemChargesInvoice,
+                    tmsDocuments: data.tmsDocuments,
+                } as CreateWoBasicDetailDto);
+
+                if (userId) {
+                    insertValues.createdBy = userId;
+                    insertValues.updatedBy = userId;
+                    insertValues.team = teamId;
+                }
+
+                const [basic] = await tx.insert(woBasicDetails).values(insertValues).returning();
+
+                const [project] = await tx.insert(projects).values({
+                    teamName,
+                    organisationId: organizationId ?? null,
+                    itemId: itemId!,
+                    locationId: locationId ?? null,
+                    poNo: order.woNumber ?? null,
+                    projectCode: order.projectCode ?? null,
+                    projectName: order.projectName ?? null,
+                    poUpload: order.woDraft ?? null,
+                    poDate: this.parseDate(order.woDate),
+                    tenderId: data.tenderId ?? null,
+                    woBasicDetailId: basic.id,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                } as typeof projects.$inferInsert).returning();
+
+                if (order.contacts?.length) {
+                    await tx.insert(woContacts).values(order.contacts.map(contact => ({
+                        woBasicDetailId: basic.id,
+                        name: contact.name ?? null,
+                        designation: contact.designation ?? null,
+                        phone: contact.phone ?? null,
+                        email: contact.email ?? null,
+                        organization: contact.organization ?? null,
+                        departments: contact.departments ?? null,
+                    })));
+                }
+
+                results.push({ basic, projectId: project.id });
+            }
+
+            return results;
+        });
+
+        if (data.tenderId && userId) {
+            const newStatus = 26;
+            await this.db
+                .update(tenderInfos)
+                .set({ status: newStatus, updatedAt: new Date() })
+                .where(eq(tenderInfos.id, data.tenderId));
+
+            await this.tenderStatusHistoryService.trackStatusChange(
+                data.tenderId,
+                newStatus,
+                userId,
+                prevStatus,
+                'WO Basic Details batch created',
+            );
+        }
+
+        // Side effects after the atomic DB commit.
+        for (const [index, item] of created.entries()) {
+            const order = data.orders[index];
+            if (Number(order.gemChargesAmount) > 0) {
+                await this.createProjectPaymentRequest(
+                    item.projectId,
+                    {
+                        projectName: order.projectName,
+                        gemChargesAmount: order.gemChargesAmount,
+                        gemChargesPortalLink: order.gemChargesPortalLink,
+                        gemChargesInvoice: order.gemChargesInvoice,
+                    },
+                    item.basic.id,
+                    userId,
+                );
+            }
+        }
+
+        return created.map(({ basic, projectId }) => ({
+            ...this.mapRowToResponse(basic),
+            projectId,
+        }));
     }
 
     private notifyWoBasicDetailsWhatsapp(

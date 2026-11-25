@@ -338,3 +338,51 @@ export const ReviseOrderSchema = z.object({
 });
 
 export type ReviseOrderDto = z.infer<typeof ReviseOrderSchema>;
+
+// ============================================
+// BATCH CREATE (Repeat / Multiple separate)
+// ============================================
+
+export const BatchOrderSchema = z.object({
+  woNumber: z.string().max(255),
+  woDate: z.string().date(),
+  woValuePreGst: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format"),
+  woValueGstAmt: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format"),
+  projectCode: z.string().max(100).optional(),
+  projectName: z.string().max(255).optional(),
+  woDraft: z.string().optional(),
+  budgetPreGst: z.string().optional(),
+  receiptPreGst: z.string().optional(),
+  grossMargin: z.string().optional(),
+  finalPrice: z.string().optional(),
+  budgetSupply: z.string().optional(),
+  budgetService: z.string().optional(),
+  budgetFreight: z.string().optional(),
+  budgetAdmin: z.string().optional(),
+  budgetBuybackSale: z.string().optional(),
+  gemChargesAmount: z.number().nonnegative().optional(),
+  gemChargesPortalLink: z.string().optional(),
+  gemChargesInvoice: z.string().optional(),
+  contacts: z.array(z.object({
+    name: z.string().optional(),
+    designation: z.string().optional(),
+    phone: z.string().optional(),
+    email: z.string().optional(),
+    organization: z.string().optional(),
+    departments: z.string().optional(),
+  })).optional(),
+});
+
+export const BatchCreateWoBasicDetailSchema = z.object({
+  tenderId: z.number().int().positive().optional(),
+  teamId: z.number().int().positive().nullish(),
+  organizationId: z.number().int().positive().nullish(),
+  itemId: z.number().int().positive().nullish(),
+  locationId: z.number().int().positive().nullish(),
+  orderType: z.enum(["single", "repeat", "multiple"]).default("single"),
+  tmsDocuments: z.record(z.boolean()).optional(),
+  orders: z.array(BatchOrderSchema).min(1),
+});
+
+export type BatchOrderDto = z.infer<typeof BatchOrderSchema>;
+export type BatchCreateWoBasicDetailDto = z.infer<typeof BatchCreateWoBasicDetailSchema>;

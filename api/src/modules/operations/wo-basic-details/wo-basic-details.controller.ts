@@ -3,8 +3,8 @@ import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Inject, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger } from "winston";
-import type { AssignOeDto, CreateWoBasicDetailDto, RemoveOeAssignmentDto, ReviseOrderDto, UpdateWoBasicDetailDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
-import { AssignOeSchema, CreateWoBasicDetailSchema, RemoveOeAssignmentSchema, ReviseOrderSchema, UpdateWoBasicDetailSchema, WoBasicDetailsQuerySchema } from './dto/wo-basic-details.dto';
+import type { AssignOeDto, BatchCreateWoBasicDetailDto, CreateWoBasicDetailDto, RemoveOeAssignmentDto, ReviseOrderDto, UpdateWoBasicDetailDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
+import { AssignOeSchema, BatchCreateWoBasicDetailSchema, CreateWoBasicDetailSchema, RemoveOeAssignmentSchema, ReviseOrderSchema, UpdateWoBasicDetailSchema, WoBasicDetailsQuerySchema } from './dto/wo-basic-details.dto';
 import { WoBasicDetailsService } from './wo-basic-details.service';
 
 @Controller('wo-basic-details')
@@ -67,6 +67,16 @@ export class WoBasicDetailsController {
     @Get(':id/with-relations')
     async getByIdWithRelations(@Param('id', ParseIntPipe) id: number) {
         return this.woBasicDetailsService.findByIdWithRelations(id);
+    }
+
+    @Post('batch')
+    @HttpCode(HttpStatus.CREATED)
+    async createBatch(
+        @Body() body: unknown,
+        @CurrentUser() user: ValidatedUser,
+    ) {
+        const parsed = BatchCreateWoBasicDetailSchema.parse(body) as BatchCreateWoBasicDetailDto;
+        return this.woBasicDetailsService.createBatch(parsed, user.sub);
     }
 
     @Post()
