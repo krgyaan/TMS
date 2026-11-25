@@ -31,6 +31,7 @@ import { LeadFollowupSchedulerModule } from "@/modules/crm/leadfollowup/lead-fol
 import { FollowUpModule } from "@/modules/follow-up/follow-up.module";
 import { AssetsModule } from "@/modules/hrms/assets/assets.module";
 import { ComplaintsModule } from "@/modules/hrms/complaints/complaints.module";
+import { OfficeInventoryModule } from "@/modules/hrms/office-inventory/office-inventory.module";
 import { EmployeeProfilesModule } from "@/modules/hrms/employee-profiles/employee-profiles.module";
 import { ImprestAdminModule } from "@/modules/imprest-admin/imprest-admin.module";
 import { GoogleIntegrationModule } from "@/modules/integrations/google/google.module";
@@ -286,6 +287,7 @@ import { QueueMonitoringModule } from "./modules/queue-monitoring/queue-monitori
         EmployeeProfilesModule,
         AssetsModule,
         ComplaintsModule,
+        OfficeInventoryModule,
         AccountChecklistModule,
         SchedulerModule,
         OnboardingModule,

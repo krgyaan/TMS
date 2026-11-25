@@ -530,6 +530,8 @@ export const paths = {
             create: "/hrms/complaints/create",
             view: (id: number | string) => `/hrms/complaints/${id}/view`,
         },
+
+        officeInventory: "/hrms/office-inventory",
         
         //================ onboarding  ==============================//
         onboardingDashboard: "/hrms/onboarding/dashboard",

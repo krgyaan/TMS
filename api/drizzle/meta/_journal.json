@@ -848,6 +848,20 @@
       "when": 1808000000000,
       "tag": "0191_imprest_category_ledgers",
       "breakpoints": true
+    },
+    {
+      "idx": 145,
+      "version": "7",
+      "when": 1809000000000,
+      "tag": "0192_create_hrms_office_inventory_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 146,
+      "version": "7",
+      "when": 1810000000000,
+      "tag": "0193_seed_hrms_office_inventory_data",
+      "breakpoints": true
     }
   ]
 }
