@@ -37,6 +37,8 @@ export const buildCourierDefaultValues = (): CourierFormValues => ({
     empFrom: undefined as unknown as number,
     delDate: "",
     urgency: undefined as unknown as number,
+    userId: undefined,
+    courierDocs: [],
     status: undefined,
     trackingNumber: "",
     courierProvider: "",
@@ -60,6 +62,8 @@ export const mapCourierToForm = (courier: Courier | null | undefined): CourierFo
         empFrom: courier.empFrom ?? (undefined as unknown as number),
         delDate: toDateInputValue(courier.delDate),
         urgency: courier.urgency ?? (undefined as unknown as number),
+        userId: courier.userId,
+        courierDocs: courier.courierDocs ?? [],
         status: courier.status,
         trackingNumber: courier.trackingNumber ?? "",
         courierProvider: courier.courierProvider ?? "",
@@ -85,6 +89,8 @@ export const mapCourierFormToCreate = (values: CourierFormValues): CreateCourier
 
 export const mapCourierFormToUpdate = (values: CourierFormValues): UpdateCourierInput => ({
     ...mapCourierFormToCreate(values),
+    userId: values.userId,
+    courierDocs: values.courierDocs ?? [],
     status: values.status,
     trackingNumber: emptyToNull(values.trackingNumber),
     courierProvider: emptyToNull(values.courierProvider),

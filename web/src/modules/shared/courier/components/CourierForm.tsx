@@ -19,7 +19,6 @@ import { useUsers } from "@/hooks/api/useUsers";
 import {
     useCreateCourier,
     useUpdateCourier,
-    useUploadCourierDocs,
 } from "@/hooks/api/useCourier";
 import {
     CourierFormSchema,
@@ -72,7 +71,6 @@ export function CourierForm({ mode, courierId, existingData, title, description,
 
     const createMutation = useCreateCourier();
     const updateMutation = useUpdateCourier();
-    const uploadDocsMutation = useUploadCourierDocs();
 
     const [files, setFiles] = useState<string[]>([]);
     const hasSubmittedRef = useRef(false);
@@ -91,8 +89,7 @@ export function CourierForm({ mode, courierId, existingData, title, description,
         form.reset(initialValues);
     }, [form, initialValues]);
 
-    const isSubmitting =
-        createMutation.isPending || updateMutation.isPending || uploadDocsMutation.isPending;
+    const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
     const handleSubmit: SubmitHandler<CourierFormValues> = async values => {
         if (hasSubmittedRef.current) return;
@@ -118,10 +115,6 @@ export function CourierForm({ mode, courierId, existingData, title, description,
                 id: courierId,
                 data: mapCourierFormToUpdate(values),
             });
-
-            if (files.length > 0 && canUploadDocs) {
-                await uploadDocsMutation.mutateAsync({ id: courierId, files });
-            }
 
             toast.success("Courier updated successfully");
             navigate(paths.shared.courierView(courierId));
@@ -207,7 +200,7 @@ export function CourierForm({ mode, courierId, existingData, title, description,
                                         <Input
                                             {...field}
                                             type="date"
-                                            min={new Date().toISOString().split("T")[0]}
+                                            min={mode === "create" ? new Date().toISOString().split("T")[0] : undefined}
                                             disabled={isSubmitting}
                                         />
                                     )}
@@ -250,6 +243,19 @@ export function CourierForm({ mode, courierId, existingData, title, description,
                                                 <Input {...field} value={field.value ?? ""} placeholder="Enter tracking number" disabled={isSubmitting} />
                                             )}
                                         </FieldWrapper>
+                                        <SelectField
+                                            control={form.control}
+                                            name="userId"
+                                            label="Created By"
+                                            options={employees.map(e => ({
+                                                value: String(e.id),
+                                                label: e.name,
+                                                description: e.email ?? undefined,
+                                            }))}
+                                            placeholder={employeesLoading ? "Loading employees..." : "Select Employee"}
+                                            disabled={isSubmitting || employeesLoading}
+                                            valueType="number"
+                                        />
                                     </div>
                                 </div>
 
@@ -344,12 +350,25 @@ export function CourierForm({ mode, courierId, existingData, title, description,
                                     <FileText className="h-4 w-4 text-muted-foreground" />
                                     Soft Copy of the documents
                                 </p>
-                                <FileUploader
-                                    context="courier"
-                                    value={files}
-                                    onChange={setFiles}
-                                    disabled={isSubmitting}
-                                />
+                                {mode === "edit" ? (
+                                    <FieldWrapper control={form.control} name="courierDocs" label="">
+                                        {field => (
+                                            <FileUploader
+                                                context="courier"
+                                                value={field.value ?? []}
+                                                onChange={field.onChange}
+                                                disabled={isSubmitting}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                ) : (
+                                    <FileUploader
+                                        context="courier"
+                                        value={files}
+                                        onChange={setFiles}
+                                        disabled={isSubmitting}
+                                    />
+                                )}
                             </div>
                         )}
 

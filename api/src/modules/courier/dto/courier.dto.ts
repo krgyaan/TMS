@@ -30,6 +30,8 @@ export type CreateCourierInput = z.infer<typeof CreateCourierSchema>;
  * Nullable fields allow clearing existing values.
  */
 export const UpdateCourierSchema = CreateCourierSchema.partial().extend({
+    userId: z.coerce.number().int().positive().optional(),
+    courierDocs: z.array(z.string()).nullable().optional(),
     status: z.coerce.number().int().min(0).max(5).optional(),
     trackingNumber: z.string().max(255).nullable().optional(),
     courierProvider: z.string().max(255).nullable().optional(),

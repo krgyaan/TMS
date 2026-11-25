@@ -671,6 +671,8 @@ export class CourierService {
             if (data.empFrom !== undefined) updateData.empFrom = data.empFrom;
             if (data.urgency !== undefined) updateData.urgency = data.urgency;
             if (data.delDate !== undefined) updateData.delDate = data.delDate; // ✅ already Date
+            if (data.userId !== undefined) updateData.userId = data.userId;
+            if (data.courierDocs !== undefined) updateData.courierDocs = data.courierDocs ?? [];
             if (data.status !== undefined) updateData.status = data.status;
             if (data.trackingNumber !== undefined) updateData.trackingNumber = data.trackingNumber?.trim() || null;
             if (data.courierProvider !== undefined) updateData.courierProvider = data.courierProvider?.trim() || null;
