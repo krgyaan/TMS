@@ -6,11 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCreateWoBasicDetailBatch, useWoBasicDetailPrefill, useWoBasicDetailsByTender } from "@/hooks/api/useWoBasicDetails";
 import type { CreateWoBasicDetailBatchDto, CreateWoBasicDetailBatchOrderDto } from "@/modules/operations/types/wo.types";
-import { ArrowLeft, ArrowRight, Check, Plus, Save, SkipForward, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Plus, Save, SkipForward, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -124,7 +123,6 @@ export function BasicDetailBatchForm() {
     const [tmsDocuments, setTmsDocuments] = useState<Record<string, boolean>>(
         Object.fromEntries(TMS_DOCS.map(doc => [doc, false])),
     );
-    const [showChecklist, setShowChecklist] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     const tenderContacts = useMemo<ContactRow[]>(() => {
@@ -493,33 +491,16 @@ export function BasicDetailBatchForm() {
                             </Table>
                         </div>
 
-                        <div>
-                            <button
-                                type="button"
-                                onClick={() => setShowChecklist(value => !value)}
-                                className="flex w-full items-center justify-between rounded-lg border bg-muted/30 px-4 py-3 text-left"
-                            >
-                                <span className="flex items-center gap-2 text-sm font-semibold">
-                                    <Check className="h-4 w-4 text-orange-500" />
-                                    Checklist confirmation from TE (same for all orders)
-                                </span>
-                                <Badge variant="secondary">
-                                    {Object.values(tmsDocuments).filter(Boolean).length}/{TMS_DOCS.length}
-                                </Badge>
-                            </button>
-                            {showChecklist && (
-                                <div className="mt-3 grid grid-cols-1 gap-3 rounded-lg border bg-muted/50 p-4 md:grid-cols-2 lg:grid-cols-4">
-                                    {TMS_DOCS.map(doc => (
-                                        <label key={doc} className="flex items-center gap-2 text-sm">
-                                            <Checkbox
-                                                checked={tmsDocuments[doc] ?? false}
-                                                onCheckedChange={value => setTmsDocuments(prev => ({ ...prev, [doc]: Boolean(value) }))}
-                                            />
-                                            {doc}
-                                        </label>
-                                    ))}
-                                </div>
-                            )}
+                        <div className="mt-3 grid grid-cols-1 gap-3 rounded-lg border bg-muted/50 p-4 md:grid-cols-2 lg:grid-cols-4">
+                            {TMS_DOCS.map(doc => (
+                                <label key={doc} className="flex items-center gap-2 text-sm">
+                                    <Checkbox
+                                        checked={tmsDocuments[doc] ?? false}
+                                        onCheckedChange={value => setTmsDocuments(prev => ({ ...prev, [doc]: Boolean(value) }))}
+                                    />
+                                    {doc}
+                                </label>
+                            ))}
                         </div>
 
                         <div className="flex flex-wrap justify-end gap-2 border-t pt-6">
@@ -538,18 +519,18 @@ export function BasicDetailBatchForm() {
                     <div className="space-y-5">
                         <OrderTabs rows={rows} active={activeOrder} onChange={setActiveOrder} orderType={orderType} startSequence={startSequence} />
                         {activeRow && (
-                            <div className="space-y-5 rounded-lg border p-4">
+                            <div className="space-y-5 p-4">
                                 <div>
                                     <h3 className="text-lg font-semibold">Costs & Budget — {projectLabel(orderType, startSequence + activeOrder)}</h3>
                                     <p className="text-sm text-muted-foreground">{activeIdentifiers.name || "Project name pending"}</p>
                                 </div>
-                                <div className="grid gap-4 md:grid-cols-3">
+                                <div className="grid gap-4 md:grid-cols-5">
                                     <LabeledNumber label="Budget (Pre-GST)" value={activeRow.budgetPreGst} onChange={value => updateRow(activeOrder, { budgetPreGst: value })} />
                                     <LabeledNumber label="Receipt (Pre-GST)" value={activeRow.receiptPreGst} onChange={value => updateRow(activeOrder, { receiptPreGst: value })} />
                                     <LabeledNumber label="Final Price" value={activeRow.finalPrice} onChange={value => updateRow(activeOrder, { finalPrice: value })} />
                                 </div>
                                 <div>
-                                    <h4 className="mb-3 text-sm font-semibold">Budget Breakdown</h4>
+                                    <h4 className="mb-3 text-sm font-semibold text-muted-foreground">Budget Breakdown</h4>
                                     <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
                                         <LabeledNumber label="Supply" value={activeRow.budgetSupply} onChange={value => updateBudgetField(activeOrder, "budgetSupply", value)} />
                                         <LabeledNumber label="Service" value={activeRow.budgetService} onChange={value => updateBudgetField(activeOrder, "budgetService", value)} />
@@ -558,7 +539,7 @@ export function BasicDetailBatchForm() {
                                         <LabeledNumber label="Buyback Sale" value={activeRow.budgetBuybackSale} onChange={value => updateBudgetField(activeOrder, "budgetBuybackSale", value)} />
                                     </div>
                                 </div>
-                                <div className="grid gap-4 md:grid-cols-3">
+                                <div className="grid gap-4 md:grid-cols-5">
                                     <LabeledNumber
                                         label={isGemTender ? "GeM Charges *" : "GeM Charges"}
                                         value={activeRow.gemChargesAmount}
@@ -599,7 +580,7 @@ export function BasicDetailBatchForm() {
                     <div className="space-y-5">
                         <OrderTabs rows={rows} active={activeOrder} onChange={setActiveOrder} orderType={orderType} startSequence={startSequence} />
                         {activeRow && (
-                            <div className="space-y-4 rounded-lg border p-4">
+                            <div className="space-y-4 p-4">
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <h3 className="text-lg font-semibold">Contacts — {projectLabel(orderType, startSequence + activeOrder)}</h3>
@@ -639,7 +620,7 @@ export function BasicDetailBatchForm() {
                                 )}
                             </div>
                         )}
-                        <Separator />
+
                         <div className="flex flex-wrap justify-between gap-2 border-t pt-6">
                             <Button type="button" variant="outline" onClick={goBack}>
                                 <ArrowLeft className="mr-2 h-4 w-4" /> Back
