@@ -208,6 +208,47 @@ export interface CreateWoBasicDetailDto {
 
 export interface UpdateWoBasicDetailDto extends Partial<Omit<CreateWoBasicDetailDto, 'tenderId' | 'enquiryId'>> {}
 
+export interface CreateWoBasicDetailBatchOrderDto {
+  woNumber: string;
+  woDate: string;
+  woValuePreGst: string;
+  woValueGstAmt: string;
+  projectCode?: string;
+  projectName?: string;
+  woDraft?: string;
+  budgetPreGst?: string;
+  receiptPreGst?: string;
+  grossMargin?: string;
+  finalPrice?: string;
+  budgetSupply?: string;
+  budgetService?: string;
+  budgetFreight?: string;
+  budgetAdmin?: string;
+  budgetBuybackSale?: string;
+  gemChargesAmount?: number;
+  gemChargesPortalLink?: string;
+  gemChargesInvoice?: string;
+  contacts?: Array<{
+    name?: string;
+    designation?: string;
+    phone?: string;
+    email?: string;
+    organization?: string;
+    departments?: string;
+  }>;
+}
+
+export interface CreateWoBasicDetailBatchDto {
+  tenderId?: number;
+  teamId?: number | null;
+  organizationId?: number | null;
+  itemId?: number | null;
+  locationId?: number | null;
+  orderType: 'single' | 'repeat' | 'multiple';
+  tmsDocuments?: TmsDocuments;
+  orders: CreateWoBasicDetailBatchOrderDto[];
+}
+
 export interface AssignOeDto {
   woBasicDetailId: number | null;
   oeFirst: number | null;

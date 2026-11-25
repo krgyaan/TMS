@@ -1,0 +1,714 @@
+import { paths } from "@/app/routes/paths";
+import { FileUploader } from "@/components/file-upload";
+import { DateInput } from "@/components/form/DateInput";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useCreateWoBasicDetailBatch, useWoBasicDetailPrefill, useWoBasicDetailsByTender } from "@/hooks/api/useWoBasicDetails";
+import type { CreateWoBasicDetailBatchDto, CreateWoBasicDetailBatchOrderDto } from "@/modules/operations/types/wo.types";
+import { ArrowLeft, ArrowRight, Check, Plus, Save, SkipForward, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
+
+const teamArray = [
+    { id: 1, name: "AC" },
+    { id: 2, name: "DC" },
+];
+
+const TMS_DOCS = [
+    "Complete Tender Documents",
+    "Tender Info",
+    "EMD Information",
+    "Physical documents submission",
+    "RFQ and Quotation",
+    "Document Checklist",
+    "Costing Sheet",
+    "TQ",
+    "RA and Result details",
+    "Corrigendum",
+];
+
+type ContactRow = {
+    name: string;
+    designation: string;
+    phone: string;
+    email: string;
+    organization: string;
+    departments: string;
+};
+
+type OrderRow = {
+    woNumber: string;
+    woDate: Date | null;
+    woValuePreGst: string;
+    woValueGstAmt: string;
+    woDraft: string[];
+    budgetPreGst: string;
+    receiptPreGst: string;
+    finalPrice: string;
+    budgetSupply: string;
+    budgetService: string;
+    budgetFreight: string;
+    budgetAdmin: string;
+    budgetBuybackSale: string;
+    gemChargesAmount: string;
+    gemChargesPortalLink: string;
+    gemChargesInvoice: string[];
+    contacts: ContactRow[];
+};
+
+const emptyContact = (): ContactRow => ({
+    name: "",
+    designation: "",
+    phone: "",
+    email: "",
+    organization: "",
+    departments: "",
+});
+
+const emptyOrder = (contacts: ContactRow[] = []): OrderRow => ({
+    woNumber: "",
+    woDate: null,
+    woValuePreGst: "",
+    woValueGstAmt: "",
+    woDraft: [],
+    budgetPreGst: "",
+    receiptPreGst: "",
+    finalPrice: "",
+    budgetSupply: "",
+    budgetService: "",
+    budgetFreight: "",
+    budgetAdmin: "",
+    budgetBuybackSale: "",
+    gemChargesAmount: "",
+    gemChargesPortalLink: "",
+    gemChargesInvoice: [],
+    contacts: contacts.length ? contacts.map((contact) => ({ ...contact })) : [],
+});
+
+const financialYear = (date: Date): string => {
+    const month = date.getMonth() + 1;
+    const year = date.getFullYear();
+    const fy = month >= 4 ? year : year - 1;
+    const short = String(fy).slice(-2);
+    return `${short}${(Number(short) + 1).toString().padStart(2, "0")}`;
+};
+
+const num = (value: string | number | undefined): number => Number(value || 0);
+
+export function BasicDetailBatchForm() {
+    const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const tenderId = Number(searchParams.get("tenderId") || 0);
+    const returnTo = paths.operations.woBasicDetailListPage;
+
+    const { data: prefillData } = useWoBasicDetailPrefill(tenderId || null);
+    const { data: existingOrders = [] } = useWoBasicDetailsByTender(tenderId || 0);
+    const createBatch = useCreateWoBasicDetailBatch();
+
+    const startSequence =
+        existingOrders.reduce((max, order) => Math.max(max, order.orderSequence ?? 0), 0) + 1;
+    const hasExistingOrders = existingOrders.length > 0;
+
+    const [orderType, setOrderType] = useState<"single" | "repeat" | "multiple">(
+        hasExistingOrders ? "repeat" : "single",
+    );
+    const [step, setStep] = useState<1 | 2 | 3>(1);
+    const [activeOrder, setActiveOrder] = useState(0);
+    const [rows, setRows] = useState<OrderRow[]>([emptyOrder()]);
+    const [tmsDocuments, setTmsDocuments] = useState<Record<string, boolean>>(
+        Object.fromEntries(TMS_DOCS.map(doc => [doc, false])),
+    );
+    const [showChecklist, setShowChecklist] = useState(false);
+    const [errors, setErrors] = useState<Record<string, string>>({});
+
+    const tenderContacts = useMemo<ContactRow[]>(() => {
+        return (prefillData?.clients ?? []).map(client => ({
+            name: client.clientName ?? "",
+            designation: client.clientDesignation ?? "",
+            phone: client.clientMobile ?? "",
+            email: client.clientEmail ?? "",
+            organization: "",
+            departments: "",
+        }));
+    }, [prefillData]);
+
+    const isGemTender = Boolean(prefillData?.isGemTender);
+
+    const projectIdentifiers = (row: OrderRow, index: number) => {
+        if (!prefillData) return { code: "", name: "" };
+
+        const teamName = teamArray.find(team => team.id === prefillData.team)?.name || "";
+        const orgName = prefillData.organizationAcronym || "";
+        const itemName = prefillData.itemName || "";
+        const locationName = prefillData.locationName || "";
+        const woSuffix = row.woNumber ? row.woNumber.slice(-4) : "";
+        const yearSegment = row.woDate ? financialYear(row.woDate) : "";
+
+        if (!teamName || !orgName || !itemName || !locationName || !woSuffix || !yearSegment) {
+            return { code: "", name: "" };
+        }
+
+        const sequence = startSequence + index;
+        const suffix =
+            orderType === "repeat" ? `R${sequence}` :
+            orderType === "multiple" ? `P${sequence}` : "";
+        const baseCode = `${teamName}/${yearSegment}/${orgName}/${locationName}/${itemName}/${woSuffix}`;
+        const baseName = `${orgName} ${locationName} ${itemName}`.trim();
+
+        return {
+            code: suffix ? `${baseCode}/${suffix}` : baseCode,
+            name: suffix ? `${baseName} ${suffix}` : baseName,
+        };
+    };
+
+    const updateRow = (index: number, patch: Partial<OrderRow>) => {
+        setRows(prev => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+    };
+
+    const recalculatedBudget = (row: OrderRow) => {
+        const total =
+            num(row.budgetSupply) +
+            num(row.budgetService) +
+            num(row.budgetFreight) +
+            num(row.budgetAdmin) +
+            num(row.gemChargesAmount) -
+            num(row.budgetBuybackSale);
+        return total;
+    };
+
+    const updateBudgetField = (index: number, field: keyof OrderRow, value: string) => {
+        setRows(prev => prev.map((row, i) => {
+            if (i !== index) return row;
+            const next = { ...row, [field]: value } as OrderRow;
+            const hasBreakdown = [
+                next.budgetSupply,
+                next.budgetService,
+                next.budgetFreight,
+                next.budgetAdmin,
+                next.budgetBuybackSale,
+                next.gemChargesAmount,
+            ].some(v => num(v) > 0);
+            if (hasBreakdown) next.budgetPreGst = String(recalculatedBudget(next));
+            return next;
+        }));
+    };
+
+    const addRow = () => {
+        setRows(prev => [...prev, emptyOrder(tenderContacts.length ? tenderContacts : [emptyContact()])]);
+    };
+
+    const removeRow = (index: number) => {
+        setRows(prev => (prev.length === 1 ? prev : prev.filter((_, i) => i !== index)));
+        setActiveOrder(prev => Math.max(0, Math.min(prev, rows.length - 2)));
+    };
+
+    const updateContact = (orderIndex: number, contactIndex: number, patch: Partial<ContactRow>) => {
+        setRows(prev => prev.map((row, i) => {
+            if (i !== orderIndex) return row;
+            const contacts = row.contacts.map((contact, ci) => (ci === contactIndex ? { ...contact, ...patch } : contact));
+            return { ...row, contacts };
+        }));
+    };
+
+    const addContact = (orderIndex: number) => {
+        setRows(prev => prev.map((row, i) => (i === orderIndex ? { ...row, contacts: [...row.contacts, emptyContact()] } : row)));
+    };
+
+    const removeContact = (orderIndex: number, contactIndex: number) => {
+        setRows(prev => prev.map((row, i) => (
+            i === orderIndex ? { ...row, contacts: row.contacts.filter((_, ci) => ci !== contactIndex) } : row
+        )));
+    };
+
+    const applyOrderType = (value: "single" | "repeat" | "multiple") => {
+        setOrderType(value);
+        if (value === "single") {
+            setRows(prev => prev.slice(0, 1));
+            setActiveOrder(0);
+        }
+    };
+
+    const validateStep1 = () => {
+        const nextErrors: Record<string, string> = {};
+        rows.forEach((row, index) => {
+            if (!row.woNumber.trim()) nextErrors[`${index}.woNumber`] = "Required";
+            if (!row.woDate) nextErrors[`${index}.woDate`] = "Required";
+            if (!(num(row.woValuePreGst) > 0)) nextErrors[`${index}.woValuePreGst`] = "Required";
+            if (!(num(row.woValueGstAmt) > 0)) nextErrors[`${index}.woValueGstAmt`] = "Required";
+            if (row.woDraft.length === 0) nextErrors[`${index}.woDraft`] = "Upload at least one file";
+        });
+        setErrors(nextErrors);
+        return Object.keys(nextErrors).length === 0;
+    };
+
+    const validateGem = () => {
+        if (!isGemTender) return true;
+        const nextErrors: Record<string, string> = {};
+        rows.forEach((row, index) => {
+            if (row.gemChargesAmount.trim() === "") {
+                nextErrors[`${index}.gemChargesAmount`] = "Required (enter 0 if not applicable)";
+            }
+        });
+        setErrors(prev => ({ ...prev, ...nextErrors }));
+        return Object.keys(nextErrors).length === 0;
+    };
+
+    const goNext = () => {
+        setErrors({});
+        if (step === 1 && !validateStep1()) return;
+        if (step === 2 && !validateGem()) return;
+        setStep(prev => (prev < 3 ? ((prev + 1) as 1 | 2 | 3) : prev));
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    const goBack = () => {
+        setStep(prev => (prev > 1 ? ((prev - 1) as 1 | 2 | 3) : prev));
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    const submit = async () => {
+        const step1Valid = validateStep1();
+        if (!step1Valid) {
+            setStep(1);
+            return;
+        }
+        if (!validateGem()) {
+            setStep(2);
+            return;
+        }
+
+        if (!prefillData) {
+            toast.error("Tender details are still loading. Please try again.");
+            return;
+        }
+
+        const missingIdentifiers = rows.findIndex((row, index) => {
+            const identifiers = projectIdentifiers(row, index);
+            return !identifiers.code || !identifiers.name;
+        });
+        if (missingIdentifiers >= 0) {
+            toast.error(`Project code/name could not be generated for row ${missingIdentifiers + 1}. Check the WO number and date.`);
+            setStep(1);
+            return;
+        }
+
+        const payload: CreateWoBasicDetailBatchDto = {
+            tenderId,
+            orderType,
+            tmsDocuments,
+            orders: rows.map((row, index) => {
+                const identifiers = projectIdentifiers(row, index);
+                const order: CreateWoBasicDetailBatchOrderDto = {
+                    woNumber: row.woNumber,
+                    woDate: row.woDate!.toISOString().split("T")[0],
+                    woValuePreGst: row.woValuePreGst,
+                    woValueGstAmt: row.woValueGstAmt,
+                    projectCode: identifiers.code,
+                    projectName: identifiers.name,
+                    budgetPreGst: row.budgetPreGst || undefined,
+                    receiptPreGst: row.receiptPreGst || undefined,
+                    finalPrice: row.finalPrice || undefined,
+                    budgetSupply: row.budgetSupply || undefined,
+                    budgetService: row.budgetService || undefined,
+                    budgetFreight: row.budgetFreight || undefined,
+                    budgetAdmin: row.budgetAdmin || undefined,
+                    budgetBuybackSale: row.budgetBuybackSale || undefined,
+                    gemChargesAmount: row.gemChargesAmount === "" ? undefined : Number(row.gemChargesAmount),
+                    gemChargesPortalLink: row.gemChargesPortalLink || undefined,
+                    contacts: row.contacts
+                        .filter(contact => contact.name || contact.email || contact.phone)
+                        .map(contact => ({
+                            name: contact.name || undefined,
+                            designation: contact.designation || undefined,
+                            phone: contact.phone || undefined,
+                            email: contact.email || undefined,
+                            organization: contact.organization || undefined,
+                            departments: contact.departments || undefined,
+                        })),
+                };
+                if (row.woDraft.length) order.woDraft = JSON.stringify(row.woDraft);
+                if (row.gemChargesInvoice.length) order.gemChargesInvoice = JSON.stringify(row.gemChargesInvoice);
+                return order;
+            }),
+        };
+
+        try {
+            await createBatch.mutateAsync(payload);
+            navigate(returnTo);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Failed to create work orders");
+        }
+    };
+
+    const activeRow = rows[activeOrder] ?? rows[0];
+    const activeIdentifiers = activeRow ? projectIdentifiers(activeRow, activeOrder) : { code: "", name: "" };
+
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex items-center justify-between gap-3">
+                    <div>
+                        <CardTitle>Create Basic Details</CardTitle>
+                        <CardDescription className="mt-2">
+                            Enter one or more orders for this won tender.
+                        </CardDescription>
+                    </div>
+                    <CardAction>
+                        <Button variant="outline" onClick={() => navigate(-1)}>
+                            <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                        </Button>
+                    </CardAction>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <div className="grid grid-cols-3 gap-2">
+                    {[
+                        { id: 1, title: "Orders & Documents" },
+                        { id: 2, title: "Costs & Budget" },
+                        { id: 3, title: "Contacts" },
+                    ].map(item => (
+                        <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => setStep(item.id as 1 | 2 | 3)}
+                            className={`rounded-lg border p-3 text-left ${step === item.id ? "border-primary bg-primary/5" : "border-border bg-muted/30"}`}
+                        >
+                            <span className="block text-xs text-muted-foreground">Step {item.id}</span>
+                            <span className="text-sm font-semibold">{item.title}</span>
+                        </button>
+                    ))}
+                </div>
+
+                {step === 1 && (
+                    <div className="space-y-6">
+                        <div className="flex flex-wrap gap-2">
+                            {(hasExistingOrders ? ["repeat", "multiple"] : ["single", "repeat", "multiple"]).map(type => (
+                                <Button
+                                    key={type}
+                                    type="button"
+                                    variant={orderType === type ? "default" : "outline"}
+                                    onClick={() => applyOrderType(type as "single" | "repeat" | "multiple")}
+                                >
+                                    {type === "single" ? "Single" : type === "repeat" ? "Repeat" : "Multiple"}
+                                </Button>
+                            ))}
+                            <Badge variant="secondary">Separate tracking</Badge>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2">
+                            <div>
+                                <h3 className="text-lg font-semibold">Orders</h3>
+                                <p className="text-sm text-muted-foreground">
+                                    {orderType === "single"
+                                        ? "One order for this tender."
+                                        : "Add each repeated or multiple order as a separate project."}
+                                </p>
+                            </div>
+                            {orderType !== "single" && (
+                                <Button type="button" variant="outline" onClick={addRow}>
+                                    <Plus className="mr-2 h-4 w-4" /> Add More
+                                </Button>
+                            )}
+                        </div>
+
+                        <div className="overflow-x-auto rounded-lg border">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="w-16">#</TableHead>
+                                        <TableHead>WO Number</TableHead>
+                                        <TableHead>WO Date</TableHead>
+                                        <TableHead>WO Value</TableHead>
+                                        <TableHead>GST</TableHead>
+                                        <TableHead>Project Code</TableHead>
+                                        <TableHead>Project Name</TableHead>
+                                        <TableHead className="min-w-[220px]">Draft WO</TableHead>
+                                        <TableHead className="w-12" />
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {rows.map((row, index) => {
+                                        const identifiers = projectIdentifiers(row, index);
+                                        const sequence = startSequence + index;
+                                        const label =
+                                            orderType === "repeat" ? `R${sequence}` :
+                                            orderType === "multiple" ? `P${sequence}` : "Single";
+                                        return (
+                                            <TableRow key={index}>
+                                                <TableCell className="align-top text-sm font-semibold">{label}</TableCell>
+                                                <TableCell className="align-top">
+                                                    <Input
+                                                        value={row.woNumber}
+                                                        onChange={event => updateRow(index, { woNumber: event.target.value })}
+                                                        placeholder="WO number"
+                                                    />
+                                                    {errors[`${index}.woNumber`] && <p className="mt-1 text-xs text-destructive">{errors[`${index}.woNumber`]}</p>}
+                                                </TableCell>
+                                                <TableCell className="align-top min-w-[150px]">
+                                                    <DateInput
+                                                        value={row.woDate ? row.woDate.toISOString().split("T")[0] : ""}
+                                                        onChange={value => updateRow(index, { woDate: value ? new Date(value) : null })}
+                                                    />
+                                                    {errors[`${index}.woDate`] && <p className="mt-1 text-xs text-destructive">{errors[`${index}.woDate`]}</p>}
+                                                </TableCell>
+                                                <TableCell className="align-top min-w-[130px]">
+                                                    <Input type="number" step="0.01" value={row.woValuePreGst} onChange={event => updateRow(index, { woValuePreGst: event.target.value })} />
+                                                    {errors[`${index}.woValuePreGst`] && <p className="mt-1 text-xs text-destructive">{errors[`${index}.woValuePreGst`]}</p>}
+                                                </TableCell>
+                                                <TableCell className="align-top min-w-[130px]">
+                                                    <Input type="number" step="0.01" value={row.woValueGstAmt} onChange={event => updateRow(index, { woValueGstAmt: event.target.value })} />
+                                                    {errors[`${index}.woValueGstAmt`] && <p className="mt-1 text-xs text-destructive">{errors[`${index}.woValueGstAmt`]}</p>}
+                                                </TableCell>
+                                                <TableCell className="align-top min-w-[200px] break-all text-xs font-mono">{identifiers.code || "—"}</TableCell>
+                                                <TableCell className="align-top min-w-[160px] text-xs">{identifiers.name || "—"}</TableCell>
+                                                <TableCell className="align-top min-w-[220px]">
+                                                    <FileUploader
+                                                        context="wo-draft"
+                                                        value={row.woDraft}
+                                                        onChange={files => updateRow(index, { woDraft: files })}
+                                                    />
+                                                    {errors[`${index}.woDraft`] && <p className="mt-1 text-xs text-destructive">{errors[`${index}.woDraft`]}</p>}
+                                                </TableCell>
+                                                <TableCell className="align-top">
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        disabled={rows.length === 1}
+                                                        onClick={() => removeRow(index)}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                        </div>
+
+                        <div>
+                            <button
+                                type="button"
+                                onClick={() => setShowChecklist(value => !value)}
+                                className="flex w-full items-center justify-between rounded-lg border bg-muted/30 px-4 py-3 text-left"
+                            >
+                                <span className="flex items-center gap-2 text-sm font-semibold">
+                                    <Check className="h-4 w-4 text-orange-500" />
+                                    Checklist confirmation from TE (same for all orders)
+                                </span>
+                                <Badge variant="secondary">
+                                    {Object.values(tmsDocuments).filter(Boolean).length}/{TMS_DOCS.length}
+                                </Badge>
+                            </button>
+                            {showChecklist && (
+                                <div className="mt-3 grid grid-cols-1 gap-3 rounded-lg border bg-muted/50 p-4 md:grid-cols-2 lg:grid-cols-4">
+                                    {TMS_DOCS.map(doc => (
+                                        <label key={doc} className="flex items-center gap-2 text-sm">
+                                            <Checkbox
+                                                checked={tmsDocuments[doc] ?? false}
+                                                onCheckedChange={value => setTmsDocuments(prev => ({ ...prev, [doc]: Boolean(value) }))}
+                                            />
+                                            {doc}
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex flex-wrap justify-end gap-2 border-t pt-6">
+                            <Button type="button" variant="outline" onClick={() => navigate(-1)}>Cancel</Button>
+                            <Button type="button" variant="ghost" onClick={() => { setErrors({}); setStep(2); }}>
+                                <SkipForward className="mr-2 h-4 w-4" /> Skip to costs
+                            </Button>
+                            <Button type="button" onClick={goNext}>
+                                Next: Costs <ArrowRight className="ml-2 h-4 w-4" />
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                {step === 2 && (
+                    <div className="space-y-5">
+                        <OrderTabs rows={rows} active={activeOrder} onChange={setActiveOrder} orderType={orderType} startSequence={startSequence} />
+                        {activeRow && (
+                            <div className="space-y-5 rounded-lg border p-4">
+                                <div>
+                                    <h3 className="text-lg font-semibold">Costs & Budget — {projectLabel(orderType, startSequence + activeOrder)}</h3>
+                                    <p className="text-sm text-muted-foreground">{activeIdentifiers.name || "Project name pending"}</p>
+                                </div>
+                                <div className="grid gap-4 md:grid-cols-3">
+                                    <LabeledNumber label="Budget (Pre-GST)" value={activeRow.budgetPreGst} onChange={value => updateRow(activeOrder, { budgetPreGst: value })} />
+                                    <LabeledNumber label="Receipt (Pre-GST)" value={activeRow.receiptPreGst} onChange={value => updateRow(activeOrder, { receiptPreGst: value })} />
+                                    <LabeledNumber label="Final Price" value={activeRow.finalPrice} onChange={value => updateRow(activeOrder, { finalPrice: value })} />
+                                </div>
+                                <div>
+                                    <h4 className="mb-3 text-sm font-semibold">Budget Breakdown</h4>
+                                    <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
+                                        <LabeledNumber label="Supply" value={activeRow.budgetSupply} onChange={value => updateBudgetField(activeOrder, "budgetSupply", value)} />
+                                        <LabeledNumber label="Service" value={activeRow.budgetService} onChange={value => updateBudgetField(activeOrder, "budgetService", value)} />
+                                        <LabeledNumber label="Freight" value={activeRow.budgetFreight} onChange={value => updateBudgetField(activeOrder, "budgetFreight", value)} />
+                                        <LabeledNumber label="Admin" value={activeRow.budgetAdmin} onChange={value => updateBudgetField(activeOrder, "budgetAdmin", value)} />
+                                        <LabeledNumber label="Buyback Sale" value={activeRow.budgetBuybackSale} onChange={value => updateBudgetField(activeOrder, "budgetBuybackSale", value)} />
+                                    </div>
+                                </div>
+                                <div className="grid gap-4 md:grid-cols-3">
+                                    <LabeledNumber
+                                        label={isGemTender ? "GeM Charges *" : "GeM Charges"}
+                                        value={activeRow.gemChargesAmount}
+                                        onChange={value => updateBudgetField(activeOrder, "gemChargesAmount", value)}
+                                    />
+                                    <LabeledText label="GeM Portal Link" value={activeRow.gemChargesPortalLink} onChange={value => updateRow(activeOrder, { gemChargesPortalLink: value })} />
+                                    <div className="space-y-1">
+                                        <p className="text-sm font-medium">GeM Invoice</p>
+                                        <FileUploader
+                                            context="wo-draft"
+                                            value={activeRow.gemChargesInvoice}
+                                            onChange={files => updateRow(activeOrder, { gemChargesInvoice: files })}
+                                        />
+                                    </div>
+                                </div>
+                                {isGemTender && errors[`${activeOrder}.gemChargesAmount`] && (
+                                    <p className="text-xs text-destructive">This tender was bid on GeM; enter the GeM charges or 0.</p>
+                                )}
+                            </div>
+                        )}
+                        <div className="flex flex-wrap justify-between gap-2 border-t pt-6">
+                            <Button type="button" variant="outline" onClick={goBack}>
+                                <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                            </Button>
+                            <div className="flex gap-2">
+                                <Button type="button" variant="ghost" onClick={() => { setErrors({}); setStep(3); }}>
+                                    <SkipForward className="mr-2 h-4 w-4" /> Skip to contacts
+                                </Button>
+                                <Button type="button" onClick={goNext}>
+                                    Next: Contacts <ArrowRight className="ml-2 h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {step === 3 && (
+                    <div className="space-y-5">
+                        <OrderTabs rows={rows} active={activeOrder} onChange={setActiveOrder} orderType={orderType} startSequence={startSequence} />
+                        {activeRow && (
+                            <div className="space-y-4 rounded-lg border p-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h3 className="text-lg font-semibold">Contacts — {projectLabel(orderType, startSequence + activeOrder)}</h3>
+                                        <p className="text-sm text-muted-foreground">{activeRow.contacts.length} contact(s)</p>
+                                    </div>
+                                    <Button type="button" variant="outline" size="sm" onClick={() => addContact(activeOrder)}>
+                                        <Plus className="mr-2 h-4 w-4" /> Add Contact
+                                    </Button>
+                                </div>
+                                <div className="space-y-3">
+                                    {activeRow.contacts.map((contact, contactIndex) => (
+                                        <div key={contactIndex} className="grid gap-3 rounded-lg border p-3 md:grid-cols-5">
+                                            <LabeledText label="Name" value={contact.name} onChange={value => updateContact(activeOrder, contactIndex, { name: value })} />
+                                            <LabeledText label="Designation" value={contact.designation} onChange={value => updateContact(activeOrder, contactIndex, { designation: value })} />
+                                            <LabeledText label="Phone" value={contact.phone} onChange={value => updateContact(activeOrder, contactIndex, { phone: value })} />
+                                            <LabeledText label="Email" value={contact.email} onChange={value => updateContact(activeOrder, contactIndex, { email: value })} />
+                                            <div className="flex items-end">
+                                                <Button type="button" variant="ghost" size="icon" onClick={() => removeContact(activeOrder, contactIndex)}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {activeRow.contacts.length === 0 && (
+                                        <p className="text-sm text-muted-foreground">No contacts added for this order yet.</p>
+                                    )}
+                                </div>
+                                {tenderContacts.length > 0 && activeRow.contacts.length === 0 && (
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={() => updateRow(activeOrder, { contacts: tenderContacts.map(contact => ({ ...contact })) })}
+                                    >
+                                        Prefill from tender contacts
+                                    </Button>
+                                )}
+                            </div>
+                        )}
+                        <Separator />
+                        <div className="flex flex-wrap justify-between gap-2 border-t pt-6">
+                            <Button type="button" variant="outline" onClick={goBack}>
+                                <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                            </Button>
+                            <Button type="button" onClick={submit} disabled={createBatch.isPending}>
+                                <Save className="mr-2 h-4 w-4" />
+                                {createBatch.isPending ? "Saving..." : `Create ${rows.length} order(s)`}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
+function projectLabel(orderType: "single" | "repeat" | "multiple", sequence: number) {
+    if (orderType === "repeat") return `R${sequence}`;
+    if (orderType === "multiple") return `P${sequence}`;
+    return "Single";
+}
+
+function OrderTabs({
+    rows,
+    active,
+    onChange,
+    orderType,
+    startSequence,
+}: {
+    rows: OrderRow[];
+    active: number;
+    onChange: (index: number) => void;
+    orderType: "single" | "repeat" | "multiple";
+    startSequence: number;
+}) {
+    if (rows.length <= 1) return null;
+    return (
+        <div className="flex flex-wrap gap-2">
+            {rows.map((row, index) => (
+                <Button
+                    key={index}
+                    type="button"
+                    size="sm"
+                    variant={active === index ? "default" : "outline"}
+                    onClick={() => onChange(index)}
+                >
+                    {projectLabel(orderType, startSequence + index)} · {row.woNumber || "New order"}
+                </Button>
+            ))}
+        </div>
+    );
+}
+
+function LabeledNumber({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+    return (
+        <label className="space-y-1">
+            <span className="text-sm font-medium">{label}</span>
+            <Input type="number" step="0.01" value={value} onChange={event => onChange(event.target.value)} placeholder="0.00" />
+        </label>
+    );
+}
+
+function LabeledText({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+    return (
+        <label className="space-y-1">
+            <span className="text-sm font-medium">{label}</span>
+            <Input value={value} onChange={event => onChange(event.target.value)} />
+        </label>
+    );
+}
+
+export default BasicDetailBatchForm;

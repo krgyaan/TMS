@@ -2,6 +2,7 @@ import { useTeamFilter } from '@/hooks/useTeamFilter';
 import { handleQueryError } from '@/lib/react-query';
 import type {
   AssignOeDto,
+  CreateWoBasicDetailBatchDto,
   CreateWoBasicDetailDto,
   ReviseOrderDto,
   UpdateWoBasicDetailDto,
@@ -142,6 +143,21 @@ export const useCreateWoBasicDetail = () => {
       toast.success('WO Basic Detail created successfully');
     },
     onError: (error: any) => {
+      toast.error(handleQueryError(error));
+    },
+  });
+};
+
+export const useCreateWoBasicDetailBatch = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: CreateWoBasicDetailBatchDto) => woBasicDetailsService.createBatch(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.all });
+      toast.success('Work orders created successfully');
+    },
+    onError: (error) => {
       toast.error(handleQueryError(error));
     },
   });
