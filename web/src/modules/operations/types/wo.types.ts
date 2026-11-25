@@ -95,8 +95,11 @@ export interface WoBasicDetail {
   projectCode: string | null;
   projectName: string | null;
   currentStage: WorkflowStage | null;
-  orderType: string | null;       // 'single' | 'multiple'
+  orderType: string | null;       // 'single' | 'repeat' | 'multiple'
   orderSequence: number | null;   // 1, 2, 3... within the same tender
+  orderNature?: string | null;
+  poReceivedStatus?: string | null;
+  sapPoUpload?: string | string[] | null;
   woValuePreGst: string | null;
   woValueGstAmt: string | null;
   receiptPreGst: string | null;
@@ -181,6 +184,9 @@ export interface CreateWoBasicDetailDto {
   enquiryId?: number;
   orderType?: 'single' | 'repeat' | 'multiple';
   orderSequence?: number;
+  orderNature?: 'supply' | 'service' | 'sitc';
+  poReceivedStatus?: 'received' | 'not_received' | 'not_applicable';
+  sapPoUpload?: string;
   woNumber?: string;
   woDate?: string;
   projectCode?: string;
@@ -225,6 +231,9 @@ export interface CreateWoBasicDetailBatchOrderDto {
   budgetFreight?: string;
   budgetAdmin?: string;
   budgetBuybackSale?: string;
+  orderNature: 'supply' | 'service' | 'sitc';
+  poReceivedStatus: 'received' | 'not_received' | 'not_applicable';
+  sapPoUpload?: string;
   requestGemCharges?: boolean;
   gemChargesAmount?: number;
   gemChargesPortalLink?: string;

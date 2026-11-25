@@ -88,6 +88,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
     const watchBudget = form.watch("budgetPreGst");
     const watchReceipt = form.watch("receiptPreGst");
     const watchOrderType = form.watch("orderType");
+    const watchPoReceivedStatus = form.watch("poReceivedStatus");
 
     const { data: existingOrders = [] } = useWoBasicDetailsByTender(
         mode === "create" && !isNonTender ? effectiveTenderId ?? 0 : 0,
@@ -141,6 +142,11 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
             form.setValue("gemChargesRequired", prefillData.isGemTender);
         }
     }, [isNonTender, prefillData, form]);
+    useEffect(() => {
+        if (watchPoReceivedStatus && watchPoReceivedStatus !== "received" && form.getValues("sapPoUpload").length > 0) {
+            form.setValue("sapPoUpload", [], { shouldValidate: true });
+        }
+    }, [watchPoReceivedStatus, form]);
 
     // Background Project Code/Name Generation
     const getFinancialYear = (date: Date): string => {
@@ -508,6 +514,43 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                             : "Choose how this won tender will be tracked."}
                                     </p>
                                 </div>
+                            )}
+
+                            <SelectField
+                                control={form.control}
+                                name="orderNature"
+                                label="Order Nature *"
+                                options={[
+                                    { value: "supply", label: "Supply" },
+                                    { value: "service", label: "Service" },
+                                    { value: "sitc", label: "SITC" },
+                                ]}
+                                placeholder="Select order nature"
+                            />
+
+                            <SelectField
+                                control={form.control}
+                                name="poReceivedStatus"
+                                label="PO Received *"
+                                options={[
+                                    { value: "received", label: "Received" },
+                                    { value: "not_received", label: "Not Received" },
+                                    { value: "not_applicable", label: "Not Applicable" },
+                                ]}
+                                placeholder="Select PO status"
+                            />
+
+                            {watchPoReceivedStatus === "received" && (
+                                <FieldWrapper control={form.control} name="sapPoUpload" label="Upload SAP PO *">
+                                    {field => (
+                                        <FileUploader
+                                            context="sap-po"
+                                            value={field.value ?? []}
+                                            onChange={paths => field.onChange(paths)}
+                                            disabled={isSubmitting}
+                                        />
+                                    )}
+                                </FieldWrapper>
                             )}
 
                             <FieldWrapper control={form.control} name="woNumber" label="WO Number">

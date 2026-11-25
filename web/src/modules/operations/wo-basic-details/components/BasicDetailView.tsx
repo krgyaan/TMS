@@ -129,6 +129,15 @@ export function BasicDetailView({
 
     const grossMarginValue = data?.grossMargin ? parseFloat(String(data?.grossMargin)) : null;
     const woDraftFiles = parseFileArray(data?.woDraft);
+    const sapPoFiles = parseFileArray(data?.sapPoUpload);
+    const orderNatureLabel =
+        data.orderNature === "supply" ? "Supply" :
+        data.orderNature === "service" ? "Service" :
+        data.orderNature === "sitc" ? "SITC" : "—";
+    const poReceivedLabel =
+        data.poReceivedStatus === "received" ? "Received" :
+        data.poReceivedStatus === "not_received" ? "Not Received" :
+        data.poReceivedStatus === "not_applicable" ? "Not Applicable" : "—";
     const orderTypeLabel =
         data.orderType === "repeat" ? "Repeat" :
         data.orderType === "multiple" ? "Multiple" : "Single";
@@ -258,6 +267,44 @@ export function BasicDetailView({
                                     : '—'}
                             </TableCell>
                         </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Order Nature
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                <Badge variant="outline">{orderNatureLabel}</Badge>
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                PO Received
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                <Badge variant={data.poReceivedStatus === "received" ? "default" : "secondary"}>
+                                    {poReceivedLabel}
+                                </Badge>
+                            </TableCell>
+                        </TableRow>
+                        {sapPoFiles.length > 0 && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    SAP PO
+                                </TableCell>
+                                <TableCell colSpan={3} className="text-sm">
+                                    <div className="flex flex-wrap gap-2">
+                                        {sapPoFiles.map((filePath, index) => (
+                                            <a
+                                                key={`${filePath}-${index}`}
+                                                href={resolveFileUrl(filePath, "sap-po")}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-primary underline"
+                                            >
+                                                SAP PO {index + 1}
+                                            </a>
+                                        ))}
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        )}
 
                         {/* Financial Details */}
                         <TableRow className="bg-muted/50">

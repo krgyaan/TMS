@@ -5,6 +5,9 @@ import type { WoBasicDetail, CreateWoBasicDetailDto, UpdateWoBasicDetailDto } fr
 export const buildDefaultValues = (): WoBasicDetailFormValues => ({
   tenderId: null,
   orderType: "single",
+  orderNature: undefined,
+  poReceivedStatus: undefined,
+  sapPoUpload: [],
   teamId: null,
   organizationId: null,
   itemId: null,
@@ -55,6 +58,17 @@ export const mapResponseToForm = (data: WoBasicDetail): WoBasicDetailFormValues 
       data.orderType === "repeat" || data.orderType === "multiple"
         ? data.orderType
         : "single",
+    orderNature:
+      data.orderNature === "supply" || data.orderNature === "service" || data.orderNature === "sitc"
+        ? data.orderNature
+        : undefined,
+    poReceivedStatus:
+      data.poReceivedStatus === "received"
+        || data.poReceivedStatus === "not_received"
+        || data.poReceivedStatus === "not_applicable"
+        ? data.poReceivedStatus
+        : undefined,
+    sapPoUpload: parseFileArray(data.sapPoUpload),
     teamId: data.team,
     woNumber: String(data.woNumber || ""),
     woDate: data.woDate ? new Date(data.woDate) : null,
@@ -111,6 +125,11 @@ export const mapFormToCreatePayload = (values: WoBasicDetailFormValues): CreateW
 
   if (values.tenderId) payload.tenderId = values.tenderId;
   if (values.orderType) payload.orderType = values.orderType;
+  if (values.orderNature) payload.orderNature = values.orderNature;
+  if (values.poReceivedStatus) payload.poReceivedStatus = values.poReceivedStatus;
+  if (values.poReceivedStatus === "received" && values.sapPoUpload.length) {
+    payload.sapPoUpload = JSON.stringify(values.sapPoUpload);
+  }
   if (values.woValuePreGst !== undefined) payload.woValuePreGst = String(values.woValuePreGst);
   if (values.woValueGstAmt !== undefined) payload.woValueGstAmt = String(values.woValueGstAmt);
   if (values.budgetPreGst !== undefined) payload.budgetPreGst = String(values.budgetPreGst);
@@ -146,6 +165,13 @@ export const mapFormToUpdatePayload = (values: WoBasicDetailFormValues): UpdateW
     tmsDocuments: values.tmsDocuments,
   };
 
+  if (values.orderNature) payload.orderNature = values.orderNature;
+  if (values.poReceivedStatus) payload.poReceivedStatus = values.poReceivedStatus;
+  if (values.poReceivedStatus === "received" && values.sapPoUpload.length) {
+    payload.sapPoUpload = JSON.stringify(values.sapPoUpload);
+  } else if (values.poReceivedStatus !== "received") {
+    payload.sapPoUpload = "[]";
+  }
   if (values.woValuePreGst !== undefined) payload.woValuePreGst = String(values.woValuePreGst);
   if (values.woValueGstAmt !== undefined) payload.woValueGstAmt = String(values.woValueGstAmt);
   if (values.budgetPreGst !== undefined) payload.budgetPreGst = String(values.budgetPreGst);

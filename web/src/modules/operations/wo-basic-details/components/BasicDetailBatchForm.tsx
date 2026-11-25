@@ -46,6 +46,9 @@ type OrderRow = {
     woDate: Date | null;
     woValuePreGst: string;
     woValueGstAmt: string;
+    orderNature: "" | "supply" | "service" | "sitc";
+    poReceivedStatus: "" | "received" | "not_received" | "not_applicable";
+    sapPoUpload: string[];
     woDraft: string[];
     budgetPreGst: string;
     receiptPreGst: string;
@@ -83,6 +86,9 @@ const emptyOrder = (contacts: ContactRow[] = [], defaults: OrderDefaults = {}): 
     woDate: null,
     woValuePreGst: "",
     woValueGstAmt: "",
+    orderNature: "",
+    poReceivedStatus: "",
+    sapPoUpload: [],
     woDraft: [],
     budgetPreGst: defaults.budgetPreGst ?? "",
     receiptPreGst: defaults.receiptPreGst ?? "",
@@ -278,6 +284,11 @@ export function BasicDetailBatchForm() {
             if (!row.woDate) nextErrors[`${index}.woDate`] = "Required";
             if (!(num(row.woValuePreGst) > 0)) nextErrors[`${index}.woValuePreGst`] = "Required";
             if (!(num(row.woValueGstAmt) > 0)) nextErrors[`${index}.woValueGstAmt`] = "Required";
+            if (!row.orderNature) nextErrors[`${index}.orderNature`] = "Required";
+            if (!row.poReceivedStatus) nextErrors[`${index}.poReceivedStatus`] = "Required";
+            if (row.poReceivedStatus === "received" && row.sapPoUpload.length === 0) {
+                nextErrors[`${index}.sapPoUpload`] = "Upload at least one SAP PO file";
+            }
             if (row.woDraft.length === 0) nextErrors[`${index}.woDraft`] = "Upload at least one file";
         });
         setErrors(nextErrors);
@@ -371,6 +382,8 @@ export function BasicDetailBatchForm() {
                     woValueGstAmt: row.woValueGstAmt,
                     projectCode: identifiers.code,
                     projectName: identifiers.name,
+                    orderNature: row.orderNature as "supply" | "service" | "sitc",
+                    poReceivedStatus: row.poReceivedStatus as "received" | "not_received" | "not_applicable",
                     budgetPreGst: row.budgetPreGst || undefined,
                     receiptPreGst: row.receiptPreGst || undefined,
                     finalPrice: row.finalPrice || undefined,
@@ -396,6 +409,9 @@ export function BasicDetailBatchForm() {
                         })),
                 };
                 if (row.woDraft.length) order.woDraft = JSON.stringify(row.woDraft);
+                if (row.poReceivedStatus === "received" && row.sapPoUpload.length) {
+                    order.sapPoUpload = JSON.stringify(row.sapPoUpload);
+                }
                 if (row.requestGemCharges === "true" && row.gemChargesInvoice.length) {
                     order.gemChargesInvoice = JSON.stringify(row.gemChargesInvoice);
                 }
@@ -500,6 +516,9 @@ export function BasicDetailBatchForm() {
                                         <TableHead>WO Date</TableHead>
                                         <TableHead>WO Value</TableHead>
                                         <TableHead>GST</TableHead>
+                                        <TableHead>Order Nature</TableHead>
+                                        <TableHead>PO Received</TableHead>
+                                        <TableHead className="min-w-[220px]">SAP PO</TableHead>
                                         <TableHead>Project Code</TableHead>
                                         <TableHead>Project Name</TableHead>
                                         <TableHead className="min-w-[220px]">Draft WO</TableHead>
@@ -538,6 +557,49 @@ export function BasicDetailBatchForm() {
                                                 <TableCell className="align-top min-w-[130px]">
                                                     <Input type="number" step="0.01" value={row.woValueGstAmt} onChange={event => updateRow(index, { woValueGstAmt: event.target.value })} />
                                                     {errors[`${index}.woValueGstAmt`] && <p className="mt-1 text-xs text-destructive">{errors[`${index}.woValueGstAmt`]}</p>}
+                                                </TableCell>
+                                                <TableCell className="align-top min-w-[140px]">
+                                                    <select
+                                                        className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                                                        value={row.orderNature}
+                                                        onChange={event => updateRow(index, { orderNature: event.target.value as OrderRow["orderNature"] })}
+                                                    >
+                                                        <option value="">Select</option>
+                                                        <option value="supply">Supply</option>
+                                                        <option value="service">Service</option>
+                                                        <option value="sitc">SITC</option>
+                                                    </select>
+                                                    {errors[`${index}.orderNature`] && <p className="mt-1 text-xs text-destructive">{errors[`${index}.orderNature`]}</p>}
+                                                </TableCell>
+                                                <TableCell className="align-top min-w-[150px]">
+                                                    <select
+                                                        className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                                                        value={row.poReceivedStatus}
+                                                        onChange={event => updateRow(index, {
+                                                            poReceivedStatus: event.target.value as OrderRow["poReceivedStatus"],
+                                                            sapPoUpload: event.target.value === "received" ? row.sapPoUpload : [],
+                                                        })}
+                                                    >
+                                                        <option value="">Select</option>
+                                                        <option value="received">Received</option>
+                                                        <option value="not_received">Not Received</option>
+                                                        <option value="not_applicable">Not Applicable</option>
+                                                    </select>
+                                                    {errors[`${index}.poReceivedStatus`] && <p className="mt-1 text-xs text-destructive">{errors[`${index}.poReceivedStatus`]}</p>}
+                                                </TableCell>
+                                                <TableCell className="align-top min-w-[220px]">
+                                                    {row.poReceivedStatus === "received" ? (
+                                                        <>
+                                                            <FileUploader
+                                                                context="sap-po"
+                                                                value={row.sapPoUpload}
+                                                                onChange={files => updateRow(index, { sapPoUpload: files })}
+                                                            />
+                                                            {errors[`${index}.sapPoUpload`] && <p className="mt-1 text-xs text-destructive">{errors[`${index}.sapPoUpload`]}</p>}
+                                                        </>
+                                                    ) : (
+                                                        <span className="text-xs text-muted-foreground">—</span>
+                                                    )}
                                                 </TableCell>
                                                 <TableCell className="align-top min-w-[200px] break-all text-xs font-mono">{identifiers.code || "—"}</TableCell>
                                                 <TableCell className="align-top min-w-[160px] text-xs">{identifiers.name || "—"}</TableCell>
