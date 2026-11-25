@@ -29,6 +29,9 @@ export const CreateWoBasicDetailSchema = z.object({
   // orderSequence is derived by the backend (max existing sequence for the tender + 1)
   orderType: z.enum(["single", "repeat", "multiple"]).default("single").optional(),
   orderSequence: z.number().int().positive().optional(),
+  orderNature: z.enum(["supply", "service", "sitc"]).optional(),
+  poReceivedStatus: z.enum(["received", "not_received", "not_applicable"]).optional(),
+  sapPoUpload: z.string().optional(),
 
   // Workflow state tracking
   currentStage: z.enum(["basic_details", "wo_details", "wo_acceptance", "kick_off", "contract_agreement", "wo_upload", "completed"]).optional(),
@@ -350,6 +353,9 @@ export const BatchOrderSchema = z.object({
   woValueGstAmt: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format"),
   projectCode: z.string().max(100).optional(),
   projectName: z.string().max(255).optional(),
+  orderNature: z.enum(["supply", "service", "sitc"]),
+  poReceivedStatus: z.enum(["received", "not_received", "not_applicable"]),
+  sapPoUpload: z.string().optional(),
   woDraft: z.string().optional(),
   budgetPreGst: z.string().optional(),
   receiptPreGst: z.string().optional(),

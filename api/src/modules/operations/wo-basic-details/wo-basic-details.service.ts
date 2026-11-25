@@ -38,6 +38,16 @@ export class WoBasicDetailsService {
         this.logger = this.appLogger.withContext(WoBasicDetailsService.name);
     }
 
+    private parseUploadArray(value?: string | null): string[] | null {
+        if (!value) return null;
+        try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? parsed.filter(Boolean) : null;
+        } catch {
+            return null;
+        }
+    }
+
     private mapCreateToDb(data: CreateWoBasicDetailDto) {
         const now = new Date();
         const out: Record<string, any> = {
@@ -74,6 +84,9 @@ export class WoBasicDetailsService {
             tmsDocuments: data.tmsDocuments ?? null,
             orderType: data.orderType ?? 'single',
             orderSequence: data.orderSequence ?? 1,
+            orderNature: data.orderNature ?? null,
+            poReceivedStatus: data.poReceivedStatus ?? null,
+            sapPoUpload: this.parseUploadArray(data.sapPoUpload),
             isWorkflowPaused: false,
             createdAt: now,
             updatedAt: now,
@@ -117,6 +130,9 @@ export class WoBasicDetailsService {
         if (data.tmsDocuments !== undefined) out.tmsDocuments = data.tmsDocuments;
         if (data.orderType !== undefined) out.orderType = data.orderType;
         if (data.orderSequence !== undefined) out.orderSequence = data.orderSequence;
+        if (data.orderNature !== undefined) out.orderNature = data.orderNature;
+        if (data.poReceivedStatus !== undefined) out.poReceivedStatus = data.poReceivedStatus;
+        if (data.sapPoUpload !== undefined) out.sapPoUpload = this.parseUploadArray(data.sapPoUpload);
 
         return out as any;
     }
@@ -134,6 +150,9 @@ export class WoBasicDetailsService {
             currentStage: row.currentStage,
             orderType: row.orderType,
             orderSequence: row.orderSequence,
+            orderNature: row.orderNature,
+            poReceivedStatus: row.poReceivedStatus,
+            sapPoUpload: row.sapPoUpload ?? null,
             woValuePreGst: row.woValuePreGst,
             woValueGstAmt: row.woValueGstAmt,
             receiptPreGst: row.receiptPreGst,
@@ -181,6 +200,8 @@ export class WoBasicDetailsService {
             currentStage: row.woBasicDetails.currentStage,
             orderType: row.woBasicDetails.orderType,
             orderSequence: row.woBasicDetails.orderSequence,
+            orderNature: row.woBasicDetails.orderNature,
+            poReceivedStatus: row.woBasicDetails.poReceivedStatus,
             woValuePreGst: row.woBasicDetails.woValuePreGst,
             woValueGstAmt: row.woBasicDetails.woValueGstAmt,
             grossMargin: row.woBasicDetails.grossMargin,
@@ -207,6 +228,8 @@ export class WoBasicDetailsService {
                 currentStage: woBasicDetails.currentStage,
                 orderType: woBasicDetails.orderType,
                 orderSequence: woBasicDetails.orderSequence,
+                orderNature: woBasicDetails.orderNature,
+                poReceivedStatus: woBasicDetails.poReceivedStatus,
                 woValuePreGst: woBasicDetails.woValuePreGst,
                 woValueGstAmt: woBasicDetails.woValueGstAmt,
                 grossMargin: woBasicDetails.grossMargin,
@@ -695,6 +718,9 @@ export class WoBasicDetailsService {
                     locationId: locationId ?? undefined,
                     orderType: data.orderType,
                     orderSequence: sequence,
+                    orderNature: order.orderNature,
+                    poReceivedStatus: order.poReceivedStatus,
+                    sapPoUpload: order.sapPoUpload,
                     woNumber: order.woNumber,
                     woDate: order.woDate,
                     projectCode: order.projectCode,
@@ -740,6 +766,9 @@ export class WoBasicDetailsService {
                     projectName: order.projectName ?? null,
                     poUpload: order.woDraft ?? null,
                     poDate: this.parseDate(order.woDate),
+                    orderNature: order.orderNature ?? null,
+                    poReceivedStatus: order.poReceivedStatus ?? null,
+                    sapPoUpload: this.parseUploadArray(order.sapPoUpload),
                     tenderId: data.tenderId ?? null,
                     woBasicDetailId: basic.id,
                     createdAt: new Date(),
@@ -951,6 +980,9 @@ export class WoBasicDetailsService {
                     projectName: actualProjectName ?? data.projectName ?? null,
                     poUpload: data.woDraft ?? null,
                     poDate: this.parseDate(data.woDate),
+                    orderNature: data.orderNature ?? null,
+                    poReceivedStatus: data.poReceivedStatus ?? null,
+                    sapPoUpload: this.parseUploadArray(data.sapPoUpload),
                     performanceProof: null,
                     performanceDate: null,
                     completionProof: null,
@@ -1134,6 +1166,17 @@ export class WoBasicDetailsService {
 
         if (!row) {
             throw new NotFoundException(`WO Basic Detail with ID ${id} not found`);
+        }
+
+        const projectSync: Record<string, unknown> = { updatedAt: new Date() };
+        if (data.orderNature !== undefined) projectSync.orderNature = data.orderNature;
+        if (data.poReceivedStatus !== undefined) projectSync.poReceivedStatus = data.poReceivedStatus;
+        if (data.sapPoUpload !== undefined) projectSync.sapPoUpload = this.parseUploadArray(data.sapPoUpload);
+        if (Object.keys(projectSync).length > 1) {
+            await this.db
+                .update(projects)
+                .set(projectSync)
+                .where(eq(projects.woBasicDetailId, id));
         }
 
         // Send WhatsApp notification to the WORKORDER group (non-blocking)
