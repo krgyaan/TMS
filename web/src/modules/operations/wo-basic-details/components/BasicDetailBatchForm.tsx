@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useCreateWoBasicDetailBatch, useWoBasicDetailPrefill, useWoBasicDetailsByTender } from "@/hooks/api/useWoBasicDetails";
 import type { CreateWoBasicDetailBatchDto, CreateWoBasicDetailBatchOrderDto } from "@/modules/operations/types/wo.types";
 import { ArrowLeft, ArrowRight, Plus, Save, SkipForward, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -55,6 +55,7 @@ type OrderRow = {
     budgetFreight: string;
     budgetAdmin: string;
     budgetBuybackSale: string;
+    requestGemCharges: "true" | "false" | "";
     gemChargesAmount: string;
     gemChargesPortalLink: string;
     gemChargesInvoice: string[];
@@ -70,20 +71,28 @@ const emptyContact = (): ContactRow => ({
     departments: "",
 });
 
-const emptyOrder = (contacts: ContactRow[] = []): OrderRow => ({
+type OrderDefaults = {
+    budgetPreGst?: string;
+    receiptPreGst?: string;
+    finalPrice?: string;
+    requestGemCharges?: "true" | "false";
+};
+
+const emptyOrder = (contacts: ContactRow[] = [], defaults: OrderDefaults = {}): OrderRow => ({
     woNumber: "",
     woDate: null,
     woValuePreGst: "",
     woValueGstAmt: "",
     woDraft: [],
-    budgetPreGst: "",
-    receiptPreGst: "",
-    finalPrice: "",
+    budgetPreGst: defaults.budgetPreGst ?? "",
+    receiptPreGst: defaults.receiptPreGst ?? "",
+    finalPrice: defaults.finalPrice ?? "",
     budgetSupply: "",
     budgetService: "",
     budgetFreight: "",
     budgetAdmin: "",
     budgetBuybackSale: "",
+    requestGemCharges: defaults.requestGemCharges ?? "",
     gemChargesAmount: "",
     gemChargesPortalLink: "",
     gemChargesInvoice: [],
@@ -137,6 +146,24 @@ export function BasicDetailBatchForm() {
     }, [prefillData]);
 
     const isGemTender = Boolean(prefillData?.isGemTender);
+
+    const orderDefaults = useMemo<OrderDefaults>(() => ({
+        budgetPreGst: prefillData?.budgetPrice ?? "",
+        receiptPreGst: prefillData?.receiptPrice ?? "",
+        finalPrice: prefillData?.finalPrice ?? "",
+        requestGemCharges: prefillData?.isGemTender ? "true" : "false",
+    }), [prefillData]);
+
+    useEffect(() => {
+        if (!prefillData) return;
+        setRows(prev => prev.map(row => ({
+            ...row,
+            budgetPreGst: row.budgetPreGst || (prefillData.budgetPrice ?? ""),
+            receiptPreGst: row.receiptPreGst || (prefillData.receiptPrice ?? ""),
+            finalPrice: row.finalPrice || (prefillData.finalPrice ?? ""),
+            requestGemCharges: row.requestGemCharges || (prefillData.isGemTender ? "true" : "false"),
+        })));
+    }, [prefillData]);
 
     const projectIdentifiers = (row: OrderRow, index: number) => {
         if (!prefillData) return { code: "", name: "" };
@@ -198,7 +225,10 @@ export function BasicDetailBatchForm() {
     };
 
     const addRow = () => {
-        setRows(prev => [...prev, emptyOrder(tenderContacts.length ? tenderContacts : [emptyContact()])]);
+        setRows(prev => [
+            ...prev,
+            emptyOrder(tenderContacts.length ? tenderContacts : [emptyContact()], orderDefaults),
+        ]);
     };
 
     const removeRow = (index: number) => {
@@ -216,6 +246,15 @@ export function BasicDetailBatchForm() {
 
     const addContact = (orderIndex: number) => {
         setRows(prev => prev.map((row, i) => (i === orderIndex ? { ...row, contacts: [...row.contacts, emptyContact()] } : row)));
+    };
+
+    const prefillTenderContacts = (orderIndex: number) => {
+        setRows(prev => prev.map((row, i) => {
+            if (i !== orderIndex) return row;
+            const existing = new Set(row.contacts.map(contact => `${contact.name}|${contact.email}|${contact.phone}`));
+            const additions = tenderContacts.filter(contact => !existing.has(`${contact.name}|${contact.email}|${contact.phone}`));
+            return { ...row, contacts: [...row.contacts, ...additions.map(contact => ({ ...contact }))] };
+        }));
     };
 
     const removeContact = (orderIndex: number, contactIndex: number) => {
@@ -246,15 +285,38 @@ export function BasicDetailBatchForm() {
     };
 
     const validateGem = () => {
-        if (!isGemTender) return true;
         const nextErrors: Record<string, string> = {};
         rows.forEach((row, index) => {
+            if (row.requestGemCharges !== "true") return;
             if (row.gemChargesAmount.trim() === "") {
                 nextErrors[`${index}.gemChargesAmount`] = "Required (enter 0 if not applicable)";
+            } else if (Number(row.gemChargesAmount) > 0 && !row.gemChargesPortalLink.trim()) {
+                nextErrors[`${index}.gemChargesPortalLink`] = "Portal link is required when GeM charges are greater than 0";
             }
         });
-        setErrors(prev => ({ ...prev, ...nextErrors }));
+        setErrors(prev => {
+            const next = { ...prev };
+            Object.keys(next).forEach(key => {
+                if (key.endsWith(".gemChargesAmount") || key.endsWith(".gemChargesPortalLink")) {
+                    delete next[key];
+                }
+            });
+            return { ...next, ...nextErrors };
+        });
         return Object.keys(nextErrors).length === 0;
+    };
+
+    const updateGemRequest = (index: number, value: "true" | "false") => {
+        if (value === "true") {
+            updateRow(index, { requestGemCharges: "true" });
+            return;
+        }
+        updateRow(index, {
+            requestGemCharges: "false",
+            gemChargesAmount: "",
+            gemChargesPortalLink: "",
+            gemChargesInvoice: [],
+        });
     };
 
     const goNext = () => {
@@ -317,8 +379,11 @@ export function BasicDetailBatchForm() {
                     budgetFreight: row.budgetFreight || undefined,
                     budgetAdmin: row.budgetAdmin || undefined,
                     budgetBuybackSale: row.budgetBuybackSale || undefined,
-                    gemChargesAmount: row.gemChargesAmount === "" ? undefined : Number(row.gemChargesAmount),
-                    gemChargesPortalLink: row.gemChargesPortalLink || undefined,
+                    requestGemCharges: row.requestGemCharges === "true",
+                    gemChargesAmount: row.requestGemCharges === "true"
+                        ? (row.gemChargesAmount === "" ? undefined : Number(row.gemChargesAmount))
+                        : undefined,
+                    gemChargesPortalLink: row.requestGemCharges === "true" ? (row.gemChargesPortalLink || undefined) : undefined,
                     contacts: row.contacts
                         .filter(contact => contact.name || contact.email || contact.phone)
                         .map(contact => ({
@@ -331,7 +396,9 @@ export function BasicDetailBatchForm() {
                         })),
                 };
                 if (row.woDraft.length) order.woDraft = JSON.stringify(row.woDraft);
-                if (row.gemChargesInvoice.length) order.gemChargesInvoice = JSON.stringify(row.gemChargesInvoice);
+                if (row.requestGemCharges === "true" && row.gemChargesInvoice.length) {
+                    order.gemChargesInvoice = JSON.stringify(row.gemChargesInvoice);
+                }
                 return order;
             }),
         };
@@ -385,6 +452,17 @@ export function BasicDetailBatchForm() {
 
                 {step === 1 && (
                     <div className="space-y-6">
+                        <div className="mt-3 grid grid-cols-1 gap-3 rounded-lg border bg-muted/50 p-4 md:grid-cols-2 lg:grid-cols-4">
+                            {TMS_DOCS.map(doc => (
+                                <label key={doc} className="flex items-center gap-2 text-sm">
+                                    <Checkbox
+                                        checked={tmsDocuments[doc] ?? false}
+                                        onCheckedChange={value => setTmsDocuments(prev => ({ ...prev, [doc]: Boolean(value) }))}
+                                    />
+                                    {doc}
+                                </label>
+                            ))}
+                        </div>
                         <div className="flex flex-wrap gap-2">
                             {(hasExistingOrders ? ["repeat", "multiple"] : ["single", "repeat", "multiple"]).map(type => (
                                 <Button
@@ -398,7 +476,6 @@ export function BasicDetailBatchForm() {
                             ))}
                             <Badge variant="secondary">Separate tracking</Badge>
                         </div>
-
                         <div className="flex items-center justify-between gap-2">
                             <div>
                                 <h3 className="text-lg font-semibold">Orders</h3>
@@ -414,7 +491,6 @@ export function BasicDetailBatchForm() {
                                 </Button>
                             )}
                         </div>
-
                         <div className="overflow-x-auto rounded-lg border">
                             <Table>
                                 <TableHeader>
@@ -491,18 +567,6 @@ export function BasicDetailBatchForm() {
                             </Table>
                         </div>
 
-                        <div className="mt-3 grid grid-cols-1 gap-3 rounded-lg border bg-muted/50 p-4 md:grid-cols-2 lg:grid-cols-4">
-                            {TMS_DOCS.map(doc => (
-                                <label key={doc} className="flex items-center gap-2 text-sm">
-                                    <Checkbox
-                                        checked={tmsDocuments[doc] ?? false}
-                                        onCheckedChange={value => setTmsDocuments(prev => ({ ...prev, [doc]: Boolean(value) }))}
-                                    />
-                                    {doc}
-                                </label>
-                            ))}
-                        </div>
-
                         <div className="flex flex-wrap justify-end gap-2 border-t pt-6">
                             <Button type="button" variant="outline" onClick={() => navigate(-1)}>Cancel</Button>
                             <Button type="button" variant="ghost" onClick={() => { setErrors({}); setStep(2); }}>
@@ -539,25 +603,54 @@ export function BasicDetailBatchForm() {
                                         <LabeledNumber label="Buyback Sale" value={activeRow.budgetBuybackSale} onChange={value => updateBudgetField(activeOrder, "budgetBuybackSale", value)} />
                                     </div>
                                 </div>
-                                <div className="grid gap-4 md:grid-cols-5">
-                                    <LabeledNumber
-                                        label={isGemTender ? "GeM Charges *" : "GeM Charges"}
-                                        value={activeRow.gemChargesAmount}
-                                        onChange={value => updateBudgetField(activeOrder, "gemChargesAmount", value)}
-                                    />
-                                    <LabeledText label="GeM Portal Link" value={activeRow.gemChargesPortalLink} onChange={value => updateRow(activeOrder, { gemChargesPortalLink: value })} />
-                                    <div className="space-y-1">
-                                        <p className="text-sm font-medium">GeM Invoice</p>
-                                        <FileUploader
-                                            context="wo-draft"
-                                            value={activeRow.gemChargesInvoice}
-                                            onChange={files => updateRow(activeOrder, { gemChargesInvoice: files })}
-                                        />
+                                <div className="space-y-3 rounded-lg border p-4">
+                                    <div className="grid gap-4 md:grid-cols-3">
+                                        <label className="space-y-1">
+                                            <span className="text-sm font-medium">Request GeM Charges Payment</span>
+                                            <select
+                                                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                                                value={activeRow.requestGemCharges || (isGemTender ? "true" : "false")}
+                                                onChange={event => updateGemRequest(activeOrder, event.target.value as "true" | "false")}
+                                            >
+                                                <option value="false">No</option>
+                                                <option value="true">Yes</option>
+                                            </select>
+                                        </label>
                                     </div>
+                                    {isGemTender && (
+                                        <p className="text-xs text-muted-foreground">
+                                            This tender was bid on GeM. GeM charges payment request is enabled by default; enter 0 if not applicable.
+                                        </p>
+                                    )}
+                                    {activeRow.requestGemCharges === "true" && (
+                                        <div className="grid gap-4 md:grid-cols-3">
+                                            <div className="space-y-1">
+                                                <LabeledNumber
+                                                    label={isGemTender ? "GeM Charges (Pre-GST) *" : "GeM Charges (Pre-GST)"}
+                                                    value={activeRow.gemChargesAmount}
+                                                    onChange={value => updateBudgetField(activeOrder, "gemChargesAmount", value)}
+                                                />
+                                                {errors[`${activeOrder}.gemChargesAmount`] && (
+                                                    <p className="text-xs text-destructive">{errors[`${activeOrder}.gemChargesAmount`]}</p>
+                                                )}
+                                            </div>
+                                            <div className="space-y-1">
+                                                <LabeledText label="GeM Portal Link" value={activeRow.gemChargesPortalLink} onChange={value => updateRow(activeOrder, { gemChargesPortalLink: value })} />
+                                                {errors[`${activeOrder}.gemChargesPortalLink`] && (
+                                                    <p className="text-xs text-destructive">{errors[`${activeOrder}.gemChargesPortalLink`]}</p>
+                                                )}
+                                            </div>
+                                            <div className="space-y-1">
+                                                <p className="text-sm font-medium">GeM Invoice</p>
+                                                <FileUploader
+                                                    context="wo-draft"
+                                                    value={activeRow.gemChargesInvoice}
+                                                    onChange={files => updateRow(activeOrder, { gemChargesInvoice: files })}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                                {isGemTender && errors[`${activeOrder}.gemChargesAmount`] && (
-                                    <p className="text-xs text-destructive">This tender was bid on GeM; enter the GeM charges or 0.</p>
-                                )}
                             </div>
                         )}
                         <div className="flex flex-wrap justify-between gap-2 border-t pt-6">
@@ -590,30 +683,57 @@ export function BasicDetailBatchForm() {
                                         <Plus className="mr-2 h-4 w-4" /> Add Contact
                                     </Button>
                                 </div>
-                                <div className="space-y-3">
-                                    {activeRow.contacts.map((contact, contactIndex) => (
-                                        <div key={contactIndex} className="grid gap-3 rounded-lg border p-3 md:grid-cols-5">
-                                            <LabeledText label="Name" value={contact.name} onChange={value => updateContact(activeOrder, contactIndex, { name: value })} />
-                                            <LabeledText label="Designation" value={contact.designation} onChange={value => updateContact(activeOrder, contactIndex, { designation: value })} />
-                                            <LabeledText label="Phone" value={contact.phone} onChange={value => updateContact(activeOrder, contactIndex, { phone: value })} />
-                                            <LabeledText label="Email" value={contact.email} onChange={value => updateContact(activeOrder, contactIndex, { email: value })} />
-                                            <div className="flex items-end">
-                                                <Button type="button" variant="ghost" size="icon" onClick={() => removeContact(activeOrder, contactIndex)}>
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {activeRow.contacts.length === 0 && (
-                                        <p className="text-sm text-muted-foreground">No contacts added for this order yet.</p>
-                                    )}
+                                <div className="overflow-x-auto rounded-lg border">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead className="w-12">#</TableHead>
+                                                <TableHead>Name</TableHead>
+                                                <TableHead>Designation</TableHead>
+                                                <TableHead>Phone</TableHead>
+                                                <TableHead>Email</TableHead>
+                                                <TableHead className="w-14" />
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {activeRow.contacts.map((contact, contactIndex) => (
+                                                <TableRow key={contactIndex}>
+                                                    <TableCell className="align-top text-sm text-muted-foreground">{contactIndex + 1}</TableCell>
+                                                    <TableCell className="align-top min-w-[150px]">
+                                                        <Input value={contact.name} onChange={event => updateContact(activeOrder, contactIndex, { name: event.target.value })} placeholder="Name" />
+                                                    </TableCell>
+                                                    <TableCell className="align-top min-w-[150px]">
+                                                        <Input value={contact.designation} onChange={event => updateContact(activeOrder, contactIndex, { designation: event.target.value })} placeholder="Designation" />
+                                                    </TableCell>
+                                                    <TableCell className="align-top min-w-[140px]">
+                                                        <Input value={contact.phone} onChange={event => updateContact(activeOrder, contactIndex, { phone: event.target.value })} placeholder="Phone" />
+                                                    </TableCell>
+                                                    <TableCell className="align-top min-w-[200px]">
+                                                        <Input type="email" value={contact.email} onChange={event => updateContact(activeOrder, contactIndex, { email: event.target.value })} placeholder="Email" />
+                                                    </TableCell>
+                                                    <TableCell className="align-top">
+                                                        <Button type="button" variant="ghost" size="icon" onClick={() => removeContact(activeOrder, contactIndex)}>
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                            {activeRow.contacts.length === 0 && (
+                                                <TableRow>
+                                                    <TableCell colSpan={6} className="py-6 text-center text-sm text-muted-foreground">
+                                                        No contacts added for this order yet.
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
+                                        </TableBody>
+                                    </Table>
                                 </div>
-                                {tenderContacts.length > 0 && activeRow.contacts.length === 0 && (
+                                {tenderContacts.length > 0 && (
                                     <Button
                                         type="button"
                                         variant="secondary"
                                         size="sm"
-                                        onClick={() => updateRow(activeOrder, { contacts: tenderContacts.map(contact => ({ ...contact })) })}
+                                        onClick={() => prefillTenderContacts(activeOrder)}
                                     >
                                         Prefill from tender contacts
                                     </Button>

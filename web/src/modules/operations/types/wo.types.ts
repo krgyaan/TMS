@@ -225,6 +225,7 @@ export interface CreateWoBasicDetailBatchOrderDto {
   budgetFreight?: string;
   budgetAdmin?: string;
   budgetBuybackSale?: string;
+  requestGemCharges?: boolean;
   gemChargesAmount?: number;
   gemChargesPortalLink?: string;
   gemChargesInvoice?: string;
