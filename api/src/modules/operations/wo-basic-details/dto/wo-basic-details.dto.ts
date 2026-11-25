@@ -25,9 +25,9 @@ export const CreateWoBasicDetailSchema = z.object({
   projectCode: z.string().max(100).optional(), // Auto-generated, optional on create
   projectName: z.string().max(255).optional(),
 
-  // Order type: 'single' (default) | 'multiple' — several POs for the same won tender
-  // orderSequence is derived by the backend (count of existing orders for the tender + 1)
-  orderType: z.enum(["single", "multiple"]).default("single").optional(),
+  // Order type: 'single' (default) | 'repeat' | 'multiple'
+  // orderSequence is derived by the backend (max existing sequence for the tender + 1)
+  orderType: z.enum(["single", "repeat", "multiple"]).default("single").optional(),
   orderSequence: z.number().int().positive().optional(),
 
   // Workflow state tracking
@@ -190,6 +190,8 @@ export type WoBasicDetailsQueryDto = z.infer<typeof WoBasicDetailsQuerySchema> &
 
 export const WoBasicDetailPrefillSchema = z.object({
   team: z.number().nullable(),
+  websiteId: z.number().nullable(),
+  isGemTender: z.boolean(),
   organizationAcronym: z.string().nullable(),
   itemName: z.string().nullable(),
   locationName: z.string().nullable(),

@@ -11,10 +11,12 @@ import { DRIZZLE } from '@db/database.module';
 import { users } from '@db/schemas/auth/users.schema';
 import { woBasicDetails, woContacts, woDetails, woOrderRevisions } from '@db/schemas/operations';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, desc, eq, ilike, inArray, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { AssignOeDto, BulkAssignOeDto, CreateWoBasicDetailDto, RemoveOeAssignmentDto, ReviseOrderDto, UpdateWoBasicDetailDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
 import { computeGemChargesBreakdown, gemBreakdownToDbColumns } from './helpers/gem-charges.helper';
+const GEM_WEBSITE_ID = 5;
+
 const oeFirstUser = alias(users, 'oeFirstUser');
 const oeSiteVisitUser = alias(users, 'oeSiteVisitUser');
 const oeDocsPrepUser = alias(users, 'oeDocsPrepUser');
@@ -528,15 +530,16 @@ export class WoBasicDetailsService {
         // cannot reuse the same order number. max+1 (rather than count+1) also
         // avoids repeating a sequence after an earlier order was deleted.
         const [row] = await this.db.transaction(async (tx) => {
-            let effectiveOrderType = orderType;
+            let existingOrders = 0;
 
             if (data.tenderId) {
-                const [{ existingOrders }] = await tx
+                const [countRow] = await tx
                     .select({ existingOrders: sql<number>`count(*)::int` })
                     .from(woBasicDetails)
                     .where(eq(woBasicDetails.tenderId, data.tenderId));
+                existingOrders = countRow?.existingOrders ?? 0;
 
-                if ((existingOrders ?? 0) > 0) {
+                if (existingOrders > 0) {
                     // Additional orders are only allowed once the tender is won.
                     const [latestResult] = await tx
                         .select({ status: tenderResults.status })
@@ -551,21 +554,23 @@ export class WoBasicDetailsService {
                         );
                     }
 
-                    // A tender with existing orders is always a multi-order batch,
-                    // regardless of what the client submitted.
-                    effectiveOrderType = 'multiple';
+                    if (orderType === 'single') {
+                        throw new BadRequestException(
+                            'This tender already has orders. Add the next order as Repeat or Multiple.',
+                        );
+                    }
                 }
             }
 
-            if (effectiveOrderType === 'multiple' && data.tenderId) {
+            if (orderType !== 'single' && data.tenderId) {
                 const [{ maxSequence }] = await tx
                     .select({ maxSequence: sql<number | null>`max(${woBasicDetails.orderSequence})::int` })
                     .from(woBasicDetails)
                     .where(eq(woBasicDetails.tenderId, data.tenderId));
-                insertValues.orderType = 'multiple';
+                insertValues.orderType = orderType;
                 insertValues.orderSequence = (maxSequence ?? 0) + 1;
             } else {
-                insertValues.orderType = insertValues.orderType ?? effectiveOrderType;
+                insertValues.orderType = orderType;
                 insertValues.orderSequence = insertValues.orderSequence ?? 1;
             }
 
@@ -573,18 +578,6 @@ export class WoBasicDetailsService {
                 .insert(woBasicDetails)
                 .values(insertValues)
                 .returning();
-
-            // Adding another order turns the whole tender into a multi-order batch,
-            // so mark existing siblings as 'multiple' as well.
-            if (effectiveOrderType === 'multiple' && data.tenderId) {
-                await tx
-                    .update(woBasicDetails)
-                    .set({ orderType: 'multiple', updatedAt: new Date() })
-                    .where(and(
-                        eq(woBasicDetails.tenderId, data.tenderId),
-                        ne(woBasicDetails.id, inserted.id),
-                    ));
-            }
 
             return [inserted] as const;
         });
@@ -909,17 +902,12 @@ export class WoBasicDetailsService {
         // Check if record exists
         const existing = await this.findById(id);
 
-        // Guard against converting a 'multiple' order claim to 'single' when several orders exist for the tender
-        if (data.orderType === 'single' && existing.orderType === 'multiple' && existing.tenderId) {
-            const [{ count }] = await this.db
-                .select({ count: sql<number>`count(*)::int` })
-                .from(woBasicDetails)
-                .where(eq(woBasicDetails.tenderId, existing.tenderId));
-            if ((count ?? 1) > 1) {
-                throw new BadRequestException(
-                    `Cannot convert to a single order: ${count} orders are already linked to tender ${existing.tenderId}.`,
-                );
-            }
+        // Order type is immutable after creation; further orders are added as
+        // Repeat or Multiple instead of reclassifying an existing order/project.
+        if (data.orderType !== undefined && data.orderType !== existing.orderType) {
+            throw new BadRequestException(
+                'Order type cannot be changed after creation. Add the next order as Repeat or Multiple instead.',
+            );
         }
 
         // Check project code uniqueness if being updated
@@ -1389,6 +1377,7 @@ export class WoBasicDetailsService {
         const [tender] = await this.db
             .select({
                 team: tenderInfos.team,
+                websiteId: tenderInfos.website,
                 organizationAcronym: organizations.acronym,
                 itemName: items.name,
                 locationName: locations.name,
@@ -1425,8 +1414,12 @@ export class WoBasicDetailsService {
             .from(tenderClients)
             .where(eq(tenderClients.tenderId, tenderId));
 
+        const websiteId = tender?.websiteId ?? null;
+
         return {
             team: tender?.team ?? null,
+            websiteId,
+            isGemTender: websiteId === GEM_WEBSITE_ID,
             organizationAcronym: tender?.organizationAcronym ?? null,
             itemName: tender?.itemName ?? null,
             locationName: tender?.locationName ?? null,
