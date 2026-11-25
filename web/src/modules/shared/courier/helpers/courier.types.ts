@@ -73,6 +73,8 @@ export type CreateCourierInput = {
 };
 
 export type UpdateCourierInput = Partial<CreateCourierInput> & {
+    userId?: number;
+    courierDocs?: string[] | null;
     status?: number;
     trackingNumber?: string | null;
     courierProvider?: string | null;

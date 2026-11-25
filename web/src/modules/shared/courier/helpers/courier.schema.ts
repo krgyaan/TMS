@@ -18,6 +18,8 @@ export const CourierFormSchema = z.object({
     urgency: z.coerce.number({ message: "Please select dispatch urgency" }).int().min(1).max(2),
 
     // Editable-only fields (available in edit mode for privileged users)
+    userId: z.coerce.number().int().positive().optional(),
+    courierDocs: z.array(z.string()).optional(),
     status: z.coerce.number().int().min(0).max(5).optional(),
     trackingNumber: z.string().max(255).optional(),
     courierProvider: z.string().max(255).optional(),
