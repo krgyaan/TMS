@@ -85,6 +85,7 @@ export const MIME = {
 export const IMAGES = [MIME.JPG, MIME.PNG, MIME.WEBP];
 export const DOCS = [MIME.PDF, ...IMAGES];
 export const OFFICE = [MIME.DOC, MIME.DOCX, MIME.XLS, MIME.XLSX];
+export const WORD = [MIME.DOC, MIME.DOCX];
 export const ARCHIVES = [MIME.ZIP, MIME.RAR];
 export const VIDEOS = [MIME.MP4, MIME.MOV, MIME.WEBM, MIME.MKV];
 
