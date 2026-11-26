@@ -107,21 +107,14 @@ export function Page7Acceptance({ woDetailId, initialData, onSaveDraft, onSaveDr
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-8">
-                        <div>
-                            <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                                <FileEdit className="h-4 w-4 text-muted-foreground" />
-                                WO Amendment Decision
-                            </h3>
-                            <p className="text-xs text-muted-foreground mb-4">Does this WO require any amendments before acceptance?</p>
-                            <div className="max-w-xs">
-                                <SelectField
-                                    control={form.control}
-                                    name="oeWoAmendmentNeeded"
-                                    label="Amendment Needed?"
-                                    options={YES_NO_OPTIONS}
-                                    placeholder="Select"
-                                />
-                            </div>
+                        <div className="max-w-xs">
+                            <SelectField
+                                control={form.control}
+                                name="oeWoAmendmentNeeded"
+                                label="Amendment Needed?"
+                                options={YES_NO_OPTIONS}
+                                placeholder="Select"
+                            />
                         </div>
 
                         <ConditionalSection show={watchAmendmentNeeded === "true"}>
@@ -131,7 +124,6 @@ export function Page7Acceptance({ woDetailId, initialData, onSaveDraft, onSaveDr
                                     <AlertTriangle className="h-4 w-4 text-muted-foreground" />
                                     Amendment Details
                                 </h3>
-                                <p className="text-xs text-muted-foreground mb-4">Specify all required corrections for the Work Order.</p>
                                 <div className="space-y-6">
                                     {amendmentFields.map((field, index) => (
                                         <div key={field.id} className="p-4 border rounded-lg space-y-4 relative">
@@ -200,16 +192,12 @@ export function Page7Acceptance({ woDetailId, initialData, onSaveDraft, onSaveDr
                                     <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
                                     Final Acceptance Checklist
                                 </h3>
-                                <p className="text-xs text-muted-foreground mb-4">Complete these steps to finalize Work Order acceptance.</p>
                                 <div className="grid gap-6 md:grid-cols-2 mb-4">
                                     <div className="p-4 border rounded-lg space-y-3 bg-muted/5">
                                         <div className="flex items-center gap-3">
                                             <Pen className="h-4 w-4 text-muted-foreground" />
                                             <h4 className="font-semibold text-sm">Digital Signature</h4>
                                         </div>
-                                        <p className="text-xs text-muted-foreground leading-relaxed">
-                                            Apply digital signature of authorized signatory on all pages of the PO/WO PDF.
-                                        </p>
                                         <SelectField
                                             control={form.control}
                                             name="oeSignaturePrepared"
@@ -224,9 +212,6 @@ export function Page7Acceptance({ woDetailId, initialData, onSaveDraft, onSaveDr
                                             <Truck className="h-4 w-4 text-muted-foreground" />
                                             <h4 className="font-semibold text-sm">Courier Preparation</h4>
                                         </div>
-                                        <p className="text-xs text-muted-foreground leading-relaxed">
-                                            Initiate courier request for physical signed copies. Processed after TL approval.
-                                        </p>
                                         <SelectField
                                             control={form.control}
                                             name="courierRequestPrepared"

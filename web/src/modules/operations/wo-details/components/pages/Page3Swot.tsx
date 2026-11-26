@@ -83,9 +83,6 @@ export function Page3Swot({
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p className="text-xs text-muted-foreground mb-4">
-                            All fields are optional. Provide analysis to help with project planning.
-                        </p>
                         <div className="grid gap-6 md:grid-cols-2">
                             <div className="space-y-2">
                                 <FieldWrapper control={form.control} name="swotStrengths" label="Strengths of VE">

@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { useAutoSave } from "@/hooks/api/useWoDetails";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FileText, Info, ShieldCheck } from "lucide-react";
+import { Info, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { WIZARD_CONFIG, YES_NO_OPTIONS } from "../../helpers/constants";
@@ -123,11 +123,6 @@ export function Page2Compliance({
                     <CardContent className="space-y-8">
                         {/* LD Section */}
                         <div>
-                            <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                                <ShieldCheck className="h-4 w-4 text-muted-foreground" />
-                                Liquidated Damages (LD)
-                            </h3>
-                            <p className="text-xs text-muted-foreground mb-4">Configure penalties for completion delays.</p>
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                 <SelectField
                                     control={form.control}
@@ -178,10 +173,6 @@ export function Page2Compliance({
 
                         {/* PBG & Contract Agreement Section */}
                         <div>
-                            <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                                <FileText className="h-4 w-4 text-muted-foreground" />
-                                PBG and Contract Agreement
-                            </h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
                                 <SelectField
                                     control={form.control}
@@ -224,11 +215,6 @@ export function Page2Compliance({
 
                         {/* PO Section */}
                         <div>
-                            <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                                <FileText className="h-4 w-4 text-muted-foreground" />
-                                Detailed PO / FOA Requirements
-                            </h3>
-                            <p className="text-xs text-muted-foreground mb-4">SAP PO and detailed work order configurations.</p>
                             <div className="max-w-xs">
                                 <SelectField
                                     control={form.control}
