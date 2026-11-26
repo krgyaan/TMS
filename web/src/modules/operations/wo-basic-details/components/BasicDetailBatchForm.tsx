@@ -13,57 +13,8 @@ import { ArrowLeft, ArrowRight, Plus, Save, SkipForward, Trash2 } from "lucide-r
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-
-const teamArray = [
-    { id: 1, name: "AC" },
-    { id: 2, name: "DC" },
-];
-
-const TMS_DOCS = [
-    "Complete Tender Documents",
-    "Tender Info",
-    "EMD Information",
-    "Physical documents submission",
-    "RFQ and Quotation",
-    "Document Checklist",
-    "Costing Sheet",
-    "TQ",
-    "RA and Result details",
-    "Corrigendum",
-];
-
-type ContactRow = {
-    name: string;
-    designation: string;
-    phones: string[];
-    email: string;
-    organization: string;
-    departments: string;
-};
-
-type OrderRow = {
-    woNumber: string;
-    woDate: Date | null;
-    woValuePreGst: string;
-    woValueGstAmt: string;
-    orderNature: "" | "supply" | "service" | "sitc";
-    poReceivedStatus: "" | "received" | "not_received" | "not_applicable";
-    sapPoUpload: string[];
-    woDraft: string[];
-    budgetPreGst: string;
-    receiptPreGst: string;
-    finalPrice: string;
-    budgetSupply: string;
-    budgetService: string;
-    budgetFreight: string;
-    budgetAdmin: string;
-    budgetBuybackSale: string;
-    requestGemCharges: "true" | "false" | "";
-    gemChargesAmount: string;
-    gemChargesPortalLink: string;
-    gemChargesInvoice: string[];
-    contacts: ContactRow[];
-};
+import { TEAM_ARRAY, TMS_DOCS } from "../helpers/basiDetailBatch.constants";
+import type { BasicDetailOrderType, ContactRow, OrderDefaults, OrderRow } from "../helpers/basiDetailBatch.types";
 
 const emptyContact = (): ContactRow => ({
     name: "",
@@ -73,13 +24,6 @@ const emptyContact = (): ContactRow => ({
     organization: "",
     departments: "",
 });
-
-type OrderDefaults = {
-    budgetPreGst?: string;
-    receiptPreGst?: string;
-    finalPrice?: string;
-    requestGemCharges?: "true" | "false";
-};
 
 const emptyOrder = (contacts: ContactRow[] = [], defaults: OrderDefaults = {}): OrderRow => ({
     woNumber: "",
@@ -129,7 +73,7 @@ export function BasicDetailBatchForm() {
         existingOrders.reduce((max, order) => Math.max(max, order.orderSequence ?? 0), 0) + 1;
     const hasExistingOrders = existingOrders.length > 0;
 
-    const [orderType, setOrderType] = useState<"single" | "repeat" | "multiple">(
+    const [orderType, setOrderType] = useState<BasicDetailOrderType>(
         hasExistingOrders ? "repeat" : "single",
     );
     const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -174,7 +118,7 @@ export function BasicDetailBatchForm() {
     const projectIdentifiers = (row: OrderRow, index: number) => {
         if (!prefillData) return { code: "", name: "" };
 
-        const teamName = teamArray.find(team => team.id === prefillData.team)?.name || "";
+        const teamName = TEAM_ARRAY.find(team => team.id === prefillData.team)?.name || "";
         const orgName = prefillData.organizationAcronym || "";
         const itemName = prefillData.itemName || "";
         const locationName = prefillData.locationName || "";
@@ -306,7 +250,7 @@ export function BasicDetailBatchForm() {
         }));
     };
 
-    const applyOrderType = (value: "single" | "repeat" | "multiple") => {
+    const applyOrderType = (value: BasicDetailOrderType) => {
         setOrderType(value);
         if (value === "single") {
             setRows(prev => prev.slice(0, 1));
@@ -522,7 +466,7 @@ export function BasicDetailBatchForm() {
                                     key={type}
                                     type="button"
                                     variant={orderType === type ? "default" : "outline"}
-                                    onClick={() => applyOrderType(type as "single" | "repeat" | "multiple")}
+                                    onClick={() => applyOrderType(type as BasicDetailOrderType)}
                                 >
                                     {type === "single" ? "Single" : type === "repeat" ? "Repeat" : "Multiple"}
                                 </Button>
@@ -890,7 +834,7 @@ export function BasicDetailBatchForm() {
     );
 }
 
-function projectLabel(orderType: "single" | "repeat" | "multiple", sequence: number) {
+function projectLabel(orderType: BasicDetailOrderType, sequence: number) {
     if (orderType === "repeat") return `R${sequence}`;
     if (orderType === "multiple") return `P${sequence}`;
     return "Single";
@@ -906,7 +850,7 @@ function OrderTabs({
     rows: OrderRow[];
     active: number;
     onChange: (index: number) => void;
-    orderType: "single" | "repeat" | "multiple";
+    orderType: BasicDetailOrderType;
     startSequence: number;
 }) {
     if (rows.length <= 1) return null;
