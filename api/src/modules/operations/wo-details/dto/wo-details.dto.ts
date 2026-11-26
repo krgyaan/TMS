@@ -343,6 +343,7 @@ export const AddressSchema = z.object({
 });
 
 export const SavePage4Schema = z.object({
+  orderNature: z.enum(["supply", "service", "sitc"]).optional(),
   billingBoq: z.array(BOQItemSchema).optional(),
   buybackBoq: z.array(BOQItemSchema).optional(),
   buybackBoqApplicable: z.boolean().optional(),
@@ -351,6 +352,7 @@ export const SavePage4Schema = z.object({
 });
 
 export const SubmitPage4Schema = z.object({
+  orderNature: z.enum(["supply", "service", "sitc"]).optional(),
   billingBoq: z
     .array(BOQItemSchema)
     .min(1, 'At least one billing BOQ item is required'),

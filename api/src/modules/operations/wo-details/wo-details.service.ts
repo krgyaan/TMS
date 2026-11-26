@@ -1,3 +1,4 @@
+import { projects } from '@/db/schemas/master/projects.schema';
 import { users } from '@/db/schemas/auth/users.schema';
 import { AppLogger } from '@/logger/app-logger.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
@@ -1712,7 +1713,7 @@ export class WoDetailsService {
         break;
 
       case 4:
-        await this.savePage4Data(woDetailId, data);
+        await this.savePage4Data(woDetailId, woBasicDetailId, data);
         break;
 
       // Page 7 amendments are handled by WoAmendmentsModule
@@ -1789,8 +1790,25 @@ export class WoDetailsService {
     });
   }
 
-  private async savePage4Data(woDetailId: number, data: SavePage4Dto) {
+  private async savePage4Data(
+    woDetailId: number,
+    woBasicDetailId: number,
+    data: SavePage4Dto,
+  ) {
     const now = new Date();
+
+    // Order Nature lives on the Basic Detail and is mirrored to the project
+    if (data.orderNature !== undefined) {
+      await this.db
+        .update(woBasicDetails)
+        .set({ orderNature: data.orderNature, updatedAt: now })
+        .where(eq(woBasicDetails.id, woBasicDetailId));
+
+      await this.db
+        .update(projects)
+        .set({ orderNature: data.orderNature, updatedAt: now })
+        .where(eq(projects.woBasicDetailId, woBasicDetailId));
+    }
 
     // Handle Billing BOQ
     if (data.billingBoq !== undefined) {
