@@ -190,17 +190,26 @@
             </table>
 
             {{#each authorizedPersons}}
-            <p style="margin-top: 16px;">
-                Name Of Authorized Person: <strong>{{ this.name }}</strong>
-                &nbsp;&nbsp;(Aadhaar No.: <strong>{{ this.aadharNo }}</strong>).
-            </p>
+            <table style="width: 100%; margin-top: 16px;">
+                <tr>
+                    <td style="text-align: left; white-space: nowrap;">Name Of Authorized Person:</td>
+                    <td style="text-align: right; white-space: nowrap;">
+                        <strong>{{ this.name }}</strong>
+                        &nbsp;(Aadhaar No.: <strong>{{ this.aadharNo }}</strong>).
+                    </td>
+                </tr>
+            </table>
             {{/each}}
             {{#unless authorizedPersons.length}}
-            <p style="margin-top: 16px;">
-                Name Of Authorized Person:
-                <strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&mdash;&mdash;</strong>
-                &nbsp;&nbsp;&nbsp;&nbsp;(Aadhaar No.: &mdash;&mdash; &mdash;&mdash; &mdash;&mdash;).
-            </p>
+            <table style="width: 100%; margin-top: 16px;">
+                <tr>
+                    <td style="text-align: left; white-space: nowrap;">Name Of Authorized Person:</td>
+                    <td style="text-align: right; white-space: nowrap;">
+                        <strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&mdash;&mdash;</strong>
+                        &nbsp;&nbsp;&nbsp;&nbsp;(Aadhaar No.: &mdash;&mdash; &mdash;&mdash; &mdash;&mdash;).
+                    </td>
+                </tr>
+            </table>
             {{/unless}}
 
             <p style="margin-top: 16px;">

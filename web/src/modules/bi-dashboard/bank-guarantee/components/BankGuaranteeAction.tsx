@@ -31,7 +31,7 @@ const STEP_NAMES = {
     prefilledSignedBg: 'prefilled_signed_bg',
     bankMailIds: 'bank_mail_ids',
     bankMailIdsCc: 'bank_mail_ids_cc',
-    authorizationPersons: 'authorization_persons',
+    authorizationPerson: 'authorization_person',
     bgApprovedFdrPer: 'bg_approved_fdr_per',
     bgFormatImran: 'bg_format_imran',
     bgNo: 'bg_no',
@@ -194,11 +194,10 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
     const stage2BgUpload = useWatch({ control: form.control, name: 'bg_upload' });
     const stage3Sfms = useWatch({ control: form.control, name: 'sfms_conf' });
     const fdrNoValue = useWatch({ control: form.control, name: 'fdr_no' });
-    const authorizationPersonsValue = useWatch({ control: form.control, name: 'authorization_persons' });
+    const authorizationPersonValue = useWatch({ control: form.control, name: 'authorization_person' });
 
     const bankMailIds = useFieldArray({ control: form.control, name: 'bank_mail_ids' });
     const bankMailIdsCc = useFieldArray({ control: form.control, name: 'bank_mail_ids_cc' });
-    const authorizationRows = useFieldArray({ control: form.control, name: 'authorization_persons' });
 
     const currentAction = formData?.action ?? 0;
     const accountsCheckpoints: Checkpoint[] = [
@@ -271,7 +270,11 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
             form.setValue('fdr_copy', safeParseArray(formData.fdrCopy));
             bankMailIds.replace(toMailRows(formData.bankMailIds));
             bankMailIdsCc.replace(toMailRows(formData.bankMailIdsCc));
-            authorizationRows.replace(toAuthorizationRows(formData.authorizationPersons));
+            const savedAuthorizationPerson = toAuthorizationRows(formData.authorizationPersons)[0];
+            form.setValue('authorization_person', {
+                name: savedAuthorizationPerson?.name ?? '',
+                aadhar_no: savedAuthorizationPerson?.aadhar_no ?? '',
+            });
         } else if (action === 'accounts-form-2') {
             // BG No. is a required field on this form, so it is only present once
             // Stage 2 has actually been saved. Some older instruments already
@@ -336,20 +339,20 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
     };
 
     const handleGenerateAuthorizationLetter = async () => {
-        const persons = (form.getValues('authorization_persons') ?? [])
-            .map((row) => ({
-                name: String(row?.name ?? '').trim(),
-                aadharNo: String(row?.aadhar_no ?? '').trim(),
-            }))
-            .filter((person) => person.name.length > 0);
+        const person = form.getValues('authorization_person');
+        const name = String(person?.name ?? '').trim();
+        const aadharNo = String(person?.aadhar_no ?? '').trim();
 
-        if (persons.length === 0) {
-            toast.error('Add at least one authorized person');
+        if (!name || !/^\d{12}$/.test(aadharNo)) {
+            toast.error('Select a user and enter a 12-digit Aadhar No.');
             return;
         }
 
         try {
-            const result = await generateAuthorizationMutation.mutateAsync({ id: instrumentId, persons });
+            const result = await generateAuthorizationMutation.mutateAsync({
+                id: instrumentId,
+                persons: [{ name, aadharNo }],
+            });
             setGeneratedDocs((prev) => ({ ...prev, authorization: result.pdfPath }));
             toast.success('Authorization letter generated');
         } catch (error: any) {
@@ -395,7 +398,7 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
                 if (
                     key === 'bank_mail_ids'
                     || key === 'bank_mail_ids_cc'
-                    || key === 'authorization_persons'
+                    || key === 'authorization_person'
                     || key === 'contacts'
                     || key === 'attachments'
                 ) {
@@ -424,13 +427,11 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
             payload.bank_mail_ids_cc = JSON.stringify(
                 (values.bank_mail_ids_cc ?? []).map((r) => r.email).filter(Boolean),
             );
+            const authorizationName = values.authorization_person?.name?.trim() || '';
             payload.authorization_persons = JSON.stringify(
-                (values.authorization_persons ?? [])
-                    .map((person) => ({
-                        name: person.name?.trim() || '',
-                        aadharNo: person.aadhar_no?.trim() || '',
-                    }))
-                    .filter((person) => person.name.length > 0),
+                authorizationName
+                    ? [{ name: authorizationName, aadharNo: values.authorization_person?.aadhar_no?.trim() || '' }]
+                    : [],
             );
             payload.contacts = JSON.stringify(
                 (values.contacts ?? []).map((c) => ({
@@ -512,16 +513,12 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
                                 isGeneratingPrefilled={generatePrefilledMutation.isPending}
                                 canGeneratePrefilled={Boolean(String(fdrNoValue ?? '').trim())}
                                 prefilledPath={generatedDocs.prefilled ?? formData?.prefilledAppDocx}
-                                authorizationPersons={authorizationRows}
                                 employees={employees}
                                 onGenerateAuthorizationLetter={handleGenerateAuthorizationLetter}
                                 isGeneratingAuthorizationLetter={generateAuthorizationMutation.isPending}
                                 canGenerateAuthorizationLetter={
-                                    Array.isArray(authorizationPersonsValue)
-                                    && authorizationPersonsValue.some(
-                                        (person) => Boolean(String(person?.name ?? '').trim())
-                                            && Boolean(String(person?.aadhar_no ?? '').trim()),
-                                    )
+                                    Boolean(String(authorizationPersonValue?.name ?? '').trim())
+                                    && /^\d{12}$/.test(String(authorizationPersonValue?.aadhar_no ?? '').trim())
                                 }
                                 authorizationPath={generatedDocs.authorization ?? formData?.authorizationLetterDocx}
                             />

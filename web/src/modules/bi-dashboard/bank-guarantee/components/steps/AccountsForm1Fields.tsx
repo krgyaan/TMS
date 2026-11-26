@@ -30,12 +30,6 @@ export interface MailIdsArray {
     remove: (index: number) => void;
 }
 
-export interface AuthorizationPersonsArray {
-    fields: Array<{ id: string }>;
-    append: (value: { name?: string; aadhar_no?: string }) => void;
-    remove: (index: number) => void;
-}
-
 export interface AccountsForm1Names<T extends FieldValues> {
     bgReq: FieldPath<T>;
     reasonReq: FieldPath<T>;
@@ -43,7 +37,7 @@ export interface AccountsForm1Names<T extends FieldValues> {
     prefilledSignedBg: FieldPath<T>;
     bankMailIds: FieldPath<T>;
     bankMailIdsCc: FieldPath<T>;
-    authorizationPersons?: FieldPath<T>;
+    authorizationPerson?: FieldPath<T>;
     bgApprovedFdrPer?: FieldPath<T>;
     fdrAmt?: FieldPath<T>;
     bgFormatImran?: FieldPath<T>;
@@ -131,7 +125,6 @@ interface AccountsForm1FieldsProps<T extends FieldValues> {
     isGeneratingPrefilled?: boolean;
     canGeneratePrefilled?: boolean;
     prefilledPath?: string | null;
-    authorizationPersons?: AuthorizationPersonsArray;
     employees?: Array<{ id: number | string; name: string }>;
     onGenerateAuthorizationLetter?: () => void;
     isGeneratingAuthorizationLetter?: boolean;
@@ -151,7 +144,6 @@ export function AccountsForm1Fields<T extends FieldValues>({
     isGeneratingPrefilled,
     canGeneratePrefilled,
     prefilledPath,
-    authorizationPersons,
     employees = [],
     onGenerateAuthorizationLetter,
     isGeneratingAuthorizationLetter,
@@ -359,21 +351,71 @@ export function AccountsForm1Fields<T extends FieldValues>({
                 )}
             </div>
 
-            {bgReq === 'Accepted' && names.authorizationPersons && authorizationPersons && (
+            {bgReq === 'Accepted' && (
+                <>
+                    <BankMailIdsFields<T>
+                        control={control}
+                        path={names.bankMailIds}
+                        rows={bankMailIds}
+                        heading="Bank Mail Ids"
+                        placeholder="e.g., bank.manager@bank.com"
+                        emptyText="No mail ids added. Click &quot;Add&quot; to add one."
+                        removeLabel="Remove mail id"
+                    />
+
+                    <BankMailIdsFields<T>
+                        control={control}
+                        path={names.bankMailIdsCc}
+                        rows={bankMailIdsCc}
+                        heading="Bank Mail Ids CC"
+                        placeholder="e.g., branch@bank.com"
+                        emptyText="No CC mail ids added. Click &quot;Add&quot; to add one."
+                        removeLabel="Remove CC mail id"
+                    />
+                </>
+            )}
+
+            {bgReq === 'Accepted' && names.authorizationPerson && (
                 <div className="space-y-4 pt-4">
-                    <div className="flex items-center justify-between border-b pb-2">
+                    <div className="border-b pb-2">
                         <h4 className="font-semibold text-base text-primary">Authorization</h4>
-                        <div className="flex items-center gap-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => authorizationPersons.append({ name: '', aadhar_no: '' })}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
+                        <div className="md:col-span-4">
+                            <SelectField
+                                control={control}
+                                name={`${names.authorizationPerson}.name` as FieldPath<T>}
+                                label="Name"
+                                options={employees.map((employee) => ({
+                                    value: employee.name,
+                                    label: employee.name,
+                                }))}
+                                placeholder="Select user"
+                                valueType="string"
+                            />
+                        </div>
+                        <div className="md:col-span-4">
+                            <FieldWrapper
+                                control={control}
+                                name={`${names.authorizationPerson}.aadhar_no` as FieldPath<T>}
+                                label="Aadhar No."
                             >
-                                <Plus className="mr-2 h-4 w-4" />
-                                Add Person
-                            </Button>
-                            {onGenerateAuthorizationLetter && (
+                                {(field) => (
+                                    <Input
+                                        {...field}
+                                        value={(field.value as string | undefined) ?? ''}
+                                        placeholder="Enter 12-digit Aadhar number"
+                                        inputMode="numeric"
+                                        maxLength={12}
+                                        onChange={(event) =>
+                                            field.onChange(event.target.value.replace(/\D/g, '').slice(0, 12))
+                                        }
+                                    />
+                                )}
+                            </FieldWrapper>
+                        </div>
+                        {onGenerateAuthorizationLetter && (
+                            <div className="md:col-span-4">
                                 <Button
                                     type="button"
                                     variant="outline"
@@ -388,8 +430,8 @@ export function AccountsForm1Fields<T extends FieldValues>({
                                     )}
                                     <span className="ml-1">Generate</span>
                                 </Button>
-                            )}
-                        </div>
+                            </div>
+                        )}
                     </div>
                     {authorizationPath && (
                         <a
@@ -403,77 +445,8 @@ export function AccountsForm1Fields<T extends FieldValues>({
                             Authorization Letter
                         </a>
                     )}
-                    {authorizationPersons.fields.length === 0 && (
-                        <p className="text-sm text-muted-foreground">No authorized persons added.</p>
-                    )}
-                    <div className="space-y-3">
-                        {authorizationPersons.fields.map((row, index) => (
-                            <div key={row.id} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
-                                <div className="md:col-span-5">
-                                    <SelectField
-                                        control={control}
-                                        name={`${names.authorizationPersons!}.${index}.name` as FieldPath<T>}
-                                        label="Name"
-                                        options={employees.map((employee) => ({
-                                            value: employee.name,
-                                            label: employee.name,
-                                        }))}
-                                        placeholder="Select user"
-                                        valueType="string"
-                                    />
-                                </div>
-                                <div className="md:col-span-5">
-                                    <FieldWrapper
-                                        control={control}
-                                        name={`${names.authorizationPersons!}.${index}.aadhar_no` as FieldPath<T>}
-                                        label="Aadhar No."
-                                    >
-                                        {(field) => (
-                                            <Input
-                                                {...field}
-                                                value={(field.value as string | undefined) ?? ''}
-                                                placeholder="Enter Aadhar number"
-                                            />
-                                        )}
-                                    </FieldWrapper>
-                                </div>
-                                <div className="md:col-span-2">
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => authorizationPersons.remove(index)}
-                                        className="text-destructive hover:text-destructive"
-                                        aria-label="Remove authorized person"
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
                 </div>
             )}
-
-            <BankMailIdsFields<T>
-                control={control}
-                path={names.bankMailIds}
-                rows={bankMailIds}
-                heading="Bank Mail Ids"
-                placeholder="e.g., bank.manager@bank.com"
-                emptyText="No mail ids added. Click &quot;Add&quot; to add one."
-                removeLabel="Remove mail id"
-            />
-
-            <BankMailIdsFields<T>
-                control={control}
-                path={names.bankMailIdsCc}
-                rows={bankMailIdsCc}
-                heading="Bank Mail Ids CC"
-                placeholder="e.g., branch@bank.com"
-                emptyText="No CC mail ids added. Click &quot;Add&quot; to add one."
-                removeLabel="Remove CC mail id"
-            />
         </>
     );
 }

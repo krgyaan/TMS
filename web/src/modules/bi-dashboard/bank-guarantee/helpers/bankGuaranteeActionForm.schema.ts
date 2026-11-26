@@ -52,10 +52,10 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     bg_approved_fdr_per: z.enum(['10', '15', '100']).optional(),
     bank_mail_ids: z.array(MailRowSchema).optional(),
     bank_mail_ids_cc: z.array(MailRowSchema).optional(),
-    authorization_persons: z.array(z.object({
+    authorization_person: z.object({
         name: z.string().optional(),
         aadhar_no: z.string().optional(),
-    })).optional(),
+    }).optional(),
 
     // Accounts Form (BG) 2 - After BG Creation
     bg_no: z.string().optional(),
