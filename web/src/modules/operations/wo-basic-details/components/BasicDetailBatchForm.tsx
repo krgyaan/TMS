@@ -121,7 +121,7 @@ export function BasicDetailBatchForm() {
             finalPrice: row.finalPrice || (prefillData.finalPrice ?? ""),
             requestGemCharges: row.requestGemCharges || (prefillData.isGemTender ? "true" : "false"),
         })));
-    }, [prefillData]);
+    }, [prefillData, setRows]);
 
     useEffect(() => {
         rows.forEach((row, index) => {
