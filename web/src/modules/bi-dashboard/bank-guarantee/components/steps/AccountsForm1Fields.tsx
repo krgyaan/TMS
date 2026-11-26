@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { CompactFileUploader, FileUploader } from '@/components/file-upload';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, FileDown, Loader2 } from 'lucide-react';
 import { NumberInput } from '@/components/form/NumberInput';
 import DateInput from '@/components/form/DateInput';
 import { toFileArray } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
@@ -119,6 +119,9 @@ interface AccountsForm1FieldsProps<T extends FieldValues> {
     disabled?: boolean;
     prefilledMode?: 'array' | 'single';
     fdrValueType?: 'auto' | 'string' | 'number';
+    onGeneratePrefilled?: () => void;
+    isGeneratingPrefilled?: boolean;
+    canGeneratePrefilled?: boolean;
 }
 
 export function AccountsForm1Fields<T extends FieldValues>({
@@ -129,6 +132,9 @@ export function AccountsForm1Fields<T extends FieldValues>({
     disabled,
     prefilledMode = 'array',
     fdrValueType = 'auto',
+    onGeneratePrefilled,
+    isGeneratingPrefilled,
+    canGeneratePrefilled,
 }: AccountsForm1FieldsProps<T>) {
     const bgReq = useWatch({ control, name: names.bgReq });
     const approveBg = useWatch({ control, name: names.approveBg });
@@ -180,11 +186,34 @@ export function AccountsForm1Fields<T extends FieldValues>({
                     {names.fdrNo && (
                         <FieldWrapper control={control} name={names.fdrNo} label="FDR No. *">
                             {(field) => (
-                                <Input
-                                    {...field}
-                                    value={(field.value as string | undefined) ?? ''}
-                                    placeholder="Enter FDR number"
-                                />
+                                <div className="flex gap-2">
+                                    <Input
+                                        {...field}
+                                        value={(field.value as string | undefined) ?? ''}
+                                        placeholder="Enter FDR number"
+                                        className="flex-1"
+                                    />
+                                    {onGeneratePrefilled && (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={onGeneratePrefilled}
+                                            disabled={
+                                                disabled
+                                                || isGeneratingPrefilled
+                                                || !canGeneratePrefilled
+                                            }
+                                        >
+                                            {isGeneratingPrefilled ? (
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                                <FileDown className="h-4 w-4" />
+                                            )}
+                                            <span className="ml-1">Generate</span>
+                                        </Button>
+                                    )}
+                                </div>
                             )}
                         </FieldWrapper>
                     )}

@@ -7,7 +7,7 @@ import { Form } from '@/components/ui/form';
 import { SelectField } from '@/components/form/SelectField';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BankGuaranteeActionFormSchema, type BankGuaranteeActionFormValues } from '../helpers/bankGuaranteeActionForm.schema';
-import { useUpdateBankGuaranteeAction, useBGActionFormData, useBGFollowupData } from '@/hooks/api/useBankGuarantees';
+import { useUpdateBankGuaranteeAction, useBGActionFormData, useBGFollowupData, useGenerateBankGuaranteePrefilledFormat } from '@/hooks/api/useBankGuarantees';
 import type { Checkpoint } from '@/components/tendering/SubmissionChecklist';
 import { CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -17,6 +17,7 @@ import { AccountsForm2Fields } from './steps/AccountsForm2Fields';
 import { AccountsForm3Fields } from './steps/AccountsForm3Fields';
 import { MailAttachmentPreview } from './steps/MailAttachmentPreview';
 import { FollowupReadOnlyView, InitiateFollowupFields } from './steps/InitiateFollowupFields';
+import { fileUploadService } from '@/services/api/file-upload.service';
 import { RequestExtensionFields } from './steps/RequestExtensionFields';
 import { ReturnedCourierFields } from './steps/ReturnedCourierFields';
 import { RequestCancellationFields } from './steps/RequestCancellationFields';
@@ -136,6 +137,7 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const updateMutation = useUpdateBankGuaranteeAction();
+    const generatePrefilledMutation = useGenerateBankGuaranteePrefilledFormat();
     const { data: formData } = useBGActionFormData(instrumentId);
     const { data: followupData } = useBGFollowupData(instrumentId);
 
@@ -164,6 +166,7 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
     const stage2CoveringLetter = useWatch({ control: form.control, name: 'bg_signed_covering_letter' });
     const stage2BgUpload = useWatch({ control: form.control, name: 'bg_upload' });
     const stage3Sfms = useWatch({ control: form.control, name: 'sfms_conf' });
+    const fdrNoValue = useWatch({ control: form.control, name: 'fdr_no' });
 
     const bankMailIds = useFieldArray({ control: form.control, name: 'bank_mail_ids' });
     const bankMailIdsCc = useFieldArray({ control: form.control, name: 'bank_mail_ids_cc' });
@@ -286,6 +289,27 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
 
     const isSubmitting = form.formState.isSubmitting || updateMutation.isPending;
 
+    const handleGeneratePrefilled = async () => {
+        const fdrNo = String(form.getValues('fdr_no') ?? '').trim();
+        if (!fdrNo) {
+            toast.error('Enter FDR No. first');
+            return;
+        }
+
+        try {
+            const result = await generatePrefilledMutation.mutateAsync({ id: instrumentId, fdrNo });
+            const link = document.createElement('a');
+            link.href = fileUploadService.getFileUrl(result.pdfPath);
+            link.download = result.pdfPath.split('/').pop() || 'bg-prefilled-format.pdf';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            toast.success('Prefilled BG format generated');
+        } catch (error: any) {
+            toast.error(error?.message || 'Failed to generate prefilled BG format');
+        }
+    };
+
     const handleSubmit = async (values: BankGuaranteeActionFormValues) => {
         if (isReadOnly) return;
         try {
@@ -394,6 +418,9 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
                                 bankMailIdsCc={bankMailIdsCc}
                                 disabled={isStepLocked('accounts-form-1')}
                                 fdrValueType="string"
+                                onGeneratePrefilled={handleGeneratePrefilled}
+                                isGeneratingPrefilled={generatePrefilledMutation.isPending}
+                                canGeneratePrefilled={Boolean(String(fdrNoValue ?? '').trim())}
                             />
                             <MailAttachmentPreview
                                 instrumentId={instrumentId}

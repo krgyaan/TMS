@@ -100,6 +100,13 @@ class BankGuaranteesService extends BaseApiService {
         );
     }
 
+    async generatePrefilledFormat(id: number, fdrNo: string): Promise<{ pdfPath: string }> {
+        return this.post<{ pdfPath: string }, { fdrNo: string }>(
+            `/instruments/${id}/prefilled-format`,
+            { fdrNo },
+        );
+    }
+
     async createOldBg(payload: Record<string, any>): Promise<{ requestId: number; instrumentId: number }> {
         return this.post<{ requestId: number; instrumentId: number }, Record<string, any>>('/old-bg', payload);
     }

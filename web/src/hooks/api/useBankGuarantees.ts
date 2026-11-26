@@ -132,6 +132,18 @@ export const useBGMailPreview = (
     });
 };
 
+export const useGenerateBankGuaranteePrefilledFormat = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, fdrNo }: { id: number; fdrNo: string }) =>
+            bankGuaranteesService.generatePrefilledFormat(id, fdrNo),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.detail(variables.id) });
+        },
+    });
+};
+
 export const useCreateBankGuaranteeOldBg = () => {
     const queryClient = useQueryClient();
 

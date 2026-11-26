@@ -579,7 +579,7 @@ export class PaymentRequestsNotificationService {
     private buildBgPrefilledData = (
         overrides: Partial<Record<
             'date' | 'bgAmount' | 'beneficiaryName' | 'beneficiaryAddress' | 'bgExpiryDate' |
-            'claimExpiryDate' | 'accountNo' | 'ifsc' | 'uniqueCode',
+            'claimExpiryDate' | 'accountNo' | 'ifsc' | 'uniqueCode' | 'fdrNo',
             string
         >> = {},
     ): Record<string, any> => {
@@ -599,6 +599,7 @@ export class PaymentRequestsNotificationService {
             accountNo: pick(overrides.accountNo, '2502245699295242'),
             ifsc: pick(overrides.ifsc, 'SBIN0003704'),
             uniqueCode: pick(overrides.uniqueCode, ''),
+            fdrNo: pick(overrides.fdrNo, '______________'),
         };
     };
 
@@ -1983,6 +1984,60 @@ export class PaymentRequestsNotificationService {
         }
     }
 
+    async generateBgPrefilledApplication(
+        instrumentId: number,
+        fdrNo?: string,
+    ): Promise<{ pdfPath: string }> {
+        const [result] = await this.db
+            .select({
+                instrument: paymentInstruments,
+                bgDetails: instrumentBgDetails,
+            })
+            .from(paymentInstruments)
+            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!result?.instrument) {
+            throw new Error(`Instrument ${instrumentId} not found`);
+        }
+
+        const { instrument, bgDetails } = result;
+        const resolvedFdrNo = String(fdrNo ?? bgDetails?.fdrNo ?? '').trim();
+
+        const prefilledBgData = this.buildBgPrefilledData({
+            date: this.formatDateDDMMYYYY(new Date()),
+            bgAmount: instrument.amount ? `${Number(instrument.amount).toLocaleString('en-IN')}/-` : '',
+            beneficiaryName: bgDetails?.beneficiaryName || '',
+            beneficiaryAddress: bgDetails?.beneficiaryAddress || '',
+            bgExpiryDate: bgDetails?.bgExpiryDate ? this.formatDateDDMMYYYY(bgDetails.bgExpiryDate) : '',
+            claimExpiryDate: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',
+            accountNo: '2502245699295242',
+            ifsc: bgDetails?.bgBankIfsc || '',
+            uniqueCode: bgDetails?.uniqueCode || '',
+            fdrNo: resolvedFdrNo,
+        });
+
+        const [pdfPath] = await this.pdfGenerator.generatePdfs(
+            'bgPrefilledFormat',
+            { ...prefilledBgData },
+            instrumentId,
+            'BG'
+        );
+
+        if (!pdfPath) {
+            throw new Error(`Failed to generate BG prefilled format for instrument ${instrumentId}`);
+        }
+
+        await this.db
+            .update(instrumentBgDetails)
+            .set({ prefilledAppDocx: pdfPath })
+            .where(eq(instrumentBgDetails.instrumentId, instrumentId));
+
+        this.logger.log(`BG prefilled application generated for instrument ${instrumentId}: ${pdfPath}`);
+        return { pdfPath };
+    }
+
     /**
      * Send email notification for payment instrument (Bank Transfer, Portal Payment)
      */
@@ -2747,51 +2802,6 @@ export class PaymentRequestsNotificationService {
                 } catch (error) {
                     this.logger.warn(
                         `BG covering letter generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
-                    );
-                }
-
-                try {
-                    const prefilledBgData = this.buildBgPrefilledData({
-                        date: this.formatDateDDMMYYYY(new Date()),
-                        bgAmount: instrument.amount ? `${Number(instrument.amount).toLocaleString('en-IN')}/-` : '',
-                        beneficiaryName: bgDetails?.beneficiaryName || '',
-                        beneficiaryAddress: bgDetails?.beneficiaryAddress || '',
-                        bgExpiryDate: bgDetails?.bgExpiryDate ? this.formatDateDDMMYYYY(bgDetails.bgExpiryDate) : '',
-                        claimExpiryDate: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',
-                        accountNo: '2502245699295242',
-                        ifsc: bgDetails?.bgBankIfsc || '',
-                        uniqueCode: bgDetails?.uniqueCode || '',
-                    });
-
-                    await this.docxService.buildPrefilledApplication(prefilledBgData as any, instrumentId).catch((error) => {
-                        this.logger.warn(
-                            `BG prefilled application DOCX generation failed for instrument ${instrumentId}: ${error instanceof Error ? error.message : String(error)}`
-                        );
-                    });
-
-                    const [prefilledBgPath] = await this.pdfGenerator.generatePdfs(
-                        'bgPrefilledFormat',
-                        { ...prefilledBgData },
-                        instrumentId,
-                        'BG'
-                    );
-
-                    if (prefilledBgPath) {
-                        addAttachmentLink('Pre-filled Application Format', prefilledBgPath);
-                        try {
-                            await this.db
-                                .update(instrumentBgDetails)
-                                .set({ prefilledAppDocx: prefilledBgPath })
-                                .where(eq(instrumentBgDetails.instrumentId, instrumentId));
-                        } catch (persistError) {
-                            this.logger.warn(
-                                `Failed to persist BG prefilled application path for instrument ${instrumentId}: ${persistError instanceof Error ? persistError.message : String(persistError)}`
-                            );
-                        }
-                    }
-                } catch (error) {
-                    this.logger.warn(
-                        `BG prefilled application format generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
                     );
                 }
 

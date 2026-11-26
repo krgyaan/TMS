@@ -60,6 +60,11 @@ export class BankGuaranteeController {
         return this.bankGuaranteeService.getMailPreview(id, body);
     }
 
+    @Post('instruments/:id/prefilled-format')
+    async generatePrefilledFormat(@Param('id', ParseIntPipe) id: number, @Body() body: any) {
+        return this.bankGuaranteeService.generatePrefilledFormat(id, body?.fdrNo);
+    }
+
     @Post('old-bg')
     async createOldBg(@Body() body: any, @Req() req: any) {
         return this.bankGuaranteeService.createOldBg(body, req.user);

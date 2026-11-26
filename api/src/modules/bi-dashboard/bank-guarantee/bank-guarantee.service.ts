@@ -1194,6 +1194,10 @@ private readBodyFileValue(body: unknown, field: string): unknown {
         return this.paymentRequestsNotificationService.getBgMailPreview(instrumentId, stage, body.files ?? {});
     }
 
+    async generatePrefilledFormat(instrumentId: number, fdrNo?: string) {
+        return this.paymentRequestsNotificationService.generateBgPrefilledApplication(instrumentId, fdrNo);
+    }
+
     async updateAction(
         instrumentId: number,
         body: any,
