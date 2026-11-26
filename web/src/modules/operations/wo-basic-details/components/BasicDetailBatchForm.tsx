@@ -10,6 +10,7 @@ import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCreateWoBasicDetailBatch, useWoBasicDetailPrefill, useWoBasicDetailsByTender } from "@/hooks/api/useWoBasicDetails";
+import { formatINR } from "@/hooks/useINRFormatter";
 import type { CreateWoBasicDetailBatchDto, CreateWoBasicDetailBatchOrderDto } from "@/modules/operations/types/wo.types";
 import { ArrowLeft, ArrowRight, Plus, Save, SkipForward, Trash2 } from "lucide-react";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
@@ -17,6 +18,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { GEM_REQUEST_OPTIONS, NATURE_OPTIONS, PO_RECEIVED_OPTIONS, TEAM_ARRAY, TMS_DOCS } from "../helpers/basiDetailBatch.constants";
+import { computeGemChargesBreakdown, GEM_GST_RATE, GEM_TDS_RATE } from "../helpers/gemCharges";
 import type { BasicDetailBatchFormValues, BasicDetailOrderType, ContactRow, OrderDefaults, OrderRow } from "../helpers/basiDetailBatch.types";
 
 const emptyContact = (): ContactRow => ({
@@ -428,6 +430,10 @@ export function BasicDetailBatchForm() {
 
     const activeRow = rows[activeOrder] ?? rows[0];
     const activeIdentifiers = activeRow ? projectIdentifiers(activeRow, activeOrder) : { code: "", name: "" };
+    const activeGemBreakdown = useMemo(
+        () => computeGemChargesBreakdown(activeRow?.gemChargesAmount),
+        [activeRow?.gemChargesAmount],
+    );
 
     return (
         <Form {...form}>
@@ -659,7 +665,7 @@ export function BasicDetailBatchForm() {
                                     </div>
                                 </div>
                                 <div className="space-y-3 rounded-lg border p-4">
-                                    <div className="grid gap-4 md:grid-cols-3">
+                                    <div className="grid gap-4 md:grid-cols-4">
                                         <SelectField
                                             control={form.control}
                                             name={`orders.${activeOrder}.requestGemCharges`}
@@ -676,7 +682,7 @@ export function BasicDetailBatchForm() {
                                         </p>
                                     )}
                                     {activeRow.requestGemCharges === "true" && (
-                                        <div className="grid gap-4 md:grid-cols-3">
+                                        <div className="grid gap-4 md:grid-cols-4">
                                             <div className="space-y-1">
                                                 <LabeledNumber
                                                     label={isGemTender ? "GeM Charges (Pre-GST) *" : "GeM Charges (Pre-GST)"}
@@ -701,6 +707,31 @@ export function BasicDetailBatchForm() {
                                                     onChange={files => updateRow(activeOrder, { gemChargesInvoice: files })}
                                                 />
                                             </div>
+                                        </div>
+                                    )}
+                                    {activeRow.requestGemCharges === "true" && (
+                                        <div className="space-y-2">
+                                            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 rounded-lg border p-4">
+                                                <div className="space-y-1">
+                                                    <p className="text-sm text-muted-foreground">GST @ {GEM_GST_RATE}%</p>
+                                                    <p>{formatINR(activeGemBreakdown.gstAmount)}</p>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <p className="text-sm text-muted-foreground">Total Payable</p>
+                                                    <p>{formatINR(activeGemBreakdown.totalPayable)}</p>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <p className="text-sm text-muted-foreground">TDS @ {GEM_TDS_RATE}%</p>
+                                                    <p className="text-destructive">-{formatINR(activeGemBreakdown.tdsAmount)}</p>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <p className="text-sm text-muted-foreground">Net Payable</p>
+                                                    <p className="text-emerald-600">{formatINR(activeGemBreakdown.netPayable)}</p>
+                                                </div>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                The maker request will be auto-created for the Net Payable amount ({formatINR(activeGemBreakdown.netPayable)}).
+                                            </p>
                                         </div>
                                     )}
                                 </div>
