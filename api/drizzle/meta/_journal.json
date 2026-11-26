@@ -855,6 +855,13 @@
       "when": 1809000000000,
       "tag": "0192_add_wo_project_order_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 146,
+      "version": "7",
+      "when": 1810000000000,
+      "tag": "0193_add_contact_phones",
+      "breakpoints": true
     }
   ]
 }

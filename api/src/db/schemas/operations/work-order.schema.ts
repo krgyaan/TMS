@@ -399,6 +399,7 @@ export const woContacts = pgTable("wo_contacts", {
     name: varchar("name", { length: 255 }),
     designation: varchar("designation", { length: 50 }),
     phone: varchar("phone", { length: 20 }),
+    phones: jsonb("phones").$type<string[]>().notNull().default([]),
     email: varchar("email", { length: 255 }),
 
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
