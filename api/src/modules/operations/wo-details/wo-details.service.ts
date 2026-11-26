@@ -1,5 +1,6 @@
 import { projects } from '@/db/schemas/master/projects.schema';
 import { users } from '@/db/schemas/auth/users.schema';
+import { inventoryItems } from '@/db/schemas/accounts/inventory-items.schema';
 import { AppLogger } from '@/logger/app-logger.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { ClientDirectorySyncService } from '@/modules/shared/client-directory/client-directory-sync.service';
@@ -11,7 +12,7 @@ import {
 } from '@db/schemas/operations';
 import { rfqResponseDocuments, rfqResponses, rfqs, tenderCostingSheets, tenderInfos } from '@db/schemas/tendering';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, desc, eq, ilike, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { Page1ContactDto, SavePage1Dto, SubmitPage1Dto } from './dto/page1-handover.dto';
 import type { SavePage2Dto, SubmitPage2Dto } from './dto/page2-compliance.dto';
@@ -1767,16 +1768,21 @@ export class WoDetailsService {
     items: NonNullable<SavePage4Dto['billingBoq']>,
     woDetailId: number,
     now: Date,
+    inventoryMeta: Map<number, { itemCode: string; hsnCode: string | null }>,
   ) {
     return items.map((item, index) => {
       const basicAmount = parseFloat(item.quantity) * parseFloat(item.rate);
       const gstRate = item.gstRate ? parseFloat(item.gstRate) : 0;
       const gstAmount = (basicAmount * gstRate) / 100;
+      const meta = item.inventoryItemId ? inventoryMeta.get(item.inventoryItemId) : undefined;
 
       return {
         woDetailId,
         srNo: item.srNo,
+        inventoryItemId: item.inventoryItemId ?? null,
+        itemCode: meta?.itemCode ?? item.itemCode?.trim() ?? null,
         itemDescription: item.itemDescription,
+        hsnSac: item.hsnSac?.trim() || meta?.hsnCode || null,
         quantity: item.quantity,
         rate: item.rate,
         amount: basicAmount.toFixed(2),
@@ -1796,6 +1802,42 @@ export class WoDetailsService {
     data: SavePage4Dto,
   ) {
     const now = new Date();
+
+    const inventoryItemIds = [
+      ...(data.billingBoq ?? []),
+      ...(data.buybackBoq ?? []),
+    ]
+      .map((item) => item.inventoryItemId)
+      .filter((id): id is number => typeof id === 'number');
+
+    const inventoryMeta = new Map<number, { itemCode: string; hsnCode: string | null }>();
+
+    if (inventoryItemIds.length > 0) {
+      const uniqueIds = [...new Set(inventoryItemIds)];
+      const rows = await this.db
+        .select({
+          id: inventoryItems.id,
+          itemCode: inventoryItems.itemCode,
+          hsnCode: inventoryItems.hsnCode,
+        })
+        .from(inventoryItems)
+        .where(inArray(inventoryItems.id, uniqueIds));
+
+      const foundIds = new Set(rows.map((row) => row.id));
+      const missingIds = uniqueIds.filter((id) => !foundIds.has(id));
+      if (missingIds.length > 0) {
+        throw new BadRequestException(
+          `Invalid inventory item id(s): ${missingIds.join(', ')}`,
+        );
+      }
+
+      for (const row of rows) {
+        inventoryMeta.set(row.id, {
+          itemCode: row.itemCode,
+          hsnCode: row.hsnCode,
+        });
+      }
+    }
 
     // Order Nature lives on the Basic Detail and is mirrored to the project
     if (data.orderNature !== undefined) {
@@ -1817,7 +1859,7 @@ export class WoDetailsService {
         .where(eq(woBillingBoq.woDetailId, woDetailId));
 
       if (data.billingBoq.length > 0) {
-        const billingItems = this.buildBoqRows(data.billingBoq, woDetailId, now);
+        const billingItems = this.buildBoqRows(data.billingBoq, woDetailId, now, inventoryMeta);
         await this.db.insert(woBillingBoq).values(billingItems);
       }
     }
@@ -1829,7 +1871,7 @@ export class WoDetailsService {
         .where(eq(woBuybackBoq.woDetailId, woDetailId));
 
       if (data.buybackBoq.length > 0) {
-        const buybackItems = this.buildBoqRows(data.buybackBoq, woDetailId, now);
+        const buybackItems = this.buildBoqRows(data.buybackBoq, woDetailId, now, inventoryMeta);
         await this.db.insert(woBuybackBoq).values(buybackItems);
       }
     }

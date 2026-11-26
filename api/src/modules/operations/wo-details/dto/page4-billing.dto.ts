@@ -7,7 +7,10 @@ import { DecimalSchema, PositiveIntSchema } from "./wo-details.dto";
 export const BOQItemSchema = z.object({
   id: PositiveIntSchema.optional(),
   srNo: z.number().int().positive("SR No must be positive"),
+  inventoryItemId: PositiveIntSchema.nullable().optional(),
+  itemCode: z.string().trim().max(80).nullable().optional(),
   itemDescription: z.string().min(1, "Item description is required"),
+  hsnSac: z.string().trim().max(100).nullable().optional(),
   quantity: DecimalSchema,
   rate: DecimalSchema,
   amount: DecimalSchema.optional(), // Basic amount (qty * rate), calculated server-side

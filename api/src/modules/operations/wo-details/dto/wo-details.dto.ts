@@ -315,8 +315,11 @@ export type SubmitPage3Dto = z.infer<typeof SubmitPage3Schema>;
 
 export const BOQItemSchema = z.object({
   id: z.number().int().positive().optional(),
-  srNo: z.coerce.number().int().positive(),
+  srNo: z.number().int().positive(),
+  inventoryItemId: PositiveIntSchema.nullable().optional(),
+  itemCode: z.string().trim().max(80).nullable().optional(),
   itemDescription: z.string().min(1, 'Item description is required'),
+  hsnSac: z.string().trim().max(100).nullable().optional(),
   quantity: DecimalSchema,
   rate: DecimalSchema,
   amount: DecimalSchema.optional(),
