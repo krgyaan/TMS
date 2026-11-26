@@ -1,4 +1,5 @@
 import { bigint, bigserial, boolean, date, index, integer, jsonb, numeric, pgTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
+import { inventoryItems } from "@db/schemas/accounts/inventory-items.schema";
 
 // WO Basic Details - Initial project info filled by TE within 12 hours of PO receipt
 export const woBasicDetails = pgTable("wo_basic_details", {
@@ -415,7 +416,11 @@ export const woBillingBoq = pgTable("wo_billing_boq", {
         .references(() => woDetails.id, { onDelete: "cascade" }),
 
     srNo: integer("sr_no").notNull(),
+    inventoryItemId: bigint("inventory_item_id", { mode: "number" })
+        .references(() => inventoryItems.id, { onDelete: "set null" }),
+    itemCode: varchar("item_code", { length: 80 }),
     itemDescription: text("item_description").notNull(),
+    hsnSac: varchar("hsn_sac", { length: 100 }),
     quantity: numeric("quantity", { precision: 20, scale: 2 }).notNull(),
     rate: numeric("rate", { precision: 20, scale: 2 }).notNull(),
     amount: numeric("amount", { precision: 20, scale: 2 }),
@@ -429,6 +434,7 @@ export const woBillingBoq = pgTable("wo_billing_boq", {
 }, (table) => ([
     index("idx_billing_boq_wo_detail").on(table.woDetailId),
     index("idx_billing_boq_sort_order").on(table.sortOrder),
+    index("idx_billing_boq_inventory_item").on(table.inventoryItemId),
 ]));
 
 // WO Buyback BOQ
@@ -438,7 +444,11 @@ export const woBuybackBoq = pgTable("wo_buyback_boq", {
         .references(() => woDetails.id, { onDelete: "cascade" }),
 
     srNo: integer("sr_no").notNull(),
+    inventoryItemId: bigint("inventory_item_id", { mode: "number" })
+        .references(() => inventoryItems.id, { onDelete: "set null" }),
+    itemCode: varchar("item_code", { length: 80 }),
     itemDescription: text("item_description").notNull(),
+    hsnSac: varchar("hsn_sac", { length: 100 }),
     quantity: numeric("quantity", { precision: 20, scale: 2 }).notNull(),
     rate: numeric("rate", { precision: 20, scale: 2 }).notNull(),
     amount: numeric("amount", { precision: 20, scale: 2 }),
@@ -451,6 +461,7 @@ export const woBuybackBoq = pgTable("wo_buyback_boq", {
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ([
     index("idx_buyback_boq_wo_detail").on(table.woDetailId),
+    index("idx_buyback_boq_inventory_item").on(table.inventoryItemId),
 ]));
 
 // WO Billing Addresses
