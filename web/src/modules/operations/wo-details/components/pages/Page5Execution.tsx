@@ -182,7 +182,6 @@ export function Page5Execution({
                                 <MapPinned className="h-4 w-4 text-muted-foreground" />
                                 Site Visit Assessment
                             </h3>
-                            <p className="text-xs text-muted-foreground mb-4">Determine if a site visit is necessary for project execution.</p>
                             <div className="max-w-xs mb-4">
                                 <SelectField
                                     control={form.control}
@@ -221,7 +220,6 @@ export function Page5Execution({
                                 <FileText className="h-4 w-4 text-muted-foreground" />
                                 Product/Document Approval
                             </h3>
-                            <p className="text-xs text-muted-foreground mb-4">Identify documents that need to be collected or prepared.</p>
 
                             {(tenderFormDocs.length > 0 || rfqResponseDocs.length > 0) && (
                                 <div className="mb-6 p-4 border border-dashed rounded-lg space-y-4 bg-muted/20">

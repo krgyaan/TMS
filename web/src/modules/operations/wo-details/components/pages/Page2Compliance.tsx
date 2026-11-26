@@ -7,12 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { useInfoSheet } from "@/hooks/api/useInfoSheets";
 import { useAutoSave } from "@/hooks/api/useWoDetails";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FileText, Info, ShieldCheck } from "lucide-react";
-import { useCallback, useEffect } from "react";
+import { Info, ShieldCheck } from "lucide-react";
+import { useCallback, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { WIZARD_CONFIG, YES_NO_OPTIONS } from "../../helpers/constants";
+import { calculateMaxLdDate } from "../../helpers/ldDate";
 import { formToApi } from "../../helpers/woDetail.mapper";
 import { Page2FormSchema } from "../../helpers/woDetail.schema";
 import { WizardNavigation } from "../WizardNavigation";
@@ -38,6 +40,7 @@ const defaultValues: Page2FormValues = {
 
 export function Page2Compliance({
     woDetailId,
+    tenderId,
     initialData,
     onSaveDraft,
     onSaveDraftOnly,
@@ -50,11 +53,18 @@ export function Page2Compliance({
         defaultValues: { ...defaultValues, ...initialData },
     });
 
+    const { data: infoSheet } = useInfoSheet(tenderId ?? null);
+    const seededRef = useRef(false);
+    const lastLdStartRef = useRef<string | null>(null);
+
     const { autoSave, isSaving: isAutoSaving } = useAutoSave(woDetailId, 2, true, 4000, formToApi.page2);
 
     const watchLdApplicable = form.watch("ldApplicable");
+    const watchLdStartDate = form.watch("ldStartDate");
+    const watchMaxLd = form.watch("maxLd");
     const watchPbgApplicable = form.watch("isPbgApplicable");
     const watchContractAgreement = form.watch("isContractAgreement");
+    const { dirtyFields } = form.formState;
 
     useEffect(() => {
         const subscription = form.watch((values) => {
@@ -68,6 +78,40 @@ export function Page2Compliance({
             form.reset({ ...defaultValues, ...initialData });
         }
     }, [initialData, form]);
+
+    useEffect(() => {
+        if (!infoSheet || seededRef.current) return;
+        seededRef.current = true;
+
+        const isNew = !initialData;
+        const current = form.getValues();
+        const ldRequired = infoSheet.ldRequired?.toUpperCase();
+
+        const ldApplicable = ldRequired === "YES" ? "true" : ldRequired === "NO" ? "false" : undefined;
+        if (ldApplicable && (isNew || !current.ldApplicable)) {
+            form.setValue("ldApplicable", ldApplicable, { shouldDirty: false, shouldValidate: false });
+        }
+
+        if (infoSheet.maxLdPercentage != null && (isNew || !current.maxLd)) {
+            form.setValue("maxLd", String(infoSheet.maxLdPercentage), { shouldDirty: false, shouldValidate: false });
+        }
+    }, [infoSheet, initialData, form]);
+
+    useEffect(() => {
+        const startDate = watchLdStartDate ?? "";
+        if (lastLdStartRef.current === null) {
+            lastLdStartRef.current = startDate;
+            return;
+        }
+        if (!dirtyFields.ldStartDate || startDate === lastLdStartRef.current) return;
+        lastLdStartRef.current = startDate;
+
+        const maxLd = watchMaxLd || infoSheet?.maxLdPercentage;
+        const computed = calculateMaxLdDate(startDate, maxLd, infoSheet?.ldPercentagePerWeek);
+        if (computed) {
+            form.setValue("maxLdDate", computed, { shouldValidate: true });
+        }
+    }, [watchLdStartDate, watchMaxLd, dirtyFields.ldStartDate, infoSheet, form]);
 
     useEffect(() => {
         if (watchLdApplicable !== "true") {
@@ -123,11 +167,6 @@ export function Page2Compliance({
                     <CardContent className="space-y-8">
                         {/* LD Section */}
                         <div>
-                            <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                                <ShieldCheck className="h-4 w-4 text-muted-foreground" />
-                                Liquidated Damages (LD)
-                            </h3>
-                            <p className="text-xs text-muted-foreground mb-4">Configure penalties for completion delays.</p>
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                 <SelectField
                                     control={form.control}
@@ -172,16 +211,17 @@ export function Page2Compliance({
                                     />
                                 </ConditionalSection>
                             </div>
+                            {infoSheet && watchLdApplicable === "true" && (infoSheet.ldPercentagePerWeek != null || infoSheet.maxLdPercentage != null) && (
+                                <p className="mt-2 text-xs text-muted-foreground">
+                                    From tender info sheet: LD {infoSheet.ldPercentagePerWeek ?? "-"}% per week, max {infoSheet.maxLdPercentage ?? "-"}%. Max LD Date is calculated from the LD Start Date.
+                                </p>
+                            )}
                         </div>
 
                         <Separator />
 
                         {/* PBG & Contract Agreement Section */}
                         <div>
-                            <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                                <FileText className="h-4 w-4 text-muted-foreground" />
-                                PBG and Contract Agreement
-                            </h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
                                 <SelectField
                                     control={form.control}
@@ -224,11 +264,6 @@ export function Page2Compliance({
 
                         {/* PO Section */}
                         <div>
-                            <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                                <FileText className="h-4 w-4 text-muted-foreground" />
-                                Detailed PO / FOA Requirements
-                            </h3>
-                            <p className="text-xs text-muted-foreground mb-4">SAP PO and detailed work order configurations.</p>
                             <div className="max-w-xs">
                                 <SelectField
                                     control={form.control}

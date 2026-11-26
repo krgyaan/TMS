@@ -828,6 +828,11 @@ export class WoBasicDetailsService {
             }
         }
 
+        // Notify one WhatsApp message per created order.
+        for (const item of created) {
+            this.notifyWoBasicDetailsWhatsapp(item.basic, 'created', { organizationId });
+        }
+
         return created.map(({ basic, projectId }) => ({
             ...this.mapRowToResponse(basic),
             projectId,
