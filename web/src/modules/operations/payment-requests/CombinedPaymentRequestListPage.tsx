@@ -23,7 +23,7 @@ import { useTeamFilter } from "@/hooks/useTeamFilter";
 import { referenceName } from "@/lib/id-utils";
 import { PaymentRequestDetailDialog } from "@/modules/operations/payment-requests/components/PaymentRequestDetailDialog";
 import type { PaymentRequestRow } from "@/modules/operations/payment-requests/helpers/paymentRequest.types";
-import { calculateTds } from "@/modules/operations/payment-requests/helpers/tds-calculator";
+import { computeRowTdsDisplay } from "@/modules/operations/payment-requests/helpers/tds-calculator";
 import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
 import { Ban, Banknote, CheckCircle2, Copy, Eye, RotateCcw, Search, Upload } from "lucide-react";
@@ -315,14 +315,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
             field: "netPayable" as keyof PaymentRequestRow,
             headerName: "Net Payable",
             sortable: false,
-            valueGetter: (p) => {
-                const amount = Number(p.data?.amount || 0);
-                if (p.data?.status === "payment_done") {
-                    return amount - Number(p.data?.actualTdsDeducted ?? 0);
-                }
-                const tdsPct = Number(p.data?.tdsPercentage || 0);
-                return tdsPct > 0 ? calculateTds(amount, tdsPct).netPayable : amount;
-            },
+            valueGetter: (p) => (p.data ? computeRowTdsDisplay(p.data).netPayable : 0),
             valueFormatter: (p: ValueFormatterParams) => formatINR(p.value),
         },
         {
