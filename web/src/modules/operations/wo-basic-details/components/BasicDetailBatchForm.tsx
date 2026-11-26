@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useCreateWoBasicDetailBatch, useWoBasicDetailPrefill, useWoBasicDetailsByTender } from "@/hooks/api/useWoBasicDetails";
 import type { CreateWoBasicDetailBatchDto, CreateWoBasicDetailBatchOrderDto } from "@/modules/operations/types/wo.types";
 import { ArrowLeft, ArrowRight, Plus, Save, SkipForward, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -553,11 +553,8 @@ export function BasicDetailBatchForm() {
                                         <TableHead>WO Date</TableHead>
                                         <TableHead>WO Value (pre GST)</TableHead>
                                         <TableHead>GST Amt.</TableHead>
-                                        <TableHead>Nature</TableHead>
-                                        <TableHead className="min-w-[240px]">SAP PO</TableHead>
                                         <TableHead className="min-w-[240px]">Project</TableHead>
-                                        <TableHead className="min-w-[220px]">Draft WO</TableHead>
-                                        <TableHead className="w-12" />
+                                        <TableHead className="w-12">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -568,100 +565,105 @@ export function BasicDetailBatchForm() {
                                             orderType === "repeat" ? `R${sequence}` :
                                             orderType === "multiple" ? `P${sequence}` : "Single";
                                         return (
-                                            <TableRow key={index}>
-                                                <TableCell className="align-top text-sm font-semibold">{label}</TableCell>
-                                                <TableCell className="align-top">
-                                                    <Input
-                                                        value={row.woNumber}
-                                                        onChange={event => updateRow(index, { woNumber: event.target.value })}
-                                                        placeholder="WO number"
-                                                    />
-                                                    {errors[`${index}.woNumber`] && <p className="mt-1 text-xs text-destructive">{errors[`${index}.woNumber`]}</p>}
-                                                </TableCell>
-                                                <TableCell className="align-top min-w-[150px]">
-                                                    <DateInput
-                                                        value={row.woDate ? row.woDate.toISOString().split("T")[0] : ""}
-                                                        onChange={value => updateRow(index, { woDate: value ? new Date(value) : null })}
-                                                    />
-                                                    {errors[`${index}.woDate`] && <p className="mt-1 text-xs text-destructive">{errors[`${index}.woDate`]}</p>}
-                                                </TableCell>
-                                                <TableCell className="align-top min-w-[130px]">
-                                                    <Input type="number" step="0.01" value={row.woValuePreGst} onChange={event => updateRow(index, { woValuePreGst: event.target.value })} />
-                                                    {errors[`${index}.woValuePreGst`] && <p className="mt-1 text-xs text-destructive">{errors[`${index}.woValuePreGst`]}</p>}
-                                                </TableCell>
-                                                <TableCell className="align-top min-w-[130px]">
-                                                    <Input type="number" step="0.01" value={row.woValueGstAmt} onChange={event => updateRow(index, { woValueGstAmt: event.target.value })} />
-                                                    {errors[`${index}.woValueGstAmt`] && <p className="mt-1 text-xs text-destructive">{errors[`${index}.woValueGstAmt`]}</p>}
-                                                </TableCell>
-                                                <TableCell className="align-top min-w-[140px]">
-                                                    <select
-                                                        className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-                                                        value={row.orderNature}
-                                                        onChange={event => updateRow(index, { orderNature: event.target.value as OrderRow["orderNature"] })}
-                                                    >
-                                                        <option value="">Select</option>
-                                                        <option value="supply">Supply</option>
-                                                        <option value="service">Service</option>
-                                                        <option value="sitc">SITC</option>
-                                                    </select>
-                                                    {errors[`${index}.orderNature`] && <p className="mt-1 text-xs text-destructive">{errors[`${index}.orderNature`]}</p>}
-                                                </TableCell>
-                                                <TableCell className="align-top min-w-[240px]">
-                                                    <div className="space-y-2">
+                                            <Fragment key={index}>
+                                                <TableRow className="border-b-0">
+                                                    <TableCell rowSpan={2} className="align-top text-sm font-semibold">{label}</TableCell>
+                                                    <TableCell className="align-top">
+                                                        <Input
+                                                            value={row.woNumber}
+                                                            onChange={event => updateRow(index, { woNumber: event.target.value })}
+                                                            placeholder="WO number"
+                                                        />
+                                                        {errors[`${index}.woNumber`] && <p className="mt-1 text-xs text-destructive">{errors[`${index}.woNumber`]}</p>}
+                                                    </TableCell>
+                                                    <TableCell className="align-top min-w-[150px]">
+                                                        <DateInput
+                                                            value={row.woDate ? row.woDate.toISOString().split("T")[0] : ""}
+                                                            onChange={value => updateRow(index, { woDate: value ? new Date(value) : null })}
+                                                        />
+                                                        {errors[`${index}.woDate`] && <p className="mt-1 text-xs text-destructive">{errors[`${index}.woDate`]}</p>}
+                                                    </TableCell>
+                                                    <TableCell className="align-top min-w-[130px]">
+                                                        <Input type="number" step="0.01" value={row.woValuePreGst} onChange={event => updateRow(index, { woValuePreGst: event.target.value })} />
+                                                        {errors[`${index}.woValuePreGst`] && <p className="mt-1 text-xs text-destructive">{errors[`${index}.woValuePreGst`]}</p>}
+                                                    </TableCell>
+                                                    <TableCell className="align-top min-w-[130px]">
+                                                        <Input type="number" step="0.01" value={row.woValueGstAmt} onChange={event => updateRow(index, { woValueGstAmt: event.target.value })} />
+                                                        {errors[`${index}.woValueGstAmt`] && <p className="mt-1 text-xs text-destructive">{errors[`${index}.woValueGstAmt`]}</p>}
+                                                    </TableCell>
+                                                    <TableCell className="align-top min-w-[240px]">
+                                                        <div className="space-y-1">
+                                                            <p className="break-all font-mono text-xs">{identifiers.code || "—"}</p>
+                                                            <p className="text-xs text-muted-foreground">{identifiers.name || "—"}</p>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell rowSpan={2} className="align-top">
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            disabled={rows.length === 1}
+                                                            onClick={() => removeRow(index)}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                                <TableRow className="border-b bg-muted/10">
+                                                    <TableCell className="align-top">
+                                                        <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Nature</p>
                                                         <select
                                                             className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-                                                            value={row.poReceivedStatus}
-                                                            onChange={event => updateRow(index, {
-                                                                poReceivedStatus: event.target.value as OrderRow["poReceivedStatus"],
-                                                                sapPoUpload: event.target.value === "received" ? row.sapPoUpload : [],
-                                                            })}
+                                                            value={row.orderNature}
+                                                            onChange={event => updateRow(index, { orderNature: event.target.value as OrderRow["orderNature"] })}
                                                         >
-                                                            <option value="">Select PO status</option>
-                                                            <option value="received">Received</option>
-                                                            <option value="not_received">Not Received</option>
-                                                            <option value="not_applicable">Not Applicable</option>
+                                                            <option value="">Select</option>
+                                                            <option value="supply">Supply</option>
+                                                            <option value="service">Service</option>
+                                                            <option value="sitc">SITC</option>
                                                         </select>
-                                                        {errors[`${index}.poReceivedStatus`] && <p className="text-xs text-destructive">{errors[`${index}.poReceivedStatus`]}</p>}
-                                                        {row.poReceivedStatus === "received" ? (
-                                                            <>
-                                                                <FileUploader
-                                                                    context="sap-po"
-                                                                    value={row.sapPoUpload}
-                                                                    onChange={files => updateRow(index, { sapPoUpload: files })}
-                                                                />
-                                                                {errors[`${index}.sapPoUpload`] && <p className="text-xs text-destructive">{errors[`${index}.sapPoUpload`]}</p>}
-                                                            </>
-                                                        ) : (
-                                                            <span className="text-xs text-muted-foreground">SAP PO upload shown when Received</span>
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="align-top min-w-[240px]">
-                                                    <div className="space-y-1">
-                                                        <p className="break-all font-mono text-xs">{identifiers.code || "—"}</p>
-                                                        <p className="text-xs text-muted-foreground">{identifiers.name || "—"}</p>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="align-top min-w-[220px]">
-                                                    <FileUploader
-                                                        context="wo-draft"
-                                                        value={row.woDraft}
-                                                        onChange={files => updateRow(index, { woDraft: files })}
-                                                    />
-                                                    {errors[`${index}.woDraft`] && <p className="mt-1 text-xs text-destructive">{errors[`${index}.woDraft`]}</p>}
-                                                </TableCell>
-                                                <TableCell className="align-top">
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        disabled={rows.length === 1}
-                                                        onClick={() => removeRow(index)}
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </TableCell>
-                                            </TableRow>
+                                                        {errors[`${index}.orderNature`] && <p className="mt-1 text-xs text-destructive">{errors[`${index}.orderNature`]}</p>}
+                                                    </TableCell>
+                                                    <TableCell className="align-top">
+                                                        <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">PO Received / SAP PO</p>
+                                                        <div className="space-y-2">
+                                                            <select
+                                                                className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                                                                value={row.poReceivedStatus}
+                                                                onChange={event => updateRow(index, {
+                                                                    poReceivedStatus: event.target.value as OrderRow["poReceivedStatus"],
+                                                                    sapPoUpload: event.target.value === "received" ? row.sapPoUpload : [],
+                                                                })}
+                                                            >
+                                                                <option value="">Select PO status</option>
+                                                                <option value="received">Received</option>
+                                                                <option value="not_received">Not Received</option>
+                                                                <option value="not_applicable">Not Applicable</option>
+                                                            </select>
+                                                            {errors[`${index}.poReceivedStatus`] && <p className="text-xs text-destructive">{errors[`${index}.poReceivedStatus`]}</p>}
+                                                        </div>
+                                                    </TableCell>
+                                                    {row.poReceivedStatus === "received" && (
+                                                        <TableCell className="align-top min-w-[220px]">
+                                                            <FileUploader
+                                                                context="sap-po"
+                                                                value={row.sapPoUpload}
+                                                                onChange={files => updateRow(index, { sapPoUpload: files })}
+                                                            />
+                                                            {errors[`${index}.sapPoUpload`] && <p className="text-xs text-destructive">{errors[`${index}.sapPoUpload`]}</p>}
+                                                        </TableCell>
+                                                    )}
+                                                    <TableCell className="align-top min-w-[220px]">
+                                                        <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Draft WO</p>
+                                                        <FileUploader
+                                                            context="wo-draft"
+                                                            value={row.woDraft}
+                                                            onChange={files => updateRow(index, { woDraft: files })}
+                                                        />
+                                                        {errors[`${index}.woDraft`] && <p className="mt-1 text-xs text-destructive">{errors[`${index}.woDraft`]}</p>}
+                                                    </TableCell>
+                                                </TableRow>
+                                            </Fragment>
                                         );
                                     })}
                                 </TableBody>
