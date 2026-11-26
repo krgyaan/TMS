@@ -142,7 +142,7 @@ export function BasicDetailView({
         data.orderType === "repeat" ? "Repeat" :
         data.orderType === "multiple" ? "Multiple" : "Single";
     const orderSequenceLabel =
-        data.orderType !== "single" && data.orderSequence
+        data.orderType !== "single" && data.orderSequence && data.orderSequence > 1
             ? `${data.orderType === "repeat" ? "R" : "P"}${data.orderSequence}`
             : null;
 
