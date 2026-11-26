@@ -464,13 +464,13 @@ export function Page4Billing({ woDetailId, initialData, basicDetail, onSaveDraft
                         <div>
                             <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
                                 <Package className="h-4 w-4 text-muted-foreground" />
-                                Buyback BOQ
+                                Buyback Purchase BOQ
                             </h3>
                             <div className="max-w-xs mb-4">
                                 <SelectField
                                     control={form.control}
                                     name="buybackBoqApplicable"
-                                    label="Buyback BOQ Applicable?"
+                                    label="Buyback Purchase BOQ Applicable?"
                                     options={YES_NO_OPTIONS}
                                     placeholder="Select"
                                 />
@@ -483,12 +483,12 @@ export function Page4Billing({ woDetailId, initialData, basicDetail, onSaveDraft
                                     removeBuybackBoq,
                                     () => appendBuybackBoq({ ...defaultBoqItem, srNo: buybackBoqFields.length + 1 }),
                                     buybackTotals,
-                                    "Buyback BOQ Items",
+                                    "Buyback Purchase BOQ Items",
                                     0
                                 )
                             ) : (
                                 <p className="text-sm text-muted-foreground italic">
-                                    Buyback BOQ is not applicable for this work order.
+                                    Buyback Purchase BOQ is not applicable for this work order.
                                 </p>
                             )}
                         </div>
