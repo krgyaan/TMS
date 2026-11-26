@@ -117,6 +117,16 @@ class BankGuaranteesService extends BaseApiService {
         );
     }
 
+    async generateAuthorizationLetter(
+        id: number,
+        persons: Array<{ name: string; aadharNo: string }>,
+    ): Promise<{ pdfPath: string }> {
+        return this.post<{ pdfPath: string }, { persons: Array<{ name: string; aadharNo: string }> }>(
+            `/instruments/${id}/authorization-letter`,
+            { persons },
+        );
+    }
+
     async createOldBg(payload: Record<string, any>): Promise<{ requestId: number; instrumentId: number }> {
         return this.post<{ requestId: number; instrumentId: number }, Record<string, any>>('/old-bg', payload);
     }

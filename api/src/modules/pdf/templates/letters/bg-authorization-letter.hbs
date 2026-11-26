@@ -189,11 +189,19 @@
                 </tbody>
             </table>
 
+            {{#each authorizedPersons}}
+            <p style="margin-top: 16px;">
+                Name Of Authorized Person: <strong>{{ this.name }}</strong>
+                &nbsp;&nbsp;(Aadhaar No.: <strong>{{ this.aadharNo }}</strong>).
+            </p>
+            {{/each}}
+            {{#unless authorizedPersons.length}}
             <p style="margin-top: 16px;">
                 Name Of Authorized Person:
                 <strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&mdash;&mdash;</strong>
                 &nbsp;&nbsp;&nbsp;&nbsp;(Aadhaar No.: &mdash;&mdash; &mdash;&mdash; &mdash;&mdash;).
             </p>
+            {{/unless}}
 
             <p style="margin-top: 16px;">
                 Kindly handover the above-mentioned documents pertaining to our company to the above-mentioned

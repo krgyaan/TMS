@@ -163,6 +163,23 @@ export const useGenerateBankGuaranteeCoveringLetter = () => {
     });
 };
 
+export const useGenerateBankGuaranteeAuthorizationLetter = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({
+            id,
+            persons,
+        }: {
+            id: number;
+            persons: Array<{ name: string; aadharNo: string }>;
+        }) => bankGuaranteesService.generateAuthorizationLetter(id, persons),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.detail(variables.id) });
+        },
+    });
+};
+
 export const useCreateBankGuaranteeOldBg = () => {
     const queryClient = useQueryClient();
 

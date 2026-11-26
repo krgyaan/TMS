@@ -874,6 +874,25 @@ private parseStringArray(v: unknown): string[] | null {
     return arr.map((x) => String(x).trim()).filter(Boolean);
 }
 
+private parseAuthorizationPersons(v: unknown): Array<{ name: string; aadharNo: string }> | null {
+    if (v === undefined || v === null) return null;
+    let arr: unknown = v;
+    if (typeof v === 'string') {
+        try {
+            arr = JSON.parse(v);
+        } catch {
+            return null;
+        }
+    }
+    if (!Array.isArray(arr)) return null;
+    return arr
+        .map((item: any) => ({
+            name: String(item?.name ?? '').trim(),
+            aadharNo: String(item?.aadharNo ?? item?.aadhar_no ?? '').trim(),
+        }))
+        .filter((person) => person.name.length > 0);
+}
+
 private hasFileValue(v: unknown): boolean {
     return (this.parseStringArray(v)?.length ?? 0) > 0;
 }
@@ -1205,6 +1224,13 @@ private readBodyFileValue(body: unknown, field: string): unknown {
         return this.paymentRequestsNotificationService.generateBgCoveringLetter(instrumentId, overrides);
     }
 
+    async generateAuthorizationLetter(
+        instrumentId: number,
+        persons?: Array<{ name: string; aadharNo: string }>,
+    ) {
+        return this.paymentRequestsNotificationService.generateBgAuthorizationLetter(instrumentId, persons);
+    }
+
     async updateAction(
         instrumentId: number,
         body: any,
@@ -1350,6 +1376,9 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             if (mailIds !== null) bgDetailsUpdate.bankMailIds = mailIds;
             const mailIdsCc = this.parseStringArray(body.bank_mail_ids_cc);
             if (mailIdsCc !== null) bgDetailsUpdate.bankMailIdsCc = mailIdsCc;
+
+            const authorizationPersons = this.parseAuthorizationPersons(body.authorization_persons);
+            if (authorizationPersons !== null) bgDetailsUpdate.authorizationPersons = authorizationPersons;
 
             // FDR details are captured up-front in Form 1 as well. They share the
             // same columns as Accounts Form 3, so a later Form 3 submission
@@ -2267,6 +2296,8 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 prefilledAppDocx: instrumentBgDetails.prefilledAppDocx,
                 coverLetterDocx: instrumentBgDetails.coverLetterDocx,
                 envelopeSlip: instrumentBgDetails.envelopeSlip,
+                authorizationLetterDocx: instrumentBgDetails.authorizationLetterDocx,
+                authorizationPersons: instrumentBgDetails.authorizationPersons,
                 // Accounts Form 3 (capture FDR details)
                 fdrPer: instrumentBgDetails.fdrPer,
                 fdrCopy: instrumentBgDetails.fdrCopy,
@@ -2468,6 +2499,8 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             prefilledAppDocx: result.prefilledAppDocx,
             coverLetterDocx: result.coverLetterDocx,
             envelopeSlip: result.envelopeSlip,
+            authorizationLetterDocx: result.authorizationLetterDocx,
+            authorizationPersons: result.authorizationPersons ?? [],
             // Accounts Form 3 (capture FDR details). fdrPer is returned as a
             // string because the form field is z.enum(['10','15','100']) and the
             // SelectField emits strings for it.

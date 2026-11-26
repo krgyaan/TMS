@@ -73,6 +73,11 @@ export class BankGuaranteeController {
         });
     }
 
+    @Post('instruments/:id/authorization-letter')
+    async generateAuthorizationLetter(@Param('id', ParseIntPipe) id: number, @Body() body: any) {
+        return this.bankGuaranteeService.generateAuthorizationLetter(id, body?.persons);
+    }
+
     @Post('old-bg')
     async createOldBg(@Body() body: any, @Req() req: any) {
         return this.bankGuaranteeService.createOldBg(body, req.user);

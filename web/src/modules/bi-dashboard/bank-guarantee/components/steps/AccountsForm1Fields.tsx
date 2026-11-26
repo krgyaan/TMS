@@ -30,6 +30,12 @@ export interface MailIdsArray {
     remove: (index: number) => void;
 }
 
+export interface AuthorizationPersonsArray {
+    fields: Array<{ id: string }>;
+    append: (value: { name?: string; aadhar_no?: string }) => void;
+    remove: (index: number) => void;
+}
+
 export interface AccountsForm1Names<T extends FieldValues> {
     bgReq: FieldPath<T>;
     reasonReq: FieldPath<T>;
@@ -37,6 +43,7 @@ export interface AccountsForm1Names<T extends FieldValues> {
     prefilledSignedBg: FieldPath<T>;
     bankMailIds: FieldPath<T>;
     bankMailIdsCc: FieldPath<T>;
+    authorizationPersons?: FieldPath<T>;
     bgApprovedFdrPer?: FieldPath<T>;
     fdrAmt?: FieldPath<T>;
     bgFormatImran?: FieldPath<T>;
@@ -124,6 +131,12 @@ interface AccountsForm1FieldsProps<T extends FieldValues> {
     isGeneratingPrefilled?: boolean;
     canGeneratePrefilled?: boolean;
     prefilledPath?: string | null;
+    authorizationPersons?: AuthorizationPersonsArray;
+    employees?: Array<{ id: number | string; name: string }>;
+    onGenerateAuthorizationLetter?: () => void;
+    isGeneratingAuthorizationLetter?: boolean;
+    canGenerateAuthorizationLetter?: boolean;
+    authorizationPath?: string | null;
 }
 
 export function AccountsForm1Fields<T extends FieldValues>({
@@ -138,6 +151,12 @@ export function AccountsForm1Fields<T extends FieldValues>({
     isGeneratingPrefilled,
     canGeneratePrefilled,
     prefilledPath,
+    authorizationPersons,
+    employees = [],
+    onGenerateAuthorizationLetter,
+    isGeneratingAuthorizationLetter,
+    canGenerateAuthorizationLetter,
+    authorizationPath,
 }: AccountsForm1FieldsProps<T>) {
     const bgReq = useWatch({ control, name: names.bgReq });
     const approveBg = useWatch({ control, name: names.approveBg });
@@ -339,6 +358,102 @@ export function AccountsForm1Fields<T extends FieldValues>({
                     </FieldWrapper>
                 )}
             </div>
+
+            {bgReq === 'Accepted' && names.authorizationPersons && authorizationPersons && (
+                <div className="space-y-4 pt-4">
+                    <div className="flex items-center justify-between border-b pb-2">
+                        <h4 className="font-semibold text-base text-primary">Authorization</h4>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => authorizationPersons.append({ name: '', aadhar_no: '' })}
+                            >
+                                <Plus className="mr-2 h-4 w-4" />
+                                Add Person
+                            </Button>
+                            {onGenerateAuthorizationLetter && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={onGenerateAuthorizationLetter}
+                                    disabled={isGeneratingAuthorizationLetter || !canGenerateAuthorizationLetter}
+                                >
+                                    {isGeneratingAuthorizationLetter ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <FileDown className="h-4 w-4" />
+                                    )}
+                                    <span className="ml-1">Generate</span>
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+                    {authorizationPath && (
+                        <a
+                            href={fileUploadService.getFileUrl(authorizationPath)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download
+                            className="inline-flex items-center gap-1 text-sm font-medium text-primary underline"
+                        >
+                            <FileText className="h-4 w-4" />
+                            Authorization Letter
+                        </a>
+                    )}
+                    {authorizationPersons.fields.length === 0 && (
+                        <p className="text-sm text-muted-foreground">No authorized persons added.</p>
+                    )}
+                    <div className="space-y-3">
+                        {authorizationPersons.fields.map((row, index) => (
+                            <div key={row.id} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
+                                <div className="md:col-span-5">
+                                    <SelectField
+                                        control={control}
+                                        name={`${names.authorizationPersons!}.${index}.name` as FieldPath<T>}
+                                        label="Name"
+                                        options={employees.map((employee) => ({
+                                            value: employee.name,
+                                            label: employee.name,
+                                        }))}
+                                        placeholder="Select user"
+                                        valueType="string"
+                                    />
+                                </div>
+                                <div className="md:col-span-5">
+                                    <FieldWrapper
+                                        control={control}
+                                        name={`${names.authorizationPersons!}.${index}.aadhar_no` as FieldPath<T>}
+                                        label="Aadhar No."
+                                    >
+                                        {(field) => (
+                                            <Input
+                                                {...field}
+                                                value={(field.value as string | undefined) ?? ''}
+                                                placeholder="Enter Aadhar number"
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                </div>
+                                <div className="md:col-span-2">
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => authorizationPersons.remove(index)}
+                                        className="text-destructive hover:text-destructive"
+                                        aria-label="Remove authorized person"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             <BankMailIdsFields<T>
                 control={control}

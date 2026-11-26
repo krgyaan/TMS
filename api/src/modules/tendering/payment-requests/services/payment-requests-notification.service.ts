@@ -2176,6 +2176,64 @@ export class PaymentRequestsNotificationService {
         return { pdfPath, envelopePdfPath };
     }
 
+    async generateBgAuthorizationLetter(
+        instrumentId: number,
+        persons?: Array<{ name: string; aadharNo: string }>,
+    ): Promise<{ pdfPath: string }> {
+        const [result] = await this.db
+            .select({
+                instrument: paymentInstruments,
+                bgDetails: instrumentBgDetails,
+            })
+            .from(paymentInstruments)
+            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!result?.instrument) {
+            throw new Error(`Instrument ${instrumentId} not found`);
+        }
+
+        const { instrument, bgDetails } = result;
+        const normalizedPersons = (Array.isArray(persons) ? persons : bgDetails?.authorizationPersons ?? [])
+            .map((person) => ({
+                name: String(person?.name ?? '').trim(),
+                aadharNo: String(person?.aadharNo ?? (person as any)?.aadhar_no ?? '').trim(),
+            }))
+            .filter((person) => person.name.length > 0);
+
+        const authorizationLetterData = {
+            date: this.formatDateDDMMYYYY(new Date()),
+            partyName: bgDetails?.beneficiaryName || '',
+            bgAmount: instrument.amount
+                ? `${Number(instrument.amount).toLocaleString('en-IN')}/-`
+                : '',
+            authorizedPersons: normalizedPersons,
+        };
+
+        const [pdfPath] = await this.pdfGenerator.generatePdfs(
+            'bgAuthorizationLetter',
+            { ...authorizationLetterData },
+            instrumentId,
+            'BG'
+        );
+
+        if (!pdfPath) {
+            throw new Error(`Failed to generate BG authorization letter for instrument ${instrumentId}`);
+        }
+
+        await this.db
+            .update(instrumentBgDetails)
+            .set({
+                authorizationLetterDocx: pdfPath,
+                authorizationPersons: normalizedPersons,
+            })
+            .where(eq(instrumentBgDetails.instrumentId, instrumentId));
+
+        this.logger.log(`BG authorization letter generated for instrument ${instrumentId}: ${pdfPath}`);
+        return { pdfPath };
+    }
+
     /**
      * Send email notification for payment instrument (Bank Transfer, Portal Payment)
      */
@@ -2868,47 +2926,6 @@ export class PaymentRequestsNotificationService {
                     }
                     attachmentLinks.push({ label, url });
                 };
-
-                try {
-                    const authorizationLetterData = {
-                        date: this.formatDateDDMMYYYY(new Date()),
-                        partyName: bgDetails?.beneficiaryName || '',
-                        bgAmount: instrument.amount
-                            ? `${Number(instrument.amount).toLocaleString('en-IN')}/-`
-                            : '',
-                    };
-
-                    await this.docxService.buildAuthorizationLetter(authorizationLetterData, instrumentId).catch((error) => {
-                        this.logger.warn(
-                            `BG authorization letter DOCX generation failed for instrument ${instrumentId}: ${error instanceof Error ? error.message : String(error)}`
-                        );
-                    });
-
-                    const [authorizationLetterPath] = await this.pdfGenerator.generatePdfs(
-                        'bgAuthorizationLetter',
-                        { ...authorizationLetterData },
-                        instrumentId,
-                        'BG'
-                    );
-
-                    if (authorizationLetterPath) {
-                        addAttachmentLink('Authorization Letter', authorizationLetterPath);
-                        try {
-                            await this.db
-                                .update(instrumentBgDetails)
-                                .set({ authorizationLetterDocx: authorizationLetterPath })
-                                .where(eq(instrumentBgDetails.instrumentId, instrumentId));
-                        } catch (persistError) {
-                            this.logger.warn(
-                                `Failed to persist BG authorization letter path for instrument ${instrumentId}: ${persistError instanceof Error ? persistError.message : String(persistError)}`
-                            );
-                        }
-                    }
-                } catch (error) {
-                    this.logger.warn(
-                        `BG authorization letter generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
-                    );
-                }
 
                 // Attachment 1 — the BG Format uploaded in the create form
                 // (bgSoftCopy holds the first uploaded file).
