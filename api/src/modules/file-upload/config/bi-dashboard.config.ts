@@ -1,4 +1,4 @@
-import { MB, DOCS, OFFICE, type FileConfig } from './common';
+import { MB, DOCS, OFFICE, WORD, type FileConfig } from './common';
 
 /**
  * Bi-dashboard module contexts (Bank Guarantee, FDR, Demand Draft, Cheque).
@@ -30,76 +30,76 @@ export const biDashboardConfigs: Record<string, FileConfig> = {
     "bg-format-files": bgFile({
         maxFiles: 5,
         maxSizeBytes: MB(20),
-        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedMimeTypes: [...DOCS, ...WORD],
         allowedExtensions: [".pdf", ".doc", ".docx"],
     }),
     "bg-po-files": bgFile({
         maxFiles: 1,
         maxSizeBytes: MB(5),
-        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedMimeTypes: [...DOCS, ...WORD],
         allowedExtensions: [".pdf", ".doc", ".docx"],
     }),
     // Bank Guarantee file contexts
     "bg-format-imran": bgFile({
         maxFiles: 2,
         maxSizeBytes: MB(10),
-        allowedMimeTypes: [...DOCS],
-        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+        allowedMimeTypes: [...DOCS, ...WORD],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx"],
     }),
     "bg-prefilled-signed": bgFile({
         maxFiles: 2,
         maxSizeBytes: MB(10),
-        allowedMimeTypes: [...DOCS],
-        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+        allowedMimeTypes: [...DOCS, ...WORD],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx"],
     }),
     "bg-sfms-conf": bgFile({
         maxFiles: 2,
         maxSizeBytes: MB(10),
-        allowedMimeTypes: [...DOCS],
-        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+        allowedMimeTypes: [...DOCS, ...WORD],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx"],
     }),
     "bg-fdr-copy": bgFile({
         maxFiles: 2,
         maxSizeBytes: MB(10),
-        allowedMimeTypes: [...DOCS],
-        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+        allowedMimeTypes: [...DOCS, ...WORD],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx"],
     }),
     "bg-ext-letter": bgFile({
         maxFiles: 2,
         maxSizeBytes: MB(10),
-        allowedMimeTypes: [...DOCS],
-        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+        allowedMimeTypes: [...DOCS, ...WORD],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx"],
     }),
     "bg-docket-slip": bgFile({
         maxFiles: 2,
         maxSizeBytes: MB(10),
-        allowedMimeTypes: [...DOCS],
-        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+        allowedMimeTypes: [...DOCS, ...WORD],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx"],
     }),
     "bg-stamp-covering-letter": bgFile({
         maxFiles: 2,
         maxSizeBytes: MB(10),
-        allowedMimeTypes: [...DOCS],
-        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+        allowedMimeTypes: [...DOCS, ...WORD],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx"],
     }),
     "bg-cancell-confirm": bgFile({
         maxFiles: 2,
         maxSizeBytes: MB(10),
-        allowedMimeTypes: [...DOCS],
-        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+        allowedMimeTypes: [...DOCS, ...WORD],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx"],
     }),
     // Accounts Form (BG) 2 - after BG creation
     "bg-upload": bgFile({
         maxFiles: 1,
         maxSizeBytes: MB(10),
-        allowedMimeTypes: [...DOCS],
-        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+        allowedMimeTypes: [...DOCS, ...WORD],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx"],
     }),
     "bg-signed-covering-letter": bgFile({
         maxFiles: 1,
         maxSizeBytes: MB(10),
-        allowedMimeTypes: [...DOCS],
-        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+        allowedMimeTypes: [...DOCS, ...WORD],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx"],
     }),
     "bgcovletter": bgFile({
         maxFiles: 5,

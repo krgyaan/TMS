@@ -1,5 +1,5 @@
 // @ts-expect-error Node's test loader needs the explicit TypeScript extension.
-import { ITEM_CATALOG, UNIT_OPTIONS, findCatalogItem } from "./item-catalog.ts";
+import { ITEM_CATALOG, UNIT_OPTIONS, findCatalogItem } from "./inventoryItem.catalog.ts";
 
 export { UNIT_OPTIONS };
 export type Unit = typeof UNIT_OPTIONS[number];

@@ -32,4 +32,26 @@ describe("computeTdsDeducted", () => {
     it("returns 0 when no TDS is due on the payment amount", () => {
         expect(computeTdsDeducted(0, PO_TDS_PCT, PO_TDS_AMOUNT, 0)).toBe(0);
     });
+
+    describe("194Q @ 0.10%", () => {
+        // Cap is on the pre-GST subtotal (0.10% of 1,00,000 = 100); the payment
+        // request may be GST-inclusive (1,18,000).
+        const CAP = 100;
+
+        it("caps a GST-inclusive payment at the pre-GST document amount", () => {
+            expect(computeTdsDeducted(118000, 0.1, CAP, 0)).toBe(CAP);
+        });
+
+        it("never lets cumulative 0.10% deductions exceed the cap", () => {
+            const first = computeTdsDeducted(59000, 0.1, CAP, 0);
+            const second = computeTdsDeducted(59000, 0.1, CAP, first);
+            expect(first).toBe(59);
+            expect(second).toBe(41);
+            expect(first + second).toBe(CAP);
+        });
+
+        it("returns 0 once a 0.10% cap is exhausted", () => {
+            expect(computeTdsDeducted(59000, 0.1, CAP, CAP)).toBe(0);
+        });
+    });
 });

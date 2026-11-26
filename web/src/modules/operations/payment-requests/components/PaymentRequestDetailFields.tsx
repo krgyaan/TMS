@@ -7,7 +7,7 @@ import { fileUploadService } from "@/services/api/file-upload.service";
 import { purchaseOrderApi } from "@/services/api/purchase-order.api";
 import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
 import type { PaymentRequestRow } from "@/modules/operations/payment-requests/helpers/paymentRequest.types";
-import { calculateTds } from "@/modules/operations/payment-requests/helpers/tds-calculator";
+import { computeTdsDisplay } from "@/modules/operations/payment-requests/helpers/tds-calculator";
 import { PAYMENT_AGAINST_LABELS, STATUS_CONFIG } from "../constants";
 
 interface PaymentRequestDetailFieldsProps {
@@ -34,25 +34,35 @@ export const PaymentRequestDetailFields: React.FC<PaymentRequestDetailFieldsProp
         </div>
         {(() => {
             const actualTds = Number(detail.actualTdsDeducted ?? 0);
-            const tdsPct = Number(detail.tdsPercentage ?? 0);
-            if (tdsPct <= 0 && actualTds <= 0) return null;
-            // For a completed payment the backend persists the capped TDS
-            // (including 0 once the document's TDS budget is exhausted), so
-            // trust that value. Only preview an uncapped estimate otherwise.
+            const prTdsPct = Number(detail.tdsPercentage ?? 0);
+            if (prTdsPct <= 0 && actualTds <= 0) return null;
+
             const isFinal = detail.status === "payment_done";
-            const useCapped = isFinal && (tdsPct > 0 || actualTds > 0);
-            const { tdsAmount, netPayable } = calculateTds(Number(detail.amount), tdsPct);
-            const displayTds = useCapped ? actualTds : tdsAmount;
-            const displayNet = useCapped ? Number(detail.amount) - actualTds : netPayable;
+            const isPo = detail.purchaseOrderId != null;
+            const documentPct = isPo ? Number(detail.poTdsPercentage ?? prTdsPct) : Number(detail.vwoTdsPercentage ?? prTdsPct);
+            const documentCap = isPo ? Number(detail.poTdsAmount ?? 0) : Number(detail.vwoTdsAmount ?? 0);
+            const ratePct = documentCap > 0 ? documentPct : prTdsPct;
+
+            const { tdsAmount: displayTds, netPayable: displayNet, capped } = computeTdsDisplay({
+                amount: Number(detail.amount),
+                tdsPercentage: ratePct,
+                actualTds,
+                isFinal,
+                documentCap,
+            });
+
             return (
                 <div className="col-span-2 mt-2">
                     <Label className="text-muted-foreground text-xs">Net Payable</Label>
                     <p className="font-medium text-green-500">{formatINR(displayNet)}</p>
                     <Label className="text-muted-foreground text-xs font-mono">
-                        {useCapped
-                            ? `TDS Deducted${tdsPct > 0 ? ` (capped @ ${tdsPct}%)` : ""} (-${formatINR(displayTds)}) = Net Payable ${formatINR(displayNet)}`
-                            : `TDS @ ${tdsPct}% (est.) (-${formatINR(displayTds)}) = Net Payable ${formatINR(displayNet)}`}
+                        {isFinal
+                            ? `TDS Deducted${ratePct > 0 ? ` (capped @ ${ratePct}%)` : ""} (-${formatINR(displayTds)}) = Net Payable ${formatINR(displayNet)}`
+                            : `TDS @ ${ratePct}% (est.) (-${formatINR(displayTds)}) = Net Payable ${formatINR(displayNet)}`}
                     </Label>
+                    {capped && (
+                        <p className="text-[11px] text-amber-600">Capped to the document TDS amount.</p>
+                    )}
                 </div>
             );
         })()}

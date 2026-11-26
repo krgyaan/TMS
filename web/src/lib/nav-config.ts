@@ -153,6 +153,7 @@ export const navMain: NavGroup[] = [
             { title: "Assets", url: "/hrms/admin/assets", permission: "hrms.admin" },
             { title: "Training", url: "/hrms/training", permission: "hrms.admin"},
             { title: "Complaints", url: paths.hrms.complaints.list, permission: "hrms.admin" },
+            { title: "Office Inventory", url: paths.hrms.officeInventory, permission: "hrms.office-inventory" },
             // { title: "Probation", url: "", permission: "hrms.admin" },
         ],
     },
