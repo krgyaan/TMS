@@ -2038,6 +2038,91 @@ export class PaymentRequestsNotificationService {
         return { pdfPath };
     }
 
+    async generateBgCoveringLetter(
+        instrumentId: number,
+        overrides: { bgNo?: string; bgDate?: string } = {},
+    ): Promise<{ pdfPath: string }> {
+        const [result] = await this.db
+            .select({
+                instrument: paymentInstruments,
+                request: paymentRequests,
+                bgDetails: instrumentBgDetails,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentInstruments.requestId, paymentRequests.id))
+            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!result?.instrument) {
+            throw new Error(`Instrument ${instrumentId} not found`);
+        }
+
+        const { instrument, request: paymentReq, bgDetails } = result;
+        const tenderTeamId = await this.getTenderTeamId(
+            paymentReq.tenderId || 0,
+            paymentReq.requestedBy || 0,
+        );
+
+        const [tlUser] = await this.db
+            .select({ name: users.name, mobile: users.mobile, email: users.email })
+            .from(users)
+            .where(and(eq(users.team, tenderTeamId), eq(users.roleId, 3)))
+            .limit(1);
+
+        const [accountsLeader] = await this.db
+            .select({ name: users.name, mobile: users.mobile, email: users.email })
+            .from(users)
+            .where(eq(users.email, 'imran@volksenergie.in'))
+            .limit(1);
+
+        const cpContact = await this.resolveBgCoveringLetterCp(bgDetails?.bgClientCp);
+        const reference = await this.resolveBgReference(paymentReq);
+
+        const bgNo = String(overrides.bgNo ?? bgDetails?.bgNo ?? '').trim();
+        const bgDate = overrides.bgDate ?? bgDetails?.bgDate ?? null;
+
+        const coveringLetterData = {
+            date: this.formatDateDDMMYYYY(new Date()),
+            cpName: cpContact.name,
+            cpDesignation: cpContact.designation,
+            courierAddress: this.resolveBgCourierAddress(instrument),
+            referenceNo: reference?.value || '',
+            referenceLabel: reference?.label || '',
+            purpose: formatBgPurpose(bgDetails?.bgPurpose, 'Financial security'),
+            bgNo,
+            bgDate: this.formatDateDDMMYYYY(bgDate),
+            bgExpiryDate: bgDetails?.bgExpiryDate ? this.formatDateDDMMYYYY(bgDetails.bgExpiryDate) : '',
+            claimDate: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',
+            amount: instrument.amount ? Number(instrument.amount).toLocaleString('en-IN') : '',
+            teamLeaderName: tlUser?.name || 'Team Leader',
+            teamLeaderPhone: this.formatPhoneWithCountryCode(tlUser?.mobile),
+            teamLeaderEmail: tlUser?.email || '',
+            accountsLeaderName: accountsLeader?.name || 'Accounts Leader',
+            accountsLeaderPhone: this.formatPhoneWithCountryCode(accountsLeader?.mobile),
+            accountsLeaderEmail: accountsLeader?.email || 'imran@volksenergie.in',
+        };
+
+        const [pdfPath] = await this.pdfGenerator.generatePdfs(
+            'bgCoveringLetter',
+            { ...coveringLetterData },
+            instrumentId,
+            'BG'
+        );
+
+        if (!pdfPath) {
+            throw new Error(`Failed to generate BG covering letter for instrument ${instrumentId}`);
+        }
+
+        await this.db
+            .update(instrumentBgDetails)
+            .set({ coverLetterDocx: pdfPath })
+            .where(eq(instrumentBgDetails.instrumentId, instrumentId));
+
+        this.logger.log(`BG covering letter generated for instrument ${instrumentId}: ${pdfPath}`);
+        return { pdfPath };
+    }
+
     /**
      * Send email notification for payment instrument (Bank Transfer, Portal Payment)
      */
@@ -2719,26 +2804,6 @@ export class PaymentRequestsNotificationService {
                     tenderTeamId = requesterData[0]?.team || 1;
                 }
 
-                // Get TL user
-                const [tlUser] = await this.db
-                    .select({ name: users.name, mobile: users.mobile, email: users.email })
-                    .from(users)
-                    .where(
-                        and(
-                            eq(users.team, tenderTeamId),
-                            eq(users.roleId, 3)
-                        )
-                    )
-                    .limit(1);
-
-                // Accounts Leader shown in the cover letter signature block.
-                const [accountsLeader] = await this.db
-                    .select({ name: users.name, mobile: users.mobile, email: users.email })
-                    .from(users)
-                    .where(eq(users.email, 'imran@volksenergie.in'))
-                    .limit(1);
-
-                const cpContact = await this.resolveBgCoveringLetterCp(bgDetails?.bgClientCp);
                 const bgReference = await this.resolveBgReference(paymentReq);
                 const bgPurposeText = formatBgPurpose(bgDetails?.bgPurpose, 'Financial security');
 
@@ -2750,60 +2815,6 @@ export class PaymentRequestsNotificationService {
                     }
                     attachmentLinks.push({ label, url });
                 };
-
-                try {
-                    const coveringLetterData = {
-                        date: this.formatDateDDMMYYYY(new Date()),
-                        cpName: cpContact.name,
-                        cpDesignation: cpContact.designation,
-                        courierAddress: this.resolveBgCourierAddress(instrument),
-                        referenceNo: bgReference?.value || '',
-                        referenceLabel: bgReference?.label || '',
-                        purpose: bgPurposeText,
-                        bgNo: '',
-                        bgDate: '',
-                        bgExpiryDate: bgDetails?.bgExpiryDate ? this.formatDateDDMMYYYY(bgDetails.bgExpiryDate) : '',
-                        claimDate: bgDetails?.bgClaim ? this.formatDateDDMMYYYY(bgDetails.bgClaim) : '',
-                        amount: instrument.amount ? Number(instrument.amount).toLocaleString('en-IN') : '',
-                        teamLeaderName: tlUser?.name || 'Team Leader',
-                        teamLeaderPhone: this.formatPhoneWithCountryCode(tlUser?.mobile),
-                        teamLeaderEmail: tlUser?.email || '',
-                        accountsLeaderName: accountsLeader?.name || 'Accounts Leader',
-                        accountsLeaderPhone: this.formatPhoneWithCountryCode(accountsLeader?.mobile),
-                        accountsLeaderEmail: accountsLeader?.email || 'imran@volksenergie.in',
-                    };
-
-                    await this.docxService.buildCoveringLetter(coveringLetterData, instrumentId).catch((error) => {
-                        this.logger.warn(
-                            `BG covering letter DOCX generation failed for instrument ${instrumentId}: ${error instanceof Error ? error.message : String(error)}`
-                        );
-                    });
-
-                    const [coveringLetterPath] = await this.pdfGenerator.generatePdfs(
-                        'bgCoveringLetter',
-                        { ...coveringLetterData },
-                        instrumentId,
-                        'BG'
-                    );
-
-                    if (coveringLetterPath) {
-                        addAttachmentLink('Covering Letter', coveringLetterPath);
-                        try {
-                            await this.db
-                                .update(instrumentBgDetails)
-                                .set({ coverLetterDocx: coveringLetterPath })
-                                .where(eq(instrumentBgDetails.instrumentId, instrumentId));
-                        } catch (persistError) {
-                            this.logger.warn(
-                                `Failed to persist BG cover letter path for instrument ${instrumentId}: ${persistError instanceof Error ? persistError.message : String(persistError)}`
-                            );
-                        }
-                    }
-                } catch (error) {
-                    this.logger.warn(
-                        `BG covering letter generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
-                    );
-                }
 
                 try {
                     const authorizationLetterData = {

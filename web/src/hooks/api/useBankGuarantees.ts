@@ -144,6 +144,25 @@ export const useGenerateBankGuaranteePrefilledFormat = () => {
     });
 };
 
+export const useGenerateBankGuaranteeCoveringLetter = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({
+            id,
+            bgNo,
+            bgDate,
+        }: {
+            id: number;
+            bgNo?: string;
+            bgDate?: string;
+        }) => bankGuaranteesService.generateCoveringLetter(id, { bgNo, bgDate }),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.detail(variables.id) });
+        },
+    });
+};
+
 export const useCreateBankGuaranteeOldBg = () => {
     const queryClient = useQueryClient();
 

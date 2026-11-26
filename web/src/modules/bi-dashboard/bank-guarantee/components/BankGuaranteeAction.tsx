@@ -7,7 +7,7 @@ import { Form } from '@/components/ui/form';
 import { SelectField } from '@/components/form/SelectField';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BankGuaranteeActionFormSchema, type BankGuaranteeActionFormValues } from '../helpers/bankGuaranteeActionForm.schema';
-import { useUpdateBankGuaranteeAction, useBGActionFormData, useBGFollowupData, useGenerateBankGuaranteePrefilledFormat } from '@/hooks/api/useBankGuarantees';
+import { useUpdateBankGuaranteeAction, useBGActionFormData, useBGFollowupData, useGenerateBankGuaranteePrefilledFormat, useGenerateBankGuaranteeCoveringLetter } from '@/hooks/api/useBankGuarantees';
 import type { Checkpoint } from '@/components/tendering/SubmissionChecklist';
 import { CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -138,6 +138,7 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
     const [searchParams] = useSearchParams();
     const updateMutation = useUpdateBankGuaranteeAction();
     const generatePrefilledMutation = useGenerateBankGuaranteePrefilledFormat();
+    const generateCoveringLetterMutation = useGenerateBankGuaranteeCoveringLetter();
     const { data: formData } = useBGActionFormData(instrumentId);
     const { data: followupData } = useBGFollowupData(instrumentId);
 
@@ -310,6 +311,32 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
         }
     };
 
+    const handleGenerateCoveringLetter = async () => {
+        const bgNo = String(form.getValues('bg_no') ?? '').trim();
+        const bgDate = toDateString(form.getValues('bg_date'));
+        if (!bgNo || !bgDate) {
+            toast.error('Enter BG No. and BG Creation Date first');
+            return;
+        }
+
+        try {
+            const result = await generateCoveringLetterMutation.mutateAsync({
+                id: instrumentId,
+                bgNo,
+                bgDate,
+            });
+            const link = document.createElement('a');
+            link.href = fileUploadService.getFileUrl(result.pdfPath);
+            link.download = result.pdfPath.split('/').pop() || 'bg-covering-letter.pdf';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            toast.success('Covering letter generated');
+        } catch (error: any) {
+            toast.error(error?.message || 'Failed to generate covering letter');
+        }
+    };
+
     const handleSubmit = async (values: BankGuaranteeActionFormValues) => {
         if (isReadOnly) return;
         try {
@@ -439,6 +466,8 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
                             <AccountsForm2Fields
                                 control={form.control}
                                 names={STEP_NAMES}
+                                onGenerateCoveringLetter={handleGenerateCoveringLetter}
+                                isGeneratingCoveringLetter={generateCoveringLetterMutation.isPending}
                             />
                             <MailAttachmentPreview
                                 instrumentId={instrumentId}

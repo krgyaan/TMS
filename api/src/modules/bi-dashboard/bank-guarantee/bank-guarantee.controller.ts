@@ -65,6 +65,14 @@ export class BankGuaranteeController {
         return this.bankGuaranteeService.generatePrefilledFormat(id, body?.fdrNo);
     }
 
+    @Post('instruments/:id/covering-letter')
+    async generateCoveringLetter(@Param('id', ParseIntPipe) id: number, @Body() body: any) {
+        return this.bankGuaranteeService.generateCoveringLetter(id, {
+            bgNo: body?.bgNo,
+            bgDate: body?.bgDate,
+        });
+    }
+
     @Post('old-bg')
     async createOldBg(@Body() body: any, @Req() req: any) {
         return this.bankGuaranteeService.createOldBg(body, req.user);

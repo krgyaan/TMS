@@ -1,11 +1,13 @@
+import { useWatch } from 'react-hook-form';
 import type { Control, FieldPath, FieldValues } from 'react-hook-form';
+import { Button } from '@/components/ui/button';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { SelectField } from '@/components/form/SelectField';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import DateInput from '@/components/form/DateInput';
 import { FileUploader } from '@/components/file-upload';
-import { Truck } from 'lucide-react';
+import { Truck, FileDown, Loader2 } from 'lucide-react';
 import { toFileArray } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
 
 const URGENCY_OPTIONS = [
@@ -32,6 +34,8 @@ interface AccountsForm2FieldsProps<T extends FieldValues> {
      */
     showCourier?: boolean;
     employees?: Array<{ id: number | string; name: string }>;
+    onGenerateCoveringLetter?: () => void;
+    isGeneratingCoveringLetter?: boolean;
 }
 
 /** Legacy courier block, shown only where the schema still has these fields. */
@@ -112,7 +116,13 @@ export function AccountsForm2Fields<T extends FieldValues>({
     names,
     showCourier = false,
     employees = [],
+    onGenerateCoveringLetter,
+    isGeneratingCoveringLetter,
 }: AccountsForm2FieldsProps<T>) {
+    const bgNoValue = useWatch({ control, name: names.bgNo });
+    const bgDateValue = useWatch({ control, name: names.bgDate });
+    const canGenerateCoveringLetter = Boolean(String(bgNoValue ?? '').trim()) && Boolean(bgDateValue);
+
     return (
         <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2 gap-y-4 items-start">
@@ -126,7 +136,30 @@ export function AccountsForm2Fields<T extends FieldValues>({
                 </FieldWrapper>
                 <FieldWrapper control={control} name={names.bgNo} label="BG No. *">
                     {(field) => (
-                        <Input {...field} value={(field.value as string | undefined) ?? ''} placeholder="Enter BG number" />
+                        <div className="flex gap-2">
+                            <Input
+                                {...field}
+                                value={(field.value as string | undefined) ?? ''}
+                                placeholder="Enter BG number"
+                                className="flex-1"
+                            />
+                            {onGenerateCoveringLetter && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={onGenerateCoveringLetter}
+                                    disabled={isGeneratingCoveringLetter || !canGenerateCoveringLetter}
+                                >
+                                    {isGeneratingCoveringLetter ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <FileDown className="h-4 w-4" />
+                                    )}
+                                    <span className="ml-1">Generate</span>
+                                </Button>
+                            )}
+                        </div>
                     )}
                 </FieldWrapper>
                 {names.bgValidity && (

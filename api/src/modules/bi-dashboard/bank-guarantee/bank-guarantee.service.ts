@@ -1198,6 +1198,13 @@ private readBodyFileValue(body: unknown, field: string): unknown {
         return this.paymentRequestsNotificationService.generateBgPrefilledApplication(instrumentId, fdrNo);
     }
 
+    async generateCoveringLetter(
+        instrumentId: number,
+        overrides: { bgNo?: string; bgDate?: string } = {},
+    ) {
+        return this.paymentRequestsNotificationService.generateBgCoveringLetter(instrumentId, overrides);
+    }
+
     async updateAction(
         instrumentId: number,
         body: any,
