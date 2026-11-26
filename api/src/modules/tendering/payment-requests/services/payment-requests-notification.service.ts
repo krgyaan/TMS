@@ -442,8 +442,6 @@ export class PaymentRequestsNotificationService {
         const json = instrument?.courierAddressJson as Record<string, any> | null | undefined;
         if (json && typeof json === 'object') {
             const parts = [
-                json.name,
-                json.phone,
                 [json.line1, json.line2].filter(Boolean).join(', '),
                 json.city,
                 [json.state, json.pincode].filter(Boolean).join(' - '),

@@ -134,10 +134,10 @@ export const PDF_CONFIG = {
             storagePath: 'bgcovletter',
             baseDir: 'bi-dashboard/bank-guarantee/bgcovletter',
             margin: {
-                top: '0mm',
-                right: '0mm',
-                bottom: '0mm',
-                left: '0mm',
+                top: '35mm',
+                right: '12mm',
+                bottom: '18mm',
+                left: '12mm',
             },
         },
         bgPrefilledFormat: {
