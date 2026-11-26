@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useFieldArray, useForm, useWatch, type Resolver } from 'react-hook-form';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { SelectField } from '@/components/form/SelectField';
@@ -17,7 +17,6 @@ import { AccountsForm2Fields } from './steps/AccountsForm2Fields';
 import { AccountsForm3Fields } from './steps/AccountsForm3Fields';
 import { MailAttachmentPreview } from './steps/MailAttachmentPreview';
 import { FollowupReadOnlyView, InitiateFollowupFields } from './steps/InitiateFollowupFields';
-import { fileUploadService } from '@/services/api/file-upload.service';
 import { RequestExtensionFields } from './steps/RequestExtensionFields';
 import { ReturnedCourierFields } from './steps/ReturnedCourierFields';
 import { RequestCancellationFields } from './steps/RequestCancellationFields';
@@ -129,6 +128,7 @@ const SectionCard = ({ title, children }: { title: string; children: ReactNode }
     </Card>
 );
 
+
 interface BankGuaranteeActionFormProps {
     instrumentId: number;
 }
@@ -141,6 +141,11 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
     const generateCoveringLetterMutation = useGenerateBankGuaranteeCoveringLetter();
     const { data: formData } = useBGActionFormData(instrumentId);
     const { data: followupData } = useBGFollowupData(instrumentId);
+    const [generatedDocs, setGeneratedDocs] = useState<{
+        prefilled?: string;
+        coverLetter?: string;
+        envelope?: string;
+    }>({});
 
     // Deep links from the BG emails: ?section=accounts-form-1 / accounts-form-2
     const requestedSection = searchParams.get('section');
@@ -299,12 +304,7 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
 
         try {
             const result = await generatePrefilledMutation.mutateAsync({ id: instrumentId, fdrNo });
-            const link = document.createElement('a');
-            link.href = fileUploadService.getFileUrl(result.pdfPath);
-            link.download = result.pdfPath.split('/').pop() || 'bg-prefilled-format.pdf';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            setGeneratedDocs((prev) => ({ ...prev, prefilled: result.pdfPath }));
             toast.success('Prefilled BG format generated');
         } catch (error: any) {
             toast.error(error?.message || 'Failed to generate prefilled BG format');
@@ -319,25 +319,17 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
             return;
         }
 
-        const downloadFile = (path: string, fallback: string) => {
-            const link = document.createElement('a');
-            link.href = fileUploadService.getFileUrl(path);
-            link.download = path.split('/').pop() || fallback;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        };
-
         try {
             const result = await generateCoveringLetterMutation.mutateAsync({
                 id: instrumentId,
                 bgNo,
                 bgDate,
             });
-            downloadFile(result.pdfPath, 'bg-covering-letter.pdf');
-            if (result.envelopePdfPath) {
-                downloadFile(result.envelopePdfPath, 'bg-envelope-slip.pdf');
-            }
+            setGeneratedDocs((prev) => ({
+                ...prev,
+                coverLetter: result.pdfPath,
+                envelope: result.envelopePdfPath,
+            }));
             toast.success(
                 result.envelopePdfPath
                     ? 'Covering letter and envelope slip generated'
@@ -459,6 +451,7 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
                                 onGeneratePrefilled={handleGeneratePrefilled}
                                 isGeneratingPrefilled={generatePrefilledMutation.isPending}
                                 canGeneratePrefilled={Boolean(String(fdrNoValue ?? '').trim())}
+                                prefilledPath={generatedDocs.prefilled ?? formData?.prefilledAppDocx}
                             />
                             <MailAttachmentPreview
                                 instrumentId={instrumentId}
@@ -479,6 +472,8 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
                                 names={STEP_NAMES}
                                 onGenerateCoveringLetter={handleGenerateCoveringLetter}
                                 isGeneratingCoveringLetter={generateCoveringLetterMutation.isPending}
+                                coverLetterPath={generatedDocs.coverLetter ?? formData?.coverLetterDocx}
+                                envelopeSlipPath={generatedDocs.envelope ?? formData?.envelopeSlip}
                             />
                             <MailAttachmentPreview
                                 instrumentId={instrumentId}

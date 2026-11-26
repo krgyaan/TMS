@@ -7,8 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import DateInput from '@/components/form/DateInput';
 import { FileUploader } from '@/components/file-upload';
-import { Truck, FileDown, Loader2 } from 'lucide-react';
+import { Truck, FileDown, FileText, Loader2 } from 'lucide-react';
 import { toFileArray } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
+import { fileUploadService } from '@/services/api/file-upload.service';
 
 const URGENCY_OPTIONS = [
     { value: '1', label: 'Same Day (Urgent)' },
@@ -36,6 +37,8 @@ interface AccountsForm2FieldsProps<T extends FieldValues> {
     employees?: Array<{ id: number | string; name: string }>;
     onGenerateCoveringLetter?: () => void;
     isGeneratingCoveringLetter?: boolean;
+    coverLetterPath?: string | null;
+    envelopeSlipPath?: string | null;
 }
 
 /** Legacy courier block, shown only where the schema still has these fields. */
@@ -118,6 +121,8 @@ export function AccountsForm2Fields<T extends FieldValues>({
     employees = [],
     onGenerateCoveringLetter,
     isGeneratingCoveringLetter,
+    coverLetterPath,
+    envelopeSlipPath,
 }: AccountsForm2FieldsProps<T>) {
     const bgNoValue = useWatch({ control, name: names.bgNo });
     const bgDateValue = useWatch({ control, name: names.bgDate });
@@ -162,6 +167,38 @@ export function AccountsForm2Fields<T extends FieldValues>({
                         </div>
                     )}
                 </FieldWrapper>
+                <div className="space-y-1">
+                    <p className="text-sm font-medium leading-none">Generated Documents</p>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1">
+                        {coverLetterPath && (
+                            <a
+                                href={fileUploadService.getFileUrl(coverLetterPath)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                download
+                                className="inline-flex items-center gap-1 text-sm font-medium text-primary underline"
+                            >
+                                <FileText className="h-4 w-4" />
+                                Covering Letter
+                            </a>
+                        )}
+                        {envelopeSlipPath && (
+                            <a
+                                href={fileUploadService.getFileUrl(envelopeSlipPath)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                download
+                                className="inline-flex items-center gap-1 text-sm font-medium text-primary underline"
+                            >
+                                <FileText className="h-4 w-4" />
+                                Envelope Slip
+                            </a>
+                        )}
+                        {!coverLetterPath && !envelopeSlipPath && (
+                            <p className="text-xs text-muted-foreground">Not generated yet</p>
+                        )}
+                    </div>
+                </div>
                 {names.bgValidity && (
                     <FieldWrapper control={control} name={names.bgValidity} label="BG Validity *">
                         {(field) => (
@@ -182,7 +219,7 @@ export function AccountsForm2Fields<T extends FieldValues>({
                         )}
                     </FieldWrapper>
                 )}
-                <div className="md:col-span-2">
+                <div>
                     <FieldWrapper control={control} name={names.bg2Remark} label="Remarks (if any)">
                         {(field) => (
                             <Textarea

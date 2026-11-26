@@ -2264,6 +2264,9 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 bg2Remark: instrumentBgDetails.bg2Remark,
                 bgUpload: instrumentBgDetails.bgUpload,
                 bgSignedCoveringLetter: instrumentBgDetails.bgSignedCoveringLetter,
+                prefilledAppDocx: instrumentBgDetails.prefilledAppDocx,
+                coverLetterDocx: instrumentBgDetails.coverLetterDocx,
+                envelopeSlip: instrumentBgDetails.envelopeSlip,
                 // Accounts Form 3 (capture FDR details)
                 fdrPer: instrumentBgDetails.fdrPer,
                 fdrCopy: instrumentBgDetails.fdrCopy,
@@ -2462,6 +2465,9 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             bg2Remark: result.bg2Remark,
             bgUpload: result.bgUpload,
             bgSignedCoveringLetter: result.bgSignedCoveringLetter,
+            prefilledAppDocx: result.prefilledAppDocx,
+            coverLetterDocx: result.coverLetterDocx,
+            envelopeSlip: result.envelopeSlip,
             // Accounts Form 3 (capture FDR details). fdrPer is returned as a
             // string because the form field is z.enum(['10','15','100']) and the
             // SelectField emits strings for it.
