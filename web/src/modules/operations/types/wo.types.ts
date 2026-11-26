@@ -636,7 +636,10 @@ export interface WoBillingBoq {
   id: number;
   woDetailId: number;
   srNo: number;
+  inventoryItemId: number | null;
+  itemCode: string | null;
   itemDescription: string;
+  hsnSac: string | null;
   quantity: string;
   rate: string;
   amount: string | null;
@@ -651,7 +654,10 @@ export interface WoBillingBoq {
 export interface CreateWoBillingBoqDto {
   woDetailId: number;
   srNo: number;
+  inventoryItemId?: number | null;
+  itemCode?: string | null;
   itemDescription: string;
+  hsnSac?: string | null;
   quantity: string;
   rate: string;
   gstRate?: string;
@@ -660,7 +666,10 @@ export interface CreateWoBillingBoqDto {
 
 export interface UpdateWoBillingBoqDto {
   srNo?: number;
+  inventoryItemId?: number | null;
+  itemCode?: string | null;
   itemDescription?: string;
+  hsnSac?: string | null;
   quantity?: string;
   rate?: string;
   gstRate?: string;
@@ -676,7 +685,10 @@ export interface WoBuybackBoq {
   id: number;
   woDetailId: number;
   srNo: number;
+  inventoryItemId: number | null;
+  itemCode: string | null;
   itemDescription: string;
+  hsnSac: string | null;
   quantity: string;
   rate: string;
   amount: string | null;
@@ -691,7 +703,10 @@ export interface WoBuybackBoq {
 export interface CreateWoBuybackBoqDto {
   woDetailId: number;
   srNo: number;
+  inventoryItemId?: number | null;
+  itemCode?: string | null;
   itemDescription: string;
+  hsnSac?: string | null;
   quantity: string;
   rate: string;
   gstRate?: string;
@@ -700,7 +715,10 @@ export interface CreateWoBuybackBoqDto {
 
 export interface UpdateWoBuybackBoqDto {
   srNo?: number;
+  inventoryItemId?: number | null;
+  itemCode?: string | null;
   itemDescription?: string;
+  hsnSac?: string | null;
   quantity?: string;
   rate?: string;
   gstRate?: string;

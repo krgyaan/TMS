@@ -16,6 +16,7 @@ import { SelectField } from "@/components/form/SelectField";
 import { useAutoSave } from "@/hooks/api/useWoDetails";
 import { parseFileArray } from "@/lib/utils";
 import { resolveFileUrl } from "@/modules/operations/helpers/resolveFileUrl";
+import { ItemCodeCombobox } from "@/modules/operations/wo-details/components/ItemCodeCombobox";
 import { WizardNavigation } from "@/modules/operations/wo-details/components/WizardNavigation";
 import { WIZARD_CONFIG, GST_OPTIONS, ORDER_NATURE_OPTIONS, YES_NO_OPTIONS } from "@/modules/operations/wo-details/helpers/constants";
 import { Page4FormSchema } from "@/modules/operations/wo-details/helpers/woDetail.schema";
@@ -32,7 +33,10 @@ interface Page4BillingProps extends PageFormProps {
 
 const defaultBoqItem: BOQItem = {
     srNo: 1,
+    inventoryItemId: null,
+    itemCode: "",
     itemDescription: "",
+    hsnSac: "",
     quantity: 0,
     rate: 0,
     gstRate: 0,
@@ -191,11 +195,13 @@ export function Page4Billing({ woDetailId, initialData, basicDetail, onSaveDraft
                 {title}
             </h3>
             <div className="border rounded-lg overflow-x-auto">
-                <table className="w-full text-sm min-w-[1040px]">
+                <table className="w-full text-sm min-w-[1400px]">
                     <thead className="bg-muted">
                         <tr>
                             <th className="p-3 text-left w-16">Sr. No.</th>
+                            <th className="p-3 text-left min-w-[180px]">Item Code</th>
                             <th className="p-3 text-left min-w-[200px]">Item Description</th>
+                            <th className="p-3 text-left w-32">HSN/SAC</th>
                             <th className="p-3 text-left w-24">Qty</th>
                             <th className="p-3 text-left w-28">Rate</th>
                             <th className="p-3 text-left w-40">Basic Amount</th>
@@ -221,8 +227,34 @@ export function Page4Billing({ woDetailId, initialData, basicDetail, onSaveDraft
                                         </FieldWrapper>
                                     </td>
                                     <td className="p-2">
+                                        <ItemCodeCombobox
+                                            value={watchedItems?.[index]?.itemCode}
+                                            onSelect={(item) => {
+                                                const prefix = `${namePrefix}.${index}`;
+                                                if (!item) {
+                                                    form.setValue(`${prefix}.inventoryItemId`, null, { shouldDirty: true });
+                                                    form.setValue(`${prefix}.itemCode`, "", { shouldDirty: true });
+                                                    form.setValue(`${prefix}.hsnSac`, "", { shouldDirty: true });
+                                                    return;
+                                                }
+
+                                                form.setValue(`${prefix}.inventoryItemId`, item.id, { shouldDirty: true });
+                                                form.setValue(`${prefix}.itemCode`, item.itemCode, { shouldDirty: true });
+                                                form.setValue(`${prefix}.hsnSac`, item.hsnCode ?? "", { shouldDirty: true });
+                                                if (!watchedItems?.[index]?.itemDescription?.trim()) {
+                                                    form.setValue(`${prefix}.itemDescription`, item.itemName, { shouldDirty: true });
+                                                }
+                                            }}
+                                        />
+                                    </td>
+                                    <td className="p-2">
                                         <FieldWrapper control={form.control} name={`${namePrefix}.${index}.itemDescription`} label="">
                                             {(field) => <Input {...field} placeholder="Item description" className="h-8 text-xs" />}
+                                        </FieldWrapper>
+                                    </td>
+                                    <td className="p-2">
+                                        <FieldWrapper control={form.control} name={`${namePrefix}.${index}.hsnSac`} label="">
+                                            {(field) => <Input {...field} value={field.value ?? ""} placeholder="HSN/SAC" className="h-8 text-xs" />}
                                         </FieldWrapper>
                                     </td>
                                     <td className="p-2">
@@ -271,7 +303,7 @@ export function Page4Billing({ woDetailId, initialData, basicDetail, onSaveDraft
                         })}
                         {fields.length === 0 && (
                             <tr>
-                                <td colSpan={9} className="p-4 text-center text-muted-foreground">
+                                <td colSpan={11} className="p-4 text-center text-muted-foreground">
                                     No items. Add one using the button below.
                                 </td>
                             </tr>
@@ -280,7 +312,7 @@ export function Page4Billing({ woDetailId, initialData, basicDetail, onSaveDraft
                     {fields.length > 0 && (
                         <tfoot className="bg-muted/50">
                             <tr>
-                                <td colSpan={4} className="p-3 text-right font-semibold">Total:</td>
+                                <td colSpan={6} className="p-3 text-right font-semibold">Total:</td>
                                 <td className="p-3 font-semibold tabular-nums">{formatAmount(totals.basic)}</td>
                                 <td></td>
                                 <td className="p-3 font-semibold tabular-nums text-blue-600">{formatAmount(totals.gst)}</td>

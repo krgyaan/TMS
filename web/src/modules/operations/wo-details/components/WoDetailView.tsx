@@ -231,6 +231,7 @@ function BoqTable({
             <TableHeader>
                 <TableRow>
                     <TableHead className="w-16">Sr. No.</TableHead>
+                    <TableHead>Item Code</TableHead>
                     <TableHead>Item Description</TableHead>
                     <TableHead className="text-right">Quantity</TableHead>
                     <TableHead className="text-right">Rate</TableHead>
@@ -256,6 +257,7 @@ function BoqTable({
                     return (
                         <TableRow key={item.id}>
                             <TableCell>{item.srNo}</TableCell>
+                            <TableCell className="font-mono text-xs">{item.itemCode || "—"}</TableCell>
                             <TableCell>{item.itemDescription}</TableCell>
                             <TableCell className="text-right">{item.quantity}</TableCell>
                             <TableCell className="text-right">
@@ -277,7 +279,7 @@ function BoqTable({
                 {items.length === 0 && (
                     <TableRow>
                         <TableCell
-                            colSpan={8}
+                            colSpan={9}
                             className="py-6 text-center text-sm italic text-muted-foreground"
                         >
                             {emptyLabel}

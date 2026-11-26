@@ -342,9 +342,16 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
                 {detail.billingBoq && detail.billingBoq.length > 0 ? (
                     <div className="border rounded text-sm mb-3">
                         {detail.billingBoq.map((item: WoBillingBoq, i: number) => (
-                            <div key={item.id || i} className="flex justify-between px-3 py-1.5 border-b last:border-0">
-                                <span>{item.itemDescription || "—"}</span>
-                                <span className="text-muted-foreground">
+                            <div key={item.id || i} className="flex justify-between gap-3 px-3 py-1.5 border-b last:border-0">
+                                <span className="flex min-w-0 items-center gap-2">
+                                    {item.itemCode && (
+                                        <Badge variant="outline" className="shrink-0 font-mono text-[10px]">
+                                            {item.itemCode}
+                                        </Badge>
+                                    )}
+                                    <span>{item.itemDescription || "—"}</span>
+                                </span>
+                                <span className="shrink-0 text-muted-foreground">
                                     {item.quantity || "0"} × ₹{item.rate || "0"}
                                 </span>
                             </div>

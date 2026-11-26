@@ -53,7 +53,10 @@ export const Page3FormSchema = z.object({
 export const BOQItemSchema = z.object({
   id: z.number().optional(),
   srNo: z.number().int().positive().optional(),
+  inventoryItemId: z.number().int().positive().nullable().optional(),
+  itemCode: z.string().max(80).nullable().optional(),
   itemDescription: z.string().optional(),
+  hsnSac: z.string().max(100).nullable().optional(),
   quantity: z.number().optional(),
   rate: z.number().optional(),
   amount: z.number().optional(),
