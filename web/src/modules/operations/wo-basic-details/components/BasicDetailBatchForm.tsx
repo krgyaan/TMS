@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCreateWoBasicDetailBatch, useWoBasicDetailPrefill, useWoBasicDetailsByTender } from "@/hooks/api/useWoBasicDetails";
@@ -428,6 +429,7 @@ export function BasicDetailBatchForm() {
     const activeIdentifiers = activeRow ? projectIdentifiers(activeRow, activeOrder) : { code: "", name: "" };
 
     return (
+        <Form {...form}>
         <Card>
             <CardHeader>
                 <div className="flex items-center justify-between gap-3">
@@ -836,6 +838,7 @@ export function BasicDetailBatchForm() {
                 )}
             </CardContent>
         </Card>
+        </Form>
     );
 }
 
