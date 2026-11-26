@@ -44,11 +44,11 @@ describe('WoBasicDetailsService multi-order support', () => {
         );
     });
 
-    it('forces multiple, allocates max+1 and marks existing orders atomically', async () => {
+    it('creates a repeat order with max+1 sequence', async () => {
         const createdRow = {
             id: 99,
             tenderId: 10,
-            orderType: 'multiple',
+            orderType: 'repeat',
             orderSequence: 3,
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -79,22 +79,13 @@ describe('WoBasicDetailsService multi-order support', () => {
             .mockImplementationOnce(() => ({
                 from: () => ({ where: () => Promise.resolve([{ maxSequence: 2 }]) }),
             }));
-        const txUpdateWhere = jest.fn().mockResolvedValue(undefined);
         const tx = {
             select: txSelect,
             insert: jest.fn(() => ({
                 values: (values: any) => {
-                    // Client sent nothing forcing multiple; the existing-order
-                    // check must promote it.
-                    expect(values.orderType).toBe('multiple');
+                    expect(values.orderType).toBe('repeat');
                     expect(values.orderSequence).toBe(3);
                     return { returning: () => Promise.resolve([createdRow]) };
-                },
-            })),
-            update: jest.fn(() => ({
-                set: (values: any) => {
-                    expect(values.orderType).toBe('multiple');
-                    return { where: txUpdateWhere };
                 },
             })),
         };
@@ -117,7 +108,7 @@ describe('WoBasicDetailsService multi-order support', () => {
 
         const result = await service.create({
             tenderId: 10,
-            orderType: 'single',
+            orderType: 'repeat',
             projectCode: 'P-1',
             projectName: 'Project',
             woNumber: 'WO-1',
@@ -134,8 +125,6 @@ describe('WoBasicDetailsService multi-order support', () => {
             }),
         );
         expect(tx.insert).toHaveBeenCalledWith(woBasicDetails);
-        expect(tx.update).toHaveBeenCalledWith(woBasicDetails);
-        expect(txUpdateWhere).toHaveBeenCalledTimes(1);
         expect(mockTenderStatusHistoryService.trackStatusChange).toHaveBeenCalledWith(
             10,
             26,

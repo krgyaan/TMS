@@ -5,6 +5,9 @@ import type { WoBasicDetail, CreateWoBasicDetailDto, UpdateWoBasicDetailDto } fr
 export const buildDefaultValues = (): WoBasicDetailFormValues => ({
   tenderId: null,
   orderType: "single",
+  orderNature: undefined,
+  poReceivedStatus: undefined,
+  sapPoUpload: [],
   teamId: null,
   organizationId: null,
   itemId: null,
@@ -17,7 +20,6 @@ export const buildDefaultValues = (): WoBasicDetailFormValues => ({
   receiptPreGst: 0,
   grossMargin: 0,
   finalPrice: 0,
-  pricesChanged: "false",
   budgetSupply: 0,
   budgetService: 0,
   budgetFreight: 0,
@@ -29,6 +31,7 @@ export const buildDefaultValues = (): WoBasicDetailFormValues => ({
   woDraft: [],
   teChecklistConfirmed: false,
   requestGemCharges: "false",
+  gemChargesRequired: false,
   gemChargesAmount: undefined,
   gemChargesPortalLink: "",
   gemChargesInvoice: [],
@@ -51,7 +54,21 @@ export const buildDefaultValues = (): WoBasicDetailFormValues => ({
 export const mapResponseToForm = (data: WoBasicDetail): WoBasicDetailFormValues => {
   return {
     tenderId: data.tenderId,
-    orderType: data.orderType === "multiple" ? "multiple" : "single",
+    orderType:
+      data.orderType === "repeat" || data.orderType === "multiple"
+        ? data.orderType
+        : "single",
+    orderNature:
+      data.orderNature === "supply" || data.orderNature === "service" || data.orderNature === "sitc"
+        ? data.orderNature
+        : undefined,
+    poReceivedStatus:
+      data.poReceivedStatus === "received"
+        || data.poReceivedStatus === "not_received"
+        || data.poReceivedStatus === "not_applicable"
+        ? data.poReceivedStatus
+        : undefined,
+    sapPoUpload: parseFileArray(data.sapPoUpload),
     teamId: data.team,
     woNumber: String(data.woNumber || ""),
     woDate: data.woDate ? new Date(data.woDate) : null,
@@ -62,7 +79,6 @@ export const mapResponseToForm = (data: WoBasicDetail): WoBasicDetailFormValues 
     receiptPreGst: Number(data.receiptPreGst) || 0,
     grossMargin: Number(data.grossMargin) || 0,
     finalPrice: Number(data.finalPrice) || 0,
-    pricesChanged: "false",
     teChecklistConfirmed: false,
     budgetSupply: Number(data.budgetSupply) || 0,
     budgetService: Number(data.budgetService) || 0,
@@ -78,6 +94,7 @@ export const mapResponseToForm = (data: WoBasicDetail): WoBasicDetailFormValues 
       (data.budgetGemCharges != null && Number(data.budgetGemCharges) > 0)
         ? "true"
         : "false",
+    gemChargesRequired: false,
     gemChargesAmount: data.gemChargesAmount != null ? Number(data.gemChargesAmount) : undefined,
     gemChargesPortalLink: data.gemChargesPortalLink || "",
     gemChargesInvoice: parseFileArray(data.gemChargesInvoice),
@@ -108,6 +125,11 @@ export const mapFormToCreatePayload = (values: WoBasicDetailFormValues): CreateW
 
   if (values.tenderId) payload.tenderId = values.tenderId;
   if (values.orderType) payload.orderType = values.orderType;
+  if (values.orderNature) payload.orderNature = values.orderNature;
+  if (values.poReceivedStatus) payload.poReceivedStatus = values.poReceivedStatus;
+  if (values.poReceivedStatus === "received" && values.sapPoUpload.length) {
+    payload.sapPoUpload = JSON.stringify(values.sapPoUpload);
+  }
   if (values.woValuePreGst !== undefined) payload.woValuePreGst = String(values.woValuePreGst);
   if (values.woValueGstAmt !== undefined) payload.woValueGstAmt = String(values.woValueGstAmt);
   if (values.budgetPreGst !== undefined) payload.budgetPreGst = String(values.budgetPreGst);
@@ -119,7 +141,9 @@ export const mapFormToCreatePayload = (values: WoBasicDetailFormValues): CreateW
   if (values.budgetFreight !== undefined && values.budgetFreight > 0) payload.budgetFreight = String(values.budgetFreight);
   if (values.budgetAdmin !== undefined && values.budgetAdmin > 0) payload.budgetAdmin = String(values.budgetAdmin);
   if (values.budgetBuybackSale !== undefined && values.budgetBuybackSale > 0) payload.budgetBuybackSale = String(values.budgetBuybackSale);
-  if (values.budgetGemCharges !== undefined && values.budgetGemCharges > 0) payload.budgetGemCharges = String(values.budgetGemCharges);
+  if (values.gemChargesAmount !== undefined && values.gemChargesAmount > 0) {
+    payload.budgetGemCharges = String(values.gemChargesAmount);
+  }
   if (values.requestGemCharges === "true") {
     payload.gemChargesAmount = values.gemChargesAmount ?? 0;
     if (values.gemChargesPortalLink?.trim()) payload.gemChargesPortalLink = values.gemChargesPortalLink;
@@ -141,8 +165,13 @@ export const mapFormToUpdatePayload = (values: WoBasicDetailFormValues): UpdateW
     tmsDocuments: values.tmsDocuments,
   };
 
-  if (values.orderType) payload.orderType = values.orderType;
-
+  if (values.orderNature) payload.orderNature = values.orderNature;
+  if (values.poReceivedStatus) payload.poReceivedStatus = values.poReceivedStatus;
+  if (values.poReceivedStatus === "received" && values.sapPoUpload.length) {
+    payload.sapPoUpload = JSON.stringify(values.sapPoUpload);
+  } else if (values.poReceivedStatus !== "received") {
+    payload.sapPoUpload = "[]";
+  }
   if (values.woValuePreGst !== undefined) payload.woValuePreGst = String(values.woValuePreGst);
   if (values.woValueGstAmt !== undefined) payload.woValueGstAmt = String(values.woValueGstAmt);
   if (values.budgetPreGst !== undefined) payload.budgetPreGst = String(values.budgetPreGst);
@@ -154,7 +183,9 @@ export const mapFormToUpdatePayload = (values: WoBasicDetailFormValues): UpdateW
   if (values.budgetFreight !== undefined && values.budgetFreight > 0) payload.budgetFreight = String(values.budgetFreight);
   if (values.budgetAdmin !== undefined && values.budgetAdmin > 0) payload.budgetAdmin = String(values.budgetAdmin);
   if (values.budgetBuybackSale !== undefined && values.budgetBuybackSale > 0) payload.budgetBuybackSale = String(values.budgetBuybackSale);
-  if (values.budgetGemCharges !== undefined && values.budgetGemCharges > 0) payload.budgetGemCharges = String(values.budgetGemCharges);
+  if (values.gemChargesAmount !== undefined && values.gemChargesAmount > 0) {
+    payload.budgetGemCharges = String(values.gemChargesAmount);
+  }
   if (values.requestGemCharges === "true") {
     payload.gemChargesAmount = values.gemChargesAmount ?? 0;
     if (values.gemChargesPortalLink?.trim()) payload.gemChargesPortalLink = values.gemChargesPortalLink;

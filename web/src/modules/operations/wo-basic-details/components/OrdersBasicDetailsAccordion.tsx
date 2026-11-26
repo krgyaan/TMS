@@ -41,8 +41,10 @@ export function OrdersBasicDetailsAccordion({
                         <div className="flex min-w-0 flex-1 flex-col gap-1 text-left sm:flex-row sm:items-center sm:gap-3">
                             <span className="flex shrink-0 items-center gap-2 text-sm font-semibold">
                                 Order {index + 1}
-                                {order.orderType === "multiple" && order.orderSequence ? (
-                                    <Badge variant="default">#{order.orderSequence}</Badge>
+                                {order.orderType !== "single" && order.orderSequence ? (
+                                    <Badge variant="default">
+                                        {order.orderType === "repeat" ? "R" : "P"}{order.orderSequence}
+                                    </Badge>
                                 ) : null}
                             </span>
                             <span className="truncate text-xs text-muted-foreground">

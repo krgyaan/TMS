@@ -39,7 +39,10 @@ export interface Contact {
 export interface BOQItem {
   id?: number;
   srNo?: number;
+  inventoryItemId?: number | null;
+  itemCode?: string | null;
   itemDescription?: string;
+  hsnSac?: string | null;
   quantity?: number;
   rate?: number;
   amount?: number;

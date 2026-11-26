@@ -17,6 +17,12 @@ export const operationsConfigs: Record<string, FileConfig> = {
         allowedMimeTypes: [...DOCS, ...OFFICE],
         allowedExtensions: [".pdf", ".doc", ".docx", ".xls", ".xlsx"],
     },
+    "sap-po": {
+        maxFiles: 10,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".xls", ".xlsx"],
+    },
     "wo-signed-copy": {
         maxFiles: 1,
         maxSizeBytes: MB(10),

@@ -9,6 +9,7 @@ export const CreateWoContactSchema = z.object({
   name: z.string().max(255).optional(),
   designation: z.string().max(50).optional(),
   phone: z.string().max(20).optional(),
+  phones: z.array(z.string().max(20)).optional(),
   email: z.string().email().max(255).optional().or(z.literal('')),
 });
 
@@ -20,6 +21,7 @@ export const UpdateWoContactSchema = z.object({
   name: z.string().max(255).optional(),
   designation: z.string().max(50).optional(),
   phone: z.string().max(20).optional(),
+  phones: z.array(z.string().max(20)).optional(),
   email: z.string().email().max(255).optional().or(z.literal('')),
 });
 

@@ -25,10 +25,13 @@ export const CreateWoBasicDetailSchema = z.object({
   projectCode: z.string().max(100).optional(), // Auto-generated, optional on create
   projectName: z.string().max(255).optional(),
 
-  // Order type: 'single' (default) | 'multiple' — several POs for the same won tender
-  // orderSequence is derived by the backend (count of existing orders for the tender + 1)
-  orderType: z.enum(["single", "multiple"]).default("single").optional(),
+  // Order type: 'single' (default) | 'repeat' | 'multiple'
+  // orderSequence is derived by the backend (max existing sequence for the tender + 1)
+  orderType: z.enum(["single", "repeat", "multiple"]).default("single").optional(),
   orderSequence: z.number().int().positive().optional(),
+  orderNature: z.enum(["supply", "service", "sitc"]).optional(),
+  poReceivedStatus: z.enum(["received", "not_received", "not_applicable"]).optional(),
+  sapPoUpload: z.string().optional(),
 
   // Workflow state tracking
   currentStage: z.enum(["basic_details", "wo_details", "wo_acceptance", "kick_off", "contract_agreement", "wo_upload", "completed"]).optional(),
@@ -190,6 +193,8 @@ export type WoBasicDetailsQueryDto = z.infer<typeof WoBasicDetailsQuerySchema> &
 
 export const WoBasicDetailPrefillSchema = z.object({
   team: z.number().nullable(),
+  websiteId: z.number().nullable(),
+  isGemTender: z.boolean(),
   organizationAcronym: z.string().nullable(),
   itemName: z.string().nullable(),
   locationName: z.string().nullable(),
@@ -336,3 +341,56 @@ export const ReviseOrderSchema = z.object({
 });
 
 export type ReviseOrderDto = z.infer<typeof ReviseOrderSchema>;
+
+// ============================================
+// BATCH CREATE (Repeat / Multiple separate)
+// ============================================
+
+export const BatchOrderSchema = z.object({
+  woNumber: z.string().max(255),
+  woDate: z.string().date(),
+  woValuePreGst: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format"),
+  woValueGstAmt: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format"),
+  projectCode: z.string().max(100).optional(),
+  projectName: z.string().max(255).optional(),
+  orderNature: z.enum(["supply", "service", "sitc"]),
+  poReceivedStatus: z.enum(["received", "not_received", "not_applicable"]),
+  sapPoUpload: z.string().optional(),
+  woDraft: z.string().optional(),
+  budgetPreGst: z.string().optional(),
+  receiptPreGst: z.string().optional(),
+  grossMargin: z.string().optional(),
+  finalPrice: z.string().optional(),
+  budgetSupply: z.string().optional(),
+  budgetService: z.string().optional(),
+  budgetFreight: z.string().optional(),
+  budgetAdmin: z.string().optional(),
+  budgetBuybackSale: z.string().optional(),
+  requestGemCharges: z.boolean().optional(),
+  gemChargesAmount: z.number().nonnegative().optional(),
+  gemChargesPortalLink: z.string().optional(),
+  gemChargesInvoice: z.string().optional(),
+  contacts: z.array(z.object({
+    name: z.string().optional(),
+    designation: z.string().optional(),
+    phone: z.string().optional(),
+    phones: z.array(z.string()).optional(),
+    email: z.string().optional(),
+    organization: z.string().optional(),
+    departments: z.string().optional(),
+  })).optional(),
+});
+
+export const BatchCreateWoBasicDetailSchema = z.object({
+  tenderId: z.number().int().positive().optional(),
+  teamId: z.number().int().positive().nullish(),
+  organizationId: z.number().int().positive().nullish(),
+  itemId: z.number().int().positive().nullish(),
+  locationId: z.number().int().positive().nullish(),
+  orderType: z.enum(["single", "repeat", "multiple"]).default("single"),
+  tmsDocuments: z.record(z.boolean()).optional(),
+  orders: z.array(BatchOrderSchema).min(1),
+});
+
+export type BatchOrderDto = z.infer<typeof BatchOrderSchema>;
+export type BatchCreateWoBasicDetailDto = z.infer<typeof BatchCreateWoBasicDetailSchema>;

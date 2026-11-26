@@ -853,11 +853,32 @@
       "idx": 145,
       "version": "7",
       "when": 1809000000000,
-      "tag": "0192_create_hrms_office_inventory_tables",
+      "tag": "0192_add_wo_project_order_fields",
       "breakpoints": true
     },
     {
       "idx": 146,
+      "version": "7",
+      "when": 1809000000000,
+      "tag": "0192_create_hrms_office_inventory_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 147,
+      "version": "7",
+      "when": 1810000000000,
+      "tag": "0193_add_contact_phones",
+      "breakpoints": true
+    },
+    {
+      "idx": 148,
+      "version": "7",
+      "when": 1811000000000,
+      "tag": "0194_add_wo_boq_inventory_item_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 149,
       "version": "7",
       "when": 1810000000000,
       "tag": "0193_seed_hrms_office_inventory_data",

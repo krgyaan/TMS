@@ -41,7 +41,7 @@ export const WIZARD_PAGES = [
   },
 ] as const;
 
-export const DEPARTMENTS = ["EIC", "User", "C&P", "Finance"] as const;
+export const DEPARTMENTS = ["EIC", "User", "C&P", "Finance", "Store"] as const;
 export type Department = (typeof DEPARTMENTS)[number];
 
 export const DEPARTMENT_OPTIONS = DEPARTMENTS.map((dept) => ({
@@ -66,6 +66,12 @@ export const TENDER_CHECKLIST_ITEMS = [
 export const YES_NO_OPTIONS = [
   { value: 'true', label: 'Yes' },
   { value: 'false', label: 'No' },
+];
+
+export const ORDER_NATURE_OPTIONS = [
+  { value: 'supply', label: 'Supply' },
+  { value: 'service', label: 'Service' },
+  { value: 'sitc', label: 'SITC' },
 ];
 
 export const GST_OPTIONS = [

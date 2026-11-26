@@ -129,6 +129,22 @@ export function BasicDetailView({
 
     const grossMarginValue = data?.grossMargin ? parseFloat(String(data?.grossMargin)) : null;
     const woDraftFiles = parseFileArray(data?.woDraft);
+    const sapPoFiles = parseFileArray(data?.sapPoUpload);
+    const orderNatureLabel =
+        data.orderNature === "supply" ? "Supply" :
+        data.orderNature === "service" ? "Service" :
+        data.orderNature === "sitc" ? "SITC" : "—";
+    const poReceivedLabel =
+        data.poReceivedStatus === "received" ? "Received" :
+        data.poReceivedStatus === "not_received" ? "Not Received" :
+        data.poReceivedStatus === "not_applicable" ? "Not Applicable" : "—";
+    const orderTypeLabel =
+        data.orderType === "repeat" ? "Repeat" :
+        data.orderType === "multiple" ? "Multiple" : "Single";
+    const orderSequenceLabel =
+        data.orderType !== "single" && data.orderSequence
+            ? `${data.orderType === "repeat" ? "R" : "P"}${data.orderSequence}`
+            : null;
 
     // Calculate TMS documents completion stats
     const tmsDocsComplete = hasTmsDocuments
@@ -238,19 +254,57 @@ export function BasicDetailView({
                                 Order Type
                             </TableCell>
                             <TableCell className="text-sm">
-                                <Badge variant={data.orderType === "multiple" ? "default" : "secondary"}>
-                                    {data.orderType === "multiple" ? "Multiple" : "Single"}
+                                <Badge variant={data.orderType !== "single" ? "default" : "secondary"}>
+                                    {orderTypeLabel}
                                 </Badge>
                             </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Order Sequence
                             </TableCell>
                             <TableCell className="text-sm">
-                                {data.orderType === "multiple" && data.orderSequence
-                                    ? <Badge variant="default">#{data.orderSequence}</Badge>
+                                {orderSequenceLabel
+                                    ? <Badge variant="default">{orderSequenceLabel}</Badge>
                                     : '—'}
                             </TableCell>
                         </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Order Nature
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                <Badge variant="outline">{orderNatureLabel}</Badge>
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                PO Received
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                <Badge variant={data.poReceivedStatus === "received" ? "default" : "secondary"}>
+                                    {poReceivedLabel}
+                                </Badge>
+                            </TableCell>
+                        </TableRow>
+                        {sapPoFiles.length > 0 && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    SAP PO
+                                </TableCell>
+                                <TableCell colSpan={3} className="text-sm">
+                                    <div className="flex flex-wrap gap-2">
+                                        {sapPoFiles.map((filePath, index) => (
+                                            <a
+                                                key={`${filePath}-${index}`}
+                                                href={resolveFileUrl(filePath, "sap-po")}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-primary underline"
+                                            >
+                                                SAP PO {index + 1}
+                                            </a>
+                                        ))}
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        )}
 
                         {/* Financial Details */}
                         <TableRow className="bg-muted/50">
@@ -705,17 +759,19 @@ export function BasicDetailView({
                                             {contact.designation}
                                         </div>
                                     )}
-                                    {contact.phone && (
-                                        <div className="flex items-center gap-2 text-sm">
-                                            <Phone className="h-3 w-3 text-muted-foreground" />
-                                            <a
-                                                href={`tel:${contact.phone}`}
-                                                className="text-primary hover:underline"
-                                            >
-                                                {contact.phone}
-                                            </a>
-                                        </div>
-                                    )}
+                                    {((contact.phones?.length ? contact.phones : contact.phone ? [contact.phone] : []) as string[])
+                                        .filter(Boolean)
+                                        .map((phone, phoneIndex) => (
+                                            <div key={`${phone}-${phoneIndex}`} className="flex items-center gap-2 text-sm">
+                                                <Phone className="h-3 w-3 text-muted-foreground" />
+                                                <a
+                                                    href={`tel:${phone}`}
+                                                    className="text-primary hover:underline"
+                                                >
+                                                    {phone}
+                                                </a>
+                                            </div>
+                                        ))}
                                     {contact.email && (
                                         <div className="flex items-center gap-2 text-sm">
                                             <Mail className="h-3 w-3 text-muted-foreground" />

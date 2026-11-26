@@ -21,15 +21,25 @@ export class WoContactsService {
   ) {}
 
   // MAPPING FUNCTIONS
+  private normalizePhones(phones?: string[], phone?: string): string[] {
+    const values = (phones ?? [])
+      .map(value => value?.trim())
+      .filter((value): value is string => Boolean(value));
+    if (values.length === 0 && phone?.trim()) values.push(phone.trim());
+    return values;
+  }
+
   private mapCreateToDb(data: CreateWoContactDto) {
     const now = new Date();
+    const phones = this.normalizePhones(data.phones, data.phone);
     return {
       woBasicDetailId: data.woBasicDetailId,
       organization: data.organization ?? null,
       departments: data.departments ?? null,
       name: data.name ?? null,
       designation: data.designation ?? null,
-      phone: data.phone ?? null,
+      phone: phones[0] ?? null,
+      phones,
       email: data.email ?? null,
       createdAt: now,
       updatedAt: now,
@@ -44,6 +54,11 @@ export class WoContactsService {
     if (data.name !== undefined) out.name = data.name;
     if (data.designation !== undefined) out.designation = data.designation;
     if (data.phone !== undefined) out.phone = data.phone;
+    if (data.phones !== undefined) {
+      const phones = this.normalizePhones(data.phones, data.phone);
+      out.phones = phones;
+      out.phone = phones[0] ?? null;
+    }
     if (data.email !== undefined) out.email = data.email;
 
     return out as Partial<typeof woContacts.$inferInsert>;
@@ -58,6 +73,7 @@ export class WoContactsService {
       name: row.name,
       designation: row.designation,
       phone: row.phone,
+      phones: row.phones ?? [],
       email: row.email,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
@@ -93,7 +109,8 @@ export class WoContactsService {
         sql`(
           ${woContacts.name} ILIKE ${`%${filters.search}%`} OR
           ${woContacts.email} ILIKE ${`%${filters.search}%`} OR
-          ${woContacts.organization} ILIKE ${`%${filters.search}%`}
+          ${woContacts.organization} ILIKE ${`%${filters.search}%`} OR
+          ${woContacts.phones}::text ILIKE ${`%${filters.search}%`}
         )`
       );
     }
@@ -186,7 +203,7 @@ export class WoContactsService {
     await this.clientDirectorySyncService.syncToClientDirectory([{
       name: data.name ?? '',
       email: data.email,
-      phone: data.phone,
+      phone: this.normalizePhones(data.phones, data.phone)[0],
       org: data.organization,
     }]);
 
@@ -208,17 +225,21 @@ export class WoContactsService {
     }
 
     const now = new Date();
-    const insertValues = data.contacts.map((contact) => ({
-      woBasicDetailId: data.woBasicDetailId,
-      organization: contact.organization ?? null,
-      departments: contact.departments ?? null,
-      name: contact.name ?? null,
-      designation: contact.designation ?? null,
-      phone: contact.phone ?? null,
-      email: contact.email ?? null,
-      createdAt: now,
-      updatedAt: now,
-    }));
+    const insertValues = data.contacts.map((contact) => {
+      const phones = this.normalizePhones(contact.phones, contact.phone);
+      return {
+        woBasicDetailId: data.woBasicDetailId,
+        organization: contact.organization ?? null,
+        departments: contact.departments ?? null,
+        name: contact.name ?? null,
+        designation: contact.designation ?? null,
+        phone: phones[0] ?? null,
+        phones,
+        email: contact.email ?? null,
+        createdAt: now,
+        updatedAt: now,
+      };
+    });
 
     const rows = await this.db.insert(woContacts).values(insertValues).returning();
 
@@ -228,7 +249,7 @@ export class WoContactsService {
         .map((c) => ({
           name: c.name ?? '',
           email: c.email,
-          phone: c.phone,
+          phone: this.normalizePhones(c.phones, c.phone)[0],
           org: c.organization,
         })),
     );
@@ -257,7 +278,9 @@ export class WoContactsService {
     await this.clientDirectorySyncService.syncToClientDirectory([{
       name: data.name ?? '',
       email: data.email,
-      phone: data.phone,
+      phone: data.phones !== undefined || data.phone !== undefined
+        ? this.normalizePhones(data.phones, data.phone)[0]
+        : row.phone,
       org: data.organization,
     }]);
 

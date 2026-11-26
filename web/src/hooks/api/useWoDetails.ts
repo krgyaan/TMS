@@ -143,7 +143,7 @@ export const useSavePageDraft = () => {
       pageNum: number;
       data: any;
     }) => woDetailsService.savePageDraft(woDetailId, pageNum, data),
-    onSuccess: (_, { woDetailId, pageNum }) => {
+    onSuccess: (_, { woDetailId, pageNum, data }) => {
       queryClient.invalidateQueries({
         queryKey: woDetailsKeys.pageData(woDetailId, pageNum),
         exact: true,
@@ -155,6 +155,11 @@ export const useSavePageDraft = () => {
       queryClient.invalidateQueries({
         queryKey: woDetailsKeys.history(woDetailId),
       });
+      if (pageNum === 4 && data?.orderNature !== undefined) {
+        queryClient.invalidateQueries({
+          queryKey: woBasicDetailsKeys.details(),
+        });
+      }
       // Silent success for drafts - no toast
     },
     onError: (error: any) => {
@@ -178,7 +183,7 @@ export const useSubmitPage = () => {
       pageNum: number;
       data: any;
     }) => woDetailsService.submitPage(woDetailId, pageNum, data),
-    onSuccess: (result, { woDetailId, pageNum }) => {
+    onSuccess: (result, { woDetailId, pageNum, data }) => {
       queryClient.invalidateQueries({
         queryKey: woDetailsKeys.pageData(woDetailId, pageNum),
         exact: true,
@@ -193,6 +198,11 @@ export const useSubmitPage = () => {
       queryClient.invalidateQueries({
         queryKey: woDetailsKeys.history(woDetailId),
       });
+      if (pageNum === 4 && data?.orderNature !== undefined) {
+        queryClient.invalidateQueries({
+          queryKey: woBasicDetailsKeys.details(),
+        });
+      }
       toast.success(`Page ${pageNum} saved successfully`);
       return result;
     },
