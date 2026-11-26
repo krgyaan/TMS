@@ -319,19 +319,30 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
             return;
         }
 
+        const downloadFile = (path: string, fallback: string) => {
+            const link = document.createElement('a');
+            link.href = fileUploadService.getFileUrl(path);
+            link.download = path.split('/').pop() || fallback;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
         try {
             const result = await generateCoveringLetterMutation.mutateAsync({
                 id: instrumentId,
                 bgNo,
                 bgDate,
             });
-            const link = document.createElement('a');
-            link.href = fileUploadService.getFileUrl(result.pdfPath);
-            link.download = result.pdfPath.split('/').pop() || 'bg-covering-letter.pdf';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            toast.success('Covering letter generated');
+            downloadFile(result.pdfPath, 'bg-covering-letter.pdf');
+            if (result.envelopePdfPath) {
+                downloadFile(result.envelopePdfPath, 'bg-envelope-slip.pdf');
+            }
+            toast.success(
+                result.envelopePdfPath
+                    ? 'Covering letter and envelope slip generated'
+                    : 'Covering letter generated',
+            );
         } catch (error: any) {
             toast.error(error?.message || 'Failed to generate covering letter');
         }

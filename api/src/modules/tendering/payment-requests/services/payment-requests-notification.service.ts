@@ -457,6 +457,34 @@ export class PaymentRequestsNotificationService {
         return instrument?.courierAddress?.trim() || '';
     };
 
+    private buildBgEnvelopeData = (
+        instrument: { courierAddressJson?: unknown; courierAddress?: string | null } | null | undefined,
+    ): { to_name: string; to_address_lines: string[]; contact_number: string } => {
+        const json = (instrument?.courierAddressJson ?? null) as Record<string, any> | null;
+
+        if (json && typeof json === 'object') {
+            const addressLines = [
+                json.line1,
+                json.line2,
+                json.city,
+                [json.state, json.pincode].filter(Boolean).join(' - '),
+            ].filter((part): part is string => typeof part === 'string' && part.trim().length > 0);
+
+            return {
+                to_name: json.name || '',
+                to_address_lines: addressLines,
+                contact_number: json.phone || '',
+            };
+        }
+
+        const addressLines = (instrument?.courierAddress || '')
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0);
+
+        return { to_name: '', to_address_lines: addressLines, contact_number: '' };
+    };
+
     private resolveBgReference = async (
         paymentReq: { tenderNo?: string | null; projectId?: number | null; tenderId?: number | null },
     ): Promise<{ label: string; value: string; date: string | Date | null } | null> => {
@@ -2041,7 +2069,7 @@ export class PaymentRequestsNotificationService {
     async generateBgCoveringLetter(
         instrumentId: number,
         overrides: { bgNo?: string; bgDate?: string } = {},
-    ): Promise<{ pdfPath: string }> {
+    ): Promise<{ pdfPath: string; envelopePdfPath?: string }> {
         const [result] = await this.db
             .select({
                 instrument: paymentInstruments,
@@ -2114,13 +2142,40 @@ export class PaymentRequestsNotificationService {
             throw new Error(`Failed to generate BG covering letter for instrument ${instrumentId}`);
         }
 
+        let envelopePdfPath: string | undefined;
+        try {
+            const envelopeData = this.buildBgEnvelopeData(instrument);
+            const [generatedEnvelope] = await this.pdfGenerator.generatePdfs(
+                'bgEnvelopeSlip',
+                {
+                    data: {
+                        ...envelopeData,
+                        submission_label: reference?.label || '',
+                        submission_ref: reference?.value || '',
+                    },
+                },
+                instrumentId,
+                'BG'
+            );
+            envelopePdfPath = generatedEnvelope ?? undefined;
+        } catch (error) {
+            this.logger.warn(
+                `BG envelope slip generation failed for instrument ${instrumentId}: ${error instanceof Error ? error.message : String(error)}`
+            );
+        }
+
         await this.db
             .update(instrumentBgDetails)
-            .set({ coverLetterDocx: pdfPath })
+            .set({
+                coverLetterDocx: pdfPath,
+                ...(envelopePdfPath ? { envelopeSlip: envelopePdfPath } : {}),
+            })
             .where(eq(instrumentBgDetails.instrumentId, instrumentId));
 
-        this.logger.log(`BG covering letter generated for instrument ${instrumentId}: ${pdfPath}`);
-        return { pdfPath };
+        this.logger.log(
+            `BG covering letter generated for instrument ${instrumentId}: ${pdfPath}${envelopePdfPath ? `, envelope slip: ${envelopePdfPath}` : ''}`
+        );
+        return { pdfPath, envelopePdfPath };
     }
 
     /**
@@ -2854,56 +2909,6 @@ export class PaymentRequestsNotificationService {
                 } catch (error) {
                     this.logger.warn(
                         `BG authorization letter generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
-                    );
-                }
-
-                // Attachment — envelope slip (PDF) printed and pasted on the
-                // dispatch envelope. No letterhead / footer / watermark.
-                try {
-                    const courierJson = (instrument?.courierAddressJson ?? null) as Record<string, any> | null;
-                    const addressLines: string[] = courierJson
-                        ? [
-                            courierJson.line1,
-                            courierJson.line2,
-                            courierJson.city,
-                            [courierJson.state, courierJson.pincode].filter(Boolean).join(' - '),
-                        ].filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
-                        : (instrument?.courierAddress || '')
-                            .split(/\r?\n/)
-                            .map((line) => line.trim())
-                            .filter((line) => line.length > 0);
-
-                    const [envelopeSlipPath] = await this.pdfGenerator.generatePdfs(
-                        'bgEnvelopeSlip',
-                        {
-                            data: {
-                                to_name: courierJson?.name || '',
-                                to_address_lines: addressLines,
-                                contact_number: courierJson?.phone || '',
-                                submission_label: bgReference?.label || '',
-                                submission_ref: bgReference?.value || '',
-                            },
-                        },
-                        instrumentId,
-                        'BG'
-                    );
-
-                    if (envelopeSlipPath) {
-                        addAttachmentLink('Envelope Slip', envelopeSlipPath);
-                        try {
-                            await this.db
-                                .update(instrumentBgDetails)
-                                .set({ envelopeSlip: envelopeSlipPath })
-                                .where(eq(instrumentBgDetails.instrumentId, instrumentId));
-                        } catch (persistError) {
-                            this.logger.warn(
-                                `Failed to persist BG envelope slip path for instrument ${instrumentId}: ${persistError instanceof Error ? persistError.message : String(persistError)}`
-                            );
-                        }
-                    }
-                } catch (error) {
-                    this.logger.warn(
-                        `BG envelope slip generation failed for instrument ${instrumentId} — sending create mail without it: ${error instanceof Error ? error.message : String(error)}`
                     );
                 }
 

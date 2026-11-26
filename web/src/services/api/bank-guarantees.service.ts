@@ -110,8 +110,8 @@ class BankGuaranteesService extends BaseApiService {
     async generateCoveringLetter(
         id: number,
         payload: { bgNo?: string; bgDate?: string },
-    ): Promise<{ pdfPath: string }> {
-        return this.post<{ pdfPath: string }, { bgNo?: string; bgDate?: string }>(
+    ): Promise<{ pdfPath: string; envelopePdfPath?: string }> {
+        return this.post<{ pdfPath: string; envelopePdfPath?: string }, { bgNo?: string; bgDate?: string }>(
             `/instruments/${id}/covering-letter`,
             payload,
         );
