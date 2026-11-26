@@ -809,6 +809,10 @@ export class PaymentRequestService {
                 projectName: projects.projectName,
                 poNumber: purchaseOrders.poNumber,
                 vwoNumber: vendorWorkOrders.woNumber,
+                poTdsPercentage: purchaseOrders.tdsPercentage,
+                poTdsAmount: purchaseOrders.tdsAmount,
+                vwoTdsPercentage: vendorWorkOrders.tdsPercentage,
+                vwoTdsAmount: vendorWorkOrders.tdsAmount,
                 fixedExpenseId: fixedExpenses.id,
                 fixedExpenseAmountType: fixedExpenses.amountType,
             })
@@ -831,6 +835,10 @@ export class PaymentRequestService {
                 projectName: projects.projectName,
                 poNumber: purchaseOrders.poNumber,
                 vwoNumber: vendorWorkOrders.woNumber,
+                poTdsPercentage: purchaseOrders.tdsPercentage,
+                poTdsAmount: purchaseOrders.tdsAmount,
+                vwoTdsPercentage: vendorWorkOrders.tdsPercentage,
+                vwoTdsAmount: vendorWorkOrders.tdsAmount,
             })
             .from(paymentRequests)
             .leftJoin(users, eq(paymentRequests.requestedBy, users.id))

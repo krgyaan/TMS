@@ -13,8 +13,8 @@ import type { ColDef } from "ag-grid-community";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDeleteInventoryItem, useInventoryItems, useUpdateInventoryItem, type ItemMasterTeam } from "@/hooks/api/useInventoryItems";
 import type { InventoryItem } from "@/types/inventory-item.types";
-import { formatKeySpecification, itemMasterColumnsForViewport, keySpecificationAttributes } from "./item-master-display";
-import { getItemMainCategory } from "./item-catalog";
+import { formatKeySpecification, itemMasterColumnsForViewport, keySpecificationAttributes } from "./helpers/inventoryItem.display";
+import { getItemMainCategory } from "./helpers/inventoryItem.catalog";
 import { toast } from "sonner";
 import { paths } from "@/app/routes/paths";
 
@@ -119,7 +119,7 @@ export default function InventoryItemListPage({ team }: { team: ItemMasterTeam }
         <CardContent>
             {error && <Alert variant="destructive" className="mb-3"><AlertDescription>Unable to refresh items: {error.message}</AlertDescription></Alert>}
             <div className="mb-4 w-full">
-                <div className="relative w-full"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input className="h-11 w-full pl-9 md:h-10" placeholder="Search code, name, category, make/brand..." value={searchInput} onChange={event => setSearchValue(event.target.value)} /></div>
+                <div className="relative w-full"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input className="h-11 w-full pl-9 md:h-10" placeholder="Search code, name, category, HSN..." value={searchInput} onChange={event => setSearchValue(event.target.value)} /></div>
             </div>
             {isSettings && selectedRows.length > 0 && <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-2 text-sm">
                 <span>{selectedRows.length} selected</span>

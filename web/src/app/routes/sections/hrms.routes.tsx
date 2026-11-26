@@ -29,6 +29,9 @@ const ComplaintListPage = lazy(() => import("@/modules/hrms/complaints/Complaint
 const ComplaintCreatePage = lazy(() => import("@/modules/hrms/complaints/ComplaintCreatePage"));
 const ComplaintViewPage = lazy(() => import("@/modules/hrms/complaints/ComplaintViewPage"));
 
+// Office Inventory
+const OfficeInventoryPage = lazy(() => import("@/modules/hrms/office-inventory/OfficeInventoryPage"));
+
 
 export default function HrmsRoutes() {
     return (
@@ -62,6 +65,8 @@ export default function HrmsRoutes() {
                 path="complaints/:id/view"
                 element={<ComplaintViewPage backTo="/hrms/complaints" backLabel="Back to Complaints" />}
             />
+
+            <Route path="office-inventory" element={<OfficeInventoryPage />} />
         </Routes>
     );
 }

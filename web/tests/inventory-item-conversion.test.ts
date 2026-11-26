@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { UNIT_OPTIONS } from "../src/modules/accounts/inventory-items/item-config.ts";
+import { UNIT_OPTIONS } from "../src/modules/accounts/inventory-items/helpers/inventoryItem.config.ts";
 
 test("exposes every supported unit", () => {
     assert.deepEqual(UNIT_OPTIONS, ["Kg", "Kgs.", "Mtr", "Ft", "Length (3M)", "Length (6M)", "Nos.", "RMtr", "Sq. Mtr.", "Litre", "Can", "Container", "Pair", "Pairs", "Set"]);

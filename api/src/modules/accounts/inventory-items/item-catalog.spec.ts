@@ -1,4 +1,4 @@
-import { AC_ITEM_CATALOG, DC_ITEM_CATALOG, getAllowedConversionPairs, getAllowedUnits } from "./item-catalog";
+import { AC_ITEM_CATALOG, DC_ITEM_CATALOG, getAllowedConversionPairs, getAllowedUnits, getDefaultHsn } from "./item-catalog";
 import { generateTemplatedItemCode } from "./item-code-generator";
 import { validateCatalogItemValues } from "./item-catalog-validation";
 
@@ -80,5 +80,17 @@ describe("AC item catalog", () => {
         expect(generateTemplatedItemCode("AC Accessories", "GI Duct / MS Duct", { material: "MS", shape: "Oval", fabrication: "Factory", thickness: "16", insulationStatus: "Insulated", insulationThickness: "9" })).toBe("Duct/MS/Ov/F/16G/I/9");
         expect(generateTemplatedItemCode("AC Accessories", "GI Duct / MS Duct", { material: "MS", shape: "Rectangular", fabrication: "Factory", thickness: "16" })).toBe("Duct/MS/Re/F/16G");
         expect(generateTemplatedItemCode("AC Accessories", "Round Duct with Aluminium Foil", { construction: "Rigid", insulationStatus: "Non-Insulated", diameter: "300" })).toBe("RoundDuct/R/NI");
+    });
+
+    it("resolves prefilled HSN codes for static and attribute-dependent items including Helmet", () => {
+        expect(getDefaultHsn("AC Accessories", "Copper", { type: "Pipe" })).toBe("74111000");
+        expect(getDefaultHsn("AC Accessories", "Copper", { type: "Elbow" })).toBe("74121000");
+        expect(getDefaultHsn("AC Accessories", "GI Sheet / MS Sheet", { material: "MS" })).toBe("72085290");
+        expect(getDefaultHsn("AC Accessories", "GI Sheet / MS Sheet", { material: "GI" })).toBe("72104900");
+        expect(getDefaultHsn("Cables", "Cable")).toBe("85444999");
+        expect(getDefaultHsn("Batteries", "Ni-Cd Battery")).toBe("85072000");
+        expect(getDefaultHsn("Battery Accessories", "Helmet")).toBe("65061010");
+        expect(generateTemplatedItemCode("Battery Accessories", "Helmet", {})).toBe("Helmet");
+        expect(getDefaultHsn("HVAC", "Split AC")).toBeUndefined();
     });
 });
