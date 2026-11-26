@@ -374,6 +374,7 @@ export const BatchOrderSchema = z.object({
     name: z.string().optional(),
     designation: z.string().optional(),
     phone: z.string().optional(),
+    phones: z.array(z.string()).optional(),
     email: z.string().optional(),
     organization: z.string().optional(),
     departments: z.string().optional(),
