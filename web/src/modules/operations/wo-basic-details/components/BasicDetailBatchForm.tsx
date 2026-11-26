@@ -1,21 +1,22 @@
 import { paths } from "@/app/routes/paths";
 import { FileUploader } from "@/components/file-upload";
 import { DateInput } from "@/components/form/DateInput";
+import { SelectField } from "@/components/form/SelectField";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCreateWoBasicDetailBatch, useWoBasicDetailPrefill, useWoBasicDetailsByTender } from "@/hooks/api/useWoBasicDetails";
 import type { CreateWoBasicDetailBatchDto, CreateWoBasicDetailBatchOrderDto } from "@/modules/operations/types/wo.types";
 import { ArrowLeft, ArrowRight, Plus, Save, SkipForward, Trash2 } from "lucide-react";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { TEAM_ARRAY, TMS_DOCS } from "../helpers/basiDetailBatch.constants";
-import type { BasicDetailOrderType, ContactRow, OrderDefaults, OrderRow } from "../helpers/basiDetailBatch.types";
+import { GEM_REQUEST_OPTIONS, NATURE_OPTIONS, PO_RECEIVED_OPTIONS, TEAM_ARRAY, TMS_DOCS } from "../helpers/basiDetailBatch.constants";
+import type { BasicDetailBatchFormValues, BasicDetailOrderType, ContactRow, OrderDefaults, OrderRow } from "../helpers/basiDetailBatch.types";
 
 const emptyContact = (): ContactRow => ({
     name: "",
@@ -79,7 +80,13 @@ export function BasicDetailBatchForm() {
     );
     const [step, setStep] = useState<1 | 2 | 3>(1);
     const [activeOrder, setActiveOrder] = useState(0);
-    const [rows, setRows] = useState<OrderRow[]>([emptyOrder()]);
+    const form = useForm<BasicDetailBatchFormValues>({
+        defaultValues: { orders: [emptyOrder()] },
+    });
+    const rows = form.watch("orders");
+    const setRows = useCallback((updater: (previous: OrderRow[]) => OrderRow[]) => {
+        form.setValue("orders", updater(form.getValues("orders")), { shouldDirty: true });
+    }, [form]);
     const [tmsDocuments, setTmsDocuments] = useState<Record<string, boolean>>(
         Object.fromEntries(TMS_DOCS.map(doc => [doc, false])),
     );
@@ -115,6 +122,27 @@ export function BasicDetailBatchForm() {
             requestGemCharges: row.requestGemCharges || (prefillData.isGemTender ? "true" : "false"),
         })));
     }, [prefillData]);
+
+    useEffect(() => {
+        rows.forEach((row, index) => {
+            if (row.poReceivedStatus !== "received" && row.sapPoUpload.length > 0) {
+                form.setValue(`orders.${index}.sapPoUpload`, [], { shouldDirty: true });
+            }
+        });
+    }, [rows, form]);
+
+    useEffect(() => {
+        rows.forEach((row, index) => {
+            if (
+                row.requestGemCharges !== "true" &&
+                (row.gemChargesAmount || row.gemChargesPortalLink || row.gemChargesInvoice.length > 0)
+            ) {
+                form.setValue(`orders.${index}.gemChargesAmount`, "", { shouldDirty: true });
+                form.setValue(`orders.${index}.gemChargesPortalLink`, "", { shouldDirty: true });
+                form.setValue(`orders.${index}.gemChargesInvoice`, [], { shouldDirty: true });
+            }
+        });
+    }, [rows, form]);
 
     const projectIdentifiers = (row: OrderRow, index: number) => {
         if (!prefillData) return { code: "", name: "" };
@@ -297,19 +325,6 @@ export function BasicDetailBatchForm() {
             return { ...next, ...nextErrors };
         });
         return Object.keys(nextErrors).length === 0;
-    };
-
-    const updateGemRequest = (index: number, value: "true" | "false") => {
-        if (value === "true") {
-            updateRow(index, { requestGemCharges: "true" });
-            return;
-        }
-        updateRow(index, {
-            requestGemCharges: "false",
-            gemChargesAmount: "",
-            gemChargesPortalLink: "",
-            gemChargesInvoice: [],
-        });
     };
 
     const goNext = () => {
@@ -556,41 +571,26 @@ export function BasicDetailBatchForm() {
                                                 </TableRow>
                                                 <TableRow className="border-b bg-muted/10">
                                                     <TableCell className="align-top">
-                                                        <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Nature</p>
-                                                        <Select
-                                                            value={row.orderNature || undefined}
-                                                            onValueChange={value => updateRow(index, { orderNature: value as OrderRow["orderNature"] })}
-                                                        >
-                                                            <SelectTrigger className="h-9 w-full">
-                                                                <SelectValue placeholder="Select" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="supply">Supply</SelectItem>
-                                                                <SelectItem value="service">Service</SelectItem>
-                                                                <SelectItem value="sitc">SITC</SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
+                                                        <SelectField
+                                                            control={form.control}
+                                                            name={`orders.${index}.orderNature`}
+                                                            label="Nature"
+                                                            options={NATURE_OPTIONS}
+                                                            placeholder="Select nature"
+                                                            valueType="string"
+                                                        />
                                                         {errors[`${index}.orderNature`] && <p className="mt-1 text-xs text-destructive">{errors[`${index}.orderNature`]}</p>}
                                                     </TableCell>
                                                     <TableCell className="align-top">
-                                                        <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">PO Received / SAP PO</p>
                                                         <div className="space-y-2">
-                                                            <Select
-                                                                value={row.poReceivedStatus || undefined}
-                                                                onValueChange={value => updateRow(index, {
-                                                                    poReceivedStatus: value as OrderRow["poReceivedStatus"],
-                                                                    sapPoUpload: value === "received" ? row.sapPoUpload : [],
-                                                                })}
-                                                            >
-                                                                <SelectTrigger className="h-9 w-full">
-                                                                    <SelectValue placeholder="Select PO status" />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    <SelectItem value="received">Received</SelectItem>
-                                                                    <SelectItem value="not_received">Not Received</SelectItem>
-                                                                    <SelectItem value="not_applicable">Not Applicable</SelectItem>
-                                                                </SelectContent>
-                                                            </Select>
+                                                            <SelectField
+                                                                control={form.control}
+                                                                name={`orders.${index}.poReceivedStatus`}
+                                                                label="PO Received"
+                                                                options={PO_RECEIVED_OPTIONS}
+                                                                placeholder="Select PO status"
+                                                                valueType="string"
+                                                            />
                                                             {errors[`${index}.poReceivedStatus`] && <p className="text-xs text-destructive">{errors[`${index}.poReceivedStatus`]}</p>}
                                                         </div>
                                                     </TableCell>
@@ -659,21 +659,15 @@ export function BasicDetailBatchForm() {
                                 </div>
                                 <div className="space-y-3 rounded-lg border p-4">
                                     <div className="grid gap-4 md:grid-cols-3">
-                                        <label className="space-y-1">
-                                            <span className="text-sm font-medium">Request GeM Charges Payment</span>
-                                            <Select
-                                                value={activeRow.requestGemCharges || (isGemTender ? "true" : "false")}
-                                                onValueChange={value => updateGemRequest(activeOrder, value as "true" | "false")}
-                                            >
-                                                <SelectTrigger className="h-9 w-full">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="false">No</SelectItem>
-                                                    <SelectItem value="true">Yes</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </label>
+                                        <SelectField
+                                            control={form.control}
+                                            name={`orders.${activeOrder}.requestGemCharges`}
+                                            label="Request GeM Charges Payment"
+                                            options={GEM_REQUEST_OPTIONS}
+                                            placeholder="Select"
+                                            valueType="string"
+                                            descriptionPlacement="below"
+                                        />
                                     </div>
                                     {isGemTender && (
                                         <p className="text-xs text-muted-foreground">

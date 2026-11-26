@@ -39,3 +39,7 @@ export type OrderDefaults = {
     finalPrice?: string;
     requestGemCharges?: "true" | "false";
 };
+
+export type BasicDetailBatchFormValues = {
+    orders: OrderRow[];
+};
