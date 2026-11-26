@@ -41,7 +41,7 @@ export const WIZARD_PAGES = [
   },
 ] as const;
 
-export const DEPARTMENTS = ["EIC", "User", "C&P", "Finance"] as const;
+export const DEPARTMENTS = ["EIC", "User", "C&P", "Finance", "Store"] as const;
 export type Department = (typeof DEPARTMENTS)[number];
 
 export const DEPARTMENT_OPTIONS = DEPARTMENTS.map((dept) => ({

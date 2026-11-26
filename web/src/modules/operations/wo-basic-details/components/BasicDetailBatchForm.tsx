@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCreateWoBasicDetailBatch, useWoBasicDetailPrefill, useWoBasicDetailsByTender } from "@/hooks/api/useWoBasicDetails";
 import type { CreateWoBasicDetailBatchDto, CreateWoBasicDetailBatchOrderDto } from "@/modules/operations/types/wo.types";
@@ -556,34 +557,40 @@ export function BasicDetailBatchForm() {
                                                 <TableRow className="border-b bg-muted/10">
                                                     <TableCell className="align-top">
                                                         <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Nature</p>
-                                                        <select
-                                                            className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-                                                            value={row.orderNature}
-                                                            onChange={event => updateRow(index, { orderNature: event.target.value as OrderRow["orderNature"] })}
+                                                        <Select
+                                                            value={row.orderNature || undefined}
+                                                            onValueChange={value => updateRow(index, { orderNature: value as OrderRow["orderNature"] })}
                                                         >
-                                                            <option value="">Select</option>
-                                                            <option value="supply">Supply</option>
-                                                            <option value="service">Service</option>
-                                                            <option value="sitc">SITC</option>
-                                                        </select>
+                                                            <SelectTrigger className="h-9 w-full">
+                                                                <SelectValue placeholder="Select" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="supply">Supply</SelectItem>
+                                                                <SelectItem value="service">Service</SelectItem>
+                                                                <SelectItem value="sitc">SITC</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
                                                         {errors[`${index}.orderNature`] && <p className="mt-1 text-xs text-destructive">{errors[`${index}.orderNature`]}</p>}
                                                     </TableCell>
                                                     <TableCell className="align-top">
                                                         <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">PO Received / SAP PO</p>
                                                         <div className="space-y-2">
-                                                            <select
-                                                                className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-                                                                value={row.poReceivedStatus}
-                                                                onChange={event => updateRow(index, {
-                                                                    poReceivedStatus: event.target.value as OrderRow["poReceivedStatus"],
-                                                                    sapPoUpload: event.target.value === "received" ? row.sapPoUpload : [],
+                                                            <Select
+                                                                value={row.poReceivedStatus || undefined}
+                                                                onValueChange={value => updateRow(index, {
+                                                                    poReceivedStatus: value as OrderRow["poReceivedStatus"],
+                                                                    sapPoUpload: value === "received" ? row.sapPoUpload : [],
                                                                 })}
                                                             >
-                                                                <option value="">Select PO status</option>
-                                                                <option value="received">Received</option>
-                                                                <option value="not_received">Not Received</option>
-                                                                <option value="not_applicable">Not Applicable</option>
-                                                            </select>
+                                                                <SelectTrigger className="h-9 w-full">
+                                                                    <SelectValue placeholder="Select PO status" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="received">Received</SelectItem>
+                                                                    <SelectItem value="not_received">Not Received</SelectItem>
+                                                                    <SelectItem value="not_applicable">Not Applicable</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
                                                             {errors[`${index}.poReceivedStatus`] && <p className="text-xs text-destructive">{errors[`${index}.poReceivedStatus`]}</p>}
                                                         </div>
                                                     </TableCell>
@@ -654,14 +661,18 @@ export function BasicDetailBatchForm() {
                                     <div className="grid gap-4 md:grid-cols-3">
                                         <label className="space-y-1">
                                             <span className="text-sm font-medium">Request GeM Charges Payment</span>
-                                            <select
-                                                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                                            <Select
                                                 value={activeRow.requestGemCharges || (isGemTender ? "true" : "false")}
-                                                onChange={event => updateGemRequest(activeOrder, event.target.value as "true" | "false")}
+                                                onValueChange={value => updateGemRequest(activeOrder, value as "true" | "false")}
                                             >
-                                                <option value="false">No</option>
-                                                <option value="true">Yes</option>
-                                            </select>
+                                                <SelectTrigger className="h-9 w-full">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="false">No</SelectItem>
+                                                    <SelectItem value="true">Yes</SelectItem>
+                                                </SelectContent>
+                                            </Select>
                                         </label>
                                     </div>
                                     {isGemTender && (
