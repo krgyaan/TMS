@@ -92,6 +92,7 @@ export const formToApi = {
 
   page4(form: Page4FormValues) {
     return {
+      orderNature: form.orderNature || undefined,
       buybackBoqApplicable: stringToBool(form.buybackBoqApplicable),
       billingBoq: form.billingBoq
         ?.filter((item) => item.itemDescription?.trim())

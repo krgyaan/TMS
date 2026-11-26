@@ -78,6 +78,7 @@ export const AddressSchema = z.object({
 });
 
 export const Page4FormSchema = z.object({
+  orderNature: z.enum(["supply", "service", "sitc"]).or(z.literal("")).optional(),
   billingBoq: z.array(BOQItemSchema).optional().default([]),
   buybackBoq: z.array(BOQItemSchema).optional().default([]),
   buybackBoqApplicable: z.string().optional(),

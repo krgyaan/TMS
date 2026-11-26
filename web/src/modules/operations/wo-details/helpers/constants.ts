@@ -68,6 +68,12 @@ export const YES_NO_OPTIONS = [
   { value: 'false', label: 'No' },
 ];
 
+export const ORDER_NATURE_OPTIONS = [
+  { value: 'supply', label: 'Supply' },
+  { value: 'service', label: 'Service' },
+  { value: 'sitc', label: 'SITC' },
+];
+
 export const GST_OPTIONS = [
   { value: '0', label: '0%' },
   { value: '5', label: '5%' },
