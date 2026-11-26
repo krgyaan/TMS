@@ -35,7 +35,7 @@ const TMS_DOCS = [
 type ContactRow = {
     name: string;
     designation: string;
-    phone: string;
+    phones: string[];
     email: string;
     organization: string;
     departments: string;
@@ -68,7 +68,7 @@ type OrderRow = {
 const emptyContact = (): ContactRow => ({
     name: "",
     designation: "",
-    phone: "",
+    phones: [""],
     email: "",
     organization: "",
     departments: "",
@@ -144,7 +144,7 @@ export function BasicDetailBatchForm() {
         return (prefillData?.clients ?? []).map(client => ({
             name: client.clientName ?? "",
             designation: client.clientDesignation ?? "",
-            phone: client.clientMobile ?? "",
+            phones: client.clientMobile ? [client.clientMobile] : [""],
             email: client.clientEmail ?? "",
             organization: "",
             departments: "",
@@ -254,19 +254,56 @@ export function BasicDetailBatchForm() {
         setRows(prev => prev.map((row, i) => (i === orderIndex ? { ...row, contacts: [...row.contacts, emptyContact()] } : row)));
     };
 
+    const removeContact = (orderIndex: number, contactIndex: number) => {
+        setRows(prev => prev.map((row, i) => (
+            i === orderIndex
+                ? { ...row, contacts: row.contacts.filter((_, ci) => ci !== contactIndex) }
+                : row
+        )));
+    };
+
     const prefillTenderContacts = (orderIndex: number) => {
         setRows(prev => prev.map((row, i) => {
             if (i !== orderIndex) return row;
-            const existing = new Set(row.contacts.map(contact => `${contact.name}|${contact.email}|${contact.phone}`));
-            const additions = tenderContacts.filter(contact => !existing.has(`${contact.name}|${contact.email}|${contact.phone}`));
+            const existing = new Set(row.contacts.map(contact => `${contact.name}|${contact.email}|${contact.phones.join(",")}`));
+            const additions = tenderContacts.filter(contact => !existing.has(`${contact.name}|${contact.email}|${contact.phones.join(",")}`));
             return { ...row, contacts: [...row.contacts, ...additions.map(contact => ({ ...contact }))] };
         }));
     };
 
-    const removeContact = (orderIndex: number, contactIndex: number) => {
-        setRows(prev => prev.map((row, i) => (
-            i === orderIndex ? { ...row, contacts: row.contacts.filter((_, ci) => ci !== contactIndex) } : row
-        )));
+    const updateContactPhone = (orderIndex: number, contactIndex: number, phoneIndex: number, value: string) => {
+        setRows(prev => prev.map((row, i) => {
+            if (i !== orderIndex) return row;
+            const contacts = row.contacts.map((contact, ci) => {
+                if (ci !== contactIndex) return contact;
+                const phones = [...contact.phones];
+                phones[phoneIndex] = value;
+                return { ...contact, phones };
+            });
+            return { ...row, contacts };
+        }));
+    };
+
+    const addContactPhone = (orderIndex: number, contactIndex: number) => {
+        setRows(prev => prev.map((row, i) => {
+            if (i !== orderIndex) return row;
+            const contacts = row.contacts.map((contact, ci) => (
+                ci === contactIndex ? { ...contact, phones: [...contact.phones, ""] } : contact
+            ));
+            return { ...row, contacts };
+        }));
+    };
+
+    const removeContactPhone = (orderIndex: number, contactIndex: number, phoneIndex: number) => {
+        setRows(prev => prev.map((row, i) => {
+            if (i !== orderIndex) return row;
+            const contacts = row.contacts.map((contact, ci) => {
+                if (ci !== contactIndex) return contact;
+                const phones = contact.phones.filter((_, pi) => pi !== phoneIndex);
+                return { ...contact, phones: phones.length ? phones : [""] };
+            });
+            return { ...row, contacts };
+        }));
     };
 
     const applyOrderType = (value: "single" | "repeat" | "multiple") => {
@@ -398,11 +435,11 @@ export function BasicDetailBatchForm() {
                         : undefined,
                     gemChargesPortalLink: row.requestGemCharges === "true" ? (row.gemChargesPortalLink || undefined) : undefined,
                     contacts: row.contacts
-                        .filter(contact => contact.name || contact.email || contact.phone)
+                        .filter(contact => contact.name || contact.email || contact.phones.some(Boolean))
                         .map(contact => ({
                             name: contact.name || undefined,
                             designation: contact.designation || undefined,
-                            phone: contact.phone || undefined,
+                            phones: contact.phones.filter(Boolean),
                             email: contact.email || undefined,
                             organization: contact.organization || undefined,
                             departments: contact.departments || undefined,
@@ -514,13 +551,11 @@ export function BasicDetailBatchForm() {
                                         <TableHead className="w-16">#</TableHead>
                                         <TableHead>WO Number</TableHead>
                                         <TableHead>WO Date</TableHead>
-                                        <TableHead>WO Value</TableHead>
-                                        <TableHead>GST</TableHead>
-                                        <TableHead>Order Nature</TableHead>
-                                        <TableHead>PO Received</TableHead>
-                                        <TableHead className="min-w-[220px]">SAP PO</TableHead>
-                                        <TableHead>Project Code</TableHead>
-                                        <TableHead>Project Name</TableHead>
+                                        <TableHead>WO Value (pre GST)</TableHead>
+                                        <TableHead>GST Amt.</TableHead>
+                                        <TableHead>Nature</TableHead>
+                                        <TableHead className="min-w-[240px]">SAP PO</TableHead>
+                                        <TableHead className="min-w-[240px]">Project</TableHead>
                                         <TableHead className="min-w-[220px]">Draft WO</TableHead>
                                         <TableHead className="w-12" />
                                     </TableRow>
@@ -571,38 +606,42 @@ export function BasicDetailBatchForm() {
                                                     </select>
                                                     {errors[`${index}.orderNature`] && <p className="mt-1 text-xs text-destructive">{errors[`${index}.orderNature`]}</p>}
                                                 </TableCell>
-                                                <TableCell className="align-top min-w-[150px]">
-                                                    <select
-                                                        className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-                                                        value={row.poReceivedStatus}
-                                                        onChange={event => updateRow(index, {
-                                                            poReceivedStatus: event.target.value as OrderRow["poReceivedStatus"],
-                                                            sapPoUpload: event.target.value === "received" ? row.sapPoUpload : [],
-                                                        })}
-                                                    >
-                                                        <option value="">Select</option>
-                                                        <option value="received">Received</option>
-                                                        <option value="not_received">Not Received</option>
-                                                        <option value="not_applicable">Not Applicable</option>
-                                                    </select>
-                                                    {errors[`${index}.poReceivedStatus`] && <p className="mt-1 text-xs text-destructive">{errors[`${index}.poReceivedStatus`]}</p>}
+                                                <TableCell className="align-top min-w-[240px]">
+                                                    <div className="space-y-2">
+                                                        <select
+                                                            className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                                                            value={row.poReceivedStatus}
+                                                            onChange={event => updateRow(index, {
+                                                                poReceivedStatus: event.target.value as OrderRow["poReceivedStatus"],
+                                                                sapPoUpload: event.target.value === "received" ? row.sapPoUpload : [],
+                                                            })}
+                                                        >
+                                                            <option value="">Select PO status</option>
+                                                            <option value="received">Received</option>
+                                                            <option value="not_received">Not Received</option>
+                                                            <option value="not_applicable">Not Applicable</option>
+                                                        </select>
+                                                        {errors[`${index}.poReceivedStatus`] && <p className="text-xs text-destructive">{errors[`${index}.poReceivedStatus`]}</p>}
+                                                        {row.poReceivedStatus === "received" ? (
+                                                            <>
+                                                                <FileUploader
+                                                                    context="sap-po"
+                                                                    value={row.sapPoUpload}
+                                                                    onChange={files => updateRow(index, { sapPoUpload: files })}
+                                                                />
+                                                                {errors[`${index}.sapPoUpload`] && <p className="text-xs text-destructive">{errors[`${index}.sapPoUpload`]}</p>}
+                                                            </>
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground">SAP PO upload shown when Received</span>
+                                                        )}
+                                                    </div>
                                                 </TableCell>
-                                                <TableCell className="align-top min-w-[220px]">
-                                                    {row.poReceivedStatus === "received" ? (
-                                                        <>
-                                                            <FileUploader
-                                                                context="sap-po"
-                                                                value={row.sapPoUpload}
-                                                                onChange={files => updateRow(index, { sapPoUpload: files })}
-                                                            />
-                                                            {errors[`${index}.sapPoUpload`] && <p className="mt-1 text-xs text-destructive">{errors[`${index}.sapPoUpload`]}</p>}
-                                                        </>
-                                                    ) : (
-                                                        <span className="text-xs text-muted-foreground">—</span>
-                                                    )}
+                                                <TableCell className="align-top min-w-[240px]">
+                                                    <div className="space-y-1">
+                                                        <p className="break-all font-mono text-xs">{identifiers.code || "—"}</p>
+                                                        <p className="text-xs text-muted-foreground">{identifiers.name || "—"}</p>
+                                                    </div>
                                                 </TableCell>
-                                                <TableCell className="align-top min-w-[200px] break-all text-xs font-mono">{identifiers.code || "—"}</TableCell>
-                                                <TableCell className="align-top min-w-[160px] text-xs">{identifiers.name || "—"}</TableCell>
                                                 <TableCell className="align-top min-w-[220px]">
                                                     <FileUploader
                                                         context="wo-draft"
@@ -752,7 +791,7 @@ export function BasicDetailBatchForm() {
                                                 <TableHead className="w-12">#</TableHead>
                                                 <TableHead>Name</TableHead>
                                                 <TableHead>Designation</TableHead>
-                                                <TableHead>Phone</TableHead>
+                                                <TableHead>Phone Numbers</TableHead>
                                                 <TableHead>Email</TableHead>
                                                 <TableHead className="w-14" />
                                             </TableRow>
@@ -767,8 +806,38 @@ export function BasicDetailBatchForm() {
                                                     <TableCell className="align-top min-w-[150px]">
                                                         <Input value={contact.designation} onChange={event => updateContact(activeOrder, contactIndex, { designation: event.target.value })} placeholder="Designation" />
                                                     </TableCell>
-                                                    <TableCell className="align-top min-w-[140px]">
-                                                        <Input value={contact.phone} onChange={event => updateContact(activeOrder, contactIndex, { phone: event.target.value })} placeholder="Phone" />
+                                                    <TableCell className="align-top min-w-[200px]">
+                                                        <div className="space-y-2">
+                                                            {contact.phones.map((phone, phoneIndex) => (
+                                                                <div key={phoneIndex} className="flex items-center gap-1">
+                                                                    <Input
+                                                                        value={phone}
+                                                                        onChange={event => updateContactPhone(activeOrder, contactIndex, phoneIndex, event.target.value)}
+                                                                        placeholder={phoneIndex === 0 ? "Primary phone" : "Additional phone"}
+                                                                    />
+                                                                    {contact.phones.length > 1 && (
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-8 w-8 shrink-0"
+                                                                            onClick={() => removeContactPhone(activeOrder, contactIndex, phoneIndex)}
+                                                                        >
+                                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                                        </Button>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                            <Button
+                                                                type="button"
+                                                                variant="link"
+                                                                size="sm"
+                                                                className="h-auto p-0 text-xs"
+                                                                onClick={() => addContactPhone(activeOrder, contactIndex)}
+                                                            >
+                                                                + Add number
+                                                            </Button>
+                                                        </div>
                                                     </TableCell>
                                                     <TableCell className="align-top min-w-[200px]">
                                                         <Input type="email" value={contact.email} onChange={event => updateContact(activeOrder, contactIndex, { email: event.target.value })} placeholder="Email" />

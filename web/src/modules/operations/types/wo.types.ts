@@ -367,6 +367,7 @@ export interface WoContact {
   name: string | null;
   designation: string | null;
   phone: string | null;
+  phones: string[];
   email: string | null;
   createdAt: string;
   updatedAt: string;
@@ -379,6 +380,7 @@ export interface CreateWoContactDto {
   name?: string;
   designation?: string;
   phone?: string;
+  phones?: string[];
   email?: string;
 }
 

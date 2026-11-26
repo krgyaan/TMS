@@ -759,17 +759,19 @@ export function BasicDetailView({
                                             {contact.designation}
                                         </div>
                                     )}
-                                    {contact.phone && (
-                                        <div className="flex items-center gap-2 text-sm">
-                                            <Phone className="h-3 w-3 text-muted-foreground" />
-                                            <a
-                                                href={`tel:${contact.phone}`}
-                                                className="text-primary hover:underline"
-                                            >
-                                                {contact.phone}
-                                            </a>
-                                        </div>
-                                    )}
+                                    {((contact.phones?.length ? contact.phones : contact.phone ? [contact.phone] : []) as string[])
+                                        .filter(Boolean)
+                                        .map((phone, phoneIndex) => (
+                                            <div key={`${phone}-${phoneIndex}`} className="flex items-center gap-2 text-sm">
+                                                <Phone className="h-3 w-3 text-muted-foreground" />
+                                                <a
+                                                    href={`tel:${phone}`}
+                                                    className="text-primary hover:underline"
+                                                >
+                                                    {phone}
+                                                </a>
+                                            </div>
+                                        ))}
                                     {contact.email && (
                                         <div className="flex items-center gap-2 text-sm">
                                             <Mail className="h-3 w-3 text-muted-foreground" />

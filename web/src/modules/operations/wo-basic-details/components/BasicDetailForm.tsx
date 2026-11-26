@@ -254,7 +254,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
             setContacts(tenderClients.map((c: any) => ({
                 name: c.clientName,
                 designation: c.clientDesignation,
-                phone: c.clientMobile,
+                phones: c.clientMobile ? [c.clientMobile] : [""],
                 email: c.clientEmail,
                 organization: "",
                 departments: "",
@@ -275,11 +275,33 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
     };
 
     const handleAddContact = () => {
-        setContacts([...contacts, { name: "", designation: "", phone: "", email: "", organization: "", departments: "" }]);
+        setContacts([...contacts, { name: "", designation: "", phones: [""], email: "", organization: "", departments: "" }]);
     };
 
     const handleRemoveContact = (idx: number) => {
         setContacts(contacts.filter((_, i) => i !== idx));
+    };
+
+    const handleUpdateContactPhone = (idx: number, phoneIdx: number, value: string) => {
+        const newContacts = [...contacts];
+        const phones = [...(newContacts[idx].phones ?? [""])];
+        phones[phoneIdx] = value;
+        newContacts[idx] = { ...newContacts[idx], phones };
+        setContacts(newContacts);
+    };
+
+    const handleAddContactPhone = (idx: number) => {
+        const newContacts = [...contacts];
+        const phones = [...(newContacts[idx].phones ?? [""]), ""];
+        newContacts[idx] = { ...newContacts[idx], phones };
+        setContacts(newContacts);
+    };
+
+    const handleRemoveContactPhone = (idx: number, phoneIdx: number) => {
+        const newContacts = [...contacts];
+        const phones = (newContacts[idx].phones ?? [""]).filter((_: string, i: number) => i !== phoneIdx);
+        newContacts[idx] = { ...newContacts[idx], phones: phones.length ? phones : [""] };
+        setContacts(newContacts);
     };
 
     const isSubmitting =
@@ -310,7 +332,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                         contacts: contacts.map(c => ({
                             name: c.name,
                             designation: c.designation || undefined,
-                            phone: c.phone || undefined,
+                            phones: (c.phones ?? (c.phone ? [c.phone] : [])).filter(Boolean),
                             email: c.email || undefined,
                             organization: c.organization || undefined,
                             departments: c.departments || undefined,
@@ -328,7 +350,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                         contacts: contacts.map(c => ({
                             name: c.name,
                             designation: c.designation || undefined,
-                            phone: c.phone || undefined,
+                            phones: (c.phones ?? (c.phone ? [c.phone] : [])).filter(Boolean),
                             email: c.email || undefined,
                             organization: c.organization || undefined,
                             departments: c.departments || undefined,
@@ -717,7 +739,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                         <tr>
                                             <th className="p-3 text-left">Name</th>
                                             <th className="p-3 text-left">Designation</th>
-                                            <th className="p-3 text-left">Phone</th>
+                                            <th className="p-3 text-left">Phone Numbers</th>
                                             <th className="p-3 text-left">Email</th>
                                             <th className="p-3 text-left w-10">Actions</th>
                                         </tr>
@@ -742,12 +764,38 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                                     />
                                                 </td>
                                                 <td className="p-2">
-                                                    <Input
-                                                        value={contact.phone || ""}
-                                                        onChange={(e) => handleUpdateContact(idx, "phone", e.target.value)}
-                                                        placeholder="Phone"
-                                                        className="h-8 text-xs"
-                                                    />
+                                                    <div className="space-y-2">
+                                                        {(contact.phones ?? (contact.phone ? [contact.phone] : [""])).map((phone: string, phoneIdx: number) => (
+                                                            <div key={phoneIdx} className="flex items-center gap-1">
+                                                                <Input
+                                                                    value={phone || ""}
+                                                                    onChange={(e) => handleUpdateContactPhone(idx, phoneIdx, e.target.value)}
+                                                                    placeholder={phoneIdx === 0 ? "Primary phone" : "Additional phone"}
+                                                                    className="h-8 text-xs"
+                                                                />
+                                                                {(contact.phones?.length ?? 1) > 1 && (
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-7 w-7"
+                                                                        onClick={() => handleRemoveContactPhone(idx, phoneIdx)}
+                                                                    >
+                                                                        <Trash2 className="h-3 w-3" />
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                        <Button
+                                                            type="button"
+                                                            variant="link"
+                                                            size="sm"
+                                                            className="h-auto p-0 text-xs"
+                                                            onClick={() => handleAddContactPhone(idx)}
+                                                        >
+                                                            + Add number
+                                                        </Button>
+                                                    </div>
                                                 </td>
                                                 <td className="p-2">
                                                     <Input
