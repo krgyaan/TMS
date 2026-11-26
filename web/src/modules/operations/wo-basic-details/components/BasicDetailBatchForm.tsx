@@ -161,13 +161,14 @@ export function BasicDetailBatchForm() {
 
         const sequence = startSequence + index;
         const suffix =
-            orderType === "repeat" ? `R${sequence}` :
-            orderType === "multiple" ? `P${sequence}` : "";
+            sequence <= 1 ? "" :
+            orderType === "repeat" ? `(R${sequence})` :
+            orderType === "multiple" ? `(P${sequence})` : "";
         const baseCode = `${teamName}/${yearSegment}/${orgName}/${locationName}/${itemName}/${woSuffix}`;
         const baseName = `${orgName} ${locationName} ${itemName}`.trim();
 
         return {
-            code: suffix ? `${baseCode}/${suffix}` : baseCode,
+            code: suffix ? `${baseCode} ${suffix}` : baseCode,
             name: suffix ? `${baseName} ${suffix}` : baseName,
         };
     };
@@ -523,9 +524,7 @@ export function BasicDetailBatchForm() {
                                     {rows.map((row, index) => {
                                         const identifiers = projectIdentifiers(row, index);
                                         const sequence = startSequence + index;
-                                        const label =
-                                            orderType === "repeat" ? `R${sequence}` :
-                                            orderType === "multiple" ? `P${sequence}` : "Single";
+                                        const label = orderLabel(orderType, sequence);
                                         return (
                                             <Fragment key={index}>
                                                 <TableRow className="border-b-0">
@@ -842,10 +841,15 @@ export function BasicDetailBatchForm() {
     );
 }
 
-function projectLabel(orderType: BasicDetailOrderType, sequence: number) {
+function orderLabel(orderType: BasicDetailOrderType, sequence: number) {
+    if (sequence <= 1) return orderType === "single" ? "Single" : "Order 1";
     if (orderType === "repeat") return `R${sequence}`;
     if (orderType === "multiple") return `P${sequence}`;
     return "Single";
+}
+
+function projectLabel(orderType: BasicDetailOrderType, sequence: number) {
+    return orderLabel(orderType, sequence);
 }
 
 function OrderTabs({

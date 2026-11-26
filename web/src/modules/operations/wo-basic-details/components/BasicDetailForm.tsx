@@ -168,8 +168,9 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
         const orderType = watchOrderType ?? "single";
         const sequence = hasExistingOrders ? nextOrderSequence : 1;
         const orderSuffix =
-            orderType === "repeat" ? `R${sequence}` :
-            orderType === "multiple" ? `P${sequence}` : "";
+            sequence <= 1 ? "" :
+            orderType === "repeat" ? `(R${sequence})` :
+            orderType === "multiple" ? `(P${sequence})` : "";
         const woSuffix = watchWoNumber ? String(watchWoNumber).slice(-4) : "";
         const yearSegment = watchWoDate ? getFinancialYear(watchWoDate instanceof Date ? watchWoDate : new Date(watchWoDate)) : "";
 
@@ -184,7 +185,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
             const baseCode = `${teamName}/${yearSegment}/${orgName}/${locName}/${itemName}/${woSuffix}`;
             const baseName = `${orgName} ${locName} ${itemName}`.trim();
             return {
-                projectCode: orderSuffix ? `${baseCode}/${orderSuffix}` : baseCode,
+                projectCode: orderSuffix ? `${baseCode} ${orderSuffix}` : baseCode,
                 projectName: orderSuffix ? `${baseName} ${orderSuffix}` : baseName,
             };
         }
@@ -198,7 +199,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
         const baseCode = `${teamName}/${yearSegment}/${orgName}/${locName}/${itemName}/${woSuffix}`;
         const baseName = `${orgName} ${locName} ${itemName}`.trim();
         return {
-            projectCode: orderSuffix ? `${baseCode}/${orderSuffix}` : baseCode,
+            projectCode: orderSuffix ? `${baseCode} ${orderSuffix}` : baseCode,
             projectName: orderSuffix ? `${baseName} ${orderSuffix}` : baseName,
         };
     }, [isNonTender, prefillData, watchWoNumber, watchWoDate, watchTeamId, watchOrganizationId, watchItemId, watchLocationId, teamOptions, organizationOptions, itemOptions, locationOptions, watchOrderType, hasExistingOrders, nextOrderSequence]);
