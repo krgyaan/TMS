@@ -38,7 +38,8 @@
         "tally:preview": "tsx -r tsconfig-paths/register scripts/tally-preview.ts",
         "tally:sync-ledgers": "tsx -r tsconfig-paths/register scripts/tally-sync-ledgers.ts",
         "tally:link-employee-ledgers": "tsx -r tsconfig-paths/register scripts/tally-link-employee-ledgers.ts",
-        "tally:check-categories": "tsx -r tsconfig-paths/register scripts/tally-check-categories.ts"
+        "tally:check-categories": "tsx -r tsconfig-paths/register scripts/tally-check-categories.ts",
+        "tally:link-imprest-categories": "tsx -r tsconfig-paths/register scripts/tally-link-imprest-categories.ts"
     },
     "dependencies": {
         "@asteasolutions/zod-to-openapi": "^7.3.4",
