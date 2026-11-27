@@ -8,6 +8,15 @@ const emdModeMapping: Record<string, string> = {
 const normalizeMode = (val: unknown) =>
     typeof val === 'string' ? (emdModeMapping[val] ?? val) : val;
 
+// Legacy courier-days field. The edit API can return it as null (it is no
+// longer captured by the BG forms), so normalise null to undefined before the
+// optional number validation -- otherwise z.coerce.number() turns null into 0
+// and the hidden field blocks the whole edit form.
+const optionalCourierDays = z.preprocess(
+    (value) => (value === null ? undefined : value),
+    z.coerce.number().min(1).max(10).optional(),
+);
+
 const DELIVERY_OPTION_VALUES = DELIVERY_OPTIONS.map(option => option.value) as ['TENDER_DUE', '24', '48'];
 const CHEQUE_DELIVERY_OPTION_VALUES = CHEQUE_DELIVERY_OPTIONS.map(option => option.value) as ['3', '6', '12', '24'];
 
@@ -94,7 +103,7 @@ export const PaymentDetailsSchema = z.object({
     bgClientCpEmail: z.email().optional().or(z.literal('')),
     bgClientFinanceEmail: z.email().optional().or(z.literal('')),
     bgCourierAddress: z.string().optional(),
-    bgCourierDays: z.coerce.number().min(1).max(10).optional(),
+    bgCourierDays: optionalCourierDays,
     // Courier Dispatch (mirrors BG action form step 2)
     bgCourierOrg: z.string().optional(),
     bgCourierName: z.string().optional(),
@@ -386,7 +395,7 @@ export const BankGuaranteeSchema = z.object({
     bgClientCpEmail: z.email().optional().or(z.literal('')),
     bgClientFinanceEmail: z.email().optional().or(z.literal('')),
     bgCourierAddress: z.string().optional(),
-    bgCourierDays: z.coerce.number().min(1).max(10).optional(),
+    bgCourierDays: optionalCourierDays,
     bgBank: z.string().optional(),
     bgBankAccountName: z.string().optional(),
     bgBankAccountNo: z.string().optional(),
