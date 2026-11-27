@@ -236,7 +236,8 @@ const BankGuaranteeApprovalPage = () => {
     }
 
     const status: string = approval.tlApprovalStatus ?? 'PENDING';
-    const isPending = status === 'PENDING';
+    const canAct = status === 'PENDING' || status === 'INCOMPLETE' || status === 'REJECTED';
+    const showDecision = status !== 'PENDING';
     const decidedRemarks =
         approval.tlRejectedRemarks || approval.tlIncompleteRemarks || approval.tlApprovalRemarks || null;
 
@@ -424,7 +425,7 @@ const BankGuaranteeApprovalPage = () => {
                 </Card>
 
                 <div className="min-h-0 space-y-4 xl:overflow-y-auto">
-                    {!isPending && (
+                    {showDecision && (
                         <Card>
                             <CardHeader className="pb-2">
                                 <CardTitle className="flex items-center justify-between text-sm">
@@ -454,7 +455,7 @@ const BankGuaranteeApprovalPage = () => {
                         </Card>
                     )}
 
-                    {isPending && (
+                    {canAct && (
                         <Card className="border-primary/30 shadow-sm">
                             <CardHeader className="pb-3">
                                 <CardTitle className="flex items-center gap-2 text-base">
