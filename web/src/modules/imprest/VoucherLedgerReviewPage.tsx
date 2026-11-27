@@ -14,11 +14,6 @@ import { AlertCircle, ArrowLeft, Check, ChevronsUpDown, Loader2, Save } from "lu
 import React from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-const CONTEXT_LABEL: Record<VoucherLedgerReviewItem["context"], string> = {
-    default: "Default",
-    project: "Project",
-    business_development: "BD",
-};
 
 const PROBLEM_LABEL: Record<NonNullable<VoucherLedgerReviewItem["problem"]>, string> = {
     BLOCKED: "Category blocked",
@@ -236,39 +231,33 @@ const VoucherLedgerReviewPage: React.FC = () => {
                     <table className="w-full min-w-[1000px] text-sm">
                         <thead>
                             <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
-                                <th className="p-2">Date</th>
+                                <th className="p-2">Sr.No.</th>
+                                <th className="p-2">D.O.E.</th>
                                 <th className="p-2">Category</th>
-                                <th className="p-2">Project / Cost centre</th>
-                                <th className="p-2">Context</th>
-                                <th className="p-2">Auto ledger</th>
-                                <th className="p-2 min-w-[220px]">Final ledger</th>
+                                <th className="p-2">Project</th>
+                                <th className="p-2">Remarks</th>
+                                <th className="p-2 text-right">Amount</th>
+                                <th className="p-2 min-w-[220px]">Ledger</th>
                                 <th className="p-2">Status</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {data.items.map(item => {
+                            {data.items.map((item, index) => {
                                 const value = currentValue(item);
                                 const selectedName = currentName(item);
                                 const dirty = hasDraft(item) && drafts[item.id].ledgerId !== item.tallyLedgerId;
 
                                 return (
                                     <tr key={item.id} className="border-b align-top">
+                                        <td className="p-2 whitespace-nowrap">{index + 1}</td>
                                         <td className="p-2 whitespace-nowrap">{item.dateOfExpense ? formatDate(item.dateOfExpense) : "—"}</td>
-                                        <td className="p-2">
-                                            <div className="font-medium">{item.category ?? "—"}</div>
-                                            <div className="text-xs text-muted-foreground">{formatINR(item.amount)}</div>
-                                        </td>
+                                        <td className="p-2">{item.category ?? "—"}</td>
                                         <td className="p-2">
                                             <div>{item.projectName ?? "—"}</div>
                                             <div className="text-xs text-muted-foreground">{item.projectCode ?? "—"}</div>
                                         </td>
-                                        <td className="p-2">
-                                            <Badge variant={item.context === "business_development" ? "default" : "outline"}>{CONTEXT_LABEL[item.context]}</Badge>
-                                        </td>
-                                        <td className="p-2">
-                                            <div className="text-xs">{item.autoLedger?.name ?? "—"}</div>
-                                            <div className="text-[11px] text-muted-foreground">{item.autoLedger?.parent ?? ""}</div>
-                                        </td>
+                                        <td className="p-2">{item.remark ?? "—"}</td>
+                                        <td className="p-2 whitespace-nowrap text-right">{formatINR(item.amount)}</td>
                                         <td className="p-2">
                                             <LedgerPicker
                                                 value={value}
@@ -297,11 +286,21 @@ const VoucherLedgerReviewPage: React.FC = () => {
                                     </tr>
                                 );
                             })}
+                            <tr className="border-t-2 font-semibold">
+                                <td colSpan={5} className="p-2 text-right">
+                                    Total
+                                </td>
+                                <td className="p-2 whitespace-nowrap text-right">
+                                    {formatINR(data.items.reduce((sum, entry) => sum + entry.amount, 0))}
+                                </td>
+                                <td className="p-2" />
+                                <td className="p-2" />
+                            </tr>
                         </tbody>
                     </table>
                 </div>
 
-                <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t bg-background/95 py-3 backdrop-blur">
+                <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t bg-background/95 p-3 backdrop-blur">
                     <div className="text-sm text-muted-foreground">
                         {changed.length > 0 ? `${changed.length} unsaved change(s)` : "No unsaved changes"}
                         {saveMutation.error ? <span className="ml-2 text-destructive">Save failed.</span> : null}
