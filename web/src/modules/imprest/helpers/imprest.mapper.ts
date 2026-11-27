@@ -21,13 +21,28 @@ export const getFileType = (filename: string): "image" | "pdf" | "document" => {
 
 /**
  * Backend stores proofs as filenames; normalize them into ProofItems
- * for the lightbox / proof viewer.
+ * for the lightbox / proof viewer. Also tolerates legacy object entries.
  */
 export const mapProofFiles = (files: (string | ImprestProof)[]): ProofItem[] =>
-    files
-        .filter((file): file is string => typeof file === "string")
-        .map(file => ({
-            type: isPdfFile(file) ? "pdf" : "image",
-            url: imprestFileUrl(file),
-            name: file,
-        }));
+    (Array.isArray(files) ? files : [])
+        .map(file => {
+            if (typeof file === "string") {
+                const kind = getFileType(file);
+
+                return {
+                    type: kind === "document" ? "file" : kind,
+                    url: imprestFileUrl(file),
+                    name: file,
+                } as ProofItem;
+            }
+
+            const name = file?.name || file?.url || "Document";
+            const kind = file?.type || getFileType(name);
+
+            return {
+                type: kind === "document" ? "file" : kind,
+                url: file?.url || imprestFileUrl(name),
+                name,
+            } as ProofItem;
+        })
+        .filter(proof => Boolean(proof.url));

@@ -15,6 +15,8 @@ export interface TallyLedgerInfo {
     isActive: boolean;
 }
 
+export type VoucherLedgerReviewProof = string | { url: string; type?: string; name?: string };
+
 export interface VoucherLedgerReviewItem {
     id: number;
     categoryId: number | null;
@@ -24,6 +26,7 @@ export interface VoucherLedgerReviewItem {
     projectCode: string | null;
     projectTeam: string | null;
     remark: string | null;
+    invoiceProof: VoucherLedgerReviewProof[];
     amount: number;
     dateOfExpense: Date | null;
     context: CategoryLedgerContext;
@@ -1228,6 +1231,7 @@ export class ImprestAdminService {
                 projectCode: projects.projectCode,
                 projectTeam: projects.teamName,
                 remark: employeeImprests.remark,
+                invoiceProof: employeeImprests.invoiceProof,
                 amount: employeeImprests.amount,
                 dateOfExpense: employeeImprests.dateOfExpense,
                 overrideLedgerId: employeeImprests.tallyLedgerId,
@@ -1312,6 +1316,7 @@ export class ImprestAdminService {
                 projectCode: row.projectCode,
                 projectTeam: row.projectTeam,
                 remark: row.remark,
+                invoiceProof: Array.isArray(row.invoiceProof) ? (row.invoiceProof as VoucherLedgerReviewProof[]) : [],
                 amount: Number(row.amount),
                 dateOfExpense: row.dateOfExpense,
                 context,

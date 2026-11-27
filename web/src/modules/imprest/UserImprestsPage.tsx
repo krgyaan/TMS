@@ -19,7 +19,7 @@ import { imprestService } from "@/services/api";
 import type { ColDef } from "ag-grid-community";
 import { saveAs } from "file-saver";
 import {
-    AlertCircle, ArrowLeft, CheckCircle, Download, Eye, FileCheck, ImagePlus,
+    AlertCircle, ArrowLeft, CheckCircle, Download, FileCheck, ImagePlus,
     ListChecks, Loader2, MessageSquarePlus, Pencil, Plus, Trash2
 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -27,12 +27,11 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import * as XLSX from "xlsx";
 import "yet-another-react-lightbox/styles.css";
 import { ConfirmUnapproveDialog } from "./components/ConfirmUnapproveDialog";
+import { ImprestProofs } from "./components/ImprestProofs";
 import { ProofUploadDialog } from "./components/ProofUploadDialog";
-import { ProofViewerDialog } from "./components/ProofViewerDialog";
 import { RemarkDialog } from "./components/RemarkDialog";
 import { SummaryCards } from "./components/SummaryCards";
-import { mapProofFiles } from "./helpers/imprest.mapper";
-import type { ImprestRow, ProofItem } from "./helpers/imprest.types";
+import type { ImprestRow } from "./helpers/imprest.types";
 import { getImprestPaginationMeta } from "./imprestPagination";
 
 /** Inline Status Toggle */
@@ -167,9 +166,6 @@ const UserImprestsPage: React.FC = () => {
     const approveMutation = useApproveImprest();
     const tallyMutation = useTallyImprest();
     const proofMutation = useProofImprest();
-    const [proofModalOpen, setProofModalOpen] = useState(false);
-    const [proofs, setProofs] = useState<ProofItem[]>([]);
-    const [currentIndex, setCurrentIndex] = useState(0);
     const [addProofOpen, setAddProofOpen] = useState(false);
     const [currentProofRowId, setCurrentProofRowId] = useState<number | null>(null);
     const [filesToUpload, setFilesToUpload] = useState<string[]>([]);
@@ -240,21 +236,6 @@ const UserImprestsPage: React.FC = () => {
                 },
             }
         );
-    };
-
-    const openProofModal = (row: ImprestRow) => {
-        if (!Array.isArray(row.invoiceProof)) return;
-
-        const mapped = mapProofFiles(row.invoiceProof);
-
-        if (mapped.length === 0) {
-            alert("No proofs available.");
-            return;
-        }
-
-        setProofs(mapped);
-        setCurrentIndex(0);
-        setProofModalOpen(true);
     };
 
     const exportExcel = async () => {
@@ -408,27 +389,7 @@ const UserImprestsPage: React.FC = () => {
                 headerName: "Proofs",
                 width: 90,
                 sortable: false,
-                cellRenderer: (p: { data: ImprestRow }) => {
-                    const row = p.data;
-                    if (!row.invoiceProof.length) {
-                        return <span className="text-muted-foreground">—</span>;
-                    }
-                    return (
-                        <TooltipProvider delayDuration={100}>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <button className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline" onClick={() => openProofModal(row)}>
-                                        <Eye className="h-3.5 w-3.5" />
-                                        {row.invoiceProof.length}
-                                    </button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top" className="text-xs font-medium">
-                                    View proofs
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-                    );
-                },
+                cellRenderer: (p: { data: ImprestRow }) => <ImprestProofs proofs={p.data.invoiceProof} />,
             },
             {
                 headerName: "Status",
@@ -479,8 +440,6 @@ const UserImprestsPage: React.FC = () => {
     }, [approveMutation, tallyMutation, proofMutation, canMutateStatusAdmin, canDelete, canUpdate, handleDelete, isAccountsSection, navigate]);
 
     const ImprestMobileCard: React.FC<{ row: ImprestRow }> = ({ row }) => {
-        const proofCount = row.invoiceProof.length;
-
         return (
             <div className="border rounded-xl p-3 mb-3 bg-background shadow-sm">
                 {/* Top row: Party + Amount */}
@@ -496,12 +455,7 @@ const UserImprestsPage: React.FC = () => {
                 <div className="flex justify-between items-center mt-2 text-[11px] text-muted-foreground">
                     <span>{new Date(row.createdAt).toLocaleDateString("en-GB")}</span>
 
-                    {proofCount > 0 && (
-                        <button onClick={() => openProofModal(row)} className="flex items-center gap-1 text-primary">
-                            <Eye className="h-3.5 w-3.5" />
-                            {proofCount} proof{proofCount > 1 && "s"}
-                        </button>
-                    )}
+                    {row.invoiceProof.length > 0 && <ImprestProofs proofs={row.invoiceProof} variant="link" />}
                 </div>
 
                 {/* Status chips */}
@@ -717,14 +671,6 @@ const UserImprestsPage: React.FC = () => {
                 text={remarkText}
                 setText={setRemarkText}
                 onSubmit={submitAddRemark}
-            />
-
-            <ProofViewerDialog
-                open={proofModalOpen}
-                onOpenChange={setProofModalOpen}
-                proofs={proofs}
-                index={currentIndex}
-                setIndex={setCurrentIndex}
             />
 
             <ConfirmUnapproveDialog

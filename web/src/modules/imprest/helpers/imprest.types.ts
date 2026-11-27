@@ -107,6 +107,7 @@ export interface VoucherLedgerReviewItem {
     projectCode: string | null;
     projectTeam: string | null;
     remark: string | null;
+    invoiceProof: (string | ImprestProof)[];
     amount: number;
     dateOfExpense: string | null;
     context: VoucherLedgerContext;

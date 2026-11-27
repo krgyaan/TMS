@@ -10,16 +10,11 @@ import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import type { LedgerOption, VoucherLedgerInfo, VoucherLedgerReviewItem } from "./helpers/imprest.types";
+import { ImprestProofs } from "./components/ImprestProofs";
 import { AlertCircle, ArrowLeft, Check, ChevronsUpDown, Loader2, Save } from "lucide-react";
 import React from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-
-const PROBLEM_LABEL: Record<NonNullable<VoucherLedgerReviewItem["problem"]>, string> = {
-    BLOCKED: "Category blocked",
-    UNMAPPED: "No ledger",
-    INACTIVE: "Inactive ledger",
-};
 
 type LedgerDraft = { ledgerId: number | null; ledgerName: string | null };
 
@@ -187,14 +182,6 @@ const VoucherLedgerReviewPage: React.FC = () => {
                         <p className="mt-1 text-sm text-muted-foreground">
                             {voucher.employeeName ?? "Employee"} · {formatDate(voucher.validFrom)} → {formatDate(voucher.validTo)} · {formatINR(voucher.amount)}
                         </p>
-                        <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                            <Badge variant="secondary">Total {data.summary.total}</Badge>
-                            <Badge variant="outline">Auto {data.summary.auto}</Badge>
-                            <Badge variant="outline">Manual {data.summary.manual}</Badge>
-                            {data.summary.blocked > 0 && <Badge variant="destructive">Blocked {data.summary.blocked}</Badge>}
-                            {data.summary.unmapped > 0 && <Badge variant="destructive">Unmapped {data.summary.unmapped}</Badge>}
-                            {data.summary.inactive > 0 && <Badge variant="destructive">Inactive {data.summary.inactive}</Badge>}
-                        </div>
                     </div>
                     <div className="flex items-center gap-2">
                         <Button
@@ -210,7 +197,10 @@ const VoucherLedgerReviewPage: React.FC = () => {
                                 )
                             }
                         >
-                            <ArrowLeft className="mr-1 h-4 w-4" /> Voucher
+                            Show Voucher
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
+                            <ArrowLeft className="mr-1 h-4 w-4" /> Back
                         </Button>
                     </div>
                 </div>
@@ -238,7 +228,7 @@ const VoucherLedgerReviewPage: React.FC = () => {
                                 <th className="p-2">Remarks</th>
                                 <th className="p-2 text-right">Amount</th>
                                 <th className="p-2 min-w-[220px]">Ledger</th>
-                                <th className="p-2">Status</th>
+                                <th className="p-2">Proofs</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -275,13 +265,7 @@ const VoucherLedgerReviewPage: React.FC = () => {
                                             {dirty && <div className="mt-1 text-[11px] text-amber-600">Unsaved change</div>}
                                         </td>
                                         <td className="p-2">
-                                            {item.problem ? (
-                                                <Badge variant="destructive">{PROBLEM_LABEL[item.problem]}</Badge>
-                                            ) : item.ledgerSource === "manual" ? (
-                                                <Badge>Manual</Badge>
-                                            ) : (
-                                                <Badge variant="secondary">Auto</Badge>
-                                            )}
+                                            <ImprestProofs proofs={item.invoiceProof} />
                                         </td>
                                     </tr>
                                 );
