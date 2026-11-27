@@ -9,11 +9,19 @@ export const imprestCategories = pgTable(
         heading: varchar("heading", { length: 100 }),
         status: boolean("status").notNull().default(true),
         tallyLedgerId: bigint("tally_ledger_id", { mode: "number" }).references(() => tallyLedgers.id, { onDelete: "set null" }),
+        projectLedgerId: bigint("project_ledger_id", { mode: "number" }).references(() => tallyLedgers.id, { onDelete: "set null" }),
+        businessDevelopmentLedgerId: bigint("business_development_ledger_id", { mode: "number" }).references(() => tallyLedgers.id, {
+            onDelete: "set null",
+        }),
         tallyBlocked: boolean("tally_blocked").notNull().default(false),
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
         updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     },
-    table => [index("idx_imprest_categories_tally_ledger").on(table.tallyLedgerId)]
+    table => [
+        index("idx_imprest_categories_tally_ledger").on(table.tallyLedgerId),
+        index("idx_imprest_categories_project_ledger").on(table.projectLedgerId),
+        index("idx_imprest_categories_bd_ledger").on(table.businessDevelopmentLedgerId),
+    ]
 );
 
 export type ImprestCategory = typeof imprestCategories.$inferSelect;
