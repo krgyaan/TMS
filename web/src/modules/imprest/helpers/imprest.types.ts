@@ -51,21 +51,12 @@ export type ImprestVoucherRow = {
     accountantApproval: boolean;
     accountsRemark?: string | null;
     adminRemark?: string | null;
-    proofs: InvoiceProof[];
     createdAt: string;
 };
 
 export interface ImprestVoucherListResponse extends PaginatedResult<ImprestVoucherRow> {
     fyOptions: number[];
 }
-
-export type InvoiceProof = {
-    id: number;
-    file: string;
-    ext: string;
-    type: "image" | "pdf" | "doc" | string;
-    url: string;
-};
 
 export type ImprestVoucherView = {
     voucher: {
@@ -85,7 +76,6 @@ export type ImprestVoucherView = {
         adminSignedAt: string | null;
         accountsRemark: string | null;
         adminRemark: string | null;
-        proofs: InvoiceProof[];
     };
     items: {
         id: number;
@@ -95,7 +85,7 @@ export type ImprestVoucherView = {
         projectName: string;
         remark: string;
         amount: number;
-        invoiceProof: string;
+        dateOfExpense: string | null;
     }[];
 };
 

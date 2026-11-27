@@ -113,14 +113,6 @@ class ImprestService extends BaseApiService {
         return this.get<ImprestVoucherView>(`/voucher/view?${search.toString()}`);
     }
 
-    async getVoucherProofs(params: { userId: number; year: number; week: number }): Promise<unknown> {
-        const search = new URLSearchParams();
-        search.set('userId', String(params.userId));
-        search.set('year', String(params.year));
-        search.set('week', String(params.week));
-        return this.get<unknown>(`/voucher/proofs?${search.toString()}`);
-    }
-
     async accountApproveVoucher(payload: { id: number; remark?: string; approve: boolean }): Promise<unknown> {
         const { id, ...body } = payload;
         return this.post(`/voucher/${id}/account-approve`, body);

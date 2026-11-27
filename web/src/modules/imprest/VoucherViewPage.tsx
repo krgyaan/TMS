@@ -7,9 +7,8 @@ import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import html2pdf from "html2pdf.js";
 import { AlertCircle, ArrowLeft, CheckCircle, FileQuestion, Loader2, MessageSquare, Printer, ShieldAlert, Lock } from "lucide-react";
-import React, { useEffect } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import type { InvoiceProof } from "./helpers/imprest.types";
+import React from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 const ImprestVoucherView: React.FC = () => {
     const [searchParams] = useSearchParams();
@@ -17,9 +16,6 @@ const ImprestVoucherView: React.FC = () => {
     const userId = Number(searchParams.get("userId"));
     const from = searchParams.get("from");
     const to = searchParams.get("to");
-
-    const location = useLocation();
-    const stateProofs = location.state?.proofs as InvoiceProof[] | undefined;
 
     const navigate = useNavigate();
     const { canRead, canUpdate } = useAuth();
@@ -36,26 +32,10 @@ const ImprestVoucherView: React.FC = () => {
     const [accApprove, setAccApprove] = React.useState(false);
     const [adminApprove, setAdminApprove] = React.useState(false);
 
-    const [preview, setPreview] = React.useState<InvoiceProof | null>(null);
-
     const { data, isLoading, refetch, error: queryError } = useImprestVoucherView({ userId, from: from ?? '', to: to ?? '' });
 
     const voucher = data?.voucher;
     const items = data?.items || [];
-    
-    // Merge proofs from state or voucher
-    let proofs: InvoiceProof[] = [];
-    if (stateProofs && stateProofs.length > 0) {
-        proofs = stateProofs;
-    } else if (voucher && (voucher.proofs?.length ?? 0) > 0) {
-        proofs = voucher.proofs;
-    }
-
-    useEffect(() => {
-        if(proofs.length > 0 && !preview){
-            setPreview(proofs[0]);
-        }
-    }, [proofs, preview])
 
     // 409 amount mismatch (signed voucher) — show a dedicated error instead of the generic boundary.
     if (queryError) {
@@ -358,12 +338,12 @@ const ImprestVoucherView: React.FC = () => {
                 <table className="voucher-items">
                     <thead>
                         <tr>
-                            <th>Sr.No.</th>
-                            <th>Category</th>
-                            <th>Project Code</th>
-                            <th>Project Name</th>
-                            <th>Remarks</th>
-                            <th className="text-right">Amount</th>
+                            <th style={{ width: '10mm' }}>Sr.No.</th>
+                            <th style={{ width: '22mm' }}>Date of Expense</th>
+                            <th style={{ width: '20mm' }}>Category</th>
+                            <th style={{ width: '60mm' }}>Project</th>
+                            <th style={{ width: '60mm' }}>Remarks</th>
+                            <th style={{ width: '16mm' }} className="text-right">Amount</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -377,12 +357,15 @@ const ImprestVoucherView: React.FC = () => {
 
                         {items.map((i, idx) => (
                             <tr key={i.id}>
-                                <td>{idx + 1}</td>
-                                <td className="wrap">{i.category}</td>
-                                <td>{i.projectCode}</td>
-                                <td className="wrap">{i.projectName}</td>
-                                <td className="wrap">{i.remark}</td>
-                                <td className="text-right">{formatINR(i.amount)}</td>
+                                <td style={{ width: '10mm' }}>{idx + 1}</td>
+                                <td style={{ width: '22mm' }}>{formatDate(i.dateOfExpense)}</td>
+                                <td style={{ width: '20mm' }} className="wrap">{i.category}</td>
+                                <td style={{ width: '60mm' }} className="wrap">
+                                    <span className="block">{i.projectName || "-"}</span>
+                                    <span className="block">{i.projectCode || "-"}</span>
+                                </td>
+                                <td style={{ width: '60mm' }} className="white-space: nowrap, word-break: keep-all">{i.remark}</td>
+                                <td style={{ width: '16mm' }} className="text-right">{formatINR(i.amount)}</td>
                             </tr>
                         ))}
 
@@ -490,133 +473,6 @@ const ImprestVoucherView: React.FC = () => {
                 </div>
             </div>
 
-            {/* ---------------- Proofs ---------------- */}
-            {proofs.length > 0 && (
-                <div className="mt-10 overflow-hidden rounded-2xl border border-border bg-background shadow-sm voucher-proofs">
-                    <div className="flex flex-col gap-2 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <h3 className="text-base font-semibold text-foreground">Voucher Proofs</h3>
-                            <p className="text-sm text-muted-foreground">
-                                Preview uploaded images and PDF documents.
-                            </p>
-                        </div>
-
-                        <div className="inline-flex w-fit items-center rounded-full border border-border bg-muted/40 px-3 py-1 text-xs font-medium text-muted-foreground">
-                            {`${proofs.length} file${proofs.length === 1 ? "" : "s"}`}
-                        </div>
-                    </div>
-
-                    <div className="grid h-[600px] lg:grid-cols-[280px_minmax(0,1fr)]">
-                        {/* Sidebar */}
-                        <div className="border-b border-border bg-muted/20 p-4 lg:border-b-0 lg:border-r overflow-y-auto">
-                            {proofs.length > 0 ? (
-                                <div className="space-y-2">
-                                    {proofs.map((proof, index) => {
-                                        const active = preview?.id === proof.id;
-
-                                        return (
-                                            <button
-                                                key={proof.id}
-                                                type="button"
-                                                onClick={() => setPreview(proof)}
-                                                className={`w-full rounded-xl border p-3 text-left transition-all ${
-                                                    active
-                                                        ? "border-primary bg-primary/5 shadow-sm"
-                                                        : "border-border bg-background hover:border-primary/40 hover:bg-accent/40"
-                                                }`}
-                                            >
-                                                <div className="mb-2 flex items-center justify-between gap-2">
-                                                    <span className="text-sm font-medium text-foreground">
-                                                        Proof {index + 1}
-                                                    </span>
-                                                    <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                                                        {proof.type}
-                                                    </span>
-                                                </div>
-
-                                                <p className="truncate text-xs text-muted-foreground">
-                                                    {proof.type === "pdf" ? "PDF document" : "Image attachment"}
-                                                </p>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            ) : (
-                                <div className="flex min-h-[180px] items-center justify-center rounded-xl border border-dashed border-border bg-background px-4 text-center text-sm text-muted-foreground">
-                                    No proofs found for this voucher.
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Viewer */}
-                        <div className="flex min-w-0 flex-col bg-background overflow-y-auto">
-                            {preview ? (
-                                <>
-                                    <div className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                                        <div className="min-w-0">
-                                            <div className="mb-1 flex items-center gap-2">
-                                                <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                                                    {preview.type}
-                                                </span>
-                                                <span className="text-sm font-medium text-foreground">
-                                                    {preview.type === "pdf" ? "PDF Preview" : "Image Preview"}
-                                                </span>
-                                            </div>
-                                            <p className="truncate text-sm text-muted-foreground">
-                                                Use open/download if preview is limited in your browser.
-                                            </p>
-                                        </div>
-
-                                        <div className="flex items-center gap-2">
-                                            <Button asChild variant="outline" size="sm">
-                                                <a href={preview.url} target="_blank" rel="noreferrer">
-                                                    Open
-                                                </a>
-                                            </Button>
-
-                                            <Button asChild size="sm">
-                                                <a href={preview.url} download>
-                                                    Download
-                                                </a>
-                                            </Button>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex-1 p-4 h-full min-h-0">
-                                        {preview.type === "pdf" ? (
-                                            <div className="h-full overflow-hidden rounded-2xl border border-border bg-muted/20 shadow-sm">
-                                                <iframe
-                                                    src={`${preview.url}#toolbar=0&navpanes=0&scrollbar=1`}
-                                                    title="PDF Preview"
-                                                    className="h-full w-full bg-white"
-                                                />
-                                            </div>
-                                        ) : (
-                                            <div className="flex h-full items-center justify-center rounded-2xl border border-border bg-muted/20 p-4 shadow-sm">
-                                                <img
-                                                    src={preview.url}
-                                                    alt="Voucher Proof"
-                                                    className="max-h-full max-w-full rounded-xl object-contain"
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
-                                </>
-                            ) : (
-                                <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-                                    <div className="mb-3 rounded-full border border-border bg-muted/40 px-3 py-1 text-xs font-medium text-muted-foreground">
-                                        No file selected
-                                    </div>
-                                    <h4 className="text-sm font-medium text-foreground">Choose a proof to preview</h4>
-                                    <p className="mt-1 max-w-md text-sm text-muted-foreground">
-                                        Select any file from the left panel to view it here.
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
             {/* ================= MODALS ================= */}
 
             {/* Accounts Modal */}
@@ -805,13 +661,13 @@ const ImprestVoucherView: React.FC = () => {
                 .voucher-items td:nth-child(2) { width: 16%; }
 
                 .voucher-items th:nth-child(3),
-                .voucher-items td:nth-child(3) { width: 12%; }
+                .voucher-items td:nth-child(3) { width: 20%; }
 
                 .voucher-items th:nth-child(4),
-                .voucher-items td:nth-child(4) { width: 16%; }
+                .voucher-items td:nth-child(4) { width: 12%; }
 
                 .voucher-items th:nth-child(5),
-                .voucher-items td:nth-child(5) { width: 33%; }
+                .voucher-items td:nth-child(5) { width: 29%; }
 
                 .voucher-items th:nth-child(6),
                 .voucher-items td:nth-child(6) {
@@ -922,22 +778,21 @@ const ImprestVoucherView: React.FC = () => {
 
                 html.pdf-export .voucher-items th:nth-child(3),
                 html.pdf-export .voucher-items td:nth-child(3) {
-                    font-size: 8.5px;        /* smaller font */
+                    font-size: 9px;        /* project name + code */
                     letter-spacing: 0.2px;
-                    white-space: nowrap;     /* 🔑 prevents line break */
-                    word-break: keep-all;    /* 🔑 do not break text */
+                    min-width: 38mm;
                 }
-               html.pdf-export .voucher-items th:nth-child(4),
+
+                html.pdf-export .voucher-items th:nth-child(4),
                 html.pdf-export .voucher-items td:nth-child(4) {
-                    font-size: 9px;        /* smaller, accounting-style */
+                    font-size: 9px;        /* date of expense */
                     letter-spacing: 0.2px;
-                    min-width: 28mm;
+                    min-width: 22mm;
                 }
 
                 html.pdf-export .voucher-items th:nth-child(5),
                 html.pdf-export .voucher-items td:nth-child(5) {
-                    min-width: 70mm;       /* remarks */
-                    min-width: 28mm;
+                    min-width: 28mm;       /* remarks */
                 }
 
                 html.pdf-export .voucher-items th:nth-child(6),
@@ -969,20 +824,12 @@ const ImprestVoucherView: React.FC = () => {
 
                 /* ---------- Hide UI-only elements in PDF ---------- */
                 html.pdf-export .voucher-actions,
-                html.pdf-export .voucher-toolbar,
-                html.pdf-export .voucher-proofs {
+                html.pdf-export .voucher-toolbar {
                     display: none !important;
                 }
 
-                .voucher-items td:nth-child(3) {
-                    white-space: nowrap;
-                    word-break: keep-all;
+                .voucher-items td:nth-child(3) span:last-child {
                     font-size: 10px;
-                }
-                
-                .voucher-proofs {
-                    max-width: 1000px;
-                    margin: 24px auto;
                 }
             `}</style>
         </div>

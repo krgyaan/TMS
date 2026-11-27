@@ -139,7 +139,7 @@ const ImprestVoucherList: React.FC = () => {
                 maxWidth: 80,
                 cellRenderer: (p: { data: ImprestVoucherRow }) => (
                     <Button variant="default" size="sm" 
-                        onClick={() => navigate(isAccountsSection ? paths.accounts.imprestsVoucherView({userId: Number(p.data.beneficiaryId), from: p.data.validFrom, to: p.data.validTo}) : paths.shared.imprestVoucherView({userId: Number(p.data.beneficiaryId), from: p.data.validFrom, to: p.data.validTo}), { state: { proofs: p.data.proofs } })}
+                        onClick={() => navigate(isAccountsSection ? paths.accounts.imprestsVoucherView({userId: Number(p.data.beneficiaryId), from: p.data.validFrom, to: p.data.validTo}) : paths.shared.imprestVoucherView({userId: Number(p.data.beneficiaryId), from: p.data.validFrom, to: p.data.validTo}))}
                     >
                         <Eye className="h-4 w-4" />
                     </Button>
