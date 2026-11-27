@@ -327,13 +327,15 @@ export class PaymentRequestsCommandService {
             for (const { request, instrument, isAutoCreatedCheque } of results) {
                 try {
                     const mode = instrument.instrumentType;
-                    
-                    // Skip email for DD (auto-created Cheque will send its own email).
-                    // FDR is sent via the dedicated FDR branch in sendPaymentInstrumentEmail().
+
                     if (!isAutoCreatedCheque && mode === 'DD') {
                         continue;
                     }
-                    
+
+                    if (mode === 'BG') {
+                        continue;
+                    }
+
                     await this.notificationService.sendPaymentInstrumentEmail(
                         instrument.id,
                         mode,
@@ -698,6 +700,7 @@ export class PaymentRequestsCommandService {
                     bgPo: details.bgPoFiles?.[0] || null,
                     uniqueCode: details.uniqueCode || null,
                     uniqueAdviceMessage: details.uniqueAdviceMessage || null,
+                    tlApprovalStatus: 'PENDING',
                 }).execute();
                 break;
 

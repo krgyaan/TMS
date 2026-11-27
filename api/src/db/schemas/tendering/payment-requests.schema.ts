@@ -335,6 +335,14 @@ export const instrumentBgDetails = pgTable('instrument_bg_details', {
     bg2Remark: text('bg2_remark'), // emd_bgs.bg2_remark
     reasonReq: text('reason_req'), // emd_bgs.reason_req
 
+    // Team Leader approval for the BG request
+    tlApprovalStatus: varchar('tl_approval_status', { length: 20 }).notNull().default('PENDING'),
+    tlApprovalRemarks: text('tl_approval_remarks'),
+    tlRejectedRemarks: text('tl_rejected_remarks'),
+    tlIncompleteRemarks: text('tl_incomplete_remarks'),
+    tlApprovedBy: integer('tl_approved_by'),
+    tlApprovedAt: timestamp('tl_approved_at', { withTimezone: true }),
+
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 });

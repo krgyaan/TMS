@@ -40,6 +40,44 @@ export class BankGuaranteeController {
         return this.bankGuaranteeService.getDashboardCardStats();
     }
 
+    @Get('approvals')
+    getBgApprovals(
+        @Req() req: any,
+        @Query('status') status?: string,
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+        @Query('search') search?: string,
+    ) {
+        return this.bankGuaranteeService.getBgApprovals(req.user, {
+            status,
+            page: page ? parseInt(page, 10) : undefined,
+            limit: limit ? parseInt(limit, 10) : undefined,
+            search,
+        });
+    }
+
+    @Get('approvals/:instrumentId')
+    getBgApprovalDetail(@Param('instrumentId', ParseIntPipe) instrumentId: number) {
+        return this.bankGuaranteeService.getBgApprovalDetail(instrumentId);
+    }
+
+    @Post('instruments/:instrumentId/approval')
+    actOnBgApproval(
+        @Param('instrumentId', ParseIntPipe) instrumentId: number,
+        @Body() body: any,
+        @Req() req: any,
+    ) {
+        return this.bankGuaranteeService.actOnBgApproval(instrumentId, req.user, body);
+    }
+
+    @Post('instruments/:instrumentId/approval/resubmit')
+    resubmitBgApproval(
+        @Param('instrumentId', ParseIntPipe) instrumentId: number,
+        @Req() req: any,
+    ) {
+        return this.bankGuaranteeService.resubmitBgApproval(instrumentId, req.user);
+    }
+
     @Get('requests/:id')
     async getById(@Param('id', ParseIntPipe) id: number) {
         return this.bankGuaranteeService.getById(id);

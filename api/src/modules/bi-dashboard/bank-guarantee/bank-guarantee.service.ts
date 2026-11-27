@@ -13,7 +13,10 @@ import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { users } from '@db/schemas/auth/users.schema';
+import { roles } from '@db/schemas/auth/roles.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
+import { teams } from '@db/schemas/master/teams.schema';
+import { projects } from '@db/schemas/master/projects.schema';
 import {
     instrumentBgDetails,
     instrumentStatusHistory,
@@ -21,8 +24,8 @@ import {
     paymentRequests,
 } from '@db/schemas/tendering/payment-requests.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, desc, eq, inArray, isNull, like, ne, sql } from 'drizzle-orm';
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { and, asc, desc, eq, inArray, isNull, like, ne, or, sql } from 'drizzle-orm';
 
 @Injectable()
 export class BankGuaranteeService {
@@ -62,6 +65,10 @@ export class BankGuaranteeService {
         const conditions: any[] = [
             eq(paymentInstruments.instrumentType, 'BG'),
             eq(paymentInstruments.isActive, true),
+            or(
+                eq(instrumentBgDetails.tlApprovalStatus, 'APPROVED'),
+                isNull(instrumentBgDetails.tlApprovalStatus),
+            ),
         ];
 
         if (tab === 'new-requests') {
@@ -489,6 +496,10 @@ export class BankGuaranteeService {
         const baseWhere = and(
             eq(paymentInstruments.instrumentType, 'BG'),
             eq(paymentInstruments.isActive, true),
+            or(
+                eq(instrumentBgDetails.tlApprovalStatus, 'APPROVED'),
+                isNull(instrumentBgDetails.tlApprovalStatus),
+            ),
         );
 
         const newRequestsFilter = and(
@@ -583,7 +594,11 @@ export class BankGuaranteeService {
         const conditions = [
             eq(paymentInstruments.instrumentType, 'BG'),
             eq(paymentInstruments.isActive, true),
-            inArray(paymentInstruments.action, [1, 2, 3, 4, 5, 6, 7])
+            inArray(paymentInstruments.action, [1, 2, 3, 4, 5, 6, 7]),
+            or(
+                eq(instrumentBgDetails.tlApprovalStatus, 'APPROVED'),
+                isNull(instrumentBgDetails.tlApprovalStatus),
+            ),
         ];
 
         const rows = await this.db
@@ -1096,6 +1111,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 await this.db.insert(instrumentBgDetails).values({
                     instrumentId,
                     ...bgDetailsUpdate,
+                    tlApprovalStatus: 'APPROVED',
                     createdAt: new Date(),
                 });
             }
@@ -1544,6 +1560,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 await this.db.insert(instrumentBgDetails).values({
                     instrumentId,
                     ...bgDetailsUpdate,
+                    tlApprovalStatus: 'APPROVED',
                     createdAt: new Date(),
                 });
             }
@@ -1802,6 +1819,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 sfmsConf: toFirstPath(payload?.sfmsConf),
                 fdrCopy: toFirstPath(payload?.fdrCopy),
                 bg2Remark: remarks,
+                tlApprovalStatus: 'APPROVED',
             });
 
             const [changedBy] = userId
@@ -2073,6 +2091,444 @@ private readBodyFileValue(body: unknown, field: string): unknown {
         return { requestId, instrumentId: instrument.id };
     }
 
+    private async getApprovalActor(user: any) {
+        const userId = Number(user?.id ?? user?.sub ?? 0);
+        if (!userId) {
+            throw new ForbiddenException('User not identified');
+        }
+        const [actor] = await this.db
+            .select({ id: users.id, team: users.team, roleName: roles.name })
+            .from(users)
+            .leftJoin(roles, eq(roles.id, users.roleId))
+            .where(eq(users.id, userId))
+            .limit(1);
+        if (!actor) {
+            throw new ForbiddenException('User not found');
+        }
+        return actor;
+    }
+
+    private isApprovalAdmin(roleName: string | null) {
+        return roleName === 'Admin' || roleName === 'Super User';
+    }
+
+    private async resolveBgApprovalTeam(request: {
+        projectId?: number | null;
+        tenderId?: number | null;
+        requestedBy?: number | null;
+    }): Promise<number | null> {
+        if (request.projectId) {
+            const [project] = await this.db
+                .select({ teamName: projects.teamName })
+                .from(projects)
+                .where(eq(projects.id, Number(request.projectId)))
+                .limit(1);
+            if (project?.teamName) {
+                const [team] = await this.db
+                    .select({ id: teams.id })
+                    .from(teams)
+                    .where(eq(teams.name, project.teamName))
+                    .limit(1);
+                if (team) {
+                    return team.id;
+                }
+            }
+        }
+        if (request.tenderId) {
+            const [tender] = await this.db
+                .select({ team: tenderInfos.team })
+                .from(tenderInfos)
+                .where(eq(tenderInfos.id, Number(request.tenderId)))
+                .limit(1);
+            if (tender?.team) {
+                return tender.team;
+            }
+        }
+        if (request.requestedBy) {
+            const [requester] = await this.db
+                .select({ team: users.team })
+                .from(users)
+                .where(eq(users.id, Number(request.requestedBy)))
+                .limit(1);
+            if (requester?.team) {
+                return requester.team;
+            }
+        }
+        return null;
+    }
+
+    async getBgApprovals(
+        user: any,
+        options: { status?: string; page?: number; limit?: number; search?: string } = {},
+    ) {
+        const actor = await this.getApprovalActor(user);
+        const isAdmin = this.isApprovalAdmin(actor.roleName);
+        if (!isAdmin && actor.roleName !== 'Team Leader') {
+            throw new ForbiddenException('Only Team Leaders can view BG approvals');
+        }
+
+        const status = options.status && options.status !== 'ALL' ? options.status : 'PENDING';
+        const page = options.page && options.page > 0 ? options.page : 1;
+        const limit = options.limit && options.limit > 0 ? options.limit : 50;
+
+        const conditions: any[] = [
+            eq(paymentInstruments.instrumentType, 'BG'),
+            eq(paymentInstruments.isActive, true),
+            eq(instrumentBgDetails.tlApprovalStatus, status),
+        ];
+
+        const searchTerm = options.search?.trim();
+        if (searchTerm) {
+            const searchStr = `%${searchTerm}%`;
+            conditions.push(sql`(
+                ${paymentRequests.projectName} ILIKE ${searchStr}
+                OR ${paymentRequests.tenderNo} ILIKE ${searchStr}
+                OR ${tenderInfos.tenderName} ILIKE ${searchStr}
+                OR ${instrumentBgDetails.bgNo} ILIKE ${searchStr}
+                OR ${instrumentBgDetails.beneficiaryName} ILIKE ${searchStr}
+                OR ${paymentInstruments.amount}::text ILIKE ${searchStr}
+            )`);
+        }
+
+        const rows = await this.db
+            .select({
+                instrumentId: paymentInstruments.id,
+                requestId: paymentRequests.id,
+                projectId: paymentRequests.projectId,
+                tenderId: paymentRequests.tenderId,
+                projectName: paymentRequests.projectName,
+                tenderName: tenderInfos.tenderName,
+                tenderNo: paymentRequests.tenderNo,
+                purpose: paymentRequests.purpose,
+                amount: paymentInstruments.amount,
+                requestedBy: paymentRequests.requestedBy,
+                requestedByName: users.name,
+                createdAt: paymentInstruments.createdAt,
+                bgNo: instrumentBgDetails.bgNo,
+                beneficiaryName: instrumentBgDetails.beneficiaryName,
+                bgNeeds: instrumentBgDetails.bgNeeds,
+                tlApprovalStatus: instrumentBgDetails.tlApprovalStatus,
+                tlApprovalRemarks: instrumentBgDetails.tlApprovalRemarks,
+                tlRejectedRemarks: instrumentBgDetails.tlRejectedRemarks,
+                tlIncompleteRemarks: instrumentBgDetails.tlIncompleteRemarks,
+                tlApprovedBy: instrumentBgDetails.tlApprovedBy,
+                tlApprovedAt: instrumentBgDetails.tlApprovedAt,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(tenderInfos, and(
+                eq(tenderInfos.id, paymentRequests.tenderId),
+                ne(paymentRequests.tenderId, 0),
+            ))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .where(and(...conditions))
+            .orderBy(desc(paymentInstruments.createdAt));
+
+        const projectIds = [...new Set(rows.map((row) => Number(row.projectId)).filter((id) => id > 0))];
+        const tenderIds = [...new Set(rows.map((row) => Number(row.tenderId)).filter((id) => id > 0))];
+        const requesterIds = [...new Set(rows.map((row) => Number(row.requestedBy)).filter((id) => id > 0))];
+
+        const projectTeamNameById = new Map<number, string>();
+        if (projectIds.length > 0) {
+            const projectRows = await this.db
+                .select({ id: projects.id, teamName: projects.teamName })
+                .from(projects)
+                .where(inArray(projects.id, projectIds));
+            projectRows.forEach((project) => {
+                if (project.teamName) {
+                    projectTeamNameById.set(project.id, project.teamName);
+                }
+            });
+        }
+
+        const teamIdByName = new Map<string, number>();
+        const teamNames = [...new Set(Array.from(projectTeamNameById.values()))];
+        if (teamNames.length > 0) {
+            const teamRows = await this.db
+                .select({ id: teams.id, name: teams.name })
+                .from(teams)
+                .where(inArray(teams.name, teamNames));
+            teamRows.forEach((team) => teamIdByName.set(team.name, team.id));
+        }
+
+        const tenderTeamById = new Map<number, number>();
+        if (tenderIds.length > 0) {
+            const tenderRows = await this.db
+                .select({ id: tenderInfos.id, team: tenderInfos.team })
+                .from(tenderInfos)
+                .where(inArray(tenderInfos.id, tenderIds));
+            tenderRows.forEach((tender) => {
+                if (tender.team) {
+                    tenderTeamById.set(tender.id, tender.team);
+                }
+            });
+        }
+
+        const requesterTeamById = new Map<number, number>();
+        if (requesterIds.length > 0) {
+            const requesterRows = await this.db
+                .select({ id: users.id, team: users.team })
+                .from(users)
+                .where(inArray(users.id, requesterIds));
+            requesterRows.forEach((requester) => {
+                if (requester.team) {
+                    requesterTeamById.set(requester.id, requester.team);
+                }
+            });
+        }
+
+        const resolveTeam = (row: typeof rows[number]): number | null => {
+            if (row.projectId) {
+                const teamName = projectTeamNameById.get(Number(row.projectId));
+                const teamId = teamName ? teamIdByName.get(teamName) : undefined;
+                if (teamId) {
+                    return teamId;
+                }
+            }
+            if (row.tenderId) {
+                const teamId = tenderTeamById.get(Number(row.tenderId));
+                if (teamId) {
+                    return teamId;
+                }
+            }
+            if (row.requestedBy) {
+                const teamId = requesterTeamById.get(Number(row.requestedBy));
+                if (teamId) {
+                    return teamId;
+                }
+            }
+            return null;
+        };
+
+        const visibleRows = isAdmin
+            ? rows
+            : rows.filter((row) => Number(resolveTeam(row)) === Number(actor.team));
+
+        const total = visibleRows.length;
+        const pagedRows = visibleRows.slice((page - 1) * limit, page * limit);
+
+        const data = pagedRows.map((row) => ({
+            instrumentId: row.instrumentId,
+            requestId: row.requestId,
+            projectId: row.projectId,
+            tenderId: row.tenderId,
+            projectName: row.projectName,
+            tenderName: row.tenderName,
+            tenderNo: row.tenderNo,
+            purpose: row.purpose,
+            amount: row.amount ? Number(row.amount) : null,
+            requestedBy: row.requestedBy,
+            requestedByName: row.requestedByName,
+            createdAt: row.createdAt,
+            bgNo: row.bgNo,
+            beneficiaryName: row.beneficiaryName,
+            bgNeeds: row.bgNeeds,
+            approvalTeam: resolveTeam(row),
+            tlApprovalStatus: row.tlApprovalStatus,
+            tlApprovalRemarks: row.tlApprovalRemarks,
+            tlRejectedRemarks: row.tlRejectedRemarks,
+            tlIncompleteRemarks: row.tlIncompleteRemarks,
+            tlApprovedBy: row.tlApprovedBy,
+            tlApprovedAt: row.tlApprovedAt,
+        }));
+
+        return wrapPaginatedResponse(data, total, page, limit);
+    }
+
+    async getBgApprovalDetail(instrumentId: number) {
+        const [row] = await this.db
+            .select({
+                instrumentId: paymentInstruments.id,
+                requestId: paymentRequests.id,
+                projectId: paymentRequests.projectId,
+                tenderId: paymentRequests.tenderId,
+                projectName: paymentRequests.projectName,
+                tenderName: tenderInfos.tenderName,
+                tenderNo: paymentRequests.tenderNo,
+                purpose: paymentRequests.purpose,
+                amount: paymentInstruments.amount,
+                requestedBy: paymentRequests.requestedBy,
+                requestedByName: users.name,
+                createdAt: paymentInstruments.createdAt,
+                bgNo: instrumentBgDetails.bgNo,
+                beneficiaryName: instrumentBgDetails.beneficiaryName,
+                beneficiaryAddress: instrumentBgDetails.beneficiaryAddress,
+                bgNeeds: instrumentBgDetails.bgNeeds,
+                bgPurpose: instrumentBgDetails.bgPurpose,
+                bgExpiryDate: instrumentBgDetails.bgExpiryDate,
+                bgClaim: instrumentBgDetails.bgClaim,
+                stampCharges: instrumentBgDetails.stampCharges,
+                tlApprovalStatus: instrumentBgDetails.tlApprovalStatus,
+                tlApprovalRemarks: instrumentBgDetails.tlApprovalRemarks,
+                tlRejectedRemarks: instrumentBgDetails.tlRejectedRemarks,
+                tlIncompleteRemarks: instrumentBgDetails.tlIncompleteRemarks,
+                tlApprovedBy: instrumentBgDetails.tlApprovedBy,
+                tlApprovedAt: instrumentBgDetails.tlApprovedAt,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(tenderInfos, and(
+                eq(tenderInfos.id, paymentRequests.tenderId),
+                ne(paymentRequests.tenderId, 0),
+            ))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .where(and(
+                eq(paymentInstruments.id, instrumentId),
+                eq(paymentInstruments.instrumentType, 'BG'),
+            ))
+            .limit(1);
+
+        if (!row) {
+            throw new NotFoundException(`BG instrument ${instrumentId} not found`);
+        }
+
+        const approvalTeam = await this.resolveBgApprovalTeam({
+            projectId: row.projectId,
+            tenderId: row.tenderId,
+            requestedBy: row.requestedBy,
+        });
+
+        return {
+            ...row,
+            amount: row.amount ? Number(row.amount) : null,
+            approvalTeam,
+        };
+    }
+
+    async actOnBgApproval(instrumentId: number, user: any, body: { status?: string; remarks?: string }) {
+        const action = String(body?.status || '').toUpperCase();
+        if (!['APPROVED', 'REJECTED', 'INCOMPLETE'].includes(action)) {
+            throw new BadRequestException('status must be APPROVED, REJECTED or INCOMPLETE');
+        }
+
+        const remarks = String(body?.remarks ?? '').trim();
+        if (action !== 'APPROVED' && remarks.length === 0) {
+            throw new BadRequestException('remarks are required for rejected or incomplete approval');
+        }
+
+        const [result] = await this.db
+            .select({
+                instrument: paymentInstruments,
+                request: paymentRequests,
+                bgDetails: instrumentBgDetails,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+            .where(and(
+                eq(paymentInstruments.id, instrumentId),
+                eq(paymentInstruments.instrumentType, 'BG'),
+            ))
+            .limit(1);
+
+        if (!result?.instrument || !result.request) {
+            throw new NotFoundException(`BG instrument ${instrumentId} not found`);
+        }
+
+        const actor = await this.getApprovalActor(user);
+        const approvalTeam = await this.resolveBgApprovalTeam(result.request);
+        const isAdmin = this.isApprovalAdmin(actor.roleName);
+        const isTeamLeader = actor.roleName === 'Team Leader'
+            && approvalTeam !== null
+            && Number(actor.team) === Number(approvalTeam);
+
+        if (!isAdmin && !isTeamLeader) {
+            throw new ForbiddenException('Only the Team Leader of this request can approve it');
+        }
+
+        const decidedAt = new Date();
+        const update: Record<string, any> = {
+            tlApprovalStatus: action,
+            tlApprovedBy: actor.id,
+            tlApprovedAt: decidedAt,
+            tlApprovalRemarks: action === 'APPROVED' ? (remarks || null) : null,
+            tlRejectedRemarks: action === 'REJECTED' ? remarks : null,
+            tlIncompleteRemarks: action === 'INCOMPLETE' ? remarks : null,
+            updatedAt: decidedAt,
+        };
+
+        await this.db
+            .update(instrumentBgDetails)
+            .set(update)
+            .where(eq(instrumentBgDetails.instrumentId, instrumentId));
+
+        if (action === 'APPROVED') {
+            try {
+                await this.paymentRequestsNotificationService.sendPaymentInstrumentEmail(
+                    instrumentId,
+                    'BG',
+                    result.request.purpose,
+                    result.request.tenderId,
+                    null,
+                    result.request.requestedBy ?? 0,
+                );
+            } catch (error) {
+                this.logger.error(
+                    `Failed to send BG request mail after approval for instrument ${instrumentId}: ${error instanceof Error ? error.message : String(error)}`,
+                );
+            }
+        }
+
+        return {
+            instrumentId,
+            requestId: result.request.id,
+            tlApprovalStatus: action,
+            tlApprovalRemarks: update.tlApprovalRemarks,
+            tlRejectedRemarks: update.tlRejectedRemarks,
+            tlIncompleteRemarks: update.tlIncompleteRemarks,
+            tlApprovedBy: actor.id,
+            tlApprovedAt: decidedAt,
+        };
+    }
+
+    async resubmitBgApproval(instrumentId: number, user: any) {
+        const [result] = await this.db
+            .select({
+                instrument: paymentInstruments,
+                request: paymentRequests,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .where(and(
+                eq(paymentInstruments.id, instrumentId),
+                eq(paymentInstruments.instrumentType, 'BG'),
+            ))
+            .limit(1);
+
+        if (!result?.instrument || !result.request) {
+            throw new NotFoundException(`BG instrument ${instrumentId} not found`);
+        }
+
+        const actor = await this.getApprovalActor(user);
+        const approvalTeam = await this.resolveBgApprovalTeam(result.request);
+        const isAdmin = this.isApprovalAdmin(actor.roleName);
+        const isRequester = Number(result.request.requestedBy) === Number(actor.id);
+        const isTeamLeader = actor.roleName === 'Team Leader'
+            && approvalTeam !== null
+            && Number(actor.team) === Number(approvalTeam);
+
+        if (!isAdmin && !isRequester && !isTeamLeader) {
+            throw new ForbiddenException('Only the requester or Team Leader can resubmit this request');
+        }
+
+        await this.db
+            .update(instrumentBgDetails)
+            .set({
+                tlApprovalStatus: 'PENDING',
+                tlApprovalRemarks: null,
+                tlRejectedRemarks: null,
+                tlIncompleteRemarks: null,
+                tlApprovedBy: null,
+                tlApprovedAt: null,
+                updatedAt: new Date(),
+            })
+            .where(eq(instrumentBgDetails.instrumentId, instrumentId));
+
+        return { instrumentId, requestId: result.request.id, tlApprovalStatus: 'PENDING' };
+    }
+
     async getById(id: number) {
         const [result] = await this.db
             .select({
@@ -2187,6 +2643,12 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 bgFdrCancelRefNo: instrumentBgDetails.bgFdrCancelRefNo,
                 bg2Remark: instrumentBgDetails.bg2Remark,
                 reasonReq: instrumentBgDetails.reasonReq,
+                tlApprovalStatus: instrumentBgDetails.tlApprovalStatus,
+                tlApprovalRemarks: instrumentBgDetails.tlApprovalRemarks,
+                tlRejectedRemarks: instrumentBgDetails.tlRejectedRemarks,
+                tlIncompleteRemarks: instrumentBgDetails.tlIncompleteRemarks,
+                tlApprovedBy: instrumentBgDetails.tlApprovedBy,
+                tlApprovedAt: instrumentBgDetails.tlApprovedAt,
                 bgDetailsCreatedAt: instrumentBgDetails.createdAt,
                 bgDetailsUpdatedAt: instrumentBgDetails.updatedAt,
 
@@ -2286,6 +2748,12 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 // Accounts Form 1 (request to bank)
                 approveBg: instrumentBgDetails.approveBg,
                 reasonReq: instrumentBgDetails.reasonReq,
+                tlApprovalStatus: instrumentBgDetails.tlApprovalStatus,
+                tlApprovalRemarks: instrumentBgDetails.tlApprovalRemarks,
+                tlRejectedRemarks: instrumentBgDetails.tlRejectedRemarks,
+                tlIncompleteRemarks: instrumentBgDetails.tlIncompleteRemarks,
+                tlApprovedBy: instrumentBgDetails.tlApprovedBy,
+                tlApprovedAt: instrumentBgDetails.tlApprovedAt,
                 prefilledSignedBg: instrumentBgDetails.prefilledSignedBg,
                 bgFormatTe: instrumentBgDetails.bgFormatTe,
                 bgFormatTl: instrumentBgDetails.bgFormatTl,
@@ -2489,6 +2957,12 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             // Accounts Form 1 (request to bank)
             approveBg: result.approveBg,
             reasonReq: result.reasonReq,
+            tlApprovalStatus: result.tlApprovalStatus,
+            tlApprovalRemarks: result.tlApprovalRemarks,
+            tlRejectedRemarks: result.tlRejectedRemarks,
+            tlIncompleteRemarks: result.tlIncompleteRemarks,
+            tlApprovedBy: result.tlApprovedBy,
+            tlApprovedAt: result.tlApprovedAt,
             prefilledSignedBg: result.prefilledSignedBg,
             bgFormatTe: result.bgFormatTe,
             bgFormatTl: result.bgFormatTl,
