@@ -1,42 +1,102 @@
 <div style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.6; color: #222; max-width: 640px;">
-    <p>Dear {{data.recipientName}},</p>
+    <p><strong>Dear Imran (Accounts team),</strong></p>
 
     <p>
-        Please find the pre-filled forms for the Bank Guarantee below. The purpose of this BG is
-        {{data.bgPurpose}}.
+        Please use the pre-filled forms attached below to prepare the following Bank Guarantee.<br>
+        The purpose of the Bank Guarantee is <strong>{{data.bgPurpose}}</strong>.
+    </p>
+
+    <div style="border:1px solid #e5e7eb; border-radius:8px; padding:14px 16px; background:#fafafa; margin:10px 0 16px;">
+        <p style="margin:0 0 8px;"><strong>Please prepare the BG using the details below:</strong></p>
+        <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+            <tr>
+                <td style="width:220px; padding:3px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top;">BG in favor of</td>
+                <td style="width:8px; padding:3px 0; text-align:left; font-weight:bold; vertical-align:top;">:</td>
+                <td style="padding:3px 0 3px 10px; text-align:left; vertical-align:top;">{{data.beneficiaryName}}</td>
+            </tr>
+            <tr>
+                <td style="width:220px; padding:3px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top;">BG address</td>
+                <td style="width:8px; padding:3px 0; text-align:left; font-weight:bold; vertical-align:top;">:</td>
+                <td style="padding:3px 0 3px 10px; text-align:left; vertical-align:top;">{{data.beneficiaryAddress}}</td>
+            </tr>
+            <tr>
+                <td style="width:220px; padding:3px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top;">BG Expiry Date</td>
+                <td style="width:8px; padding:3px 0; text-align:left; font-weight:bold; vertical-align:top;">:</td>
+                <td style="padding:3px 0 3px 10px; text-align:left; vertical-align:top;">{{data.bgExpiryDate}}</td>
+            </tr>
+            <tr>
+                <td style="width:220px; padding:3px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top;">BG Claim Date</td>
+                <td style="width:8px; padding:3px 0; text-align:left; font-weight:bold; vertical-align:top;">:</td>
+                <td style="padding:3px 0 3px 10px; text-align:left; vertical-align:top;">{{data.claimDate}}</td>
+            </tr>
+            <tr>
+                <td style="width:220px; padding:3px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top;">Amount</td>
+                <td style="width:8px; padding:3px 0; text-align:left; font-weight:bold; vertical-align:top;">:</td>
+                <td style="padding:3px 0 3px 10px; text-align:left; vertical-align:top;">Rs. {{data.amount}}</td>
+            </tr>
+            <tr>
+                <td style="width:220px; padding:3px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top;">BG Stamp paper value</td>
+                <td style="width:8px; padding:3px 0; text-align:left; font-weight:bold; vertical-align:top;">:</td>
+                <td style="padding:3px 0 3px 10px; text-align:left; vertical-align:top;">Rs. {{data.stampPaperValue}}</td>
+            </tr>
+            {{#if data.hasBgFormat}}
+            <tr>
+                <td style="width:220px; padding:3px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top;">BG Format (Tender executive)</td>
+                <td style="width:8px; padding:3px 0; text-align:left; font-weight:bold; vertical-align:top;">:</td>
+                <td style="padding:3px 0 3px 10px; text-align:left; vertical-align:top;">attached.</td>
+            </tr>
+            {{/if}}
+            {{#if data.hasSupportingDoc}}
+            <tr>
+                <td style="width:220px; padding:3px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top;">{{data.supportingDocLabel}}</td>
+                <td style="width:8px; padding:3px 0; text-align:left; font-weight:bold; vertical-align:top;">:</td>
+                <td style="padding:3px 0 3px 10px; text-align:left; vertical-align:top;">attached.</td>
+            </tr>
+            {{/if}}
+        </table>
+    </div>
+
+    <div style="border:1px solid #e5e7eb; border-radius:8px; padding:14px 16px; background:#fafafa; margin:10px 0 16px;">
+        <p style="margin:0 0 8px;"><strong>Beneficiary Account details:</strong></p>
+        <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+            <tr>
+                <td style="width:220px; padding:3px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top;">Beneficiary Name</td>
+                <td style="width:8px; padding:3px 0; text-align:left; font-weight:bold; vertical-align:top;">:</td>
+                <td style="padding:3px 0 3px 10px; text-align:left; vertical-align:top;">{{data.beneName}}</td>
+            </tr>
+            <tr>
+                <td style="width:220px; padding:3px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top;">Account No.</td>
+                <td style="width:8px; padding:3px 0; text-align:left; font-weight:bold; vertical-align:top;">:</td>
+                <td style="padding:3px 0 3px 10px; text-align:left; vertical-align:top;">{{data.beneAcc}}</td>
+            </tr>
+            {{#if data.beneIfsc}}
+            <tr>
+                <td style="width:220px; padding:3px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top;">IFSC code</td>
+                <td style="width:8px; padding:3px 0; text-align:left; font-weight:bold; vertical-align:top;">:</td>
+                <td style="padding:3px 0 3px 10px; text-align:left; vertical-align:top;">{{data.beneIfsc}}</td>
+            </tr>
+            {{/if}}
+            <tr>
+                <td style="width:220px; padding:3px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top;">Unique Code</td>
+                <td style="width:8px; padding:3px 0; text-align:left; font-weight:bold; vertical-align:top;">:</td>
+                <td style="padding:3px 0 3px 10px; text-align:left; vertical-align:top;">{{data.uniqueCode}}</td>
+            </tr>
+        </table>
+    </div>
+
+    <p>This BG is required within <strong>{{data.timeLimit}}</strong> Hrs.</p>
+
+    <p>
+        Please review the BG format, if accepted, send a request to the bank using the
+        <a href="{{data.stage1Link}}">Stage 1: Request to Bank</a>. If Corrections are required,
+        reject the request and mention the corrections needed.
     </p>
 
     <p>
-        {{#if data.referenceValue}}<strong>{{data.referenceLabel}}:</strong> {{data.referenceValue}}<br>{{/if}}
-        <strong>BG in favour of:</strong> {{data.beneficiaryName}}<br>
-        <strong>BG address:</strong> {{data.beneficiaryAddress}}<br>
-        <strong>BG Expiry Date:</strong> {{data.bgExpiryDate}}<br>
-        <strong>BG Claim Date:</strong> {{data.claimDate}}<br>
-        <strong>Amount:</strong> Rs. {{data.amount}}<br>
-        <strong>BG Stamp paper value:</strong> Rs. {{data.stampPaperValue}}
-    </p>
-
-    <p><strong>Beneficiary account details</strong></p>
-    <p>
-        <strong>Beneficiary Name:</strong> {{data.beneName}}<br>
-        <strong>Account No.:</strong> {{data.beneAcc}}<br>
-        <strong>IFSC code:</strong> {{data.beneIfsc}}<br>
-        <strong>Unique Code:</strong> {{data.uniqueCode}}
-    </p>
-
-    <p>This BG is required within {{data.timeLimit}} hours.</p>
-
-    <p>
-        Please go through the BG format once. If it is fine, send the request to the bank here:
-        <a href="{{data.stage1Link}}">Stage 1: Request to Bank</a>. If any correction is needed, reject the request and
-        mention what needs to be changed.
-    </p>
-
-    <p>
-        Once the BG is ready, please courier it to the address below. Keep enough margin for courier transit so that it
-        reaches before <strong>{{data.dueDateTime}}</strong>, and share the soft copy of the BG, the docket slip and the
-        SFMS confirmation with us here: <a href="{{data.actionLink}}">{{data.actionLinkText}}</a>, or from your
-        dashboard.
+        Please courier the BG to the address below keeping sufficient margin for the courier delivery
+        time to ensure the BG reaches before the <strong>{{data.dueDateTime}}</strong> and share the
+        SOFT COPY of the BG and the Docket slip along with SFMS confirmation with us on time using
+        the form <a href="{{data.actionLink}}">Stage 2: After BG Creation</a> or your dashboard:
     </p>
 
     <p>
@@ -44,14 +104,15 @@
         {{data.courierAddress}}
     </p>
 
-    <p>Please attach the covering letter with the BG when you courier it.</p>
+    <p>Please attach the cover letter with the bank guarantee when you courier the BG. (Attached below)</p>
 
-    <p style="font-style: italic;">"Ensuring timely operations is the only source of growth."</p>
+    <p style="font-style: italic;">“Ensuring timely operations is the only source of growth.”</p>
 
     <p>
-        Regards,<br>
-        {{data.senderName}},<br>
-        Approved By Team Leader
+        <strong>Regards,</strong><br>
+        {{#if data.senderName}}{{data.senderName}},<br>{{/if}}
+        Tender executive,<br>
+        Approved by Team Leader
     </p>
 
     {{#if data.attachmentLinks.length}}

@@ -387,7 +387,7 @@ export class PaymentRequestsNotificationService {
             this.resolveUploadAbsolutePath(path),
         );
         if (uploaded.length > 0) {
-            return { paths: uploaded, label: 'PO copy/request letter from beneficiary' };
+            return { paths: uploaded, label: 'Request Letter from Beneficiary' };
         }
 
         // 2) Project dashboard: the WO draft document stored on wo_basic_details.
@@ -409,7 +409,7 @@ export class PaymentRequestsNotificationService {
                     this.resolveUploadAbsolutePath(path),
                 );
                 if (woDraftPaths.length > 0) {
-                    return { paths: woDraftPaths, label: 'WO draft document (LOA/GEM PO/LOI)' };
+                    return { paths: woDraftPaths, label: 'WO Document' };
                 }
             }
         }
@@ -424,7 +424,7 @@ export class PaymentRequestsNotificationService {
 
             const mainDoc = this.parseTenderMainDoc(tender?.documents);
             if (mainDoc && this.resolveUploadAbsolutePath(mainDoc)) {
-                return { paths: [mainDoc], label: 'Main tender document' };
+                return { paths: [mainDoc], label: 'Tender Document' };
             }
         }
 
@@ -2882,8 +2882,10 @@ export class PaymentRequestsNotificationService {
                         projectId: paymentRequests.projectId,
                         tenderNo: paymentRequests.tenderNo,
                         projectName: paymentRequests.projectName,
+                        senderName: users.name,
                     })
                     .from(paymentRequests)
+                    .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
                     .where(eq(paymentRequests.id, instrument.requestId))
                     .limit(1);
 
@@ -2915,7 +2917,6 @@ export class PaymentRequestsNotificationService {
                     tenderTeamId = requesterData[0]?.team || 1;
                 }
 
-                const bgReference = await this.resolveBgReference(paymentReq);
                 const bgPurposeText = formatBgPurpose(bgDetails?.bgPurpose, 'Financial security');
 
                 const attachmentLinks: Array<{ label: string; url: string }> = [];
@@ -2929,15 +2930,20 @@ export class PaymentRequestsNotificationService {
 
                 // Attachment 1 — the BG Format uploaded in the create form
                 // (bgSoftCopy holds the first uploaded file).
-                this.toAttachmentPaths(bgDetails?.bgSoftCopy).forEach((path) => addAttachmentLink('BG Format', path));
+                const bgFormatPaths = this.toAttachmentPaths(bgDetails?.bgSoftCopy).filter((path) =>
+                    this.resolveUploadAbsolutePath(path),
+                );
+                bgFormatPaths.forEach((path) => addAttachmentLink('BG Format', path));
 
                 // Attachment 2 — the PO doc uploaded in the BG dashboard form,
                 // else the project's WO draft, else the main tender document.
                 let supportingDocLabel = '';
+                let hasSupportingDoc = false;
                 try {
                     const supportingDoc = await this.resolveBgSupportingDocs(paymentReq, bgDetails);
                     supportingDoc.paths.forEach((path) => addAttachmentLink(supportingDoc.label || 'Supporting document', path));
                     supportingDocLabel = supportingDoc.label;
+                    hasSupportingDoc = supportingDoc.paths.length > 0;
                 } catch (error) {
                     this.logger.warn(
                         `Failed to resolve BG supporting documents for instrument ${instrumentId} — sending create mail without them: ${error instanceof Error ? error.message : String(error)}`
@@ -2973,8 +2979,7 @@ export class PaymentRequestsNotificationService {
                         template: 'bg-request',
                         data: {
                             recipientName: 'Imran',
-                            referenceLabel: bgReference?.label || '',
-                            referenceValue: bgReference?.value || '',
+                            senderName: paymentReq.senderName || '',
                             bgPurpose: bgPurposeText,
                             beneficiaryName: bgDetails?.beneficiaryName || '',
                             beneficiaryAddress: bgDetails?.beneficiaryAddress || '',
@@ -2986,13 +2991,14 @@ export class PaymentRequestsNotificationService {
                             dueDateTime,
                             beneName: orNotProvided(bgDetails?.bgBankAccName),
                             beneAcc: orNotProvided(bgDetails?.bgBankAcc),
-                            beneIfsc: orNotProvided(bgDetails?.bgBankIfsc),
+                            beneIfsc: bgDetails?.bgBankIfsc || '',
                             uniqueCode: orNotProvided(bgDetails?.uniqueCode),
                             stage1Link: `${this.getFrontendUrl()}/bi-dashboard/bank-guarantee/action/${instrumentId}?section=accounts-form-1`,
                             actionLink: `${this.getFrontendUrl()}/bi-dashboard/bank-guarantee/action/${instrumentId}?section=accounts-form-2`,
                             actionLinkText: 'Stage 2: After BG Creation',
-                            courierAddress: instrument.courierAddress || '',
-                            hasBgFormat: this.toAttachmentPaths(bgDetails?.bgSoftCopy).length > 0,
+                            courierAddress: this.resolveBgCourierAddress(instrument),
+                            hasBgFormat: bgFormatPaths.length > 0,
+                            hasSupportingDoc,
                             supportingDocLabel,
                             attachmentLinks,
                         },
