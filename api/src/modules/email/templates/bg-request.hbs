@@ -1,13 +1,12 @@
 <div style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.6; color: #222; max-width: 640px;">
-    <p><strong>Dear Imran (Accounts team),</strong></p>
+    <p><strong>Dear Imran,</strong></p>
 
     <p>
         Please use the pre-filled forms attached below to prepare the following Bank Guarantee.<br>
         The purpose of the Bank Guarantee is <strong>{{data.bgPurpose}}</strong>.
     </p>
 
-    <div style="border:1px solid #e5e7eb; border-radius:8px; padding:14px 16px; background:#fafafa; margin:10px 0 16px;">
-        <p style="margin:0 0 8px;"><strong>Please prepare the BG using the details below:</strong></p>
+    <p><strong>Please prepare the BG using the details below:</strong></p>
         <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
             <tr>
                 <td style="width:220px; padding:3px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top;">BG in favor of</td>
@@ -54,21 +53,24 @@
             </tr>
             {{/if}}
         </table>
-    </div>
 
-    <div style="border:1px solid #e5e7eb; border-radius:8px; padding:14px 16px; background:#fafafa; margin:10px 0 16px;">
-        <p style="margin:0 0 8px;"><strong>Beneficiary Account details:</strong></p>
+    {{#if data.hasBeneficiaryAccount}}
+    <p style="margin:0;"><strong>Beneficiary Account details</strong></p>
         <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+            {{#if data.beneName}}
             <tr>
                 <td style="width:220px; padding:3px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top;">Beneficiary Name</td>
                 <td style="width:8px; padding:3px 0; text-align:left; font-weight:bold; vertical-align:top;">:</td>
                 <td style="padding:3px 0 3px 10px; text-align:left; vertical-align:top;">{{data.beneName}}</td>
             </tr>
+            {{/if}}
+            {{#if data.beneAcc}}
             <tr>
                 <td style="width:220px; padding:3px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top;">Account No.</td>
                 <td style="width:8px; padding:3px 0; text-align:left; font-weight:bold; vertical-align:top;">:</td>
                 <td style="padding:3px 0 3px 10px; text-align:left; vertical-align:top;">{{data.beneAcc}}</td>
             </tr>
+            {{/if}}
             {{#if data.beneIfsc}}
             <tr>
                 <td style="width:220px; padding:3px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top;">IFSC code</td>
@@ -76,13 +78,15 @@
                 <td style="padding:3px 0 3px 10px; text-align:left; vertical-align:top;">{{data.beneIfsc}}</td>
             </tr>
             {{/if}}
+            {{#if data.uniqueCode}}
             <tr>
                 <td style="width:220px; padding:3px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top;">Unique Code</td>
                 <td style="width:8px; padding:3px 0; text-align:left; font-weight:bold; vertical-align:top;">:</td>
                 <td style="padding:3px 0 3px 10px; text-align:left; vertical-align:top;">{{data.uniqueCode}}</td>
             </tr>
+            {{/if}}
         </table>
-    </div>
+    {{/if}}
 
     <p>This BG is required within <strong>{{data.timeLimit}}</strong> Hrs.</p>
 
@@ -104,7 +108,7 @@
         {{data.courierAddress}}
     </p>
 
-    <p>Please attach the cover letter with the bank guarantee when you courier the BG. (Attached below)</p>
+    <p>Please attach the cover letter with the bank guarantee when you courier the BG.</p>
 
     <p style="font-style: italic;">“Ensuring timely operations is the only source of growth.”</p>
 

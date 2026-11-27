@@ -21,10 +21,6 @@ import { and, eq, gte, isNull, lt, ne, notInArray, sql } from 'drizzle-orm';
 import { copyFileSync, existsSync, mkdirSync } from 'fs';
 import { extname, join } from 'path';
 
-/** Blank bank/beneficiary values are shown as "Not Provided" in the BG mail. */
-const orNotProvided = (value: string | null | undefined): string =>
-    value && value.trim().length > 0 ? value.trim() : 'Not Provided';
-
 const BG_PURPOSE_LABELS: Record<string, string> = {
     ADVANCE_PAYMENT: 'Advance Payment',
     SECURITY_DEPOSIT: 'Security Deposit',
@@ -698,6 +694,50 @@ export class PaymentRequestsNotificationService {
     };
 
     
+    private resolveBgMailOverride = async (
+        fromUserId: number,
+        to: RecipientSource[],
+        cc?: RecipientSource[],
+    ): Promise<{ fromUserId: number; to: RecipientSource[]; cc: RecipientSource[] }> => {
+        const raw = this.configService.get<string>('BG_MAIL_TEST_TO') || process.env.BG_MAIL_TEST_TO || '';
+        const emails = raw
+            .split(',')
+            .map((email) => email.trim())
+            .filter((email) => email.length > 0);
+
+        if (emails.length === 0) {
+            return { fromUserId, to, cc: cc ?? [] };
+        }
+
+        let testFromUserId = fromUserId;
+        const configuredSenderId = Number(
+            this.configService.get<string>('BG_MAIL_TEST_SENDER_ID') || process.env.BG_MAIL_TEST_SENDER_ID || '',
+        );
+
+        if (Number.isInteger(configuredSenderId) && configuredSenderId > 0) {
+            testFromUserId = configuredSenderId;
+        } else {
+            const [testUser] = await this.db
+                .select({ id: users.id })
+                .from(users)
+                .where(eq(users.email, emails[0]))
+                .limit(1);
+            if (testUser) {
+                testFromUserId = testUser.id;
+            }
+        }
+
+        this.logger.warn(
+            `[BG TEST MAIL] Redirecting to ${emails.join(', ')} from user ${testFromUserId} (original sender ${fromUserId})`,
+        );
+
+        return {
+            fromUserId: testFromUserId,
+            to: [{ type: 'emails', emails }],
+            cc: [],
+        };
+    };
+
     private buildPublicFileUrl = (filePath: string): string => {
         const apiUrl = (this.configService.get<string>('app.apiUrl') || '').replace(/\/+$/, '');
         const normalized = filePath.replace(/\\/g, '/').replace(/^\/+/, '');
@@ -2966,6 +3006,14 @@ export class PaymentRequestsNotificationService {
                     { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
                 ];
 
+                const mailTarget = await this.resolveBgMailOverride(fromUserId, toEmails, ccEmails);
+
+                const beneName = bgDetails?.bgBankAccName?.trim() || '';
+                const beneAcc = bgDetails?.bgBankAcc?.trim() || '';
+                const beneIfsc = bgDetails?.bgBankIfsc?.trim() || '';
+                const beneUniqueCode = bgDetails?.uniqueCode?.trim() || '';
+                const hasBeneficiaryAccount = Boolean(beneName || beneAcc || beneIfsc || beneUniqueCode);
+
                 try {
                     this.logger.log(
                         `BG create mail for instrument ${instrumentId}: to=${toEmails.map((r) => (r as { emails?: string[] }).emails?.join(',')).join(',')}, teamId=${tenderTeamId}, links=${attachmentLinks.length}`
@@ -2974,7 +3022,7 @@ export class PaymentRequestsNotificationService {
                         requestId: instrument.requestId,
                         tenderId: paymentReq.tenderId || undefined,
                         eventType: 'BG_REQUEST',
-                        fromUserId,
+                        fromUserId: mailTarget.fromUserId,
                         subject,
                         template: 'bg-request',
                         data: {
@@ -2989,10 +3037,11 @@ export class PaymentRequestsNotificationService {
                             stampPaperValue: bgDetails?.stampCharges || 300,
                             timeLimit: Number(bgDetails?.bgNeeds) || instrument.courierDeadline || 24,
                             dueDateTime,
-                            beneName: orNotProvided(bgDetails?.bgBankAccName),
-                            beneAcc: orNotProvided(bgDetails?.bgBankAcc),
-                            beneIfsc: bgDetails?.bgBankIfsc || '',
-                            uniqueCode: orNotProvided(bgDetails?.uniqueCode),
+                            beneName,
+                            beneAcc,
+                            beneIfsc,
+                            uniqueCode: beneUniqueCode,
+                            hasBeneficiaryAccount,
                             stage1Link: `${this.getFrontendUrl()}/bi-dashboard/bank-guarantee/action/${instrumentId}?section=accounts-form-1`,
                             actionLink: `${this.getFrontendUrl()}/bi-dashboard/bank-guarantee/action/${instrumentId}?section=accounts-form-2`,
                             actionLinkText: 'Stage 2: After BG Creation',
@@ -3002,8 +3051,8 @@ export class PaymentRequestsNotificationService {
                             supportingDocLabel,
                             attachmentLinks,
                         },
-                        to: toEmails,
-                        cc: ccEmails,
+                        to: mailTarget.to,
+                        cc: mailTarget.cc,
                     });
 
                     if (result.success) {
