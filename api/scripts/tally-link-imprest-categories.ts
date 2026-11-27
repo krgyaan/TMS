@@ -7,10 +7,12 @@ import { normalizeLedgerName } from "../src/modules/integrations/tally/ledgers/l
 
 const USAGE = `Usage: pnpm tally:link-imprest-categories --file=scripts/csv/tally-imprest-categories.csv [--apply] [--company="VEPL 2025-26"]
 
-CSV columns: category_id, category_name, ledger_id, ledger_name, blocked
+CSV columns: category_id, category_name, ledger_id, ledger_name, project_ledger_id, project_ledger_name, business_development_ledger_id, business_development_ledger_name, blocked
   - category_id    imprest_categories.id
-  - ledger_id      tally_ledgers.id (leave empty when blocked=true)
-  - ledger_name    exact Tally ledger name, for verification
+  - ledger_id      default tally_ledgers.id (leave empty when blocked=true)
+  - ledger_name    exact default Tally ledger name, for verification
+  - project_ledger_*  optional project-context ledger
+  - business_development_ledger_*  optional BD-context ledger
   - blocked        true to block the category from posting
 
 Without --apply it only validates and prints the planned changes.`;
@@ -21,6 +23,10 @@ interface CategoryRow {
     categoryName: string;
     ledgerId: number | null;
     ledgerName: string;
+    projectLedgerId: number | null;
+    projectLedgerName: string;
+    businessDevelopmentLedgerId: number | null;
+    businessDevelopmentLedgerName: string;
     blocked: boolean;
 }
 
@@ -121,7 +127,11 @@ function parseCsv(text: string): string[][] {
 }
 
 function normalizeHeader(value: string): string {
-    return value.trim().toLowerCase().replace(/^\ufeff/, "").replace(/\s+/g, "_");
+    return value
+        .trim()
+        .toLowerCase()
+        .replace(/^\ufeff/, "")
+        .replace(/\s+/g, "_");
 }
 
 async function main(): Promise<void> {
@@ -144,6 +154,10 @@ async function main(): Promise<void> {
     const categoryNameIndex = headerIndex.get("category_name");
     const ledgerIdIndex = headerIndex.get("ledger_id");
     const ledgerNameIndex = headerIndex.get("ledger_name");
+    const projectLedgerIdIndex = headerIndex.get("project_ledger_id");
+    const projectLedgerNameIndex = headerIndex.get("project_ledger_name");
+    const businessDevelopmentLedgerIdIndex = headerIndex.get("business_development_ledger_id");
+    const businessDevelopmentLedgerNameIndex = headerIndex.get("business_development_ledger_name");
     const blockedIndex = headerIndex.get("blocked");
 
     if (categoryIdIndex === undefined || ledgerIdIndex === undefined) {
@@ -152,6 +166,8 @@ async function main(): Promise<void> {
 
     const rows: CategoryRow[] = dataRows.map((cells, index) => {
         const ledgerIdRaw = ledgerIdIndex === undefined ? "" : (cells[ledgerIdIndex] ?? "");
+        const projectLedgerIdRaw = projectLedgerIdIndex === undefined ? "" : (cells[projectLedgerIdIndex] ?? "");
+        const businessDevelopmentLedgerIdRaw = businessDevelopmentLedgerIdIndex === undefined ? "" : (cells[businessDevelopmentLedgerIdIndex] ?? "");
         const blockedRaw = blockedIndex === undefined ? "" : (cells[blockedIndex] ?? "");
 
         return {
@@ -160,13 +176,23 @@ async function main(): Promise<void> {
             categoryName: categoryNameIndex === undefined ? "" : (cells[categoryNameIndex] ?? ""),
             ledgerId: ledgerIdRaw.trim() === "" ? null : Number(ledgerIdRaw),
             ledgerName: ledgerNameIndex === undefined ? "" : (cells[ledgerNameIndex] ?? ""),
+            projectLedgerId: projectLedgerIdRaw.trim() === "" ? null : Number(projectLedgerIdRaw),
+            projectLedgerName: projectLedgerNameIndex === undefined ? "" : (cells[projectLedgerNameIndex] ?? ""),
+            businessDevelopmentLedgerId: businessDevelopmentLedgerIdRaw.trim() === "" ? null : Number(businessDevelopmentLedgerIdRaw),
+            businessDevelopmentLedgerName: businessDevelopmentLedgerNameIndex === undefined ? "" : (cells[businessDevelopmentLedgerNameIndex] ?? ""),
             blocked: blockedRaw.trim().toLowerCase() === "true",
         };
     });
 
     const errors: string[] = [];
     const categoryIds = [...new Set(rows.map(row => row.categoryId).filter(id => Number.isInteger(id) && id > 0))];
-    const ledgerIds = [...new Set(rows.map(row => row.ledgerId).filter((id): id is number => typeof id === "number" && Number.isInteger(id) && id > 0))];
+    const ledgerIds = [
+        ...new Set(
+            rows
+                .flatMap(row => [row.ledgerId, row.projectLedgerId, row.businessDevelopmentLedgerId])
+                .filter((id): id is number => typeof id === "number" && Number.isInteger(id) && id > 0)
+        ),
+    ];
 
     const pool = createPool(databaseUrl);
     const db = createDb(pool);
@@ -175,7 +201,14 @@ async function main(): Promise<void> {
         const categoryRows =
             categoryIds.length > 0
                 ? await db
-                      .select({ id: imprestCategories.id, name: imprestCategories.name, tallyLedgerId: imprestCategories.tallyLedgerId, tallyBlocked: imprestCategories.tallyBlocked })
+                      .select({
+                          id: imprestCategories.id,
+                          name: imprestCategories.name,
+                          tallyLedgerId: imprestCategories.tallyLedgerId,
+                          projectLedgerId: imprestCategories.projectLedgerId,
+                          businessDevelopmentLedgerId: imprestCategories.businessDevelopmentLedgerId,
+                          tallyBlocked: imprestCategories.tallyBlocked,
+                      })
                       .from(imprestCategories)
                       .where(inArray(imprestCategories.id, categoryIds))
                 : [];
@@ -196,8 +229,14 @@ async function main(): Promise<void> {
             categoryName: string;
             ledgerId: number | null;
             ledgerName: string | null;
+            projectLedgerId: number | null;
+            projectLedgerName: string | null;
+            businessDevelopmentLedgerId: number | null;
+            businessDevelopmentLedgerName: string | null;
             blocked: boolean;
             previousLedgerId: number | null;
+            previousProjectLedgerId: number | null;
+            previousBusinessDevelopmentLedgerId: number | null;
             previousBlocked: boolean;
         }> = [];
 
@@ -238,8 +277,14 @@ async function main(): Promise<void> {
                     categoryName: category.name,
                     ledgerId: null,
                     ledgerName: null,
+                    projectLedgerId: null,
+                    projectLedgerName: null,
+                    businessDevelopmentLedgerId: null,
+                    businessDevelopmentLedgerName: null,
                     blocked: true,
                     previousLedgerId: category.tallyLedgerId,
+                    previousProjectLedgerId: category.projectLedgerId,
+                    previousBusinessDevelopmentLedgerId: category.businessDevelopmentLedgerId,
                     previousBlocked: category.tallyBlocked,
                 });
                 continue;
@@ -250,20 +295,46 @@ async function main(): Promise<void> {
                 continue;
             }
 
-            const ledger = ledgersById.get(row.ledgerId);
+            const resolveLedger = (id: number | null, name: string, kind: string): { id: number | null; name: string | null } | null => {
+                if (id === null) {
+                    return { id: null, name: null };
+                }
 
-            if (!ledger) {
-                errors.push(`${label}: Tally ledger ${row.ledgerId} does not exist for this company`);
+                const ledger = ledgersById.get(id);
+
+                if (!ledger) {
+                    errors.push(`${label}: ${kind} Tally ledger ${id} does not exist for this company`);
+                    return null;
+                }
+
+                if (name && normalizeLedgerName(name) !== ledger.nameNormalized) {
+                    errors.push(`${label}: ${kind} ledger name "${name}" does not match ledger ${id} ("${ledger.name}")`);
+                    return null;
+                }
+
+                if (!ledger.isActive) {
+                    errors.push(`${label}: ${kind} Tally ledger ${id} is inactive`);
+                    return null;
+                }
+
+                return { id: ledger.id, name: ledger.name };
+            };
+
+            const defaultLedger = resolveLedger(row.ledgerId, row.ledgerName, "default");
+
+            if (!defaultLedger) {
                 continue;
             }
 
-            if (row.ledgerName && normalizeLedgerName(row.ledgerName) !== ledger.nameNormalized) {
-                errors.push(`${label}: ledger name "${row.ledgerName}" does not match ledger ${row.ledgerId} ("${ledger.name}")`);
+            const projectLedger = resolveLedger(row.projectLedgerId, row.projectLedgerName, "project");
+
+            if (!projectLedger) {
                 continue;
             }
 
-            if (!ledger.isActive) {
-                errors.push(`${label}: Tally ledger ${row.ledgerId} is inactive`);
+            const businessDevelopmentLedger = resolveLedger(row.businessDevelopmentLedgerId, row.businessDevelopmentLedgerName, "BD");
+
+            if (!businessDevelopmentLedger) {
                 continue;
             }
 
@@ -271,10 +342,16 @@ async function main(): Promise<void> {
             planned.push({
                 categoryId: row.categoryId,
                 categoryName: category.name,
-                ledgerId: ledger.id,
-                ledgerName: ledger.name,
+                ledgerId: defaultLedger.id,
+                ledgerName: defaultLedger.name,
+                projectLedgerId: projectLedger.id,
+                projectLedgerName: projectLedger.name,
+                businessDevelopmentLedgerId: businessDevelopmentLedger.id,
+                businessDevelopmentLedgerName: businessDevelopmentLedger.name,
                 blocked: false,
                 previousLedgerId: category.tallyLedgerId,
+                previousProjectLedgerId: category.projectLedgerId,
+                previousBusinessDevelopmentLedgerId: category.businessDevelopmentLedgerId,
                 previousBlocked: category.tallyBlocked,
             });
         }
@@ -297,7 +374,13 @@ async function main(): Promise<void> {
             for (const entry of planned) {
                 await tx
                     .update(imprestCategories)
-                    .set({ tallyLedgerId: entry.ledgerId, tallyBlocked: entry.blocked, updatedAt: new Date() })
+                    .set({
+                        tallyLedgerId: entry.ledgerId,
+                        projectLedgerId: entry.projectLedgerId,
+                        businessDevelopmentLedgerId: entry.businessDevelopmentLedgerId,
+                        tallyBlocked: entry.blocked,
+                        updatedAt: new Date(),
+                    })
                     .where(eq(imprestCategories.id, entry.categoryId));
             }
         });

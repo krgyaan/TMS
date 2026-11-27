@@ -1,11 +1,78 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { ConfigService } from "@nestjs/config";
+import { and, asc, desc, eq, ilike, inArray, sql } from "drizzle-orm";
 import type { DbInstance } from "@/db";
 import { DRIZZLE } from "@/db/database.module";
 
 /** A Drizzle db handle or an in-flight transaction handle. */
 type Tx = Parameters<Parameters<DbInstance["transaction"]>[0]>[0];
 export type DbOrTx = DbInstance | Tx;
+
+export interface TallyLedgerInfo {
+    id: number;
+    name: string;
+    parent: string | null;
+    isActive: boolean;
+}
+
+export interface VoucherLedgerReviewItem {
+    id: number;
+    categoryId: number | null;
+    category: string | null;
+    projectId: number | null;
+    projectName: string | null;
+    projectCode: string | null;
+    projectTeam: string | null;
+    remark: string | null;
+    amount: number;
+    dateOfExpense: Date | null;
+    context: CategoryLedgerContext;
+    autoLedger: TallyLedgerInfo | null;
+    overrideLedger: TallyLedgerInfo | null;
+    finalLedger: TallyLedgerInfo | null;
+    candidates: TallyLedgerInfo[];
+    ledgerSource: "auto" | "manual";
+    tallyLedgerId: number | null;
+    blocked: boolean;
+    problem: "BLOCKED" | "UNMAPPED" | "INACTIVE" | null;
+    reviewedBy: number | null;
+    reviewedAt: Date | null;
+    ledgerNote: string | null;
+}
+
+export interface VoucherLedgerReview {
+    voucher: {
+        id: number;
+        voucherCode: string;
+        beneficiaryId: number;
+        employeeName: string | null;
+        teamName: string | null;
+        amount: number;
+        validFrom: Date;
+        validTo: Date;
+        accountsSignedBy: string | null;
+        accountsSignedAt: Date | null;
+        adminSignedBy: string | null;
+        adminSignedAt: Date | null;
+    };
+    items: VoucherLedgerReviewItem[];
+    editable: boolean;
+    lockReason: string | null;
+    summary: {
+        total: number;
+        auto: number;
+        manual: number;
+        blocked: number;
+        unmapped: number;
+        inactive: number;
+    };
+}
+
+export interface VoucherLedgerSaveEntry {
+    imprestId: number;
+    ledgerId: number | null;
+    note?: string | null;
+}
 
 /**
  * Voucher accounting.
@@ -26,7 +93,8 @@ import { employeeImprestTransactions } from "@/db/schemas/shared/employee-impres
 import { employeeImprests } from "@/db/schemas/shared/employee-imprest.schema";
 import { CreateEmployeeImprestCreditDto } from "./zod/create-employee-imprest-credit.schema";
 import type { EmployeeImprestSummaryDto } from "./zod/imprest-admin.dto";
-import { imprestCategories, teams, userProfiles } from "@/db/schemas";
+import { imprestCategories, projects, tallyLedgers, tallySyncLedger, teams, userProfiles } from "@/db/schemas";
+import { deriveCategoryContext, isBusinessDevelopmentTeam, resolveEntryLedger, type CategoryLedgerContext } from "@/modules/integrations/tally/ledgers/category-ledger-resolver";
 import { wrapPaginatedResponse } from "@/utils/responseWrapper";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
@@ -38,7 +106,9 @@ export class ImprestAdminService {
         private readonly db: DbInstance,
 
         @Inject(WINSTON_MODULE_PROVIDER)
-        private readonly logger: Logger
+        private readonly logger: Logger,
+
+        private readonly config: ConfigService
     ) {}
 
     /**
@@ -581,10 +651,7 @@ export class ImprestAdminService {
         };
     }
 
-    async buildVoucherIfMissing(
-        { userId, from, to, createdBy }: { userId: number; from: Date; to: Date; createdBy: string },
-        tx: DbOrTx = this.db
-    ) {
+    async buildVoucherIfMissing({ userId, from, to, createdBy }: { userId: number; from: Date; to: Date; createdBy: string }, tx: DbOrTx = this.db) {
         // Serialize concurrent creation for the same (beneficiary, week window).
         // pg_advisory_xact_lock is released when the enclosing transaction
         // commits/rolls back, so two racing approvals cannot create duplicates.
@@ -599,10 +666,12 @@ export class ImprestAdminService {
                     sql`
                     EXTRACT(ISOYEAR FROM ${employeeImprestVouchers.validFrom}) = EXTRACT(ISOYEAR FROM CAST(${from} AS TIMESTAMP))
                     AND EXTRACT(WEEK FROM ${employeeImprestVouchers.validFrom}) = EXTRACT(WEEK FROM CAST(${from} AS TIMESTAMP))
-                `,
+                `
                 )
             )
-            .orderBy(sql`CASE WHEN TRIM(COALESCE(${employeeImprestVouchers.accountsSignedBy}, '')) <> '' OR TRIM(COALESCE(${employeeImprestVouchers.adminSignedBy}, '')) <> '' THEN 0 ELSE 1 END`)
+            .orderBy(
+                sql`CASE WHEN TRIM(COALESCE(${employeeImprestVouchers.accountsSignedBy}, '')) <> '' OR TRIM(COALESCE(${employeeImprestVouchers.adminSignedBy}, '')) <> '' THEN 0 ELSE 1 END`
+            )
             .limit(1);
 
         if (existingByWeek) {
@@ -720,7 +789,10 @@ export class ImprestAdminService {
      * Ensures an approved imprest is linked to (and, if needed, creates) the
      * voucher whose valid_from..valid_to window covers its expense date.
      */
-    async ensureVoucherForImprest({ imprestId, userId, effectiveDate, createdBy }: { imprestId: number; userId: number; effectiveDate: Date; createdBy: string }, tx: DbOrTx = this.db) {
+    async ensureVoucherForImprest(
+        { imprestId, userId, effectiveDate, createdBy }: { imprestId: number; userId: number; effectiveDate: Date; createdBy: string },
+        tx: DbOrTx = this.db
+    ) {
         if (!userId) {
             return null;
         }
@@ -836,6 +908,10 @@ export class ImprestAdminService {
             throw new BadRequestException("Voucher already approved by accounts");
         }
 
+        if (approve && this.isTallyIntegrationEnabled()) {
+            await this.assertVoucherLedgersResolved(voucherId);
+        }
+
         const [profile] = await this.db.select({ signature: userProfiles.signature }).from(userProfiles).where(eq(userProfiles.userId, user.id)).limit(1);
         console.log("profile", profile);
 
@@ -877,6 +953,10 @@ export class ImprestAdminService {
         //check for ceo approval w/o accounts approval
         if (approve && !voucher.accountsSignedBy) {
             throw new BadRequestException("Admin Approval can only be done once the Account Approval has been submitted");
+        }
+
+        if (approve && this.isTallyIntegrationEnabled()) {
+            await this.assertVoucherLedgersResolved(voucherId);
         }
 
         const [profile] = await this.db.select({ signature: userProfiles.signature }).from(userProfiles).where(eq(userProfiles.userId, user.id)).limit(1);
@@ -980,5 +1060,311 @@ export class ImprestAdminService {
             amountReceived,
             amountLeft: amountApproved - amountReceived,
         };
+    }
+
+    async getVoucherLedgerReview(voucherId: number): Promise<VoucherLedgerReview> {
+        return this.loadVoucherLedgerReview(voucherId);
+    }
+
+    async saveVoucherLedgers(voucherId: number, user: { sub: number }, entries: VoucherLedgerSaveEntry[]): Promise<VoucherLedgerReview> {
+        const review = await this.loadVoucherLedgerReview(voucherId);
+
+        if (!review.editable) {
+            throw new ForbiddenException(review.lockReason ?? "Voucher ledgers are locked");
+        }
+
+        const itemIds = new Set(review.items.map(item => item.id));
+
+        for (const entry of entries) {
+            if (!itemIds.has(entry.imprestId)) {
+                throw new BadRequestException(`Imprest ${entry.imprestId} is not part of voucher ${voucherId}`);
+            }
+        }
+
+        const ledgerIds = [...new Set(entries.map(entry => entry.ledgerId).filter((id): id is number => id !== null))];
+
+        if (ledgerIds.length > 0) {
+            const company = this.requireTallyCompany();
+            const ledgers = await this.db
+                .select({ id: tallyLedgers.id, isActive: tallyLedgers.isActive })
+                .from(tallyLedgers)
+                .where(and(eq(tallyLedgers.company, company), inArray(tallyLedgers.id, ledgerIds)));
+
+            const found = new Map(ledgers.map(ledger => [ledger.id, ledger.isActive] as const));
+
+            for (const ledgerId of ledgerIds) {
+                if (!found.has(ledgerId)) {
+                    throw new BadRequestException(`Tally ledger ${ledgerId} does not exist for this company`);
+                }
+
+                if (!found.get(ledgerId)) {
+                    throw new BadRequestException(`Tally ledger ${ledgerId} is inactive`);
+                }
+            }
+        }
+
+        const reviewedAt = new Date();
+
+        await this.db.transaction(async tx => {
+            for (const entry of entries) {
+                await tx
+                    .update(employeeImprests)
+                    .set({
+                        tallyLedgerId: entry.ledgerId,
+                        tallyLedgerSource: entry.ledgerId === null ? "auto" : "manual",
+                        tallyLedgerReviewedBy: user.sub,
+                        tallyLedgerReviewedAt: reviewedAt,
+                        tallyLedgerNote: entry.note ?? null,
+                        updatedAt: reviewedAt,
+                    })
+                    .where(eq(employeeImprests.id, entry.imprestId));
+            }
+        });
+
+        return this.loadVoucherLedgerReview(voucherId);
+    }
+
+    async searchLedgerOptions(query?: string): Promise<Array<{ id: number; name: string; parent: string | null }>> {
+        const company = this.getTallySettings().company;
+
+        if (!company) {
+            return [];
+        }
+
+        const search = query?.trim();
+        const where = search
+            ? and(eq(tallyLedgers.company, company), eq(tallyLedgers.isActive, true), ilike(tallyLedgers.name, `%${search}%`))
+            : and(eq(tallyLedgers.company, company), eq(tallyLedgers.isActive, true));
+
+        return this.db
+            .select({ id: tallyLedgers.id, name: tallyLedgers.name, parent: tallyLedgers.parent })
+            .from(tallyLedgers)
+            .where(where)
+            .orderBy(asc(tallyLedgers.name))
+            .limit(50);
+    }
+
+    private async assertVoucherLedgersResolved(voucherId: number): Promise<void> {
+        if (!this.isTallyIntegrationEnabled()) {
+            return;
+        }
+
+        const review = await this.loadVoucherLedgerReview(voucherId);
+        const problems = review.items.filter(item => item.problem !== null);
+
+        if (problems.length > 0) {
+            const detail = problems.map(item => `imprest #${item.id} (${item.problem})`).join(", ");
+            throw new BadRequestException(`Voucher ${review.voucher.voucherCode} has unresolved Tally ledger(s): ${detail}`);
+        }
+    }
+
+    private async loadVoucherLedgerReview(voucherId: number, tx: DbOrTx = this.db): Promise<VoucherLedgerReview> {
+        const [voucher] = await tx
+            .select({
+                id: employeeImprestVouchers.id,
+                voucherCode: employeeImprestVouchers.voucherCode,
+                beneficiaryName: employeeImprestVouchers.beneficiaryName,
+                amount: employeeImprestVouchers.amount,
+                validFrom: employeeImprestVouchers.validFrom,
+                validTo: employeeImprestVouchers.validTo,
+                accountsSignedBy: employeeImprestVouchers.accountsSignedBy,
+                accountsSignedAt: employeeImprestVouchers.accountsSignedAt,
+                adminSignedBy: employeeImprestVouchers.adminSignedBy,
+                adminSignedAt: employeeImprestVouchers.adminSignedAt,
+            })
+            .from(employeeImprestVouchers)
+            .where(eq(employeeImprestVouchers.id, voucherId))
+            .limit(1);
+
+        if (!voucher) {
+            throw new NotFoundException("Voucher not found");
+        }
+
+        const beneficiaryId = Number(voucher.beneficiaryName);
+
+        if (!Number.isInteger(beneficiaryId) || beneficiaryId <= 0) {
+            throw new NotFoundException("Voucher beneficiary not found");
+        }
+
+        const [beneficiary] = await tx
+            .select({ id: users.id, name: users.name, team: users.team, primaryTeamId: users.primaryTeamId })
+            .from(users)
+            .where(eq(users.id, beneficiaryId))
+            .limit(1);
+
+        const teamIds = beneficiary ? [beneficiary.team, beneficiary.primaryTeamId].filter((id): id is number => id !== null) : [];
+        const teamRows = teamIds.length > 0 ? await tx.select({ id: teams.id, name: teams.name }).from(teams).where(inArray(teams.id, teamIds)) : [];
+        const teamNames = new Map(teamRows.map(team => [team.id, team.name] as const));
+        const employeeIsBusinessDevelopment = teamIds.some(id => isBusinessDevelopmentTeam(teamNames.get(id)));
+        const employeeTeamName = teamIds.length > 0 ? (teamNames.get(teamIds[0]) ?? null) : null;
+
+        const rows = await tx
+            .select({
+                id: employeeImprests.id,
+                categoryId: employeeImprests.categoryId,
+                category: imprestCategories.name,
+                categoryBlocked: imprestCategories.tallyBlocked,
+                categoryDefaultLedgerId: imprestCategories.tallyLedgerId,
+                categoryProjectLedgerId: imprestCategories.projectLedgerId,
+                categoryBdLedgerId: imprestCategories.businessDevelopmentLedgerId,
+                projectId: employeeImprests.projectId,
+                projectName: employeeImprests.projectName,
+                projectCode: projects.projectCode,
+                projectTeam: projects.teamName,
+                remark: employeeImprests.remark,
+                amount: employeeImprests.amount,
+                dateOfExpense: employeeImprests.dateOfExpense,
+                overrideLedgerId: employeeImprests.tallyLedgerId,
+                reviewedBy: employeeImprests.tallyLedgerReviewedBy,
+                reviewedAt: employeeImprests.tallyLedgerReviewedAt,
+                ledgerNote: employeeImprests.tallyLedgerNote,
+            })
+            .from(employeeImprestVoucherItems)
+            .innerJoin(employeeImprests, eq(employeeImprestVoucherItems.imprestId, employeeImprests.id))
+            .leftJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
+            .leftJoin(projects, eq(projects.id, employeeImprests.projectId))
+            .where(and(eq(employeeImprestVoucherItems.voucherId, voucherId), eq(employeeImprests.approvalStatus, 1)))
+            .orderBy(asc(employeeImprests.dateOfExpense), asc(employeeImprests.id));
+
+        const ledgerIds = new Set<number>();
+
+        for (const row of rows) {
+            for (const id of [row.overrideLedgerId, row.categoryDefaultLedgerId, row.categoryProjectLedgerId, row.categoryBdLedgerId]) {
+                if (id !== null) {
+                    ledgerIds.add(id);
+                }
+            }
+        }
+
+        const ledgerRows =
+            ledgerIds.size > 0
+                ? await tx
+                      .select({ id: tallyLedgers.id, name: tallyLedgers.name, parent: tallyLedgers.parent, isActive: tallyLedgers.isActive })
+                      .from(tallyLedgers)
+                      .where(inArray(tallyLedgers.id, [...ledgerIds]))
+                : [];
+
+        const ledgersById = new Map(ledgerRows.map(ledger => [ledger.id, ledger] as const));
+        const toInfo = (id: number | null): TallyLedgerInfo | null => {
+            if (id === null) {
+                return null;
+            }
+
+            const ledger = ledgersById.get(id);
+
+            return ledger ? { id: ledger.id, name: ledger.name, parent: ledger.parent, isActive: ledger.isActive } : null;
+        };
+
+        const items: VoucherLedgerReviewItem[] = rows.map(row => {
+            const context = deriveCategoryContext({
+                projectId: row.projectId,
+                projectTeamName: row.projectTeam,
+                employeeIsBusinessDevelopment,
+            });
+            const resolution = resolveEntryLedger({
+                overrideLedgerId: row.overrideLedgerId,
+                category: {
+                    defaultLedgerId: row.categoryDefaultLedgerId,
+                    projectLedgerId: row.categoryProjectLedgerId,
+                    businessDevelopmentLedgerId: row.categoryBdLedgerId,
+                    blocked: row.categoryBlocked ?? false,
+                },
+                context,
+            });
+
+            const autoLedger = toInfo(resolution.autoLedgerId);
+            const overrideLedger = toInfo(row.overrideLedgerId);
+            const finalLedger = toInfo(resolution.finalLedgerId);
+            const problem: VoucherLedgerReviewItem["problem"] = resolution.blocked
+                ? "BLOCKED"
+                : resolution.finalLedgerId === null
+                  ? "UNMAPPED"
+                  : !finalLedger || !finalLedger.isActive
+                    ? "INACTIVE"
+                    : null;
+
+            const candidates = [autoLedger, toInfo(row.categoryDefaultLedgerId), toInfo(row.categoryProjectLedgerId), toInfo(row.categoryBdLedgerId), overrideLedger, finalLedger]
+                .filter((ledger): ledger is TallyLedgerInfo => ledger !== null)
+                .filter((ledger, index, all) => all.findIndex(candidate => candidate.id === ledger.id) === index);
+
+            return {
+                id: row.id,
+                categoryId: row.categoryId,
+                category: row.category,
+                projectId: row.projectId,
+                projectName: row.projectName,
+                projectCode: row.projectCode,
+                projectTeam: row.projectTeam,
+                remark: row.remark,
+                amount: Number(row.amount),
+                dateOfExpense: row.dateOfExpense,
+                context,
+                autoLedger,
+                overrideLedger,
+                finalLedger,
+                candidates,
+                ledgerSource: resolution.source,
+                tallyLedgerId: row.overrideLedgerId,
+                blocked: resolution.blocked,
+                problem,
+                reviewedBy: row.reviewedBy,
+                reviewedAt: row.reviewedAt,
+                ledgerNote: row.ledgerNote,
+            };
+        });
+
+        const [posted] = await tx
+            .select({ id: tallySyncLedger.id })
+            .from(tallySyncLedger)
+            .where(and(eq(tallySyncLedger.entityType, "imprest_voucher"), eq(tallySyncLedger.entityId, String(voucherId)), eq(tallySyncLedger.status, "posted")))
+            .limit(1);
+
+        const lockReason = voucher.accountsSignedAt !== null ? "Voucher is already signed by accounts" : posted ? "Voucher is already posted to Tally" : null;
+
+        return {
+            voucher: {
+                id: voucher.id,
+                voucherCode: voucher.voucherCode,
+                beneficiaryId,
+                employeeName: beneficiary?.name ?? null,
+                teamName: employeeTeamName,
+                amount: Number(voucher.amount),
+                validFrom: voucher.validFrom,
+                validTo: voucher.validTo,
+                accountsSignedBy: voucher.accountsSignedBy,
+                accountsSignedAt: voucher.accountsSignedAt,
+                adminSignedBy: voucher.adminSignedBy,
+                adminSignedAt: voucher.adminSignedAt,
+            },
+            items,
+            editable: lockReason === null,
+            lockReason,
+            summary: {
+                total: items.length,
+                auto: items.filter(item => item.ledgerSource === "auto").length,
+                manual: items.filter(item => item.ledgerSource === "manual").length,
+                blocked: items.filter(item => item.problem === "BLOCKED").length,
+                unmapped: items.filter(item => item.problem === "UNMAPPED").length,
+                inactive: items.filter(item => item.problem === "INACTIVE").length,
+            },
+        };
+    }
+
+    private getTallySettings(): { enabled: boolean; company: string | null } {
+        return this.config.get<{ enabled: boolean; company: string | null }>("tally") ?? { enabled: false, company: null };
+    }
+
+    private isTallyIntegrationEnabled(): boolean {
+        return this.getTallySettings().enabled;
+    }
+
+    private requireTallyCompany(): string {
+        const company = this.getTallySettings().company;
+
+        if (!company) {
+            throw new BadRequestException("TALLY_COMPANY is not configured");
+        }
+
+        return company;
     }
 }
