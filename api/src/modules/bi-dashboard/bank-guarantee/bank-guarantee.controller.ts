@@ -40,6 +40,44 @@ export class BankGuaranteeController {
         return this.bankGuaranteeService.getDashboardCardStats();
     }
 
+    @Get('approvals')
+    getBgApprovals(
+        @Req() req: any,
+        @Query('status') status?: string,
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+        @Query('search') search?: string,
+    ) {
+        return this.bankGuaranteeService.getBgApprovals(req.user, {
+            status,
+            page: page ? parseInt(page, 10) : undefined,
+            limit: limit ? parseInt(limit, 10) : undefined,
+            search,
+        });
+    }
+
+    @Get('approvals/:instrumentId')
+    getBgApprovalDetail(@Param('instrumentId', ParseIntPipe) instrumentId: number) {
+        return this.bankGuaranteeService.getBgApprovalDetail(instrumentId);
+    }
+
+    @Post('instruments/:instrumentId/approval')
+    actOnBgApproval(
+        @Param('instrumentId', ParseIntPipe) instrumentId: number,
+        @Body() body: any,
+        @Req() req: any,
+    ) {
+        return this.bankGuaranteeService.actOnBgApproval(instrumentId, req.user, body);
+    }
+
+    @Post('instruments/:instrumentId/approval/resubmit')
+    resubmitBgApproval(
+        @Param('instrumentId', ParseIntPipe) instrumentId: number,
+        @Req() req: any,
+    ) {
+        return this.bankGuaranteeService.resubmitBgApproval(instrumentId, req.user);
+    }
+
     @Get('requests/:id')
     async getById(@Param('id', ParseIntPipe) id: number) {
         return this.bankGuaranteeService.getById(id);
@@ -60,6 +98,24 @@ export class BankGuaranteeController {
         return this.bankGuaranteeService.getMailPreview(id, body);
     }
 
+    @Post('instruments/:id/prefilled-format')
+    async generatePrefilledFormat(@Param('id', ParseIntPipe) id: number, @Body() body: any) {
+        return this.bankGuaranteeService.generatePrefilledFormat(id, body?.fdrNo);
+    }
+
+    @Post('instruments/:id/covering-letter')
+    async generateCoveringLetter(@Param('id', ParseIntPipe) id: number, @Body() body: any) {
+        return this.bankGuaranteeService.generateCoveringLetter(id, {
+            bgNo: body?.bgNo,
+            bgDate: body?.bgDate,
+        });
+    }
+
+    @Post('instruments/:id/authorization-letter')
+    async generateAuthorizationLetter(@Param('id', ParseIntPipe) id: number, @Body() body: any) {
+        return this.bankGuaranteeService.generateAuthorizationLetter(id, body?.persons);
+    }
+
     @Post('old-bg')
     async createOldBg(@Body() body: any, @Req() req: any) {
         return this.bankGuaranteeService.createOldBg(body, req.user);
@@ -71,8 +127,8 @@ export class BankGuaranteeController {
     }
 
     @Put('old-bg/:requestId')
-    async updateOldBg(@Param('requestId', ParseIntPipe) requestId: number, @Body() body: any) {
-        return this.bankGuaranteeService.updateOldBg(requestId, body);
+    async updateOldBg(@Param('requestId', ParseIntPipe) requestId: number, @Body() body: any, @Req() req: any) {
+        return this.bankGuaranteeService.updateOldBg(requestId, body, req.user);
     }
 
     @Put(':id')

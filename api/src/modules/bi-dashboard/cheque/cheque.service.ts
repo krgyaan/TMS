@@ -27,6 +27,7 @@ import { alias } from 'drizzle-orm/pg-core';
 export class ChequeService {
     private readonly logger;
     private readonly requestedByUser = alias(users, 'requested_by_user');
+    private readonly linkedDdInstrument = alias(paymentInstruments, 'linked_dd_instrument');
 
     constructor(
         private readonly appLogger: AppLogger,
@@ -37,10 +38,14 @@ export class ChequeService {
         this.logger = this.appLogger.withContext(ChequeService.name);
     }
 
-    private deriveChequeStatus(status: string | null, chequeReason: string | null): string {
+    private isDdCreated(linkedDdStatus: string | null | undefined): boolean {
+        return !!linkedDdStatus &&
+            linkedDdStatus !== DD_STATUSES.PENDING &&
+            linkedDdStatus !== DD_STATUSES.ACCOUNTS_FORM_REJECTED;
+    }
+
+    private deriveChequeStatus(status: string | null): string {
         if (status === CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED) {
-            if (chequeReason === 'DD') return 'DD Created';
-            if (chequeReason === 'FDR') return 'FDR Created';
             return 'Cheque Created';
         }
         const map: Record<string, string> = {
@@ -55,9 +60,9 @@ export class ChequeService {
         return map[status as string] || status || 'Pending';
     }
 
-    private deriveExpiryStatus(dueDate: Date | null, chequeReason: string | null, status: string | null): string | null {
+    private deriveExpiryStatus(dueDate: Date | null, chequeReason: string | null, status: string | null, linkedDdStatus?: string | null): string | null {
         const isAccepted = status === CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED;
-        if (isAccepted && chequeReason === 'DD') return 'DD Created';
+        if (isAccepted && chequeReason === 'DD') return this.isDdCreated(linkedDdStatus) ? 'DD Created' : 'DD Requested';
         if (isAccepted && chequeReason === 'FDR') return 'FDR Created';
         if (!dueDate) return 'No date';
         const expiryDate = new Date(dueDate.getTime() + 3 * 30 * 24 * 60 * 60 * 1000);
@@ -222,12 +227,14 @@ export class ChequeService {
                 cheque: instrumentChequeDetails.chequeDate,
                 dueDate: instrumentChequeDetails.dueDate,
                 chequeStatus: paymentInstruments.status,
+                linkedDdStatus: this.linkedDdInstrument.status,
                 requestedBy: this.requestedByUser.name,
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(this.linkedDdInstrument, eq(this.linkedDdInstrument.id, instrumentChequeDetails.linkedDdId))
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .leftJoin(this.requestedByUser, eq(this.requestedByUser.id, paymentRequests.requestedBy))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
@@ -268,8 +275,8 @@ export class ChequeService {
             type: row.type,
             cheque: row.cheque,
             dueDate: row.dueDate ? new Date(row.dueDate) : null,
-            expiry: this.deriveExpiryStatus(row.dueDate ? new Date(row.dueDate) : null, row.type, row.chequeStatus),
-            chequeStatus: this.deriveChequeStatus(row.chequeStatus, row.type),
+            expiry: this.deriveExpiryStatus(row.dueDate ? new Date(row.dueDate) : null, row.type, row.chequeStatus, row.linkedDdStatus),
+            chequeStatus: this.deriveChequeStatus(row.chequeStatus),
         }));
 
         return wrapPaginatedResponse(data, total, page, limit);
@@ -307,6 +314,7 @@ export class ChequeService {
                 cheque: instrumentChequeDetails.chequeDate,
                 dueDate: instrumentChequeDetails.dueDate,
                 chequeStatus: paymentInstruments.status,
+                linkedDdStatus: this.linkedDdInstrument.status,
                 requestedBy: this.requestedByUser.name,
                 utr: paymentInstruments.utr,
                 rejectionReason: paymentInstruments.rejectionReason,
@@ -318,6 +326,7 @@ export class ChequeService {
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(this.linkedDdInstrument, eq(this.linkedDdInstrument.id, instrumentChequeDetails.linkedDdId))
             .leftJoin(this.requestedByUser, eq(this.requestedByUser.id, paymentRequests.requestedBy))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(whereClause)
@@ -339,8 +348,8 @@ export class ChequeService {
             type: row.type,
             cheque: row.cheque,
             dueDate: row.dueDate ? new Date(row.dueDate) : null,
-            expiry: this.deriveExpiryStatus(row.dueDate ? new Date(row.dueDate) : null, row.type, row.chequeStatus),
-            chequeStatus: this.deriveChequeStatus(row.chequeStatus, row.type),
+            expiry: this.deriveExpiryStatus(row.dueDate ? new Date(row.dueDate) : null, row.type, row.chequeStatus, row.linkedDdStatus),
+            chequeStatus: this.deriveChequeStatus(row.chequeStatus),
             utr: row.utr,
             rejectionReason: row.rejectionReason,
             issueDate: row.issueDate ? new Date(row.issueDate) : null,
@@ -536,14 +545,12 @@ export class ChequeService {
             if (body.cheque_no) chequeDetailsUpdate.chequeNo = body.cheque_no;
             if (body.due_date) chequeDetailsUpdate.dueDate = body.due_date;
 
-            const receivingChequePath = getFilePathFromBody('receiving_cheque_handed_over', body);
-            if (receivingChequePath) {
-                chequeDetailsUpdate.handover = receivingChequePath;
+            if (Object.prototype.hasOwnProperty.call(body, 'receiving_cheque_handed_over')) {
+                chequeDetailsUpdate.handover = getFilePathFromBody('receiving_cheque_handed_over', body);
             }
 
-            const positivePayPath = getFilePathFromBody('positive_pay_confirmation', body);
-            if (positivePayPath) {
-                chequeDetailsUpdate.confirmation = positivePayPath;
+            if (Object.prototype.hasOwnProperty.call(body, 'positive_pay_confirmation')) {
+                chequeDetailsUpdate.confirmation = getFilePathFromBody('positive_pay_confirmation', body);
             }
 
             if (body.remarks) {
@@ -856,6 +863,7 @@ export class ChequeService {
                 chequeImagePath: instrumentChequeDetails.chequeImagePath,
                 cancelledImagePath: instrumentChequeDetails.cancelledImagePath,
                 linkedDdId: instrumentChequeDetails.linkedDdId,
+                linkedDdStatus: this.linkedDdInstrument.status,
                 linkedFdrId: instrumentChequeDetails.linkedFdrId,
                 reqType: instrumentChequeDetails.reqType,
                 chequeNeeds: instrumentChequeDetails.chequeNeeds,
@@ -888,6 +896,7 @@ export class ChequeService {
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(this.linkedDdInstrument, eq(this.linkedDdInstrument.id, instrumentChequeDetails.linkedDdId))
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
@@ -981,6 +990,7 @@ export class ChequeService {
                 id: paymentInstruments.id,
                 action: paymentInstruments.action,
                 status: paymentInstruments.status,
+                rejectionReason: paymentInstruments.rejectionReason,
                 amount: paymentInstruments.amount,
                 favouring: paymentInstruments.favouring,
                 payableAt: paymentInstruments.payableAt,
@@ -1011,6 +1021,7 @@ export class ChequeService {
                 reference: instrumentChequeDetails.reference,
                 btTransferDate: instrumentChequeDetails.btTransferDate,
                 linkedDdId: instrumentChequeDetails.linkedDdId,
+                linkedDdStatus: this.linkedDdInstrument.status,
                 linkedFdrId: instrumentChequeDetails.linkedFdrId,
                 stopReasonText: instrumentChequeDetails.stopReasonText,
                 chequeGivenFromAccount: instrumentChequeDetails.chequeGivenFromAccount,
@@ -1021,6 +1032,7 @@ export class ChequeService {
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(this.linkedDdInstrument, eq(this.linkedDdInstrument.id, instrumentChequeDetails.linkedDdId))
             .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
             .where(and(
                 eq(paymentInstruments.id, id),
@@ -1040,7 +1052,10 @@ export class ChequeService {
         return {
             id: result.id,
             action: result.action,
-            chequeStatus: this.deriveChequeStatus(result.status, result.chequeReason),
+            status: result.status,
+            rejectionReason: result.rejectionReason,
+            chequeStatus: this.deriveChequeStatus(result.status),
+            linkedDdStatus: result.linkedDdStatus,
             tenderNo: result.tenderNo,
             tenderName: result.tenderName,
             tenderId: result.tenderId,

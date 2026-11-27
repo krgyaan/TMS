@@ -1,15 +1,19 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useFieldArray, useForm, useWatch, type Resolver } from 'react-hook-form';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { SelectField } from '@/components/form/SelectField';
+import { FieldWrapper } from '@/components/form/FieldWrapper';
+import { Input } from '@/components/ui/input';
+import { fileUploadService } from '@/services/api/file-upload.service';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BankGuaranteeActionFormSchema, type BankGuaranteeActionFormValues } from '../helpers/bankGuaranteeActionForm.schema';
-import { useUpdateBankGuaranteeAction, useBGActionFormData, useBGFollowupData } from '@/hooks/api/useBankGuarantees';
+import { useUpdateBankGuaranteeAction, useBGActionFormData, useBGFollowupData, useGenerateBankGuaranteePrefilledFormat, useGenerateBankGuaranteeCoveringLetter, useGenerateBankGuaranteeAuthorizationLetter } from '@/hooks/api/useBankGuarantees';
+import { useUsers } from '@/hooks/api/useUsers';
 import type { Checkpoint } from '@/components/tendering/SubmissionChecklist';
-import { CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle, FileDown, FileText, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { AccountsForm1Fields } from './steps/AccountsForm1Fields';
@@ -30,6 +34,7 @@ const STEP_NAMES = {
     prefilledSignedBg: 'prefilled_signed_bg',
     bankMailIds: 'bank_mail_ids',
     bankMailIdsCc: 'bank_mail_ids_cc',
+    authorizationPerson: 'authorization_person',
     bgApprovedFdrPer: 'bg_approved_fdr_per',
     bgFormatImran: 'bg_format_imran',
     bgNo: 'bg_no',
@@ -105,6 +110,22 @@ const safeParseArray = (v: string | null | undefined): string[] => {
 const toMailRows = (v?: string[] | null) =>
     v && v.length ? v.map((email) => ({ email })) : [{ email: '' }];
 
+const toAuthorizationRows = (v: unknown) => {
+    let arr: unknown = v;
+    if (typeof v === 'string') {
+        try {
+            arr = JSON.parse(v);
+        } catch {
+            arr = [];
+        }
+    }
+    if (!Array.isArray(arr)) return [];
+    return arr.map((person: any) => ({
+        name: String(person?.name ?? ''),
+        aadhar_no: String(person?.aadharNo ?? person?.aadhar_no ?? ''),
+    }));
+};
+
 const toFdrEnum = (v: unknown): '10' | '15' | '100' | undefined => {
     if (v == null) return undefined;
     const n = Number(v);
@@ -128,6 +149,7 @@ const SectionCard = ({ title, children }: { title: string; children: ReactNode }
     </Card>
 );
 
+
 interface BankGuaranteeActionFormProps {
     instrumentId: number;
 }
@@ -136,8 +158,18 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const updateMutation = useUpdateBankGuaranteeAction();
+    const generatePrefilledMutation = useGenerateBankGuaranteePrefilledFormat();
+    const generateCoveringLetterMutation = useGenerateBankGuaranteeCoveringLetter();
+    const generateAuthorizationMutation = useGenerateBankGuaranteeAuthorizationLetter();
     const { data: formData } = useBGActionFormData(instrumentId);
     const { data: followupData } = useBGFollowupData(instrumentId);
+    const { data: employees = [] } = useUsers();
+    const [generatedDocs, setGeneratedDocs] = useState<{
+        prefilled?: string;
+        coverLetter?: string;
+        envelope?: string;
+        authorization?: string;
+    }>({});
 
     // Deep links from the BG emails: ?section=accounts-form-1 / accounts-form-2
     const requestedSection = searchParams.get('section');
@@ -164,6 +196,9 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
     const stage2CoveringLetter = useWatch({ control: form.control, name: 'bg_signed_covering_letter' });
     const stage2BgUpload = useWatch({ control: form.control, name: 'bg_upload' });
     const stage3Sfms = useWatch({ control: form.control, name: 'sfms_conf' });
+    const fdrNoValue = useWatch({ control: form.control, name: 'fdr_no' });
+    const bgReqValue = useWatch({ control: form.control, name: 'bg_req' });
+    const authorizationPersonValue = useWatch({ control: form.control, name: 'authorization_person' });
 
     const bankMailIds = useFieldArray({ control: form.control, name: 'bank_mail_ids' });
     const bankMailIdsCc = useFieldArray({ control: form.control, name: 'bank_mail_ids_cc' });
@@ -239,6 +274,11 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
             form.setValue('fdr_copy', safeParseArray(formData.fdrCopy));
             bankMailIds.replace(toMailRows(formData.bankMailIds));
             bankMailIdsCc.replace(toMailRows(formData.bankMailIdsCc));
+            const savedAuthorizationPerson = toAuthorizationRows(formData.authorizationPersons)[0];
+            form.setValue('authorization_person', {
+                name: savedAuthorizationPerson?.name ?? '',
+                aadhar_no: savedAuthorizationPerson?.aadhar_no ?? '',
+            });
         } else if (action === 'accounts-form-2') {
             // BG No. is a required field on this form, so it is only present once
             // Stage 2 has actually been saved. Some older instruments already
@@ -286,13 +326,86 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
 
     const isSubmitting = form.formState.isSubmitting || updateMutation.isPending;
 
+    const handleGeneratePrefilled = async () => {
+        const fdrNo = String(form.getValues('fdr_no') ?? '').trim();
+        if (!fdrNo) {
+            toast.error('Enter FDR No. first');
+            return;
+        }
+
+        try {
+            const result = await generatePrefilledMutation.mutateAsync({ id: instrumentId, fdrNo });
+            setGeneratedDocs((prev) => ({ ...prev, prefilled: result.pdfPath }));
+            toast.success('Prefilled BG format generated');
+        } catch (error: any) {
+            toast.error(error?.message || 'Failed to generate prefilled BG format');
+        }
+    };
+
+    const handleGenerateAuthorizationLetter = async () => {
+        const person = form.getValues('authorization_person');
+        const name = String(person?.name ?? '').trim();
+        const aadharNo = String(person?.aadhar_no ?? '').trim();
+
+        if (!name || !/^\d{12}$/.test(aadharNo)) {
+            toast.error('Select a user and enter a 12-digit Aadhar No.');
+            return;
+        }
+
+        try {
+            const result = await generateAuthorizationMutation.mutateAsync({
+                id: instrumentId,
+                persons: [{ name, aadharNo }],
+            });
+            setGeneratedDocs((prev) => ({ ...prev, authorization: result.pdfPath }));
+            toast.success('Authorization letter generated');
+        } catch (error: any) {
+            toast.error(error?.message || 'Failed to generate authorization letter');
+        }
+    };
+
+    const handleGenerateCoveringLetter = async () => {
+        const bgNo = String(form.getValues('bg_no') ?? '').trim();
+        const bgDate = toDateString(form.getValues('bg_date'));
+        if (!bgNo || !bgDate) {
+            toast.error('Enter BG No. and BG Creation Date first');
+            return;
+        }
+
+        try {
+            const result = await generateCoveringLetterMutation.mutateAsync({
+                id: instrumentId,
+                bgNo,
+                bgDate,
+            });
+            setGeneratedDocs((prev) => ({
+                ...prev,
+                coverLetter: result.pdfPath,
+                envelope: result.envelopePdfPath,
+            }));
+            toast.success(
+                result.envelopePdfPath
+                    ? 'Covering letter and envelope slip generated'
+                    : 'Covering letter generated',
+            );
+        } catch (error: any) {
+            toast.error(error?.message || 'Failed to generate covering letter');
+        }
+    };
+
     const handleSubmit = async (values: BankGuaranteeActionFormValues) => {
         if (isReadOnly) return;
         try {
             const payload: Record<string, unknown> = {};
 
             Object.entries(values).forEach(([key, value]) => {
-                if (key === 'bank_mail_ids' || key === 'bank_mail_ids_cc' || key === 'contacts' || key === 'attachments') {
+                if (
+                    key === 'bank_mail_ids'
+                    || key === 'bank_mail_ids_cc'
+                    || key === 'authorization_person'
+                    || key === 'contacts'
+                    || key === 'attachments'
+                ) {
                     return;
                 }
 
@@ -317,6 +430,12 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
             );
             payload.bank_mail_ids_cc = JSON.stringify(
                 (values.bank_mail_ids_cc ?? []).map((r) => r.email).filter(Boolean),
+            );
+            const authorizationName = values.authorization_person?.name?.trim() || '';
+            payload.authorization_persons = JSON.stringify(
+                authorizationName
+                    ? [{ name: authorizationName, aadharNo: values.authorization_person?.aadhar_no?.trim() || '' }]
+                    : [],
             );
             payload.contacts = JSON.stringify(
                 (values.contacts ?? []).map((c) => ({
@@ -394,6 +513,10 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
                                 bankMailIdsCc={bankMailIdsCc}
                                 disabled={isStepLocked('accounts-form-1')}
                                 fdrValueType="string"
+                                onGeneratePrefilled={handleGeneratePrefilled}
+                                isGeneratingPrefilled={generatePrefilledMutation.isPending}
+                                canGeneratePrefilled={Boolean(String(fdrNoValue ?? '').trim())}
+                                prefilledPath={generatedDocs.prefilled ?? formData?.prefilledAppDocx}
                             />
                             <MailAttachmentPreview
                                 instrumentId={instrumentId}
@@ -412,6 +535,10 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
                             <AccountsForm2Fields
                                 control={form.control}
                                 names={STEP_NAMES}
+                                onGenerateCoveringLetter={handleGenerateCoveringLetter}
+                                isGeneratingCoveringLetter={generateCoveringLetterMutation.isPending}
+                                coverLetterPath={generatedDocs.coverLetter ?? formData?.coverLetterDocx}
+                                envelopeSlipPath={generatedDocs.envelope ?? formData?.envelopeSlip}
                             />
                             <MailAttachmentPreview
                                 instrumentId={instrumentId}
@@ -522,6 +649,82 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
                         </SectionCard>
                     )}
                 </fieldset>
+
+                {action === 'accounts-form-1' && bgReqValue === 'Accepted' && (
+                    <SectionCard title="Authorization">
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
+                                <div className="md:col-span-4">
+                                    <SelectField
+                                        control={form.control}
+                                        name="authorization_person.name"
+                                        label="Name"
+                                        options={employees.map((employee) => ({
+                                            value: employee.name,
+                                            label: employee.name,
+                                        }))}
+                                        placeholder="Select user"
+                                        valueType="string"
+                                    />
+                                </div>
+                                <div className="md:col-span-4">
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name="authorization_person.aadhar_no"
+                                        label="Aadhar No."
+                                    >
+                                        {(field) => (
+                                            <Input
+                                                {...field}
+                                                value={(field.value as string | undefined) ?? ''}
+                                                placeholder="Enter 12-digit Aadhar number"
+                                                inputMode="numeric"
+                                                maxLength={12}
+                                                onChange={(event) =>
+                                                    field.onChange(event.target.value.replace(/\D/g, '').slice(0, 12))
+                                                }
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                </div>
+                                <div className="md:col-span-4">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleGenerateAuthorizationLetter}
+                                        disabled={
+                                            generateAuthorizationMutation.isPending
+                                            || !String(authorizationPersonValue?.name ?? '').trim()
+                                            || !/^\d{12}$/.test(String(authorizationPersonValue?.aadhar_no ?? '').trim())
+                                        }
+                                    >
+                                        {generateAuthorizationMutation.isPending ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <FileDown className="h-4 w-4" />
+                                        )}
+                                        <span className="ml-1">Generate</span>
+                                    </Button>
+                                </div>
+                            </div>
+                            {(generatedDocs.authorization ?? formData?.authorizationLetterDocx) && (
+                                <a
+                                    href={fileUploadService.getFileUrl(
+                                        (generatedDocs.authorization ?? formData?.authorizationLetterDocx) as string,
+                                    )}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    download
+                                    className="inline-flex items-center gap-1 text-sm font-medium text-primary underline"
+                                >
+                                    <FileText className="h-4 w-4" />
+                                    Authorization Letter
+                                </a>
+                            )}
+                        </div>
+                    </SectionCard>
+                )}
 
                 <div className="flex justify-end gap-4 pt-4">
                     {courierDetailsIncomplete && (

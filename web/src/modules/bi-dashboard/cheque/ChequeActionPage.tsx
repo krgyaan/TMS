@@ -145,17 +145,19 @@ export default function ChequeActionPage() {
                     action={currentAction}
                     instrumentData={instrumentData}
                     tenderId={actionFormData?.tenderId ?? null}
+                    linkedDdId={actionFormData?.linkedDdId ?? null}
                     formHistory={{
                         accountsForm: actionFormData ? {
-                            chequeReq: actionFormData.chequeStatus === 'Rejected' ? 'Rejected' :
-                                       actionFormData.chequeStatus === 'Accepted' ? 'Accepted' : undefined,
-                            reasonReq: actionFormData.chequeStatus === 'Rejected' ? (actionFormData as any).rejectionReason ?? undefined : undefined,
+                            chequeReq: actionFormData.status === 'ACCOUNTS_FORM_REJECTED' ? 'Rejected' :
+                                       actionFormData.status === 'ACCOUNTS_FORM_ACCEPTED' || (actionFormData.action ?? 0) >= 1 ? 'Accepted' : undefined,
+                            reasonReq: actionFormData.status === 'ACCOUNTS_FORM_REJECTED' ? actionFormData.rejectionReason ?? undefined : undefined,
                             chequeNo: actionFormData.chequeNo ?? undefined,
                             dueDate: actionFormData.chequeDate ? new Date(actionFormData.chequeDate).toISOString() : undefined,
                             handover: actionFormData.handover ?? undefined,
                             chequeImages: actionFormData.chequeImagePath ? actionFormData.chequeImagePath.split(',') : undefined,
                             positivePayConfirmation: actionFormData.confirmation ?? undefined,
                             remarks: actionFormData.chequeRemarks ?? undefined,
+                            chequeGivenFromAccount: actionFormData.chequeGivenFromAccount ?? undefined,
                         } : undefined,
                         initiateFollowup: followupData ? {
                             organisationName: followupData.organisationName ?? undefined,

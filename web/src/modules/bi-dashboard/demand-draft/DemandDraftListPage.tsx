@@ -98,6 +98,7 @@ const DemandDraftListPage = () => {
         if (data.reqNo) out['Courier Req No'] = data.reqNo;
         if (data.ddNeeds) out['Deliver By'] = data.ddNeeds;
         if (data.ddPurpose) out['Purpose Detail'] = data.ddPurpose;
+        if (data.ddPurposeReason) out['Purpose Reason'] = data.ddPurposeReason;
         if (data.ddRemarks) out['Remarks'] = data.ddRemarks;
         if (data.utr) out['UTR'] = data.utr;
         if (data.issueDate) out['Issue Date'] = new Date(data.issueDate).toLocaleDateString('en-GB');

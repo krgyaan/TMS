@@ -148,15 +148,14 @@ export default function DemandDraftActionPage() {
                     linkedCheque={actionFormData?.linkedCheque ?? null}
                     formHistory={{
                         accountsForm: actionFormData ? {
-                            ddReq: actionFormData.ddStatus === 'Rejected' ? 'Rejected' :
-                                   actionFormData.ddStatus === 'Accepted' ? 'Accepted' :
-                                   actionFormData.ddRemarks ? 'Accepted' : undefined,
-                            reasonReq: actionFormData.ddStatus === 'Rejected' ? (actionFormData as any).rejectionReason ?? undefined : undefined,
+                            ddReq: actionFormData.status === 'ACCOUNTS_FORM_REJECTED' ? 'Rejected' :
+                                   (actionFormData.action ?? 0) >= 1 ? 'Accepted' : undefined,
+                            reasonReq: actionFormData.status === 'ACCOUNTS_FORM_REJECTED' ? actionFormData.rejectionReason ?? undefined : undefined,
                             ddNo: actionFormData.ddNo ?? undefined,
                             ddDate: actionFormData.ddDate ? new Date(actionFormData.ddDate).toISOString() : undefined,
                             reqNo: actionFormData.reqNo ?? undefined,
                             remarks: actionFormData.ddRemarks ?? undefined,
-                            courierOrg: actionFormData.courierDetails?.toOrg ?? undefined,
+                            courierOrg: actionFormData.courierDetails?.toOrg ?? actionFormData.courierAddressJson?.org ?? undefined,
                             courierName: actionFormData.courierAddressJson?.name ?? undefined,
                             courierPhone: actionFormData.courierAddressJson?.phone ?? undefined,
                             courierAddrLine1: actionFormData.courierAddressJson?.line1 ?? undefined,
@@ -164,6 +163,9 @@ export default function DemandDraftActionPage() {
                             courierCity: actionFormData.courierAddressJson?.city ?? undefined,
                             courierState: actionFormData.courierAddressJson?.state ?? undefined,
                             courierPincode: actionFormData.courierAddressJson?.pincode ?? undefined,
+                            empFrom: actionFormData.courierAddressJson?.empFrom != null ? String(actionFormData.courierAddressJson.empFrom) : undefined,
+                            delDate: actionFormData.courierAddressJson?.delDate ?? undefined,
+                            urgency: actionFormData.courierAddressJson?.urgency != null ? String(actionFormData.courierAddressJson.urgency) : undefined,
                         } : undefined,
                         initiateFollowup: followupData ? {
                             organisationName: followupData.organisationName ?? undefined,

@@ -78,7 +78,7 @@ const TABS_CONFIG: Array<{ key: ChequeDashboardTab; name: string; icon: React.Re
 const getStatusVariant = (status: string | null): string => {
     if (!status) return 'secondary';
     const statusLower = status.toLowerCase();
-    if (statusLower.includes('created')) {
+    if (statusLower.includes('created') || statusLower.includes('requested')) {
         return 'default';
     }
     if (statusLower.includes('cancelled') || statusLower.includes('rejected')) {

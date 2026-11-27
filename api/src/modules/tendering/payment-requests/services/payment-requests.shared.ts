@@ -264,6 +264,9 @@ const PURPOSE_VALUE_MAP: Record<string, PaymentPurpose> = {
     'ADVANCE_PAYMENT': 'Other Payment',
     'SECURITY_BOND_DEPOSIT': 'Security Deposit',
     'BID_BOND': 'Other Payment',
+    'SECURITY_DEPOSIT': 'Security Deposit',
+    'OTHER_PAYMENT': 'Other Payment',
+    'OTHER_SECURITY': 'Other Security',
     'DD': 'DD',
     'FDR': 'FDR',
 };

@@ -19,6 +19,8 @@ export const bankGuaranteesKey = {
     cardStats: () => [...bankGuaranteesKey.all, 'card-stats'] as const,
     actionForm: (id: number) => [...bankGuaranteesKey.all, 'action-form', id] as const,
     followup: (id: number) => [...bankGuaranteesKey.all, 'followup', id] as const,
+    approvals: (filters?: Record<string, unknown>) => [...bankGuaranteesKey.all, 'approvals', { filters }] as const,
+    approvalDetail: (instrumentId: number) => [...bankGuaranteesKey.all, 'approval-detail', instrumentId] as const,
 };
 
 export const useBankGuaranteeDashboard = (
@@ -132,6 +134,54 @@ export const useBGMailPreview = (
     });
 };
 
+export const useGenerateBankGuaranteePrefilledFormat = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, fdrNo }: { id: number; fdrNo: string }) =>
+            bankGuaranteesService.generatePrefilledFormat(id, fdrNo),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.detail(variables.id) });
+        },
+    });
+};
+
+export const useGenerateBankGuaranteeCoveringLetter = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({
+            id,
+            bgNo,
+            bgDate,
+        }: {
+            id: number;
+            bgNo?: string;
+            bgDate?: string;
+        }) => bankGuaranteesService.generateCoveringLetter(id, { bgNo, bgDate }),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.detail(variables.id) });
+        },
+    });
+};
+
+export const useGenerateBankGuaranteeAuthorizationLetter = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({
+            id,
+            persons,
+        }: {
+            id: number;
+            persons: Array<{ name: string; aadharNo: string }>;
+        }) => bankGuaranteesService.generateAuthorizationLetter(id, persons),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.detail(variables.id) });
+        },
+    });
+};
+
 export const useCreateBankGuaranteeOldBg = () => {
     const queryClient = useQueryClient();
 
@@ -193,6 +243,51 @@ export const useUpdateBankGuaranteeAction = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.all });
             queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.counts() });
+            queryClient.invalidateQueries({ queryKey: paymentRequestsKey.all });
+        },
+    });
+};
+
+export const useBgApprovalDetail = (instrumentId: number) => {
+    return useQuery({
+        queryKey: bankGuaranteesKey.approvalDetail(instrumentId),
+        queryFn: async () => {
+            const result = await bankGuaranteesService.getApprovalDetail(instrumentId);
+            return result;
+        },
+        enabled: !!instrumentId,
+    });
+};
+
+export const useActOnBgApproval = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({
+            instrumentId,
+            status,
+            remarks,
+        }: {
+            instrumentId: number;
+            status: 'APPROVED' | 'REJECTED' | 'INCOMPLETE';
+            remarks?: string;
+        }) => bankGuaranteesService.actOnApproval(instrumentId, { status, remarks }),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.all });
+            queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.approvalDetail(variables.instrumentId) });
+            queryClient.invalidateQueries({ queryKey: paymentRequestsKey.all });
+        },
+    });
+};
+
+export const useResubmitBgApproval = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (instrumentId: number) => bankGuaranteesService.resubmitApproval(instrumentId),
+        onSuccess: (_, instrumentId) => {
+            queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.all });
+            queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.approvalDetail(instrumentId) });
             queryClient.invalidateQueries({ queryKey: paymentRequestsKey.all });
         },
     });

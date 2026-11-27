@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <style>
+        * {
+            font-family: 'Calibri', 'Carlito', sans-serif;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            color: #000;
+            font-size: 12pt;
+        }
+
+        .page {
+            padding: 54pt 72pt;
+            box-sizing: border-box;
+        }
+
+        .heading {
+            margin: 0;
+            font-size: 16pt;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        .heading .ref {
+            font-weight: 700;
+        }
+
+        .to {
+            margin: 54pt 0 0 0;
+        }
+
+        .line {
+            margin: 0;
+            line-height: 1.15;
+            font-size: 12pt;
+        }
+
+        .name {
+            font-weight: 700;
+        }
+
+        .from {
+            margin: 46pt 0 0 430pt;
+        }
+
+        .from .line {
+            line-height: 1.25;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page">
+        <p class="heading">
+            {{#if submission_ref}}Fixed Deposit Receipt Against {{submission_label}} <span class="ref">{{submission_ref}}</span>{{else}}Fixed Deposit Receipt{{/if}}
+        </p>
+
+        <div class="to">
+            <p class="line">To,</p>
+            <p class="line name">{{to_name}}</p>
+            {{#each to_address_lines}}
+            <p class="line">{{this}}</p>
+            {{/each}}
+            {{#if contact_number}}
+            <p class="line">Contact Number: {{contact_number}}</p>
+            {{/if}}
+        </div>
+
+        <div class="from">
+            <p class="line">From:</p>
+            <p class="line name">Piyush Goyal</p>
+            <p class="line">Director &amp; CEO, Volks Energie Pvt Ltd,</p>
+            <p class="line">2<sup>nd</sup> Floor B1/D8, Mohan Cooperative Industrial Estate, New Delhi-110044</p>
+            <p class="line">Mob: +91 9650393636</p>
+        </div>
+    </div>
+</body>
+
+</html>

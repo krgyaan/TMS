@@ -7,10 +7,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { CompactFileUploader, FileUploader } from '@/components/file-upload';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, FileDown, FileText, Loader2 } from 'lucide-react';
 import { NumberInput } from '@/components/form/NumberInput';
 import DateInput from '@/components/form/DateInput';
 import { toFileArray } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
+import { fileUploadService } from '@/services/api/file-upload.service';
 
 const FDR_PERCENTAGE_OPTIONS = [
     { value: '10', label: '10%' },
@@ -119,6 +120,10 @@ interface AccountsForm1FieldsProps<T extends FieldValues> {
     disabled?: boolean;
     prefilledMode?: 'array' | 'single';
     fdrValueType?: 'auto' | 'string' | 'number';
+    onGeneratePrefilled?: () => void;
+    isGeneratingPrefilled?: boolean;
+    canGeneratePrefilled?: boolean;
+    prefilledPath?: string | null;
 }
 
 export function AccountsForm1Fields<T extends FieldValues>({
@@ -129,6 +134,10 @@ export function AccountsForm1Fields<T extends FieldValues>({
     disabled,
     prefilledMode = 'array',
     fdrValueType = 'auto',
+    onGeneratePrefilled,
+    isGeneratingPrefilled,
+    canGeneratePrefilled,
+    prefilledPath,
 }: AccountsForm1FieldsProps<T>) {
     const bgReq = useWatch({ control, name: names.bgReq });
     const approveBg = useWatch({ control, name: names.approveBg });
@@ -180,11 +189,48 @@ export function AccountsForm1Fields<T extends FieldValues>({
                     {names.fdrNo && (
                         <FieldWrapper control={control} name={names.fdrNo} label="FDR No. *">
                             {(field) => (
-                                <Input
-                                    {...field}
-                                    value={(field.value as string | undefined) ?? ''}
-                                    placeholder="Enter FDR number"
-                                />
+                                <div className="space-y-1">
+                                    <div className="flex gap-2">
+                                        <Input
+                                            {...field}
+                                            value={(field.value as string | undefined) ?? ''}
+                                            placeholder="Enter FDR number"
+                                            className="flex-1"
+                                        />
+                                        {onGeneratePrefilled && (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={onGeneratePrefilled}
+                                                disabled={
+                                                    disabled
+                                                    || isGeneratingPrefilled
+                                                    || !canGeneratePrefilled
+                                                }
+                                            >
+                                                {isGeneratingPrefilled ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                ) : (
+                                                    <FileDown className="h-4 w-4" />
+                                                )}
+                                                <span className="ml-1">Generate</span>
+                                            </Button>
+                                        )}
+                                    </div>
+                                    {prefilledPath && (
+                                        <a
+                                            href={fileUploadService.getFileUrl(prefilledPath)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            download
+                                            className="inline-flex items-center gap-1 text-sm font-medium text-primary underline"
+                                        >
+                                            <FileText className="h-4 w-4" />
+                                            Prefilled Format
+                                        </a>
+                                    )}
+                                </div>
                             )}
                         </FieldWrapper>
                     )}
@@ -294,25 +340,29 @@ export function AccountsForm1Fields<T extends FieldValues>({
                 )}
             </div>
 
-            <BankMailIdsFields<T>
-                control={control}
-                path={names.bankMailIds}
-                rows={bankMailIds}
-                heading="Bank Mail Ids"
-                placeholder="e.g., bank.manager@bank.com"
-                emptyText="No mail ids added. Click &quot;Add&quot; to add one."
-                removeLabel="Remove mail id"
-            />
+            {bgReq === 'Accepted' && (
+                <>
+                    <BankMailIdsFields<T>
+                        control={control}
+                        path={names.bankMailIds}
+                        rows={bankMailIds}
+                        heading="Bank Mail Ids"
+                        placeholder="e.g., bank.manager@bank.com"
+                        emptyText="No mail ids added. Click &quot;Add&quot; to add one."
+                        removeLabel="Remove mail id"
+                    />
 
-            <BankMailIdsFields<T>
-                control={control}
-                path={names.bankMailIdsCc}
-                rows={bankMailIdsCc}
-                heading="Bank Mail Ids CC"
-                placeholder="e.g., branch@bank.com"
-                emptyText="No CC mail ids added. Click &quot;Add&quot; to add one."
-                removeLabel="Remove CC mail id"
-            />
+                    <BankMailIdsFields<T>
+                        control={control}
+                        path={names.bankMailIdsCc}
+                        rows={bankMailIdsCc}
+                        heading="Bank Mail Ids CC"
+                        placeholder="e.g., branch@bank.com"
+                        emptyText="No CC mail ids added. Click &quot;Add&quot; to add one."
+                        removeLabel="Remove CC mail id"
+                    />
+                </>
+            )}
         </>
     );
 }

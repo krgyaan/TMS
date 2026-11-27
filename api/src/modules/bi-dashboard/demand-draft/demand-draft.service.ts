@@ -176,7 +176,7 @@ export class DemandDraftService {
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentDdDetails, eq(instrumentDdDetails.instrumentId, paymentInstruments.id))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
@@ -254,6 +254,7 @@ export class DemandDraftService {
                 reqNo: instrumentDdDetails.reqNo,
                 ddNeeds: instrumentDdDetails.ddNeeds,
                 ddPurpose: instrumentDdDetails.ddPurpose,
+                ddPurposeReason: instrumentDdDetails.ddPurposeReason,
                 ddRemarks: instrumentDdDetails.ddRemarks,
                 utr: paymentInstruments.utr,
                 issueDate: paymentInstruments.issueDate,
@@ -263,7 +264,7 @@ export class DemandDraftService {
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentDdDetails, eq(instrumentDdDetails.instrumentId, paymentInstruments.id))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
@@ -288,6 +289,7 @@ export class DemandDraftService {
             reqNo: row.reqNo,
             ddNeeds: row.ddNeeds,
             ddPurpose: row.ddPurpose,
+            ddPurposeReason: row.ddPurposeReason,
             ddRemarks: row.ddRemarks,
             utr: row.utr,
             issueDate: row.issueDate ? new Date(row.issueDate) : null,
@@ -607,6 +609,7 @@ export class DemandDraftService {
                 reqNo: instrumentDdDetails.reqNo,
                 ddNeeds: instrumentDdDetails.ddNeeds,
                 ddPurpose: instrumentDdDetails.ddPurpose,
+                ddPurposeReason: instrumentDdDetails.ddPurposeReason,
                 ddRemarks: instrumentDdDetails.ddRemarks,
                 ddDetailsCreatedAt: instrumentDdDetails.createdAt,
                 ddDetailsUpdatedAt: instrumentDdDetails.updatedAt,
@@ -676,6 +679,7 @@ export class DemandDraftService {
                 id: paymentInstruments.id,
                 action: paymentInstruments.action,
                 status: paymentInstruments.status,
+                rejectionReason: paymentInstruments.rejectionReason,
                 amount: paymentInstruments.amount,
                 favouring: paymentInstruments.favouring,
                 payableAt: paymentInstruments.payableAt,
@@ -698,6 +702,7 @@ export class DemandDraftService {
                 reqNo: instrumentDdDetails.reqNo,
                 ddNeeds: instrumentDdDetails.ddNeeds,
                 ddPurpose: instrumentDdDetails.ddPurpose,
+                ddPurposeReason: instrumentDdDetails.ddPurposeReason,
                 ddRemarks: instrumentDdDetails.ddRemarks,
                 tenderStatusName: statuses.name,
                 requestedByName: users.name,
@@ -779,6 +784,8 @@ export class DemandDraftService {
         return {
             id: result.id,
             action: result.action,
+            status: result.status,
+            rejectionReason: result.rejectionReason,
             ddStatus: this.deriveDdStatus(result.status),
             tenderNo: result.tenderNo,
             tenderName: result.tenderName,
@@ -796,6 +803,7 @@ export class DemandDraftService {
             reqNo: result.reqNo,
             ddNeeds: result.ddNeeds,
             ddPurpose: result.ddPurpose,
+            ddPurposeReason: result.ddPurposeReason,
             ddRemarks: result.ddRemarks,
             courierDetails,
             courierAddress: result.courierAddress,

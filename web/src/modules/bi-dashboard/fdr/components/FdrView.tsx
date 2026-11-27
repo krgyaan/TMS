@@ -186,13 +186,14 @@ export function FdrView({
         : deriveFdrStatus(data.fdrStatus || data.status, data.fdrNo);
     const hasAccountsFormData = data.hasAccountsFormData === true;
     const isAccountsFormRejected = (data.fdrStatus === 'ACCOUNTS_FORM_REJECTED' || data.status === 'ACCOUNTS_FORM_REJECTED');
-    const expiryStatus = data.fdrExpiryDate ? deriveFdrExpiryStatus(data.fdrExpiryDate) : data.expiryDate ? deriveFdrExpiryStatus(data.expiryDate) : null;
+    const expiryStatus = data.fdrValidity ? deriveFdrExpiryStatus(data.fdrValidity) : data.fdrExpiryDate ? deriveFdrExpiryStatus(data.fdrExpiryDate) : data.expiryDate ? deriveFdrExpiryStatus(data.expiryDate) : null;
     const roi = data.roi ?? data.fdrRoi;
     const bankMailIds = toDocList(data.bankMailIds);
     const bankMailIdsCc = toDocList(data.bankMailIdsCc);
     const prefilledSignedDocs = toDocList(data.prefilledSignedFdr);
     const uploadDocumentDocs = toDocList(data.uploadDocuments);
     const fdrCopyDocs = toDocList(data.fdrCopy);
+    const envelopeSlipDocs = toDocList(data.envelopeSlip);
 
     return (
         <Card className={className}>
@@ -385,6 +386,20 @@ export function FdrView({
                                                 {data.fdrDate ? formatDate(data.fdrDate) : '—'}
                                             </TableCell>
                                         </TableRow>
+                                        <TableRow className="hover:bg-muted/30 transition-colors">
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                FDR Expiry Date
+                                            </TableCell>
+                                            <TableCell className="text-sm">
+                                                {data.fdrExpiryDate ? formatDate(data.fdrExpiryDate) : '—'}
+                                            </TableCell>
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                FDR Validity
+                                            </TableCell>
+                                            <TableCell className="text-sm">
+                                                {data.fdrValidity ? formatDate(data.fdrValidity) : '—'}
+                                            </TableCell>
+                                        </TableRow>
                                         <FieldRow label="Courier Req No" value={data.reqNo} />
                                         <FieldRow label="UTR" value={data.utr} />
                                         <FieldRow
@@ -404,7 +419,7 @@ export function FdrView({
                         ) : null}
 
                         {/* Documents */}
-                        {(prefilledSignedDocs.length > 0 || uploadDocumentDocs.length > 0 || fdrCopyDocs.length > 0) && (
+                        {(prefilledSignedDocs.length > 0 || uploadDocumentDocs.length > 0 || fdrCopyDocs.length > 0 || envelopeSlipDocs.length > 0) && (
                             <>
                                 <SectionHeader title="Documents" icon={FileText} />
                                 <FieldRow
@@ -420,6 +435,11 @@ export function FdrView({
                                 <FieldRow
                                     label="FDR Copy"
                                     value={<DocumentLinks paths={fdrCopyDocs} />}
+                                    fullWidth
+                                />
+                                <FieldRow
+                                    label="Envelope Slip (Generated)"
+                                    value={<DocumentLinks paths={envelopeSlipDocs} />}
                                     fullWidth
                                 />
                             </>
