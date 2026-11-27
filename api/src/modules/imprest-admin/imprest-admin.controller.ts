@@ -106,16 +106,6 @@ export class ImprestAdminController {
         });
     }
 
-    @Get("voucher/proofs")
-    async getVoucherProofs(@Query("userId", ParseIntPipe) userId: number, @Query("year", ParseIntPipe) year: number, @Query("week", ParseIntPipe) week: number, @Req() req) {
-        return this.service.getVoucherProofs({
-            user: req.user,
-            userId,
-            year,
-            week,
-        });
-    }
-
     @Post("voucher/:id/account-approve")
     @CanUpdate("accounts.imprests")
     accountApprove(@Req() req, @Param("id") id: string, @Body() body: { remark?: string; approve?: boolean }) {

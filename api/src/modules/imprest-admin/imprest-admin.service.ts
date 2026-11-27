@@ -337,26 +337,6 @@ export class ImprestAdminService {
         const fyCondition = params?.fy ? sql`AND EXTRACT(YEAR FROM v.valid_from::date - INTERVAL '3 months') = ${params.fy}` : sql``;
 
         const selectSql = sql`
-                WITH proofs AS (
-                    SELECT
-                        vi.voucher_id,
-                        array_agg(DISTINCT proof)
-                            FILTER (WHERE proof IS NOT NULL) AS all_invoice_proofs
-                    FROM employee_imprest_voucher_items vi
-                    JOIN employee_imprests ei ON ei.id = vi.imprest_id
-                    CROSS JOIN LATERAL (
-                        SELECT
-                            jsonb_array_elements_text(
-                                CASE
-                                    WHEN jsonb_typeof(ei.invoice_proof) = 'array'
-                                    THEN ei.invoice_proof
-                                    ELSE '[]'::jsonb
-                                END
-                            ) AS proof
-                    ) p
-                    GROUP BY vi.voucher_id
-                )
-
                 SELECT
                     v.id AS "id",
                     v.voucher_code AS "voucherCode",
@@ -370,7 +350,6 @@ export class ImprestAdminService {
                     v.valid_to::date   AS "validTo",
 
                     v.amount AS "amount",
-                    pv.all_invoice_proofs AS "allInvoiceProofs",
 
                     v.accounts_signed_by,
                     v.admin_signed_by,
@@ -379,8 +358,6 @@ export class ImprestAdminService {
                 FROM employee_imprest_vouchers v
                 INNER JOIN users u
                     ON u.id = v.beneficiary_name::int
-                LEFT JOIN proofs pv
-                    ON pv.voucher_id = v.id
                 WHERE 1 = 1
                 ${whereSql}
                 ${searchCondition}
@@ -418,17 +395,6 @@ export class ImprestAdminService {
 
             amount: Number(r.amount),
 
-            proofs: (r.allInvoiceProofs ?? []).map((file: string, index: number) => {
-                const ext = file.split(".").pop()?.toLowerCase() ?? "";
-                return {
-                    id: index + 1,
-                    file,
-                    ext,
-                    type: ext === "pdf" ? "pdf" : "image",
-                    url: `/uploads/employee-imprest/${file}`,
-                };
-            }),
-
             accountantApproval: !!(r.accounts_signed_by && r.accounts_signed_by.trim()),
             adminApproval: !!(r.admin_signed_by && r.admin_signed_by.trim()),
 
@@ -460,31 +426,6 @@ export class ImprestAdminService {
                 tx
             )
         );
-    }
-
-    async getVoucherProofs({ user, userId, year, week }: { user: any; userId: number; year: number; week: number }) {
-        const rows = await this.db.execute(sql`
-        SELECT invoice_proof
-        FROM employee_imprests
-        WHERE user_id = ${userId}
-          AND EXTRACT(ISOYEAR FROM date_of_expense) = ${year}
-          AND EXTRACT(WEEK FROM date_of_expense) = ${week}
-    `);
-
-        const files = rows.rows.flatMap(r => (Array.isArray(r.invoice_proof) ? r.invoice_proof : [])).filter(Boolean);
-
-        const proofs = files.map((file: string, index: number) => {
-            const ext = file.split(".").pop()?.toLowerCase() ?? "";
-            return {
-                id: index + 1,
-                file,
-                ext,
-                type: ext === "pdf" ? "pdf" : "image",
-                url: `/uploads/employee-imprest/${file}`,
-            };
-        });
-
-        return { proofs };
     }
 
     private getFinancialYear() {
@@ -565,7 +506,7 @@ export class ImprestAdminService {
 
                 remark: employeeImprests.remark,
                 amount: employeeImprests.amount,
-                invoiceProof: employeeImprests.invoiceProof,
+                dateOfExpense: employeeImprests.dateOfExpense,
             })
             .from(employeeImprestVoucherItems)
             .innerJoin(employeeImprests, eq(employeeImprestVoucherItems.imprestId, employeeImprests.id))
@@ -584,19 +525,6 @@ export class ImprestAdminService {
             )
             .where(and(eq(employeeImprestVoucherItems.voucherId, voucher.id), eq(employeeImprests.approvalStatus, 1)))
             .orderBy(sql`${employeeImprests.dateOfExpense}, ${employeeImprests.id}`);
-
-        const proofFiles = items.flatMap(item => (Array.isArray(item.invoiceProof) ? item.invoiceProof : [])).filter(Boolean);
-
-        const proofs = proofFiles.map((file: string, index: number) => {
-            const ext = file.split(".").pop()?.toLowerCase() ?? "";
-            return {
-                id: index + 1,
-                file,
-                ext,
-                type: ext === "pdf" ? "pdf" : "image",
-                url: `/uploads/employee-imprest/${file}`,
-            };
-        });
 
         // Amount integrity: stored voucher.amount must equal the sum of the
         // linked approved imprests. Auto-correct unsigned vouchers (with a
@@ -644,8 +572,6 @@ export class ImprestAdminService {
                 adminSignedBy: voucher.adminSignedBy,
                 adminSignedAt: voucher.adminSignedAt,
                 adminRemark: voucher.adminRemark,
-
-                proofs,
             },
 
             items: items.map(item => ({
