@@ -37,7 +37,6 @@ export interface AccountsForm1Names<T extends FieldValues> {
     prefilledSignedBg: FieldPath<T>;
     bankMailIds: FieldPath<T>;
     bankMailIdsCc: FieldPath<T>;
-    authorizationPerson?: FieldPath<T>;
     bgApprovedFdrPer?: FieldPath<T>;
     fdrAmt?: FieldPath<T>;
     bgFormatImran?: FieldPath<T>;
@@ -125,11 +124,6 @@ interface AccountsForm1FieldsProps<T extends FieldValues> {
     isGeneratingPrefilled?: boolean;
     canGeneratePrefilled?: boolean;
     prefilledPath?: string | null;
-    employees?: Array<{ id: number | string; name: string }>;
-    onGenerateAuthorizationLetter?: () => void;
-    isGeneratingAuthorizationLetter?: boolean;
-    canGenerateAuthorizationLetter?: boolean;
-    authorizationPath?: string | null;
 }
 
 export function AccountsForm1Fields<T extends FieldValues>({
@@ -144,11 +138,6 @@ export function AccountsForm1Fields<T extends FieldValues>({
     isGeneratingPrefilled,
     canGeneratePrefilled,
     prefilledPath,
-    employees = [],
-    onGenerateAuthorizationLetter,
-    isGeneratingAuthorizationLetter,
-    canGenerateAuthorizationLetter,
-    authorizationPath,
 }: AccountsForm1FieldsProps<T>) {
     const bgReq = useWatch({ control, name: names.bgReq });
     const approveBg = useWatch({ control, name: names.approveBg });
@@ -373,79 +362,6 @@ export function AccountsForm1Fields<T extends FieldValues>({
                         removeLabel="Remove CC mail id"
                     />
                 </>
-            )}
-
-            {bgReq === 'Accepted' && names.authorizationPerson && (
-                <div className="space-y-4 pt-4">
-                    <div className="border-b pb-2">
-                        <h4 className="font-semibold text-base text-primary">Authorization</h4>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
-                        <div className="md:col-span-4">
-                            <SelectField
-                                control={control}
-                                name={`${names.authorizationPerson}.name` as FieldPath<T>}
-                                label="Name"
-                                options={employees.map((employee) => ({
-                                    value: employee.name,
-                                    label: employee.name,
-                                }))}
-                                placeholder="Select user"
-                                valueType="string"
-                            />
-                        </div>
-                        <div className="md:col-span-4">
-                            <FieldWrapper
-                                control={control}
-                                name={`${names.authorizationPerson}.aadhar_no` as FieldPath<T>}
-                                label="Aadhar No."
-                            >
-                                {(field) => (
-                                    <Input
-                                        {...field}
-                                        value={(field.value as string | undefined) ?? ''}
-                                        placeholder="Enter 12-digit Aadhar number"
-                                        inputMode="numeric"
-                                        maxLength={12}
-                                        onChange={(event) =>
-                                            field.onChange(event.target.value.replace(/\D/g, '').slice(0, 12))
-                                        }
-                                    />
-                                )}
-                            </FieldWrapper>
-                        </div>
-                        {onGenerateAuthorizationLetter && (
-                            <div className="md:col-span-4">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={onGenerateAuthorizationLetter}
-                                    disabled={isGeneratingAuthorizationLetter || !canGenerateAuthorizationLetter}
-                                >
-                                    {isGeneratingAuthorizationLetter ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                        <FileDown className="h-4 w-4" />
-                                    )}
-                                    <span className="ml-1">Generate</span>
-                                </Button>
-                            </div>
-                        )}
-                    </div>
-                    {authorizationPath && (
-                        <a
-                            href={fileUploadService.getFileUrl(authorizationPath)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            download
-                            className="inline-flex items-center gap-1 text-sm font-medium text-primary underline"
-                        >
-                            <FileText className="h-4 w-4" />
-                            Authorization Letter
-                        </a>
-                    )}
-                </div>
             )}
         </>
     );

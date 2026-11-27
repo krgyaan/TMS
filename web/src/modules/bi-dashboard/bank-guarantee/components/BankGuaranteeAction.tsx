@@ -5,12 +5,15 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { SelectField } from '@/components/form/SelectField';
+import { FieldWrapper } from '@/components/form/FieldWrapper';
+import { Input } from '@/components/ui/input';
+import { fileUploadService } from '@/services/api/file-upload.service';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BankGuaranteeActionFormSchema, type BankGuaranteeActionFormValues } from '../helpers/bankGuaranteeActionForm.schema';
 import { useUpdateBankGuaranteeAction, useBGActionFormData, useBGFollowupData, useGenerateBankGuaranteePrefilledFormat, useGenerateBankGuaranteeCoveringLetter, useGenerateBankGuaranteeAuthorizationLetter } from '@/hooks/api/useBankGuarantees';
 import { useUsers } from '@/hooks/api/useUsers';
 import type { Checkpoint } from '@/components/tendering/SubmissionChecklist';
-import { CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle, FileDown, FileText, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { AccountsForm1Fields } from './steps/AccountsForm1Fields';
@@ -194,6 +197,7 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
     const stage2BgUpload = useWatch({ control: form.control, name: 'bg_upload' });
     const stage3Sfms = useWatch({ control: form.control, name: 'sfms_conf' });
     const fdrNoValue = useWatch({ control: form.control, name: 'fdr_no' });
+    const bgReqValue = useWatch({ control: form.control, name: 'bg_req' });
     const authorizationPersonValue = useWatch({ control: form.control, name: 'authorization_person' });
 
     const bankMailIds = useFieldArray({ control: form.control, name: 'bank_mail_ids' });
@@ -513,14 +517,6 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
                                 isGeneratingPrefilled={generatePrefilledMutation.isPending}
                                 canGeneratePrefilled={Boolean(String(fdrNoValue ?? '').trim())}
                                 prefilledPath={generatedDocs.prefilled ?? formData?.prefilledAppDocx}
-                                employees={employees}
-                                onGenerateAuthorizationLetter={handleGenerateAuthorizationLetter}
-                                isGeneratingAuthorizationLetter={generateAuthorizationMutation.isPending}
-                                canGenerateAuthorizationLetter={
-                                    Boolean(String(authorizationPersonValue?.name ?? '').trim())
-                                    && /^\d{12}$/.test(String(authorizationPersonValue?.aadhar_no ?? '').trim())
-                                }
-                                authorizationPath={generatedDocs.authorization ?? formData?.authorizationLetterDocx}
                             />
                             <MailAttachmentPreview
                                 instrumentId={instrumentId}
@@ -653,6 +649,82 @@ export function BankGuaranteeAction({ instrumentId }: BankGuaranteeActionFormPro
                         </SectionCard>
                     )}
                 </fieldset>
+
+                {action === 'accounts-form-1' && bgReqValue === 'Accepted' && (
+                    <SectionCard title="Authorization">
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
+                                <div className="md:col-span-4">
+                                    <SelectField
+                                        control={form.control}
+                                        name="authorization_person.name"
+                                        label="Name"
+                                        options={employees.map((employee) => ({
+                                            value: employee.name,
+                                            label: employee.name,
+                                        }))}
+                                        placeholder="Select user"
+                                        valueType="string"
+                                    />
+                                </div>
+                                <div className="md:col-span-4">
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name="authorization_person.aadhar_no"
+                                        label="Aadhar No."
+                                    >
+                                        {(field) => (
+                                            <Input
+                                                {...field}
+                                                value={(field.value as string | undefined) ?? ''}
+                                                placeholder="Enter 12-digit Aadhar number"
+                                                inputMode="numeric"
+                                                maxLength={12}
+                                                onChange={(event) =>
+                                                    field.onChange(event.target.value.replace(/\D/g, '').slice(0, 12))
+                                                }
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                </div>
+                                <div className="md:col-span-4">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleGenerateAuthorizationLetter}
+                                        disabled={
+                                            generateAuthorizationMutation.isPending
+                                            || !String(authorizationPersonValue?.name ?? '').trim()
+                                            || !/^\d{12}$/.test(String(authorizationPersonValue?.aadhar_no ?? '').trim())
+                                        }
+                                    >
+                                        {generateAuthorizationMutation.isPending ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <FileDown className="h-4 w-4" />
+                                        )}
+                                        <span className="ml-1">Generate</span>
+                                    </Button>
+                                </div>
+                            </div>
+                            {(generatedDocs.authorization ?? formData?.authorizationLetterDocx) && (
+                                <a
+                                    href={fileUploadService.getFileUrl(
+                                        (generatedDocs.authorization ?? formData?.authorizationLetterDocx) as string,
+                                    )}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    download
+                                    className="inline-flex items-center gap-1 text-sm font-medium text-primary underline"
+                                >
+                                    <FileText className="h-4 w-4" />
+                                    Authorization Letter
+                                </a>
+                            )}
+                        </div>
+                    </SectionCard>
+                )}
 
                 <div className="flex justify-end gap-4 pt-4">
                     {courierDetailsIncomplete && (
