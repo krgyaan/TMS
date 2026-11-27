@@ -429,7 +429,7 @@ const BankGuaranteeApprovalPage = () => {
                         <Card>
                             <CardHeader className="pb-2">
                                 <CardTitle className="flex items-center justify-between text-sm">
-                                    <span>Current Decision</span>
+                                    <span>TL Review</span>
                                     <Badge variant={getStatusVariant(status)}>
                                         {STATUS_LABELS[status] || status}
                                     </Badge>
@@ -451,6 +451,45 @@ const BankGuaranteeApprovalPage = () => {
                                     <p className="text-xs font-medium text-muted-foreground">Reviewed At</p>
                                     <p>{approval.tlApprovedAt ? formatDateTime(approval.tlApprovedAt) : '—'}</p>
                                 </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {status === 'APPROVED' && approval.stage1 && (
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="flex items-center justify-between text-sm">
+                                    <span>
+                                        {approval.stage1.status === 'ACCEPTED'
+                                            ? 'BG Format Approved'
+                                            : 'BG Format Rejected'}
+                                    </span>
+                                    <Badge
+                                        variant={approval.stage1.status === 'ACCEPTED' ? 'success' : 'destructive'}
+                                    >
+                                        {approval.stage1.status === 'ACCEPTED' ? 'Approved' : 'Rejected'}
+                                    </Badge>
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3 text-sm">
+                                <div>
+                                    <p className="text-xs font-medium text-muted-foreground">
+                                        {approval.stage1.status === 'ACCEPTED' ? 'Approved By' : 'Rejected By'}
+                                    </p>
+                                    <p>{approval.stage1.name || '—'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs font-medium text-muted-foreground">
+                                        {approval.stage1.status === 'ACCEPTED' ? 'Approved At' : 'Rejected At'}
+                                    </p>
+                                    <p>{approval.stage1.at ? formatDateTime(approval.stage1.at) : '—'}</p>
+                                </div>
+                                {isFilled(approval.stage1.remarks) && (
+                                    <div>
+                                        <p className="text-xs font-medium text-muted-foreground">Remarks</p>
+                                        <p className="whitespace-pre-wrap">{approval.stage1.remarks}</p>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     )}

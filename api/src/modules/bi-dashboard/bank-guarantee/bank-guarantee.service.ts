@@ -2505,11 +2505,38 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             bgPo: row.bgPo,
         });
 
+        const [stage1] = await this.db
+            .select({
+                toStatus: instrumentStatusHistory.toStatus,
+                rejectionReason: instrumentStatusHistory.rejectionReason,
+                remarks: instrumentStatusHistory.remarks,
+                changedByName: instrumentStatusHistory.changedByName,
+                changedAt: instrumentStatusHistory.createdAt,
+            })
+            .from(instrumentStatusHistory)
+            .where(and(
+                eq(instrumentStatusHistory.instrumentId, instrumentId),
+                inArray(instrumentStatusHistory.toStatus, [
+                    'ACCOUNTS_FORM_ACCEPTED',
+                    'ACCOUNTS_FORM_REJECTED',
+                ]),
+            ))
+            .orderBy(desc(instrumentStatusHistory.id))
+            .limit(1);
+
         return {
             ...row,
             amount: row.amount ? Number(row.amount) : null,
             approvalTeam,
             ...supporting,
+            stage1: stage1
+                ? {
+                    status: stage1.toStatus === 'ACCOUNTS_FORM_ACCEPTED' ? 'ACCEPTED' : 'REJECTED',
+                    name: stage1.changedByName || null,
+                    at: stage1.changedAt,
+                    remarks: stage1.rejectionReason || stage1.remarks || null,
+                }
+                : null,
         };
     }
 
