@@ -53,6 +53,7 @@ export interface VoucherLineInput {
     categoryId: number | null;
     categoryName?: string | null;
     categoryBlocked?: boolean;
+    categoryOverride?: boolean;
     categoryLedger?: LedgerLink | null;
     projectCode: string | null;
     dateOfExpense: Date | string | null;
@@ -187,7 +188,7 @@ export function buildVoucherSnapshot(config: ImprestTallyConfig, voucher: Vouche
         if (line.categoryId === null) {
             categoryUsable = false;
             problems.push({ code: "MISSING_CATEGORY", message: `${label} has no category`, imprestId: line.imprestId });
-        } else if (line.categoryBlocked === true || isBlockedCategory(config, line.categoryId)) {
+        } else if (!line.categoryOverride && (line.categoryBlocked === true || isBlockedCategory(config, line.categoryId))) {
             categoryUsable = false;
             problems.push({
                 code: "BLOCKED_CATEGORY",

@@ -1,9 +1,10 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { DRIZZLE } from "@/db/database.module";
-import { employeeImprestVoucherItems, employeeImprestVouchers, employeeImprests, imprestCategories, projects, tallyLedgers, users } from "@/db/schemas";
+import { employeeImprestVoucherItems, employeeImprestVouchers, employeeImprests, imprestCategories, projects, tallyLedgers, teams, users } from "@/db/schemas";
 import type { DbInstance } from "@db";
 import { and, asc, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import { TallyValidationError } from "../errors/tally.errors";
+import { deriveCategoryContext, isBusinessDevelopmentTeam, resolveEntryLedger } from "../ledgers/category-ledger-resolver";
 import { IMPREST_TALLY_CONFIG, type ImprestTallyConfig } from "../mappings/imprest-tally.config";
 import { buildVoucherSnapshot, type LedgerLink, type VoucherLineInput, type VoucherSnapshot } from "./voucher-snapshot.builder";
 
@@ -17,12 +18,18 @@ interface EmployeeRow {
     id: number;
     name: string;
     imprestLedgerId: number | null;
+    team: number | null;
+    primaryTeamId: number | null;
+}
+
+interface ResolvedEmployeeRow extends EmployeeRow {
+    isBusinessDevelopment: boolean;
 }
 
 const BENEFICIARY_ID = sql<number | null>`CASE WHEN ${employeeImprestVouchers.beneficiaryName} ~ '^[0-9]+$' THEN ${employeeImprestVouchers.beneficiaryName}::int ELSE NULL END`;
 
-function toCategoryLedger(name: string | null, parent: string | null, active: boolean | null): LedgerLink | null {
-    return name === null ? null : { ledger: name, group: parent ?? "", active: active ?? false };
+function toCategoryLedger(ledger: { name: string; parent: string | null; isActive: boolean } | undefined): LedgerLink | null {
+    return ledger ? { ledger: ledger.name, group: ledger.parent ?? "", active: ledger.isActive } : null;
 }
 
 @Injectable()
@@ -55,7 +62,10 @@ export class ImprestVoucherSource {
 
         const employeeRowsPromise: Promise<EmployeeRow[]> =
             employeeIds.length > 0
-                ? this.db.select({ id: users.id, name: users.name, imprestLedgerId: users.imprestLedgerId }).from(users).where(inArray(users.id, employeeIds))
+                ? this.db
+                      .select({ id: users.id, name: users.name, imprestLedgerId: users.imprestLedgerId, team: users.team, primaryTeamId: users.primaryTeamId })
+                      .from(users)
+                      .where(inArray(users.id, employeeIds))
                 : Promise.resolve([]);
 
         const [employeeRows, lineRows] = await Promise.all([
@@ -68,36 +78,84 @@ export class ImprestVoucherSource {
                     categoryId: employeeImprests.categoryId,
                     categoryName: imprestCategories.name,
                     categoryBlocked: imprestCategories.tallyBlocked,
-                    categoryLedgerName: tallyLedgers.name,
-                    categoryLedgerParent: tallyLedgers.parent,
-                    categoryLedgerActive: tallyLedgers.isActive,
+                    categoryDefaultLedgerId: imprestCategories.tallyLedgerId,
+                    categoryProjectLedgerId: imprestCategories.projectLedgerId,
+                    categoryBdLedgerId: imprestCategories.businessDevelopmentLedgerId,
+                    projectId: employeeImprests.projectId,
+                    projectTeamName: projects.teamName,
                     projectCode: projects.projectCode,
                     dateOfExpense: employeeImprests.dateOfExpense,
                     approvalStatus: employeeImprests.approvalStatus,
+                    overrideLedgerId: employeeImprests.tallyLedgerId,
                 })
                 .from(employeeImprestVoucherItems)
                 .innerJoin(employeeImprests, eq(employeeImprests.id, employeeImprestVoucherItems.imprestId))
                 .leftJoin(projects, eq(projects.id, employeeImprests.projectId))
                 .leftJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
-                .leftJoin(tallyLedgers, eq(tallyLedgers.id, imprestCategories.tallyLedgerId))
                 .where(inArray(employeeImprestVoucherItems.voucherId, voucherIds))
                 .orderBy(asc(employeeImprestVoucherItems.voucherId), asc(employeeImprests.id)),
         ]);
 
-        const ledgerIds = [...new Set(employeeRows.map(row => row.imprestLedgerId).filter((id): id is number => id !== null))];
+        const teamIds = [...new Set(employeeRows.flatMap(row => [row.team, row.primaryTeamId]).filter((id): id is number => id !== null))];
+        const teamRows = teamIds.length > 0 ? await this.db.select({ id: teams.id, name: teams.name }).from(teams).where(inArray(teams.id, teamIds)) : [];
+        const teamNames = new Map(teamRows.map(team => [team.id, team.name] as const));
+
+        const employeesById = new Map<number, ResolvedEmployeeRow>(
+            employeeRows.map(row => {
+                const isBusinessDevelopment = [row.team, row.primaryTeamId].filter((id): id is number => id !== null).some(id => isBusinessDevelopmentTeam(teamNames.get(id)));
+
+                return [row.id, { ...row, isBusinessDevelopment }] as const;
+            })
+        );
+
+        const ledgerIds = new Set<number>();
+
+        for (const employee of employeeRows) {
+            if (employee.imprestLedgerId !== null) {
+                ledgerIds.add(employee.imprestLedgerId);
+            }
+        }
+
+        for (const row of lineRows) {
+            for (const id of [row.overrideLedgerId, row.categoryDefaultLedgerId, row.categoryProjectLedgerId, row.categoryBdLedgerId]) {
+                if (id !== null) {
+                    ledgerIds.add(id);
+                }
+            }
+        }
+
         const ledgerRows =
-            ledgerIds.length > 0
+            ledgerIds.size > 0
                 ? await this.db
                       .select({ id: tallyLedgers.id, name: tallyLedgers.name, parent: tallyLedgers.parent, isActive: tallyLedgers.isActive })
                       .from(tallyLedgers)
-                      .where(inArray(tallyLedgers.id, ledgerIds))
+                      .where(inArray(tallyLedgers.id, [...ledgerIds]))
                 : [];
 
-        const employeesById = new Map(employeeRows.map(row => [row.id, row] as const));
         const ledgersById = new Map(ledgerRows.map(row => [row.id, row] as const));
+        const voucherById = new Map(vouchers.map(voucher => [voucher.voucherId, voucher] as const));
         const linesByVoucher = new Map<number, VoucherLineInput[]>();
 
         for (const row of lineRows) {
+            const voucher = voucherById.get(row.voucherId);
+            const employee = voucher?.employeeId != null ? employeesById.get(voucher.employeeId) : undefined;
+            const context = deriveCategoryContext({
+                projectId: row.projectId,
+                projectTeamName: row.projectTeamName,
+                employeeIsBusinessDevelopment: employee?.isBusinessDevelopment ?? false,
+            });
+            const resolution = resolveEntryLedger({
+                overrideLedgerId: row.overrideLedgerId,
+                category: {
+                    defaultLedgerId: row.categoryDefaultLedgerId,
+                    projectLedgerId: row.categoryProjectLedgerId,
+                    businessDevelopmentLedgerId: row.categoryBdLedgerId,
+                    blocked: row.categoryBlocked ?? false,
+                },
+                context,
+            });
+            const finalLedger = resolution.finalLedgerId !== null ? ledgersById.get(resolution.finalLedgerId) : undefined;
+
             const lines = linesByVoucher.get(row.voucherId) ?? [];
 
             lines.push({
@@ -106,7 +164,8 @@ export class ImprestVoucherSource {
                 categoryId: row.categoryId,
                 categoryName: row.categoryName,
                 categoryBlocked: row.categoryBlocked ?? false,
-                categoryLedger: toCategoryLedger(row.categoryLedgerName, row.categoryLedgerParent, row.categoryLedgerActive),
+                categoryOverride: resolution.source === "manual",
+                categoryLedger: toCategoryLedger(finalLedger),
                 projectCode: row.projectCode,
                 dateOfExpense: row.dateOfExpense,
                 approvalStatus: row.approvalStatus,
@@ -126,7 +185,7 @@ export class ImprestVoucherSource {
                 voucherCode: voucher.voucherCode,
                 employeeId: voucher.employeeId,
                 employeeName: employee?.name ?? null,
-                employeeLedger: linkedLedger ? { ledger: linkedLedger.name, group: linkedLedger.parent ?? "", active: linkedLedger.isActive } : null,
+                employeeLedger: toCategoryLedger(linkedLedger),
                 amount: voucher.amount,
                 validFrom: voucher.validFrom,
                 validTo: voucher.validTo,

@@ -8,6 +8,8 @@ const CreateImprestCategorySchema = z.object({
     heading: z.string().max(100).optional(),
     status: z.boolean().optional().default(true),
     tallyLedgerId: z.number().int().positive().nullable().optional(),
+    projectLedgerId: z.number().int().positive().nullable().optional(),
+    businessDevelopmentLedgerId: z.number().int().positive().nullable().optional(),
     tallyBlocked: z.boolean().optional(),
 });
 

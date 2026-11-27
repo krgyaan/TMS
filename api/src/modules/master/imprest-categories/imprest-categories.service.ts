@@ -18,6 +18,8 @@ const CATEGORY_SELECTION = {
     heading: imprestCategories.heading,
     status: imprestCategories.status,
     tallyLedgerId: imprestCategories.tallyLedgerId,
+    projectLedgerId: imprestCategories.projectLedgerId,
+    businessDevelopmentLedgerId: imprestCategories.businessDevelopmentLedgerId,
     tallyBlocked: imprestCategories.tallyBlocked,
     createdAt: imprestCategories.createdAt,
     updatedAt: imprestCategories.updatedAt,
@@ -55,6 +57,8 @@ export class ImprestCategoriesService {
 
     async create(data: NewImprestCategory): Promise<ImprestCategory> {
         await this.assertTallyLedger(data.tallyLedgerId);
+        await this.assertTallyLedger(data.projectLedgerId);
+        await this.assertTallyLedger(data.businessDevelopmentLedgerId);
 
         const rows = await this.db.insert(imprestCategories).values(data).returning();
         return rows[0];
@@ -62,6 +66,8 @@ export class ImprestCategoriesService {
 
     async update(id: number, data: Partial<NewImprestCategory>): Promise<ImprestCategory> {
         await this.assertTallyLedger(data.tallyLedgerId);
+        await this.assertTallyLedger(data.projectLedgerId);
+        await this.assertTallyLedger(data.businessDevelopmentLedgerId);
 
         const rows = await this.db
             .update(imprestCategories)
