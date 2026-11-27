@@ -2,7 +2,16 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { toast } from "sonner";
 import { imprestService } from "@/services/api";
 import type { CreateImprestCreditPayload, EmployeeImprestSummary } from "@/modules/imprest/helpers/imprest-admin.types";
-import type { EmployeeImprestDashboard, EmployeeImprestTransactionRow, ImprestPaymentHistoryRow, ImprestVoucherListResponse, UpdateImprestPayload } from "@/modules/imprest/helpers/imprest.types";
+import type {
+    EmployeeImprestDashboard,
+    EmployeeImprestTransactionRow,
+    ImprestPaymentHistoryRow,
+    ImprestVoucherListResponse,
+    LedgerOption,
+    UpdateImprestPayload,
+    VoucherLedgerReview,
+    VoucherLedgerSaveEntry,
+} from "@/modules/imprest/helpers/imprest.types";
 
 /** Shared helper: extract a human-friendly message + optional status from an axios-like error. */
 const extractError = (err: unknown): { status?: number; message: string } => {
@@ -39,6 +48,12 @@ export const imprestVoucherKeys = {
     root: ["imprest-vouchers"] as const,
     list: (userId?: number) => [...imprestVoucherKeys.root, "list", userId ?? "all"] as const,
     detail: (params: { userId: number; from: string; to: string }) => [...imprestVoucherKeys.root, "detail", params] as const,
+};
+
+export const imprestVoucherLedgerKeys = {
+    root: ["imprest-voucher-ledgers"] as const,
+    review: (voucherId: number) => [...imprestVoucherLedgerKeys.root, "review", voucherId] as const,
+    options: (query: string) => [...imprestVoucherLedgerKeys.root, "options", query] as const,
 };
 
 export const imprestPaymentHistoryKeys = {
@@ -356,6 +371,41 @@ export const useEmployeeImprestSummary = () => {
     return useQuery<EmployeeImprestSummary[]>({
         queryKey: imprestSummaryKeys.root,
         queryFn: () => imprestService.getSummary(),
+    });
+};
+
+/* ---------------- VOUCHER LEDGER REVIEW ---------------- */
+
+export const useVoucherLedgerReview = (voucherId?: number) => {
+    return useQuery<VoucherLedgerReview>({
+        queryKey: imprestVoucherLedgerKeys.review(voucherId ?? 0),
+        queryFn: () => imprestService.getVoucherLedgerReview(voucherId!),
+        enabled: typeof voucherId === "number" && voucherId > 0,
+    });
+};
+
+export const useSaveVoucherLedgers = (voucherId: number) => {
+    const qc = useQueryClient();
+
+    return useMutation({
+        mutationFn: (entries: VoucherLedgerSaveEntry[]) => imprestService.saveVoucherLedgers(voucherId, entries),
+        onSuccess: data => {
+            qc.setQueryData(imprestVoucherLedgerKeys.review(voucherId), data);
+            toast.success("Tally ledgers saved");
+        },
+        onError: (err: unknown) => {
+            const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+            toast.error(message || "Failed to save Tally ledgers");
+        },
+    });
+};
+
+export const useLedgerOptions = (query: string, enabled: boolean) => {
+    return useQuery<LedgerOption[]>({
+        queryKey: imprestVoucherLedgerKeys.options(query),
+        queryFn: () => imprestService.searchLedgerOptions(query),
+        enabled,
+        staleTime: 30_000,
     });
 };
 

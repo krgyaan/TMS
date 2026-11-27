@@ -11,7 +11,7 @@ import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import type { ColDef } from "ag-grid-community";
-import { ArrowLeft, Eye } from "lucide-react";
+import { ArrowLeft, Eye, Tags } from "lucide-react";
 import React, { useMemo } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { ImprestVoucherRow } from "./helpers/imprest.types";
@@ -135,14 +135,29 @@ const ImprestVoucherList: React.FC = () => {
             },
             {
                 headerName: "",
-                width: 80,
-                maxWidth: 80,
+                width: 120,
+                maxWidth: 120,
                 cellRenderer: (p: { data: ImprestVoucherRow }) => (
-                    <Button variant="default" size="sm" 
-                        onClick={() => navigate(isAccountsSection ? paths.accounts.imprestsVoucherView({userId: Number(p.data.beneficiaryId), from: p.data.validFrom, to: p.data.validTo}) : paths.shared.imprestVoucherView({userId: Number(p.data.beneficiaryId), from: p.data.validFrom, to: p.data.validTo}))}
-                    >
-                        <Eye className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                        <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() =>
+                                navigate(
+                                    isAccountsSection
+                                        ? paths.accounts.imprestsVoucherView({ userId: Number(p.data.beneficiaryId), from: p.data.validFrom, to: p.data.validTo })
+                                        : paths.shared.imprestVoucherView({ userId: Number(p.data.beneficiaryId), from: p.data.validFrom, to: p.data.validTo })
+                                )
+                            }
+                        >
+                            <Eye className="h-4 w-4" />
+                        </Button>
+                        {isAccountsSection && (
+                            <Button variant="outline" size="sm" title="Tally ledger review" onClick={() => navigate(paths.accounts.imprestsVoucherLedgerReview(p.data.id))}>
+                                <Tags className="h-4 w-4" />
+                            </Button>
+                        )}
+                    </div>
                 ),
             },
         ],

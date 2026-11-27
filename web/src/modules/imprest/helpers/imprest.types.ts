@@ -89,6 +89,80 @@ export type ImprestVoucherView = {
     }[];
 };
 
+export type VoucherLedgerContext = "default" | "project" | "business_development";
+
+export interface VoucherLedgerInfo {
+    id: number;
+    name: string;
+    parent: string | null;
+    isActive: boolean;
+}
+
+export interface VoucherLedgerReviewItem {
+    id: number;
+    categoryId: number | null;
+    category: string | null;
+    projectId: number | null;
+    projectName: string | null;
+    projectCode: string | null;
+    projectTeam: string | null;
+    remark: string | null;
+    amount: number;
+    dateOfExpense: string | null;
+    context: VoucherLedgerContext;
+    autoLedger: VoucherLedgerInfo | null;
+    overrideLedger: VoucherLedgerInfo | null;
+    finalLedger: VoucherLedgerInfo | null;
+    candidates: VoucherLedgerInfo[];
+    ledgerSource: "auto" | "manual";
+    tallyLedgerId: number | null;
+    blocked: boolean;
+    problem: "BLOCKED" | "UNMAPPED" | "INACTIVE" | null;
+    reviewedBy: number | null;
+    reviewedAt: string | null;
+    ledgerNote: string | null;
+}
+
+export interface VoucherLedgerReview {
+    voucher: {
+        id: number;
+        voucherCode: string;
+        beneficiaryId: number;
+        employeeName: string | null;
+        teamName: string | null;
+        amount: number;
+        validFrom: string;
+        validTo: string;
+        accountsSignedBy: string | null;
+        accountsSignedAt: string | null;
+        adminSignedBy: string | null;
+        adminSignedAt: string | null;
+    };
+    items: VoucherLedgerReviewItem[];
+    editable: boolean;
+    lockReason: string | null;
+    summary: {
+        total: number;
+        auto: number;
+        manual: number;
+        blocked: number;
+        unmapped: number;
+        inactive: number;
+    };
+}
+
+export interface VoucherLedgerSaveEntry {
+    imprestId: number;
+    ledgerId: number | null;
+    note?: string | null;
+}
+
+export interface LedgerOption {
+    id: number;
+    name: string;
+    parent: string | null;
+}
+
 export interface EmployeeImprestDashboardSummaryDto {
     userName: string;
     amountSpent: number;
