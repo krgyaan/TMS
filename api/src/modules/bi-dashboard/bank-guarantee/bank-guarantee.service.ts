@@ -24,6 +24,7 @@ import {
     paymentRequests,
 } from '@db/schemas/tendering/payment-requests.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { woBasicDetails } from '@db/schemas/operations/work-order.schema';
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, desc, eq, inArray, isNull, like, ne, or, sql } from 'drizzle-orm';
 
@@ -2336,6 +2337,97 @@ private readBodyFileValue(body: unknown, field: string): unknown {
         return wrapPaginatedResponse(data, total, page, limit);
     }
 
+    private toBgDocumentPaths(value?: string | null): string[] {
+        if (!value || typeof value !== 'string' || value.trim().length === 0) {
+            return [];
+        }
+        const trimmed = value.trim();
+        if (trimmed.includes('[object File]')) {
+            return [];
+        }
+        if (trimmed.startsWith('[')) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                const list = Array.isArray(parsed) ? parsed : [parsed];
+                return list.filter((path): path is string => typeof path === 'string' && path.trim().length > 0);
+            } catch {
+                return [trimmed];
+            }
+        }
+        return [trimmed];
+    }
+
+    private parseBgTenderMainDoc(raw?: string | null): string | null {
+        if (!raw || !raw.trim()) return null;
+        const trimmed = raw.trim();
+        try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) {
+                const first = parsed.find((path) => typeof path === 'string' && path.trim().length > 0);
+                return typeof first === 'string' ? first.trim() : null;
+            }
+            if (parsed && typeof parsed === 'object') {
+                const main = (parsed as Record<string, any>).mainTender;
+                return typeof main === 'string' && main.trim().length > 0 ? main.trim() : null;
+            }
+        } catch {
+            return trimmed;
+        }
+        return trimmed;
+    }
+
+    private async resolveBgSupportingDocuments(request: {
+        projectId?: number | null;
+        tenderId?: number | null;
+        bgPo?: string | null;
+    }) {
+        const uploaded = this.toBgDocumentPaths(request.bgPo);
+
+        if (request.projectId) {
+            const [project] = await this.db
+                .select({ woBasicDetailId: projects.woBasicDetailId })
+                .from(projects)
+                .where(eq(projects.id, Number(request.projectId)))
+                .limit(1);
+            if (project?.woBasicDetailId) {
+                const [woBasic] = await this.db
+                    .select({ woDraft: woBasicDetails.woDraft })
+                    .from(woBasicDetails)
+                    .where(eq(woBasicDetails.id, project.woBasicDetailId))
+                    .limit(1);
+                const woDraftPaths = this.toBgDocumentPaths(woBasic?.woDraft);
+                if (woDraftPaths.length > 0) {
+                    return {
+                        supportingDocuments: woDraftPaths,
+                        supportingDocumentLabel: 'WO Document',
+                    };
+                }
+            }
+            return {
+                supportingDocuments: uploaded,
+                supportingDocumentLabel: 'WO Document',
+            };
+        }
+
+        if (request.tenderId) {
+            const [tender] = await this.db
+                .select({ documents: tenderInfos.documents })
+                .from(tenderInfos)
+                .where(eq(tenderInfos.id, Number(request.tenderId)))
+                .limit(1);
+            const mainDoc = this.parseBgTenderMainDoc(tender?.documents);
+            return {
+                supportingDocuments: mainDoc ? [mainDoc] : uploaded,
+                supportingDocumentLabel: 'Tender Document',
+            };
+        }
+
+        return {
+            supportingDocuments: uploaded,
+            supportingDocumentLabel: 'Supporting Document',
+        };
+    }
+
     async getBgApprovalDetail(instrumentId: number) {
         const [row] = await this.db
             .select({
@@ -2359,6 +2451,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 bgExpiryDate: instrumentBgDetails.bgExpiryDate,
                 bgClaim: instrumentBgDetails.bgClaim,
                 stampCharges: instrumentBgDetails.stampCharges,
+                bgPo: instrumentBgDetails.bgPo,
                 tlApprovalStatus: instrumentBgDetails.tlApprovalStatus,
                 tlApprovalRemarks: instrumentBgDetails.tlApprovalRemarks,
                 tlRejectedRemarks: instrumentBgDetails.tlRejectedRemarks,
@@ -2389,23 +2482,17 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             tenderId: row.tenderId,
             requestedBy: row.requestedBy,
         });
-        const requestDetails = await this.getById(row.requestId);
-
-        return {
-            ...requestDetails,
-            instrumentId: row.instrumentId,
-            requestId: row.requestId,
+        const supporting = await this.resolveBgSupportingDocuments({
             projectId: row.projectId,
             tenderId: row.tenderId,
-            requestedBy: row.requestedBy,
-            requestedByName: row.requestedByName,
+            bgPo: row.bgPo,
+        });
+
+        return {
+            ...row,
+            amount: row.amount ? Number(row.amount) : null,
             approvalTeam,
-            tlApprovalStatus: row.tlApprovalStatus,
-            tlApprovalRemarks: row.tlApprovalRemarks,
-            tlRejectedRemarks: row.tlRejectedRemarks,
-            tlIncompleteRemarks: row.tlIncompleteRemarks,
-            tlApprovedBy: row.tlApprovedBy,
-            tlApprovedAt: row.tlApprovedAt,
+            ...supporting,
         };
     }
 
