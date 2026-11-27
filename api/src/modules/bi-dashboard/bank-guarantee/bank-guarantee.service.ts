@@ -1575,6 +1575,16 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 .catch((error) =>
                     this.logger.error(`BG bank request email failed for instrument ${instrumentId}:`, error),
                 );
+            void this.operationNotification.notifyBgAccountsApproved(instrumentId, {
+                actorName: user?.name ?? null,
+            });
+        }
+
+        if (body.action === 'accounts-form-1' && body.bg_req === 'Rejected') {
+            void this.operationNotification.notifyBgAccountsRejected(instrumentId, {
+                actorName: user?.name ?? null,
+                remarks: body.reason_req || null,
+            });
         }
 
         if (body.action === 'accounts-form-2') {

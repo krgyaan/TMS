@@ -772,6 +772,63 @@ export class OperationNotificationService {
     }
   }
 
+  async notifyBgAccountsApproved(
+    instrumentId: number,
+    data: { actorName?: string | null } = {},
+  ): Promise<void> {
+    try {
+      const ctx = await this.loadBgWhatsAppContext(instrumentId);
+      if (!ctx) return;
+
+      const heading = data.actorName
+        ? `*BG Approved* @${data.actorName}`
+        : `*BG Approved*`;
+
+      const lines: string[] = [
+        heading,
+        ...this.buildBgWhatsAppLines(ctx.row),
+      ];
+
+      if (ctx.url) {
+        lines.push(`View in TMS: ${ctx.url}`);
+      }
+
+      await this.sendBgWhatsAppMessage(instrumentId, ctx.group, lines);
+    } catch (err) {
+      this.logger.warn(`Failed to send BG accounts-approved notification: ${err}`);
+    }
+  }
+
+  async notifyBgAccountsRejected(
+    instrumentId: number,
+    data: { actorName?: string | null; remarks?: string | null } = {},
+  ): Promise<void> {
+    try {
+      const ctx = await this.loadBgWhatsAppContext(instrumentId);
+      if (!ctx) return;
+
+      const heading = data.actorName
+        ? `*BG Rejected* @${data.actorName}`
+        : `*BG Rejected*`;
+
+      const lines: string[] = [
+        heading,
+        ...this.buildBgWhatsAppLines(ctx.row),
+      ];
+
+      if (data.remarks?.trim()) {
+        lines.push(`Remarks: ${data.remarks.trim()}`);
+      }
+      if (ctx.url) {
+        lines.push(`View in TMS: ${ctx.url}`);
+      }
+
+      await this.sendBgWhatsAppMessage(instrumentId, ctx.group, lines);
+    } catch (err) {
+      this.logger.warn(`Failed to send BG accounts-rejected notification: ${err}`);
+    }
+  }
+
   async notifyBgUpdated(
     instrumentId: number,
     data: { updatedByName?: string | null } = {},
