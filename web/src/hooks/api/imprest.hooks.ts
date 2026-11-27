@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { imprestService } from "@/services/api";
 import type { CreateImprestCreditPayload, EmployeeImprestSummary } from "@/modules/imprest/helpers/imprest-admin.types";
@@ -7,7 +7,7 @@ import type {
     EmployeeImprestTransactionRow,
     ImprestPaymentHistoryRow,
     ImprestVoucherListResponse,
-    LedgerOption,
+    LedgerOptionsPage,
     UpdateImprestPayload,
     VoucherLedgerReview,
     VoucherLedgerSaveEntry,
@@ -400,10 +400,16 @@ export const useSaveVoucherLedgers = (voucherId: number) => {
     });
 };
 
-export const useLedgerOptions = (query: string, enabled: boolean) => {
-    return useQuery<LedgerOption[]>({
+export const useInfiniteLedgerOptions = (query: string, enabled: boolean) => {
+    return useInfiniteQuery<LedgerOptionsPage>({
         queryKey: imprestVoucherLedgerKeys.options(query),
-        queryFn: () => imprestService.searchLedgerOptions(query),
+        queryFn: ({ pageParam }) => imprestService.searchLedgerOptions({ q: query, page: Number(pageParam), limit: 50 }),
+        initialPageParam: 1,
+        getNextPageParam: lastPage => {
+            const loaded = lastPage.page * lastPage.limit;
+
+            return loaded < lastPage.total ? lastPage.page + 1 : undefined;
+        },
         enabled,
         staleTime: 30_000,
     });

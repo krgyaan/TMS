@@ -121,8 +121,16 @@ export class ImprestAdminController {
 
     @Get("voucher/ledger-options")
     @CanRead("accounts.imprests")
-    async ledgerOptions(@Query("q") query?: string) {
-        return this.service.searchLedgerOptions(query);
+    async ledgerOptions(@Query() query: unknown) {
+        const parsed = z
+            .object({
+                q: z.string().trim().optional(),
+                page: z.coerce.number().int().min(1).optional(),
+                limit: z.coerce.number().int().min(1).max(200).optional(),
+            })
+            .parse(query);
+
+        return this.service.searchLedgerOptions(parsed);
     }
 
     @Get("voucher/:voucherId/ledger-review")

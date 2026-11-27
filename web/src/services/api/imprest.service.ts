@@ -7,7 +7,7 @@ import type {
     ImprestRow,
     ImprestVoucherListResponse,
     ImprestVoucherView,
-    LedgerOption,
+    LedgerOptionsPage,
     VoucherLedgerReview,
     VoucherLedgerSaveEntry,
 } from '@/modules/imprest/helpers/imprest.types';
@@ -124,13 +124,19 @@ class ImprestService extends BaseApiService {
         return this.put<VoucherLedgerReview>(`/voucher/${voucherId}/ledgers`, { entries });
     }
 
-    async searchLedgerOptions(query?: string): Promise<LedgerOption[]> {
+    async searchLedgerOptions(params?: { q?: string; page?: number; limit?: number }): Promise<LedgerOptionsPage> {
         const search = new URLSearchParams();
-        if (query?.trim()) {
-            search.set("q", query.trim());
+        if (params?.q?.trim()) {
+            search.set("q", params.q.trim());
+        }
+        if (params?.page !== undefined) {
+            search.set("page", String(params.page));
+        }
+        if (params?.limit !== undefined) {
+            search.set("limit", String(params.limit));
         }
         const qs = search.toString();
-        return this.get<LedgerOption[]>(`/voucher/ledger-options${qs ? `?${qs}` : ""}`);
+        return this.get<LedgerOptionsPage>(`/voucher/ledger-options${qs ? `?${qs}` : ""}`);
     }
 
     async accountApproveVoucher(payload: { id: number; remark?: string; approve: boolean }): Promise<unknown> {

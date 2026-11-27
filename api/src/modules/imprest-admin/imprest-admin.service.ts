@@ -1124,24 +1124,40 @@ export class ImprestAdminService {
         return this.loadVoucherLedgerReview(voucherId);
     }
 
-    async searchLedgerOptions(query?: string): Promise<Array<{ id: number; name: string; parent: string | null }>> {
+    async searchLedgerOptions(params: { q?: string; page?: number; limit?: number } = {}): Promise<{
+        data: Array<{ id: number; name: string; parent: string | null }>;
+        total: number;
+        page: number;
+        limit: number;
+    }> {
+        const page = Math.max(1, params.page ?? 1);
+        const limit = Math.min(200, Math.max(1, params.limit ?? 50));
         const company = this.getTallySettings().company;
 
         if (!company) {
-            return [];
+            return { data: [], total: 0, page, limit };
         }
 
-        const search = query?.trim();
+        const search = params.q?.trim();
         const where = search
             ? and(eq(tallyLedgers.company, company), eq(tallyLedgers.isActive, true), ilike(tallyLedgers.name, `%${search}%`))
             : and(eq(tallyLedgers.company, company), eq(tallyLedgers.isActive, true));
 
-        return this.db
-            .select({ id: tallyLedgers.id, name: tallyLedgers.name, parent: tallyLedgers.parent })
-            .from(tallyLedgers)
-            .where(where)
-            .orderBy(asc(tallyLedgers.name))
-            .limit(50);
+        const [data, totalRows] = await Promise.all([
+            this.db
+                .select({ id: tallyLedgers.id, name: tallyLedgers.name, parent: tallyLedgers.parent })
+                .from(tallyLedgers)
+                .where(where)
+                .orderBy(asc(tallyLedgers.name))
+                .limit(limit)
+                .offset((page - 1) * limit),
+            this.db
+                .select({ total: sql<number>`count(*)` })
+                .from(tallyLedgers)
+                .where(where),
+        ]);
+
+        return { data, total: Number(totalRows[0]?.total ?? 0), page, limit };
     }
 
     private async assertVoucherLedgersResolved(voucherId: number): Promise<void> {

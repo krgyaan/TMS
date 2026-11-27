@@ -163,6 +163,13 @@ export interface LedgerOption {
     parent: string | null;
 }
 
+export interface LedgerOptionsPage {
+    data: LedgerOption[];
+    total: number;
+    page: number;
+    limit: number;
+}
+
 export interface EmployeeImprestDashboardSummaryDto {
     userName: string;
     amountSpent: number;

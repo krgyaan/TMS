@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/contexts/AuthContext";
-import { useLedgerOptions, useSaveVoucherLedgers, useVoucherLedgerReview } from "@/hooks/api/imprest.hooks";
+import { useInfiniteLedgerOptions, useSaveVoucherLedgers, useVoucherLedgerReview } from "@/hooks/api/imprest.hooks";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
@@ -26,32 +26,38 @@ const PROBLEM_LABEL: Record<NonNullable<VoucherLedgerReviewItem["problem"]>, str
     INACTIVE: "Inactive ledger",
 };
 
+type LedgerDraft = { ledgerId: number | null; ledgerName: string | null };
+
 function LedgerPicker({
     value,
+    selectedName,
     candidates,
     autoLabel,
     disabled,
     onChange,
 }: {
     value: number | null;
+    selectedName: string | null;
     candidates: VoucherLedgerInfo[];
     autoLabel: string | null;
     disabled?: boolean;
-    onChange: (value: number | null) => void;
+    onChange: (value: number | null, name: string | null) => void;
 }) {
     const [open, setOpen] = React.useState(false);
     const [query, setQuery] = React.useState("");
     const debounced = useDebouncedSearch(query, 300);
-    const { data: options = [] } = useLedgerOptions(debounced, open && debounced.trim().length > 1);
+    const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteLedgerOptions(debounced, open);
+    const options = data?.pages.flatMap(page => page.data) ?? [];
+    const total = data?.pages[0]?.total ?? 0;
 
     const merged: Array<Pick<LedgerOption, "id" | "name" | "parent">> = [...candidates, ...options].filter(
         (option, index, all) => all.findIndex(candidate => candidate.id === option.id) === index
     );
     const selected = merged.find(option => option.id === value);
-    const label = value === null ? (autoLabel ? `Auto: ${autoLabel}` : "Auto") : (selected?.name ?? `Ledger #${value}`);
+    const label = value === null ? (autoLabel ? `Auto: ${autoLabel}` : "Auto") : (selectedName ?? selected?.name ?? `Ledger #${value}`);
 
-    const choose = (next: number | null) => {
-        onChange(next);
+    const choose = (next: number | null, name: string | null) => {
+        onChange(next, name);
         setOpen(false);
         setQuery("");
     };
@@ -65,31 +71,48 @@ function LedgerPicker({
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80 p-0" align="start">
-                <Command>
-                    <CommandInput placeholder="Search ledgers..." value={query} onValueChange={setQuery} />
+                <Command shouldFilter={false}>
+                    <CommandInput placeholder="Search all ledgers..." value={query} onValueChange={setQuery} />
                     <CommandList>
                         <CommandEmpty>No ledger found.</CommandEmpty>
                         <CommandGroup heading="Suggested">
-                            <CommandItem value="__auto__" onSelect={() => choose(null)}>
+                            <CommandItem value="__auto__" onSelect={() => choose(null, null)}>
                                 <Check className={value === null ? "mr-2 h-4 w-4 opacity-100" : "mr-2 h-4 w-4 opacity-0"} />
                                 Auto{autoLabel ? `: ${autoLabel}` : ""}
                             </CommandItem>
                             {candidates.map(candidate => (
-                                <CommandItem key={candidate.id} value={`${candidate.name} ${candidate.id}`} onSelect={() => choose(candidate.id)}>
+                                <CommandItem key={candidate.id} value={`${candidate.name} ${candidate.id}`} onSelect={() => choose(candidate.id, candidate.name)}>
                                     <Check className={value === candidate.id ? "mr-2 h-4 w-4 opacity-100" : "mr-2 h-4 w-4 opacity-0"} />
                                     <span className="truncate">{candidate.name}</span>
                                 </CommandItem>
                             ))}
                         </CommandGroup>
                         {options.length > 0 && (
-                            <CommandGroup heading="Search results">
-                                {options.map(option => (
-                                    <CommandItem key={option.id} value={`${option.name} ${option.id}`} onSelect={() => choose(option.id)}>
-                                        <Check className={value === option.id ? "mr-2 h-4 w-4 opacity-100" : "mr-2 h-4 w-4 opacity-0"} />
-                                        <span className="truncate">{option.name}</span>
-                                    </CommandItem>
-                                ))}
+                            <CommandGroup heading={`All ledgers${total > 0 ? ` — ${options.length} of ${total}` : ""}`}>
+                                {options
+                                    .filter(option => !candidates.some(candidate => candidate.id === option.id))
+                                    .map(option => (
+                                        <CommandItem key={option.id} value={`${option.name} ${option.id}`} onSelect={() => choose(option.id, option.name)}>
+                                            <Check className={value === option.id ? "mr-2 h-4 w-4 opacity-100" : "mr-2 h-4 w-4 opacity-0"} />
+                                            <span className="truncate">{option.name}</span>
+                                        </CommandItem>
+                                    ))}
                             </CommandGroup>
+                        )}
+                        {hasNextPage && (
+                            <div className="border-t p-2">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full"
+                                    disabled={isFetchingNextPage}
+                                    onClick={() => {
+                                        void fetchNextPage();
+                                    }}
+                                >
+                                    {isFetchingNextPage ? "Loading…" : `Load more (${Math.max(0, total - options.length)} remaining)`}
+                                </Button>
+                            </div>
                         )}
                     </CommandList>
                 </Command>
@@ -107,7 +130,7 @@ const VoucherLedgerReviewPage: React.FC = () => {
 
     const { data, isLoading, error } = useVoucherLedgerReview(voucherId);
     const saveMutation = useSaveVoucherLedgers(voucherId);
-    const [drafts, setDrafts] = React.useState<Record<number, number | null>>({});
+    const [drafts, setDrafts] = React.useState<Record<number, LedgerDraft>>({});
 
     React.useEffect(() => {
         setDrafts({});
@@ -143,13 +166,16 @@ const VoucherLedgerReviewPage: React.FC = () => {
 
     const voucher = data.voucher;
     const editable = data.editable && canEdit;
-    const currentValue = (item: VoucherLedgerReviewItem) => (Object.prototype.hasOwnProperty.call(drafts, item.id) ? drafts[item.id] : item.tallyLedgerId);
-    const changed = data.items.filter(item => Object.prototype.hasOwnProperty.call(drafts, item.id) && drafts[item.id] !== item.tallyLedgerId);
+    const hasDraft = (item: VoucherLedgerReviewItem) => Object.prototype.hasOwnProperty.call(drafts, item.id);
+    const currentValue = (item: VoucherLedgerReviewItem) => (hasDraft(item) ? drafts[item.id].ledgerId : item.tallyLedgerId);
+    const currentName = (item: VoucherLedgerReviewItem) =>
+        hasDraft(item) ? drafts[item.id].ledgerName : item.tallyLedgerId === null ? null : (item.overrideLedger?.name ?? null);
+    const changed = data.items.filter(item => hasDraft(item) && drafts[item.id].ledgerId !== item.tallyLedgerId);
 
     const save = () => {
         if (changed.length === 0) return;
         saveMutation.mutate(
-            changed.map(item => ({ imprestId: item.id, ledgerId: drafts[item.id] })),
+            changed.map(item => ({ imprestId: item.id, ledgerId: drafts[item.id].ledgerId })),
             { onSuccess: () => setDrafts({}) }
         );
     };
@@ -222,7 +248,8 @@ const VoucherLedgerReviewPage: React.FC = () => {
                         <tbody>
                             {data.items.map(item => {
                                 const value = currentValue(item);
-                                const dirty = Object.prototype.hasOwnProperty.call(drafts, item.id) && drafts[item.id] !== item.tallyLedgerId;
+                                const selectedName = currentName(item);
+                                const dirty = hasDraft(item) && drafts[item.id].ledgerId !== item.tallyLedgerId;
 
                                 return (
                                     <tr key={item.id} className="border-b align-top">
@@ -245,13 +272,14 @@ const VoucherLedgerReviewPage: React.FC = () => {
                                         <td className="p-2">
                                             <LedgerPicker
                                                 value={value}
+                                                selectedName={selectedName}
                                                 candidates={item.candidates}
                                                 autoLabel={item.autoLedger?.name ?? null}
                                                 disabled={!editable}
-                                                onChange={next =>
+                                                onChange={(next, name) =>
                                                     setDrafts(previous => ({
                                                         ...previous,
-                                                        [item.id]: next,
+                                                        [item.id]: { ledgerId: next, ledgerName: name },
                                                     }))
                                                 }
                                             />
