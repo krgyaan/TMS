@@ -3,6 +3,7 @@ import { followUpPersons } from '@/db/schemas/shared/follow-up-persons.schema';
 import { couriers } from '@/db/schemas/shared/couriers.schema';
 import { AppLogger } from '@/logger/app-logger.service';
 import { PaymentRequestsNotificationService } from '@/modules/tendering/payment-requests/services/payment-requests-notification.service';
+import { OperationNotificationService } from '@/modules/operations/operation-notification.service';
 import type { BankGuaranteeDashboardCounts, BankGuaranteeDashboardRow } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
 import type { CreateFollowUpDto } from '@/modules/follow-up/dto';
@@ -37,6 +38,7 @@ export class BankGuaranteeService {
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly followUpService: FollowUpService,
         private readonly paymentRequestsNotificationService: PaymentRequestsNotificationService,
+        private readonly operationNotification: OperationNotificationService,
     ) {
         this.logger = this.appLogger.withContext(BankGuaranteeService.name);
     }
@@ -2621,6 +2623,8 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 updatedAt: new Date(),
             })
             .where(eq(instrumentBgDetails.instrumentId, instrumentId));
+
+        await this.operationNotification.notifyBgCreated(instrumentId);
 
         return { instrumentId, requestId: result.request.id, tlApprovalStatus: 'PENDING' };
     }

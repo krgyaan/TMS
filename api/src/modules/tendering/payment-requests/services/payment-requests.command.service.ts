@@ -10,6 +10,7 @@ import { instrumentBgDetails, instrumentChequeDetails, instrumentDdDetails, inst
 import { paymentRequests as opsPaymentRequests } from '@db/schemas/operations/payment-requests.schema';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
 import { PaymentRequestService } from '@/modules/operations/payment-requests/payment-request.service';
+import { OperationNotificationService } from '@/modules/operations/operation-notification.service';
 import { and, desc, eq, like } from 'drizzle-orm';
 import type { CreateMomRemarkDto } from '../dto/payment-mom.dto';
 import type { CreatePaymentRequestDto, PaymentPurpose, UpdatePaymentRequestDto, UpdateStatusDto } from '../dto/payment-requests.dto';
@@ -29,6 +30,7 @@ export class PaymentRequestsCommandService {
         private readonly timersService: TimersService,
         @Inject(forwardRef(() => PaymentRequestService))
         private readonly paymentRequestService: PaymentRequestService,
+        private readonly operationNotification: OperationNotificationService,
     ) {
         this.logger = this.appLogger.withContext(PaymentRequestsCommandService.name);
     }
@@ -333,6 +335,7 @@ export class PaymentRequestsCommandService {
                     }
 
                     if (mode === 'BG') {
+                        await this.operationNotification.notifyBgCreated(instrument.id);
                         continue;
                     }
 
