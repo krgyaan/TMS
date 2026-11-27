@@ -342,6 +342,7 @@ export const instrumentBgDetails = pgTable('instrument_bg_details', {
     tlIncompleteRemarks: text('tl_incomplete_remarks'),
     tlApprovedBy: integer('tl_approved_by'),
     tlApprovedAt: timestamp('tl_approved_at', { withTimezone: true }),
+    updatedBy: integer('updated_by'),
 
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),

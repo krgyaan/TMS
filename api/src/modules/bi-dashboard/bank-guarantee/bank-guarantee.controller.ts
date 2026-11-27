@@ -127,8 +127,8 @@ export class BankGuaranteeController {
     }
 
     @Put('old-bg/:requestId')
-    async updateOldBg(@Param('requestId', ParseIntPipe) requestId: number, @Body() body: any) {
-        return this.bankGuaranteeService.updateOldBg(requestId, body);
+    async updateOldBg(@Param('requestId', ParseIntPipe) requestId: number, @Body() body: any, @Req() req: any) {
+        return this.bankGuaranteeService.updateOldBg(requestId, body, req.user);
     }
 
     @Put(':id')

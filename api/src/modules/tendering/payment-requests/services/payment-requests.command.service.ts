@@ -395,7 +395,7 @@ export class PaymentRequestsCommandService {
     // Update Methods
     // ============================================================================
 
-    async update(requestId: number, payload: UpdatePaymentRequestDto) {
+    async update(requestId: number, payload: UpdatePaymentRequestDto, user?: ValidatedUser) {
         this.logger.log(`Updating payment request: ${requestId}`);
         const [existing] = await this.db
             .select()
@@ -456,6 +456,23 @@ export class PaymentRequestsCommandService {
         });
 
         this.logger.log(`Payment request updated successfully: ${requestId}`);
+
+        for (const instrument of instruments) {
+            if (instrument.instrumentType === 'BG') {
+                await this.db
+                    .update(instrumentBgDetails)
+                    .set({
+                        updatedBy: user?.id ?? null,
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(instrumentBgDetails.instrumentId, instrument.id));
+
+                await this.operationNotification.notifyBgUpdated(instrument.id, {
+                    updatedByName: user?.name ?? null,
+                });
+            }
+        }
+
         return this.findById(requestId);
     }
 

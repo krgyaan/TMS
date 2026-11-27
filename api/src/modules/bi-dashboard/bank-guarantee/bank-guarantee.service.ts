@@ -1936,7 +1936,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
         };
     }
 
-    async updateOldBg(requestId: number, payload: Record<string, any>) {
+    async updateOldBg(requestId: number, payload: Record<string, any>, user?: any) {
         const purposeCode = String(payload?.purpose || '').trim();
         const bgNo = String(payload?.bgNo || '').trim();
         const bankName = String(payload?.bankName || '').trim();
@@ -2084,12 +2084,17 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                     sfmsConf: toFirstPath(payload?.sfmsConf),
                     fdrCopy: toFirstPath(payload?.fdrCopy),
                     bg2Remark: remarks,
+                    updatedBy: Number(user?.id ?? user?.sub ?? 0) || null,
                     updatedAt: new Date(),
                 })
                 .where(eq(instrumentBgDetails.instrumentId, instrument.id));
         });
 
         this.logger.log(`Old BG updated: request ${requestId}, instrument ${instrument.id} (BG No. ${bgNo})`);
+
+        await this.operationNotification.notifyBgUpdated(instrument.id, {
+            updatedByName: user?.name ?? null,
+        });
 
         return { requestId, instrumentId: instrument.id };
     }
@@ -2100,7 +2105,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             throw new ForbiddenException('User not identified');
         }
         const [actor] = await this.db
-            .select({ id: users.id, team: users.team, roleName: roles.name })
+            .select({ id: users.id, name: users.name, team: users.team, roleName: roles.name })
             .from(users)
             .leftJoin(roles, eq(roles.id, users.roleId))
             .where(eq(users.id, userId))
@@ -2567,6 +2572,15 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                     `Failed to send BG request mail after approval for instrument ${instrumentId}: ${error instanceof Error ? error.message : String(error)}`,
                 );
             }
+            await this.operationNotification.notifyBgApproved(instrumentId, {
+                actorName: actor.name,
+                remarks,
+            });
+        } else if (action === 'REJECTED') {
+            await this.operationNotification.notifyBgRejected(instrumentId, {
+                actorName: actor.name,
+                remarks,
+            });
         }
 
         return {

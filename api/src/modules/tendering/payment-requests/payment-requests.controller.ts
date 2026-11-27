@@ -146,9 +146,10 @@ export class PaymentRequestsController {
     async update(
         @Param('id', ParseIntPipe) id: number,
         @Body() body: unknown,
+        @CurrentUser() user: ValidatedUser,
     ) {
         const payload = UpdatePaymentRequestSchema.parse(body);
-        return this.commandService.update(id, payload);
+        return this.commandService.update(id, payload, user);
     }
 
     @Patch(':id/status')

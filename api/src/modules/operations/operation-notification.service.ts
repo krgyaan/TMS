@@ -625,77 +625,177 @@ export class OperationNotificationService {
     return fallbackUrl;
   }
 
+  private async loadBgWhatsAppContext(instrumentId: number) {
+    const [row] = await this.db
+      .select({
+        amount: paymentInstruments.amount,
+        requestId: paymentRequests.id,
+        projectId: paymentRequests.projectId,
+        tenderId: paymentRequests.tenderId,
+        projectName: paymentRequests.projectName,
+        tenderNo: paymentRequests.tenderNo,
+        requestedBy: paymentRequests.requestedBy,
+        requestedByName: users.name,
+        bgPurpose: instrumentBgDetails.bgPurpose,
+        beneficiaryName: instrumentBgDetails.beneficiaryName,
+        tenderName: tenderInfos.tenderName,
+      })
+      .from(paymentInstruments)
+      .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+      .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+      .leftJoin(tenderInfos, and(
+        eq(tenderInfos.id, paymentRequests.tenderId),
+        ne(paymentRequests.tenderId, 0),
+      ))
+      .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+      .where(and(
+        eq(paymentInstruments.id, instrumentId),
+        eq(paymentInstruments.instrumentType, 'BG'),
+      ))
+      .limit(1);
+
+    if (!row) {
+      this.logger.warn(`BG instrument ${instrumentId} not found for WhatsApp notification`);
+      return null;
+    }
+
+    const teamId = await this.resolveBgTeamId(row);
+    const group = this.resolveBgGroup(teamId);
+    if (!group) {
+      this.logger.warn(`No BG WhatsApp group mapped for team ${teamId ?? 'unknown'} — skipping instrument ${instrumentId}`);
+      return null;
+    }
+
+    const url = await this.buildDirectBgApprovalAppUrl(instrumentId);
+    return { row, group, url };
+  }
+
+  private buildBgWhatsAppLines(row: any): string[] {
+    const isProject = Number(row.projectId) > 0;
+    const projectOrTender = isProject
+      ? `Project: ${row.projectName || row.tenderNo || 'N/A'}`
+      : `Tender: ${[row.tenderNo, row.tenderName].filter(Boolean).join(' - ') || 'N/A'}`;
+
+    return [
+      `Purpose: ${formatBgPurposeLabel(row.bgPurpose)}`,
+      projectOrTender,
+      `Beneficiary: ${row.beneficiaryName || 'N/A'}`,
+      `Amount: ₹${row.amount ? Number(row.amount).toLocaleString('en-IN') : 'N/A'}`,
+    ];
+  }
+
+  private async sendBgWhatsAppMessage(instrumentId: number, group: string, lines: string[]): Promise<void> {
+    const text = lines.join('\n');
+    if (process.env.OPENWA_DRY_RUN === 'true') {
+      this.logger.log(`[DRY_RUN] BG WhatsApp for instrument ${instrumentId}:\n${text}`);
+      return;
+    }
+    await this.sendToTargets(text, { type: 'group', group });
+  }
+
   async notifyBgCreated(instrumentId: number): Promise<void> {
     try {
-      const [row] = await this.db
-        .select({
-          amount: paymentInstruments.amount,
-          requestId: paymentRequests.id,
-          projectId: paymentRequests.projectId,
-          tenderId: paymentRequests.tenderId,
-          projectName: paymentRequests.projectName,
-          tenderNo: paymentRequests.tenderNo,
-          requestedBy: paymentRequests.requestedBy,
-          requestedByName: users.name,
-          bgPurpose: instrumentBgDetails.bgPurpose,
-          beneficiaryName: instrumentBgDetails.beneficiaryName,
-          tenderName: tenderInfos.tenderName,
-        })
-        .from(paymentInstruments)
-        .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-        .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
-        .leftJoin(tenderInfos, and(
-          eq(tenderInfos.id, paymentRequests.tenderId),
-          ne(paymentRequests.tenderId, 0),
-        ))
-        .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
-        .where(and(
-          eq(paymentInstruments.id, instrumentId),
-          eq(paymentInstruments.instrumentType, 'BG'),
-        ))
-        .limit(1);
-
-      if (!row) {
-        this.logger.warn(`BG instrument ${instrumentId} not found for WhatsApp notification`);
-        return;
-      }
-
-      const teamId = await this.resolveBgTeamId(row);
-      const group = this.resolveBgGroup(teamId);
-      if (!group) {
-        this.logger.warn(`No BG WhatsApp group mapped for team ${teamId ?? 'unknown'} — skipping instrument ${instrumentId}`);
-        return;
-      }
-
-      const url = await this.buildDirectBgApprovalAppUrl(instrumentId);
-      const isProject = Number(row.projectId) > 0;
-      const projectOrTender = isProject
-        ? `Project: ${row.projectName || row.tenderNo || 'N/A'}`
-        : `Tender: ${[row.tenderNo, row.tenderName].filter(Boolean).join(' - ') || 'N/A'}`;
+      const ctx = await this.loadBgWhatsAppContext(instrumentId);
+      if (!ctx) return;
 
       const lines: string[] = [
         `*New BG Requested - TL Approval Required*`,
-        `Purpose: ${formatBgPurposeLabel(row.bgPurpose)}`,
-        projectOrTender,
-        `Beneficiary: ${row.beneficiaryName || 'N/A'}`,
-        `Amount: ₹${row.amount ? Number(row.amount).toLocaleString('en-IN') : 'N/A'}`,
-        `Created By: ${row.requestedByName || 'Unknown'}`,
+        ...this.buildBgWhatsAppLines(ctx.row),
+        `Created By: ${ctx.row.requestedByName || 'Unknown'}`,
       ];
 
-      if (url) {
-        lines.push(`Review and Approve: ${url}`);
+      if (ctx.url) {
+        lines.push(`Review and Approve: ${ctx.url}`);
       }
 
-      const text = lines.join('\n');
-
-      if (process.env.OPENWA_DRY_RUN === 'true') {
-        this.logger.log(`[DRY_RUN] BG TL approval WhatsApp:\n${text}`);
-        return;
-      }
-
-      await this.sendToTargets(text, { type: 'group', group });
+      await this.sendBgWhatsAppMessage(instrumentId, ctx.group, lines);
     } catch (err) {
       this.logger.warn(`Failed to send BG TL approval notification: ${err}`);
+    }
+  }
+
+  async notifyBgApproved(
+    instrumentId: number,
+    data: { actorName?: string | null; remarks?: string | null } = {},
+  ): Promise<void> {
+    try {
+      const ctx = await this.loadBgWhatsAppContext(instrumentId);
+      if (!ctx) return;
+
+      const lines: string[] = [
+        `*BG Approved by TL — Pending Accounts Approval*`,
+        ...this.buildBgWhatsAppLines(ctx.row),
+      ];
+
+      if (data.actorName) {
+        lines.push(`Approved By: ${data.actorName}`);
+      }
+      if (data.remarks?.trim()) {
+        lines.push(`Remarks: ${data.remarks.trim()}`);
+      }
+      if (ctx.url) {
+        lines.push(`View in TMS: ${ctx.url}`);
+      }
+
+      await this.sendBgWhatsAppMessage(instrumentId, ctx.group, lines);
+    } catch (err) {
+      this.logger.warn(`Failed to send BG approved notification: ${err}`);
+    }
+  }
+
+  async notifyBgRejected(
+    instrumentId: number,
+    data: { actorName?: string | null; remarks?: string | null } = {},
+  ): Promise<void> {
+    try {
+      const ctx = await this.loadBgWhatsAppContext(instrumentId);
+      if (!ctx) return;
+
+      const lines: string[] = [
+        `*BG Rejected by TL*`,
+        ...this.buildBgWhatsAppLines(ctx.row),
+      ];
+
+      if (data.actorName) {
+        lines.push(`Rejected By: ${data.actorName}`);
+      }
+      if (data.remarks?.trim()) {
+        lines.push(`Remarks: ${data.remarks.trim()}`);
+      }
+      if (ctx.url) {
+        lines.push(`View in TMS: ${ctx.url}`);
+      }
+
+      await this.sendBgWhatsAppMessage(instrumentId, ctx.group, lines);
+    } catch (err) {
+      this.logger.warn(`Failed to send BG rejected notification: ${err}`);
+    }
+  }
+
+  async notifyBgUpdated(
+    instrumentId: number,
+    data: { updatedByName?: string | null } = {},
+  ): Promise<void> {
+    try {
+      const ctx = await this.loadBgWhatsAppContext(instrumentId);
+      if (!ctx) return;
+
+      const heading = data.updatedByName
+        ? `*BG Updated — TL Approval Required* @${data.updatedByName}`
+        : `*BG Updated — TL Approval Required*`;
+
+      const lines: string[] = [
+        heading,
+        ...this.buildBgWhatsAppLines(ctx.row),
+      ];
+
+      if (ctx.url) {
+        lines.push(`Review & Approve: ${ctx.url}`);
+      }
+
+      await this.sendBgWhatsAppMessage(instrumentId, ctx.group, lines);
+    } catch (err) {
+      this.logger.warn(`Failed to send BG updated notification: ${err}`);
     }
   }
 
