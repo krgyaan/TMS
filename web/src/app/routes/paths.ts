@@ -245,6 +245,7 @@ export const paths = {
         bankGuaranteeAction: (id: number) => `/bi-dashboard/bank-guarantee/action/${id}`,
         bankGuaranteeEdit: (id: number) => `/bi-dashboard/bank-guarantee/edit/${id}`,
         bankGuaranteeMeetingRemarks: (id: number) => `/bi-dashboard/bank-guarantee/meeting-remarks/${id}`,
+        bankGuaranteeApproval: (instrumentId: number) => `/bi-dashboard/bank-guarantee/approval/${instrumentId}`,
         bankTransfer: "/bi-dashboard/bank-transfer",
         bankTransferView: (requestId: number) => `/bi-dashboard/bank-transfer/details/${requestId}`,
         bankTransferAction: (id: number) => `/bi-dashboard/bank-transfer/action/${id}`,

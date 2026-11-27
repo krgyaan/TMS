@@ -4,7 +4,7 @@ import type { ColDef } from "ag-grid-community";
 import DataTable from "@/components/ui/data-table";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
-import { CheckCircle, EyeIcon, Pencil, Plus, RefreshCw, Search, Send, Download, XCircle } from "lucide-react";
+import { CheckCircle, EyeIcon, Pencil, Plus, RefreshCw, Search, Send, Download, ShieldCheck, XCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsTrigger, TabsList } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -100,7 +100,8 @@ const EmdsAndTenderFeesPage = () => {
     });
     const { hasTenderingPermission } = useTenderingPermissions();
     const [exporting, setExporting] = useState(false);
-    const { isAdmin, isSuperUser } = useAuth();
+    const { isAdmin, isSuperUser, user } = useAuth();
+    const canApproveBg = isAdmin || isSuperUser || user?.role?.name === 'Team Leader';
     const [consentModal, setConsentModal] = useState<{
         open: boolean;
         row: PaymentRequestRowWithTimer | null;
@@ -468,6 +469,12 @@ const EmdsAndTenderFeesPage = () => {
                                 navigate(`${paths.tendering.emdsTenderFeesView(r.tenderId)}?pr=${r.id}`);
                             }
                         },
+                    },
+                    {
+                        label: 'Approval',
+                        icon: <ShieldCheck className="w-4 h-4" />,
+                        onClick: (r) => navigate(paths.bi.bankGuaranteeApproval(r.instrumentId!)),
+                        visible: (r) => canApproveBg && r.instrumentType === 'BG' && !!r.instrumentId,
                     },
                     {
                         label: 'Mark As DNB',

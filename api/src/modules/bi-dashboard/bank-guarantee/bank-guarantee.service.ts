@@ -2389,11 +2389,23 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             tenderId: row.tenderId,
             requestedBy: row.requestedBy,
         });
+        const requestDetails = await this.getById(row.requestId);
 
         return {
-            ...row,
-            amount: row.amount ? Number(row.amount) : null,
+            ...requestDetails,
+            instrumentId: row.instrumentId,
+            requestId: row.requestId,
+            projectId: row.projectId,
+            tenderId: row.tenderId,
+            requestedBy: row.requestedBy,
+            requestedByName: row.requestedByName,
             approvalTeam,
+            tlApprovalStatus: row.tlApprovalStatus,
+            tlApprovalRemarks: row.tlApprovalRemarks,
+            tlRejectedRemarks: row.tlRejectedRemarks,
+            tlIncompleteRemarks: row.tlIncompleteRemarks,
+            tlApprovedBy: row.tlApprovedBy,
+            tlApprovedAt: row.tlApprovedAt,
         };
     }
 
@@ -2404,9 +2416,6 @@ private readBodyFileValue(body: unknown, field: string): unknown {
         }
 
         const remarks = String(body?.remarks ?? '').trim();
-        if (action !== 'APPROVED' && remarks.length === 0) {
-            throw new BadRequestException('remarks are required for rejected or incomplete approval');
-        }
 
         const [result] = await this.db
             .select({

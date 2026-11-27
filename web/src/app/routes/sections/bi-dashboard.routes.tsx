@@ -34,6 +34,7 @@ const BI_FDRMeetingRemarks = lazy(() => import('@/modules/bi-dashboard/fdr/FdrMe
 const BI_ChequeMeetingRemarks = lazy(() => import('@/modules/bi-dashboard/cheque/ChequeMeetingRemarksPage'));
 const BI_TenderFeeMeetingRemarks = lazy(() => import('@/modules/bi-dashboard/tender-fee/TenderFeeMeetingRemarksPage'));
 const BI_BankGuaranteeMeetingRemarks = lazy(() => import('@/modules/bi-dashboard/bank-guarantee/BankGuaranteeMeetingRemarksPage')); 
+const BI_BankGuaranteeApproval = lazy(() => import('@/modules/bi-dashboard/bank-guarantee/BankGuaranteeApprovalPage'));
 
 export default function BIDashboardRoutes() {
     return (
@@ -63,7 +64,8 @@ export default function BIDashboardRoutes() {
              <Route path="fdr/meeting-remarks/:id" element={<RouteWrapper><BI_FDRMeetingRemarks /></RouteWrapper>} />
              <Route path="cheque/meeting-remarks/:id" element={<RouteWrapper><BI_ChequeMeetingRemarks /></RouteWrapper>} />
              <Route path="tender-fee/meeting-remarks/:id" element={<RouteWrapper><BI_TenderFeeMeetingRemarks /></RouteWrapper>} />
-             <Route path="bank-guarantee/meeting-remarks/:id" element={<RouteWrapper><BI_BankGuaranteeMeetingRemarks /></RouteWrapper>} />
+            <Route path="bank-guarantee/approval/:instrumentId" element={<RouteWrapper><BI_BankGuaranteeApproval /></RouteWrapper>} />
+            <Route path="bank-guarantee/meeting-remarks/:id" element={<RouteWrapper><BI_BankGuaranteeMeetingRemarks /></RouteWrapper>} />
             <Route path="fdr/details/:id" element={<RouteWrapper><BI_FDRDetails /></RouteWrapper>} />
             <Route path="cheque/details/:id" element={<RouteWrapper><BI_ChequeDetails /></RouteWrapper>} />
             <Route path="bank-guarantee/details/:id" element={<RouteWrapper><BI_BankGuaranteeDetails /></RouteWrapper>} />

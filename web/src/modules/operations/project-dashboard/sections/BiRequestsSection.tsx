@@ -7,9 +7,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import DataTable from "@/components/ui/data-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProjectBiRequests } from "@/hooks/api/usePaymentRequests";
+import { useAuth } from "@/contexts/AuthContext";
+import { isAdminOrAbove } from "@/types/auth.types";
 import { formatINR } from "@/hooks/useINRFormatter";
 import type { ColDef, ValueFormatterParams } from "ag-grid-community";
-import { ChevronDown, Eye, Plus } from "lucide-react";
+import { ChevronDown, Eye, Plus, ShieldCheck } from "lucide-react";
 import React, { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -115,6 +117,8 @@ const pickInstrument = (row?: BiRequestRow | null): BiInstrumentRow | null =>
 
 export const BiRequestsSection: React.FC<BiRequestsSectionProps> = ({ projectId }) => {
     const navigate = useNavigate();
+    const { user } = useAuth();
+    const canApproveBg = isAdminOrAbove(user?.role?.name) || user?.role?.name === "Team Leader";
     const { data, isLoading } = useProjectBiRequests(projectId ?? 0);
 
     const requests = useMemo<BiRequestRow[]>(
@@ -128,7 +132,18 @@ export const BiRequestsSection: React.FC<BiRequestsSectionProps> = ({ projectId 
             icon: <Eye className="h-4 w-4" />,
             onClick: (row) => navigate(paths.operations.biRequestView(projectId!, row.id)),
         },
-    ], [navigate]);
+        {
+            label: "Approval",
+            icon: <ShieldCheck className="h-4 w-4" />,
+            visible: (row) => canApproveBg && pickInstrument(row)?.instrumentType === "BG",
+            onClick: (row) => {
+                const instrument = pickInstrument(row);
+                if (instrument) {
+                    navigate(paths.bi.bankGuaranteeApproval(instrument.id));
+                }
+            },
+        },
+    ], [navigate, projectId, canApproveBg]);
 
     const columns = useMemo<ColDef<BiRequestRow>[]>(() => [
         {
