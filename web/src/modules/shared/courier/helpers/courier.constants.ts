@@ -43,6 +43,35 @@ export const COURIER_STATUS_BADGE: Record<number, "outline" | "secondary" | "suc
     [COURIER_STATUS.REJECTED]: 'destructive',
 };
 
+/**
+ * Allowed status transitions per current status, mirroring the BI dashboard
+ * action pages. Dispatch is represented by the DISPATCHED status.
+ */
+export const COURIER_STATUS_TRANSITIONS: Record<number, number[]> = {
+    [COURIER_STATUS.PENDING]: [COURIER_STATUS.DISPATCHED, COURIER_STATUS.REJECTED],
+    [COURIER_STATUS.IN_TRANSIT]: [
+        COURIER_STATUS.DISPATCHED,
+        COURIER_STATUS.DELIVERED,
+        COURIER_STATUS.NOT_DELIVERED,
+        COURIER_STATUS.REJECTED,
+    ],
+    [COURIER_STATUS.DISPATCHED]: [
+        COURIER_STATUS.IN_TRANSIT,
+        COURIER_STATUS.DELIVERED,
+        COURIER_STATUS.NOT_DELIVERED,
+        COURIER_STATUS.REJECTED,
+    ],
+    [COURIER_STATUS.NOT_DELIVERED]: [COURIER_STATUS.DISPATCHED, COURIER_STATUS.REJECTED],
+    [COURIER_STATUS.DELIVERED]: [],
+    [COURIER_STATUS.REJECTED]: [],
+};
+
+export const getAllowedCourierStatuses = (currentStatus: number | null | undefined): number[] =>
+    COURIER_STATUS_TRANSITIONS[currentStatus ?? COURIER_STATUS.PENDING] ?? [];
+
+export const isCourierDispatchStatus = (status: number | null | undefined): boolean =>
+    status === COURIER_STATUS.DISPATCHED;
+
 export const COURIER_TABS = [
     { key: "pending", label: "Pending" },
     { key: "dispatched", label: "Dispatched" },

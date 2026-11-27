@@ -13,4 +13,5 @@ export * from './onboarding';
 export * from './training-assignments.schema';
 export * from './training-video-reactions.schema';
 export * from './training-video-events.schema';
+export * from './office-inventory.schema';
 

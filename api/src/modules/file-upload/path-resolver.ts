@@ -1,5 +1,5 @@
 import { posix } from "path";
-import { FILE_CONFIGS, getStorageDir, type FileContext } from "./config";
+import { FILE_CONFIGS, LEGACY_CONTEXT_ALIASES, getStorageDir, type FileContext } from "./config";
 
 const STORAGE_DIRS = new Set(
     Object.values(FILE_CONFIGS)
@@ -32,8 +32,9 @@ export function resolveUploadRelativePath(storedPath: string, defaultContext: Fi
     }
 
     const first = segments[0];
+    const canonicalFirst = LEGACY_CONTEXT_ALIASES[first] ?? first;
 
-    if (!isKnownContext(first)) {
+    if (!isKnownContext(canonicalFirst)) {
         if (segments.length > 1 || STORAGE_DIRS.has(first)) {
             return normalized;
         }
@@ -44,8 +45,10 @@ export function resolveUploadRelativePath(storedPath: string, defaultContext: Fi
             : posix.join(defaultContext, normalized);
     }
 
-    const storageDir = getStorageDir(first);
-    return storageDir && !normalized.startsWith(`${storageDir}/`)
-        ? posix.join(storageDir, normalized)
-        : normalized;
+    const rest = segments.slice(1);
+    const canonicalPath = [canonicalFirst, ...rest].join("/");
+    const storageDir = getStorageDir(canonicalFirst);
+    return storageDir && !canonicalPath.startsWith(`${storageDir}/`)
+        ? posix.join(storageDir, canonicalPath)
+        : canonicalPath;
 }

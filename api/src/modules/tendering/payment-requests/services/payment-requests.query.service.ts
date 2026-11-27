@@ -1695,7 +1695,6 @@ export class PaymentRequestsQueryService {
             bgBankAccountNo: details?.bgBankAcc || '',
             bgBankIfsc: details?.bgBankIfsc || '',
             bgCourierAddress: instrument?.courierAddress || '',
-            bgCourierDays: instrument?.courierDeadline || null,
             bgCourierOrg: addrJson?.org || '',
             bgCourierName: addrJson?.name || '',
             bgCourierPhone: addrJson?.phone || '',

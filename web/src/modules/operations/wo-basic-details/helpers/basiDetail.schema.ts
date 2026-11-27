@@ -2,7 +2,10 @@ import { z } from "zod";
 
 export const WoBasicDetailFormSchema = z.object({
   tenderId: z.number().nullable().optional(),
-  orderType: z.enum(["single", "multiple"]).default("single").optional(),
+  orderType: z.enum(["single", "repeat", "multiple"]).default("single").optional(),
+  orderNature: z.enum(["supply", "service", "sitc"]).optional(),
+  poReceivedStatus: z.enum(["received", "not_received", "not_applicable"]).optional(),
+  sapPoUpload: z.array(z.string()).default([]),
 
   teamId: z.coerce.number().int().positive({ message: "Team is required" }).nullable().optional(),
   organizationId: z.coerce.number().nullable().optional(),
@@ -19,7 +22,6 @@ export const WoBasicDetailFormSchema = z.object({
   receiptPreGst: z.coerce.number().nonnegative().optional(),
   grossMargin: z.coerce.number().nonnegative().optional(),
   finalPrice: z.coerce.number().nonnegative().optional(),
-  pricesChanged: z.string().default("false"),
 
   budgetSupply: z.coerce.number().nonnegative().optional(),
   budgetService: z.coerce.number().nonnegative().optional(),
@@ -29,7 +31,11 @@ export const WoBasicDetailFormSchema = z.object({
   budgetGemCharges: z.coerce.number().nonnegative().optional(),
 
   requestGemCharges: z.string().default("false"),
-  gemChargesAmount: z.coerce.number().nonnegative().optional(),
+  gemChargesRequired: z.boolean().default(false),
+  gemChargesAmount: z.preprocess(
+    value => (value === "" || value === null ? undefined : value),
+    z.coerce.number().nonnegative().optional(),
+  ),
   gemChargesPortalLink: z.string().default(""),
   gemChargesInvoice: z.array(z.string()).default([]),
 
@@ -41,9 +47,27 @@ export const WoBasicDetailFormSchema = z.object({
   tmsDocuments: z.record(z.string(), z.boolean().optional()).default({}),
 })
 .superRefine((data, ctx) => {
+  if (data.gemChargesRequired && (data.gemChargesAmount === undefined || data.gemChargesAmount === null)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["gemChargesAmount"],
+      message: "GeM charges are required for GeM tenders. Enter 0 if not applicable.",
+    });
+  }
+
+  if (!data.orderNature) {
+    ctx.addIssue({ code: "custom", path: ["orderNature"], message: "Order Nature is required." });
+  }
+  if (!data.poReceivedStatus) {
+    ctx.addIssue({ code: "custom", path: ["poReceivedStatus"], message: "PO Received is required." });
+  }
+  if (data.poReceivedStatus === "received" && data.sapPoUpload.length === 0) {
+    ctx.addIssue({ code: "custom", path: ["sapPoUpload"], message: "Upload at least one SAP PO file." });
+  }
+
   // GEM Charges conditional validation
   if (data.requestGemCharges === "true") {
-    if (!data.gemChargesAmount || data.gemChargesAmount <= 0) {
+    if (data.gemChargesAmount === undefined || data.gemChargesAmount === null || data.gemChargesAmount <= 0) {
       ctx.addIssue({
         code: "custom",
         path: ["gemChargesAmount"],

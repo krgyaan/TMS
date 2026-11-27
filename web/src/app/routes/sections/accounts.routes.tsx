@@ -52,7 +52,7 @@ const Accounts_VendorMaster_View = lazy(() => import("@/modules/master/vendor-ma
 const Accounts_Parties = lazy(() => import("@/modules/master/vendor-master/PartyListPage"));
 const Accounts_InventoryPage = lazy(() => import("@/modules/operations/inventory/pages/InventoryPage"));
 const Accounts_ItemMaster = lazy(() => import("@/modules/accounts/inventory-items/InventoryItemListPage"));
-const Accounts_ItemMaster_Detail = lazy(() => import("@/modules/accounts/inventory-items/InventoryItemDetailPage"));
+const Accounts_ItemMaster_Detail = lazy(() => import("@/modules/accounts/inventory-items/InventoryItemShowPage"));
 
 export default function AccountsRoutes() {
     return (

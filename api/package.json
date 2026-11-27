@@ -25,6 +25,7 @@
         "drizzle:migrate": "drizzle-kit migrate --config ./drizzle.config.ts",
         "migrate:seller-parties": "tsx scripts/migrate-project-parties-sellers.ts",
         "migrate:vendor-master": "tsx scripts/migrate-vendor-master.ts",
+        "import:old-bgs": "tsx -r tsconfig-paths/register scripts/import-old-bgs.ts",
         "audit:vendor-duplicates": "tsx scripts/audit-vendor-duplicates.ts",
         "merge:vendor-duplicates": "tsx -r tsconfig-paths/register scripts/merge-vendor-duplicates.ts",
         "backfill:po-seller-org": "tsx scripts/backfill-po-seller-org.ts",
@@ -36,7 +37,8 @@
         "tally:check": "tsx scripts/tally-check.ts",
         "tally:preview": "tsx -r tsconfig-paths/register scripts/tally-preview.ts",
         "tally:sync-ledgers": "tsx -r tsconfig-paths/register scripts/tally-sync-ledgers.ts",
-        "tally:link-employee-ledgers": "tsx -r tsconfig-paths/register scripts/tally-link-employee-ledgers.ts"
+        "tally:link-employee-ledgers": "tsx -r tsconfig-paths/register scripts/tally-link-employee-ledgers.ts",
+        "tally:check-categories": "tsx -r tsconfig-paths/register scripts/tally-check-categories.ts"
     },
     "dependencies": {
         "@asteasolutions/zod-to-openapi": "^7.3.4",

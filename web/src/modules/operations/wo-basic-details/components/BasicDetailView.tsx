@@ -13,6 +13,7 @@ import type { WoContact } from '../../types/wo.types';
 import { GEM_GST_RATE, GEM_TDS_RATE } from '../helpers/gemCharges';
 import { paths } from '@/app/routes/paths';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { resolveFileUrl } from '../../helpers/resolveFileUrl';
 
 interface BasicDetailViewProps {
     data: WoBasicDetail;
@@ -20,16 +21,6 @@ interface BasicDetailViewProps {
     isLoading?: boolean;
     className?: string;
 }
-
-// Helper function to get file URL from stored path
-const getFileUrl = (filePath: string): string => {
-    // Extract the filename (last part of the path)
-    const fileName = filePath.split('/').pop() || filePath;
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
-    
-    // Always serve under 'wo-draft' context as requested
-    return `${baseUrl}/files/serve/wo-draft/${encodeURIComponent(fileName)}`;
-};
 
 
 
@@ -138,6 +129,22 @@ export function BasicDetailView({
 
     const grossMarginValue = data?.grossMargin ? parseFloat(String(data?.grossMargin)) : null;
     const woDraftFiles = parseFileArray(data?.woDraft);
+    const sapPoFiles = parseFileArray(data?.sapPoUpload);
+    const orderNatureLabel =
+        data.orderNature === "supply" ? "Supply" :
+        data.orderNature === "service" ? "Service" :
+        data.orderNature === "sitc" ? "SITC" : "—";
+    const poReceivedLabel =
+        data.poReceivedStatus === "received" ? "Received" :
+        data.poReceivedStatus === "not_received" ? "Not Received" :
+        data.poReceivedStatus === "not_applicable" ? "Not Applicable" : "—";
+    const orderTypeLabel =
+        data.orderType === "repeat" ? "Repeat" :
+        data.orderType === "multiple" ? "Multiple" : "Single";
+    const orderSequenceLabel =
+        data.orderType !== "single" && data.orderSequence && data.orderSequence > 1
+            ? `${data.orderType === "repeat" ? "R" : "P"}${data.orderSequence}`
+            : null;
 
     // Calculate TMS documents completion stats
     const tmsDocsComplete = hasTmsDocuments
@@ -247,19 +254,57 @@ export function BasicDetailView({
                                 Order Type
                             </TableCell>
                             <TableCell className="text-sm">
-                                <Badge variant={data.orderType === "multiple" ? "default" : "secondary"}>
-                                    {data.orderType === "multiple" ? "Multiple" : "Single"}
+                                <Badge variant={data.orderType !== "single" ? "default" : "secondary"}>
+                                    {orderTypeLabel}
                                 </Badge>
                             </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Order Sequence
                             </TableCell>
                             <TableCell className="text-sm">
-                                {data.orderType === "multiple" && data.orderSequence
-                                    ? <Badge variant="default">#{data.orderSequence}</Badge>
+                                {orderSequenceLabel
+                                    ? <Badge variant="default">{orderSequenceLabel}</Badge>
                                     : '—'}
                             </TableCell>
                         </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Order Nature
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                <Badge variant="outline">{orderNatureLabel}</Badge>
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                PO Received
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                <Badge variant={data.poReceivedStatus === "received" ? "default" : "secondary"}>
+                                    {poReceivedLabel}
+                                </Badge>
+                            </TableCell>
+                        </TableRow>
+                        {sapPoFiles.length > 0 && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    SAP PO
+                                </TableCell>
+                                <TableCell colSpan={3} className="text-sm">
+                                    <div className="flex flex-wrap gap-2">
+                                        {sapPoFiles.map((filePath, index) => (
+                                            <a
+                                                key={`${filePath}-${index}`}
+                                                href={resolveFileUrl(filePath, "sap-po")}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-primary underline"
+                                            >
+                                                SAP PO {index + 1}
+                                            </a>
+                                        ))}
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        )}
 
                         {/* Financial Details */}
                         <TableRow className="bg-muted/50">
@@ -714,17 +759,19 @@ export function BasicDetailView({
                                             {contact.designation}
                                         </div>
                                     )}
-                                    {contact.phone && (
-                                        <div className="flex items-center gap-2 text-sm">
-                                            <Phone className="h-3 w-3 text-muted-foreground" />
-                                            <a
-                                                href={`tel:${contact.phone}`}
-                                                className="text-primary hover:underline"
-                                            >
-                                                {contact.phone}
-                                            </a>
-                                        </div>
-                                    )}
+                                    {((contact.phones?.length ? contact.phones : contact.phone ? [contact.phone] : []) as string[])
+                                        .filter(Boolean)
+                                        .map((phone, phoneIndex) => (
+                                            <div key={`${phone}-${phoneIndex}`} className="flex items-center gap-2 text-sm">
+                                                <Phone className="h-3 w-3 text-muted-foreground" />
+                                                <a
+                                                    href={`tel:${phone}`}
+                                                    className="text-primary hover:underline"
+                                                >
+                                                    {phone}
+                                                </a>
+                                            </div>
+                                        ))}
                                     {contact.email && (
                                         <div className="flex items-center gap-2 text-sm">
                                             <Mail className="h-3 w-3 text-muted-foreground" />
@@ -781,7 +828,7 @@ export function BasicDetailView({
                                             variant="outline"
                                             size="sm"
                                             className="flex-1 h-9 text-sm gap-2"
-                                            onClick={() => window.open(getFileUrl(filePath), '_blank')}
+                                            onClick={() => window.open(resolveFileUrl(filePath, 'wo-draft'), '_blank')}
                                         >
                                             <ExternalLink className="h-4 w-4" />
                                             View
@@ -792,7 +839,7 @@ export function BasicDetailView({
                                             className="flex-1 h-9 text-sm gap-2"
                                             onClick={() => {
                                                 const a = document.createElement('a');
-                                                a.href = getFileUrl(filePath);
+                                                a.href = resolveFileUrl(filePath, 'wo-draft');
                                                 a.download = filePath.split('/').pop() || filePath;
                                                 a.click();
                                             }}

@@ -24,6 +24,10 @@ describe("resolveUploadRelativePath", () => {
         expect(resolveUploadRelativePath("file.pdf", "lead-followups")).toBe("crm/lead-followups/file.pdf");
     });
 
+    it("maps legacy document-type contexts to the current context", () => {
+        expect(resolveUploadRelativePath("draftWo/file.pdf")).toBe("operations/wo-draft/file.pdf");
+    });
+
     it("rejects path traversal", () => {
         expect(() => resolveUploadRelativePath("../secret.pdf")).toThrow("Invalid file path");
     });

@@ -108,11 +108,7 @@ export function Page6Profitability({
                                 <Link2 className="h-4 w-4 text-muted-foreground" />
                                 Tendering Costing Sheet
                             </h3>
-                            <p className="text-xs text-muted-foreground mb-4">Reference the original costing sheet for this project.</p>
                             <div className="max-w-md">
-                                <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                                    Costing Sheet URL
-                                </label>
                                 {form.watch("costingSheetLink") ? (
                                     <Button
                                         variant="outline"
@@ -137,7 +133,6 @@ export function Page6Profitability({
                                 <AlertCircle className="h-4 w-4 text-muted-foreground" />
                                 PO/WO Comparison & Discrepancies
                             </h3>
-                            <p className="text-xs text-muted-foreground mb-4">Compare the costing sheet with the received PO/WO.</p>
                             <div className="max-w-xs mb-4">
                                 <SelectField
                                     control={form.control}

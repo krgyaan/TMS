@@ -13,20 +13,25 @@ export const CourierFormSchema = z.object({
         .string()
         .min(1, "Mobile number is required")
         .regex(/^\d{10}$/, "Mobile number must be 10 digits"),
-    empFrom: z.coerce.number({ required_error: "Please select an employee" }).int().positive(),
+    empFrom: z.coerce.number({ message: "Please select an employee" }).int().positive(),
     delDate: z.string().min(1, "Expected delivery date is required"),
-    urgency: z.coerce.number({ required_error: "Please select dispatch urgency" }).int().min(1).max(2),
+    urgency: z.coerce.number({ message: "Please select dispatch urgency" }).int().min(1).max(2),
+
+    // Editable-only fields (available in edit mode for privileged users)
+    userId: z.coerce.number().int().positive().optional(),
+    courierDocs: z.array(z.string()).optional(),
+    status: z.coerce.number().int().min(0).max(5).optional(),
+    trackingNumber: z.string().max(255).optional(),
+    courierProvider: z.string().max(255).optional(),
+    pickupDate: z.string().optional(),
+    docketNo: z.string().max(255).optional(),
+    docketSlip: z.array(z.string()).optional(),
+    deliveryDate: z.string().optional(),
+    deliveryPod: z.array(z.string()).optional(),
+    withinTime: z.enum(["1", "0"]).optional(),
 });
 
 export type CourierFormValues = z.infer<typeof CourierFormSchema>;
-
-export const CourierDispatchSchema = z.object({
-    courierProvider: z.string().min(1, "Courier provider is required"),
-    pickupDate: z.string().min(1, "Pickup date and time is required"),
-    docketNo: z.string().min(1, "Docket number is required"),
-});
-
-export type CourierDispatchFormValues = z.infer<typeof CourierDispatchSchema>;
 
 export const CourierStatusSchema = z
     .object({
@@ -34,8 +39,40 @@ export const CourierStatusSchema = z
         deliveryDate: z.string().optional(),
         withinTime: z.enum(["1", "0"]).optional(),
         pod: z.array(z.string()).optional(),
+
+        // Dispatch fields (merged into the status form)
+        courierProvider: z.string().optional(),
+        pickupDate: z.string().optional(),
+        docketNo: z.string().optional(),
+        docketSlip: z.array(z.string()).optional(),
     })
     .superRefine((value, ctx) => {
+        if (value.status === COURIER_STATUS.DISPATCHED) {
+            if (!value.courierProvider?.trim()) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: "Courier provider is required",
+                    path: ["courierProvider"],
+                });
+            }
+
+            if (!value.pickupDate) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: "Pickup date & time is required",
+                    path: ["pickupDate"],
+                });
+            }
+
+            if (!value.docketNo?.trim()) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: "Docket number is required",
+                    path: ["docketNo"],
+                });
+            }
+        }
+
         if (value.status !== COURIER_STATUS.DELIVERED) return;
 
         if (!value.deliveryDate) {

@@ -33,18 +33,14 @@ describe("planLedgerSync", () => {
     it("updates an existing ledger matched by name", () => {
         const plan = planLedgerSync([existing()], [incoming({ parent: "Direct Expenses" })]);
 
-        expect(plan.updates).toEqual([
-            { id: 1, name: "Site Expenses", nameNormalized: "site expenses", parent: "Direct Expenses", guid: null },
-        ]);
+        expect(plan.updates).toEqual([{ id: 1, name: "Site Expenses", nameNormalized: "site expenses", parent: "Direct Expenses", guid: null }]);
         expect(plan.inserts).toEqual([]);
     });
 
     it("matches by GUID and follows a rename", () => {
         const plan = planLedgerSync([existing({ guid: "g-1" })], [incoming({ name: "Site Expense", guid: "g-1" })]);
 
-        expect(plan.updates).toEqual([
-            { id: 1, name: "Site Expense", nameNormalized: "site expense", parent: "Indirect Expenses", guid: "g-1" },
-        ]);
+        expect(plan.updates).toEqual([{ id: 1, name: "Site Expense", nameNormalized: "site expense", parent: "Indirect Expenses", guid: "g-1" }]);
         expect(plan.conflicts).toEqual([]);
     });
 

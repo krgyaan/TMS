@@ -315,8 +315,11 @@ export type SubmitPage3Dto = z.infer<typeof SubmitPage3Schema>;
 
 export const BOQItemSchema = z.object({
   id: z.number().int().positive().optional(),
-  srNo: z.coerce.number().int().positive(),
+  srNo: z.number().int().positive(),
+  inventoryItemId: PositiveIntSchema.nullable().optional(),
+  itemCode: z.string().trim().max(80).nullable().optional(),
   itemDescription: z.string().min(1, 'Item description is required'),
+  hsnSac: z.string().trim().max(100).nullable().optional(),
   quantity: DecimalSchema,
   rate: DecimalSchema,
   amount: DecimalSchema.optional(),
@@ -343,6 +346,7 @@ export const AddressSchema = z.object({
 });
 
 export const SavePage4Schema = z.object({
+  orderNature: z.enum(["supply", "service", "sitc"]).optional(),
   billingBoq: z.array(BOQItemSchema).optional(),
   buybackBoq: z.array(BOQItemSchema).optional(),
   buybackBoqApplicable: z.boolean().optional(),
@@ -351,6 +355,7 @@ export const SavePage4Schema = z.object({
 });
 
 export const SubmitPage4Schema = z.object({
+  orderNature: z.enum(["supply", "service", "sitc"]).optional(),
   billingBoq: z
     .array(BOQItemSchema)
     .min(1, 'At least one billing BOQ item is required'),

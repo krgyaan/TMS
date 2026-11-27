@@ -1,24 +1,25 @@
 import { paths } from "@/app/routes/paths";
 import { FileUploader } from "@/components/file-upload";
-import { ConditionalSection } from "@/components/form/ConditionalSection";
 import { DateInput } from "@/components/form/DateInput";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { useCreateWoBasicDetail, useUpdateWoBasicDetail, useWoBasicDetailPrefill } from "@/hooks/api/useWoBasicDetails";
+import { useCreateWoBasicDetail, useUpdateWoBasicDetail, useWoBasicDetailPrefill, useWoBasicDetailsByTender } from "@/hooks/api/useWoBasicDetails";
 import { useCreateBulkWoContacts, useDeleteAllContactsByBasicDetail, useWoContactsByBasicDetail } from "@/hooks/api/useWoContacts";
 import { useItemOptions, useLocationOptions, useOrganizationOptions, useTeamOptions } from "@/hooks/useSelectOptions";
 import { formatINR } from "@/hooks/useINRFormatter";
 import type { CreateWoBasicDetailDto } from "@/modules/operations/types/wo.types";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Calculator, Check, Plus, Save, Trash2, TrendingUp } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, ArrowRight, Calculator, Check, Info, Plus, Save, SkipForward, Trash2, TrendingUp } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm, type Resolver, type SubmitHandler } from "react-hook-form";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -27,7 +28,6 @@ import { buildDefaultValues, mapFormToCreatePayload, mapFormToUpdatePayload, map
 import { computeGemChargesBreakdown, GEM_GST_RATE, GEM_TDS_RATE } from "../helpers/gemCharges";
 import { WoBasicDetailFormSchema } from "../helpers/basiDetail.schema";
 import type { WoBasicDetail, WoBasicDetailFormValues } from "../helpers/basiDetail.types";
-import { ProjectNameWarningAlert } from "./ProjectNameWarningAlert";
 
 interface BasicDetailFormProps {
     mode: "create" | "edit";
@@ -44,7 +44,14 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
     const location = useLocation();
     const [searchParams] = useSearchParams();
     const urlTenderId = searchParams.get("tenderId");
-    const isNonTender = !urlTenderId;
+    // Edit routes do not carry ?tenderId, so the tender reference must come
+    // from the loaded record. Without this, every edit was treated as a
+    // non-tender WO and exposed Team/Org/Item/Location fields.
+    const existingTenderId = mode === "edit" ? existingData?.tenderId ?? null : null;
+    const isNonTender = mode === "edit" ? !existingTenderId : !urlTenderId;
+    const effectiveTenderId = mode === "edit"
+        ? existingTenderId
+        : urlTenderId ? Number(urlTenderId) : null;
     const returnTo = (location.state as { from?: string } | null)?.from;
     const createMutation = useCreateWoBasicDetail();
     const updateMutation = useUpdateWoBasicDetail();
@@ -59,33 +66,51 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
             return mapResponseToForm(existingData);
         }
         const defaults = buildDefaultValues();
-        if (mode === "create" && !isNonTender && urlTenderId) {
-            defaults.tenderId = Number(urlTenderId);
+        if (mode === "create" && !isNonTender && effectiveTenderId) {
+            defaults.tenderId = effectiveTenderId;
         }
         return defaults;
-    }, [mode, existingData, urlTenderId, isNonTender]);
+    }, [mode, existingData, isNonTender, effectiveTenderId]);
 
     const form = useForm<WoBasicDetailFormValues>({
         resolver: zodResolver(WoBasicDetailFormSchema) as Resolver<WoBasicDetailFormValues>,
         defaultValues: initialValues,
     });
 
+    const [currentStep, setCurrentStep] = useState<1 | 2>(1);
+    const [showBreakdown, setShowBreakdown] = useState(false);
+    const [showChecklist, setShowChecklist] = useState(false);
+    const [showContacts, setShowContacts] = useState(false);
+
     const watchTenderId = form.watch("tenderId");
     const watchWoNumber = form.watch("woNumber");
     const watchWoDate = form.watch("woDate");
     const watchBudget = form.watch("budgetPreGst");
     const watchReceipt = form.watch("receiptPreGst");
-    const watchProjectName = form.watch("projectName");
-    const [projectNameSuffix, setProjectNameSuffix] = useState<string | null>(null);
-    const watchPricesChanged = form.watch("pricesChanged");
+    const watchOrderType = form.watch("orderType");
+    const watchPoReceivedStatus = form.watch("poReceivedStatus");
+
+    const { data: existingOrders = [] } = useWoBasicDetailsByTender(
+        mode === "create" && !isNonTender ? effectiveTenderId ?? 0 : 0,
+    );
+    const hasExistingOrders =
+        mode === "create" && !isNonTender && existingOrders.length > 0;
+    const nextOrderSequence =
+        existingOrders.reduce((max, order) => Math.max(max, order.orderSequence ?? 0), 0) + 1;
 
     useEffect(() => {
-        if (projectNameSuffix && mode === "create") {
-            form.setValue("projectName", projectNameSuffix);
+        if (hasExistingOrders && form.getValues("orderType") === "single") {
+            form.setValue("orderType", "repeat", { shouldValidate: true });
         }
-    }, [projectNameSuffix, form, mode]);
+    }, [hasExistingOrders, form]);
+
     const watchPaymentConsent = form.watch("requestGemCharges");
     const watchGemChargesAmount = form.watch("gemChargesAmount");
+    const watchBudgetSupply = form.watch("budgetSupply");
+    const watchBudgetService = form.watch("budgetService");
+    const watchBudgetFreight = form.watch("budgetFreight");
+    const watchBudgetAdmin = form.watch("budgetAdmin");
+    const watchBudgetBuybackSale = form.watch("budgetBuybackSale");
     const gemChargesBreakdown = useMemo(
         () => computeGemChargesBreakdown(watchGemChargesAmount),
         [watchGemChargesAmount],
@@ -112,6 +137,17 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
         }
     }, [mode, isNonTender, prefillData, form]);
 
+    useEffect(() => {
+        if (!isNonTender && prefillData) {
+            form.setValue("gemChargesRequired", prefillData.isGemTender);
+        }
+    }, [isNonTender, prefillData, form]);
+    useEffect(() => {
+        if (watchPoReceivedStatus && watchPoReceivedStatus !== "received" && form.getValues("sapPoUpload").length > 0) {
+            form.setValue("sapPoUpload", [], { shouldValidate: true });
+        }
+    }, [watchPoReceivedStatus, form]);
+
     // Background Project Code/Name Generation
     const getFinancialYear = (date: Date): string => {
         const month = date.getMonth() + 1;
@@ -127,56 +163,30 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
     const watchOrganizationId = form.watch("organizationId");
     const watchItemId = form.watch("itemId");
     const watchLocationId = form.watch("locationId");
-    const watchBudgetGemCharges = form.watch("budgetGemCharges");
-    const previousBudgetGemCharges = useRef<number | null>(null);
-
-    useEffect(() => {
-        const budget = Number(watchBudgetGemCharges) || 0;
-        const previous = previousBudgetGemCharges.current;
-        previousBudgetGemCharges.current = budget;
-
-        if (budget > 0) {
-            if (form.getValues("requestGemCharges") !== "true") {
-                form.setValue("requestGemCharges", "true", {
-                    shouldDirty: true,
-                    shouldValidate: true,
-                });
-            }
-
-            if (Number(form.getValues("gemChargesAmount") || 0) <= 0) {
-                form.setValue("gemChargesAmount", budget, {
-                    shouldDirty: true,
-                    shouldValidate: true,
-                });
-            }
-            return;
-        }
-
-        if (previous !== null && previous > 0) {
-            form.setValue("requestGemCharges", "false", {
-                shouldDirty: true,
-                shouldValidate: true,
-            });
-            form.setValue("gemChargesAmount", undefined, { shouldDirty: true });
-            form.setValue("gemChargesPortalLink", "", { shouldDirty: true });
-            form.setValue("gemChargesInvoice", [], { shouldDirty: true });
-        }
-    }, [watchBudgetGemCharges, form]);
 
     const { projectCode: derivedCode, projectName: derivedName } = useMemo(() => {
+        const orderType = watchOrderType ?? "single";
+        const sequence = hasExistingOrders ? nextOrderSequence : 1;
+        const orderSuffix =
+            sequence <= 1 ? "" :
+            orderType === "repeat" ? `(R${sequence})` :
+            orderType === "multiple" ? `(P${sequence})` : "";
+        const woSuffix = watchWoNumber ? String(watchWoNumber).slice(-4) : "";
+        const yearSegment = watchWoDate ? getFinancialYear(watchWoDate instanceof Date ? watchWoDate : new Date(watchWoDate)) : "";
+
         if (!isNonTender) {
             if (!prefillData) return { projectCode: "", projectName: "" };
             const teamName = teamArray.find((team) => team.id === prefillData.team)?.name || "";
             const orgName = prefillData.organizationAcronym || "";
             const itemName = prefillData.itemName || "";
             const locName = prefillData.locationName || "";
-            const suffix = watchWoNumber ? String(watchWoNumber).slice(-4) : "";
-            const yearSegment = watchWoDate ? getFinancialYear(watchWoDate instanceof Date ? watchWoDate : new Date(watchWoDate)) : "";
-            const hasAllCore = !!teamName && !!orgName && !!itemName && !!locName && !!yearSegment && !!suffix;
+            const hasAllCore = !!teamName && !!orgName && !!itemName && !!locName && !!yearSegment && !!woSuffix;
             if (!hasAllCore) return { projectCode: "", projectName: "" };
+            const baseCode = `${teamName}/${yearSegment}/${orgName}/${locName}/${itemName}/${woSuffix}`;
+            const baseName = `${orgName} ${locName} ${itemName}`.trim();
             return {
-                projectCode: `${teamName}/${yearSegment}/${orgName}/${locName}/${itemName}/${suffix}`,
-                projectName: `${orgName} ${locName} ${itemName}`.trim(),
+                projectCode: orderSuffix ? `${baseCode} ${orderSuffix}` : baseCode,
+                projectName: orderSuffix ? `${baseName} ${orderSuffix}` : baseName,
             };
         }
 
@@ -184,20 +194,23 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
         const orgName = organizationOptions.find(o => Number(o.id) === Number(watchOrganizationId))?.name || "";
         const itemName = itemOptions.find(i => Number(i.id) === Number(watchItemId))?.name || "";
         const locName = locationOptions.find(l => Number(l.id) === Number(watchLocationId))?.name || "";
-        const suffix = watchWoNumber ? String(watchWoNumber).slice(-4) : "";
-        const yearSegment = watchWoDate ? getFinancialYear(watchWoDate instanceof Date ? watchWoDate : new Date(watchWoDate)) : "";
-        const hasAllCore = !!teamName && !!orgName && !!itemName && !!locName && !!yearSegment && !!suffix;
+        const hasAllCore = !!teamName && !!orgName && !!itemName && !!locName && !!yearSegment && !!woSuffix;
         if (!hasAllCore) return { projectCode: "", projectName: "" };
+        const baseCode = `${teamName}/${yearSegment}/${orgName}/${locName}/${itemName}/${woSuffix}`;
+        const baseName = `${orgName} ${locName} ${itemName}`.trim();
         return {
-            projectCode: `${teamName}/${yearSegment}/${orgName}/${locName}/${itemName}/${suffix}`,
-            projectName: `${orgName} ${locName} ${itemName}`.trim(),
+            projectCode: orderSuffix ? `${baseCode} ${orderSuffix}` : baseCode,
+            projectName: orderSuffix ? `${baseName} ${orderSuffix}` : baseName,
         };
-    }, [isNonTender, prefillData, watchWoNumber, watchWoDate, watchTeamId, watchOrganizationId, watchItemId, watchLocationId, teamOptions, organizationOptions, itemOptions, locationOptions]);
+    }, [isNonTender, prefillData, watchWoNumber, watchWoDate, watchTeamId, watchOrganizationId, watchItemId, watchLocationId, teamOptions, organizationOptions, itemOptions, locationOptions, watchOrderType, hasExistingOrders, nextOrderSequence]);
 
     useEffect(() => {
+        // Only auto-derive project identifiers for new records; edits keep the
+        // stored code/name so historical values are not silently rewritten.
+        if (mode !== "create") return;
         if (derivedCode) form.setValue("projectCode", derivedCode);
-        if (derivedName && !projectNameSuffix) form.setValue("projectName", derivedName);
-    }, [derivedCode, derivedName, form, projectNameSuffix]);
+        if (derivedName) form.setValue("projectName", derivedName);
+    }, [mode, derivedCode, derivedName, form]);
 
     // Auto-calculate Margin if manually edited
     useEffect(() => {
@@ -242,7 +255,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
             setContacts(tenderClients.map((c: any) => ({
                 name: c.clientName,
                 designation: c.clientDesignation,
-                phone: c.clientMobile,
+                phones: c.clientMobile ? [c.clientMobile] : [""],
                 email: c.clientEmail,
                 organization: "",
                 departments: "",
@@ -263,11 +276,33 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
     };
 
     const handleAddContact = () => {
-        setContacts([...contacts, { name: "", designation: "", phone: "", email: "", organization: "", departments: "" }]);
+        setContacts([...contacts, { name: "", designation: "", phones: [""], email: "", organization: "", departments: "" }]);
     };
 
     const handleRemoveContact = (idx: number) => {
         setContacts(contacts.filter((_, i) => i !== idx));
+    };
+
+    const handleUpdateContactPhone = (idx: number, phoneIdx: number, value: string) => {
+        const newContacts = [...contacts];
+        const phones = [...(newContacts[idx].phones ?? [""])];
+        phones[phoneIdx] = value;
+        newContacts[idx] = { ...newContacts[idx], phones };
+        setContacts(newContacts);
+    };
+
+    const handleAddContactPhone = (idx: number) => {
+        const newContacts = [...contacts];
+        const phones = [...(newContacts[idx].phones ?? [""]), ""];
+        newContacts[idx] = { ...newContacts[idx], phones };
+        setContacts(newContacts);
+    };
+
+    const handleRemoveContactPhone = (idx: number, phoneIdx: number) => {
+        const newContacts = [...contacts];
+        const phones = (newContacts[idx].phones ?? [""]).filter((_: string, i: number) => i !== phoneIdx);
+        newContacts[idx] = { ...newContacts[idx], phones: phones.length ? phones : [""] };
+        setContacts(newContacts);
     };
 
     const isSubmitting =
@@ -298,7 +333,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                         contacts: contacts.map(c => ({
                             name: c.name,
                             designation: c.designation || undefined,
-                            phone: c.phone || undefined,
+                            phones: (c.phones ?? (c.phone ? [c.phone] : [])).filter(Boolean),
                             email: c.email || undefined,
                             organization: c.organization || undefined,
                             departments: c.departments || undefined,
@@ -316,7 +351,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                         contacts: contacts.map(c => ({
                             name: c.name,
                             designation: c.designation || undefined,
-                            phone: c.phone || undefined,
+                            phones: (c.phones ?? (c.phone ? [c.phone] : [])).filter(Boolean),
                             email: c.email || undefined,
                             organization: c.organization || undefined,
                             departments: c.departments || undefined,
@@ -325,31 +360,64 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                 }
             }
 
-            // For multiple orders, immediately open the form for the next order in the batch
-            if (mode === "create" && values.orderType === "multiple" && !isNonTender && values.tenderId) {
-                navigate(`${paths.operations.woBasicDetailCreatePage}?tenderId=${values.tenderId}`, {
-                    replace: true,
-                    state: { from: returnTo },
-                });
-                toast.info("Order created. Fill the next order for the same tender.");
-                return;
-            }
-
             navigate(returnTo || paths.operations.woBasicDetailListPage);
         } catch (error: any) {
             toast.error(error?.message || "Failed to save basic detail");
         }
     };
 
-    const budgetTotal = useMemo(() => {
-        const s = Number(form.watch("budgetSupply") || 0);
-        const sv = Number(form.watch("budgetService") || 0);
-        const f = Number(form.watch("budgetFreight") || 0);
-        const a = Number(form.watch("budgetAdmin") || 0);
-        const b = Number(form.watch("budgetBuybackSale") || 0);
-        const g = Number(form.watch("budgetGemCharges") || 0);
+    const breakdownTotal = useMemo(() => {
+        const s = Number(watchBudgetSupply || 0);
+        const sv = Number(watchBudgetService || 0);
+        const f = Number(watchBudgetFreight || 0);
+        const a = Number(watchBudgetAdmin || 0);
+        const b = Number(watchBudgetBuybackSale || 0);
+        const g = Number(watchGemChargesAmount || 0);
         return s + sv + f + a + g - b;
-    }, [form.watch("budgetSupply"), form.watch("budgetService"), form.watch("budgetFreight"), form.watch("budgetAdmin"), form.watch("budgetBuybackSale"), form.watch("budgetGemCharges")]);
+    }, [watchBudgetSupply, watchBudgetService, watchBudgetFreight, watchBudgetAdmin, watchBudgetBuybackSale, watchGemChargesAmount]);
+
+    const hasBreakdownValues = useMemo(() => {
+        return [watchBudgetSupply, watchBudgetService, watchBudgetFreight, watchBudgetAdmin, watchBudgetBuybackSale]
+            .some(value => Number(value || 0) > 0);
+    }, [watchBudgetSupply, watchBudgetService, watchBudgetFreight, watchBudgetAdmin, watchBudgetBuybackSale]);
+
+    useEffect(() => {
+        if (showBreakdown && hasBreakdownValues) {
+            form.setValue("budgetPreGst", Number(breakdownTotal.toFixed(2)), { shouldDirty: true });
+        }
+    }, [showBreakdown, hasBreakdownValues, breakdownTotal, form]);
+
+    const step1Fields = useMemo<Array<keyof WoBasicDetailFormValues>>(() => {
+        const fields: Array<keyof WoBasicDetailFormValues> = [
+            "woNumber",
+            "woDate",
+            "woValuePreGst",
+            "woValueGstAmt",
+            "woDraft",
+        ];
+        if (isNonTender) {
+            fields.push("teamId", "organizationId", "itemId", "locationId");
+        }
+        return fields;
+    }, [isNonTender]);
+
+    const goToStep = async (step: 1 | 2, skipValidation = false) => {
+        if (step === 2 && !skipValidation) {
+            const valid = await form.trigger(step1Fields, { shouldFocus: true });
+            if (!valid) return;
+        }
+        setCurrentStep(step);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    const handleInvalidSubmit = () => {
+        const hasStep1Error = step1Fields.some(field =>
+            Boolean((form.formState.errors as Record<string, unknown>)[field as string]),
+        );
+        if (hasStep1Error) setCurrentStep(1);
+    };
+
+    const submitForm = form.handleSubmit(handleSubmit, handleInvalidSubmit);
 
     return (
         <Card>
@@ -377,8 +445,28 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                 </div>
             </CardHeader>
             <CardContent>
+                <div className="mb-6 grid grid-cols-2 gap-2">
+                    <button
+                        type="button"
+                        onClick={() => goToStep(1, true)}
+                        className={`rounded-lg border p-3 text-left transition-colors ${currentStep === 1 ? "border-primary bg-primary/5" : "border-border bg-muted/30"}`}
+                    >
+                        <span className="block text-xs text-muted-foreground">Step 1</span>
+                        <span className="text-sm font-semibold">Order & Document</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => goToStep(2, true)}
+                        className={`rounded-lg border p-3 text-left transition-colors ${currentStep === 2 ? "border-primary bg-primary/5" : "border-border bg-muted/30"}`}
+                    >
+                        <span className="block text-xs text-muted-foreground">Step 2</span>
+                        <span className="text-sm font-semibold">Costs & Review</span>
+                    </button>
+                </div>
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+                    <form onSubmit={submitForm} className="space-y-8">
+                        {currentStep === 1 && (
+                        <>
                         {/* Non-tender: Team/Org/Item/Location selects */}
                         {isNonTender && (
                             <>
@@ -423,16 +511,69 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                         <div className="grid gap-4 grid-cols-1 md:grid-cols-3 lg:grid-cols-4 items-start">
                             {/* Order Type: only eligible when linked to a tender */}
                             {!isNonTender && (
-                                <SelectField
-                                    control={form.control}
-                                    name="orderType"
-                                    label="Order Type"
-                                    options={[
-                                        { value: "single", label: "Single" },
-                                        { value: "multiple", label: "Multiple (part of a batch)" },
-                                    ]}
-                                    placeholder="Single"
-                                />
+                                <div className="space-y-1">
+                                    <SelectField
+                                        control={form.control}
+                                        name="orderType"
+                                        label="Order Type"
+                                        options={
+                                            hasExistingOrders
+                                                ? [
+                                                    { value: "repeat", label: `Repeat (R${nextOrderSequence})` },
+                                                    { value: "multiple", label: `Multiple — separate (P${nextOrderSequence})` },
+                                                ]
+                                                : [
+                                                    { value: "single", label: "Single" },
+                                                    { value: "repeat", label: "Repeat (R1)" },
+                                                    { value: "multiple", label: "Multiple — separate (P1)" },
+                                                ]
+                                        }
+                                        placeholder={hasExistingOrders ? "Select type" : "Single"}
+                                        disabled={mode === "edit"}
+                                    />
+                                    <p className="px-1 text-xs text-muted-foreground">
+                                        {hasExistingOrders
+                                            ? `This tender already has ${existingOrders.length} order(s). New order: #${nextOrderSequence}.`
+                                            : "Choose how this won tender will be tracked."}
+                                    </p>
+                                </div>
+                            )}
+
+                            <SelectField
+                                control={form.control}
+                                name="orderNature"
+                                label="Order Nature *"
+                                options={[
+                                    { value: "supply", label: "Supply" },
+                                    { value: "service", label: "Service" },
+                                    { value: "sitc", label: "SITC" },
+                                ]}
+                                placeholder="Select order nature"
+                            />
+
+                            <SelectField
+                                control={form.control}
+                                name="poReceivedStatus"
+                                label="PO Received *"
+                                options={[
+                                    { value: "received", label: "Received" },
+                                    { value: "not_received", label: "Not Received" },
+                                    { value: "not_applicable", label: "Not Applicable" },
+                                ]}
+                                placeholder="Select PO status"
+                            />
+
+                            {watchPoReceivedStatus === "received" && (
+                                <FieldWrapper control={form.control} name="sapPoUpload" label="Upload SAP PO *">
+                                    {field => (
+                                        <FileUploader
+                                            context="sap-po"
+                                            value={field.value ?? []}
+                                            onChange={paths => field.onChange(paths)}
+                                            disabled={isSubmitting}
+                                        />
+                                    )}
+                                </FieldWrapper>
                             )}
 
                             <FieldWrapper control={form.control} name="woNumber" label="WO Number">
@@ -483,42 +624,63 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                             </div>
                         </div>
 
-                        {mode === "create" && watchProjectName && (
-                            <ProjectNameWarningAlert
-                                projectName={watchProjectName}
-                                teamId={form.watch("teamId")}
-                                onSuffixChange={suggestion => setProjectNameSuffix(suggestion)}
-                            />
+                        <div className="flex flex-wrap items-center justify-end gap-2 pt-6 border-t">
+                            <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>
+                                Cancel
+                            </Button>
+                            <Button type="button" variant="ghost" onClick={() => goToStep(2, true)} disabled={isSubmitting}>
+                                <SkipForward className="mr-2 h-4 w-4" />
+                                Skip to costs
+                            </Button>
+                            <Button type="button" onClick={() => goToStep(2)} disabled={isSubmitting}>
+                                Next: Costs
+                                <ArrowRight className="ml-2 h-4 w-4" />
+                            </Button>
+                        </div>
+                        </>
                         )}
 
-                        {/* Checklist - only for tender mode */}
+                        {currentStep === 2 && (
+                        <>
+                        {/* Checklist - optional, collapsed */}
                         {!isNonTender && (
                             <>
                                 <div>
-                                    <h3 className="text-lg font-semibold flex items-center gap-2 mb-3">
-                                        <Check className="h-5 w-5 text-orange-500" />
-                                        Checklist confirmation from TE
-                                    </h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg border">
-                                        {tmsDocList.map((doc) => (
-                                            <div key={doc} className="flex items-center space-x-2">
-                                                <FieldWrapper control={form.control} name={`tmsDocuments.${doc}`} label="">
-                                                    {field => (
-                                                        <div className="flex items-center space-x-2">
-                                                            <Checkbox
-                                                                id={doc}
-                                                                checked={field.value || false}
-                                                                onCheckedChange={field.onChange}
-                                                            />
-                                                            <Label htmlFor={doc} className="text-sm cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis">
-                                                                {doc}
-                                                            </Label>
-                                                        </div>
-                                                    )}
-                                                </FieldWrapper>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowChecklist((value) => !value)}
+                                        className="flex w-full items-center justify-between rounded-lg border bg-muted/30 px-4 py-3 text-left"
+                                    >
+                                        <span className="flex items-center gap-2 text-sm font-semibold">
+                                            <Check className="h-4 w-4 text-orange-500" />
+                                            Checklist confirmation from TE
+                                        </span>
+                                        <Badge variant="secondary">
+                                            {Object.values(form.watch("tmsDocuments") || {}).filter(Boolean).length}/{tmsDocList.length}
+                                        </Badge>
+                                    </button>
+                                    {showChecklist && (
+                                        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg border">
+                                            {tmsDocList.map((doc) => (
+                                                <div key={doc} className="flex items-center space-x-2">
+                                                    <FieldWrapper control={form.control} name={`tmsDocuments.${doc}`} label="">
+                                                        {field => (
+                                                            <div className="flex items-center space-x-2">
+                                                                <Checkbox
+                                                                    id={doc}
+                                                                    checked={field.value || false}
+                                                                    onCheckedChange={field.onChange}
+                                                                />
+                                                                <Label htmlFor={doc} className="text-sm cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis">
+                                                                    {doc}
+                                                                </Label>
+                                                            </div>
+                                                        )}
+                                                    </FieldWrapper>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                                 <Separator />
                             </>
@@ -526,95 +688,59 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
 
                         {/* Pricing */}
                         <div>
-                            <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
+                            <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
                                 <TrendingUp className="h-5 w-5 text-orange-500" />
                                 Pricing Details
                             </h3>
-                            {!isNonTender && (
-                                <div className="max-w-xs mb-4">
-                                    <SelectField
-                                        control={form.control}
-                                        name="pricesChanged"
-                                        label="Is costing prices changed?"
-                                        options={YES_NO_OPTIONS}
-                                        placeholder="Select..."
-                                    />
+                            <p className="mb-4 text-sm text-muted-foreground">
+                                Prefilled from the costing sheet when available. Adjust only if needed.
+                            </p>
+                            <div className="grid gap-4 grid-cols-1 md:grid-cols-3 lg:grid-cols-4 items-start">
+                                <FieldWrapper control={form.control} name="budgetPreGst" label="Budget (Pre-GST)">
+                                    {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="receiptPreGst" label="Receipt (Pre-GST)">
+                                    {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="finalPrice" label="Final Price">
+                                    {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
+                                </FieldWrapper>
+                                <div className="space-y-1">
+                                    <p className="text-sm font-medium">Gross Margin</p>
+                                    <div className="flex h-9 items-center rounded-md border bg-muted/40 px-3 text-sm font-semibold">
+                                        {Number(watchBudget) > 0 && Number(watchReceipt) > 0
+                                            ? `${(((Number(watchReceipt) - Number(watchBudget)) / Number(watchReceipt)) * 100).toFixed(2)}%`
+                                            : "—"}
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground">Auto-calculated from receipt and budget</p>
                                 </div>
-                            )}
-                            {isNonTender ? (
-                                <div className="grid gap-4 grid-cols-1 md:grid-cols-3 lg:grid-cols-4 items-start">
-                                    <FieldWrapper control={form.control} name="budgetPreGst" label="Budget Price">
-                                        {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="receiptPreGst" label="Receipt Price">
-                                        {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="finalPrice" label="Final Price">
-                                        {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="grossMargin" label="Gross Margin %">
-                                        {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
-                                    </FieldWrapper>
-                                </div>
-                            ) : (
-                                <>
-                                    <ConditionalSection show={watchPricesChanged === "true"}>
-                                        <div className="grid gap-4 grid-cols-1 md:grid-cols-3 lg:grid-cols-4 items-start">
-                                            <FieldWrapper control={form.control} name="budgetPreGst" label="Budget Price">
-                                                {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
-                                            </FieldWrapper>
-                                            <FieldWrapper control={form.control} name="receiptPreGst" label="Receipt Price">
-                                                {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
-                                            </FieldWrapper>
-                                            <FieldWrapper control={form.control} name="finalPrice" label="Final Price">
-                                                {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
-                                            </FieldWrapper>
-                                            <FieldWrapper control={form.control} name="grossMargin" label="Gross Margin %">
-                                                {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
-                                            </FieldWrapper>
-                                        </div>
-                                    </ConditionalSection>
-                                    <ConditionalSection show={watchPricesChanged !== "true"}>
-                                        <div className="grid gap-4 grid-cols-1 md:grid-cols-3 lg:grid-cols-4 items-start p-4 bg-muted/30 rounded-lg border">
-                                            <div className="space-y-1">
-                                                <p className="text-sm text-muted-foreground">Budget Price</p>
-                                                <p className="font-semibold">₹{Number(form.watch("budgetPreGst") || 0).toLocaleString()}</p>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <p className="text-sm text-muted-foreground">Receipt Price</p>
-                                                <p className="font-semibold">₹{Number(form.watch("receiptPreGst") || 0).toLocaleString()}</p>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <p className="text-sm text-muted-foreground">Final Price</p>
-                                                <p className="font-semibold">₹{Number(form.watch("finalPrice") || 0).toLocaleString()}</p>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <p className="text-sm text-muted-foreground">Gross Margin</p>
-                                                <p className={`font-bold ${Number(form.watch("grossMargin")) < 0 ? 'text-destructive' : 'text-emerald-600'}`}>
-                                                    {form.watch("grossMargin") ? `${Number(form.watch("grossMargin")).toFixed(2)}%` : "---"}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </ConditionalSection>
-                                </>
-                            )}
+                            </div>
                         </div>
 
                         <Separator />
 
                         {/* Contact Details */}
                         <div>
-                            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                                <Plus className="h-5 w-5 text-orange-500" />
-                                Contact Details
-                            </h3>
+                            <button
+                                type="button"
+                                onClick={() => setShowContacts((value) => !value)}
+                                className="mb-3 flex w-full items-center justify-between rounded-lg border bg-muted/30 px-4 py-3 text-left"
+                            >
+                                <span className="flex items-center gap-2 text-sm font-semibold">
+                                    <Plus className="h-4 w-4 text-orange-500" />
+                                    Contact Details
+                                </span>
+                                <Badge variant="secondary">{contacts.length} contact(s)</Badge>
+                            </button>
+                            {showContacts && (
+                            <>
                             <div className="border rounded-lg overflow-hidden">
                                 <table className="w-full text-sm">
                                     <thead className="bg-muted">
                                         <tr>
                                             <th className="p-3 text-left">Name</th>
                                             <th className="p-3 text-left">Designation</th>
-                                            <th className="p-3 text-left">Phone</th>
+                                            <th className="p-3 text-left">Phone Numbers</th>
                                             <th className="p-3 text-left">Email</th>
                                             <th className="p-3 text-left w-10">Actions</th>
                                         </tr>
@@ -639,12 +765,38 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                                     />
                                                 </td>
                                                 <td className="p-2">
-                                                    <Input
-                                                        value={contact.phone || ""}
-                                                        onChange={(e) => handleUpdateContact(idx, "phone", e.target.value)}
-                                                        placeholder="Phone"
-                                                        className="h-8 text-xs"
-                                                    />
+                                                    <div className="space-y-2">
+                                                        {(contact.phones ?? (contact.phone ? [contact.phone] : [""])).map((phone: string, phoneIdx: number) => (
+                                                            <div key={phoneIdx} className="flex items-center gap-1">
+                                                                <Input
+                                                                    value={phone || ""}
+                                                                    onChange={(e) => handleUpdateContactPhone(idx, phoneIdx, e.target.value)}
+                                                                    placeholder={phoneIdx === 0 ? "Primary phone" : "Additional phone"}
+                                                                    className="h-8 text-xs"
+                                                                />
+                                                                {(contact.phones?.length ?? 1) > 1 && (
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-7 w-7"
+                                                                        onClick={() => handleRemoveContactPhone(idx, phoneIdx)}
+                                                                    >
+                                                                        <Trash2 className="h-3 w-3" />
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                        <Button
+                                                            type="button"
+                                                            variant="link"
+                                                            size="sm"
+                                                            className="h-auto p-0 text-xs"
+                                                            onClick={() => handleAddContactPhone(idx)}
+                                                        >
+                                                            + Add number
+                                                        </Button>
+                                                    </div>
                                                 </td>
                                                 <td className="p-2">
                                                     <Input
@@ -688,99 +840,137 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                 <Plus className="h-4 w-4 mr-2" />
                                 Add Custom Contact
                             </Button>
+                            </>
+                            )}
                         </div>
 
                         <Separator />
 
-                        {/* Budget Breakdown */}
-                        <div className="space-y-3">
+                        {/* Budget & GeM charges */}
+                        <div className="space-y-4">
                             <h3 className="text-lg font-semibold flex items-center gap-2">
                                 <Calculator className="h-5 w-5 text-orange-500" />
-                                Budget Breakdown
+                                Budget & GeM Charges
                             </h3>
-                            <div className="grid gap-4 grid-cols-1 md:grid-cols-3 lg:grid-cols-4 items-start">
-                                <FieldWrapper control={form.control} name="budgetSupply" label="Supply (pre GST)">
-                                    {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
-                                </FieldWrapper>
-                                <FieldWrapper control={form.control} name="budgetService" label="Service (pre GST)">
-                                    {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
-                                </FieldWrapper>
-                                <FieldWrapper control={form.control} name="budgetFreight" label="Freight (pre GST)">
-                                    {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
-                                </FieldWrapper>
-                                <FieldWrapper control={form.control} name="budgetAdmin" label="Admin/Misc. (pre GST)">
-                                    {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
-                                </FieldWrapper>
-                                <FieldWrapper control={form.control} name="budgetBuybackSale" label="Buyback Sale (pre GST)">
-                                    {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
-                                </FieldWrapper>
-                                <FieldWrapper control={form.control} name="budgetGemCharges" label="GeM Charges (pre GST)">
-                                    {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
-                                </FieldWrapper>
-                            </div>
-                            <div className="flex justify-end gap-4 items-center">
-                                <div className="p-2 bg-muted/30 rounded-lg border">
-                                    <p className="text-sm text-muted-foreground">Total Budget</p>
-                                    <p className="text-lg font-bold">₹{budgetTotal.toLocaleString()}</p>
-                                </div>
-                            </div>
+
                             <div className="grid gap-4 grid-cols-1 md:grid-cols-3 lg:grid-cols-4 items-start">
                                 <SelectField
                                     control={form.control}
                                     name="requestGemCharges"
-                                    label="Request GeM Charges Payment"
+                                    label="Request GeM charges payment"
                                     options={YES_NO_OPTIONS}
                                     placeholder=""
                                 />
-                                {/* GeM Charges Payment Request Section */}
-                                <ConditionalSection show={watchPaymentConsent === "true"} className="col-span-3">
-                                    <div className="space-y-3">
-                                        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 items-start">
-                                            <FieldWrapper control={form.control} name="gemChargesAmount" label="GeM Charges Amount (Pre-GST)">
-                                                {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
-                                            </FieldWrapper>
-                                            <FieldWrapper control={form.control} name="gemChargesPortalLink" label="Portal Link">
-                                                {field => <Input {...field} placeholder="Enter portal payment link..." value={field.value || ""} />}
-                                            </FieldWrapper>
-                                            <FieldWrapper control={form.control} name="gemChargesInvoice" label="Invoice" className="col-span-2">
-                                                {field => (
-                                                    <FileUploader
-                                                        context="wo-draft"
-                                                        value={field.value ?? []}
-                                                        onChange={paths => field.onChange(paths)}
-                                                    />
-                                                )}
-                                            </FieldWrapper>
-                                        </div>
-                                        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 p-4 rounded-lg border">
-                                            <div className="space-y-1">
-                                                <p className="text-sm text-muted-foreground">GST @ {GEM_GST_RATE}%</p>
-                                                <p>{formatINR(gemChargesBreakdown.gstAmount)}</p>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <p className="text-sm text-muted-foreground">Total Payable</p>
-                                                <p>{formatINR(gemChargesBreakdown.totalPayable)}</p>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <p className="text-sm text-muted-foreground">TDS @ {GEM_TDS_RATE}%</p>
-                                                <p className="text-destructive">-{formatINR(gemChargesBreakdown.tdsAmount)}</p>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <p className="text-sm text-muted-foreground">Net Payable</p>
-                                                <p className="text-emerald-600">{formatINR(gemChargesBreakdown.netPayable)}</p>
-                                            </div>
-                                        </div>
-                                        <p className="text-xs text-muted-foreground">
-                                            The maker request will be auto-created for the Net Payable amount ({formatINR(gemChargesBreakdown.netPayable)}).
-                                        </p>
-                                    </div>
-                                </ConditionalSection>
+                                <FieldWrapper
+                                    control={form.control}
+                                    name="gemChargesAmount"
+                                    label={prefillData?.isGemTender ? "GeM Charges (Pre-GST) *" : "GeM Charges (Pre-GST)"}
+                                >
+                                    {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value ?? ""} />}
+                                </FieldWrapper>
                             </div>
+
+                            {prefillData?.isGemTender && (
+                                <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+                                    <Info className="h-4 w-4" />
+                                    <AlertTitle>This tender was bid on GeM</AlertTitle>
+                                    <AlertDescription>
+                                        GeM charges are required. Enter 0 if there were no GeM charges.
+                                    </AlertDescription>
+                                </Alert>
+                            )}
+
+                            {watchPaymentConsent === "true" && (
+                                <div className="space-y-3 rounded-lg border p-4">
+                                    <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 items-start">
+                                        <FieldWrapper control={form.control} name="gemChargesPortalLink" label="Portal Link">
+                                            {field => <Input {...field} placeholder="Enter portal payment link..." value={field.value || ""} />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="gemChargesInvoice" label="Invoice" className="col-span-2">
+                                            {field => (
+                                                <FileUploader
+                                                    context="wo-draft"
+                                                    value={field.value ?? []}
+                                                    onChange={paths => field.onChange(paths)}
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                    </div>
+                                    <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 p-4 rounded-lg border">
+                                        <div className="space-y-1">
+                                            <p className="text-sm text-muted-foreground">GST @ {GEM_GST_RATE}%</p>
+                                            <p>{formatINR(gemChargesBreakdown.gstAmount)}</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-sm text-muted-foreground">Total Payable</p>
+                                            <p>{formatINR(gemChargesBreakdown.totalPayable)}</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-sm text-muted-foreground">TDS @ {GEM_TDS_RATE}%</p>
+                                            <p className="text-destructive">-{formatINR(gemChargesBreakdown.tdsAmount)}</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-sm text-muted-foreground">Net Payable</p>
+                                            <p className="text-emerald-600">{formatINR(gemChargesBreakdown.netPayable)}</p>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                        The maker request will be auto-created for the Net Payable amount ({formatINR(gemChargesBreakdown.netPayable)}).
+                                    </p>
+                                </div>
+                            )}
+
+                            <Button type="button" variant="ghost" size="sm" onClick={() => setShowBreakdown((value) => !value)}>
+                                {showBreakdown ? "Hide" : "Show"} detailed budget breakdown
+                            </Button>
+
+                            {showBreakdown && (
+                                <div className="space-y-3 rounded-lg border p-4">
+                                    <div className="grid gap-4 grid-cols-1 md:grid-cols-3 lg:grid-cols-4 items-start">
+                                        <FieldWrapper control={form.control} name="budgetSupply" label="Supply (pre GST)">
+                                            {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="budgetService" label="Service (pre GST)">
+                                            {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="budgetFreight" label="Freight (pre GST)">
+                                            {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="budgetAdmin" label="Admin/Misc. (pre GST)">
+                                            {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="budgetBuybackSale" label="Buyback Sale (pre GST)">
+                                            {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
+                                        </FieldWrapper>
+                                    </div>
+                                    <div className="flex justify-end">
+                                        <div className="rounded-lg border bg-muted/30 p-3">
+                                            <p className="text-sm text-muted-foreground">Calculated budget</p>
+                                            <p className="text-lg font-bold">₹{breakdownTotal.toLocaleString()}</p>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                        When breakdown values are entered, the Budget (Pre-GST) field is updated automatically.
+                                    </p>
+                                </div>
+                            )}
                         </div>
 
-                        <div className="flex justify-end gap-2 pt-6 border-t">
-                            <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>
-                                Cancel
+                        <Separator />
+
+                        {/* Review */}
+                        <div className="space-y-1 rounded-lg border bg-muted/30 p-4 text-sm">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Review</p>
+                            <p><span className="text-muted-foreground">Project:</span> {form.watch("projectCode") || "—"} · {form.watch("projectName") || "—"}</p>
+                            <p><span className="text-muted-foreground">Work order:</span> {form.watch("woNumber") || "—"}</p>
+                            <p><span className="text-muted-foreground">Order type:</span> {watchOrderType || "single"}</p>
+                            <p><span className="text-muted-foreground">GeM charges:</span> {watchGemChargesAmount ?? 0}{watchPaymentConsent === "true" ? " (payment request)" : ""}</p>
+                        </div>
+
+                        <div className="flex flex-wrap justify-end gap-2 pt-6 border-t">
+                            <Button type="button" variant="outline" onClick={() => goToStep(1, true)} disabled={isSubmitting}>
+                                <ArrowLeft className="mr-2 h-4 w-4" />
+                                Back
                             </Button>
                             <Button type="button" variant="ghost" onClick={() => form.reset(initialValues)} disabled={isSubmitting}>
                                 Reset
@@ -791,6 +981,8 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                 Submit
                             </Button>
                         </div>
+                        </>
+                        )}
                     </form>
                 </Form>
             </CardContent>

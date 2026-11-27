@@ -7,6 +7,17 @@ import type {
 
 const BASE_URL = '/files';
 
+const LEGACY_CONTEXT_ALIASES: Record<string, string> = {
+    draftWo: 'wo-draft',
+};
+
+const normalizeLegacyContext = (filePath: string): string => {
+    const segments = filePath.replace(/\\/g, '/').replace(/^\/+/, '').split('/');
+    const canonical = LEGACY_CONTEXT_ALIASES[segments[0]];
+    if (canonical) segments[0] = canonical;
+    return segments.join('/');
+};
+
 export const fileUploadService = {
     /**
      * Get all configs
@@ -52,7 +63,7 @@ export const fileUploadService = {
      */
     getFileUrl: (filePath: string): string => {
         const baseUrl = axiosInstance.defaults.baseURL || '';
-        return `${baseUrl}${BASE_URL}/serve/${filePath}`;
+        return `${baseUrl}${BASE_URL}/serve/${normalizeLegacyContext(filePath)}`;
     },
 
     /**

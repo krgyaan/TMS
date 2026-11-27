@@ -247,7 +247,7 @@ export class ClientDirectoryService {
             { name: sql<string>`client_name`, email: sql<string | null>`client_email`, phone: sql<string | null>`client_mobile`, org: sql<string | null>`NULL`, table: sql`tender_clients` },
             { name: sql<string>`name`, email: sql<string | null>`email`, phone: sql<string | null>`phone`, org: sql<string | null>`NULL`, table: sql`physical_docs_persons` },
             { name: sql<string>`name`, email: sql<string | null>`email`, phone: sql<string | null>`phone`, org: sql<string | null>`organization`, table: sql`follow_up_persons` },
-            { name: sql<string>`name`, email: sql<string | null>`email`, phone: sql<string | null>`phone`, org: sql<string | null>`organization`, table: sql`wo_contacts` },
+            { name: sql<string>`name`, email: sql<string | null>`email`, phone: sql<string | null>`phones->>0`, org: sql<string | null>`organization`, table: sql`wo_contacts` },
             { name: sql<string>`name`, email: sql<string | null>`email`, phone: sql<string | null>`mobile`, org: sql<string | null>`NULL`, table: sql`vendors` },
             // vendor_contact_person_* is the vendor's person. contact_person_* on
             // these two tables is our own employee and does not belong in a

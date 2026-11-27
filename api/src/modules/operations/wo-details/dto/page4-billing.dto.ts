@@ -7,7 +7,10 @@ import { DecimalSchema, PositiveIntSchema } from "./wo-details.dto";
 export const BOQItemSchema = z.object({
   id: PositiveIntSchema.optional(),
   srNo: z.number().int().positive("SR No must be positive"),
+  inventoryItemId: PositiveIntSchema.nullable().optional(),
+  itemCode: z.string().trim().max(80).nullable().optional(),
   itemDescription: z.string().min(1, "Item description is required"),
+  hsnSac: z.string().trim().max(100).nullable().optional(),
   quantity: DecimalSchema,
   rate: DecimalSchema,
   amount: DecimalSchema.optional(), // Basic amount (qty * rate), calculated server-side
@@ -50,6 +53,7 @@ export type AddressDto = z.infer<typeof AddressSchema>;
  * Save Page 4 data (all optional for drafts)
  */
 export const SavePage4Schema = z.object({
+  orderNature: z.enum(["supply", "service", "sitc"]).optional(),
   billingBoq: z.array(BOQItemSchema).optional(),
   buybackBoq: z.array(BOQItemSchema).optional(),
   buybackBoqApplicable: z.boolean().optional(),
@@ -63,6 +67,7 @@ export type SavePage4Dto = z.infer<typeof SavePage4Schema>;
  * Submit Page 4 (validates required fields)
  */
 export const SubmitPage4Schema = z.object({
+  orderNature: z.enum(["supply", "service", "sitc"]).optional(),
   billingBoq: z
     .array(BOQItemSchema)
     .min(1, "At least one billing BOQ item is required"),

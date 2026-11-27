@@ -57,7 +57,7 @@ const Operations_CreateBiFdr = lazy(() => import("@/modules/operations/project-d
 const Operations_CreateBiDemandDraft = lazy(() => import("@/modules/operations/project-dashboard/pages/CreateBiDemandDraftPage"));
 const Operations_BiRequestView = lazy(() => import("@/modules/operations/project-dashboard/pages/BiRequestViewPage"));
 const Operations_ItemMaster = lazy(() => import("@/modules/accounts/inventory-items/InventoryItemListPage"));
-const Operations_ItemMaster_Detail = lazy(() => import("@/modules/accounts/inventory-items/InventoryItemDetailPage"));
+const Operations_ItemMaster_Detail = lazy(() => import("@/modules/accounts/inventory-items/InventoryItemShowPage"));
 
 export default function OperationsRoutes() {
     return (

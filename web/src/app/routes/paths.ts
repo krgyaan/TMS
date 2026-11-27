@@ -462,10 +462,10 @@ export const paths = {
         followUpShow: (id: number) => `/shared/follow-up/show/${id}`,
 
         couriers: "/shared/couriers",
-        courierDispatch: (id: number) => `/shared/couriers/dispatch/${id}`,
         courierCreate: "/shared/couriers/create",
         courierView: (id: number) => `/shared/couriers/show/${id}`,
         courierEdit: (id: number) => `/shared/couriers/edit/${id}`,
+        courierAction: (id: number) => `/shared/couriers/action/${id}`,
 
         imprest: "/shared/imprests",
         imprestUser: (id: number) => `/shared/imprests/user/${id}`,
@@ -533,6 +533,8 @@ export const paths = {
             create: "/hrms/complaints/create",
             view: (id: number | string) => `/hrms/complaints/${id}/view`,
         },
+
+        officeInventory: "/hrms/office-inventory",
         
         //================ onboarding  ==============================//
         onboardingDashboard: "/hrms/onboarding/dashboard",

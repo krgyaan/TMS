@@ -222,7 +222,7 @@ export function WoDetailsWizard({
             case 3:
                 return <Page3Swot {...commonProps} initialData={pageInitialData as any} />;
             case 4:
-                return <Page4Billing {...commonProps} initialData={pageInitialData as any} />;
+                return <Page4Billing {...commonProps} initialData={pageInitialData as any} basicDetail={basicDetail} />;
             case 5:
                 return <Page5Execution {...commonProps} initialData={pageInitialData as any} />;
             case 6:

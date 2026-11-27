@@ -1,38 +1,33 @@
 import { paths } from "@/app/routes/paths";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
-import { Button } from "@/components/ui/button";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import DataTable from "@/components/ui/data-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProjectPaymentRequests } from "@/hooks/api/useProjectPaymentRequests";
-import { useHasWCInsurance } from "@/hooks/api/useProjectInsurance";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
 import type { PaymentRequestRow } from "@/modules/operations/payment-requests/helpers/paymentRequest.types";
-import { calculateTds } from "@/modules/operations/payment-requests/helpers/tds-calculator";
+import { computeRowTdsDisplay } from "@/modules/operations/payment-requests/helpers/tds-calculator";
 import { PaymentRequestDetailDialog } from "@/modules/operations/payment-requests/components/PaymentRequestDetailDialog";
 import type { ColDef, GridApi, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
-import { Edit, Eye, Plus } from "lucide-react";
+import { Edit, Eye } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PAYMENT_AGAINST_LABELS } from "@/modules/operations/payment-requests/constants";
 
 interface PaymentRequestsSectionProps {
     projectId: number | null;
-    insuranceRequired?: boolean;
 }
 
 export const PaymentRequestsSection: React.FC<PaymentRequestsSectionProps> = ({
     projectId,
-    insuranceRequired = true,
 }) => {
     const navigate = useNavigate();
     const [prGridApi, setPrGridApi] = useState<GridApi | null>(null);
     const { data, isLoading } = useProjectPaymentRequests(projectId!);
-    const { hasWC } = useHasWCInsurance(projectId ?? 0, insuranceRequired);
 
     const paymentRequests = data ?? [];
 
@@ -90,14 +85,7 @@ export const PaymentRequestsSection: React.FC<PaymentRequestsSectionProps> = ({
             field: "netPayable" as keyof PaymentRequestRow,
             headerName: "Net Payable",
             sortable: false,
-            valueGetter: (p) => {
-                const amount = Number(p.data?.amount || 0);
-                if (p.data?.status === "payment_done") {
-                    return amount - Number(p.data?.actualTdsDeducted ?? 0);
-                }
-                const tdsPct = Number(p.data?.tdsPercentage || 0);
-                return tdsPct > 0 ? calculateTds(amount, tdsPct).netPayable : amount;
-            },
+            valueGetter: (p) => (p.data ? computeRowTdsDisplay(p.data).netPayable : 0),
             valueFormatter: (p: ValueFormatterParams) => formatINR(p.value),
         },
         {
@@ -165,17 +153,6 @@ export const PaymentRequestsSection: React.FC<PaymentRequestsSectionProps> = ({
                             <CardTitle className="text-base font-semibold">
                                 Payment Requests
                             </CardTitle>
-                            <CardAction>
-                                <Button
-                                    size="sm"
-                                    variant="default"
-                                    disabled={!hasWC}
-                                    onClick={() => navigate(paths.operations.raiseProjectPaymentRequestForm(projectId))}
-                                >
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Request for Payment
-                                </Button>
-                            </CardAction>
                         </div>
                         <CardDescription>
                             {paymentRequests.length} request{paymentRequests.length !== 1 ? 's' : ''} found

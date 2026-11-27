@@ -95,8 +95,11 @@ export interface WoBasicDetail {
   projectCode: string | null;
   projectName: string | null;
   currentStage: WorkflowStage | null;
-  orderType: string | null;       // 'single' | 'multiple'
+  orderType: string | null;       // 'single' | 'repeat' | 'multiple'
   orderSequence: number | null;   // 1, 2, 3... within the same tender
+  orderNature?: string | null;
+  poReceivedStatus?: string | null;
+  sapPoUpload?: string | string[] | null;
   woValuePreGst: string | null;
   woValueGstAmt: string | null;
   receiptPreGst: string | null;
@@ -179,8 +182,11 @@ export interface WoDetailsHistoryEntry {
 export interface CreateWoBasicDetailDto {
   tenderId?: number;
   enquiryId?: number;
-  orderType?: 'single' | 'multiple';
+  orderType?: 'single' | 'repeat' | 'multiple';
   orderSequence?: number;
+  orderNature?: 'supply' | 'service' | 'sitc';
+  poReceivedStatus?: 'received' | 'not_received' | 'not_applicable';
+  sapPoUpload?: string;
   woNumber?: string;
   woDate?: string;
   projectCode?: string;
@@ -207,6 +213,51 @@ export interface CreateWoBasicDetailDto {
 }
 
 export interface UpdateWoBasicDetailDto extends Partial<Omit<CreateWoBasicDetailDto, 'tenderId' | 'enquiryId'>> {}
+
+export interface CreateWoBasicDetailBatchOrderDto {
+  woNumber: string;
+  woDate: string;
+  woValuePreGst: string;
+  woValueGstAmt: string;
+  projectCode?: string;
+  projectName?: string;
+  woDraft?: string;
+  budgetPreGst?: string;
+  receiptPreGst?: string;
+  grossMargin?: string;
+  finalPrice?: string;
+  budgetSupply?: string;
+  budgetService?: string;
+  budgetFreight?: string;
+  budgetAdmin?: string;
+  budgetBuybackSale?: string;
+  orderNature: 'supply' | 'service' | 'sitc';
+  poReceivedStatus: 'received' | 'not_received' | 'not_applicable';
+  sapPoUpload?: string;
+  requestGemCharges?: boolean;
+  gemChargesAmount?: number;
+  gemChargesPortalLink?: string;
+  gemChargesInvoice?: string;
+  contacts?: Array<{
+    name?: string;
+    designation?: string;
+    phone?: string;
+    email?: string;
+    organization?: string;
+    departments?: string;
+  }>;
+}
+
+export interface CreateWoBasicDetailBatchDto {
+  tenderId?: number;
+  teamId?: number | null;
+  organizationId?: number | null;
+  itemId?: number | null;
+  locationId?: number | null;
+  orderType: 'single' | 'repeat' | 'multiple';
+  tmsDocuments?: TmsDocuments;
+  orders: CreateWoBasicDetailBatchOrderDto[];
+}
 
 export interface AssignOeDto {
   woBasicDetailId: number | null;
@@ -265,6 +316,8 @@ export interface WoBasicDetailsFilters {
 
 export interface WoBasicDetailPrefillData {
   team: number | null;
+  websiteId: number | null;
+  isGemTender: boolean;
   organizationAcronym: string | null;
   itemName: string | null;
   locationName: string | null;
@@ -314,6 +367,7 @@ export interface WoContact {
   name: string | null;
   designation: string | null;
   phone: string | null;
+  phones: string[];
   email: string | null;
   createdAt: string;
   updatedAt: string;
@@ -326,6 +380,7 @@ export interface CreateWoContactDto {
   name?: string;
   designation?: string;
   phone?: string;
+  phones?: string[];
   email?: string;
 }
 
@@ -581,7 +636,10 @@ export interface WoBillingBoq {
   id: number;
   woDetailId: number;
   srNo: number;
+  inventoryItemId: number | null;
+  itemCode: string | null;
   itemDescription: string;
+  hsnSac: string | null;
   quantity: string;
   rate: string;
   amount: string | null;
@@ -596,7 +654,10 @@ export interface WoBillingBoq {
 export interface CreateWoBillingBoqDto {
   woDetailId: number;
   srNo: number;
+  inventoryItemId?: number | null;
+  itemCode?: string | null;
   itemDescription: string;
+  hsnSac?: string | null;
   quantity: string;
   rate: string;
   gstRate?: string;
@@ -605,7 +666,10 @@ export interface CreateWoBillingBoqDto {
 
 export interface UpdateWoBillingBoqDto {
   srNo?: number;
+  inventoryItemId?: number | null;
+  itemCode?: string | null;
   itemDescription?: string;
+  hsnSac?: string | null;
   quantity?: string;
   rate?: string;
   gstRate?: string;
@@ -621,7 +685,10 @@ export interface WoBuybackBoq {
   id: number;
   woDetailId: number;
   srNo: number;
+  inventoryItemId: number | null;
+  itemCode: string | null;
   itemDescription: string;
+  hsnSac: string | null;
   quantity: string;
   rate: string;
   amount: string | null;
@@ -636,7 +703,10 @@ export interface WoBuybackBoq {
 export interface CreateWoBuybackBoqDto {
   woDetailId: number;
   srNo: number;
+  inventoryItemId?: number | null;
+  itemCode?: string | null;
   itemDescription: string;
+  hsnSac?: string | null;
   quantity: string;
   rate: string;
   gstRate?: string;
@@ -645,7 +715,10 @@ export interface CreateWoBuybackBoqDto {
 
 export interface UpdateWoBuybackBoqDto {
   srNo?: number;
+  inventoryItemId?: number | null;
+  itemCode?: string | null;
   itemDescription?: string;
+  hsnSac?: string | null;
   quantity?: string;
   rate?: string;
   gstRate?: string;

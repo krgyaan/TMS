@@ -17,7 +17,7 @@ interface ProjectSummarySheetSectionProps {
 
 function BoqTable(
     { title, icon, items }: 
-    { title: string; icon: React.ReactNode; items: Array<{ srNo: number; itemDescription: string; quantity: string; rate: string; amount: string | null; gstRate: string | null; gstAmount: string | null; totalAmount: string | null }>}
+    { title: string; icon: React.ReactNode; items: Array<{ srNo: number; itemCode?: string | null; itemDescription: string; quantity: string; rate: string; amount: string | null; gstRate: string | null; gstAmount: string | null; totalAmount: string | null }>}
 ) {
     const getRowValues = (item: (typeof items)[number]) => {
         const quantity = parseFloat(item.quantity) || 0;
@@ -42,6 +42,7 @@ function BoqTable(
                     <TableHeader>
                         <TableRow className="bg-muted/50">
                             <TableHead className="w-16">Sr. No.</TableHead>
+                            <TableHead>Item Code</TableHead>
                             <TableHead>Item Description</TableHead>
                             <TableHead className="text-right">Quantity</TableHead>
                             <TableHead className="text-right">Rate</TableHead>
@@ -57,6 +58,7 @@ function BoqTable(
                             return (
                                 <TableRow key={idx} className="hover:bg-muted/30 transition-colors">
                                     <TableCell>{idx + 1}</TableCell>
+                                    <TableCell className="font-mono text-xs">{item.itemCode || "—"}</TableCell>
                                     <TableCell>{item.itemDescription}</TableCell>
                                     <TableCell className="text-right">{item.quantity}</TableCell>
                                     <TableCell className="text-right">{formatINR(parseFloat(item.rate))}</TableCell>
@@ -69,7 +71,7 @@ function BoqTable(
                         })}
                         {items.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={8} className="text-center py-6 text-muted-foreground italic">
+                                <TableCell colSpan={9} className="text-center py-6 text-muted-foreground italic">
                                     No items
                                 </TableCell>
                             </TableRow>
@@ -77,7 +79,7 @@ function BoqTable(
                     </TableBody>
                     {items.length > 0 && (
                         <TableRow className="bg-muted/30 font-semibold">
-                            <TableCell colSpan={7} className="text-right">Total</TableCell>
+                            <TableCell colSpan={8} className="text-right">Total</TableCell>
                             <TableCell className="text-right">{formatINR(total)}</TableCell>
                         </TableRow>
                     )}

@@ -60,7 +60,7 @@ export default function CostingSheetShowPage() {
                                 {basicDetails.length > 1 && (
                                     <h4 className="text-sm font-semibold text-muted-foreground">
                                         Order {idx + 1}
-                                        {wo.orderType === "multiple" && wo.orderSequence ? ` · #${wo.orderSequence}` : ""}
+                                        {wo.orderSequence && wo.orderSequence > 1 ? ` · ${wo.orderType === "repeat" ? "R" : "P"}${wo.orderSequence}` : ""}
                                     </h4>
                                 )}
                                 <BasicDetailsSection woBasicDetailId={wo.id} />

@@ -1,5 +1,6 @@
 import type {
   AssignOeDto,
+  CreateWoBasicDetailBatchDto,
   CreateWoBasicDetailDto,
   OeAssignments,
   PaginatedResult,
@@ -60,6 +61,10 @@ class WoBasicDetailsService extends BaseApiService {
 
   async create(data: CreateWoBasicDetailDto): Promise<WoBasicDetail> {
     return this.post<WoBasicDetail>('', data);
+  }
+
+  async createBatch(data: CreateWoBasicDetailBatchDto): Promise<WoBasicDetail[]> {
+    return this.post<WoBasicDetail[]>('/batch', data);
   }
 
   async update(id: number, data: UpdateWoBasicDetailDto): Promise<WoBasicDetail> {

@@ -65,7 +65,7 @@ export default function ProjectDashboardPage() {
             <SaleInvoicesSection projectId={projectId} />
             <InventorySection projectId={projectId} />
             <PurchaseInvoicesSection projectId={projectId} />
-            <PaymentRequestsSection projectId={projectId} insuranceRequired={insuranceRequired} />
+            <PaymentRequestsSection projectId={projectId} />
             <BiRequestsSection projectId={projectId} />
             <InsuranceSection projectId={projectId} />
             <EmployeeImprestsSection projectId={projectId} />

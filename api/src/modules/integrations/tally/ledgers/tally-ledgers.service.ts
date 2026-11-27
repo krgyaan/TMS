@@ -63,9 +63,7 @@ export class TallyLedgersService {
         const changed = plan.updates.filter(update => {
             const previous = existingById.get(update.id);
 
-            return (
-                !previous || previous.name !== update.name || previous.parent !== update.parent || previous.guid !== update.guid || !previous.isActive
-            );
+            return !previous || previous.name !== update.name || previous.parent !== update.parent || previous.guid !== update.guid || !previous.isActive;
         });
 
         const changedIds = new Set(changed.map(update => update.id));
@@ -165,7 +163,10 @@ export class TallyLedgersService {
                 .orderBy(asc(tallyLedgers.name))
                 .limit(limit)
                 .offset((page - 1) * limit),
-            this.db.select({ total: sql<number>`count(*)` }).from(tallyLedgers).where(where),
+            this.db
+                .select({ total: sql<number>`count(*)` })
+                .from(tallyLedgers)
+                .where(where),
         ]);
 
         return { data: rows, page, limit, total: Number(totalRows[0]?.total ?? 0) };

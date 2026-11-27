@@ -132,7 +132,12 @@ const bgDetails = z.object({
     bgClientCpEmail: z.string().email().optional().or(z.literal("")),
     bgClientFinanceEmail: z.string().email().optional().or(z.literal("")),
     bgCourierAddress: optionalString,
-    bgCourierDays: optionalNumber(z.coerce.number().min(1).max(10)),
+    // Legacy field no longer captured by the BG forms. Null is tolerated here
+    // because older edit payloads may still include it from the instrument.
+    bgCourierDays: z.preprocess(
+        (value) => (value === null ? undefined : value),
+        optionalNumber(z.coerce.number().min(1).max(10)),
+    ),
     bgCourierOrg: optionalString,
     bgCourierName: optionalString,
     bgCourierPhone: optionalString,

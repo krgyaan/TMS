@@ -114,14 +114,12 @@ export function Page5Execution({
 
     const DocumentList = ({
         title,
-        icon: Icon,
         fields,
         namePrefix,
         onAdd,
         onRemove,
     }: {
         title: string;
-        icon: React.ElementType;
         fields: any[];
         namePrefix: string;
         onAdd: () => void;
@@ -184,7 +182,6 @@ export function Page5Execution({
                                 <MapPinned className="h-4 w-4 text-muted-foreground" />
                                 Site Visit Assessment
                             </h3>
-                            <p className="text-xs text-muted-foreground mb-4">Determine if a site visit is necessary for project execution.</p>
                             <div className="max-w-xs mb-4">
                                 <SelectField
                                     control={form.control}
@@ -221,9 +218,8 @@ export function Page5Execution({
                         <div>
                             <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
                                 <FileText className="h-4 w-4 text-muted-foreground" />
-                                Documentation & OEM Approvals
+                                Product/Document Approval
                             </h3>
-                            <p className="text-xs text-muted-foreground mb-4">Identify documents that need to be collected or prepared.</p>
 
                             {(tenderFormDocs.length > 0 || rfqResponseDocs.length > 0) && (
                                 <div className="mb-6 p-4 border border-dashed rounded-lg space-y-4 bg-muted/20">
@@ -277,15 +273,13 @@ export function Page5Execution({
                             <div className="grid gap-6 md:grid-cols-3">
                                 <DocumentList
                                     title="Available from Tendering"
-                                    icon={FileText}
                                     fields={docsFromTenderingFields}
                                     namePrefix="documentsFromTendering"
                                     onAdd={() => appendDocFromTendering("" as any)}
                                     onRemove={removeDocFromTendering}
                                 />
                                 <DocumentList
-                                    title="Additional Documents Needed"
-                                    icon={FileText}
+                                    title="Documents needed from OEM"
                                     fields={docsNeededFields}
                                     namePrefix="documentsNeeded"
                                     onAdd={() => appendDocNeeded("" as any)}
@@ -293,7 +287,6 @@ export function Page5Execution({
                                 />
                                 <DocumentList
                                     title="To be Created In-House"
-                                    icon={FileText}
                                     fields={docsInHouseFields}
                                     namePrefix="documentsInHouse"
                                     onAdd={() => appendDocInHouse("" as any)}

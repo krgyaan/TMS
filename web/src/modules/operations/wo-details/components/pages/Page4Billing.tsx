@@ -7,16 +7,20 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { MapPin, Package, Plus, Receipt, Trash2, Truck } from "lucide-react";
+import { ExternalLink, MapPin, Package, Plus, Receipt, Trash2, Truck } from "lucide-react";
 import { useCallback, useEffect, useMemo } from "react";
 import { useFieldArray, useForm, useWatch, type Resolver } from "react-hook-form";
 
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { useAutoSave } from "@/hooks/api/useWoDetails";
+import { parseFileArray } from "@/lib/utils";
+import { resolveFileUrl } from "@/modules/operations/helpers/resolveFileUrl";
+import { ItemCodeCombobox } from "@/modules/operations/wo-details/components/ItemCodeCombobox";
 import { WizardNavigation } from "@/modules/operations/wo-details/components/WizardNavigation";
-import { WIZARD_CONFIG, GST_OPTIONS, YES_NO_OPTIONS } from "@/modules/operations/wo-details/helpers/constants";
+import { WIZARD_CONFIG, GST_OPTIONS, ORDER_NATURE_OPTIONS, YES_NO_OPTIONS } from "@/modules/operations/wo-details/helpers/constants";
 import { Page4FormSchema } from "@/modules/operations/wo-details/helpers/woDetail.schema";
+import type { WoBasicDetail } from "@/modules/operations/types/wo.types";
 import { formToApi } from "../../helpers/woDetail.mapper";
 
 import NumberInput from "@/components/form/NumberInput";
@@ -24,11 +28,15 @@ import type { Address, BOQItem, Page4FormValues, PageFormProps } from "@/modules
 
 interface Page4BillingProps extends PageFormProps {
     initialData?: Partial<Page4FormValues>;
+    basicDetail?: WoBasicDetail | null;
 }
 
 const defaultBoqItem: BOQItem = {
     srNo: 1,
+    inventoryItemId: null,
+    itemCode: "",
     itemDescription: "",
+    hsnSac: "",
     quantity: 0,
     rate: 0,
     gstRate: 0,
@@ -77,10 +85,11 @@ const calculateBoqTotals = (items: BOQItem[] | undefined): BoqTotals =>
 const formatAmount = (value: number): string =>
     `₹${value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export function Page4Billing({ woDetailId, initialData, onSaveDraft, onSaveDraftOnly, onSkip, onBack, isSaving }: Page4BillingProps) {
+export function Page4Billing({ woDetailId, initialData, basicDetail, onSaveDraft, onSaveDraftOnly, onSkip, onBack, isSaving }: Page4BillingProps) {
     const form = useForm<Page4FormValues>({
         resolver: zodResolver(Page4FormSchema) as Resolver<Page4FormValues>,
         defaultValues: {
+            orderNature: initialData?.orderNature ?? (basicDetail?.orderNature as Page4FormValues["orderNature"]) ?? "",
             buybackBoqApplicable: initialData?.buybackBoqApplicable ?? "false",
             billingBoq: initialData?.billingBoq?.length ? initialData.billingBoq : [defaultBoqItem],
             buybackBoq: initialData?.buybackBoq || [],
@@ -88,6 +97,9 @@ export function Page4Billing({ woDetailId, initialData, onSaveDraft, onSaveDraft
             shippingAddresses: initialData?.shippingAddresses?.length ? initialData.shippingAddresses : [defaultAddress],
         },
     });
+
+    const woDraftFiles = parseFileArray(basicDetail?.woDraft);
+    const sapPoFiles = parseFileArray(basicDetail?.sapPoUpload);
 
     const {
         fields: billingBoqFields,
@@ -133,6 +145,7 @@ export function Page4Billing({ woDetailId, initialData, onSaveDraft, onSaveDraft
     useEffect(() => {
         if (initialData) {
             form.reset({
+                orderNature: form.getValues("orderNature") ?? "",
                 buybackBoqApplicable: initialData.buybackBoqApplicable ?? "false",
                 billingBoq: initialData.billingBoq?.length ? initialData.billingBoq : [defaultBoqItem],
                 buybackBoq: initialData.buybackBoq || [],
@@ -141,6 +154,13 @@ export function Page4Billing({ woDetailId, initialData, onSaveDraft, onSaveDraft
             });
         }
     }, [initialData, form]);
+
+    useEffect(() => {
+        if (!basicDetail?.orderNature) return;
+        if (!form.getValues("orderNature")) {
+            form.setValue("orderNature", basicDetail.orderNature as Page4FormValues["orderNature"]);
+        }
+    }, [basicDetail?.orderNature, form]);
 
     const handleSaveAndContinue = useCallback(async () => {
         const errors = await onSaveDraft(form.getValues());
@@ -175,11 +195,13 @@ export function Page4Billing({ woDetailId, initialData, onSaveDraft, onSaveDraft
                 {title}
             </h3>
             <div className="border rounded-lg overflow-x-auto">
-                <table className="w-full text-sm min-w-[1040px]">
+                <table className="w-full text-sm min-w-[1400px]">
                     <thead className="bg-muted">
                         <tr>
                             <th className="p-3 text-left w-16">Sr. No.</th>
+                            <th className="p-3 text-left min-w-[180px]">Item Code</th>
                             <th className="p-3 text-left min-w-[200px]">Item Description</th>
+                            <th className="p-3 text-left w-32">HSN/SAC</th>
                             <th className="p-3 text-left w-24">Qty</th>
                             <th className="p-3 text-left w-28">Rate</th>
                             <th className="p-3 text-left w-40">Basic Amount</th>
@@ -205,8 +227,34 @@ export function Page4Billing({ woDetailId, initialData, onSaveDraft, onSaveDraft
                                         </FieldWrapper>
                                     </td>
                                     <td className="p-2">
+                                        <ItemCodeCombobox
+                                            value={watchedItems?.[index]?.itemCode}
+                                            onSelect={(item) => {
+                                                const prefix = `${namePrefix}.${index}`;
+                                                if (!item) {
+                                                    form.setValue(`${prefix}.inventoryItemId`, null, { shouldDirty: true });
+                                                    form.setValue(`${prefix}.itemCode`, "", { shouldDirty: true });
+                                                    form.setValue(`${prefix}.hsnSac`, "", { shouldDirty: true });
+                                                    return;
+                                                }
+
+                                                form.setValue(`${prefix}.inventoryItemId`, item.id, { shouldDirty: true });
+                                                form.setValue(`${prefix}.itemCode`, item.itemCode, { shouldDirty: true });
+                                                form.setValue(`${prefix}.hsnSac`, item.hsnCode ?? "", { shouldDirty: true });
+                                                if (!watchedItems?.[index]?.itemDescription?.trim()) {
+                                                    form.setValue(`${prefix}.itemDescription`, item.itemName, { shouldDirty: true });
+                                                }
+                                            }}
+                                        />
+                                    </td>
+                                    <td className="p-2">
                                         <FieldWrapper control={form.control} name={`${namePrefix}.${index}.itemDescription`} label="">
                                             {(field) => <Input {...field} placeholder="Item description" className="h-8 text-xs" />}
+                                        </FieldWrapper>
+                                    </td>
+                                    <td className="p-2">
+                                        <FieldWrapper control={form.control} name={`${namePrefix}.${index}.hsnSac`} label="">
+                                            {(field) => <Input {...field} value={field.value ?? ""} placeholder="HSN/SAC" className="h-8 text-xs" />}
                                         </FieldWrapper>
                                     </td>
                                     <td className="p-2">
@@ -255,7 +303,7 @@ export function Page4Billing({ woDetailId, initialData, onSaveDraft, onSaveDraft
                         })}
                         {fields.length === 0 && (
                             <tr>
-                                <td colSpan={9} className="p-4 text-center text-muted-foreground">
+                                <td colSpan={11} className="p-4 text-center text-muted-foreground">
                                     No items. Add one using the button below.
                                 </td>
                             </tr>
@@ -264,7 +312,7 @@ export function Page4Billing({ woDetailId, initialData, onSaveDraft, onSaveDraft
                     {fields.length > 0 && (
                         <tfoot className="bg-muted/50">
                             <tr>
-                                <td colSpan={4} className="p-3 text-right font-semibold">Total:</td>
+                                <td colSpan={6} className="p-3 text-right font-semibold">Total:</td>
                                 <td className="p-3 font-semibold tabular-nums">{formatAmount(totals.basic)}</td>
                                 <td></td>
                                 <td className="p-3 font-semibold tabular-nums text-blue-600">{formatAmount(totals.gst)}</td>
@@ -372,9 +420,59 @@ export function Page4Billing({ woDetailId, initialData, onSaveDraft, onSaveDraft
         </div>
     );
 
+    const renderDocLinks = (files: string[], context: string, label: string) =>
+        files.length > 0 ? (
+            <div className="flex flex-col gap-1">
+                {files.map((file, index) => (
+                    <a
+                        key={`${file}-${index}`}
+                        href={resolveFileUrl(file, context)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-sm text-primary underline underline-offset-4"
+                    >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        View {label}{files.length > 1 ? ` ${index + 1}` : ""}
+                    </a>
+                ))}
+            </div>
+        ) : (
+            <p className="text-sm text-muted-foreground">Not uploaded</p>
+        );
+
     return (
         <Form {...form}>
             <form onSubmit={(e) => e.preventDefault()} className="space-y-8">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                            <Package className="h-5 w-5 text-muted-foreground" />
+                            Order &amp; PO Details
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid gap-6 md:grid-cols-3">
+                            <div className="max-w-xs">
+                                <SelectField
+                                    control={form.control}
+                                    name="orderNature"
+                                    label="Order Nature"
+                                    options={ORDER_NATURE_OPTIONS}
+                                    placeholder="Select order nature"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>PO (WO Draft)</Label>
+                                {renderDocLinks(woDraftFiles, "wo-draft", "PO")}
+                            </div>
+                            <div className="space-y-2">
+                                <Label>SAP PO</Label>
+                                {renderDocLinks(sapPoFiles, "sap-po", "SAP PO")}
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-lg">
@@ -398,13 +496,13 @@ export function Page4Billing({ woDetailId, initialData, onSaveDraft, onSaveDraft
                         <div>
                             <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
                                 <Package className="h-4 w-4 text-muted-foreground" />
-                                Buyback BOQ
+                                Buyback Purchase BOQ
                             </h3>
                             <div className="max-w-xs mb-4">
                                 <SelectField
                                     control={form.control}
                                     name="buybackBoqApplicable"
-                                    label="Buyback BOQ Applicable?"
+                                    label="Buyback Purchase BOQ Applicable?"
                                     options={YES_NO_OPTIONS}
                                     placeholder="Select"
                                 />
@@ -417,12 +515,12 @@ export function Page4Billing({ woDetailId, initialData, onSaveDraft, onSaveDraft
                                     removeBuybackBoq,
                                     () => appendBuybackBoq({ ...defaultBoqItem, srNo: buybackBoqFields.length + 1 }),
                                     buybackTotals,
-                                    "Buyback BOQ Items",
+                                    "Buyback Purchase BOQ Items",
                                     0
                                 )
                             ) : (
                                 <p className="text-sm text-muted-foreground italic">
-                                    Buyback BOQ is not applicable for this work order.
+                                    Buyback Purchase BOQ is not applicable for this work order.
                                 </p>
                             )}
                         </div>

@@ -14,7 +14,7 @@ import { CourierForm } from "./components/CourierForm";
 
 const CourierEditPage = () => {
     const navigate = useNavigate();
-    const { user, role, teamId } = useAuth();
+    const { role, teamId } = useAuth();
     const { id } = useParams<{ id: string }>();
     const courierId = id ? parseInt(id, 10) : 0;
 
@@ -58,7 +58,7 @@ const CourierEditPage = () => {
         );
     }
 
-    const canEdit = isCourierPrivileged(role, teamId) || courier.userId === user?.id;
+    const canEdit = isCourierPrivileged(role, teamId);
 
     if (!canEdit) {
         return (
@@ -73,9 +73,14 @@ const CourierEditPage = () => {
     }
 
     return (
-        <div>
-            <CourierForm mode="edit" courierId={courierId} existingData={courier} />
-        </div>
+        <CourierForm
+            mode="edit"
+            courierId={courierId}
+            existingData={courier}
+            title="Edit Courier"
+            description={`Courier #${courier.id} - ${courier.toName}${courier.toOrg ? ` (${courier.toOrg})` : ""}`}
+            onBack={() => navigate(paths.shared.courierView(courier.id))}
+        />
     );
 };
 

@@ -1,4 +1,5 @@
 import { bigint, bigserial, boolean, date, index, integer, jsonb, numeric, pgTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
+import { inventoryItems } from "@db/schemas/accounts/inventory-items.schema";
 
 // WO Basic Details - Initial project info filled by TE within 12 hours of PO receipt
 export const woBasicDetails = pgTable("wo_basic_details", {
@@ -15,10 +16,15 @@ export const woBasicDetails = pgTable("wo_basic_details", {
     projectCode: varchar("project_code", { length: 100 }).unique(),
     projectName: varchar("project_name", { length: 255 }),
 
-    // Order type: 'single' (one order per tender) | 'multiple' (several orders per tender)
+    // Order type: 'single' (one order per tender) | 'repeat' | 'multiple'
     // orderSequence numbers each order within the same tender (1, 2, 3...)
     orderType: varchar("order_type", { length: 20 }).default('single'),
     orderSequence: integer("order_sequence").default(1),
+
+    // Project classification / PO receipt
+    orderNature: varchar("order_nature", { length: 20 }), // 'supply' | 'service' | 'sitc'
+    poReceivedStatus: varchar("po_received_status", { length: 20 }), // 'received' | 'not_received' | 'not_applicable'
+    sapPoUpload: jsonb("sap_po_upload").$type<string[]>(),
 
     // Workflow state: 'basic_details' | 'wo_details' | 'wo_acceptance' | 'wo_upload' | 'completed'
     currentStage: varchar("current_stage", { length: 50 }),
@@ -394,6 +400,7 @@ export const woContacts = pgTable("wo_contacts", {
     name: varchar("name", { length: 255 }),
     designation: varchar("designation", { length: 50 }),
     phone: varchar("phone", { length: 20 }),
+    phones: jsonb("phones").$type<string[]>().notNull().default([]),
     email: varchar("email", { length: 255 }),
 
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -409,7 +416,11 @@ export const woBillingBoq = pgTable("wo_billing_boq", {
         .references(() => woDetails.id, { onDelete: "cascade" }),
 
     srNo: integer("sr_no").notNull(),
+    inventoryItemId: bigint("inventory_item_id", { mode: "number" })
+        .references(() => inventoryItems.id, { onDelete: "set null" }),
+    itemCode: varchar("item_code", { length: 80 }),
     itemDescription: text("item_description").notNull(),
+    hsnSac: varchar("hsn_sac", { length: 100 }),
     quantity: numeric("quantity", { precision: 20, scale: 2 }).notNull(),
     rate: numeric("rate", { precision: 20, scale: 2 }).notNull(),
     amount: numeric("amount", { precision: 20, scale: 2 }),
@@ -423,6 +434,7 @@ export const woBillingBoq = pgTable("wo_billing_boq", {
 }, (table) => ([
     index("idx_billing_boq_wo_detail").on(table.woDetailId),
     index("idx_billing_boq_sort_order").on(table.sortOrder),
+    index("idx_billing_boq_inventory_item").on(table.inventoryItemId),
 ]));
 
 // WO Buyback BOQ
@@ -432,7 +444,11 @@ export const woBuybackBoq = pgTable("wo_buyback_boq", {
         .references(() => woDetails.id, { onDelete: "cascade" }),
 
     srNo: integer("sr_no").notNull(),
+    inventoryItemId: bigint("inventory_item_id", { mode: "number" })
+        .references(() => inventoryItems.id, { onDelete: "set null" }),
+    itemCode: varchar("item_code", { length: 80 }),
     itemDescription: text("item_description").notNull(),
+    hsnSac: varchar("hsn_sac", { length: 100 }),
     quantity: numeric("quantity", { precision: 20, scale: 2 }).notNull(),
     rate: numeric("rate", { precision: 20, scale: 2 }).notNull(),
     amount: numeric("amount", { precision: 20, scale: 2 }),
@@ -445,6 +461,7 @@ export const woBuybackBoq = pgTable("wo_buyback_boq", {
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ([
     index("idx_buyback_boq_wo_detail").on(table.woDetailId),
+    index("idx_buyback_boq_inventory_item").on(table.inventoryItemId),
 ]));
 
 // WO Billing Addresses

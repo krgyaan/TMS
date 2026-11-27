@@ -39,6 +39,7 @@ const normalizeBoqItems = (items: unknown): NonNullable<Page4FormValues["billing
     const item = raw as Record<string, unknown>;
     return {
       ...item,
+      inventoryItemId: toOptionalNumber(item.inventoryItemId),
       quantity: toOptionalNumber(item.quantity),
       rate: toOptionalNumber(item.rate),
       amount: toOptionalNumber(item.amount),
@@ -92,13 +93,17 @@ export const formToApi = {
 
   page4(form: Page4FormValues) {
     return {
+      orderNature: form.orderNature || undefined,
       buybackBoqApplicable: stringToBool(form.buybackBoqApplicable),
       billingBoq: form.billingBoq
         ?.filter((item) => item.itemDescription?.trim())
         .map((item) => ({
           id: item.id,
           srNo: item.srNo,
+          inventoryItemId: item.inventoryItemId ?? null,
+          itemCode: item.itemCode || null,
           itemDescription: item.itemDescription,
+          hsnSac: item.hsnSac || null,
           quantity: item.quantity,
           rate: item.rate,
           gstRate: item.gstRate ?? 0,
@@ -110,7 +115,10 @@ export const formToApi = {
         .map((item) => ({
           id: item.id,
           srNo: item.srNo,
+          inventoryItemId: item.inventoryItemId ?? null,
+          itemCode: item.itemCode || null,
           itemDescription: item.itemDescription,
+          hsnSac: item.hsnSac || null,
           quantity: item.quantity,
           rate: item.rate,
           gstRate: item.gstRate ?? 0,

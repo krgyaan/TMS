@@ -1,11 +1,11 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { DRIZZLE } from "@/db/database.module";
-import { employeeImprestVoucherItems, employeeImprestVouchers, employeeImprests, projects, tallyLedgers, users } from "@/db/schemas";
+import { employeeImprestVoucherItems, employeeImprestVouchers, employeeImprests, imprestCategories, projects, tallyLedgers, users } from "@/db/schemas";
 import type { DbInstance } from "@db";
 import { and, asc, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import { TallyValidationError } from "../errors/tally.errors";
 import { IMPREST_TALLY_CONFIG, type ImprestTallyConfig } from "../mappings/imprest-tally.config";
-import { buildVoucherSnapshot, type VoucherLineInput, type VoucherSnapshot } from "./voucher-snapshot.builder";
+import { buildVoucherSnapshot, type LedgerLink, type VoucherLineInput, type VoucherSnapshot } from "./voucher-snapshot.builder";
 
 export interface ListSnapshotsParams {
     from: Date;
@@ -20,6 +20,10 @@ interface EmployeeRow {
 }
 
 const BENEFICIARY_ID = sql<number | null>`CASE WHEN ${employeeImprestVouchers.beneficiaryName} ~ '^[0-9]+$' THEN ${employeeImprestVouchers.beneficiaryName}::int ELSE NULL END`;
+
+function toCategoryLedger(name: string | null, parent: string | null, active: boolean | null): LedgerLink | null {
+    return name === null ? null : { ledger: name, group: parent ?? "", active: active ?? false };
+}
 
 @Injectable()
 export class ImprestVoucherSource {
@@ -51,10 +55,7 @@ export class ImprestVoucherSource {
 
         const employeeRowsPromise: Promise<EmployeeRow[]> =
             employeeIds.length > 0
-                ? this.db
-                      .select({ id: users.id, name: users.name, imprestLedgerId: users.imprestLedgerId })
-                      .from(users)
-                      .where(inArray(users.id, employeeIds))
+                ? this.db.select({ id: users.id, name: users.name, imprestLedgerId: users.imprestLedgerId }).from(users).where(inArray(users.id, employeeIds))
                 : Promise.resolve([]);
 
         const [employeeRows, lineRows] = await Promise.all([
@@ -65,6 +66,11 @@ export class ImprestVoucherSource {
                     imprestId: employeeImprests.id,
                     amount: sql<string | null>`${employeeImprests.amount}::text`,
                     categoryId: employeeImprests.categoryId,
+                    categoryName: imprestCategories.name,
+                    categoryBlocked: imprestCategories.tallyBlocked,
+                    categoryLedgerName: tallyLedgers.name,
+                    categoryLedgerParent: tallyLedgers.parent,
+                    categoryLedgerActive: tallyLedgers.isActive,
                     projectCode: projects.projectCode,
                     dateOfExpense: employeeImprests.dateOfExpense,
                     approvalStatus: employeeImprests.approvalStatus,
@@ -72,6 +78,8 @@ export class ImprestVoucherSource {
                 .from(employeeImprestVoucherItems)
                 .innerJoin(employeeImprests, eq(employeeImprests.id, employeeImprestVoucherItems.imprestId))
                 .leftJoin(projects, eq(projects.id, employeeImprests.projectId))
+                .leftJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
+                .leftJoin(tallyLedgers, eq(tallyLedgers.id, imprestCategories.tallyLedgerId))
                 .where(inArray(employeeImprestVoucherItems.voucherId, voucherIds))
                 .orderBy(asc(employeeImprestVoucherItems.voucherId), asc(employeeImprests.id)),
         ]);
@@ -96,6 +104,9 @@ export class ImprestVoucherSource {
                 imprestId: row.imprestId,
                 amount: row.amount,
                 categoryId: row.categoryId,
+                categoryName: row.categoryName,
+                categoryBlocked: row.categoryBlocked ?? false,
+                categoryLedger: toCategoryLedger(row.categoryLedgerName, row.categoryLedgerParent, row.categoryLedgerActive),
                 projectCode: row.projectCode,
                 dateOfExpense: row.dateOfExpense,
                 approvalStatus: row.approvalStatus,

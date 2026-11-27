@@ -6,6 +6,7 @@ import {
     resolveCostCentre,
     resolveEmployeeLedger,
     resolveEmployeePayableGroup,
+    type CategoryLedgerMapping,
     type ImprestTallyConfig,
 } from "../mappings/imprest-tally.config";
 import { normalizeMasterName } from "../masters/name.util";
@@ -23,6 +24,7 @@ export type VoucherProblemCode =
     | "MISSING_CATEGORY"
     | "BLOCKED_CATEGORY"
     | "UNMAPPED_CATEGORY"
+    | "INACTIVE_CATEGORY_LEDGER"
     | "MISSING_AMOUNT"
     | "INVALID_AMOUNT"
     | "NON_POSITIVE_AMOUNT"
@@ -37,19 +39,24 @@ export interface VoucherProblem {
     imprestId?: number;
 }
 
+export interface LedgerLink {
+    ledger: string;
+    group: string;
+    active: boolean;
+}
+
+export type EmployeeLedgerLink = LedgerLink;
+
 export interface VoucherLineInput {
     imprestId: number;
     amount: string | number | null;
     categoryId: number | null;
+    categoryName?: string | null;
+    categoryBlocked?: boolean;
+    categoryLedger?: LedgerLink | null;
     projectCode: string | null;
     dateOfExpense: Date | string | null;
     approvalStatus: number;
-}
-
-export interface EmployeeLedgerLink {
-    ledger: string;
-    group: string;
-    active: boolean;
 }
 
 export interface VoucherInput {
@@ -171,20 +178,55 @@ export function buildVoucherSnapshot(config: ImprestTallyConfig, voucher: Vouche
     for (const line of orderedLines) {
         const label = `Imprest ${line.imprestId}`;
 
+        const fallbackCategory = resolveCategoryLedger(config, line.categoryId);
+        const linkedCategory = line.categoryLedger ?? null;
+        const categoryLabel = line.categoryName ? `"${line.categoryName}"` : String(line.categoryId);
+        let category: CategoryLedgerMapping | null = null;
+        let categoryUsable = true;
+
         if (line.categoryId === null) {
+            categoryUsable = false;
             problems.push({ code: "MISSING_CATEGORY", message: `${label} has no category`, imprestId: line.imprestId });
-        } else if (isBlockedCategory(config, line.categoryId)) {
+        } else if (line.categoryBlocked === true || isBlockedCategory(config, line.categoryId)) {
+            categoryUsable = false;
             problems.push({
                 code: "BLOCKED_CATEGORY",
-                message: `${label} is in a category that needs a Tally decision`,
+                message: `${label} category ${categoryLabel} is blocked from Tally posting`,
                 imprestId: line.imprestId,
             });
-        } else if (resolveCategoryLedger(config, line.categoryId) === null) {
-            problems.push({
-                code: "UNMAPPED_CATEGORY",
-                message: `${label} category ${line.categoryId} has no ledger mapping`,
-                imprestId: line.imprestId,
-            });
+        } else if (linkedCategory) {
+            const ledgerName = normalizeMasterName(linkedCategory.ledger);
+
+            if (!linkedCategory.active) {
+                categoryUsable = false;
+                problems.push({
+                    code: "INACTIVE_CATEGORY_LEDGER",
+                    message: `${label} category ${categoryLabel} is mapped to an inactive ledger`,
+                    imprestId: line.imprestId,
+                });
+            }
+
+            category = ledgerName ? { ledger: ledgerName, group: normalizeMasterName(linkedCategory.group) || (fallbackCategory?.group ?? "") } : fallbackCategory;
+
+            if (!category) {
+                categoryUsable = false;
+                problems.push({
+                    code: "UNMAPPED_CATEGORY",
+                    message: `${label} category ${categoryLabel} has no ledger mapping`,
+                    imprestId: line.imprestId,
+                });
+            }
+        } else {
+            category = fallbackCategory;
+
+            if (!category) {
+                categoryUsable = false;
+                problems.push({
+                    code: "UNMAPPED_CATEGORY",
+                    message: `${label} category ${categoryLabel} has no ledger mapping`,
+                    imprestId: line.imprestId,
+                });
+            }
         }
 
         if (line.approvalStatus !== 1) {
@@ -224,9 +266,7 @@ export function buildVoucherSnapshot(config: ImprestTallyConfig, voucher: Vouche
             });
         }
 
-        const category = resolveCategoryLedger(config, line.categoryId);
-
-        if (category && costCentre && amountPaise !== null && amountPaise > 0) {
+        if (category && categoryUsable && costCentre && amountPaise !== null && amountPaise > 0) {
             postingLines.push({
                 imprestId: line.imprestId,
                 ledger: category.ledger,
