@@ -7,7 +7,6 @@ const Accounts_Imprests_Create = lazy(() => import("@/modules/imprest/CreateImpr
 const Accounts_Imprests_Edit = lazy(() => import("@/modules/imprest/EditImprestPage"));
 const Accounts_Imprests_PaymentHistory = lazy(() => import("@/modules/imprest/PaymentHistoryPage"));
 const Accounts_Imprests_Voucher = lazy(() => import("@/modules/imprest/VoucherListPage"));
-const Accounts_Imprests_VoucherView = lazy(() => import("@/modules/imprest/VoucherViewPage"));
 const Accounts_Imprests_VoucherLedgerReview = lazy(() => import("@/modules/imprest/VoucherLedgerReviewPage"));
 const Accounts_FinancialDocs = lazy(() => import("@/modules/accounts/financial-docs"));
 const Accounts_LoanAdvances = lazy(() => import("@/modules/accounts/loan-advances/LoanAdvanceListPage"));
@@ -64,7 +63,6 @@ export default function AccountsRoutes() {
             <Route path="imprests/payment-history" element={<RouteWrapper><Accounts_Imprests_PaymentHistory /></RouteWrapper>} />
             <Route path="imprests/voucher" element={<RouteWrapper><Accounts_Imprests_Voucher /></RouteWrapper>} />
             <Route path="imprests/voucher/:userId" element={<RouteWrapper><Accounts_Imprests_Voucher /></RouteWrapper>} />
-            <Route path="imprests/voucher/view" element={<RouteWrapper><Accounts_Imprests_VoucherView /></RouteWrapper>} />
             <Route path="imprests/voucher/:voucherId/ledger-review" element={<RouteWrapper><Accounts_Imprests_VoucherLedgerReview /></RouteWrapper>} />
             <Route path="imprests/:id/edit" element={<RouteWrapper><Accounts_Imprests_Edit /></RouteWrapper>} />
             <Route path="financial-docs" element={<RouteWrapper><Accounts_FinancialDocs /></RouteWrapper>} />

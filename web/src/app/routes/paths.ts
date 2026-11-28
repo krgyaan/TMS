@@ -266,8 +266,6 @@ export const paths = {
         imprestsPaymentHistoryByUser: (id: number) => `/accounts/imprests/payment-history?userId=${id}`,
         imprestsVoucher: "/accounts/imprests/voucher",
         imprestsVoucherByUser: (id: number) => `/accounts/imprests/voucher/${id}`,
-        imprestsVoucherView: (params: { userId: number; from: string; to: string }) =>
-            `/accounts/imprests/voucher/view?userId=${params.userId}&from=${encodeURIComponent(params.from)}&to=${encodeURIComponent(params.to)}`,
         imprestsVoucherLedgerReview: (voucherId: number) => `/accounts/imprests/voucher/${voucherId}/ledger-review`,
         financialDocs: "/accounts/financial-docs",
         loanAdvances: "/accounts/loan-advances",
