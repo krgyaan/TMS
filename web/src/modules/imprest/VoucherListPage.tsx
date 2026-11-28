@@ -11,7 +11,7 @@ import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import type { ColDef } from "ag-grid-community";
-import { ArrowLeft, Eye, Tags } from "lucide-react";
+import { ArrowLeft, Eye } from "lucide-react";
 import React, { useMemo } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { ImprestVoucherRow } from "./helpers/imprest.types";
@@ -142,21 +142,17 @@ const ImprestVoucherList: React.FC = () => {
                         <Button
                             variant="default"
                             size="sm"
+                            title="View voucher / ledgers"
                             onClick={() =>
                                 navigate(
                                     isAccountsSection
-                                        ? paths.accounts.imprestsVoucherView({ userId: Number(p.data.beneficiaryId), from: p.data.validFrom, to: p.data.validTo })
+                                        ? paths.accounts.imprestsVoucherLedgerReview(p.data.id)
                                         : paths.shared.imprestVoucherView({ userId: Number(p.data.beneficiaryId), from: p.data.validFrom, to: p.data.validTo })
                                 )
                             }
                         >
                             <Eye className="h-4 w-4" />
                         </Button>
-                        {isAccountsSection && (
-                            <Button variant="outline" size="sm" title="Tally ledger review" onClick={() => navigate(paths.accounts.imprestsVoucherLedgerReview(p.data.id))}>
-                                <Tags className="h-4 w-4" />
-                            </Button>
-                        )}
                     </div>
                 ),
             },

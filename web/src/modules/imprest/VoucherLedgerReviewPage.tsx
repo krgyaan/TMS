@@ -1,17 +1,25 @@
-import { paths } from "@/app/routes/paths";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
-import { useInfiniteLedgerOptions, useSaveVoucherLedgers, useVoucherLedgerReview } from "@/hooks/api/imprest.hooks";
+import {
+    useAccountApproveVoucher,
+    useAdminApproveVoucher,
+    useDownloadVoucherPdf,
+    useInfiniteLedgerOptions,
+    useSaveVoucherLedgers,
+    useVoucherLedgerReview,
+} from "@/hooks/api/imprest.hooks";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import type { LedgerOption, VoucherLedgerInfo, VoucherLedgerReviewItem } from "./helpers/imprest.types";
 import { ImprestProofs } from "./components/ImprestProofs";
-import { AlertCircle, ArrowLeft, Check, ChevronsUpDown, Loader2, Save } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, CheckCircle, ChevronsUpDown, Download, Loader2, Save } from "lucide-react";
 import React from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -118,9 +126,17 @@ const VoucherLedgerReviewPage: React.FC = () => {
     const { canRead, canUpdate } = useAuth();
     const canEdit = canUpdate("accounts.imprests") && canRead("accounts.imprests");
 
-    const { data, isLoading, error } = useVoucherLedgerReview(voucherId);
+    const { data, isLoading, error, refetch } = useVoucherLedgerReview(voucherId);
     const saveMutation = useSaveVoucherLedgers(voucherId);
+    const downloadPdfMutation = useDownloadVoucherPdf();
+    const accountApproveMutation = useAccountApproveVoucher();
+    const adminApproveMutation = useAdminApproveVoucher();
     const [drafts, setDrafts] = React.useState<Record<number, LedgerDraft>>({});
+    const [accModalOpen, setAccModalOpen] = React.useState(false);
+    const [adminModalOpen, setAdminModalOpen] = React.useState(false);
+    const [remark, setRemark] = React.useState("");
+    const [accApprove, setAccApprove] = React.useState(false);
+    const [adminApprove, setAdminApprove] = React.useState(false);
 
     React.useEffect(() => {
         setDrafts({});
@@ -170,6 +186,52 @@ const VoucherLedgerReviewPage: React.FC = () => {
         );
     };
 
+    const resetApprovalForm = () => {
+        setRemark("");
+        setAccApprove(false);
+        setAdminApprove(false);
+    };
+
+    const openAccountsModal = () => {
+        setRemark(voucher.accountsRemark ?? "");
+        setAccApprove(false);
+        setAccModalOpen(true);
+    };
+
+    const openAdminModal = () => {
+        setRemark(voucher.adminRemark ?? "");
+        setAdminApprove(false);
+        setAdminModalOpen(true);
+    };
+
+    const handleAccountSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        accountApproveMutation.mutate(
+            { id: voucher.id, remark, approve: accApprove },
+            {
+                onSuccess: () => {
+                    setAccModalOpen(false);
+                    resetApprovalForm();
+                    void refetch();
+                },
+            }
+        );
+    };
+
+    const handleAdminSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        adminApproveMutation.mutate(
+            { id: voucher.id, remark, approve: adminApprove },
+            {
+                onSuccess: () => {
+                    setAdminModalOpen(false);
+                    resetApprovalForm();
+                    void refetch();
+                },
+            }
+        );
+    };
+
     return (
         <Card>
             <CardHeader>
@@ -187,17 +249,11 @@ const VoucherLedgerReviewPage: React.FC = () => {
                         <Button
                             variant="outline"
                             size="sm"
-                            onClick={() =>
-                                navigate(
-                                    paths.accounts.imprestsVoucherView({
-                                        userId: voucher.beneficiaryId,
-                                        from: voucher.validFrom,
-                                        to: voucher.validTo,
-                                    })
-                                )
-                            }
+                            disabled={downloadPdfMutation.isPending}
+                            onClick={() => downloadPdfMutation.mutate({ voucherId: voucher.id, voucherCode: voucher.voucherCode })}
                         >
-                            Show Voucher
+                            {downloadPdfMutation.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Download className="mr-1 h-4 w-4" />}
+                            Download PDF
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
                             <ArrowLeft className="mr-1 h-4 w-4" /> Back
@@ -216,6 +272,42 @@ const VoucherLedgerReviewPage: React.FC = () => {
                         <AlertCircle className="h-4 w-4" /> You can review the ledgers but not change them.
                     </div>
                 )}
+
+                {/* Voucher header (mirrors the voucher view page) */}
+                <div className="rounded-lg border">
+                    <div className="border-b p-4">
+                        <h3 className="text-base font-semibold">Volks Energie Pvt Ltd</h3>
+                        <p className="text-xs text-muted-foreground">Solar and Air Conditioning Contractor</p>
+                        <p className="text-xs text-muted-foreground">New Delhi - 110044</p>
+                        <p className="text-xs text-muted-foreground">Ph: +91-8882591733 | E-mail: accounts@volksenergie.in</p>
+                    </div>
+                    <div className="border-b p-3 text-center text-base font-semibold">Expense Report</div>
+                    <div className="grid gap-2 border-b p-4 text-sm sm:grid-cols-2">
+                        <div>
+                            FROM <b>{formatDate(voucher.validFrom)}</b> TO <b>{formatDate(voucher.validTo)}</b>
+                        </div>
+                        <div className="sm:text-right">
+                            <b>Voucher No: {voucher.voucherCode}</b>
+                        </div>
+                    </div>
+                    <div className="grid gap-3 p-4 text-sm sm:grid-cols-3">
+                        <div>
+                            Employee Name:
+                            <br />
+                            <b>{voucher.beneficiaryName ?? voucher.employeeName ?? "—"}</b>
+                        </div>
+                        <div>
+                            Employee ID:
+                            <br />
+                            <b>ID00{voucher.beneficiaryId}</b>
+                        </div>
+                        <div>
+                            Team Name:
+                            <br />
+                            <b>{voucher.teamName ?? "—"}</b>
+                        </div>
+                    </div>
+                </div>
 
                 <div className="overflow-x-auto">
                     <table className="w-full min-w-[1000px] text-sm">
@@ -284,6 +376,70 @@ const VoucherLedgerReviewPage: React.FC = () => {
                     </table>
                 </div>
 
+                {/* Voucher footer (mirrors the voucher view page) */}
+                <div className="grid gap-4 lg:grid-cols-2">
+                    <div className="rounded-lg border p-4">
+                        <table className="w-full text-sm">
+                            <tbody>
+                                <tr>
+                                    <th className="py-1 text-left font-medium">Prepared By:</th>
+                                    <td className="py-1">{voucher.beneficiaryName ?? voucher.employeeName ?? "—"}</td>
+                                    <th className="py-1 text-left font-medium">Date:</th>
+                                    <td className="py-1" />
+                                </tr>
+                                <tr>
+                                    <th className="py-1 text-left font-medium">Checked By:</th>
+                                    <td className="py-1">{voucher.accountsSignedBy ? "—" : <i>to be signed</i>}</td>
+                                    <th className="py-1 text-left font-medium">Date:</th>
+                                    <td className="py-1">{formatDate(voucher.accountsSignedAt)}</td>
+                                </tr>
+                                <tr>
+                                    <th className="py-1 text-left font-medium">Approved By:</th>
+                                    <td className="py-1">{voucher.adminSignedBy ? "—" : <i>to be signed</i>}</td>
+                                    <th className="py-1 text-left font-medium">Date:</th>
+                                    <td className="py-1">{formatDate(voucher.adminSignedAt)}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div className="space-y-3">
+                        <div className="rounded-lg border p-4">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Accounts Comment</p>
+                            <p className="mt-1 text-sm">
+                                {voucher.accountsRemark || <span className="italic text-muted-foreground">No comment added</span>}
+                            </p>
+                        </div>
+                        <div className="rounded-lg border p-4">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">CEO Comment</p>
+                            <p className="mt-1 text-sm">
+                                {voucher.adminRemark || <span className="italic text-muted-foreground">No comment added</span>}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Approval actions */}
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
+                    <div className="flex flex-wrap gap-2 text-xs">
+                        <Badge variant={voucher.accountsSignedBy ? "secondary" : "outline"}>
+                            {voucher.accountsSignedBy ? "Approved by Accounts" : "Accounts approval pending"}
+                        </Badge>
+                        <Badge variant={voucher.adminSignedBy ? "secondary" : "outline"}>
+                            {voucher.adminSignedBy ? "Approved by CEO" : "CEO approval pending"}
+                        </Badge>
+                    </div>
+                    {canEdit && (
+                        <div className="flex items-center gap-2">
+                            <Button variant="default" size="sm" onClick={openAccountsModal}>
+                                <CheckCircle className="mr-1 h-4 w-4" /> Approve by Accounts
+                            </Button>
+                            <Button variant="default" size="sm" onClick={openAdminModal}>
+                                <CheckCircle className="mr-1 h-4 w-4" /> Approve by CEO
+                            </Button>
+                        </div>
+                    )}
+                </div>
+
                 <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t bg-background/95 p-3 backdrop-blur">
                     <div className="text-sm text-muted-foreground">
                         {changed.length > 0 ? `${changed.length} unsaved change(s)` : "No unsaved changes"}
@@ -295,6 +451,114 @@ const VoucherLedgerReviewPage: React.FC = () => {
                     </Button>
                 </div>
             </CardContent>
+
+            {/* Accounts Approval Modal */}
+            <Dialog open={accModalOpen} onOpenChange={setAccModalOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl">Accounts Approval</DialogTitle>
+                        <DialogDescription>Add an optional remark and confirm your approval for this imprest voucher.</DialogDescription>
+                    </DialogHeader>
+
+                    <form onSubmit={handleAccountSubmit} className="space-y-6 pt-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-semibold text-foreground">Remark (Optional)</label>
+                            <Textarea
+                                placeholder="Add any comments or notes here..."
+                                value={remark}
+                                onChange={e => setRemark(e.target.value)}
+                                className="h-24 resize-none p-2"
+                            />
+                        </div>
+
+                        {!voucher.accountsSignedBy ? (
+                            <div className="flex items-start gap-3 rounded-lg border bg-muted/40 p-4">
+                                <input
+                                    type="checkbox"
+                                    id="acc-approve"
+                                    checked={accApprove}
+                                    onChange={e => setAccApprove(e.target.checked)}
+                                    className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                />
+                                <label htmlFor="acc-approve" className="cursor-pointer text-sm font-medium leading-none">
+                                    Approve Voucher
+                                </label>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-2 rounded-lg border border-green-500/20 bg-green-500/10 p-4">
+                                <CheckCircle className="h-5 w-5 text-green-600" />
+                                <span className="text-sm font-medium text-green-700">Already Approved by Accounts</span>
+                            </div>
+                        )}
+
+                        <div className="flex justify-end gap-3 pt-2">
+                            <Button type="button" variant="outline" onClick={() => setAccModalOpen(false)} className="w-24">
+                                Cancel
+                            </Button>
+                            <Button type="submit" className="w-32" disabled={accountApproveMutation.isPending}>
+                                {accountApproveMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                                Submit
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* CEO Approval Modal */}
+            <Dialog open={adminModalOpen} onOpenChange={setAdminModalOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl">CEO Approval</DialogTitle>
+                        <DialogDescription>Add an optional remark and confirm your approval for this imprest voucher.</DialogDescription>
+                    </DialogHeader>
+
+                    <form onSubmit={handleAdminSubmit} className="space-y-6 pt-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-semibold text-foreground">Remark (Optional)</label>
+                            <Textarea
+                                placeholder="Add any comments or notes here..."
+                                value={remark}
+                                onChange={e => setRemark(e.target.value)}
+                                className="h-24 resize-none p-2"
+                            />
+                        </div>
+
+                        {!voucher.adminSignedBy ? (
+                            <div className={`flex items-start gap-3 rounded-lg border p-4 ${!voucher.accountsSignedBy ? "bg-muted/60 opacity-80" : "bg-muted/40"}`}>
+                                <input
+                                    type="checkbox"
+                                    id="admin-approve"
+                                    checked={adminApprove}
+                                    disabled={!voucher.accountsSignedBy}
+                                    onChange={e => setAdminApprove(e.target.checked)}
+                                    className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary disabled:cursor-not-allowed"
+                                />
+                                <div className="space-y-1">
+                                    <label htmlFor="admin-approve" className={`text-sm font-medium leading-none ${!voucher.accountsSignedBy ? "cursor-not-allowed" : "cursor-pointer"}`}>
+                                        Approve this voucher
+                                    </label>
+                                    {!voucher.accountsSignedBy && <p className="mt-1 text-xs font-medium text-destructive">Accounts approval is required first.</p>}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-2 rounded-lg border border-green-500/20 bg-green-500/10 p-4">
+                                <CheckCircle className="h-5 w-5 text-green-600" />
+                                <span className="text-sm font-medium text-green-700">Already Approved by CEO</span>
+                            </div>
+                        )}
+
+                        <div className="flex justify-end gap-3 pt-2">
+                            <Button type="button" variant="outline" onClick={() => setAdminModalOpen(false)} className="w-24">
+                                Cancel
+                            </Button>
+                            <Button type="submit" className="w-32" disabled={adminApproveMutation.isPending}>
+                                {adminApproveMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                                Submit
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </Card>
     );
 };

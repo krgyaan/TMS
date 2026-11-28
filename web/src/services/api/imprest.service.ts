@@ -120,6 +120,10 @@ class ImprestService extends BaseApiService {
         return this.get<VoucherLedgerReview>(`/voucher/${voucherId}/ledger-review`);
     }
 
+    async downloadVoucherPdf(voucherId: number): Promise<Blob> {
+        return this.get<Blob>(`/voucher/${voucherId}/pdf`, { responseType: 'blob' });
+    }
+
     async saveVoucherLedgers(voucherId: number, entries: VoucherLedgerSaveEntry[]): Promise<VoucherLedgerReview> {
         return this.put<VoucherLedgerReview>(`/voucher/${voucherId}/ledgers`, { entries });
     }

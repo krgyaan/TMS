@@ -1,4 +1,5 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { saveAs } from "file-saver";
 import { toast } from "sonner";
 import { imprestService } from "@/services/api";
 import type { CreateImprestCreditPayload, EmployeeImprestSummary } from "@/modules/imprest/helpers/imprest-admin.types";
@@ -285,6 +286,7 @@ export const useAccountApproveVoucher = () => {
         onSuccess: () => {
             toast.success("Voucher updated successfully");
             qc.invalidateQueries({ queryKey: imprestVoucherKeys.root });
+            qc.invalidateQueries({ queryKey: imprestVoucherLedgerKeys.root });
             qc.invalidateQueries({ queryKey: imprestKeys.root });
         },
 
@@ -301,6 +303,7 @@ export const useAdminApproveVoucher = () => {
         onSuccess: () => {
             toast.success("Voucher updated successfully");
             qc.invalidateQueries({ queryKey: imprestVoucherKeys.root });
+            qc.invalidateQueries({ queryKey: imprestVoucherLedgerKeys.root });
             qc.invalidateQueries({ queryKey: imprestKeys.root });
         },
 
@@ -396,6 +399,19 @@ export const useSaveVoucherLedgers = (voucherId: number) => {
         onError: (err: unknown) => {
             const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
             toast.error(message || "Failed to save Tally ledgers");
+        },
+    });
+};
+
+export const useDownloadVoucherPdf = () => {
+    return useMutation({
+        mutationFn: (payload: { voucherId: number; voucherCode: string }) => imprestService.downloadVoucherPdf(payload.voucherId),
+        onSuccess: (blob, payload) => {
+            const safeCode = payload.voucherCode.replace(/[^a-zA-Z0-9._-]+/g, "-");
+            saveAs(blob, `Imprest-Voucher-${safeCode}.pdf`);
+        },
+        onError: () => {
+            toast.error("Failed to download voucher PDF");
         },
     });
 };

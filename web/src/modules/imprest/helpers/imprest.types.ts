@@ -129,6 +129,7 @@ export interface VoucherLedgerReview {
         id: number;
         voucherCode: string;
         beneficiaryId: number;
+        beneficiaryName: string | null;
         employeeName: string | null;
         teamName: string | null;
         amount: number;
@@ -136,8 +137,10 @@ export interface VoucherLedgerReview {
         validTo: string;
         accountsSignedBy: string | null;
         accountsSignedAt: string | null;
+        accountsRemark: string | null;
         adminSignedBy: string | null;
         adminSignedAt: string | null;
+        adminRemark: string | null;
     };
     items: VoucherLedgerReviewItem[];
     editable: boolean;

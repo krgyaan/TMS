@@ -1117,8 +1117,6 @@ export class ImprestAdminService {
             checked_date: this.formatPdfDate(voucher.accountsSignedAt),
             approved_by: voucher.adminSignedBy ? "—" : "to be signed",
             approved_date: this.formatPdfDate(voucher.adminSignedAt),
-            accounts_comment: voucher.accountsRemark ?? "",
-            admin_comment: voucher.adminRemark ?? "",
         };
 
         const [generatedPath] = await this.pdfGenerator.generatePdfs("voucher", data, voucherId, "VOUCHER");
@@ -1429,7 +1427,7 @@ export class ImprestAdminService {
             .where(and(eq(tallySyncLedger.entityType, "imprest_voucher"), eq(tallySyncLedger.entityId, String(voucherId)), eq(tallySyncLedger.status, "posted")))
             .limit(1);
 
-        const lockReason = voucher.accountsSignedAt !== null ? "Voucher is already signed by accounts" : posted ? "Voucher is already posted to Tally" : null;
+        const lockReason = posted ? "Voucher is already posted to Tally" : null;
 
         return {
             voucher: {
