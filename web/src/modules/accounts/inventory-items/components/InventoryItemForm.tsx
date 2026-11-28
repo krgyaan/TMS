@@ -31,7 +31,7 @@ export default function InventoryItemForm({ mode, existingData }: InventoryItemF
     const navigate = useNavigate();
     const form = useForm<InventoryItemFormValues>({
         resolver: zodResolver(inventoryItemFormSchema) as never,
-        defaultValues: { category: "", legacyCodeEdit: false, itemName: "", itemType: "", specifications: {}, modelNumber: "", description: "", unit: "Nos.", storedUnit: "", conversionEnabled: false, conversionUnit: "", conversionFactor: "", hsnCode: "", isActive: true },
+        defaultValues: { category: "", legacyCodeEdit: false, itemName: "", itemType: "", specifications: {}, description: "", unit: "Nos.", storedUnit: "", conversionEnabled: false, conversionUnit: "", conversionFactor: "", hsnCode: "", isActive: true },
     });
     const createItem = useCreateInventoryItem();
     const updateItem = useUpdateInventoryItem();
@@ -76,7 +76,7 @@ export default function InventoryItemForm({ mode, existingData }: InventoryItemF
             const editCategory = getItemMainCategory(item.itemName, item.category);
             form.reset({
                 category: editCategory, legacyCodeEdit: false, itemName: item.itemName, itemType: item.itemType || "",
-                specifications: storedSpecifications, modelNumber: item.modelNumber || "", description: item.description || "",
+                specifications: storedSpecifications, description: item.description || "",
                 unit: item.unit as Unit, storedUnit: item.unit, conversionEnabled: Boolean(item.conversionUnit), conversionUnit: item.conversionUnit || "",
                 conversionFactor: item.conversionFactor || "", hsnCode: item.hsnCode || "", isActive: item.isActive,
             });
@@ -86,7 +86,7 @@ export default function InventoryItemForm({ mode, existingData }: InventoryItemF
             setUnitChangedNotice(false);
         } else if (!isEdit && initializedForm.current !== "new") {
             form.reset({
-                category: "", legacyCodeEdit: false, itemName: "", itemType: "", specifications: {}, modelNumber: "", description: "", unit: "Nos.", storedUnit: "", conversionEnabled: false,
+                category: "", legacyCodeEdit: false, itemName: "", itemType: "", specifications: {}, description: "", unit: "Nos.", storedUnit: "", conversionEnabled: false,
                 conversionUnit: "", conversionFactor: "", hsnCode: "", isActive: true,
             });
             lastWidth.current = "";
@@ -223,7 +223,7 @@ export default function InventoryItemForm({ mode, existingData }: InventoryItemF
                 return fieldIsVisible(values.specifications, field) && Boolean(value.trim());
             }));
             const payload: InventoryItemPayload = {
-                category: values.category, modelNumber: values.modelNumber?.trim() || null, itemName: values.itemName,
+                category: values.category, modelNumber: isEdit ? (item?.modelNumber ?? null) : null, itemName: values.itemName,
                 itemType: typeField ? values.specifications[typeField.key] || null : values.itemType?.trim() || null,
                 specifications: visibleSpecifications, description: values.description?.trim() || null,
                 unit: values.unit, conversionUnit: values.conversionEnabled ? values.conversionUnit || null : null,
@@ -380,13 +380,6 @@ export default function InventoryItemForm({ mode, existingData }: InventoryItemF
                 {conversionEnabled && storedFixedMismatch && <Alert><AlertDescription>The saved factor ({item?.conversionFactor}) differs from the fixed rule ({selectedConversion?.factor}). The stored value remains loaded; saving will recalculate it.</AlertDescription></Alert>}
                 {showPreview && conversionUnit && <p className="rounded-md bg-muted/50 p-3 text-sm" aria-live="polite">1 {unit} = {formatPreview(factorNumber)} {conversionUnit}, 1 {conversionUnit} = {formatPreview(1 / factorNumber)} {unit}</p>}
                 {unitChangedNotice && <Alert><AlertDescription>Unit changed. The previous conversion and factor were cleared.</AlertDescription></Alert>}
-            </section>
-
-            <section className={sectionClass}>
-                <div><h2 className="font-semibold">Model Number</h2><p className="text-sm text-muted-foreground">Optional model identifier.</p></div>
-                <FormField label="Model Number" helper="Optional. Up to 120 characters." error={errors.modelNumber?.message}>
-                    <Input maxLength={120} className={formControlClass} aria-invalid={Boolean(errors.modelNumber)} {...form.register("modelNumber")} />
-                </FormField>
             </section>
 
             <section className={sectionClass}>
