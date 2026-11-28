@@ -7,7 +7,7 @@ import { OperationNotificationService } from '@/modules/operations/operation-not
 import type { BankGuaranteeDashboardCounts, BankGuaranteeDashboardRow } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
 import type { CreateFollowUpDto } from '@/modules/follow-up/dto';
-import { BG_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
+import { BG_STATUSES, FDR_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import { extractProjectBgPurpose } from '@/modules/tendering/payment-requests/services/payment-requests.shared';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
@@ -20,6 +20,7 @@ import { teams } from '@db/schemas/master/teams.schema';
 import { projects } from '@db/schemas/master/projects.schema';
 import {
     instrumentBgDetails,
+    instrumentFdrDetails,
     instrumentStatusHistory,
     paymentInstruments,
     paymentRequests,
@@ -1046,7 +1047,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             'bgPo', 'bgClientUser', 'bgClientCp', 'bgClientFin',
             'bgBankAcc', 'bgBankIfsc', 'bgBankAccName', 'courierNo',
             'extensionLetter', 'newBgClaim', 'approveBg',
-            'fdrAmt', 'fdrPer', 'fdrNo', 'fdrDate', 'fdrValidity', 'fdrRoi',
+            'fdrAmt', 'fdrPer', 'fdrNo', 'fdrValidity', 'fdrRoi',
             'bankMailIds', 'bankMailIdsCc',
             'bgChargeDeducted', 'newStampChargeDeducted', 'cancelRemark',
             'bgFdrCancelDate', 'bgFdrCancelAmount', 'bgFdrCancelRefNo',
@@ -1250,6 +1251,204 @@ private readBodyFileValue(body: unknown, field: string): unknown {
         return this.paymentRequestsNotificationService.generateBgAuthorizationLetter(instrumentId, persons);
     }
 
+    private async syncBgFdrInstrument(instrumentId: number, user: any): Promise<void> {
+        const [bg] = await this.db
+            .select({
+                requestId: paymentInstruments.requestId,
+                amount: paymentInstruments.amount,
+                bgNo: instrumentBgDetails.bgNo,
+                beneficiaryName: instrumentBgDetails.beneficiaryName,
+                fdrNo: instrumentBgDetails.fdrNo,
+                fdrValidity: instrumentBgDetails.fdrValidity,
+                fdrRoi: instrumentBgDetails.fdrRoi,
+                fdrPer: instrumentBgDetails.fdrPer,
+                fdrAmt: instrumentBgDetails.fdrAmt,
+                fdrCopy: instrumentBgDetails.fdrCopy,
+            })
+            .from(paymentInstruments)
+            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!bg || !bg.fdrNo?.trim()) {
+            return;
+        }
+
+        const fdrNo = bg.fdrNo.trim();
+        const fdrAmount = bg.fdrAmt != null ? bg.fdrAmt : bg.amount;
+        const userId = Number(user?.id ?? user?.sub ?? 0);
+
+        await this.db.transaction(async (tx) => {
+            const [sameRequest] = await tx
+                .select({ id: paymentInstruments.id })
+                .from(paymentInstruments)
+                .where(and(
+                    eq(paymentInstruments.requestId, bg.requestId),
+                    eq(paymentInstruments.instrumentType, 'FDR'),
+                ))
+                .limit(1);
+
+            let existing = sameRequest;
+            if (!existing) {
+                const [sameNumber] = await tx
+                    .select({ id: paymentInstruments.id })
+                    .from(paymentInstruments)
+                    .innerJoin(instrumentFdrDetails, eq(instrumentFdrDetails.instrumentId, paymentInstruments.id))
+                    .where(and(
+                        eq(paymentInstruments.instrumentType, 'FDR'),
+                        eq(instrumentFdrDetails.fdrNo, fdrNo),
+                    ))
+                    .limit(1);
+                existing = sameNumber;
+            }
+
+            if (existing) {
+                await tx
+                    .update(paymentInstruments)
+                    .set({
+                        amount: fdrAmount != null ? String(fdrAmount) : '0',
+                        favouring: bg.beneficiaryName ?? null,
+                        expiryDate: bg.fdrValidity ?? null,
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(paymentInstruments.id, existing.id));
+
+                await tx
+                    .update(instrumentFdrDetails)
+                    .set({
+                        fdrNo: fdrNo,
+                        fdrValidity: bg.fdrValidity ?? null,
+                        roi: bg.fdrRoi ?? null,
+                        marginPercent: bg.fdrPer ?? null,
+                        fdrCopy: bg.fdrCopy ?? null,
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(instrumentFdrDetails.instrumentId, existing.id));
+                return;
+            }
+
+            const [fdrInstrument] = await tx
+                .insert(paymentInstruments)
+                .values({
+                    requestId: bg.requestId,
+                    instrumentType: 'FDR',
+                    amount: fdrAmount != null ? String(fdrAmount) : '0',
+                    favouring: bg.beneficiaryName ?? null,
+                    expiryDate: bg.fdrValidity ?? null,
+                    status: FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED,
+                    action: 1,
+                    isActive: true,
+                })
+                .returning();
+
+            await tx
+                .insert(instrumentFdrDetails)
+                .values({
+                    instrumentId: fdrInstrument.id,
+                    fdrNo: fdrNo,
+                    fdrValidity: bg.fdrValidity ?? null,
+                    roi: bg.fdrRoi ?? null,
+                    marginPercent: bg.fdrPer ?? null,
+                    fdrPurpose: 'BANK_GUARANTEE',
+                    fdrCopy: bg.fdrCopy ?? null,
+                    fdrRemark: `Auto-created from BG ${bg.bgNo || bg.requestId}`,
+                });
+
+            await tx
+                .insert(instrumentStatusHistory)
+                .values({
+                    instrumentId: fdrInstrument.id,
+                    fromStatus: 'PENDING',
+                    toStatus: FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED,
+                    fromAction: 0,
+                    toAction: 1,
+                    fromStage: 0,
+                    toStage: 0,
+                    formData: { source: 'BG', bgInstrumentId: instrumentId },
+                    changedBy: userId,
+                    changedByName: user?.name ?? '',
+                    changedByRole: String(user?.roleId ?? 0),
+                    ipAddress: '',
+                    userAgent: '',
+                });
+        });
+    }
+
+    private async cancelBgFdrInstrument(
+        instrumentId: number,
+        user: any,
+        details?: { date?: string | null; amount?: string | number | null; referenceNo?: string | null },
+    ): Promise<void> {
+        const [bg] = await this.db
+            .select({ requestId: paymentInstruments.requestId })
+            .from(paymentInstruments)
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!bg) {
+            return;
+        }
+
+        const [fdr] = await this.db
+            .select({
+                id: paymentInstruments.id,
+                status: paymentInstruments.status,
+                action: paymentInstruments.action,
+                legacyData: paymentInstruments.legacyData,
+            })
+            .from(paymentInstruments)
+            .where(and(
+                eq(paymentInstruments.requestId, bg.requestId),
+                eq(paymentInstruments.instrumentType, 'FDR'),
+            ))
+            .limit(1);
+
+        if (!fdr || fdr.status === FDR_STATUSES.CANCELLED) {
+            return;
+        }
+
+        const cancelledDate = details?.date || new Date().toISOString().split('T')[0];
+        const legacyData: Record<string, any> = {
+            ...((fdr.legacyData as Record<string, any> | null) ?? {}),
+            fdr_cancellation_date: details?.date ?? cancelledDate,
+            fdr_cancellation_amount: details?.amount ?? null,
+            fdr_cancellation_reference_no: details?.referenceNo ?? null,
+        };
+        const userId = Number(user?.id ?? user?.sub ?? 0);
+
+        await this.db.transaction(async (tx) => {
+            await tx
+                .update(paymentInstruments)
+                .set({
+                    status: FDR_STATUSES.CANCELLED,
+                    action: 7,
+                    cancelledDate,
+                    amountCredited: details?.amount != null ? String(details.amount) : null,
+                    legacyData,
+                    updatedAt: new Date(),
+                })
+                .where(eq(paymentInstruments.id, fdr.id));
+
+            await tx
+                .insert(instrumentStatusHistory)
+                .values({
+                    instrumentId: fdr.id,
+                    fromStatus: fdr.status,
+                    toStatus: FDR_STATUSES.CANCELLED,
+                    fromAction: fdr.action ?? 0,
+                    toAction: 7,
+                    fromStage: 0,
+                    toStage: 0,
+                    formData: { source: 'BG', bgInstrumentId: instrumentId },
+                    changedBy: userId,
+                    changedByName: user?.name ?? '',
+                    changedByRole: String(user?.roleId ?? 0),
+                    ipAddress: '',
+                    userAgent: '',
+                });
+        });
+    }
+
     async updateAction(
         instrumentId: number,
         body: any,
@@ -1403,7 +1602,6 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             // same columns as Accounts Form 3, so a later Form 3 submission
             // refines/overwrites these values.
             if (body.fdr_no) bgDetailsUpdate.fdrNo = body.fdr_no;
-            if (body.fdr_date) bgDetailsUpdate.fdrDate = body.fdr_date;
             if (body.fdr_validity) bgDetailsUpdate.fdrValidity = body.fdr_validity;
             if (body.fdr_roi) bgDetailsUpdate.fdrRoi = body.fdr_roi;
             if (body.fdr_amt !== undefined && body.fdr_amt !== null && body.fdr_amt !== '') {
@@ -1566,6 +1764,34 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                     tlApprovalStatus: 'APPROVED',
                     createdAt: new Date(),
                 });
+            }
+        }
+
+        if ((body.action === 'accounts-form-1' && body.bg_req === 'Accepted') || body.action === 'accounts-form-3') {
+            try {
+                await this.syncBgFdrInstrument(instrumentId, user);
+            } catch (error) {
+                this.logger.error(`BG FDR sync failed for instrument ${instrumentId}:`, error);
+            }
+        }
+
+        if (body.action === 'fdr-cancellation-confirmation') {
+            try {
+                await this.cancelBgFdrInstrument(instrumentId, user, {
+                    date: body.bg_fdr_cancel_date ?? null,
+                    amount: body.bg_fdr_cancel_amount ?? null,
+                    referenceNo: body.bg_fdr_cancel_ref_no ?? null,
+                });
+            } catch (error) {
+                this.logger.error(`BG FDR cancellation sync failed for instrument ${instrumentId}:`, error);
+            }
+        }
+
+        if (body.action === 'bg-cancellation-confirmation') {
+            try {
+                await this.cancelBgFdrInstrument(instrumentId, user);
+            } catch (error) {
+                this.logger.error(`BG FDR cancellation sync failed for instrument ${instrumentId}:`, error);
             }
         }
 
@@ -2781,7 +3007,6 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 fdrPer: instrumentBgDetails.fdrPer,
                 fdrCopy: instrumentBgDetails.fdrCopy,
                 fdrNo: instrumentBgDetails.fdrNo,
-                fdrDate: instrumentBgDetails.fdrDate,
                 fdrValidity: instrumentBgDetails.fdrValidity,
                 fdrRoi: instrumentBgDetails.fdrRoi,
                 bgChargeDeducted: instrumentBgDetails.bgChargeDeducted,
@@ -2936,7 +3161,6 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 fdrNo: instrumentBgDetails.fdrNo,
                 fdrAmt: instrumentBgDetails.fdrAmt,
                 fdrValidity: instrumentBgDetails.fdrValidity,
-                fdrDate: instrumentBgDetails.fdrDate,
                 fdrRoi: instrumentBgDetails.fdrRoi,
                 cancelRemark: instrumentBgDetails.cancelRemark,
                 stampCoveringLetter: instrumentBgDetails.stampCoveringLetter,
@@ -3152,7 +3376,6 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             newStampChargeDeducted: result.newStampChargeDeducted ? Number(result.newStampChargeDeducted) : null,
             fdrNo: result.fdrNo,
             fdrAmt: result.fdrAmt ? Number(result.fdrAmt) : null,
-            fdrDate: result.fdrDate ? new Date(result.fdrDate) : null,
             fdrValidity: result.fdrValidity ? new Date(result.fdrValidity) : null,
             fdrRoi: result.fdrRoi ? Number(result.fdrRoi) : null,
             cancelRemark: result.cancelRemark,
