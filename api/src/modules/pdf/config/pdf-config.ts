@@ -253,6 +253,18 @@ export const PDF_CONFIG = {
                 left: '8mm',
             },
         },
+        voucher: {
+            directory: '.',
+            templates: ['imprest-voucher'],
+            storagePath: 'imprest-vouchers',
+            baseDir: 'accounts/imprest-vouchers',
+            margin: {
+                top: '8mm',
+                right: '8mm',
+                bottom: '8mm',
+                left: '8mm',
+            },
+        },
     },
 
     /**

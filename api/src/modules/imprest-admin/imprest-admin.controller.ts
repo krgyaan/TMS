@@ -1,5 +1,8 @@
 import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
-import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Query, Req, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Delete, Get, NotFoundException, Param, ParseIntPipe, Post, Put, Query, Req, Res, UseGuards } from "@nestjs/common";
+import { createReadStream, existsSync } from "node:fs";
+import { join } from "node:path";
+import type { Response } from "express";
 import { z } from "zod";
 import { CanDelete, CanRead, CanUpdate, CurrentUser } from "../auth/decorators";
 import { PermissionGuard } from "../auth/guards/permission.guard";
@@ -137,6 +140,24 @@ export class ImprestAdminController {
     @CanRead("accounts.imprests")
     async getVoucherLedgerReview(@Param("voucherId", ParseIntPipe) voucherId: number) {
         return this.service.getVoucherLedgerReview(voucherId);
+    }
+
+    @Get("voucher/:voucherId/pdf")
+    @CanRead("accounts.imprests")
+    async downloadVoucherPdf(@Param("voucherId", ParseIntPipe) voucherId: number, @Res() res: Response) {
+        const { path: relativePath, filename } = await this.service.generateVoucherPdf(voucherId);
+        const absolutePath = join(process.cwd(), "uploads", relativePath);
+
+        if (!existsSync(absolutePath)) {
+            throw new NotFoundException("PDF file not found on disk");
+        }
+
+        res.set({
+            "Content-Type": "application/pdf",
+            "Content-Disposition": `attachment; filename="${filename}"`,
+        });
+
+        createReadStream(absolutePath).pipe(res);
     }
 
     @Put("voucher/:voucherId/ledgers")

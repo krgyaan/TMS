@@ -2,8 +2,10 @@ import { Module } from "@nestjs/common";
 import { ImprestAdminController } from "./imprest-admin.controller";
 import { ImprestAdminService } from "./imprest-admin.service";
 import { PermissionService } from "../auth/services/permission.service";
+import { PdfGeneratorModule } from "../pdf/pdf-generator.module";
 
 @Module({
+    imports: [PdfGeneratorModule],
     controllers: [ImprestAdminController],
     providers: [ImprestAdminService, PermissionService],
     exports: [ImprestAdminService],

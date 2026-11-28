@@ -1,8 +1,11 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { mkdir, rename } from "node:fs/promises";
+import { join } from "node:path";
 import { and, asc, desc, eq, ilike, inArray, sql } from "drizzle-orm";
 import type { DbInstance } from "@/db";
 import { DRIZZLE } from "@/db/database.module";
+import { PdfGeneratorService } from "@/modules/pdf/pdf-generator.service";
 
 /** A Drizzle db handle or an in-flight transaction handle. */
 type Tx = Parameters<Parameters<DbInstance["transaction"]>[0]>[0];
@@ -48,6 +51,7 @@ export interface VoucherLedgerReview {
         id: number;
         voucherCode: string;
         beneficiaryId: number;
+        beneficiaryName: string | null;
         employeeName: string | null;
         teamName: string | null;
         amount: number;
@@ -55,8 +59,10 @@ export interface VoucherLedgerReview {
         validTo: Date;
         accountsSignedBy: string | null;
         accountsSignedAt: Date | null;
+        accountsRemark: string | null;
         adminSignedBy: string | null;
         adminSignedAt: Date | null;
+        adminRemark: string | null;
     };
     items: VoucherLedgerReviewItem[];
     editable: boolean;
@@ -111,7 +117,9 @@ export class ImprestAdminService {
         @Inject(WINSTON_MODULE_PROVIDER)
         private readonly logger: Logger,
 
-        private readonly config: ConfigService
+        private readonly config: ConfigService,
+
+        private readonly pdfGenerator: PdfGeneratorService
     ) {}
 
     /**
@@ -1069,6 +1077,85 @@ export class ImprestAdminService {
         return this.loadVoucherLedgerReview(voucherId);
     }
 
+    /**
+     * Generate the official voucher PDF (server-side, Puppeteer + Handlebars)
+     * and return its path relative to the uploads directory.
+     */
+    async generateVoucherPdf(voucherId: number): Promise<{ path: string; filename: string }> {
+        const review = await this.loadVoucherLedgerReview(voucherId);
+        const voucher = review.voucher;
+
+        const items = review.items.map((item, index) => ({
+            sr_no: index + 1,
+            date_of_expense: this.formatPdfDate(item.dateOfExpense),
+            category: item.category ?? "-",
+            project_name: item.projectName ?? "-",
+            project_code: item.projectCode ?? "-",
+            remark: item.remark ?? "",
+            amount: Number(item.amount),
+        }));
+
+        const totalAmount = items.reduce((sum, item) => sum + item.amount, 0);
+
+        const data = {
+            company_name: "Volks Energie Pvt Ltd",
+            company_tagline: "Solar and Air Conditioning Contractor",
+            company_address: "New Delhi - 110044",
+            company_phone: "+91-8882591733",
+            company_email: "accounts@volksenergie.in",
+            voucher_no: voucher.voucherCode,
+            from_date: this.formatPdfDate(voucher.validFrom),
+            to_date: this.formatPdfDate(voucher.validTo),
+            employee_name: voucher.beneficiaryName ?? voucher.employeeName ?? "",
+            employee_id: `ID00${voucher.beneficiaryId}`,
+            team_name: voucher.teamName ?? "",
+            items,
+            total_amount: totalAmount,
+            total_in_words: this.pdfGenerator.grandTotalInWords(totalAmount),
+            prepared_by: voucher.beneficiaryName ?? voucher.employeeName ?? "",
+            checked_by: voucher.accountsSignedBy ? "—" : "to be signed",
+            checked_date: this.formatPdfDate(voucher.accountsSignedAt),
+            approved_by: voucher.adminSignedBy ? "—" : "to be signed",
+            approved_date: this.formatPdfDate(voucher.adminSignedAt),
+            accounts_comment: voucher.accountsRemark ?? "",
+            admin_comment: voucher.adminRemark ?? "",
+        };
+
+        const [generatedPath] = await this.pdfGenerator.generatePdfs("voucher", data, voucherId, "VOUCHER");
+
+        if (!generatedPath) {
+            throw new BadRequestException("Failed to generate voucher PDF");
+        }
+
+        const safeCode = voucher.voucherCode.replace(/[^a-zA-Z0-9._-]+/g, "-");
+        const filename = `Imprest-Voucher-${safeCode}.pdf`;
+        const relativePath = join("accounts", "imprest-vouchers", filename);
+        const uploadsRoot = join(process.cwd(), "uploads");
+
+        await mkdir(join(uploadsRoot, "accounts", "imprest-vouchers"), { recursive: true });
+        await rename(join(uploadsRoot, generatedPath), join(uploadsRoot, relativePath));
+
+        return { path: relativePath, filename };
+    }
+
+    private formatPdfDate(value: Date | string | null | undefined): string {
+        if (!value) {
+            return "";
+        }
+
+        const date = value instanceof Date ? value : new Date(value);
+
+        if (Number.isNaN(date.getTime())) {
+            return "";
+        }
+
+        const day = String(date.getDate()).padStart(2, "0");
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const year = date.getFullYear();
+
+        return `${day}-${month}-${year}`;
+    }
+
     async saveVoucherLedgers(voucherId: number, user: { sub: number }, entries: VoucherLedgerSaveEntry[]): Promise<VoucherLedgerReview> {
         const review = await this.loadVoucherLedgerReview(voucherId);
 
@@ -1188,8 +1275,10 @@ export class ImprestAdminService {
                 validTo: employeeImprestVouchers.validTo,
                 accountsSignedBy: employeeImprestVouchers.accountsSignedBy,
                 accountsSignedAt: employeeImprestVouchers.accountsSignedAt,
+                accountsRemark: employeeImprestVouchers.accountsRemark,
                 adminSignedBy: employeeImprestVouchers.adminSignedBy,
                 adminSignedAt: employeeImprestVouchers.adminSignedAt,
+                adminRemark: employeeImprestVouchers.adminRemark,
             })
             .from(employeeImprestVouchers)
             .where(eq(employeeImprestVouchers.id, voucherId))
@@ -1347,6 +1436,7 @@ export class ImprestAdminService {
                 id: voucher.id,
                 voucherCode: voucher.voucherCode,
                 beneficiaryId,
+                beneficiaryName: beneficiary?.name ?? null,
                 employeeName: beneficiary?.name ?? null,
                 teamName: employeeTeamName,
                 amount: Number(voucher.amount),
@@ -1354,8 +1444,10 @@ export class ImprestAdminService {
                 validTo: voucher.validTo,
                 accountsSignedBy: voucher.accountsSignedBy,
                 accountsSignedAt: voucher.accountsSignedAt,
+                accountsRemark: voucher.accountsRemark,
                 adminSignedBy: voucher.adminSignedBy,
                 adminSignedAt: voucher.adminSignedAt,
+                adminRemark: voucher.adminRemark,
             },
             items,
             editable: lockReason === null,

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Imprest Voucher {{voucher_no}}</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 11px;
+            color: #000;
+            margin: 0;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        .header, .header td { border: 1px solid #000; }
+        .header td { padding: 6px; vertical-align: top; }
+        .header h4 { margin: 0; font-size: 16px; font-weight: bold; }
+        .header p { margin: 2px 0; font-size: 11px; }
+        .title-cell { text-align: center; font-size: 16px; font-weight: bold; padding: 10px 6px; }
+        .text-right { text-align: right; }
+        .items {
+            margin-top: 14px;
+            table-layout: fixed;
+            font-size: 10px;
+        }
+        .items th, .items td {
+            border: 1px solid #000;
+            padding: 5px;
+            vertical-align: top;
+            word-wrap: break-word;
+        }
+        .items th { font-weight: bold; text-align: left; background: #f2f2f2; }
+        .project-code { display: block; font-size: 9px; color: #444; }
+        .total-row td { font-weight: bold; border-top: 2px solid #000; }
+        .words { margin-top: 6px; font-size: 10px; }
+        .signatures { width: 62%; margin-top: 26px; }
+        .signatures, .signatures th, .signatures td { border: 1px solid #000; }
+        .signatures th, .signatures td { padding: 8px; font-size: 11px; text-align: left; }
+        thead { display: table-header-group; }
+        tr { page-break-inside: avoid; }
+    </style>
+</head>
+<body>
+    <table class="header">
+        <tr>
+            <td colspan="4">
+                <h4>{{company_name}}</h4>
+                <p>{{company_tagline}}</p>
+                <p>{{company_address}}</p>
+                <p>Ph: {{company_phone}} | E-mail: {{company_email}}</p>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="4" class="title-cell">Expense Report</td>
+        </tr>
+        <tr>
+            <td>FROM <b>{{from_date}}</b> TO <b>{{to_date}}</b></td>
+            <td colspan="3" class="text-right"><b>Voucher No: {{voucher_no}}</b></td>
+        </tr>
+        <tr>
+            <td>Employee Name:<br /><b>{{employee_name}}</b></td>
+            <td>Employee ID:<br /><b>{{employee_id}}</b></td>
+            <td colspan="2">Team Name:<br /><b>{{team_name}}</b></td>
+        </tr>
+    </table>
+
+    <table class="items">
+        <thead>
+            <tr>
+                <th style="width: 6%">Sr.No.</th>
+                <th style="width: 14%">Date of Expense</th>
+                <th style="width: 20%">Category</th>
+                <th style="width: 24%">Project</th>
+                <th style="width: 24%">Remarks</th>
+                <th style="width: 12%" class="text-right">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{#each items}}
+            <tr>
+                <td>{{sr_no}}</td>
+                <td>{{date_of_expense}}</td>
+                <td>{{category}}</td>
+                <td>
+                    <span>{{project_name}}</span>
+                    <span class="project-code">{{project_code}}</span>
+                </td>
+                <td>{{remark}}</td>
+                <td class="text-right">{{formatCurrency amount}}</td>
+            </tr>
+            {{/each}}
+            <tr class="total-row">
+                <td colspan="5" class="text-right">Total</td>
+                <td class="text-right">{{formatCurrency total_amount}}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <p class="words"><b>Amount in words:</b> {{total_in_words}}</p>
+
+    <table class="signatures">
+        <tbody>
+            <tr>
+                <th>Prepared By:</th>
+                <td>{{prepared_by}}</td>
+                <th>Date:</th>
+                <td></td>
+            </tr>
+            <tr>
+                <th>Checked By:</th>
+                <td>{{checked_by}}</td>
+                <th>Date:</th>
+                <td>{{checked_date}}</td>
+            </tr>
+            <tr>
+                <th>Approved By:</th>
+                <td>{{approved_by}}</td>
+                <th>Date:</th>
+                <td>{{approved_date}}</td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+</html>
