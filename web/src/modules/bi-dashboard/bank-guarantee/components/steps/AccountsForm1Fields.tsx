@@ -41,7 +41,6 @@ export interface AccountsForm1Names<T extends FieldValues> {
     fdrAmt?: FieldPath<T>;
     bgFormatImran?: FieldPath<T>;
     fdrNo?: FieldPath<T>;
-    fdrDate?: FieldPath<T>;
     fdrValidity?: FieldPath<T>;
     fdrRoi?: FieldPath<T>;
     fdrCopy?: FieldPath<T>;
@@ -231,16 +230,6 @@ export function AccountsForm1Fields<T extends FieldValues>({
                                         </a>
                                     )}
                                 </div>
-                            )}
-                        </FieldWrapper>
-                    )}
-                    {names.fdrDate && (
-                        <FieldWrapper control={control} name={names.fdrDate} label="FDR Date *">
-                            {(field) => (
-                                <DateInput
-                                    value={(field.value as string | undefined) ?? undefined}
-                                    onChange={field.onChange}
-                                />
                             )}
                         </FieldWrapper>
                     )}
