@@ -22,13 +22,14 @@ function KeySpecificationChips({ item, compact = false }: { item: InventoryItem;
     const attributes = keySpecificationAttributes(item.category, item.itemName, item.specifications || {}, item.itemType);
     const tooltip = attributes.map(attribute => `${attribute.label}: ${attribute.value}`).join("\n");
     if (!attributes.length) return <span>—</span>;
-    const displayed = compact ? attributes : attributes.slice(0, 3);
+    const displayed = compact ? attributes : attributes.slice(0, 6);
     const hiddenCount = attributes.length - displayed.length;
-    return <div className={`${compact ? "" : "line-clamp-3"} max-w-full whitespace-normal break-words text-xs leading-5`} title={tooltip}>
-        {displayed.map(attribute => <span key={attribute.key} className="mb-1 mr-1 inline-flex max-w-full items-baseline gap-1 rounded-md border bg-muted/40 px-1.5 py-0.5 align-top">
-            <span className="text-muted-foreground">{attribute.label}</span><span className="break-all text-foreground">{attribute.value}</span>
+    return <div className="flex w-full min-w-0 flex-wrap items-center gap-1.5 py-1.5 text-xs leading-4" title={tooltip}>
+        {displayed.map(attribute => <span key={attribute.key} className="inline-flex max-w-full items-baseline gap-1 rounded-md border bg-muted/40 px-2 py-0.5">
+            <span className="shrink-0 whitespace-nowrap text-muted-foreground">{attribute.label}</span>
+            <span className="min-w-0 break-words text-foreground">{attribute.value}</span>
         </span>)}
-        {hiddenCount > 0 && <span className="mb-1 mr-1 inline-flex rounded-md border bg-muted px-1.5 py-0.5 align-top">+{hiddenCount} more</span>}
+        {hiddenCount > 0 && <span className="inline-flex shrink-0 whitespace-nowrap rounded-md border bg-muted px-2 py-0.5 text-muted-foreground">+{hiddenCount} more</span>}
     </div>;
 }
 
@@ -76,14 +77,14 @@ export default function InventoryItemListPage({ team }: { team: ItemMasterTeam }
     ], [isSettings, canUpdate, permissionModule, canDelete, deleteItem, navigate, team]);
 
     const columns = useMemo<ColDef<InventoryItem>[]>(() => [
-        { field: "itemCode", headerName: "Item Code", width: 130, minWidth: 130, maxWidth: 175, tooltipField: "itemCode" },
-        { field: "itemName", headerName: "Item Name", flex: 1.4, minWidth: 190, maxWidth: 350, tooltipField: "itemName", cellStyle: { fontWeight: 500 } as ColDef<InventoryItem>["cellStyle"] },
-        ...(visibility.category ? [{ headerName: "Category", field: "category", flex: 1.2, minWidth: 170, maxWidth: 300, valueGetter: (p: { data?: InventoryItem }) => p.data ? p.data.category || "Legacy" : "", tooltipValueGetter: (p: { value?: string | null }) => p.value ?? "", wrapText: true, autoHeight: true, cellRenderer: (p: { value?: string }) => <div className="w-full whitespace-normal break-words py-1 leading-5">{p.value}</div> } as ColDef<InventoryItem>] : []),
-        { headerName: "Key Specification", flex: 2.4, minWidth: 280, maxWidth: 500, valueGetter: (p: { data?: InventoryItem }) => formatKeySpecification(p.data?.category, p.data?.itemName || "", p.data?.specifications || {}, p.data?.itemType), tooltipValueGetter: (p: { value?: string | null }) => p.value ?? "", wrapText: true, autoHeight: true, cellRenderer: (p: { data?: InventoryItem }) => p.data ? <KeySpecificationChips item={p.data} /> : <span>—</span> },
-        ...(visibility.unit ? [{ field: "unit", headerName: "Unit", width: 80, minWidth: 80, maxWidth: 90 } as ColDef<InventoryItem>] : []),
-        { field: "hsnCode", headerName: "HSN Code", width: 110, minWidth: 110, maxWidth: 130, valueGetter: (p: { data?: InventoryItem }) => p.data?.hsnCode || "—", tooltipValueGetter: (p: { value?: string | null }) => p.value ?? "" },
-        ...(visibility.createdBy ? [{ headerName: "Created By", field: "createdByName", width: 150, minWidth: 150, maxWidth: 180, valueGetter: (p: { data?: InventoryItem }) => p.data?.createdByName || "—", tooltipValueGetter: (p: { value?: string | null }) => p.value ?? "" } as ColDef<InventoryItem>] : []),
-        { headerName: "Actions", filter: false, sortable: false, width: 80, minWidth: 80, maxWidth: 80, headerComponent: () => <div className="w-full text-center">Actions</div>, cellRenderer: createActionColumnRenderer(actions), cellStyle: { display: "flex", alignItems: "center", justifyContent: "center" } as ColDef<InventoryItem>["cellStyle"] },
+        { field: "itemCode", headerName: "Item Code", width: 140, minWidth: 120, maxWidth: 170, tooltipField: "itemCode", cellRenderer: (p: { value?: string; data?: InventoryItem }) => <span className={`truncate text-[12.5px] font-semibold tracking-tight ${p.data?.isActive === false ? "text-muted-foreground" : "text-slate-950 dark:text-slate-50"}`}>{p.value}</span> },
+        { field: "itemName", headerName: "Item Name", flex: 0.9, minWidth: 130, maxWidth: 200, tooltipField: "itemName", cellStyle: { fontWeight: 500 } as ColDef<InventoryItem>["cellStyle"] },
+        ...(visibility.category ? [{ headerName: "Category", field: "category", flex: 0.75, minWidth: 115, maxWidth: 165, valueGetter: (p: { data?: InventoryItem }) => p.data ? p.data.category || "Legacy" : "", tooltipValueGetter: (p: { value?: string | null }) => p.value ?? "", wrapText: true, autoHeight: true, cellRenderer: (p: { value?: string }) => <div className="w-full whitespace-normal break-words py-1 leading-5">{p.value}</div> } as ColDef<InventoryItem>] : []),
+        { headerName: "Key Specification", flex: 4.5, minWidth: 340, valueGetter: (p: { data?: InventoryItem }) => formatKeySpecification(p.data?.category, p.data?.itemName || "", p.data?.specifications || {}, p.data?.itemType), tooltipValueGetter: (p: { value?: string | null }) => p.value ?? "", wrapText: true, autoHeight: true, cellRenderer: (p: { data?: InventoryItem }) => p.data ? <KeySpecificationChips item={p.data} /> : <span>—</span> },
+        ...(visibility.unit ? [{ field: "unit", headerName: "Unit", width: 68, minWidth: 64, maxWidth: 78, tooltipField: "unit" } as ColDef<InventoryItem>] : []),
+        { field: "hsnCode", headerName: "HSN Code", width: 90, minWidth: 84, maxWidth: 104, valueGetter: (p: { data?: InventoryItem }) => p.data?.hsnCode || "—", tooltipValueGetter: (p: { value?: string | null }) => p.value ?? "" },
+        ...(visibility.createdBy ? [{ headerName: "Created By", field: "createdByName", width: 125, minWidth: 110, maxWidth: 150, valueGetter: (p: { data?: InventoryItem }) => p.data?.createdByName || "—", tooltipValueGetter: (p: { value?: string | null }) => p.value ?? "" } as ColDef<InventoryItem>] : []),
+        { headerName: "Actions", filter: false, sortable: false, width: 72, minWidth: 72, maxWidth: 76, headerComponent: () => <div className="w-full text-center">Actions</div>, cellRenderer: createActionColumnRenderer(actions), cellStyle: { display: "flex", alignItems: "center", justifyContent: "center" } as ColDef<InventoryItem>["cellStyle"] },
     ], [visibility.category, visibility.unit, visibility.createdBy, actions]);
 
     const setSearchValue = (value: string) => {
@@ -130,7 +131,7 @@ export default function InventoryItemListPage({ team }: { team: ItemMasterTeam }
                 {visibility.mobile ? <div className="space-y-3">
                     {(data?.data || []).map(item => <article key={item.id} className={`space-y-3 rounded-md border p-3 ${item.isActive ? "" : "text-muted-foreground"}`}>
                         <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
-                            <div><span className="text-muted-foreground">Item Code</span><div className="break-words">{item.itemCode}</div></div>
+                            <div><span className="text-muted-foreground">Item Code</span><div className={`break-words text-[15px] font-semibold tracking-tight ${item.isActive ? "text-slate-950 dark:text-slate-50" : "text-muted-foreground"}`}>{item.itemCode}</div></div>
                             <div><span className="text-muted-foreground">Item Name</span><div className="break-words font-medium">{item.itemName}</div></div>
                             <div><span className="text-muted-foreground">Category</span><div>{getItemMainCategory(item.itemName, item.category)}</div></div>
                             <div className="col-span-2"><span className="text-muted-foreground">Key Specification</span><KeySpecificationChips item={item} compact /></div>
@@ -141,8 +142,8 @@ export default function InventoryItemListPage({ team }: { team: ItemMasterTeam }
                         <div className="flex justify-end">{actions.filter(action => action.visible?.(item) ?? true).map(action => <Button key={action.label} className={`${action.className || ""} min-h-11 min-w-11`} size="sm" variant="ghost" onClick={() => void action.onClick(item)}>{action.label}</Button>)}</div>
                     </article>)}
                 </div> : <div className="w-full min-w-0 overflow-hidden">
-                    <div style={{ "--ag-cell-horizontal-padding": "16px" } as CSSProperties}>
-                        <DataTable data={data?.data || []} columnDefs={columns} gridOptions={{ rowHeight: 52, headerHeight: 44, selectionColumnDef: { width: 56, minWidth: 56, maxWidth: 56, pinned: "left", cellStyle: { display: "flex", alignItems: "center", justifyContent: "center" } }, defaultColDef: { filter: false, sortable: true, resizable: true, cellStyle: { display: "flex", alignItems: "center" } }, getRowStyle: params => params.data?.isActive ? undefined : ({ color: "var(--muted-foreground)" }), tooltipShowDelay: 350 }} loading={isFetching} manualPagination rowCount={data?.meta.total || 0} paginationState={pagination} onPaginationChange={updatePagination} onPageSizeChange={pageSize => setPagination({ pageIndex: 0, pageSize })} enableRowSelection={isSettings && (canUpdate(permissionModule) || canDelete(permissionModule))} selectionType="multiple" onSelectionChanged={isSettings ? setSelectedRows : undefined} />
+                    <div style={{ "--ag-cell-horizontal-padding": "12px" } as CSSProperties}>
+                        <DataTable data={data?.data || []} columnDefs={columns} gridOptions={{ rowHeight: 52, headerHeight: 44, selectionColumnDef: { width: 48, minWidth: 48, maxWidth: 48, pinned: "left", cellStyle: { display: "flex", alignItems: "center", justifyContent: "center" } }, defaultColDef: { filter: false, sortable: true, resizable: true, cellStyle: { display: "flex", alignItems: "center" } }, getRowStyle: params => params.data?.isActive ? undefined : ({ color: "var(--muted-foreground)" }), tooltipShowDelay: 350 }} loading={isFetching} manualPagination rowCount={data?.meta.total || 0} paginationState={pagination} onPaginationChange={updatePagination} onPageSizeChange={pageSize => setPagination({ pageIndex: 0, pageSize })} enableRowSelection={isSettings && (canUpdate(permissionModule) || canDelete(permissionModule))} selectionType="multiple" onSelectionChanged={isSettings ? setSelectedRows : undefined} />
                     </div>
                 </div>}
             </div>
