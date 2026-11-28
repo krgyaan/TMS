@@ -705,13 +705,33 @@ export class PaymentRequestsQueryService {
                 eq(paymentInstruments.isActive, true)
             ));
 
+        const fdrInstrumentIds = prInstruments
+            .filter((instrument) => instrument.instrumentType === 'FDR')
+            .map((instrument) => instrument.id);
+
+        const fdrNoByInstrument = new Map<number, string | null>();
+        if (fdrInstrumentIds.length > 0) {
+            const fdrRows = await this.db
+                .select({
+                    instrumentId: instrumentFdrDetails.instrumentId,
+                    fdrNo: instrumentFdrDetails.fdrNo,
+                })
+                .from(instrumentFdrDetails)
+                .where(inArray(instrumentFdrDetails.instrumentId, fdrInstrumentIds));
+
+            fdrRows.forEach((row) => fdrNoByInstrument.set(row.instrumentId, row.fdrNo));
+        }
+
         return {
             requests: requests.map((req: any) => ({
                 ...this.mapPaymentRequest(req),
                 projectId: req.projectId,
                 instruments: prInstruments
                     .filter(i => i.requestId === req.id)
-                    .map(i => this.mapInstrumentBase(i)),
+                    .map(i => ({
+                        ...this.mapInstrumentBase(i),
+                        fdrNo: i.instrumentType === 'FDR' ? (fdrNoByInstrument.get(i.id) ?? null) : null,
+                    })),
             })),
         };
     }

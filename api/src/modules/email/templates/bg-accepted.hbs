@@ -1,61 +1,137 @@
-<div style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.6; color: #222; max-width: 640px;">
-    <p>Dear team,</p>
+<div style="font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16; color:#000000; max-width:640px;">
+    <p style="margin:0 0 10pt; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;"><strong>Dear team,</strong></p>
 
-    <p>
+    <p style="margin:0 0 10pt; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16; text-align:justify;">
         Please use the attached documents to prepare the following Bank Guarantee.<br>
-        The purpose of the Bank Guarantee is {{data.bgPurpose}}.
+        The purpose of the Bank Guarantee is <strong>{{data.bgPurpose}}</strong>.
     </p>
 
-    <p>
-        Please prepare the BG using the details below:<br>
-        {{#if data.referenceValue}}{{data.referenceLabel}}: {{data.referenceValue}}<br>{{/if}}
-        BG in favor of: {{data.beneficiaryName}}<br>
-        BG Expiry Date: {{data.bgExpiryDate}}<br>
-        BG Claim Date: {{data.claimDate}}<br>
-        Amount: Rs. {{data.amount}}<br>
-        {{#if data.stampPaperValue}}BG Stamp paper value: Rs. {{data.stampPaperValue}}<br>{{/if}}
-        {{#if data.fdrMargin}}FDR %age for Margin: {{data.fdrMargin}}<br>{{/if}}
-        {{#if data.hasBgFormat}}BG Formats: attached.<br>{{/if}}
-        {{#if data.hasSupportingDoc}}{{data.supportingDocName}}: attached with the mail.<br>{{/if}}
-        {{#if data.hasCeoRequestLetter}}Request Letter, Signed by CEO: attached with the mail.{{/if}}
-    </p>
+    <p style="margin:0; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;"><strong>Please prepare the BG using the details below:</strong></p>
+    <table cellpadding="0" cellspacing="0" style="border-collapse:collapse; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">
+        {{#if data.referenceValue}}
+        <tr>
+            <td style="width:230px; padding:2px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">{{data.referenceLabel}}</td>
+            <td style="width:8px; padding:2px 0; text-align:left; font-weight:bold; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">:</td>
+            <td style="padding:2px 0 2px 10px; text-align:left; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">{{data.referenceValue}}</td>
+        </tr>
+        {{/if}}
+        <tr>
+            <td style="width:230px; padding:2px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">BG in favor of</td>
+            <td style="width:8px; padding:2px 0; text-align:left; font-weight:bold; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">:</td>
+            <td style="padding:2px 0 2px 10px; text-align:left; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">{{data.beneficiaryName}}</td>
+        </tr>
+        <tr>
+            <td style="width:230px; padding:2px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">BG Expiry Date</td>
+            <td style="width:8px; padding:2px 0; text-align:left; font-weight:bold; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">:</td>
+            <td style="padding:2px 0 2px 10px; text-align:left; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">{{data.bgExpiryDate}}</td>
+        </tr>
+        <tr>
+            <td style="width:230px; padding:2px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">BG Claim Date</td>
+            <td style="width:8px; padding:2px 0; text-align:left; font-weight:bold; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">:</td>
+            <td style="padding:2px 0 2px 10px; text-align:left; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">{{data.claimDate}}</td>
+        </tr>
+        <tr>
+            <td style="width:230px; padding:2px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">Amount</td>
+            <td style="width:8px; padding:2px 0; text-align:left; font-weight:bold; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">:</td>
+            <td style="padding:2px 0 2px 10px; text-align:left; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">Rs. {{data.amount}}</td>
+        </tr>
+        {{#if data.stampPaperValue}}
+        <tr>
+            <td style="width:230px; padding:2px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">BG Stamp paper value</td>
+            <td style="width:8px; padding:2px 0; text-align:left; font-weight:bold; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">:</td>
+            <td style="padding:2px 0 2px 10px; text-align:left; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">Rs. {{data.stampPaperValue}}</td>
+        </tr>
+        {{/if}}
+        {{#if data.fdrMargin}}
+        <tr>
+            <td style="width:230px; padding:2px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">FDR %age for Margin</td>
+            <td style="width:8px; padding:2px 0; text-align:left; font-weight:bold; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">:</td>
+            <td style="padding:2px 0 2px 10px; text-align:left; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">{{data.fdrMargin}}</td>
+        </tr>
+        {{/if}}
+        {{#if data.hasBgFormat}}
+        <tr>
+            <td style="width:230px; padding:2px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">BG Formats</td>
+            <td style="width:8px; padding:2px 0; text-align:left; font-weight:bold; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">:</td>
+            <td style="padding:2px 0 2px 10px; text-align:left; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">attached.</td>
+        </tr>
+        {{/if}}
+        {{#if data.hasSupportingDoc}}
+        <tr>
+            <td style="width:230px; padding:2px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">{{data.supportingDocName}}</td>
+            <td style="width:8px; padding:2px 0; text-align:left; font-weight:bold; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">:</td>
+            <td style="padding:2px 0 2px 10px; text-align:left; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">attached with the mail.</td>
+        </tr>
+        {{/if}}
+        {{#if data.hasCeoRequestLetter}}
+        <tr>
+            <td style="width:230px; padding:2px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">Request Letter, Signed by CEO</td>
+            <td style="width:8px; padding:2px 0; text-align:left; font-weight:bold; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">:</td>
+            <td style="padding:2px 0 2px 10px; text-align:left; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">attached with the mail.</td>
+        </tr>
+        {{/if}}
+    </table>
 
     {{#if data.hasBeneficiaryAccount}}
-    <p>
-        Beneficiary Account details:<br>
-        {{#if data.beneName}}Beneficiary Name: {{data.beneName}}<br>{{/if}}
-        {{#if data.beneAcc}}Account No.: {{data.beneAcc}}<br>{{/if}}
-        {{#if data.beneIfsc}}IFSC code: {{data.beneIfsc}}<br>{{/if}}
-        {{#if data.uniqueCode}}Unique Code: {{data.uniqueCode}}{{/if}}
-    </p>
+    <p style="margin:12pt 0 0; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;"><strong>Beneficiary Account details</strong></p>
+    <table cellpadding="0" cellspacing="0" style="border-collapse:collapse; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">
+        {{#if data.beneName}}
+        <tr>
+            <td style="width:230px; padding:2px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">Beneficiary Name</td>
+            <td style="width:8px; padding:2px 0; text-align:left; font-weight:bold; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">:</td>
+            <td style="padding:2px 0 2px 10px; text-align:left; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">{{data.beneName}}</td>
+        </tr>
+        {{/if}}
+        {{#if data.beneAcc}}
+        <tr>
+            <td style="width:230px; padding:2px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">Account No.</td>
+            <td style="width:8px; padding:2px 0; text-align:left; font-weight:bold; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">:</td>
+            <td style="padding:2px 0 2px 10px; text-align:left; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">{{data.beneAcc}}</td>
+        </tr>
+        {{/if}}
+        {{#if data.beneIfsc}}
+        <tr>
+            <td style="width:230px; padding:2px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">IFSC code</td>
+            <td style="width:8px; padding:2px 0; text-align:left; font-weight:bold; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">:</td>
+            <td style="padding:2px 0 2px 10px; text-align:left; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">{{data.beneIfsc}}</td>
+        </tr>
+        {{/if}}
+        {{#if data.uniqueCode}}
+        <tr>
+            <td style="width:230px; padding:2px 0; text-align:left; font-weight:bold; white-space:nowrap; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">Unique Code</td>
+            <td style="width:8px; padding:2px 0; text-align:left; font-weight:bold; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">:</td>
+            <td style="padding:2px 0 2px 10px; text-align:left; vertical-align:top; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">{{data.uniqueCode}}</td>
+        </tr>
+        {{/if}}
+    </table>
     {{/if}}
 
-    <p>
+    <p style="margin:10pt 0; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16; text-align:justify;">
         Please make a close ended BG. BG Format text vetting is not accepted as the text as it has been provided by a
         Government Organization, which does not allow any changes to the BG Format.
     </p>
 
-    <p>
+    <p style="margin:0 0 10pt; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16; text-align:justify;">
         Also, please debit our account no. {{data.debitAccountNo}}, for the amount for BG commission and SFMS Charges.
     </p>
 
-    <p>
+    <p style="margin:0 0 10pt; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16; text-align:justify;">
         Please prepare the BG within the timeline mentioned above and share the SOFT COPY of the BG along with SFMS
         confirmation by replying to this mail.
     </p>
 
-    <p style="font-style: italic;">"Ensuring timely operations is the only source of growth."</p>
+    <p style="margin:0 0 10pt; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16; font-style:italic;">"Ensuring timely operations is the only source of growth."</p>
 
-    <p>
-        Regards,<br>
+    <p style="margin:0 0 10pt; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">
+        <strong>Thanking &amp; Regards,</strong><br>
         Imran Khan,<br>
-        Accounts Leader,<br>
-        +91-88825-91733
+        Finance &amp; Accounts Leader,<br>
+        <a href="tel:+918882591733" style="color:#0563c1; text-decoration:underline; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt;">+91-88825-91733</a>
     </p>
 
-    <p>
+    <p style="margin:0; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt; line-height:1.16;">
         Approved by Piyush Goyal<br>
-        +91-96503-93636<br>
+        <a href="tel:+919650393636" style="color:#0563c1; text-decoration:underline; font-family:'Century Gothic','Aptos',Calibri,Arial,Helvetica,sans-serif; font-size:11pt;">+91-96503-93636</a><br>
         CEO,<br>
         Volks Energie Pvt. Ltd.
     </p>

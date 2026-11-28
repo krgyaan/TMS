@@ -1,14 +1,36 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { DRIZZLE } from '../../db/database.module';
 import type { DbInstance } from '../../db';
 import { users } from '../../db/schemas/';
+import { projects } from '../../db/schemas/master/projects.schema';
+import { teams } from '../../db/schemas/master/teams.schema';
+import { instrumentBgDetails, paymentInstruments, paymentRequests } from '../../db/schemas/tendering/payment-requests.schema';
+import { tenderInfos } from '../../db/schemas/tendering/tenders.schema';
 import { OpenwaService } from '../../openwa/openwa.service';
 import { GROUPS, resolveTeamPoGroup } from '../../config/groups';
 import { openwaConfig } from '../../config/openwa.config';
 import type { ConfigType } from '@nestjs/config';
 import { WhatsappJidResolver } from '../notifications/helpers/whatsapp-jid.resolver';
 import { PublicLinkService } from '../public-notifications/public-link.service';
+
+const BG_PURPOSE_LABELS: Record<string, string> = {
+  ADVANCE_PAYMENT: 'Advance Payment',
+  SECURITY_DEPOSIT: 'Security Deposit',
+  SECURITY: 'Security Deposit',
+  SECURITY_BOND_DEPOSIT: 'Security Bond/Deposit',
+  COUNTER_GUARANTEE: 'Counter Guarantee',
+  FINANCIAL: 'Financial',
+  PERFORMANCE: 'Performance BG',
+  PERFORMANCE_BG: 'Performance BG',
+};
+
+const formatBgPurposeLabel = (value?: string | null): string => {
+  const raw = value?.trim();
+  if (!raw) return 'N/A';
+  return BG_PURPOSE_LABELS[raw.toUpperCase()] ?? raw;
+};
+
 
 export interface PaymentRequestNotificationData {
   requestNo: string;
@@ -533,6 +555,304 @@ export class OperationNotificationService {
       await this.sendToTargets(text, target);
     } catch (err) {
       this.logger.warn(`Failed to send maker done notification: ${err}`);
+    }
+  }
+
+  private resolveBgGroup(teamId?: number | null): string | null {
+    if (teamId === 1) return GROUPS.ACBG;
+    if (teamId === 2) return GROUPS.DCBG;
+    return null;
+  }
+
+  private async resolveBgTeamId(request: {
+    projectId?: number | null;
+    tenderId?: number | null;
+    requestedBy?: number | null;
+  }): Promise<number | null> {
+    if (request.projectId) {
+      const [project] = await this.db
+        .select({ teamName: projects.teamName })
+        .from(projects)
+        .where(eq(projects.id, Number(request.projectId)))
+        .limit(1);
+      if (project?.teamName) {
+        const [team] = await this.db
+          .select({ id: teams.id })
+          .from(teams)
+          .where(eq(teams.name, project.teamName))
+          .limit(1);
+        if (team) return team.id;
+      }
+    }
+
+    if (request.tenderId) {
+      const [tender] = await this.db
+        .select({ team: tenderInfos.team })
+        .from(tenderInfos)
+        .where(eq(tenderInfos.id, Number(request.tenderId)))
+        .limit(1);
+      if (tender?.team) return tender.team;
+    }
+
+    if (request.requestedBy) {
+      const [requester] = await this.db
+        .select({ team: users.team })
+        .from(users)
+        .where(eq(users.id, Number(request.requestedBy)))
+        .limit(1);
+      if (requester?.team) return requester.team;
+    }
+
+    return null;
+  }
+
+  private async buildDirectBgApprovalAppUrl(instrumentId?: number | null): Promise<string | null> {
+    if (!instrumentId) return null;
+    const relativePath = `/bi-dashboard/bank-guarantee/approval/${instrumentId}`;
+    const baseUrl = (
+      process.env.PUBLIC_APP_URL ||
+      process.env.FRONTEND_URL ||
+      'http://localhost:5173'
+    ).replace(/\/+$/, '');
+    const fallbackUrl = `${baseUrl}${relativePath}`;
+
+    try {
+      const shortUrl = await this.publicLink.buildAppShortUrl(relativePath, 'bg-tl-approval');
+      if (shortUrl) return shortUrl;
+    } catch (err) {
+      this.logger.warn(`Failed to build short BG approval URL: ${err}`);
+    }
+    return fallbackUrl;
+  }
+
+  private async loadBgWhatsAppContext(instrumentId: number) {
+    const [row] = await this.db
+      .select({
+        amount: paymentInstruments.amount,
+        requestId: paymentRequests.id,
+        projectId: paymentRequests.projectId,
+        tenderId: paymentRequests.tenderId,
+        projectName: paymentRequests.projectName,
+        tenderNo: paymentRequests.tenderNo,
+        requestedBy: paymentRequests.requestedBy,
+        requestedByName: users.name,
+        bgPurpose: instrumentBgDetails.bgPurpose,
+        beneficiaryName: instrumentBgDetails.beneficiaryName,
+        tenderName: tenderInfos.tenderName,
+      })
+      .from(paymentInstruments)
+      .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+      .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+      .leftJoin(tenderInfos, and(
+        eq(tenderInfos.id, paymentRequests.tenderId),
+        ne(paymentRequests.tenderId, 0),
+      ))
+      .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+      .where(and(
+        eq(paymentInstruments.id, instrumentId),
+        eq(paymentInstruments.instrumentType, 'BG'),
+      ))
+      .limit(1);
+
+    if (!row) {
+      this.logger.warn(`BG instrument ${instrumentId} not found for WhatsApp notification`);
+      return null;
+    }
+
+    const teamId = await this.resolveBgTeamId(row);
+    const group = this.resolveBgGroup(teamId);
+    if (!group) {
+      this.logger.warn(`No BG WhatsApp group mapped for team ${teamId ?? 'unknown'} — skipping instrument ${instrumentId}`);
+      return null;
+    }
+
+    const url = await this.buildDirectBgApprovalAppUrl(instrumentId);
+    return { row, group, url };
+  }
+
+  private buildBgWhatsAppLines(row: any): string[] {
+    const isProject = Number(row.projectId) > 0;
+    const projectOrTender = isProject
+      ? `Project: ${row.projectName || row.tenderNo || 'N/A'}`
+      : `Tender: ${[row.tenderNo, row.tenderName].filter(Boolean).join(' - ') || 'N/A'}`;
+
+    return [
+      `Purpose: ${formatBgPurposeLabel(row.bgPurpose)}`,
+      projectOrTender,
+      `Beneficiary: ${row.beneficiaryName || 'N/A'}`,
+      `Amount: ₹${row.amount ? Number(row.amount).toLocaleString('en-IN') : 'N/A'}`,
+    ];
+  }
+
+  private async sendBgWhatsAppMessage(instrumentId: number, group: string, lines: string[]): Promise<void> {
+    const text = lines.join('\n');
+    if (process.env.OPENWA_DRY_RUN === 'true') {
+      this.logger.log(`[DRY_RUN] BG WhatsApp for instrument ${instrumentId}:\n${text}`);
+      return;
+    }
+    await this.sendToTargets(text, { type: 'group', group });
+  }
+
+  async notifyBgCreated(instrumentId: number): Promise<void> {
+    try {
+      const ctx = await this.loadBgWhatsAppContext(instrumentId);
+      if (!ctx) return;
+
+      const lines: string[] = [
+        `*New BG Requested - TL Approval Required*`,
+        ...this.buildBgWhatsAppLines(ctx.row),
+        `Created By: ${ctx.row.requestedByName || 'Unknown'}`,
+      ];
+
+      if (ctx.url) {
+        lines.push(`Review and Approve: ${ctx.url}`);
+      }
+
+      await this.sendBgWhatsAppMessage(instrumentId, ctx.group, lines);
+    } catch (err) {
+      this.logger.warn(`Failed to send BG TL approval notification: ${err}`);
+    }
+  }
+
+  async notifyBgApproved(
+    instrumentId: number,
+    data: { actorName?: string | null; remarks?: string | null } = {},
+  ): Promise<void> {
+    try {
+      const ctx = await this.loadBgWhatsAppContext(instrumentId);
+      if (!ctx) return;
+
+      const lines: string[] = [
+        `*BG Approved by TL — Pending Accounts Approval*`,
+        ...this.buildBgWhatsAppLines(ctx.row),
+      ];
+
+      if (data.actorName) {
+        lines.push(`Approved By: ${data.actorName}`);
+      }
+      if (data.remarks?.trim()) {
+        lines.push(`Remarks: ${data.remarks.trim()}`);
+      }
+      if (ctx.url) {
+        lines.push(`View in TMS: ${ctx.url}`);
+      }
+
+      await this.sendBgWhatsAppMessage(instrumentId, ctx.group, lines);
+    } catch (err) {
+      this.logger.warn(`Failed to send BG approved notification: ${err}`);
+    }
+  }
+
+  async notifyBgRejected(
+    instrumentId: number,
+    data: { actorName?: string | null; remarks?: string | null } = {},
+  ): Promise<void> {
+    try {
+      const ctx = await this.loadBgWhatsAppContext(instrumentId);
+      if (!ctx) return;
+
+      const lines: string[] = [
+        `*BG Rejected by TL*`,
+        ...this.buildBgWhatsAppLines(ctx.row),
+      ];
+
+      if (data.actorName) {
+        lines.push(`Rejected By: ${data.actorName}`);
+      }
+      if (data.remarks?.trim()) {
+        lines.push(`Remarks: ${data.remarks.trim()}`);
+      }
+      if (ctx.url) {
+        lines.push(`View in TMS: ${ctx.url}`);
+      }
+
+      await this.sendBgWhatsAppMessage(instrumentId, ctx.group, lines);
+    } catch (err) {
+      this.logger.warn(`Failed to send BG rejected notification: ${err}`);
+    }
+  }
+
+  async notifyBgAccountsApproved(
+    instrumentId: number,
+    data: { actorName?: string | null } = {},
+  ): Promise<void> {
+    try {
+      const ctx = await this.loadBgWhatsAppContext(instrumentId);
+      if (!ctx) return;
+
+      const heading = data.actorName
+        ? `*BG Approved* @${data.actorName}`
+        : `*BG Approved*`;
+
+      const lines: string[] = [
+        heading,
+        ...this.buildBgWhatsAppLines(ctx.row),
+      ];
+
+      if (ctx.url) {
+        lines.push(`View in TMS: ${ctx.url}`);
+      }
+
+      await this.sendBgWhatsAppMessage(instrumentId, ctx.group, lines);
+    } catch (err) {
+      this.logger.warn(`Failed to send BG accounts-approved notification: ${err}`);
+    }
+  }
+
+  async notifyBgAccountsRejected(
+    instrumentId: number,
+    data: { actorName?: string | null; remarks?: string | null } = {},
+  ): Promise<void> {
+    try {
+      const ctx = await this.loadBgWhatsAppContext(instrumentId);
+      if (!ctx) return;
+
+      const heading = data.actorName
+        ? `*BG Rejected* @${data.actorName}`
+        : `*BG Rejected*`;
+
+      const lines: string[] = [
+        heading,
+        ...this.buildBgWhatsAppLines(ctx.row),
+      ];
+
+      if (data.remarks?.trim()) {
+        lines.push(`Remarks: ${data.remarks.trim()}`);
+      }
+      if (ctx.url) {
+        lines.push(`View in TMS: ${ctx.url}`);
+      }
+
+      await this.sendBgWhatsAppMessage(instrumentId, ctx.group, lines);
+    } catch (err) {
+      this.logger.warn(`Failed to send BG accounts-rejected notification: ${err}`);
+    }
+  }
+
+  async notifyBgUpdated(
+    instrumentId: number,
+    data: { updatedByName?: string | null } = {},
+  ): Promise<void> {
+    try {
+      const ctx = await this.loadBgWhatsAppContext(instrumentId);
+      if (!ctx) return;
+
+      const heading = data.updatedByName
+        ? `*BG Updated — TL Approval Required* @${data.updatedByName}`
+        : `*BG Updated — TL Approval Required*`;
+
+      const lines: string[] = [
+        heading,
+        ...this.buildBgWhatsAppLines(ctx.row),
+      ];
+
+      if (ctx.url) {
+        lines.push(`Review & Approve: ${ctx.url}`);
+      }
+
+      await this.sendBgWhatsAppMessage(instrumentId, ctx.group, lines);
+    } catch (err) {
+      this.logger.warn(`Failed to send BG updated notification: ${err}`);
     }
   }
 

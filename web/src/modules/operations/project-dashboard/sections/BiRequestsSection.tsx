@@ -7,9 +7,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import DataTable from "@/components/ui/data-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProjectBiRequests } from "@/hooks/api/usePaymentRequests";
+import { useAuth } from "@/contexts/AuthContext";
+import { isAdminOrAbove } from "@/types/auth.types";
 import { formatINR } from "@/hooks/useINRFormatter";
 import type { ColDef, ValueFormatterParams } from "ag-grid-community";
-import { ChevronDown, Eye, Plus } from "lucide-react";
+import { ChevronDown, Eye, Plus, ShieldCheck } from "lucide-react";
 import React, { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -19,6 +21,7 @@ interface BiInstrumentRow {
     purpose: string | null;
     amount: string;
     status: string;
+    fdrNo?: string | null;
 }
 
 interface BiRequestRow {
@@ -53,23 +56,69 @@ const BG_STATUS_LABELS: Record<string, string> = {
     FDR_CANCELLED: "FDR released",
 };
 
+const FDR_STATUS_LABELS: Record<string, string> = {
+    PENDING: "Pending",
+    ACCOUNTS_FORM_REJECTED: "FDR Rejected",
+    FOLLOWUP_INITIATED: "Followup Initiated",
+    RETURN_VIA_COURIER: "Returned via courier",
+    RETURN_VIA_BANK_TRANSFER: "Returned via Bank Transfer",
+    SETTLED_WITH_PROJECT: "Settled with Project Account",
+    CANCELLATION_REQUESTED: "FDR Cancellation request sent to branch",
+    CANCELLED: "FDR Cancelled at Branch",
+};
+
+const DD_STATUS_LABELS: Record<string, string> = {
+    PENDING: "Pending",
+    ACCOUNTS_FORM_ACCEPTED: "DD Created",
+    ACCOUNTS_FORM_REJECTED: "DD Rejected",
+    FOLLOWUP_INITIATED: "Followup Initiated",
+    RETURN_VIA_COURIER: "Returned via courier",
+    RETURN_VIA_BANK_TRANSFER: "Returned via Bank Transfer",
+    SETTLED_WITH_PROJECT: "Settled with Project Account",
+    CANCELLATION_REQUESTED: "DD Cancellation request sent to branch",
+    CANCELLED: "DD Cancelled at Branch",
+};
+
+const titleCaseStatus = (status: string) =>
+    status
+        .toLowerCase()
+        .replaceAll("_", " ")
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+
 const formatStatusLabel = (status?: string | null, instrumentType?: string | null) => {
     if (!status) return "-";
     const label = instrumentType === "BG" ? BG_STATUS_LABELS[status] : undefined;
-    return (
-        label ??
-        status
-            .toLowerCase()
-            .replaceAll("_", " ")
-            .replace(/\b\w/g, (char) => char.toUpperCase())
-    );
+    return label ?? titleCaseStatus(status);
 };
 
-const formatInstrumentStatus = (instrument?: BiInstrumentRow | null) =>
-    formatStatusLabel(instrument?.status, instrument?.instrumentType);
+const formatFdrStatus = (status?: string | null, fdrNo?: string | null) => {
+    if (!status) return "-";
+    if (status === "ACCOUNTS_FORM_ACCEPTED") {
+        return fdrNo ? "FDR Created" : "FDR Accepted";
+    }
+    return FDR_STATUS_LABELS[status] ?? titleCaseStatus(status);
+};
+
+const formatInstrumentStatus = (instrument?: BiInstrumentRow | null) => {
+    if (!instrument) return "-";
+    if (instrument.instrumentType === "FDR") {
+        return formatFdrStatus(instrument.status, instrument.fdrNo);
+    }
+    if (instrument.instrumentType === "DD") {
+        return DD_STATUS_LABELS[instrument.status] ?? titleCaseStatus(instrument.status);
+    }
+    return formatStatusLabel(instrument.status, instrument.instrumentType);
+};
+
+const pickInstrument = (row?: BiRequestRow | null): BiInstrumentRow | null =>
+    row?.instruments?.find((instrument) => instrument.instrumentType !== "Cheque")
+    ?? row?.instruments?.[0]
+    ?? null;
 
 export const BiRequestsSection: React.FC<BiRequestsSectionProps> = ({ projectId }) => {
     const navigate = useNavigate();
+    const { user } = useAuth();
+    const canApproveBg = isAdminOrAbove(user?.role?.name) || user?.role?.name === "Team Leader";
     const { data, isLoading } = useProjectBiRequests(projectId ?? 0);
 
     const requests = useMemo<BiRequestRow[]>(
@@ -83,7 +132,18 @@ export const BiRequestsSection: React.FC<BiRequestsSectionProps> = ({ projectId 
             icon: <Eye className="h-4 w-4" />,
             onClick: (row) => navigate(paths.operations.biRequestView(projectId!, row.id)),
         },
-    ], [navigate]);
+        {
+            label: "Approval",
+            icon: <ShieldCheck className="h-4 w-4" />,
+            visible: (row) => canApproveBg && pickInstrument(row)?.instrumentType === "BG",
+            onClick: (row) => {
+                const instrument = pickInstrument(row);
+                if (instrument) {
+                    navigate(paths.bi.bankGuaranteeApproval(instrument.id));
+                }
+            },
+        },
+    ], [navigate, projectId, canApproveBg]);
 
     const columns = useMemo<ColDef<BiRequestRow>[]>(() => [
         {
@@ -109,7 +169,7 @@ export const BiRequestsSection: React.FC<BiRequestsSectionProps> = ({ projectId 
             sortable: false,
             filter: false,
             width: 130,
-            valueGetter: (p) => p.data?.instruments?.[0]?.instrumentType || "-",
+            valueGetter: (p) => pickInstrument(p.data)?.instrumentType || "-",
         },
         {
             field: "purpose",
@@ -132,7 +192,7 @@ export const BiRequestsSection: React.FC<BiRequestsSectionProps> = ({ projectId 
             filter: true,
             width: 150,
             valueGetter: (p) => {
-                const instrument = p.data?.instruments?.[0];
+                const instrument = pickInstrument(p.data);
                 return instrument
                     ? formatInstrumentStatus(instrument)
                     : formatStatusLabel(p.data?.status);
@@ -201,6 +261,12 @@ export const BiRequestsSection: React.FC<BiRequestsSectionProps> = ({ projectId 
                                         onClick={() => navigate(paths.operations.biRequestFdrCreate(projectId))}
                                     >
                                         FDR
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        className="cursor-pointer"
+                                        onClick={() => navigate(paths.operations.biRequestDdCreate(projectId))}
+                                    >
+                                        Demand Draft
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>

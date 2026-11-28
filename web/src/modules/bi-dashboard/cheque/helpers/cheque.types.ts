@@ -114,4 +114,5 @@ export interface ChequeActionFormProps {
         tenderStatusName?: string;
     };
     formHistory?: ChequeFormHistory;
+    linkedDdId?: number | null;
 }

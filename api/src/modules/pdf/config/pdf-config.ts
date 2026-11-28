@@ -17,6 +17,7 @@ const FDR_PREFIXED_TYPES = new Set([
     'fdrAuthorizationLetter',
     'fdrRequestLetter',
     'fdrForm',
+    'fdrEnvelopeSlip',
 ]);
 
 /**
@@ -133,10 +134,10 @@ export const PDF_CONFIG = {
             storagePath: 'bgcovletter',
             baseDir: 'bi-dashboard/bank-guarantee/bgcovletter',
             margin: {
-                top: '0mm',
-                right: '0mm',
-                bottom: '0mm',
-                left: '0mm',
+                top: '35mm',
+                right: '12mm',
+                bottom: '18mm',
+                left: '12mm',
             },
         },
         bgPrefilledFormat: {
@@ -204,6 +205,19 @@ export const PDF_CONFIG = {
             templates: ['fdr-form'],
             storagePath: 'fdrform',
             baseDir: 'bi-dashboard/fdr/fdrform',
+            margin: {
+                top: '0mm',
+                right: '0mm',
+                bottom: '0mm',
+                left: '0mm',
+            },
+        },
+        fdrEnvelopeSlip: {
+            directory: 'fdr',
+            templates: ['envelope-slip'],
+            storagePath: 'fdrenvslip',
+            baseDir: 'bi-dashboard/fdr/fdrenvslip',
+            landscape: true,
             margin: {
                 top: '0mm',
                 right: '0mm',

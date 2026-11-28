@@ -150,7 +150,7 @@ export class BgPrefilledApplicationService extends BgDocxBase {
                     this.t('*We instruct you to debit charges (as applicable) and/or margin to our Current Account/Cash Credit Account/Saving Account No. '),
                     this.t(data.accountNo, { bold: true }),
                     this.t(' along with your charges. FD no. '),
-                    this.t('          ', { bold: true }),
+                    this.t('______________', { bold: true }),
                     this.t(' for margin '),
                     this.t('@10%', { bold: true }),
                     this.t('.'),

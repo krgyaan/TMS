@@ -90,6 +90,36 @@ class BankGuaranteesService extends BaseApiService {
         return this.get<any>(`/instruments/${id}/followup`);
     }
 
+    async getApprovals(params?: {
+        status?: string;
+        page?: number;
+        limit?: number;
+        search?: string;
+    }): Promise<PaginatedResult<any>> {
+        const search = new URLSearchParams();
+        if (params?.status) search.set('status', params.status);
+        if (params?.page) search.set('page', String(params.page));
+        if (params?.limit) search.set('limit', String(params.limit));
+        if (params?.search) search.set('search', params.search);
+        const queryString = search.toString();
+        return this.get<PaginatedResult<any>>(`/approvals${queryString ? `?${queryString}` : ''}`);
+    }
+
+    async getApprovalDetail(instrumentId: number): Promise<any> {
+        return this.get<any>(`/approvals/${instrumentId}`);
+    }
+
+    async actOnApproval(
+        instrumentId: number,
+        payload: { status: 'APPROVED' | 'REJECTED' | 'INCOMPLETE'; remarks?: string },
+    ): Promise<any> {
+        return this.post<any, typeof payload>(`/instruments/${instrumentId}/approval`, payload);
+    }
+
+    async resubmitApproval(instrumentId: number): Promise<any> {
+        return this.post<any, Record<string, never>>(`/instruments/${instrumentId}/approval/resubmit`, {});
+    }
+
     async getMailPreview(
         id: number,
         payload: { stage: number; files: Record<string, string[]> },
@@ -97,6 +127,33 @@ class BankGuaranteesService extends BaseApiService {
         return this.post<any, { stage: number; files: Record<string, string[]> }>(
             `/instruments/${id}/mail-preview`,
             payload,
+        );
+    }
+
+    async generatePrefilledFormat(id: number, fdrNo: string): Promise<{ pdfPath: string }> {
+        return this.post<{ pdfPath: string }, { fdrNo: string }>(
+            `/instruments/${id}/prefilled-format`,
+            { fdrNo },
+        );
+    }
+
+    async generateCoveringLetter(
+        id: number,
+        payload: { bgNo?: string; bgDate?: string },
+    ): Promise<{ pdfPath: string; envelopePdfPath?: string }> {
+        return this.post<{ pdfPath: string; envelopePdfPath?: string }, { bgNo?: string; bgDate?: string }>(
+            `/instruments/${id}/covering-letter`,
+            payload,
+        );
+    }
+
+    async generateAuthorizationLetter(
+        id: number,
+        persons: Array<{ name: string; aadharNo: string }>,
+    ): Promise<{ pdfPath: string }> {
+        return this.post<{ pdfPath: string }, { persons: Array<{ name: string; aadharNo: string }> }>(
+            `/instruments/${id}/authorization-letter`,
+            { persons },
         );
     }
 

@@ -36,6 +36,11 @@ function FieldRow({ label, value, fullWidth = false }: { label: string; value: R
     );
 }
 
+const formatDdNeeds = (value: string | number | null | undefined): string => {
+    if (value === null || value === undefined || value === '') return '—';
+    return String(value) === 'TENDER_DUE' ? 'Tender Due Date' : `${value} Hours`;
+};
+
 function EmptyState({ message }: { message: string }) {
     return (
         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -199,6 +204,11 @@ export function DemandDraftView({
                             </TableCell>
                             <TableCell className="text-sm">
                                 {data.ddPurpose || '—'}
+                                {data.ddPurposeReason && (
+                                    <div className="text-xs text-muted-foreground mt-0.5">
+                                        Reason: {data.ddPurposeReason}
+                                    </div>
+                                )}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -206,7 +216,7 @@ export function DemandDraftView({
                                 DD Needed In
                             </TableCell>
                             <TableCell className="text-sm">
-                                {data.ddNeeds || '—'} Hours
+                                {formatDdNeeds(data.ddNeeds || data.courierDeadline)}
                             </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Favouring

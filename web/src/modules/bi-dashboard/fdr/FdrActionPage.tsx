@@ -149,7 +149,9 @@ export default function FdrActionPage() {
                             reasonReq: actionFormData.rejectionReason ?? undefined,
                             fdrNo: actionFormData.fdrNo ?? undefined,
                             fdrDate: actionFormData.fdrDate ? new Date(actionFormData.fdrDate).toISOString() : undefined,
-                            fdrValidity: actionFormData.fdrExpiryDate ? new Date(actionFormData.fdrExpiryDate).toISOString() : undefined,
+                            fdrValidity: actionFormData.fdrValidity
+                                ? new Date(actionFormData.fdrValidity).toISOString()
+                                : undefined,
                             fdrRoi: actionFormData.fdrRoi != null ? Number(actionFormData.fdrRoi) : undefined,
                             fdrCopy: (actionFormData as any).fdrCopy ?? undefined,
                             reqNo: actionFormData.reqNo ?? undefined,

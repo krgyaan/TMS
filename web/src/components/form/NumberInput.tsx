@@ -6,26 +6,63 @@ type NumberInputProps = Omit<React.ComponentProps<"input">, "value" | "onChange"
     onChange: (value: number) => void
 }
 
-export function NumberInput({ value, onChange, ...rest }: NumberInputProps) {
-    const toString = (v: number | null | undefined) => {
-        if (v === null || v === undefined) return ""
-        return String(v)
+export function NumberInput({ value, onChange, onBlur, onFocus, ...rest }: NumberInputProps) {
+    const [raw, setRaw] = React.useState(value === null || value === undefined ? "" : String(value))
+    const [focused, setFocused] = React.useState(false)
+
+    React.useEffect(() => {
+        if (!focused) {
+            setRaw(value === null || value === undefined ? "" : String(value))
+        }
+    }, [value, focused])
+
+    const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        let next = event.target.value.replace(/[^0-9.\-]/g, "")
+        const negative = next.startsWith("-")
+        next = next.replace(/-/g, "")
+        const dotIndex = next.indexOf(".")
+        if (dotIndex !== -1) {
+            next = `${next.slice(0, dotIndex + 1)}${next.slice(dotIndex + 1).replace(/\./g, "")}`
+        }
+        if (negative) {
+            next = `-${next}`
+        }
+
+        setRaw(next)
+
+        if (next === "" || next === "-" || next === "." || next === "-.") {
+            onChange(null as any)
+            return
+        }
+
+        const parsed = Number(next)
+        onChange(Number.isNaN(parsed) ? (null as any) : parsed)
+    }
+
+    const handleBlur = (event: React.FocusEvent<HTMLInputElement>) => {
+        setFocused(false)
+        const normalized = raw.endsWith(".") ? raw.slice(0, -1) : raw
+        setRaw(normalized)
+        if (normalized === "" || normalized === "-" || normalized === "-0") {
+            onChange(null as any)
+        } else {
+            const parsed = Number(normalized)
+            onChange(Number.isNaN(parsed) ? (null as any) : parsed)
+        }
+        onBlur?.(event)
     }
 
     return (
         <Input
-            type="number"
+            type="text"
             inputMode="decimal"
-            value={toString(value)}
-            onChange={(e) => {
-                const v = e.target.value
-                if (v === "" || v === "-") {
-                    onChange(null as any)
-                    return
-                }
-                const n = Number(v)
-                onChange(Number.isNaN(n) ? (null as any) : n)
+            value={raw}
+            onChange={handleChange}
+            onFocus={(event) => {
+                setFocused(true)
+                onFocus?.(event)
             }}
+            onBlur={handleBlur}
             {...rest}
         />
     )

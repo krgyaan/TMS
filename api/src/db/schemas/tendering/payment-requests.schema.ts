@@ -174,6 +174,7 @@ export const instrumentDdDetails = pgTable('instrument_dd_details', {
     reqNo: varchar('req_no', { length: 100 }), // emd_demand_drafts.req_no
     ddNeeds: varchar('dd_needs', { length: 255 }), // emd_demand_drafts.dd_needs
     ddPurpose: varchar('dd_purpose', { length: 255 }), // emd_demand_drafts.dd_purpose
+    ddPurposeReason: text('dd_purpose_reason'), // Reason captured for Other Payment / Other Security
     ddRemarks: text('dd_remarks'), // emd_demand_drafts.remarks
 
     createdAt: timestamp('created_at').defaultNow(),
@@ -196,6 +197,7 @@ export const instrumentFdrDetails = pgTable('instrument_fdr_details', {
     marginPercent: decimal('margin_percent', { precision: 15, scale: 2 }), // New field, not in MySQL but needed
     fdrPurpose: varchar('fdr_purpose', { length: 500 }), // New field, similar to emd_fdrs.fdr_needs
     fdrExpiryDate: date('fdr_expiry_date'), // emd_fdrs.fdr_expiry
+    fdrValidity: date('fdr_validity'), // Accounts Form (FDR) 2 - actual FDR validity
     fdrNeeds: varchar('fdr_needs', { length: 255 }), // emd_fdrs.fdr_needs
     fdrRemark: text('fdr_remark'), // emd_fdrs.fdr_remark
     prefilledSignedFdr: text('prefilled_signed_fdr'), // JSON string of uploaded file paths
@@ -208,6 +210,7 @@ export const instrumentFdrDetails = pgTable('instrument_fdr_details', {
     authorizationLetterPath: varchar('authorization_letter_path', { length: 500 }),
     requestLetterPath: varchar('request_letter_path', { length: 500 }),
     fdrFormPath: varchar('fdr_form_path', { length: 500 }),
+    envelopeSlip: varchar('envelope_slip', { length: 500 }), // envelope slip printed and pasted on the dispatch envelope
     bankMailIds: jsonb('bank_mail_ids').$type<string[]>(),
     bankMailIdsCc: jsonb('bank_mail_ids_cc').$type<string[]>(),
 
@@ -261,6 +264,7 @@ export const instrumentBgDetails = pgTable('instrument_bg_details', {
     coverLetterDocx: varchar('cover_letter_docx', { length: 500 }), // bi-dashboard/bank-guarantee/bgcovletter/...
     prefilledAppDocx: varchar('prefilled_app_docx', { length: 500 }), // bi-dashboard/bank-guarantee/bgprefill/...
     authorizationLetterDocx: varchar('authorization_letter_docx', { length: 500 }), // bi-dashboard/bank-guarantee/bgauthletter/...
+    authorizationPersons: jsonb('authorization_persons').$type<Array<{ name: string; aadharNo: string }>>(),
     envelopeSlip: varchar('envelope_slip', { length: 500 }), // reserved: envelope slip upload
     bgUpload: varchar('bg_upload', { length: 500 }), // Accounts Form (BG) 2 - issued BG document
     bgSignedCoveringLetter: varchar('bg_signed_covering_letter', { length: 500 }), // Accounts Form (BG) 2 - signed covering letter
@@ -330,6 +334,15 @@ export const instrumentBgDetails = pgTable('instrument_bg_details', {
     // Remarks
     bg2Remark: text('bg2_remark'), // emd_bgs.bg2_remark
     reasonReq: text('reason_req'), // emd_bgs.reason_req
+
+    // Team Leader approval for the BG request
+    tlApprovalStatus: varchar('tl_approval_status', { length: 20 }).notNull().default('PENDING'),
+    tlApprovalRemarks: text('tl_approval_remarks'),
+    tlRejectedRemarks: text('tl_rejected_remarks'),
+    tlIncompleteRemarks: text('tl_incomplete_remarks'),
+    tlApprovedBy: integer('tl_approved_by'),
+    tlApprovedAt: timestamp('tl_approved_at', { withTimezone: true }),
+    updatedBy: integer('updated_by'),
 
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
