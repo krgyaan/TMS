@@ -1047,7 +1047,7 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             'bgPo', 'bgClientUser', 'bgClientCp', 'bgClientFin',
             'bgBankAcc', 'bgBankIfsc', 'bgBankAccName', 'courierNo',
             'extensionLetter', 'newBgClaim', 'approveBg',
-            'fdrAmt', 'fdrPer', 'fdrNo', 'fdrDate', 'fdrValidity', 'fdrRoi',
+            'fdrAmt', 'fdrPer', 'fdrNo', 'fdrValidity', 'fdrRoi',
             'bankMailIds', 'bankMailIdsCc',
             'bgChargeDeducted', 'newStampChargeDeducted', 'cancelRemark',
             'bgFdrCancelDate', 'bgFdrCancelAmount', 'bgFdrCancelRefNo',
@@ -1259,7 +1259,6 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 bgNo: instrumentBgDetails.bgNo,
                 beneficiaryName: instrumentBgDetails.beneficiaryName,
                 fdrNo: instrumentBgDetails.fdrNo,
-                fdrDate: instrumentBgDetails.fdrDate,
                 fdrValidity: instrumentBgDetails.fdrValidity,
                 fdrRoi: instrumentBgDetails.fdrRoi,
                 fdrPer: instrumentBgDetails.fdrPer,
@@ -1309,7 +1308,6 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                     .set({
                         amount: fdrAmount != null ? String(fdrAmount) : '0',
                         favouring: bg.beneficiaryName ?? null,
-                        issueDate: bg.fdrDate ?? null,
                         expiryDate: bg.fdrValidity ?? null,
                         updatedAt: new Date(),
                     })
@@ -1319,7 +1317,6 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                     .update(instrumentFdrDetails)
                     .set({
                         fdrNo: fdrNo,
-                        fdrDate: bg.fdrDate ?? null,
                         fdrValidity: bg.fdrValidity ?? null,
                         roi: bg.fdrRoi ?? null,
                         marginPercent: bg.fdrPer ?? null,
@@ -1337,7 +1334,6 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                     instrumentType: 'FDR',
                     amount: fdrAmount != null ? String(fdrAmount) : '0',
                     favouring: bg.beneficiaryName ?? null,
-                    issueDate: bg.fdrDate ?? null,
                     expiryDate: bg.fdrValidity ?? null,
                     status: FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED,
                     action: 1,
@@ -1350,7 +1346,6 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 .values({
                     instrumentId: fdrInstrument.id,
                     fdrNo: fdrNo,
-                    fdrDate: bg.fdrDate ?? null,
                     fdrValidity: bg.fdrValidity ?? null,
                     roi: bg.fdrRoi ?? null,
                     marginPercent: bg.fdrPer ?? null,
@@ -1607,7 +1602,6 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             // same columns as Accounts Form 3, so a later Form 3 submission
             // refines/overwrites these values.
             if (body.fdr_no) bgDetailsUpdate.fdrNo = body.fdr_no;
-            if (body.fdr_date) bgDetailsUpdate.fdrDate = body.fdr_date;
             if (body.fdr_validity) bgDetailsUpdate.fdrValidity = body.fdr_validity;
             if (body.fdr_roi) bgDetailsUpdate.fdrRoi = body.fdr_roi;
             if (body.fdr_amt !== undefined && body.fdr_amt !== null && body.fdr_amt !== '') {
@@ -3013,7 +3007,6 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 fdrPer: instrumentBgDetails.fdrPer,
                 fdrCopy: instrumentBgDetails.fdrCopy,
                 fdrNo: instrumentBgDetails.fdrNo,
-                fdrDate: instrumentBgDetails.fdrDate,
                 fdrValidity: instrumentBgDetails.fdrValidity,
                 fdrRoi: instrumentBgDetails.fdrRoi,
                 bgChargeDeducted: instrumentBgDetails.bgChargeDeducted,
@@ -3168,7 +3161,6 @@ private readBodyFileValue(body: unknown, field: string): unknown {
                 fdrNo: instrumentBgDetails.fdrNo,
                 fdrAmt: instrumentBgDetails.fdrAmt,
                 fdrValidity: instrumentBgDetails.fdrValidity,
-                fdrDate: instrumentBgDetails.fdrDate,
                 fdrRoi: instrumentBgDetails.fdrRoi,
                 cancelRemark: instrumentBgDetails.cancelRemark,
                 stampCoveringLetter: instrumentBgDetails.stampCoveringLetter,
@@ -3384,7 +3376,6 @@ private readBodyFileValue(body: unknown, field: string): unknown {
             newStampChargeDeducted: result.newStampChargeDeducted ? Number(result.newStampChargeDeducted) : null,
             fdrNo: result.fdrNo,
             fdrAmt: result.fdrAmt ? Number(result.fdrAmt) : null,
-            fdrDate: result.fdrDate ? new Date(result.fdrDate) : null,
             fdrValidity: result.fdrValidity ? new Date(result.fdrValidity) : null,
             fdrRoi: result.fdrRoi ? Number(result.fdrRoi) : null,
             cancelRemark: result.cancelRemark,

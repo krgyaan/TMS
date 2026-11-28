@@ -72,7 +72,6 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     fdr_amt: z.coerce.number().optional(),
     fdr_copy: z.any().optional(), // File
     fdr_no: z.string().optional(),
-    fdr_date: z.string().optional(),
     fdr_validity: z.string().optional(),
     fdr_roi: z.coerce.number().optional(),
     bg_charge_deducted: optionalCharge,
@@ -311,13 +310,12 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
         return !!data.bg_approved_fdr_per
             && typeof data.fdr_amt === 'number'
             && !!data.fdr_no
-            && !!data.fdr_date
             && !!data.fdr_validity
             && !!data.fdr_roi
             && hasFile(data.fdr_copy);
     },
     {
-        message: 'FDR percentage, FDR value, FDR no., FDR date, FDR validity, FDR ROI and FDR copy are required',
+        message: 'FDR percentage, FDR value, FDR no., FDR validity, FDR ROI and FDR copy are required',
         path: ['fdr_no'],
     }
 ).refine(
